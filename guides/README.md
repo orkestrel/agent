@@ -66,6 +66,11 @@ primitive bounding an agent turn. It documents **that package's** surface
 here so a reader of this package can see the primitive it is built from
 without leaving this guide set.
 
+[`src/workflow.md`](src/workflow.md) is a byte-identical mirror of the guide
+for `@orkestrel/workflow` — a runtime dependency. It documents **that
+package's** surface, not anything sourced in this repo; it is kept here for
+the same reason.
+
 [`src/guide.md`](src/guide.md) is a byte-identical mirror of the guide for
 `@orkestrel/guide` — the devDependency powering this repo's guides-parity
 test suite (`tests/guides/src/parity.test.ts`). It documents **that
