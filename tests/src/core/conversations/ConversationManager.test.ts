@@ -5,7 +5,7 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../../../setup.js'
+import { createStubSummarizer } from '../../../setup.js'
 
 // ConversationManager is the §9 registry over the conversation layer WITH an active pointer — an
 // insertion-ordered store keyed by id (add / conversation / conversations / count / remove(id|ids[])

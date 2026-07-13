@@ -1,4 +1,4 @@
-import type { EmitterInterface } from '../../emitters/types.js'
+import type { EmitterInterface } from '@orkestrel/emitter'
 import type {
 	FileInterface,
 	Range,
@@ -12,9 +12,9 @@ import type {
 	WorkspaceOptions,
 	WorkspaceSnapshot,
 } from '../types.js'
-import { isArray, isRecord } from '../../contracts/index.js'
-import { Emitter } from '../../emitters/Emitter.js'
-import { escapeRegExp } from '../../helpers.js'
+import { isArray, isRecord } from '@orkestrel/contract'
+import { Emitter } from '@orkestrel/emitter'
+import { escapeRegExp } from '../helpers.js'
 import { WorkspaceError } from '../errors.js'
 import { createFile } from '../factories.js'
 import {

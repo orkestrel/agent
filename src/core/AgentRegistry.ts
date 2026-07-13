@@ -8,9 +8,9 @@ import type {
 	ProviderInterface,
 	ToolInterface,
 } from './types.js'
-import type { BudgetInterface, TokenUsage } from '../budgets/types.js'
-import type { SchedulerInterface } from '../schedulers/types.js'
-import { createTokenBudget } from '../budgets/factories.js'
+import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { SchedulerInterface } from '@orkestrel/workflow'
+import { createTokenBudget } from '@orkestrel/budget'
 import { Agent } from './Agent.js'
 import { ToolManager } from './tools/ToolManager.js'
 
@@ -43,7 +43,8 @@ import { ToolManager } from './tools/ToolManager.js'
  *
  * @example
  * ```ts
- * const registry = new AgentRegistry({ providers: { main: createOllama({ model: 'qwen3.5:2b-q4_K_M' }) } })
+ * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
+ * const registry = new AgentRegistry({ providers: { main: provider } })
  * const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'Say ok.' }] })
  * const result = await agent.generate()
  * ```

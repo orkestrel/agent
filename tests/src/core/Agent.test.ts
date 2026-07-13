@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { SchedulerInterface } from '@orkestrel/workflow'
 import type {
 	AgentResult,
 	ContextFormatInterface,
@@ -6,17 +7,15 @@ import type {
 	ProviderDelta,
 	ProviderInterface,
 	ProviderResult,
-	SchedulerInterface,
 } from '@src/core'
+import { createScheduler } from '@orkestrel/workflow'
+import { createBudget, createTokenBudget } from '@orkestrel/budget'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
-	createBudget,
 	createConversation,
 	createConversationManager,
-	createScheduler,
-	createTokenBudget,
 	createTool,
 	createToolManager,
 	estimateMessages,
@@ -40,7 +39,7 @@ import {
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 	waitForDelay,
-} from '../../../setup.js'
+} from '../../setup.js'
 
 // Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
 // src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted

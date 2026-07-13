@@ -1,12 +1,12 @@
 import {
 	booleanShape,
-	describedLiteral,
 	integerShape,
+	literalShape,
 	objectShape,
 	optionalShape,
 	stringShape,
 	unionShape,
-} from '../contracts/index.js'
+} from '@orkestrel/contract'
 
 // Workspace-tool contract shape — the shape VALUE `createWorkspaceTool` (factories.ts) compiles
 // into the four lockstep outputs (JSON Schema + guard + parser + first-match parser). It MUST
@@ -21,7 +21,7 @@ import {
 // — the FLAT-steps ergonomic lever a 2B model authors a complete operation from. The range edit is
 // the FLAT `'splice'` op (four positive-integer caret components), never a nested range — the four
 // ints are reassembled into a `Range` by `rangeOf` in the handler. The description-carrying
-// `operation` discriminant rides on the shared `describedLiteral` (contracts module) — the same
+// `operation` discriminant rides on the shared `literalShape` (@orkestrel/contract) — the same
 // helper the workflow tool's `via` discriminant uses (consolidated there per AGENTS §5).
 
 /**
@@ -43,21 +43,20 @@ import {
  */
 export const workspaceToolShape = unionShape(
 	objectShape({
-		operation: describedLiteral("Read a whole text file's text by path.", 'read'),
+		operation: literalShape(['read'], { description: "Read a whole text file's text by path." }),
 		path: stringShape({ description: 'The path of the file to read.' }),
 	}),
 	objectShape({
-		operation: describedLiteral('List every file in the workspace.', 'list'),
+		operation: literalShape(['list'], { description: 'List every file in the workspace.' }),
 	}),
 	objectShape({
-		operation: describedLiteral('Check whether a file exists at the path.', 'has'),
+		operation: literalShape(['has'], { description: 'Check whether a file exists at the path.' }),
 		path: stringShape({ description: 'The path to check for.' }),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Search every text file for a query, returning each hit.',
-			'search',
-		),
+		operation: literalShape(['search'], {
+			description: 'Search every text file for a query, returning each hit.',
+		}),
 		query: stringShape({ description: 'The text (or regular-expression source) to search for.' }),
 		regex: optionalShape(
 			booleanShape({
@@ -78,10 +77,9 @@ export const workspaceToolShape = unionShape(
 		),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Replace a query with a replacement across every text file.',
-			'replace',
-		),
+		operation: literalShape(['replace'], {
+			description: 'Replace a query with a replacement across every text file.',
+		}),
 		query: stringShape({ description: 'The text (or regular-expression source) to replace.' }),
 		replacement: stringShape({ description: 'The text to substitute for each match.' }),
 		regex: optionalShape(
@@ -103,15 +101,17 @@ export const workspaceToolShape = unionShape(
 		),
 	}),
 	objectShape({
-		operation: describedLiteral('Create or overwrite a whole file with content.', 'write'),
+		operation: literalShape(['write'], {
+			description: 'Create or overwrite a whole file with content.',
+		}),
 		path: stringShape({ description: 'The path of the file to write.' }),
 		content: stringShape({ description: 'The full new contents of the file.' }),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Replace a 1-based range of an existing text file (from inclusive, to exclusive) with content.',
-			'splice',
-		),
+		operation: literalShape(['splice'], {
+			description:
+				'Replace a 1-based range of an existing text file (from inclusive, to exclusive) with content.',
+		}),
 		path: stringShape({ description: 'The path of the text file to edit.' }),
 		content: stringShape({ description: 'The text to splice in place of the range.' }),
 		fromLine: integerShape({
@@ -130,41 +130,41 @@ export const workspaceToolShape = unionShape(
 		}),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Add content to the start of a file (creating it when absent).',
-			'prepend',
-		),
+		operation: literalShape(['prepend'], {
+			description: 'Add content to the start of a file (creating it when absent).',
+		}),
 		path: stringShape({ description: 'The path of the file to prepend to.' }),
 		content: stringShape({ description: 'The text to add at the start of the file.' }),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Add content to the end of a file (creating it when absent).',
-			'append',
-		),
+		operation: literalShape(['append'], {
+			description: 'Add content to the end of a file (creating it when absent).',
+		}),
 		path: stringShape({ description: 'The path of the file to append to.' }),
 		content: stringShape({ description: 'The text to add at the end of the file.' }),
 	}),
 	objectShape({
-		operation: describedLiteral('Rename or move a file (overwriting an occupied target).', 'move'),
+		operation: literalShape(['move'], {
+			description: 'Rename or move a file (overwriting an occupied target).',
+		}),
 		from: stringShape({ description: 'The current path of the file.' }),
 		to: stringShape({ description: 'The new path for the file.' }),
 	}),
 	objectShape({
-		operation: describedLiteral('Delete a file from the workspace.', 'remove'),
+		operation: literalShape(['remove'], { description: 'Delete a file from the workspace.' }),
 		path: stringShape({ description: 'The path of the file to remove.' }),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'List the workspaces you can move between (each id, file count, and whether it is active), so you can pick an id to switch to.',
-			'workspaces',
-		),
+		operation: literalShape(['workspaces'], {
+			description:
+				'List the workspaces you can move between (each id, file count, and whether it is active), so you can pick an id to switch to.',
+		}),
 	}),
 	objectShape({
-		operation: describedLiteral(
-			'Switch the active workspace to the one with this id (get ids from the "workspaces" operation). Edit and read operations then target it.',
-			'switch',
-		),
+		operation: literalShape(['switch'], {
+			description:
+				'Switch the active workspace to the one with this id (get ids from the "workspaces" operation). Edit and read operations then target it.',
+		}),
 		id: stringShape({
 			description: 'The id of the workspace to make active (from the "workspaces" listing).',
 		}),

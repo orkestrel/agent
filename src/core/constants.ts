@@ -154,7 +154,7 @@ export const WORKSPACE_TOOL_EXAMPLE: WorkspaceOperation = Object.freeze({
  * tool.
  *
  * @remarks
- * Mirrors {@link import('../workflows/constants.js').WORKFLOW_TOOL_DESCRIPTION}'s teaching style:
+ * Mirrors the analogous `WORKFLOW_TOOL_DESCRIPTION` in `@orkestrel/workflow`'s teaching style:
  * names the `operation` discriminant field, enumerates all 13 operations with their FLAT fields,
  * gives a worked example for the common ones (read / write / search / replace / splice), and embeds
  * {@link WORKSPACE_TOOL_EXAMPLE} verbatim (pinned by a parity test). The range edit is the FLAT

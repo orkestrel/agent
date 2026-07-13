@@ -4,7 +4,7 @@ import {
 	assertWorkspaceStoreContract,
 	buildWorkspaceSnapshot,
 	roundTripJSON,
-} from '../../../../../setup.js'
+} from '../../../../setup.js'
 
 // The W-d MemoryWorkspaceStore — the in-memory default behind the WorkspaceStoreInterface
 // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the

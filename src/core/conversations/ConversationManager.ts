@@ -6,7 +6,7 @@ import type {
 	ConversationStoreInterface,
 	ConversationSummarizer,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
+import { isArray } from '@orkestrel/contract'
 import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
 import { Conversation } from './Conversation.js'
 

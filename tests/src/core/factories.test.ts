@@ -10,7 +10,6 @@ import type {
 } from '@src/core'
 import {
 	AgentJobError,
-	arrayShape,
 	createAgent,
 	createAgentContext,
 	createAgentQueue,
@@ -18,26 +17,29 @@ import {
 	createAgentRunner,
 	createBinaryContent,
 	createFile,
-	createMemoryQueueStore,
 	createTextContent,
 	createTool,
 	createToolManager,
 	createWorkspace,
 	createWorkspaceManager,
 	createWorkspaceTool,
-	integerShape,
 	isAgentJobError,
 	isBinary,
-	isRecord,
 	isText,
 	isWorkspaceError,
+	ProviderAbortError,
+	WORKSPACE_TOOL_NAME,
+} from '@src/core'
+import {
+	arrayShape,
+	integerShape,
+	isRecord,
 	literalShape,
 	objectShape,
 	optionalShape,
-	ProviderAbortError,
 	stringShape,
-	WORKSPACE_TOOL_NAME,
-} from '@src/core'
+} from '@orkestrel/contract'
+import { createMemoryQueueStore } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
 import {
 	createAgentJob,
@@ -46,7 +48,7 @@ import {
 	createTokenUsage,
 	loopTool,
 	waitForDelay,
-} from '../../../setup.js'
+} from '../../setup.js'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
 // createAgent, all needing no daemon (AGENTS �16). `createOllama` (the live-Ollama
@@ -299,7 +301,7 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 		provider: stringShape(),
 		messages: arrayShape(
 			objectShape({
-				role: literalShape('system', 'user', 'assistant', 'tool'),
+				role: literalShape(['system', 'user', 'assistant', 'tool']),
 				content: stringShape(),
 			}),
 		),
@@ -624,7 +626,7 @@ describe('createAgentQueue — durability, extended', () => {
 		provider: stringShape(),
 		messages: arrayShape(
 			objectShape({
-				role: literalShape('system', 'user', 'assistant', 'tool'),
+				role: literalShape(['system', 'user', 'assistant', 'tool']),
 				content: stringShape(),
 			}),
 		),

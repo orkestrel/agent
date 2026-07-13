@@ -1,6 +1,7 @@
-import { createDatabaseWorkspaceStore, createMemoryDriver } from '@src/core'
+import { createDatabaseWorkspaceStore } from '@src/core'
+import { createMemoryDriver } from '@orkestrel/database'
 import { describe, expect, it } from 'vitest'
-import { assertWorkspaceStoreContract, buildWorkspaceSnapshot } from '../../../../../setup.js'
+import { assertWorkspaceStoreContract, buildWorkspaceSnapshot } from '../../../../setup.js'
 
 // src/core/agents/workspaces/stores/DatabaseWorkspaceStore.ts — the durable, driver-pluggable twin
 // of the plain-Map MemoryWorkspaceStore behind the WorkspaceStoreInterface seam (get / set / delete,

@@ -1,13 +1,8 @@
-import {
-	createDatabase,
-	createDatabaseConversationStore,
-	createDatabaseWorkspaceStore,
-	createMemoryDriver,
-	rawShape,
-	stringShape,
-} from '@src/core'
+import { createDatabaseConversationStore, createDatabaseWorkspaceStore } from '@src/core'
+import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { rawShape, stringShape } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
-import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../../setup.js'
+import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../setup.js'
 
 // src/core/agents/conversations/stores/DatabaseConversationStore.ts — the durable, driver-pluggable
 // twin of the plain-Map MemoryConversationStore behind the ConversationStoreInterface seam (get /

@@ -1,7 +1,7 @@
-import type { BudgetInterface, TokenUsage } from '../budgets/types.js'
-import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '../emitters/types.js'
-import type { SchedulerInterface } from '../schedulers/types.js'
-import type { QueueStoreInterface } from '../workers/types.js'
+import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
+import type { QueueStoreInterface } from '@orkestrel/queue'
+import type { SchedulerInterface } from '@orkestrel/workflow'
 
 /** The role a {@link MessageInterface} plays in a conversation turn. */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
@@ -85,6 +85,24 @@ export interface ToolResult {
 	readonly name: string
 	readonly value?: unknown
 	readonly error?: string
+}
+
+/**
+ * One block of an MCP-shaped tool call response — plain text, the only content kind
+ * {@link buildToolResult} emits.
+ */
+export interface ToolResultContent {
+	readonly type: 'text'
+	readonly text: string
+}
+
+/**
+ * The MCP `CallToolResult` shape a {@link ToolResult} maps to via {@link buildToolResult} —
+ * `content` blocks plus an `isError` flag set ONLY on failure (never `false`).
+ */
+export interface ToolCallResult {
+	readonly content: readonly ToolResultContent[]
+	readonly isError?: true
 }
 
 /**
@@ -2172,9 +2190,9 @@ export interface WorkspaceSnapshot {
 
 /**
  * The durable persistence seam for a {@link WorkspaceSnapshot} — three async primitives
- * (`get` / `set` / `delete`) keyed by a workspace id, mirroring
- * {@link import('../workflows/types.js').WorkflowStoreInterface} (and the
- * {@link import('../../server/http/types.js').SessionStoreInterface} driver-swap pattern).
+ * (`get` / `set` / `delete`) keyed by a workspace id, mirroring the analogous
+ * `WorkflowStoreInterface` in `@orkestrel/workflow` (and the driver-swap pattern a server
+ * surface's session store would follow).
  *
  * @remarks
  * The store persists the {@link WorkspaceSnapshot} — the self-contained, pure-JSON workspace
@@ -2190,7 +2208,7 @@ export interface WorkspaceSnapshot {
  *
  * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
  * same shape as the memory one. The snapshot carries its OWN id, so `set` takes no separate id
- * param (mirroring {@link import('../workflows/types.js').WorkflowStoreInterface.set}). UNLIKE a
+ * param (mirroring the analogous `WorkflowStoreInterface.set` in `@orkestrel/workflow`). UNLIKE a
  * session store there is NO idle-TTL / eviction — a persisted workspace lives until an explicit
  * `delete`. It is concrete over {@link WorkspaceSnapshot} — no generic parameter (AGENTS §21
  * minimal-interface), since the snapshot is the ONE payload a workspace store persists.
@@ -2205,7 +2223,7 @@ export interface WorkspaceStoreInterface {
 	get(id: string): Promise<WorkspaceSnapshot | undefined>
 	/**
 	 * Insert or replace a snapshot under its own `snapshot.id` (no separate id param —
-	 * mirroring {@link import('../workflows/types.js').WorkflowStoreInterface.set}).
+	 * mirroring the analogous `WorkflowStoreInterface.set` in `@orkestrel/workflow`).
 	 *
 	 * @param snapshot - The snapshot to store (keyed by its `id`)
 	 */
@@ -2225,8 +2243,8 @@ export interface WorkspaceStoreInterface {
  *
  * @remarks
  * The Database twin of {@link WorkspaceStoreInterface} stores the snapshot whole (the `snapshot`
- * column is a `rawShape`, an opaque JSON blob — exactly as
- * {@link import('../workflows/types.js').WorkflowSnapshotRow} stores a workflow snapshot), so the
+ * column is a `rawShape`, an opaque JSON blob — exactly as the analogous
+ * `WorkflowSnapshotRow` in `@orkestrel/workflow` stores a workflow snapshot), so the
  * row type stays FLAT and the `File`-list snapshot shape never forces the contract to `Infer` it.
  * The column therefore reads back as the broad `unknown`; the store narrows it to a
  * {@link WorkspaceSnapshot} on `get` ({@link import('./helpers.js').isWorkspaceSnapshot}, the

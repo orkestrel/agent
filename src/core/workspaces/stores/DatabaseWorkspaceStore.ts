@@ -3,7 +3,7 @@ import type {
 	WorkspaceSnapshotRow,
 	WorkspaceStoreInterface,
 } from '../../types.js'
-import type { TableInterface } from '../../../databases/index.js'
+import type { TableInterface } from '@orkestrel/database'
 import { isWorkspaceSnapshot } from '../../helpers.js'
 
 /**
@@ -18,7 +18,7 @@ import { isWorkspaceSnapshot } from '../../helpers.js'
  * IndexedDB backend swaps in WITHOUT touching the
  * {@link import('../WorkspaceManager.js').WorkspaceManager} or the
  * {@link import('../Workspace.js').Workspace} — the same seam as
- * {@link import('../../../workflows/stores/DatabaseWorkflowStore.js').DatabaseWorkflowStore}. The
+ * the analogous `DatabaseWorkflowStore` in `@orkestrel/workflow`. The
  * driver defaults to memory ({@link import('../../factories.js').createDatabaseWorkspaceStore}
  * passes `createMemoryDriver()`), so it ALSO works in memory out of the box; you opt into the
  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.

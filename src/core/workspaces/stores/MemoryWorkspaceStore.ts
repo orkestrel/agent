@@ -8,7 +8,7 @@ import type { WorkspaceSnapshot, WorkspaceStoreInterface } from '../../types.js'
  * @remarks
  * A plain `Map<string, WorkspaceSnapshot>` (AGENTS §21 — the snapshot is already pure,
  * self-contained JSON, so no encoding is needed for the memory tier). Like the
- * {@link import('../../../workflows/stores/MemoryWorkflowStore.js').MemoryWorkflowStore} it twins,
+ * the analogous `MemoryWorkflowStore` in `@orkestrel/workflow` it twins,
  * there is NO idle-TTL and NO eviction: a persisted workspace lives until an explicit `delete`. A
  * durable backend (JSON / SQLite / IndexedDB) swaps in through the SAME interface without touching
  * the {@link import('../WorkspaceManager.js').WorkspaceManager} or the

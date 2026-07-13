@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ContextFormatInterface, ProviderInterface } from '@src/core'
 import { createAgent, createTool, createToolManager } from '@src/core'
-import { collect, createScriptedProvider, createTokenUsage, type DeltasOf } from '../../../setup.js'
+import { collect, createScriptedProvider, createTokenUsage, type DeltasOf } from '../../setup.js'
 
 // PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
 // on Ollama (or any concrete backend). This cross-cutting proof (structure-exempt name)

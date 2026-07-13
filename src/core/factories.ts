@@ -43,14 +43,14 @@ import type {
 	WorkspaceStoreInterface,
 	WorkspaceToolOptions,
 } from './types.js'
-import type { ContractInterface } from '../contracts/index.js'
-import type { DriverInterface, TableInterface } from '../databases/index.js'
-import type { QueueInterface } from '../workers/types.js'
-import type { RunnerInterface } from '../runners/types.js'
-import { createContract, rawShape, schemaToParameters, stringShape } from '../contracts/index.js'
-import { createDatabase, createMemoryDriver } from '../databases/index.js'
-import { createQueue } from '../workers/factories.js'
-import { createRunner } from '../runners/factories.js'
+import type { ContractInterface } from '@orkestrel/contract'
+import type { DriverInterface, TableInterface } from '@orkestrel/database'
+import type { QueueInterface } from '@orkestrel/queue'
+import type { RunnerInterface } from '@orkestrel/workflow'
+import { createContract, rawShape, schemaToParameters, stringShape } from '@orkestrel/contract'
+import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { createQueue } from '@orkestrel/queue'
+import { createRunner } from '@orkestrel/workflow'
 import { Agent } from './Agent.js'
 import { AgentContext } from './AgentContext.js'
 import { AgentRegistry } from './AgentRegistry.js'
@@ -155,10 +155,10 @@ export function createToolManager(): ToolManagerInterface {
  *
  * @example
  * ```ts
+ * import type { ProviderInterface } from '@src/core'
  * import { createConversation } from '@src/core'
- * import { createOllama } from '@src/ollama'
  *
- * const provider = createOllama({ model: 'qwen3.5:2b-q4_K_M' })
+ * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const conversation = createConversation({
  * 	// Append the instruction as the FINAL user turn — a chat model emits nothing when the
  * 	// prompt ends on an assistant turn, so a leading-system instruction is unreliable.
@@ -454,10 +454,11 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
  *
  * @example
  * ```ts
+ * import type { ProviderInterface } from '@src/core'
  * import { createAgent, createTokenBudget } from '@src/core'
- * import { createOllama } from '@src/ollama'
  *
- * const agent = createAgent(createOllama({ model: 'qwen3.5:2b-q4_K_M' }), {
+ * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
+ * const agent = createAgent(provider, {
  * 	system: 'You are concise.',
  * 	budget: createTokenBudget({ max: 50_000, scope: 'total' }),
  * })
@@ -558,11 +559,12 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  *
  * @example
  * ```ts
+ * import type { ProviderInterface } from '@src/core'
  * import { createAgentRegistry, createTool } from '@src/core'
- * import { createOllama } from '@src/ollama'
  *
+ * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const registry = createAgentRegistry({
- * 	providers: { main: createOllama({ model: 'qwen3.5:2b-q4_K_M' }) },
+ * 	providers: { main: provider },
  * 	tools: { add: createTool({ name: 'add', execute: (a) => Number(a.x) + Number(a.y) }) },
  * })
  * const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'Hi.' }] })
@@ -755,7 +757,7 @@ export function createBinaryContent(data: string, mime: BinaryMIME): FileContent
 /**
  * Create a workspace — a mutable, `path`-keyed working set of immutable
  * {@link FileInterface}s with the in-memory edit surface (read / write / search / replace /
- * move / remove), observable through its {@link import('../emitters/types.js').EmitterInterface}.
+ * move / remove), observable through its `EmitterInterface` (from `@orkestrel/emitter`).
  *
  * @param options - Optional initial {@link import('./types.js').WorkspaceEventMap} listeners (`on`) and the emitter's `error` handler (see {@link WorkspaceOptions})
  * @returns A working {@link WorkspaceInterface}
@@ -781,7 +783,7 @@ export function createWorkspace(options?: WorkspaceOptions): WorkspaceInterface 
  *
  * @remarks
  * A plain `Map` (the snapshot is already pure JSON, so no encoding is needed for the memory tier),
- * the structural twin of {@link import('../workflows/factories.js').createMemoryWorkflowStore}.
+ * the structural twin of the analogous `createMemoryWorkflowStore` in `@orkestrel/workflow`.
  * `get` / `set` / `delete` are async (the same shape a durable backend fits); UNLIKE a session
  * store there is NO idle-TTL / eviction — a persisted workspace lives until an explicit `delete`.
  * Its driver-pluggable twin is {@link createDatabaseWorkspaceStore} (the snapshot as one opaque
@@ -815,7 +817,7 @@ export function createMemoryWorkspaceStore(): WorkspaceStoreInterface {
  * Builds a one-table database (`workspaces`, keyed by `id`) over the supplied driver, the snapshot
  * held as ONE OPAQUE JSON COLUMN — the column map is `{ id; snapshot }` where `snapshot` is a
  * `rawShape` (a JSON blob), exactly as
- * {@link import('../workflows/factories.js').createDatabaseWorkflowStore} stores its snapshot. The
+ * the analogous `createDatabaseWorkflowStore` in `@orkestrel/workflow` stores its snapshot. The
  * snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is lossless
  * AND keeps the row type FLAT (the column reads back as `unknown`, narrowed on `get` by
  * {@link import('./helpers.js').isWorkspaceSnapshot}). The `driver` DEFAULTS to
@@ -916,10 +918,10 @@ export function createWorkspaceManager(
  *
  * A plain {@link ToolManagerInterface}-compatible tool (so `createMCPServer` / `createMCPRoutes`
  * expose it over MCP for free — nothing MCP is wired here), built as a factory + dispatch closure
- * exactly like {@link import('../workflows/factories.js').createWorkflowTool} (NOT a class). The
+ * exactly like the analogous `createWorkflowTool` in `@orkestrel/workflow` (NOT a class). The
  * contract is compiled ONCE and its JSON Schema is narrowed to the open
  * `Readonly<Record<string, unknown>>` a tool advertises via the shared
- * {@link import('../contracts/index.js').schemaToParameters} contracts helper, never an assertion
+ * {@link schemaToParameters} contracts helper, never an assertion
  * (§14) — a compiled contract schema is always a record, so it passes; the `undefined` fallback only
  * satisfies the type's optionality.
  *

@@ -1,4 +1,4 @@
-import type { EmitterErrorHandler, EmitterHooks } from '../../emitters/types.js'
+import type { EmitterErrorHandler, EmitterHooks } from '@orkestrel/emitter'
 import type {
 	WorkspaceEventMap,
 	WorkspaceInput,
@@ -7,7 +7,7 @@ import type {
 	WorkspaceManagerOptions,
 	WorkspaceStoreInterface,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
+import { isArray } from '@orkestrel/contract'
 import { Workspace } from './Workspace.js'
 
 /**

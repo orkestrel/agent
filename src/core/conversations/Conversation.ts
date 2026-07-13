@@ -1,4 +1,4 @@
-import type { EmitterInterface } from '../../emitters/types.js'
+import type { EmitterInterface } from '@orkestrel/emitter'
 import type {
 	CompactOptions,
 	ConversationEventMap,
@@ -11,9 +11,9 @@ import type {
 	MessageInterface,
 	SectionInterface,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
+import { isArray } from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX, DEFAULT_CONVERSATION_KEEP } from '../constants.js'
-import { Emitter } from '../../emitters/Emitter.js'
+import { Emitter } from '@orkestrel/emitter'
 import { ConversationError } from '../errors.js'
 
 /**

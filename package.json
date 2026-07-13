@@ -1,21 +1,21 @@
 {
-	"name": "@orkestrel/workflow",
+	"name": "@orkestrel/agent",
 	"version": "0.0.1",
-	"description": "A typed workflow engine for the @orkestrel line — a serializable Workflow → Phase → Task tree run by a composed runner on a cooperative scheduler. Part of the @orkestrel line.",
+	"description": "A typed agent runtime for the @orkestrel line — providers, tools, conversations, workspaces, and a composable agent context. Part of the @orkestrel line.",
 	"keywords": [
-		"orchestration",
-		"runner",
-		"scheduler",
-		"task",
-		"typescript",
-		"workflow"
+		"agent",
+		"conversation",
+		"llm",
+		"provider",
+		"tool",
+		"typescript"
 	],
-	"homepage": "https://github.com/orkestrel/workflow#readme",
-	"bugs": "https://github.com/orkestrel/workflow/issues",
+	"homepage": "https://github.com/orkestrel/agent#readme",
+	"bugs": "https://github.com/orkestrel/agent/issues",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/orkestrel/workflow.git"
+		"url": "git+https://github.com/orkestrel/agent.git"
 	},
 	"files": [
 		"dist",
@@ -25,6 +25,7 @@
 	"sideEffects": false,
 	"main": "./dist/src/core/index.cjs",
 	"module": "./dist/src/core/index.js",
+	"types": "./dist/src/core/index.d.ts",
 	"exports": {
 		".": {
 			"import": {
@@ -65,9 +66,8 @@
 		"@orkestrel/abort": "^0.0.1",
 		"@orkestrel/budget": "^0.0.1",
 		"@orkestrel/contract": "^0.0.1",
-		"@orkestrel/database": "^0.0.1",
+		"@orkestrel/database": "^0.0.2",
 		"@orkestrel/emitter": "^0.0.1",
-		"@orkestrel/pool": "^0.0.1",
 		"@orkestrel/queue": "^0.0.1",
 		"@orkestrel/timeout": "^0.0.1"
 	},

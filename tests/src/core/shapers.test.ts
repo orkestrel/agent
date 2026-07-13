@@ -1,4 +1,5 @@
-import { createContract, WORKSPACE_TOOL_EXAMPLE, workspaceToolShape } from '@src/core'
+import { WORKSPACE_TOOL_EXAMPLE, workspaceToolShape } from '@src/core'
+import { createContract } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
 
 // The workspace-tool shape compiles (createContract) into the four lockstep outputs; this pins the

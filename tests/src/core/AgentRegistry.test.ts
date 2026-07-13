@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentJobInput } from '@src/core'
-import { createAgentRegistry, createAuthority, createScheduler, createTool } from '@src/core'
+import { createScheduler } from '@orkestrel/workflow'
+import { createAgentRegistry, createAuthority, createTool } from '@src/core'
 import {
 	addTool,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createTokenUsage,
 	loopTool,
-} from '../../../setup.js'
+} from '../../setup.js'
 
 // AgentRegistry.test.ts — the MIRROR of src/core/agents/AgentRegistry.ts. Pins the
 // registry's own contract (Ollama-free, a scripted provider): the accessors resolve a

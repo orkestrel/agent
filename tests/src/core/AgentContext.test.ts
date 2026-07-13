@@ -15,7 +15,7 @@ import {
 	createWorkspaceManager,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../../setup.js'
+import { createStubSummarizer } from '../../setup.js'
 
 // AgentContext assembles a turn's provider input — the leading system block (the prompt
 // + the scoped instructions, each under its manager's description, then the ACTIVE

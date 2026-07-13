@@ -1,7 +1,7 @@
 import type { ContextSectionFormat, InstructionInterface } from '@src/core'
 import { InstructionManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, createRecorder, recordEmitterEvents } from '../../../../setup.js'
+import { createErrorRecorder, createRecorder, recordEmitterEvents } from '../../../setup.js'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
 // directives block from (AGENTS §16 — real behavior, no mocks). Covers add (single +

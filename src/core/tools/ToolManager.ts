@@ -5,7 +5,7 @@ import type {
 	ToolManagerInterface,
 	ToolResult,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
+import { isArray } from '@orkestrel/contract'
 
 /**
  * The tool registry the agent loop dispatches model tool-calls through — resolves

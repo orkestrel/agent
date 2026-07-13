@@ -1,4 +1,4 @@
-import type { EmitterInterface } from '../../emitters/types.js'
+import type { EmitterInterface } from '@orkestrel/emitter'
 import type {
 	ContextSectionFormat,
 	InstructionInput,
@@ -7,8 +7,8 @@ import type {
 	InstructionManagerInterface,
 	InstructionManagerOptions,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
-import { Emitter } from '../../emitters/Emitter.js'
+import { isArray } from '@orkestrel/contract'
+import { Emitter } from '@orkestrel/emitter'
 import { Instruction } from './Instruction.js'
 
 /**

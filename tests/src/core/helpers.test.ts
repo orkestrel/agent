@@ -26,7 +26,7 @@ import {
 	spliceRange,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createScriptedProvider, createTokenUsage } from '../../../setup.js'
+import { createScriptedProvider, createTokenUsage } from '../../setup.js'
 
 // The pure derivation helper behind a file's inferred fenced-code language (AGENTS §16 —
 // real behavior, no mocks). Total: a known extension maps to its value, an unknown

@@ -8,7 +8,7 @@ import {
 	Workspace,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, recordEmitterEvents } from '../../../../setup.js'
+import { createErrorRecorder, recordEmitterEvents } from '../../../setup.js'
 
 // The in-memory Workspace edit surface (AGENTS §16 — real data, no mocks). Every edit
 // replaces the immutable File at a path (transitioning created → modified); the modality

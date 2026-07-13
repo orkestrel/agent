@@ -1,12 +1,12 @@
-import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '../../emitters/types.js'
+import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type {
 	ScopeInput,
 	ScopeInterface,
 	ScopeManagerEventMap,
 	ScopeManagerInterface,
 } from '../types.js'
-import { isArray } from '../../contracts/index.js'
-import { Emitter } from '../../emitters/Emitter.js'
+import { isArray } from '@orkestrel/contract'
+import { Emitter } from '@orkestrel/emitter'
 import { Scope } from './Scope.js'
 
 /**

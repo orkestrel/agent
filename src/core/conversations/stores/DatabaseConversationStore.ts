@@ -3,7 +3,7 @@ import type {
 	ConversationSnapshotRow,
 	ConversationStoreInterface,
 } from '../../types.js'
-import type { TableInterface } from '../../../databases/index.js'
+import type { TableInterface } from '@orkestrel/database'
 import { isConversationSnapshot } from '../../helpers.js'
 
 /**

@@ -1,7 +1,7 @@
 import type { ScopeInterface } from '@src/core'
 import { ScopeManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, createRecorder, recordEmitterEvents } from '../../../../setup.js'
+import { createErrorRecorder, createRecorder, recordEmitterEvents } from '../../../setup.js'
 
 // ScopeManager is the id-keyed registry of reusable named scopes (AGENTS §16 — real
 // behavior, no mocks). Covers create (minting an id, always adding — never overwriting),

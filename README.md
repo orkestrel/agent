@@ -1,44 +1,57 @@
-# @orkestrel/workflow
+# @orkestrel/agent
 
-A typed workflow engine for the `@orkestrel` line — a serializable
-`Workflow → Phase → Task` tree that a UI or an LLM authors as pure JSON, and
-a thin `WorkflowRunner` executes by COMPOSING the shipped substrate (a
-per-phase `Runner`, `Abort`, `Timeout`, `Budget`, and a cooperative
-cross-environment `Scheduler`) rather than re-implementing its own
-concurrency / retry / abort machinery.
+A typed **agent runtime** for the `@orkestrel` line — providers, tools,
+conversations, workspaces, and a composable agent context. `createAgent`
+composes a `ProviderInterface`, an `AgentContextInterface`, and a tool
+registry into a bounded context → provider → tools → repeat turn, exposed as
+a one-shot `generate` and a live `stream`. Part of the `@orkestrel` line.
 
 ## Install
 
 ```sh
-npm install @orkestrel/workflow
+npm install @orkestrel/agent
 ```
 
 ## Requirements
 
-- Core is cross-environment ESM; `./browser` adds browser-native cooperative
-  scheduler backends (`requestAnimationFrame` / `requestIdleCallback` /
-  Prioritized Task Scheduling), `./server` adds the Node-native
-  `setImmediate` scheduler backend
+- Node.js >= 24
+- Dual ESM + CommonJS builds (`import` and `require` both supported)
 
-## Status
+## Usage
 
-Pre-release (`0.0.1`): the definition contract, the live entity tree, the
-thin runner (with the `function` / `tool` / `agent` task forms and the
-depth/cycle-bounded agent-native recursion), the durable `WorkflowStore`
-(in-memory + driver-pluggable), and the cooperative `Scheduler` (the
-cross-environment default plus the browser and Node environment backends)
-are all implemented and tested, but the public API is still unstable and
-may change without notice. See [guides/src/workflow.md](./guides/src/workflow.md)
-for the full documented surface.
+```ts
+import { createAgent, createTool, createToolManager } from '@orkestrel/agent'
+
+const tools = createToolManager()
+tools.add(
+	createTool({
+		name: 'add',
+		description: 'Add two numbers',
+		execute: (args) => Number(args.a) + Number(args.b),
+	}),
+)
+
+// `provider` is your ProviderInterface implementation (see the guide)
+const agent = createAgent(provider, { system: 'You are concise.', tools })
+agent.context.messages.add({ role: 'user', content: 'Say hi.' })
+
+const stream = agent.stream()
+for await (const chunk of stream.events) {
+	if (chunk.type === 'token') process.stdout.write(chunk.content)
+}
+const result = await stream.result // { content, usage?, partial }
+```
+
+## Guide
+
+For the full surface — providers, the agent loop, tools, conversations,
+workspaces, and the composable `AgentContext` — see
+[`guides/src/agent.md`](guides/src/agent.md).
 
 ## Package
 
-Published as three environment-scoped entry points per the `exports` field
-in `package.json`: `.` (the shared, environment-agnostic core — the
-definition/entity/runner surface plus the cross-environment `Scheduler`
-default), `./browser` (adds the browser-native scheduler backends), and
-`./server` (adds the Node-native scheduler backend). Core ships dual
-ESM+CJS builds; `./browser` is ESM-only.
+Published as a single typed entry point per the `exports` field in
+`package.json`.
 
 ## License
 

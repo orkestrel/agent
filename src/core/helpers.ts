@@ -10,9 +10,11 @@ import type {
 	Range,
 	SectionInterface,
 	ToolCall,
+	ToolCallResult,
+	ToolResult,
 	WorkspaceSnapshot,
 } from './types.js'
-import { isArray, isNumber, isRecord, isString } from '../contracts/index.js'
+import { isArray, isNumber, isRecord, isString } from '@orkestrel/contract'
 import { EXTENSION_TO_LANGUAGE } from './constants.js'
 import { AgentJobError } from './errors.js'
 
@@ -114,7 +116,7 @@ export function estimateTokens(text: string): number {
 
 /**
  * Estimate the context-token footprint of a batch of messages — the default `consume`
- * estimator for an agent's context {@link import('../budgets/types.js').BudgetInterface}
+ * estimator for an agent's context `BudgetInterface` (a budgets surface's tracking contract)
  * (the {@link import('./types.js').AgentOptions} `window`).
  *
  * @remarks
@@ -298,7 +300,7 @@ export function isFile(value: unknown): value is FileInterface {
  * SHAPE: a `string` `id` and a `files` array EVERY element of which is a valid {@link FileInterface}
  * record ({@link isFile}) — enough to safely impose the {@link WorkspaceSnapshot} type at a storage
  * boundary WITHOUT a cast. The structural twin of
- * {@link import('../workflows/helpers.js').isWorkflowSnapshot}. A malformed blob (a non-record, a
+ * the analogous `isWorkflowSnapshot` in `@orkestrel/workflow`. A malformed blob (a non-record, a
  * missing / non-string `id`, a non-array `files`, or any malformed file element) resolves `false`,
  * so a {@link import('./workspaces/stores/DatabaseWorkspaceStore.js').DatabaseWorkspaceStore} read
  * yields `undefined` rather than a broken workspace.
@@ -344,6 +346,29 @@ export function isWorkspaceSnapshot(value: unknown): value is WorkspaceSnapshot 
 export function isToolCall(value: unknown): value is ToolCall {
 	if (!isRecord(value)) return false
 	return isString(value.id) && isString(value.name) && isRecord(value.arguments)
+}
+
+/**
+ * Project a {@link ToolResult} into the MCP `CallToolResult` shape — a top-level `error`
+ * maps to a single `isError: true` text block (the failure reason), otherwise the `value`
+ * is JSON-stringified into a single text block with no `isError`.
+ *
+ * @param result - The {@link ToolResult} to project (as returned by {@link import('./tools/ToolManager.js').ToolManager.execute})
+ * @returns The equivalent {@link ToolCallResult}
+ *
+ * @example
+ * ```ts
+ * buildToolResult({ id: 'c1', name: 'search', error: 'max depth' })
+ * // { content: [{ type: 'text', text: 'max depth' }], isError: true }
+ * buildToolResult({ id: 'c1', name: 'search', value: { count: 1 } })
+ * // { content: [{ type: 'text', text: '{"count":1}' }] }
+ * ```
+ */
+export function buildToolResult(result: ToolResult): ToolCallResult {
+	if (result.error !== undefined) {
+		return { content: [{ type: 'text', text: result.error }], isError: true }
+	}
+	return { content: [{ type: 'text', text: JSON.stringify(result.value) }] }
 }
 
 /**
@@ -746,4 +771,28 @@ export function rangeOf(
  */
 export function fencedFile(path: string, language: string, content: string): string {
 	return `File: ${path}\n\`\`\`${language}\n${content}\n\`\`\``
+}
+
+/**
+ * Escape a string's regex-special characters so it matches LITERALLY inside a `RegExp` — the
+ * primitive a {@link import('./workspaces/Workspace.js').Workspace} search builds a literal-text
+ * search pattern through (as opposed to a caller-supplied regex pattern).
+ *
+ * @remarks
+ * Prefixes every character in the class `. * + ? ^ $ { } ( ) | [ ] \` with a backslash, so the
+ * escaped string, when compiled into a `RegExp`, matches only its own literal characters — no
+ * character acts as a quantifier, anchor, group, or class. Pure string assembly, total — never
+ * throws.
+ *
+ * @param value - The text to escape for literal use inside a `RegExp` pattern
+ * @returns `value` with every regex-special character backslash-escaped
+ *
+ * @example
+ * ```ts
+ * escapeRegExp('a.b*c') // 'a\\.b\\*c'
+ * new RegExp(escapeRegExp('a.b*c')).test('a.b*c') // true
+ * ```
+ */
+export function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

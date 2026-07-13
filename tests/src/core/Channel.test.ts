@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Channel } from '@src/core'
-import { collect, waitForDelay } from '../../../setup.js'
+import { collect, waitForDelay } from '../../setup.js'
 
 // The Channel is MODULE-INTERNAL to the agents surface (not barrel-exported), so it is
 // imported by its relative source path — the same way the server worker fixtures reach

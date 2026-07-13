@@ -5,11 +5,7 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import {
-	createErrorRecorder,
-	createStubSummarizer,
-	recordEmitterEvents,
-} from '../../../../setup.js'
+import { createErrorRecorder, createStubSummarizer, recordEmitterEvents } from '../../../setup.js'
 
 // The framed recap content a section's summary renders as in view() — the lean RECAP label
 // prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
