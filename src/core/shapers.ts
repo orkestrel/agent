@@ -21,8 +21,8 @@ import {
 // — the FLAT-steps ergonomic lever a 2B model authors a complete operation from. The range edit is
 // the FLAT `'splice'` op (four positive-integer caret components), never a nested range — the four
 // ints are reassembled into a `Range` by `rangeOf` in the handler. The description-carrying
-// `operation` discriminant rides on the shared `literalShape` (@orkestrel/contract) — the same
-// helper the workflow tool's `via` discriminant uses (consolidated there per AGENTS §5).
+// `operation` discriminant rides on the shared `literalShape` (@orkestrel/contract) — the
+// consolidated discriminant helper (AGENTS §5) backing this tool's own `operation` axis.
 
 /**
  * The shape of a {@link import('./types.js').WorkspaceOperation} — a descriptive tagged union over

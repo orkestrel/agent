@@ -918,7 +918,9 @@ export function createWorkspaceManager(
  *
  * A plain {@link ToolManagerInterface}-compatible tool (so `createMCPServer` / `createMCPRoutes`
  * expose it over MCP for free — nothing MCP is wired here), built as a factory + dispatch closure
- * exactly like the analogous `createWorkflowTool` in `@orkestrel/workflow` (NOT a class). The
+ * in the same consumer-edge style as `createWorkflowTool` in `@orkestrel/workflow` (NOT a class —
+ * their signatures differ; the shared idea is that concrete tools live at the factories edge over
+ * a pure tool runtime). The
  * contract is compiled ONCE and its JSON Schema is narrowed to the open
  * `Readonly<Record<string, unknown>>` a tool advertises via the shared
  * {@link schemaToParameters} contracts helper, never an assertion
