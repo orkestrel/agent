@@ -37,17 +37,14 @@ import type {
 	WorkspaceInterface,
 	WorkspaceManagerInterface,
 	WorkspaceManagerOptions,
-	WorkspaceOperation,
 	WorkspaceOptions,
 	WorkspaceSnapshotRow,
 	WorkspaceStoreInterface,
-	WorkspaceToolOptions,
 } from './types.js'
-import type { ContractInterface } from '@orkestrel/contract'
 import type { DriverInterface, TableInterface } from '@orkestrel/database'
 import type { QueueInterface } from '@orkestrel/queue'
 import type { RunnerInterface } from '@orkestrel/workflow'
-import { createContract, rawShape, schemaToParameters, stringShape } from '@orkestrel/contract'
+import { rawShape, stringShape } from '@orkestrel/contract'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { createQueue } from '@orkestrel/queue'
 import { createRunner } from '@orkestrel/workflow'
@@ -67,10 +64,7 @@ import { ScopeManager } from './scopes/ScopeManager.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
 import { Tool } from './tools/Tool.js'
 import { ToolManager } from './tools/ToolManager.js'
-import { WORKSPACE_TOOL_DESCRIPTION, WORKSPACE_TOOL_NAME } from './constants.js'
-import { WorkspaceError } from './errors.js'
-import { computeSize, countLines, isText, rangeOf } from './helpers.js'
-import { workspaceToolShape } from './shapers.js'
+import { computeSize, countLines } from './helpers.js'
 import { Workspace } from './workspaces/Workspace.js'
 import { WorkspaceManager } from './workspaces/WorkspaceManager.js'
 import { DatabaseWorkspaceStore } from './workspaces/stores/DatabaseWorkspaceStore.js'
@@ -891,169 +885,4 @@ export function createWorkspaceManager(
 	options?: WorkspaceManagerOptions,
 ): WorkspaceManagerInterface {
 	return new WorkspaceManager(options)
-}
-
-/**
- * Wrap a {@link WorkspaceManagerInterface} as an LLM-callable {@link ToolInterface} — it ADVERTISES
- * the `operation`-discriminated 13-op union ({@link import('./shapers.js').workspaceToolShape}) as
- * its `parameters`, and its handler PARSES the model-supplied args against that contract and
- * DISPATCHES the matched operation against the manager's ACTIVE workspace (the registry ops drive
- * the manager itself), returning the plain result (throwing a typed {@link WorkspaceError} on
- * failure).
- *
- * @remarks
- * MANAGER-DRIVEN: every edit / read op (read / list / has / search / replace / write / splice /
- * prepend / append / move / remove) targets `manager.active`, so the model edits whichever workspace
- * is active and a host can re-point it ({@link WorkspaceManagerInterface.switch}) between turns —
- * wire the agent's registry in via `createWorkspaceTool(agent.context.workspaces)`. Two REGISTRY ops
- * make the model self-sufficient: `workspaces` LISTS the registered workspaces (each
- * `{ id, files, active }`) so it can discover an id, and `switch` re-points the active workspace by
- * id (lenient — an unknown id is a no-op reporting `switched: false`, never a throw).
- *
- * NO-ACTIVE RULE (the ergonomic seam): a WRITING op (write / splice / prepend / append / move /
- * remove / replace) run when `manager.active` is `undefined` AUTO-CREATES + activates a default
- * workspace (`manager.add()`) so the model can just start writing; a pure-READ op (read / list / has
- * / search) against no active workspace returns the EMPTY result (`undefined` / `[]` / `false`),
- * never creating one and never throwing.
- *
- * A plain {@link ToolManagerInterface}-compatible tool (so `createMCPServer` / `createMCPRoutes`
- * expose it over MCP for free — nothing MCP is wired here), built as a factory + dispatch closure
- * in the same consumer-edge style as `createWorkflowTool` in `@orkestrel/workflow` (NOT a class —
- * their signatures differ; the shared idea is that concrete tools live at the factories edge over
- * a pure tool runtime). The
- * contract is compiled ONCE and its JSON Schema is narrowed to the open
- * `Readonly<Record<string, unknown>>` a tool advertises via the shared
- * {@link schemaToParameters} contracts helper, never an assertion
- * (§14) — a compiled contract schema is always a record, so it passes; the `undefined` fallback only
- * satisfies the type's optionality.
- *
- * The handler conforms to the universal tool-handler contract (AGENTS §14): it `contract.parse`s the
- * args, THROWS a `TOOL` {@link WorkspaceError} when no operation arm matched (a malformed / unknown
- * operation), else `switch`es on `op.operation` and RETURNS the plain result — letting a
- * `WorkspaceError` raised by the live workspace (`MODALITY` / `PATTERN` / `RANGE`) PROPAGATE
- * unCAUGHT. The {@link import('./tools/ToolManager.js').ToolManager} performs the ONE
- * canonical wrap (`{ id, name, value }` on a return; `{ id, name, error }` on a throw, ISOLATED so
- * nothing escapes the run), so the outcome appears EXACTLY ONCE over BOTH the agent loop and MCP (a
- * throw → MCP `isError: true`). There is no `{ ok, output, duration }` envelope. The range edit is
- * the FLAT `'splice'` op: its four flat caret integers are reassembled into a {@link import('./types.js').Range}
- * by {@link rangeOf} and fed to the workspace's ranged `write`.
- *
- * @param manager - The workspace registry the tool reads + edits (its ACTIVE workspace; closed over by the handler)
- * @param options - Optional advertised `name` / `description` overrides (see {@link WorkspaceToolOptions})
- * @returns A {@link ToolInterface} (named {@link import('./constants.js').WORKSPACE_TOOL_NAME} by
- *   default) whose `parameters` advertise the `operation`-discriminated union schema
- *
- * @example
- * ```ts
- * import { createWorkspaceManager, createWorkspaceTool, createToolManager } from '@src/core'
- *
- * const manager = createWorkspaceManager()
- * const tool = createWorkspaceTool(manager) // edits the manager's ACTIVE workspace
- * const tools = createToolManager()
- * tools.add(tool) // a model can now read + edit the active workspace by calling `workspace`
- * ```
- */
-export function createWorkspaceTool(
-	manager: WorkspaceManagerInterface,
-	options?: WorkspaceToolOptions,
-): ToolInterface {
-	const contract: ContractInterface<WorkspaceOperation> = createContract(workspaceToolShape)
-	// The advertised schema, narrowed to the open tool-parameters record (§14, never `as`) via the
-	// shared `schemaToParameters` contracts helper.
-	const parameters = schemaToParameters(contract.schema)
-	return createTool({
-		name: options?.name ?? WORKSPACE_TOOL_NAME,
-		description: options?.description ?? WORKSPACE_TOOL_DESCRIPTION,
-		parameters,
-		// The universal tool-handler contract (§14): PARSE the args against the operation contract;
-		// an un-parseable / unknown operation ⇒ THROW a `TOOL` WorkspaceError. Else DISPATCH the
-		// matched op — the registry ops (`workspaces` / `switch`) drive the manager, every edit / read
-		// op the manager's ACTIVE workspace. A WorkspaceError the workspace itself raises (MODALITY /
-		// PATTERN / RANGE) PROPAGATES — the ToolManager isolates every throw into the canonical
-		// ToolResult's top-level `error`, so nothing escapes the run.
-		execute: (args) => {
-			const op = contract.parse(args)
-			if (op === undefined) {
-				throw new WorkspaceError('TOOL', `unknown or malformed operation`, { args })
-			}
-			// Registry ops act on the MANAGER, not a workspace — handle them first.
-			if (op.operation === 'workspaces') {
-				const activeId = manager.active?.id
-				return manager.workspaces().map((workspace) => ({
-					id: workspace.id,
-					files: workspace.count,
-					active: workspace.id === activeId,
-				}))
-			}
-			if (op.operation === 'switch') {
-				const switched = manager.switch(op.id)
-				// Lenient: an unknown id leaves `active` unchanged and reports `switched: false`.
-				return switched === undefined
-					? { id: op.id, switched: false }
-					: { id: switched.id, switched: true, files: switched.count }
-			}
-			// Edit / read ops target the ACTIVE workspace. A WRITING op ensures a target — auto-creating
-			// + activating a default workspace when none is active (the no-active ergonomic seam) — while
-			// a pure-READ op returns the empty result against no active workspace rather than creating one.
-			const active = manager.active
-			switch (op.operation) {
-				case 'read':
-					return active?.read(op.path)
-				case 'list':
-					return (active?.files() ?? []).map((file) => ({
-						path: file.path,
-						state: file.state,
-						size: file.size,
-						lines: file.lines,
-						kind: isText(file.content) ? 'text' : 'binary',
-					}))
-				case 'has':
-					return active?.has(op.path) ?? false
-				case 'search':
-					return (
-						active?.search(op.query, { regex: op.regex, exact: op.exact, limit: op.limit }) ?? []
-					)
-				case 'replace': {
-					const workspace = active ?? manager.add()
-					return workspace.replace(op.query, op.replacement, {
-						regex: op.regex,
-						exact: op.exact,
-						limit: op.limit,
-					})
-				}
-				case 'write': {
-					const workspace = active ?? manager.add()
-					workspace.write(op.path, op.content)
-					return { path: op.path, state: workspace.file(op.path)?.state }
-				}
-				case 'splice': {
-					const workspace = active ?? manager.add()
-					workspace.write(
-						op.path,
-						op.content,
-						rangeOf(op.fromLine, op.fromColumn, op.toLine, op.toColumn),
-					)
-					return { path: op.path, state: workspace.file(op.path)?.state }
-				}
-				case 'prepend': {
-					const workspace = active ?? manager.add()
-					workspace.prepend(op.path, op.content)
-					return { path: op.path, state: workspace.file(op.path)?.state }
-				}
-				case 'append': {
-					const workspace = active ?? manager.add()
-					workspace.append(op.path, op.content)
-					return { path: op.path, state: workspace.file(op.path)?.state }
-				}
-				case 'move': {
-					const workspace = active ?? manager.add()
-					return { from: op.from, to: op.to, moved: workspace.move(op.from, op.to) }
-				}
-				case 'remove': {
-					const workspace = active ?? manager.add()
-					return { path: op.path, removed: workspace.remove(op.path) }
-				}
-			}
-		},
-	})
 }

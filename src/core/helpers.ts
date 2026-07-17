@@ -714,10 +714,10 @@ export function spliceRange(text: string, range: Range, replacement: string): st
 }
 
 /**
- * Assemble a 1-based nested {@link Range} from the four FLAT caret integers of the workspace tool's
- * `'splice'` operation — the bridge from the small-model FLAT surface
- * ({@link import('./types.js').WorkspaceOperation}) back to the nested {@link Range} the
- * {@link import('./workspaces/Workspace.js').Workspace} edit surface speaks.
+ * Assemble a 1-based nested {@link Range} from four FLAT caret integers — the bridge a
+ * workspace-editing tool (see `@orkestrel/tool`) uses from its small-model FLAT surface back to the
+ * nested {@link Range} the {@link import('./workspaces/Workspace.js').Workspace} edit surface
+ * speaks. Published as a public helper for that consumer.
  *
  * @remarks
  * Pairs `(fromLine, fromColumn)` into `start` and `(toLine, toColumn)` into `end` verbatim — a pure

@@ -31,8 +31,8 @@ compaction. It documents **that package's** surface (the `Budget` class,
 repo; it is kept here for the same reason.
 
 [`src/contract.md`](src/contract.md) is a byte-identical mirror of the guide
-for `@orkestrel/contract` — a runtime dependency, the shape DSL
-`createWorkspaceTool` compiles its `operation`-discriminated contract
+for `@orkestrel/contract` — a runtime dependency, the shape DSL other tools
+(e.g. the `@orkestrel/tool` workspace-editing tool) compile their contracts
 through. It documents **that package's** surface (guards, combinators,
 parsers, and the shape DSL), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitives it is built from

@@ -1,7 +1,6 @@
 export type * from './types.js'
 export * from './constants.js'
 export * from './errors.js'
-export * from './shapers.js'
 export * from './factories.js'
 export * from './Agent.js'
 export * from './AgentContext.js'

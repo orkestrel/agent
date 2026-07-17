@@ -2265,10 +2265,10 @@ export interface WorkspaceSnapshotRow {
  * - `MODALITY` — a text-only op (ranged read/write, `prepend`, `append`) was aimed at a binary file.
  * - `PATTERN` — a `search` / `replace` `query` was an invalid regular expression (with `regex: true`).
  * - `RANGE` — a ranged `write` got a structurally invalid {@link Range} (inverted, or a sub-1 line/column).
- * - `TOOL` — a handler-level validation fault from {@link import('./factories.js').createWorkspaceTool}:
- *   the agent-supplied args were a malformed / unknown {@link WorkspaceOperation} (none of the 13 arms
- *   matched). Distinct from the surface faults above (which the live workspace raises) — this is the
- *   tool boundary rejecting an un-parseable operation before any workspace call.
+ * - `TOOL` — a handler-level validation fault raised by a workspace-editing tool boundary (see
+ *   `@orkestrel/tool`) when the agent-supplied args were malformed / unknown. Distinct from the
+ *   surface faults above (which the live workspace raises) — this is the tool boundary rejecting an
+ *   un-parseable operation before any workspace call.
  */
 export type WorkspaceErrorCode = 'MODALITY' | 'PATTERN' | 'RANGE' | 'TOOL'
 
@@ -2456,104 +2456,3 @@ export interface WorkspaceManagerInterface {
 	remove(id: string): boolean
 	clear(): void
 }
-
-/**
- * Options for {@link import('./factories.js').createWorkspaceTool} — optional overrides of the
- * advertised tool `name` / `description`.
- *
- * @param options - The workspace-tool options
- *
- * @remarks
- * - `name` — the advertised tool name a model calls; defaults to {@link import('./constants.js').WORKSPACE_TOOL_NAME} (`'workspace'`).
- * - `description` — the model-facing description; defaults to {@link import('./constants.js').WORKSPACE_TOOL_DESCRIPTION} (the operation guide). Deliberately minimal (AGENTS §21) — the tool needs no depth / ancestry (it has no recursion).
- */
-export interface WorkspaceToolOptions {
-	readonly name?: string
-	readonly description?: string
-}
-
-/**
- * One operation an agent invokes through {@link import('./factories.js').createWorkspaceTool} — a
- * FLAT, descriptive tagged union over the 13 workspace edit / read / navigation actions,
- * discriminated by the `operation` literal (AGENTS §4.8: a discriminant is named for its axis — the
- * action being performed — NEVER `kind`).
- *
- * @remarks
- * This is the SOURCE OF TRUTH the tool contract is typed to ({@link import('./shapers.js').workspaceToolShape}
- * compiles to a structurally-identical guard / parser / JSON Schema). Every field is FLAT (no nested
- * objects) — the small-model ergonomic lever: a range edit is the four flat integers of the
- * `'splice'` arm (`fromLine` / `fromColumn` / `toLine` / `toColumn`), reassembled into a 1-based
- * {@link Range} by {@link import('./helpers.js').rangeOf}, never a nested `{ start, end }`. Each EDIT
- * / READ arm maps onto exactly one {@link WorkspaceInterface} call against the manager's ACTIVE
- * workspace; the two REGISTRY arms (`switch` / `workspaces`) drive the
- * {@link WorkspaceManagerInterface} pointer instead — `workspaces` LISTS the workspaces the model
- * can move between, and `switch` re-points which one the edit / read arms target.
- */
-export type WorkspaceOperation =
-	/** Read a whole text file's text by `path` from the ACTIVE workspace (a binary / absent path — or no active workspace — yields no content). */
-	| { readonly operation: 'read'; readonly path: string }
-	/** List every file in the ACTIVE workspace (path / state / size / lines / kind summaries); `[]` when no workspace is active. */
-	| { readonly operation: 'list' }
-	/** Whether a file exists at `path` in the ACTIVE workspace (`false` when no workspace is active). */
-	| { readonly operation: 'has'; readonly path: string }
-	/**
-	 * Scan every text file for `query`, returning each hit (path + 1-based line / column + the line).
-	 *
-	 * @remarks
-	 * `regex` treats `query` as a regular-expression source (default `false` — a literal substring);
-	 * `exact` matches case-sensitively (default `true`); `limit` caps the total hits returned.
-	 */
-	| {
-			readonly operation: 'search'
-			readonly query: string
-			readonly regex?: boolean
-			readonly exact?: boolean
-			readonly limit?: number
-	  }
-	/**
-	 * Replace `query` with `replacement` across every text file, returning the tally.
-	 *
-	 * @remarks
-	 * Same matching axes as `search`: `regex` (default `false`), `exact` (default `true`), `limit`
-	 * (cap the total replacements).
-	 */
-	| {
-			readonly operation: 'replace'
-			readonly query: string
-			readonly replacement: string
-			readonly regex?: boolean
-			readonly exact?: boolean
-			readonly limit?: number
-	  }
-	/** Write (create or overwrite) the whole file at `path` with `content`. */
-	| { readonly operation: 'write'; readonly path: string; readonly content: string }
-	/**
-	 * Splice `content` into an existing text file, replacing the 1-based range
-	 * `(fromLine, fromColumn)` (INCLUSIVE) → `(toLine, toColumn)` (EXCLUSIVE).
-	 *
-	 * @remarks
-	 * The FLAT range edit — the four positive-integer caret components reassemble into a {@link Range}
-	 * ({@link import('./helpers.js').rangeOf}). An empty span (`from === to`) inserts; a span past the
-	 * end is clamped. An inverted / sub-1 range throws `RANGE`; a binary target throws `MODALITY`.
-	 */
-	| {
-			readonly operation: 'splice'
-			readonly path: string
-			readonly content: string
-			readonly fromLine: number
-			readonly fromColumn: number
-			readonly toLine: number
-			readonly toColumn: number
-	  }
-	/** Prepend `content` to the start of the file at `path` (creating it when absent). */
-	| { readonly operation: 'prepend'; readonly path: string; readonly content: string }
-	/** Append `content` to the end of the file at `path` (creating it when absent). */
-	| { readonly operation: 'append'; readonly path: string; readonly content: string }
-	/** Re-key the file `from` → `to` (overwriting an occupied target). */
-	| { readonly operation: 'move'; readonly from: string; readonly to: string }
-	/** Remove the file at `path` from the workspace. */
-	| { readonly operation: 'remove'; readonly path: string }
-	/** List the workspaces the model can move between — each `{ id, files, active }` — so it can choose an `id` to `switch` to. */
-	| { readonly operation: 'workspaces' }
-	/** Re-point the manager's ACTIVE workspace to the one with `id` (an unknown `id` is a lenient no-op). The edit / read arms target the active workspace from then on. */
-	| { readonly operation: 'switch'; readonly id: string }
