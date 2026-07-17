@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/agent",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "A typed agent runtime for the @orkestrel line — providers, tools, conversations, workspaces, and a composable agent context. Part of the @orkestrel line.",
 	"keywords": [
 		"agent",
