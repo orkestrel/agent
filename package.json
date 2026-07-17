@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/agent",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "A typed agent runtime for the @orkestrel line — providers, tools, conversations, workspaces, and a composable agent context. Part of the @orkestrel line.",
 	"keywords": [
 		"agent",
@@ -70,7 +70,7 @@
 		"@orkestrel/emitter": "^0.0.1",
 		"@orkestrel/queue": "^0.0.1",
 		"@orkestrel/timeout": "^0.0.1",
-		"@orkestrel/workflow": "^0.0.2"
+		"@orkestrel/workflow": "^0.0.3"
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.58.9",
