@@ -18,7 +18,9 @@ import { isArray } from '@orkestrel/contract'
  *   (last write wins). `count` is the map size, `tool(name)` looks one up, `tools()`
  *   lists them in insertion order, and `definitions()` maps each to a plain
  *   {@link ToolDefinition} (`name` / `description?` / `parameters?`, the `execute`
- *   handler stripped) — exactly what a provider advertises to the model.
+ *   handler stripped) — exactly what a provider advertises to the model, with
+ *   `tool.summary ?? tool.description` advertised as `description` (a lean `summary`
+ *   stands in for the full text when set).
  * - **Per-call error isolation (the load-bearing part).** `execute` resolves a
  *   {@link ToolCall}'s tool by name and ALWAYS resolves a {@link ToolResult}: an
  *   unknown name → `{ id, name, error: 'tool not found: <name>' }`; a successful run →
@@ -114,7 +116,9 @@ export class ToolManager implements ToolManagerInterface {
 	}
 
 	// Strip a tool to the plain ToolDefinition a provider advertises — the schema the
-	// model sees (name / description? / parameters?), without the execute handler.
+	// model sees (name / description? / parameters?), without the execute handler. The
+	// advertised description is the lean `summary` when set, else the full `description`
+	// (both absent ⇒ the field is omitted, exactly as before `summary` existed).
 	#definition(tool: ToolInterface): ToolDefinition {
 		const definition: {
 			name: string
@@ -123,7 +127,8 @@ export class ToolManager implements ToolManagerInterface {
 		} = {
 			name: tool.name,
 		}
-		if (tool.description !== undefined) definition.description = tool.description
+		const description = tool.summary ?? tool.description
+		if (description !== undefined) definition.description = description
 		if (tool.parameters !== undefined) definition.parameters = tool.parameters
 		return definition
 	}

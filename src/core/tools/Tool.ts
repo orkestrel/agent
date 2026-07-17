@@ -26,12 +26,14 @@ import type { ToolInterface, ToolOptions } from '../types.js'
 export class Tool implements ToolInterface {
 	readonly name: string
 	readonly description?: string
+	readonly summary?: string
 	readonly parameters?: Readonly<Record<string, unknown>>
 	readonly #execute: (args: Readonly<Record<string, unknown>>) => Promise<unknown> | unknown
 
 	constructor(options: ToolOptions) {
 		this.name = options.name
 		this.description = options.description
+		this.summary = options.summary
 		this.parameters = options.parameters
 		this.#execute = options.execute
 	}

@@ -118,6 +118,12 @@ export interface ToolCallResult {
  */
 export interface ToolInterface extends ToolDefinition {
 	/**
+	 * A one-or-two-sentence concise description advertised to the model IN PLACE of the
+	 * full `description` (which stays on the tool for on-demand retrieval, e.g. a
+	 * describe tool); absent ⇒ the full `description` is advertised exactly as today.
+	 */
+	readonly summary?: string
+	/**
 	 * Run the tool. `args` is the model-supplied `unknown` JSON object — narrow it
 	 * inside (§14); the manager isolates a throw into a {@link ToolResult} `error`.
 	 *
@@ -134,12 +140,16 @@ export interface ToolInterface extends ToolDefinition {
  * @remarks
  * `name` is required (it keys the tool in a {@link ToolManagerInterface} and is what
  * the model calls); `description` and `parameters` are the optional JSON-Schema the
- * provider advertises (forwarded verbatim). `execute` receives the model-supplied
- * arguments record and returns the tool's result (sync or async).
+ * provider advertises (forwarded verbatim). `summary`, when set, is a lean
+ * one-or-two-sentence advertisement used IN PLACE of `description` in a
+ * {@link ToolManagerInterface.definitions} listing — `description` stays available on
+ * the tool for on-demand retrieval. `execute` receives the model-supplied arguments
+ * record and returns the tool's result (sync or async).
  */
 export interface ToolOptions {
 	readonly name: string
 	readonly description?: string
+	readonly summary?: string
 	readonly parameters?: Readonly<Record<string, unknown>>
 	readonly execute: (args: Readonly<Record<string, unknown>>) => Promise<unknown> | unknown
 }
@@ -152,7 +162,9 @@ export interface ToolOptions {
  * - **Registry.** `add` registers one tool or a batch (§9.2), keyed by `tool.name`
  *   (a re-`add` of the same name overwrites — last write wins); `count` is the number
  *   registered. `tool(name)` looks one up; `tools()` lists them in insertion order;
- *   `definitions()` strips each to a plain {@link ToolDefinition} for the provider.
+ *   `definitions()` strips each to a plain {@link ToolDefinition} for the provider,
+ *   advertising `tool.summary ?? tool.description` in the definition's `description`
+ *   field — a lean `summary` stands in for the full `description` when set.
  * - **Per-call error isolation.** `execute` resolves a {@link ToolCall}'s tool by name
  *   and runs it, ALWAYS resolving a {@link ToolResult}: a success carries `value`, a
  *   handler throw is caught into `error`, and an unknown name becomes a not-found
@@ -1358,13 +1370,21 @@ export interface AgentRegistryInterface {
  * `providers` is required (a job always names a provider); `tools` / `authorities` /
  * `schedulers` are optional pools, each an entity-keyed record (§8) mapping a registry
  * name to its live object. A name absent from its pool throws when resolved (see
- * {@link AgentRegistryInterface}).
+ * {@link AgentRegistryInterface}). `store` is the durable {@link ConversationStoreInterface}
+ * every agent this registry builds carries: each built agent gets its OWN store-backed
+ * {@link ConversationManagerInterface} over THIS shared store — a fresh conversation id per
+ * build (minted by the seeded `add`), so concurrent builds never collide, and the store
+ * simply accumulates one snapshot per built agent that later calls `save`. Persistence
+ * stays caller-triggered (`open` / `save`) — `build` never hydrates, so `build` stays
+ * SYNCHRONOUS. Omitted ⇒ every built agent gets a registry-only manager, byte-identical
+ * to today.
  */
 export interface AgentRegistryOptions {
 	readonly providers: Readonly<Record<string, ProviderInterface>>
 	readonly tools?: Readonly<Record<string, ToolInterface>>
 	readonly authorities?: Readonly<Record<string, AuthorityInterface>>
 	readonly schedulers?: Readonly<Record<string, SchedulerInterface>>
+	readonly store?: ConversationStoreInterface
 }
 
 /**

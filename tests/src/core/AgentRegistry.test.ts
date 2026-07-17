@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentJobInput } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
-import { createAgentRegistry, createAuthority, createTool } from '@src/core'
+import {
+	createAgentRegistry,
+	createAuthority,
+	createMemoryConversationStore,
+	createTool,
+} from '@src/core'
 import {
 	addTool,
 	createRecordingScheduler,
@@ -526,6 +531,56 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		// Each runs independently to the same scripted result.
 		expect((await first.generate()).content).toBe('twice')
 		expect((await second.generate()).content).toBe('twice')
+	})
+})
+
+describe('AgentRegistry — conversation store seam', () => {
+	it('threads a store-backed conversation manager into every built agent — save persists, retrievable via store.get', async () => {
+		const store = createMemoryConversationStore()
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+			store,
+		})
+		const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'hi' }] })
+		const active = agent.context.conversations.active
+		if (active === undefined) throw new Error('expected an active conversation')
+		const id = active.id
+		const saved = await agent.context.conversations.save(id)
+		expect(saved).toBe(true)
+		const snapshot = await store.get(id)
+		expect(snapshot?.id).toBe(id)
+		expect(snapshot?.messages.map((m) => m.content)).toEqual(['hi'])
+	})
+
+	it('gives two builds distinct conversation ids in the same shared store — no collision', () => {
+		const store = createMemoryConversationStore()
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+			store,
+		})
+		const first = registry.build({ provider: 'main', messages: [] })
+		const second = registry.build({ provider: 'main', messages: [] })
+		expect(first.context.conversations.active?.id).not.toBe(second.context.conversations.active?.id)
+	})
+
+	it('build stays synchronous even when a store is configured (no hydration on build)', () => {
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+			store: createMemoryConversationStore(),
+		})
+		// No `await` — a synchronous call proves `build` never returns a Promise.
+		const agent = registry.build({ provider: 'main', messages: [] })
+		expect(agent).toBeDefined()
+	})
+
+	it('omits the store — behavior identical to today (a registry-only manager)', () => {
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+		})
+		const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'hi' }] })
+		// Spot-check an existing assertion still passes unchanged.
+		expect(agent.context.messages.messages()).toHaveLength(1)
+		expect(agent.context.messages.messages()[0]).toMatchObject({ role: 'user', content: 'hi' })
 	})
 })
 

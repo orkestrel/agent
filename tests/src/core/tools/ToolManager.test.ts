@@ -166,6 +166,45 @@ describe('ToolManager — registry', () => {
 	})
 })
 
+describe('ToolManager — summary advertisement', () => {
+	it('advertises the summary in place of the full description via definitions()', () => {
+		const manager = new ToolManager()
+		manager.add(
+			new Tool({
+				name: 'search',
+				description: 'A very long, detailed explanation of how the search tool works internally.',
+				summary: 'Search the index.',
+				execute: () => 0,
+			}),
+		)
+
+		expect(manager.definitions()).toEqual([{ name: 'search', description: 'Search the index.' }])
+		// The full description stays on the tool itself for on-demand retrieval.
+		expect(manager.tool('search')?.description).toBe(
+			'A very long, detailed explanation of how the search tool works internally.',
+		)
+	})
+
+	it('advertises the full description exactly as before when no summary is set', () => {
+		const manager = new ToolManager()
+		manager.add(
+			new Tool({ name: 'plain', description: 'Full description only.', execute: () => 0 }),
+		)
+
+		expect(manager.definitions()).toEqual([
+			{ name: 'plain', description: 'Full description only.' },
+		])
+	})
+
+	it('omits description when neither summary nor description is set', () => {
+		const manager = new ToolManager()
+		manager.add(new Tool({ name: 'bare', execute: () => 0 }))
+
+		expect(manager.definitions()).toEqual([{ name: 'bare' }])
+		expect('description' in manager.definitions()[0]).toBe(false)
+	})
+})
+
 describe('ToolManager — execute isolation', () => {
 	it('resolves a successful call to { id, name, value }', async () => {
 		const manager = new ToolManager()

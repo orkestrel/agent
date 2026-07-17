@@ -5,6 +5,7 @@ import type {
 	AgentRegistryInterface,
 	AgentRegistryOptions,
 	AuthorityInterface,
+	ConversationStoreInterface,
 	ProviderInterface,
 	ToolInterface,
 } from './types.js'
@@ -12,6 +13,7 @@ import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import { createTokenBudget } from '@orkestrel/budget'
 import { Agent } from './Agent.js'
+import { ConversationManager } from './conversations/ConversationManager.js'
 import { ToolManager } from './tools/ToolManager.js'
 
 /**
@@ -54,12 +56,14 @@ export class AgentRegistry implements AgentRegistryInterface {
 	readonly #tools: ReadonlyMap<string, ToolInterface>
 	readonly #authorities: ReadonlyMap<string, AuthorityInterface>
 	readonly #schedulers: ReadonlyMap<string, SchedulerInterface>
+	readonly #store: ConversationStoreInterface | undefined
 
 	constructor(options: AgentRegistryOptions) {
 		this.#providers = new Map(Object.entries(options.providers))
 		this.#tools = new Map(Object.entries(options.tools ?? {}))
 		this.#authorities = new Map(Object.entries(options.authorities ?? {}))
 		this.#schedulers = new Map(Object.entries(options.schedulers ?? {}))
+		this.#store = options.store
 	}
 
 	provider(name: string): ProviderInterface {
@@ -90,7 +94,11 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// Assemble the AgentOptions for one job: a fresh ToolManager loaded from the named
 	// tools, the rebuilt token budget, the resolved authority / scheduler, plus the data
 	// fields and the threaded cancel. Optional fields are OMITTED (not set to `undefined`)
-	// so the Agent's `?? default` fallbacks behave exactly as for a hand-built agent.
+	// so the Agent's `?? default` fallbacks behave exactly as for a hand-built agent. When
+	// the registry carries a conversation store, thread a fresh store-backed
+	// ConversationManager for THIS build (a fresh conversation id per build ⇒ no
+	// collisions in the shared store) — omitted when no store is set, so the shape stays
+	// byte-identical to a registry with no `store`.
 	#options(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
 		return {
 			system: input.system,
@@ -100,6 +108,8 @@ export class AgentRegistry implements AgentRegistryInterface {
 			budget: this.#budget(input.budget),
 			authority: input.authority === undefined ? undefined : this.authority(input.authority),
 			scheduler: input.scheduler === undefined ? undefined : this.scheduler(input.scheduler),
+			conversations:
+				this.#store === undefined ? undefined : new ConversationManager({ store: this.#store }),
 			signal,
 		}
 	}
