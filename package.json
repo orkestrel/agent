@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/agent",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "A typed agent runtime for the @orkestrel line — providers, tools, conversations, workspaces, and a composable agent context. Part of the @orkestrel line.",
 	"keywords": [
 		"agent",
@@ -65,7 +65,7 @@
 	"dependencies": {
 		"@orkestrel/abort": "^0.0.2",
 		"@orkestrel/budget": "^0.0.2",
-		"@orkestrel/contract": "^0.0.2",
+		"@orkestrel/contract": "^0.0.3",
 		"@orkestrel/database": "^0.0.4",
 		"@orkestrel/emitter": "^0.0.2",
 		"@orkestrel/queue": "^0.0.2",
