@@ -32,7 +32,7 @@ import { AgentContext } from './AgentContext.js'
 import { Channel } from './Channel.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { isProviderAbortError } from './errors.js'
-import { filterAllowList } from './helpers.js'
+import { estimateTokens, filterAllowList } from './helpers.js'
 
 /**
  * The agent loop — composes a {@link ProviderInterface}, an {@link AgentContext}, and
@@ -144,13 +144,19 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
-		const timeout =
-			this.#timeoutMs === undefined ? undefined : createTimeout({ ms: this.#timeoutMs })
+		// Resolve effective per-run bounds — a per-run override (§F3) wins, else the
+		// construction default. `limit` and `budget` also thread into `#run` (the loop bound
+		// + F2's mid-stream charging); `budget` here is the SAME instance folded into `#parents`
+		// below, so its trip both aborts the run and is the budget `#run` charges against.
+		const timeoutMs = options?.timeout ?? this.#timeoutMs
+		const timeout = timeoutMs === undefined ? undefined : createTimeout({ ms: timeoutMs })
 		timeout?.start()
-		this.#budget?.start()
-		// Fold every present bound (external signal + deadline + budget) into one cancel
-		// the run races against; this run's own `abort()` fires this handle.
-		const abort = createAbort({ signal: this.#parents(timeout) })
+		const budget = options?.budget ?? this.#budget
+		budget?.start()
+		const limit = options?.limit ?? this.#limit
+		// Fold every present bound (external signal + a per-run signal + deadline + budget)
+		// into one cancel the run races against; this run's own `abort()` fires this handle.
+		const abort = createAbort({ signal: this.#parents(timeout, budget, options?.signal) })
 		this.#runs.add(abort)
 		this.#status = 'running'
 		// Observe the run begin — AFTER the `running` transition, so a swallowed listener
@@ -161,13 +167,25 @@ export class Agent implements AgentInterface {
 			thinking: undefined,
 			usage: undefined,
 			partial: false,
+			exhausted: false,
 		}
 		const channel = new Channel<AgentChunk>()
 		const settled: DeferredInterface<AgentResult> = createDeferred<AgentResult>()
 		// Kick off the eager pump SYNCHRONOUSLY (not lazily on first `events` pull): it
 		// drives `#run` into the channel and settles `settled` regardless of whether anyone
-		// drains `events`. The per-run `think` preference rides through to `provider.stream`.
-		void this.#pump(abort, outcome, timeout, channel, settled, options?.think)
+		// drains `events`. The per-run `think` / `schema` preferences ride through to
+		// `provider.stream`; `limit` / `budget` ride through as the effective run bounds.
+		void this.#pump(
+			abort,
+			outcome,
+			timeout,
+			channel,
+			settled,
+			options?.think,
+			options?.schema,
+			limit,
+			budget,
+		)
 		// An abandoned handle (neither `events` drained nor `result` awaited) must not surface an
 		// unhandledRejection on a genuine error — guard the PUBLIC result, where the rejection lives
 		// (#pump's finally rejects `settled` without re-throwing, so the pump promise itself resolves).
@@ -210,10 +228,15 @@ export class Agent implements AgentInterface {
 		channel: Channel<AgentChunk>,
 		settled: DeferredInterface<AgentResult>,
 		think: boolean | undefined,
+		schema: Readonly<Record<string, unknown>> | undefined,
+		limit: number,
+		budget: BudgetInterface<TokenUsage> | undefined,
 	): Promise<void> {
 		let failure: { error: unknown } | undefined
 		try {
-			for await (const chunk of this.#run(abort, outcome, think)) channel.push(chunk)
+			for await (const chunk of this.#run(abort, outcome, think, schema, limit, budget)) {
+				channel.push(chunk)
+			}
 		} catch (error) {
 			failure = { error }
 		} finally {
@@ -230,9 +253,12 @@ export class Agent implements AgentInterface {
 				// settled; emit only OBSERVES it). A cancel still RESOLVES a partial, so a
 				// cancelled run emits `abort` (the cancel reason) THEN `finish` (the settled
 				// partial) — observers see both "it was cancelled" and the partial outcome; a
-				// natural / cap finish (`partial: false`) emits `finish` only. Both emits are
+				// natural / cap finish (`partial: false`) emits `finish` only. LIMIT EXHAUSTION
+				// (unresolved tool intent at the turn cap) is NOT a cancel — it emits `exhaust`
+				// (the turn count) INSTEAD of `abort`, still followed by `finish`. Both emits are
 				// post-settle, so an isolated listener throw can't reorder the latch.
-				if (outcome.partial) this.#emitter.emit('abort', abort.signal.reason)
+				if (outcome.exhausted) this.#emitter.emit('exhaust', limit)
+				else if (outcome.partial) this.#emitter.emit('abort', abort.signal.reason)
 				this.#emitter.emit('finish', result)
 			} else {
 				this.#status = 'error'
@@ -273,6 +299,9 @@ export class Agent implements AgentInterface {
 		abort: AbortInterface,
 		outcome: RunOutcome,
 		think: boolean | undefined,
+		schema: Readonly<Record<string, unknown>> | undefined,
+		limit: number,
+		budget: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, void> {
 		// Pass the provider's optional context-framing default into `build()` — the
 		// PROVIDER level of the format cascade. An agnostic provider supplies no `format`,
@@ -282,6 +311,14 @@ export class Agent implements AgentInterface {
 		let content = ''
 		let thinking: string | undefined
 		let usage: TokenUsage | undefined
+		// F1 limit-exhaustion tracking — `pending` is `true` while the most recent turn left
+		// unresolved tool intent (the tool branch was taken and the loop is about to `continue`);
+		// `broke` marks whether the loop exited via an explicit `break` (a cancel, or the natural
+		// final-answer finish) rather than the `for` condition failing. Exhaustion is exactly
+		// "the condition failed (`!broke`) while tool intent was still pending" — a `limit: 0` run
+		// never enters the loop, so both stay `false` and the outcome is non-partial.
+		let pending = false
+		let broke = false
 		// PER-RUN auto-compaction state — created FRESH each run (never carried across runs or a
 		// conversation switch). `futile` is the single-level guard (clause 26): once a `compact()`
 		// returns `undefined` while still over the window, the prompt can't shrink further, so
@@ -309,7 +346,7 @@ export class Agent implements AgentInterface {
 			// auto-compaction for the run; the growing tail can still fold on the between-turns checks.
 			if (!abort.signal.aborted) await this.#trim(messages, compaction, false)
 		}
-		for (let turn = 0; turn < this.#limit; turn += 1) {
+		for (let turn = 0; turn < limit; turn += 1) {
 			// Observe each iteration begin (the turn index). The emitter isolates a listener
 			// throw, so it can't perturb the loop that immediately follows.
 			this.#emitter.emit('turn', turn)
@@ -325,6 +362,7 @@ export class Agent implements AgentInterface {
 				} catch (error) {
 					if (abort.signal.aborted) {
 						outcome.partial = true
+						broke = true
 						break
 					}
 					throw error
@@ -332,6 +370,7 @@ export class Agent implements AgentInterface {
 			}
 			if (abort.signal.aborted) {
 				outcome.partial = true
+				broke = true
 				break
 			}
 			// Advertise only the tools the active scope admits — a scoped-out tool is filtered
@@ -343,11 +382,36 @@ export class Agent implements AgentInterface {
 				(definition) => definition.name,
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
+			// F2 bounded mid-stream budget enforcement — a PER-TURN local accumulator (`turnContent`,
+			// distinct from the run-spanning `content`) so `charged` (the amount already consumed
+			// against `budget` THIS turn) never mixes with prior turns' content. As each content delta
+			// arrives, re-estimate the turn's token footprint so far and consume only the INCREMENT
+			// over what was already charged — the running `budget.consume` therefore mirrors the live
+			// stream instead of waiting for the turn's final usage report. Thinking deltas are NOT
+			// metered here: `#provide` never routes a `'thinking'` delta through `onDelta` (only
+			// `'content'` deltas are), so there is no live thinking text to estimate mid-stream — the
+			// honest choice given the loop's existing delta wiring; thinking is metered, like content,
+			// only via the post-turn usage reconcile below (which charges the FULL reported usage).
+			let charged = 0
+			let turnContent = ''
 			let result: ProviderResult
 			try {
-				result = yield* this.#provide(messages, abort.signal, definitions, think, (delta) => {
-					content += delta
-				})
+				result = yield* this.#provide(
+					messages,
+					abort.signal,
+					definitions,
+					think,
+					schema,
+					(delta) => {
+						content += delta
+						turnContent += delta
+						const est = estimateTokens(turnContent)
+						if (est > charged) {
+							budget?.consume({ prompt: 0, completion: est - charged, total: est - charged })
+							charged = est
+						}
+					},
+				)
 			} catch (error) {
 				// A cancel mid-stream (the bound signal aborted): stop and mark partial. The
 				// deltas streamed before the cancel were already accumulated into `content`
@@ -361,6 +425,7 @@ export class Agent implements AgentInterface {
 						thinking = this.#thought(thinking, error.partial.thinking)
 					}
 					outcome.partial = true
+					broke = true
 					break
 				}
 				throw error
@@ -369,7 +434,18 @@ export class Agent implements AgentInterface {
 				thinking = this.#thought(thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
-				this.#budget?.consume(result.usage)
+				// RESIDUAL reconcile — the mid-stream charges above already consumed `charged` worth
+				// of budget against this turn's completion; charge only what remains of the FULL
+				// reported usage so the turn's total budget draw matches `result.usage` exactly (never
+				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
+				// exists), so it is charged here in full. `#sum` / the emitted `usage` chunk below
+				// still carry the FULL authoritative `result.usage` — reconciliation affects only the
+				// budget charge, never the reported usage.
+				budget?.consume({
+					prompt: result.usage.prompt,
+					completion: Math.max(0, result.usage.completion - charged),
+					total: Math.max(0, result.usage.total - charged),
+				})
 				usage = this.#sum(usage, result.usage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
 				this.#emitter.emit('usage', result.usage)
@@ -406,12 +482,23 @@ export class Agent implements AgentInterface {
 				// the prior behavior. `latchFutile: true` — by now the tail has accumulated this turn's
 				// appends, so an `undefined` fold here is genuinely futile (clause 26).
 				if (compacting) await this.#trim(messages, compaction, true)
+				pending = true
 				continue
 			}
 			// No tools: this turn's content is the final answer — record it and finish.
 			messages.push(this.#context.messages.add({ role: 'assistant', content: result.content }))
 			content = result.content
+			pending = false
+			broke = true
 			break
+		}
+		// F1 — the loop exhausted `limit` (the `for` condition failed, never a `break`) while the
+		// most recent turn still held unresolved tool intent: commit the outcome PARTIAL and flag it
+		// `exhausted` (distinct from a cancel — no `signal` / `timeout` / `budget` tripped). A
+		// `limit: 0` run never enters the loop (`pending` stays `false`), so it stays non-partial.
+		if (!broke && pending) {
+			outcome.partial = true
+			outcome.exhausted = true
 		}
 		outcome.content = content
 		outcome.thinking = thinking
@@ -554,20 +641,26 @@ export class Agent implements AgentInterface {
 	// yields — a `'content'` delta is the answer (fed back via `onDelta`, surfaced as a
 	// `token` chunk); a `'thinking'` delta is live reasoning (surfaced as a `think` chunk,
 	// NEVER fed into `onDelta` — reasoning is not answer content) — returning the provider's
-	// assembled result. The per-run `think` preference rides into `provider.stream` as
-	// {@link ProviderStreamOptions}. Kept separate so the loop reads as one straight line.
+	// assembled result. The per-run `think` / `schema` preferences ride into `provider.stream`
+	// as {@link ProviderStreamOptions}, composed together — keys are OMITTED when undefined, so
+	// the provider receives no options object at all when both are absent (preserving the prior
+	// think-only behavior exactly). Kept separate so the loop reads as one straight line.
 	async *#provide(
 		messages: readonly MessageInterface[],
 		signal: AbortSignal,
 		definitions: ReturnType<ToolManagerInterface['definitions']> | undefined,
 		think: boolean | undefined,
+		schema: Readonly<Record<string, unknown>> | undefined,
 		onDelta: (delta: string) => void,
 	): AsyncGenerator<AgentChunk, ProviderResult> {
+		const options: { think?: boolean; schema?: Readonly<Record<string, unknown>> } = {}
+		if (think !== undefined) options.think = think
+		if (schema !== undefined) options.schema = schema
 		const generator = this.#provider.stream(
 			messages,
 			signal,
 			definitions,
-			think === undefined ? undefined : { think },
+			Object.keys(options).length > 0 ? options : undefined,
 		)
 		let next = await generator.next()
 		while (!next.done) {
@@ -583,13 +676,20 @@ export class Agent implements AgentInterface {
 		return next.value
 	}
 
-	// The parent signal for a run's abort: the external signal, the deadline, and the
-	// budget folded via AbortSignal.any — or a lone present one, or undefined when none.
-	#parents(timeout: TimeoutInterface | undefined): AbortSignal | undefined {
+	// The parent signal for a run's abort: the external signal, an optional per-run signal
+	// (§F3 — composed with, never replacing, the construction `signal`), the deadline, and the
+	// EFFECTIVE budget (a per-run override, else the construction `budget`) folded via
+	// `AbortSignal.any` — or a lone present one, or `undefined` when none.
+	#parents(
+		timeout: TimeoutInterface | undefined,
+		budget: BudgetInterface<TokenUsage> | undefined,
+		signal: AbortSignal | undefined,
+	): AbortSignal | undefined {
 		const signals: AbortSignal[] = []
 		if (this.#signal !== undefined) signals.push(this.#signal)
+		if (signal !== undefined) signals.push(signal)
 		if (timeout !== undefined) signals.push(timeout.signal)
-		if (this.#budget !== undefined) signals.push(this.#budget.signal)
+		if (budget !== undefined) signals.push(budget.signal)
 		if (signals.length === 0) return undefined
 		if (signals.length === 1) return signals[0]
 		return AbortSignal.any(signals)

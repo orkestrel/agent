@@ -241,13 +241,18 @@ export type ProviderDelta =
  * `think` OVERRIDES the provider's constructed reasoning preference for THIS call: `true`
  * asks the backend to separate reasoning natively (a thinking model returns it on its
  * `message.thinking` channel, surfaced as `'thinking'` {@link ProviderDelta}s + the final
- * {@link ProviderResult.thinking}); `false` suppresses it. Omitted ⇒ the provider's own
- * default applies (the constructor value), so the contract stays backward-safe — a caller
+ * {@link ProviderResult.thinking}); `false` suppresses it. `schema`, when given, asks the
+ * backend to constrain its response to the given JSON-Schema shape (the same open
+ * JSON-Schema record {@link ToolDefinition.parameters} already carries) — a structured-output
+ * request for THIS call only. Both omitted ⇒ the provider's own defaults apply (the
+ * constructor value / no schema constraint), so the contract stays backward-safe — a caller
  * that passes no options behaves exactly as before.
  */
 export interface ProviderStreamOptions {
 	/** Override the provider's reasoning preference for this call; omitted ⇒ the provider default. */
 	readonly think?: boolean
+	/** Constrain the response to this JSON-Schema shape (the same open record {@link ToolDefinition.parameters} uses); omitted ⇒ no constraint. */
+	readonly schema?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -888,9 +893,13 @@ export type AgentChunk =
  * `partial` is `true` when the turn was committed early from a cancel — an external
  * `signal` abort, the turn's own `abort()`, a `timeout` deadline, or an exhausted
  * `budget` — in which case `content` is whatever had accumulated when the cancel
- * landed. It is `false` for a turn that ran to a natural finish. `usage` is present
- * only when at least one provider call reported usage. `thinking` is present only
- * when a provider call surfaced reasoning it separated from the answer
+ * landed. `partial` is ALSO `true` when the loop exhausted its `limit` while still
+ * holding unresolved tool intent (the model requested tools on the very last allowed
+ * turn) — a distinct, non-cancel cause covered by {@link RunOutcome.exhausted} (see
+ * the `exhaust` {@link AgentEventMap} event). It is `false` for a turn that ran to a
+ * natural finish (including a `limit: 0` run, which never enters the loop). `usage` is
+ * present only when at least one provider call reported usage. `thinking` is present
+ * only when a provider call surfaced reasoning it separated from the answer
  * ({@link ProviderResult.thinking}, joined across the run's calls) — display/audit
  * metadata that never re-enters the conversation.
  */
@@ -913,16 +922,19 @@ export interface AgentResult {
  * the loop: `content` accumulates the streamed assistant text, `thinking` the
  * reasoning the provider calls separated from it ({@link ProviderResult.thinking},
  * joined across calls — `undefined` until one surfaces it), `usage` the summed
- * {@link TokenUsage} (present only when a provider call reported it), and `partial`
- * flips `true` when a cancel commits the run early. It is the INTERNAL precursor to
- * the settled `AgentResult` — the loop reads it back to assemble the public result —
- * not a caller-facing shape.
+ * {@link TokenUsage} (present only when a provider call reported it), `partial`
+ * flips `true` when a cancel commits the run early OR when the loop exhausts its
+ * `limit` with unresolved tool intent, and `exhausted` flips `true` in that second
+ * case specifically (a distinct, non-cancel cause the {@link AgentEventMap} `exhaust`
+ * event observes). It is the INTERNAL precursor to the settled `AgentResult` — the
+ * loop reads it back to assemble the public result — not a caller-facing shape.
  */
 export interface RunOutcome {
 	content: string
 	thinking: string | undefined
 	usage: TokenUsage | undefined
 	partial: boolean
+	exhausted: boolean
 }
 
 /**
@@ -986,6 +998,13 @@ export type AgentEventMap = {
 	readonly error: readonly [error: unknown]
 	/** The run was cancelled (external signal / timeout / budget / `abort()`) — the cancel reason. */
 	readonly abort: readonly [reason: unknown]
+	/**
+	 * The loop exhausted its `limit` while still holding unresolved tool intent (the model
+	 * requested tools on the very last allowed turn) — the turn count reached. Distinct from
+	 * `abort`: exhaustion is NOT a cancel (no external signal / timeout / budget tripped), so
+	 * this fires INSTEAD of `abort`, still followed by `finish` carrying the partial result.
+	 */
+	readonly exhaust: readonly [turns: number]
 	/**
 	 * AUTOMATIC compaction's summarizer THREW — a NON-FATAL warn channel (the run continues; see
 	 * {@link AgentOptions.window}). When the loop's between-turns / pre-first-turn auto-compaction
@@ -1139,6 +1158,34 @@ export interface AgentRunOptions {
 	 * behaviour), so a caller that passes no options runs exactly as before.
 	 */
 	readonly think?: boolean
+	/**
+	 * Constrain the response to this JSON-Schema shape, forwarded to the provider's `stream`
+	 * as {@link ProviderStreamOptions.schema} — a per-run structured-output request. Omitted ⇒
+	 * no constraint (the loop is byte-for-byte the prior behaviour).
+	 */
+	readonly schema?: Readonly<Record<string, unknown>>
+	/**
+	 * Overrides {@link AgentOptions.limit} for THIS run only — the max tool-iteration turns
+	 * before the loop stops. Omitted ⇒ the agent's constructed `limit` applies.
+	 */
+	readonly limit?: number
+	/**
+	 * Overrides {@link AgentOptions.timeout} for THIS run only — a wall-clock deadline (ms)
+	 * whose abort commits a partial result. Omitted ⇒ the agent's constructed `timeout` applies.
+	 */
+	readonly timeout?: number
+	/**
+	 * Overrides {@link AgentOptions.budget} for THIS run only — a token cost bound whose abort
+	 * commits a partial result; `start()`ed for this run exactly as the constructed budget is.
+	 * Omitted ⇒ the agent's constructed `budget` applies.
+	 */
+	readonly budget?: BudgetInterface<TokenUsage>
+	/**
+	 * An additional per-run external cancel, COMPOSED with {@link AgentOptions.signal} (both
+	 * fold into the run's bound abort via `AbortSignal.any` — neither is dropped). Omitted ⇒
+	 * only the agent's constructed `signal` (if any) applies.
+	 */
+	readonly signal?: AbortSignal
 }
 
 export interface AgentInterface {

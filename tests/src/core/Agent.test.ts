@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SchedulerInterface } from '@orkestrel/workflow'
+import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type {
 	AgentResult,
 	ContextFormatInterface,
@@ -60,6 +61,53 @@ const USAGE = createTokenUsage()
 // script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
 // repeat �€” so a loop that should have stopped (a cap / budget / cancel) but didn't is caught.
 const SCRIPT_OPTIONS: ScriptedProviderOptions = { name: 'script', record: true, exhaust: 'throw' }
+
+/** A real, hand-rolled {@link BudgetInterface} over {@link TokenUsage} that RECORDS every
+ * `consume()` call verbatim (AGENTS §16.1 recorder pattern) instead of extracting a single
+ * numeric field like `createTokenBudget` — so a test can sum the recorded field-by-field
+ * charges to prove the loop's F2 mid-stream + reconcile charging never double-counts or
+ * loses spend. A genuine `BudgetInterface` (its own `AbortController`, its own tally),
+ * never a mock of one. */
+interface RecordingBudgetInterface extends BudgetInterface<TokenUsage> {
+	readonly consumes: readonly TokenUsage[]
+}
+function createRecordingBudget(max: number): RecordingBudgetInterface {
+	const consumes: TokenUsage[] = []
+	let consumed = 0
+	let controller = new AbortController()
+	return {
+		id: 'recording-budget',
+		get signal() {
+			return controller.signal
+		},
+		max,
+		get consumed() {
+			return consumed
+		},
+		get remaining() {
+			return max - consumed
+		},
+		get exhausted() {
+			return consumed >= max
+		},
+		start() {
+			if (!controller.signal.aborted) return
+			controller = new AbortController()
+		},
+		consume(value: TokenUsage) {
+			consumes.push(value)
+			consumed += value.total
+			if (consumed >= max && !controller.signal.aborted) controller.abort()
+		},
+		clear() {
+			consumed = 0
+			controller = new AbortController()
+		},
+		get consumes() {
+			return consumes
+		},
+	}
+}
 
 describe('Agent �€” single turn', () => {
 	it('generate returns the content of a no-tools turn', async () => {
@@ -607,7 +655,9 @@ describe('Agent �€” authority gate', () => {
 		// No tool ever ran; the cap still bounded the loop at 3 turns.
 		expect(recorder.count).toBe(0)
 		expect(provider.calls).toHaveLength(3)
-		expect(result.partial).toBe(false)
+		// F1: the model still held unresolved tool intent on the last allowed turn (every turn
+		// requested the denied tool) — the loop exhausted its limit, so the outcome is partial.
+		expect(result.partial).toBe(true)
 		// Each turn produced exactly one tool chunk carrying a denial.
 		const toolChunks = chunks.filter((c) => c.type === 'tool')
 		expect(toolChunks).toHaveLength(3)
@@ -815,9 +865,10 @@ describe('Agent �€” iteration cap', () => {
 		const agent = createAgent(provider, { tools, limit: 3 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		// 3 turns ran, then the loop stopped (didn't exhaust the 10-turn script forever).
+		// 3 turns ran, then the loop stopped (didn't exhaust the 10-turn script forever). F1: the
+		// model still wanted a tool on the last allowed turn, so this is an exhaustion — partial.
 		expect(provider.calls).toHaveLength(3)
-		expect(result.partial).toBe(false)
+		expect(result.partial).toBe(true)
 	})
 })
 
@@ -1626,10 +1677,10 @@ describe('Agent �€” limit boundary', () => {
 		expect(provider.calls).toHaveLength(1)
 		expect(recorder.count).toBe(1)
 		expect(chunks.some((c) => c.type === 'tool')).toBe(true)
-		// Hitting the cap is NOT a cancel �€” `partial` is reserved for an early cancel commit
-		// (the AgentResult contract), so a cap-bounded finish reports `partial: false` with
-		// whatever the single turn streamed as its content.
-		expect(result.partial).toBe(false)
+		// F1: the single allowed turn requested a tool (unresolved intent) and the limit was
+		// then exhausted — the cap-bounded finish reports `partial: true` with whatever the
+		// single turn streamed as its content.
+		expect(result.partial).toBe(true)
 		expect(result.content).toBe('one')
 	})
 
@@ -1661,9 +1712,9 @@ describe('Agent �€” limit boundary', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(provider.calls).toHaveLength(10)
-		// Same contract as limit:1 �€” the cap bounds the loop, but it is not a cancel, so
-		// the result is `partial: false` (matching the existing iteration-cap test).
-		expect(result.partial).toBe(false)
+		// F1: every turn requested the tool, so the last allowed turn still held unresolved
+		// intent when the default cap was reached — the outcome is partial (exhausted).
+		expect(result.partial).toBe(true)
 	})
 })
 
@@ -2389,8 +2440,9 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		// Hitting the cap is a natural (non-partial) finish �€” `finish` fires, `abort` does not.
-		expect(result.partial).toBe(false)
+		// F1: limit-exhaustion with unresolved tool intent is NOT a cancel — `finish` fires,
+		// `abort` does not (an `exhaust` event fires instead, covered by the F1 describe block).
+		expect(result.partial).toBe(true)
 		expect(events.finish.count).toBe(1)
 		expect(events.abort.count).toBe(0)
 	})
@@ -2997,5 +3049,238 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 		expect(JSON.stringify(bOriginals)).not.toContain('alpha')
 		// And the SAME agent served both �€” its active conversation is whichever was last switched in.
 		expect(agent.context.conversations.active).toBe(b)
+	})
+})
+
+// F1 -- limit-exhaustion: the loop stopping because it ran out of turns while the model
+// still wanted more tool calls is a distinct, non-cancel cause (`exhausted`) that fires
+// `exhaust` INSTEAD of `abort`, still followed by `finish`.
+describe('Agent - F1 limit exhaustion', () => {
+	it('exhausts the limit with unresolved tool intent: partial, exhaust(limit), no abort, tool ran limit times', async () => {
+		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'loop',
+				execute: (args) => {
+					recorder.handler(args)
+					return 'again'
+				},
+			}),
+		)
+		// Every turn requests the tool -- the model never naturally finishes (exhaust: 'repeat'
+		// so a single scripted turn can serve as many calls as the loop makes).
+		const provider = createScriptedProvider(
+			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
+			{ ...SCRIPT_OPTIONS, exhaust: 'repeat' },
+		)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			tools,
+			limit: 2,
+			on: {
+				exhaust: () => order.push('exhaust'),
+				abort: () => order.push('abort'),
+				finish: () => order.push('finish'),
+			},
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.partial).toBe(true)
+		expect(provider.calls).toHaveLength(2)
+		expect(recorder.count).toBe(2)
+		// exhaust fired (carrying the effective limit) INSTEAD of abort, then finish -- in that order.
+		expect(order).toEqual(['exhaust', 'finish'])
+	})
+
+	it('a natural final answer on the very last allowed turn stays non-partial (no exhaust)', async () => {
+		const tools = createToolManager()
+		tools.add(loopTool())
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } },
+				{ result: { content: 'done' } },
+			],
+			SCRIPT_OPTIONS,
+		)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			tools,
+			limit: 2,
+			on: { exhaust: () => order.push('exhaust'), finish: () => order.push('finish') },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.partial).toBe(false)
+		expect(result.content).toBe('done')
+		expect(order).toEqual(['finish'])
+	})
+
+	it('limit: 0 resolves immediately, non-partial, no exhaust, no provider call', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			limit: 0,
+			on: { exhaust: () => order.push('exhaust'), finish: () => order.push('finish') },
+		})
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate()
+		expect(result).toEqual({ content: '', partial: false })
+		expect(provider.calls).toHaveLength(0)
+		expect(order).toEqual(['finish'])
+	})
+})
+
+// F2 -- bounded mid-stream budget enforcement: content deltas are charged incrementally as
+// estimated tokens against the effective budget, a mid-stream trip folds into the abort
+// funnel, and the turn-end reconcile makes the total charge net to the authoritative usage.
+describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
+	it('a mid-stream estimated charge crossing the budget aborts the run (partial, abort event)', async () => {
+		const budget = createTokenBudget({ max: 5, scope: 'completion' })
+		// 10 five-char deltas -- cumulative estimateTokens (ceil(len/4)) crosses 5 well before
+		// the turn completes, so the trip lands MID-STREAM, not at the final usage reconcile.
+		const deltas = Array.from({ length: 10 }, () => 'abcde')
+		const provider = createScriptedProvider(
+			[{ result: { content: deltas.join('') }, deltas }],
+			SCRIPT_OPTIONS,
+		)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			budget,
+			on: { abort: () => order.push('abort'), finish: () => order.push('finish') },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.partial).toBe(true)
+		expect(order).toEqual(['abort', 'finish'])
+		// The cancel landed before all 10 deltas streamed -- the provider genuinely saw its
+		// bound signal aborted mid-stream (a scripted provider throws ProviderAbortError only
+		// once `signal.aborted` is observed between deltas).
+		expect(result.content.length).toBeLessThan(deltas.join('').length)
+	})
+
+	it('the turn-end reconcile nets total budget consumption to the authoritative usage (no double-charge, no loss)', async () => {
+		const usage: TokenUsage = { prompt: 20, completion: 30, total: 50 }
+		const provider = createScriptedProvider(
+			[{ result: { content: 'hello world', usage }, deltas: ['hello ', 'world'] }],
+			SCRIPT_OPTIONS,
+		)
+		const budget = createRecordingBudget(1_000_000) // generous -- never trips
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate()
+		expect(result.partial).toBe(false)
+		expect(result.usage).toEqual(usage) // the REPORTED usage is unaffected by budget metering
+		const sum = (field: keyof TokenUsage): number =>
+			budget.consumes.reduce((total, one) => total + one[field], 0)
+		expect(sum('prompt')).toBe(usage.prompt)
+		expect(sum('completion')).toBe(usage.completion)
+		expect(sum('total')).toBe(usage.total)
+		// At least one mid-stream charge happened (the content deltas were estimated as they
+		// streamed) AND the reconcile happened (more than one consume call for the one turn).
+		expect(budget.consumes.length).toBeGreaterThan(1)
+	})
+})
+
+// F3 -- per-run bounds: `limit` / `timeout` / `budget` / `signal` on `AgentRunOptions`
+// override the construction defaults (`??` semantics) for that run only; a per-run
+// `signal` COMPOSES with (never replaces) the construction `signal`.
+describe('Agent - F3 per-run overrides', () => {
+	it('a per-run limit overrides the constructed limit', async () => {
+		const tools = createToolManager()
+		tools.add(loopTool())
+		const provider = createScriptedProvider(
+			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
+			SCRIPT_OPTIONS,
+		)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			tools,
+			limit: 10,
+			on: { exhaust: () => order.push('exhaust') },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate({ limit: 1 })
+		expect(result.partial).toBe(true)
+		expect(provider.calls).toHaveLength(1)
+		expect(order).toEqual(['exhaust'])
+	})
+
+	it('a per-run signal COMPOSES with the constructed signal -- either aborting cancels the run', async () => {
+		// The constructed signal is already aborted; the per-run signal stays quiet.
+		const constructionController = new AbortController()
+		constructionController.abort()
+		const providerA = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const agentA = createAgent(providerA, { signal: constructionController.signal })
+		agentA.context.messages.add({ role: 'user', content: 'hi' })
+		const quietRunSignal = new AbortController().signal
+		const resultA = await agentA.generate({ signal: quietRunSignal })
+		expect(resultA.partial).toBe(true)
+		expect(providerA.calls).toHaveLength(0)
+
+		// The per-run signal aborts; the constructed signal stays quiet.
+		const providerB = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const agentB = createAgent(providerB) // no constructed signal
+		agentB.context.messages.add({ role: 'user', content: 'hi' })
+		const runController = new AbortController()
+		runController.abort()
+		const resultB = await agentB.generate({ signal: runController.signal })
+		expect(resultB.partial).toBe(true)
+		expect(providerB.calls).toHaveLength(0)
+	})
+
+	it('a per-run timeout commits a partial when it elapses', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], {
+			...SCRIPT_OPTIONS,
+			delay: 50,
+		})
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate({ timeout: 5 })
+		expect(result.partial).toBe(true)
+	})
+
+	it('a per-run budget is the one charged -- the constructed budget stays untouched', async () => {
+		const usage: TokenUsage = { prompt: 5, completion: 5, total: 10 }
+		const provider = createScriptedProvider([{ result: { content: 'ok', usage } }], SCRIPT_OPTIONS)
+		const constructionBudget = createRecordingBudget(1_000_000)
+		const runBudget = createRecordingBudget(1_000_000)
+		const agent = createAgent(provider, { budget: constructionBudget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate({ budget: runBudget })
+		expect(result.partial).toBe(false)
+		expect(constructionBudget.consumes).toEqual([])
+		expect(runBudget.consumes.length).toBeGreaterThan(0)
+	})
+})
+
+// F4 -- `schema` (like `think`) is a per-run `ProviderStreamOptions` field: composed options
+// are passed to `provider.stream`, omitting undefined keys (an options object only when at
+// least one of `think` / `schema` is present -- preserving the prior think-only behavior).
+describe('Agent - F4 per-run schema', () => {
+	it('forwards a per-run schema alone', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
+		await agent.generate({ schema })
+		expect(provider.calls[0]?.options).toEqual({ schema })
+	})
+
+	it('forwards think AND schema together when both are set', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
+		await agent.generate({ think: true, schema })
+		expect(provider.calls[0]?.options).toEqual({ think: true, schema })
+	})
+
+	it('omits the options object entirely when neither think nor schema is set (preserved behavior)', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		await agent.generate()
+		expect(provider.calls[0]?.options).toBeUndefined()
 	})
 })

@@ -168,7 +168,9 @@ describe('AgentRegistry — build (rehydration)', () => {
 		const result = await agent.generate()
 		// The cap bounded the loop at 3 provider calls (no infinite loop).
 		expect(provider.started).toBe(3)
-		expect(result.partial).toBe(false)
+		// Every turn requested the tool, so the wired limit was exhausted with
+		// unresolved tool intent — the result is partial.
+		expect(result.partial).toBe(true)
 	})
 
 	it('resolves a `scheduler` name and the rehydrated loop paces through it', async () => {
