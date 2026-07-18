@@ -3218,6 +3218,77 @@ describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
 		// streamed) AND the reconcile happened (more than one consume call for the one turn).
 		expect(budget.consumes.length).toBeGreaterThan(1)
 	})
+
+	// A cancel mid-stream is not the only place usage can surface: a provider that OBSERVED
+	// usage before the cancel landed carries it on the `ProviderAbortError.partial` too. The
+	// abort path must fold it into `result.usage` (mirroring the normal post-turn path) rather
+	// than silently dropping the aborted turn's tokens.
+	it('a cancel mid-stream carrying partial usage folds it into the settled result.usage', async () => {
+		const gate = createGate()
+		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
+		const provider: ProviderInterface = {
+			id: 's',
+			name: 's',
+			async *stream(_messages, signal) {
+				yield { type: 'content', text: 'part' }
+				await gate.promise
+				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
+				return { content: 'partfull' }
+			},
+			async generate() {
+				return { content: 'partfull' }
+			},
+		}
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const stream = agent.stream()
+		const drained = collect(stream.events)
+		await waitForDelay()
+		agent.abort()
+		gate.resolve()
+		await drained
+		const result = await stream.result
+		expect(result.partial).toBe(true)
+		expect(result.content).toBe('part')
+		expect(result.usage).toEqual(abortUsage)
+	})
+
+	it('a cancel mid-stream reconciles the budget to the reported partial usage (no double-charge, no loss)', async () => {
+		const gate = createGate()
+		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
+		const provider: ProviderInterface = {
+			id: 's',
+			name: 's',
+			async *stream(_messages, signal) {
+				yield { type: 'content', text: 'part' }
+				await gate.promise
+				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
+				return { content: 'partfull' }
+			},
+			async generate() {
+				return { content: 'partfull' }
+			},
+		}
+		const budget = createRecordingBudget(1_000_000) // generous -- never trips
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const stream = agent.stream()
+		const drained = collect(stream.events)
+		await waitForDelay()
+		agent.abort()
+		gate.resolve()
+		await drained
+		const result = await stream.result
+		expect(result.partial).toBe(true)
+		expect(result.usage).toEqual(abortUsage)
+		// Mid-stream estimate(s) + the abort-path residual reconcile net to EXACTLY the reported
+		// partial usage -- the same invariant the normal-path reconcile test proves above.
+		const sum = (field: keyof TokenUsage): number =>
+			budget.consumes.reduce((total, one) => total + one[field], 0)
+		expect(sum('prompt')).toBe(abortUsage.prompt)
+		expect(sum('completion')).toBe(abortUsage.completion)
+		expect(sum('total')).toBe(abortUsage.total)
+	})
 })
 
 // F3 -- per-run bounds: `limit` / `timeout` / `budget` / `signal` on `AgentRunOptions`

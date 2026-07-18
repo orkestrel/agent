@@ -898,7 +898,11 @@ export type AgentChunk =
  * turn) — a distinct, non-cancel cause covered by {@link RunOutcome.exhausted} (see
  * the `exhaust` {@link AgentEventMap} event). It is `false` for a turn that ran to a
  * natural finish (including a `limit: 0` run, which never enters the loop). `usage` is
- * present only when at least one provider call reported usage. `thinking` is present
+ * present only when at least one provider call reported usage — an aborted run's `usage`
+ * INCLUDES the cancelled turn's tokens when the provider reports partial usage on the
+ * abort (folded in exactly like a completed turn's); a provider that cannot observe
+ * usage mid-stream (e.g. a daemon whose final counts never arrive before the cancel)
+ * reports none for that turn, and none is fabricated. `thinking` is present
  * only when a provider call surfaced reasoning it separated from the answer
  * ({@link ProviderResult.thinking}, joined across the run's calls) — display/audit
  * metadata that never re-enters the conversation.

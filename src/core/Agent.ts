@@ -425,8 +425,25 @@ export class Agent implements AgentInterface {
 				// channel, though — the abort partial is its only carrier, so harvest it. A
 				// non-abort error (the signal is not aborted) propagates so the run rejects.
 				if (abort.signal.aborted) {
-					if (isProviderAbortError(error) && error.partial.thinking !== undefined) {
-						thinking = this.#thought(thinking, error.partial.thinking)
+					if (isProviderAbortError(error)) {
+						if (error.partial.thinking !== undefined) {
+							thinking = this.#thought(thinking, error.partial.thinking)
+						}
+						// The abort's partial usage — when the provider observed it mid-stream — is
+						// folded and reconciled exactly like the normal post-turn path below: the
+						// FULL reported usage sums into `usage`, and only the RESIDUAL over the
+						// mid-stream `charged` estimate is consumed against `budget` (never
+						// double-counted). A provider that can't observe usage mid-stream (its
+						// final counts never arrive) reports none, and none is fabricated here.
+						if (error.partial.usage !== undefined) {
+							const abortUsage = error.partial.usage
+							budget?.consume({
+								prompt: abortUsage.prompt,
+								completion: Math.max(0, abortUsage.completion - charged),
+								total: Math.max(0, abortUsage.total - charged),
+							})
+							usage = this.#sum(usage, abortUsage)
+						}
 					}
 					outcome.partial = true
 					broke = true
