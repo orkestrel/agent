@@ -152,6 +152,10 @@ export class Agent implements AgentInterface {
 		const timeout = timeoutMs === undefined ? undefined : createTimeout({ ms: timeoutMs })
 		timeout?.start()
 		const budget = options?.budget ?? this.#budget
+		// A construction-level budget (`this.#budget`, not a per-run `options?.budget` override) is
+		// a SHARED cumulative tally across every sequential run on this agent — concurrent streams
+		// on one agent race their charges against the same instance. Use separate agents (or a
+		// per-run `options.budget`) for concurrent streams that must not share a budget.
 		budget?.start()
 		const limit = options?.limit ?? this.#limit
 		// Fold every present bound (external signal + a per-run signal + deadline + budget)
@@ -493,12 +497,17 @@ export class Agent implements AgentInterface {
 			break
 		}
 		// F1 — the loop exhausted `limit` (the `for` condition failed, never a `break`) while the
-		// most recent turn still held unresolved tool intent: commit the outcome PARTIAL and flag it
-		// `exhausted` (distinct from a cancel — no `signal` / `timeout` / `budget` tripped). A
-		// `limit: 0` run never enters the loop (`pending` stays `false`), so it stays non-partial.
+		// most recent turn still held unresolved tool intent: commit the outcome PARTIAL. Flag it
+		// `exhausted` ONLY when the signal did NOT abort — a cancel that lands during the LAST turn's
+		// post-provider work (tool authorize/execute, the residual budget reconcile, between-turns
+		// compaction) also takes this `pending=true; continue` path and exits via the `for` condition
+		// (never a `break`), so `broke` stays `false` even though it was a genuine cancel, not a limit
+		// exhaustion. Checking `abort.signal.aborted` here classifies that case correctly: the pump
+		// then emits `abort` (the cancel reason), never `exhaust`. A `limit: 0` run never enters the
+		// loop (`pending` stays `false`), so it stays non-partial either way.
 		if (!broke && pending) {
 			outcome.partial = true
-			outcome.exhausted = true
+			outcome.exhausted = !abort.signal.aborted
 		}
 		outcome.content = content
 		outcome.thinking = thinking

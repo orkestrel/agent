@@ -3129,6 +3129,44 @@ describe('Agent - F1 limit exhaustion', () => {
 		expect(provider.calls).toHaveLength(0)
 		expect(order).toEqual(['finish'])
 	})
+
+	it("a cancel firing during the last turn's post-provider work (tool execute) reports abort, not exhaust", async () => {
+		// The tool's own execute() fires the bound external signal mid-authorize/execute, on the
+		// run's ONLY allowed turn (limit: 1). The loop still takes the `pending = true; continue`
+		// path and exits via the `for` condition (never a `break`) -- the same shape as a genuine
+		// exhaustion -- but the signal IS aborted, so this must classify as a cancel: `abort` fires
+		// (carrying the reason), `exhaust` must NOT fire.
+		const controller = new AbortController()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'loop',
+				execute: () => {
+					controller.abort()
+					return 'x'
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
+			SCRIPT_OPTIONS,
+		)
+		const order: string[] = []
+		const agent = createAgent(provider, {
+			tools,
+			limit: 1,
+			signal: controller.signal,
+			on: {
+				exhaust: () => order.push('exhaust'),
+				abort: () => order.push('abort'),
+				finish: () => order.push('finish'),
+			},
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.partial).toBe(true)
+		expect(order).toEqual(['abort', 'finish'])
+	})
 })
 
 // F2 -- bounded mid-stream budget enforcement: content deltas are charged incrementally as
