@@ -14,10 +14,13 @@ import {
 	createAgentRunner,
 	createBinaryContent,
 	createFile,
+	createInstructionManager,
+	createScope,
 	createTextContent,
 	createTool,
 	createToolManager,
 	createWorkspace,
+	createWorkspaceManager,
 	isAgentJobError,
 	isBinary,
 	isText,
@@ -113,6 +116,59 @@ describe('createAgent', () => {
 		expect(result.content).toBe('pong')
 		expect(result.partial).toBe(false)
 		expect(agent.status).toBe('done')
+	})
+
+	it('a passed instructions manager surfaces via agent.context.instructions (visible in build())', () => {
+		const instructions = createInstructionManager()
+		instructions.add({ name: 'tone', content: 'Be terse.' })
+		const agent = createAgent(createScriptedProvider([{ content: 'ok' }]), { instructions })
+
+		expect(agent.context.instructions).toBe(instructions)
+		const built = agent.context.build()
+		expect(built[0]?.role).toBe('system')
+		expect(built[0]?.content).toContain('Be terse.')
+	})
+
+	it('a passed workspaces manager surfaces via agent.context.workspaces (an added text file appears in build())', () => {
+		const workspaces = createWorkspaceManager()
+		workspaces.add()
+		if (workspaces.active === undefined) throw new Error('expected an active workspace')
+		workspaces.active.write('a.ts', 'const x = 1')
+		const agent = createAgent(createScriptedProvider([{ content: 'ok' }]), { workspaces })
+
+		expect(agent.context.workspaces).toBe(workspaces)
+		const built = agent.context.build()
+		expect(built[0]?.role).toBe('system')
+		expect(built[0]?.content).toContain('const x = 1')
+	})
+
+	it('a passed scope filters: no-tools scope empties advertised tool definitions + filters instructions from build()', async () => {
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
+		const instructions = createInstructionManager()
+		instructions.add({ name: 'tone', content: 'Be terse.' })
+		const noTools = createScope({ name: 'reader', tools: [], instructions: [] })
+		const provider = createScriptedProvider([{ content: 'ok' }], { record: true })
+		const agent = createAgent(provider, { tools, instructions, scope: noTools })
+
+		expect(agent.context.scope).toBe(noTools)
+		expect(agent.context.tools.definitions()).toEqual([{ name: 'add' }]) // manager itself unfiltered
+		const built = agent.context.build()
+		expect(built.find((message) => message.role === 'system')).toBeUndefined() // instruction scoped out
+
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		await agent.generate()
+		expect(provider.calls[0]?.tools).toBeUndefined() // no tools ADVERTISED to the provider
+	})
+
+	it('omitted instructions/workspaces/scope still yield working empty managers (regression guard)', () => {
+		const agent = createAgent(createScriptedProvider([{ content: 'ok' }]))
+
+		expect(agent.context.instructions.count).toBe(0)
+		expect(agent.context.workspaces.count).toBe(0)
+		expect(agent.context.workspaces.active).toBeUndefined()
+		expect(agent.context.scope).toBeUndefined()
+		expect(agent.context.build()).toEqual([])
 	})
 })
 
@@ -682,6 +738,32 @@ describe('createAgentQueue — durability, extended', () => {
 		}
 		const caught = await queue.enqueue(withMissingTool).catch((error: unknown) => error)
 		expect(caught instanceof Error ? caught.message : '').toBe('unknown tool: nonexistent')
+		expect(provider.started).toBe(0)
+	})
+
+	it('a job naming an AUTHORITY missing from the registry rejects loudly on enqueue', async () => {
+		const provider = createScriptedProvider([{ content: 'x' }])
+		const registry = createAgentRegistry({ providers: { main: provider } })
+		const queue = createAgentQueue({ registry })
+		const caught = await queue
+			.enqueue(createAgentJob({ authority: 'ghost' }))
+			.catch((error: unknown) => error)
+		expect(caught).toBeInstanceOf(Error)
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown authority: ghost')
+		expect(isAgentJobError(caught)).toBe(false)
+		expect(provider.started).toBe(0)
+	})
+
+	it('a job naming a SCHEDULER missing from the registry rejects loudly on enqueue', async () => {
+		const provider = createScriptedProvider([{ content: 'x' }])
+		const registry = createAgentRegistry({ providers: { main: provider } })
+		const queue = createAgentQueue({ registry })
+		const caught = await queue
+			.enqueue(createAgentJob({ scheduler: 'ghost' }))
+			.catch((error: unknown) => error)
+		expect(caught).toBeInstanceOf(Error)
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown scheduler: ghost')
+		expect(isAgentJobError(caught)).toBe(false)
 		expect(provider.started).toBe(0)
 	})
 

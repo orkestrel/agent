@@ -14,8 +14,9 @@ import type {
 	ToolResult,
 	WorkspaceSnapshot,
 } from './types.js'
+import type { TokenUsage } from '@orkestrel/budget'
 import { isArray, isNumber, isRecord, isString } from '@orkestrel/contract'
-import { EXTENSION_TO_LANGUAGE } from './constants.js'
+import { EXTENSION_TO_LANGUAGE, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentJobError } from './errors.js'
 
 // The pure derivation helper a file uses to fill an inferred language field from its path
@@ -120,23 +121,32 @@ export function estimateTokens(text: string): number {
  * (the {@link import('./types.js').AgentOptions} `window`).
  *
  * @remarks
- * Sums {@link estimateTokens} over each message's `content` (the `ceil(length / 4)` char
- * heuristic), so it is deterministic and provider-free — the same messages always yield the
- * same estimate, with an empty batch `0`. It is the fully-swappable default an agent's
- * auto-compaction context budget charges each turn's new messages through; a caller wanting a
- * sharper count supplies its own `consume` to `createBudget` instead. Total — never throws.
+ * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` char
+ * heuristic) PLUS {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (a fixed per-message
+ * role/framing overhead) PLUS, when present, {@link estimateTokens} over its JSON-stringified
+ * `calls` PLUS `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
+ * deliberately-approximate per-image cost — a base64 length is NOT a token proxy). Deterministic
+ * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
+ * It is the fully-swappable default an agent's auto-compaction context budget charges each
+ * turn's new messages through; a caller wanting a sharper count supplies its own `consume` to
+ * `createBudget` instead. Total — never throws.
  *
  * @param messages - The messages to estimate (a turn's appended assistant + tool messages)
- * @returns The summed estimated token count (`Σ estimateTokens(m.content)`; `0` when empty)
+ * @returns The summed estimated token count (`0` when empty)
  *
  * @example
  * ```ts
  * estimateMessages([]) // 0
- * estimateMessages([{ id: '1', role: 'user', content: 'hello' }]) // 2
+ * estimateMessages([{ id: '1', role: 'user', content: 'hello' }]) // 6  (2 content + 4 overhead)
  * ```
  */
 export function estimateMessages(messages: readonly MessageInterface[]): number {
-	return messages.reduce((sum, message) => sum + estimateTokens(message.content), 0)
+	return messages.reduce((sum, message) => {
+		const content = estimateTokens(message.content) + MESSAGE_TOKEN_OVERHEAD
+		const calls = message.calls?.length ? estimateTokens(JSON.stringify(message.calls)) : 0
+		const images = (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE
+		return sum + content + calls + images
+	}, 0)
 }
 
 /**
@@ -795,4 +805,32 @@ export function fencedFile(path: string, language: string, content: string): str
  */
 export function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Sanitize a {@link TokenUsage} into safe, non-negative integers — the guard an agent's
+ * abort-usage path applies to a provider's partial usage before it is charged against a
+ * budget or folded into the run total.
+ *
+ * @remarks
+ * Per field (`prompt` / `completion` / `total`): a non-finite value (`NaN`, `+Infinity`,
+ * `-Infinity`) or a negative value floors to `0`; a fractional value floors to its
+ * non-negative integer part. No upper cap is applied. Total — never throws.
+ *
+ * @param usage - The token usage to sanitize (e.g. a provider's abort-partial usage)
+ * @returns A new {@link TokenUsage} with every field a safe non-negative integer
+ *
+ * @example
+ * ```ts
+ * sanitizeUsage({ prompt: -5, completion: NaN, total: 12.7 }) // { prompt: 0, completion: 0, total: 12 }
+ * ```
+ */
+export function sanitizeUsage(usage: TokenUsage): TokenUsage {
+	const clean = (value: number): number =>
+		Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+	return {
+		prompt: clean(usage.prompt),
+		completion: clean(usage.completion),
+		total: clean(usage.total),
+	}
 }

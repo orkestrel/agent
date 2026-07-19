@@ -255,6 +255,49 @@ describe('ConversationManager — the default keep flows in, and per-add overrid
 	})
 })
 
+describe('ConversationManager — the default sections cap flows in, and per-add overrides win', () => {
+	it("created conversations inherit the manager's default sections cap", async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize, sections: 1 })
+		const conversation = manager.add()
+
+		conversation.add({ role: 'user', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'b' })
+		await conversation.compact()
+
+		// sections: 1 flowed in ⇒ the second fold merges into the cap of 1.
+		expect(conversation.sections).toHaveLength(1)
+	})
+
+	it('a per-add sections OVERRIDES the manager default', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize, sections: 5 })
+		const conversation = manager.add({ sections: 1 })
+
+		conversation.add({ role: 'user', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'b' })
+		await conversation.compact()
+
+		// The per-add sections: 1 wins over the manager's sections: 5 ⇒ capped at 1.
+		expect(conversation.sections).toHaveLength(1)
+	})
+
+	it('with no manager default and no per-add override, sections stay unbounded', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize })
+		const conversation = manager.add()
+
+		conversation.add({ role: 'user', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'b' })
+		await conversation.compact()
+
+		expect(conversation.sections).toHaveLength(2)
+	})
+})
+
 describe('ConversationManager — created conversations are independent', () => {
 	it('each conversation has its own live tail + sections', async () => {
 		const stub = createStubSummarizer()
