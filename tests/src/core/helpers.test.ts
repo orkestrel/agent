@@ -164,6 +164,25 @@ describe('estimateMessages', () => {
 		expect(estimateMessages([withEmptyCalls])).toBe(MESSAGE_TOKEN_OVERHEAD)
 	})
 
+	// F5 — a circular `ToolCall.arguments` makes `JSON.stringify` throw; estimateMessages'
+	// TSDoc promises it "never throws", so the circular case must not reject/throw and instead
+	// falls back to a conservative fixed contribution (MESSAGE_TOKEN_OVERHEAD-scale).
+	it('never throws on a circular calls argument — falls back to the documented fixed contribution', () => {
+		const circular: Record<string, unknown> = { q: 'acme' }
+		circular.self = circular
+		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: circular })]
+		const withCircularCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls }
+
+		let estimate = 0
+		expect(() => {
+			estimate = estimateMessages([withCircularCalls])
+		}).not.toThrow()
+		expect(Number.isFinite(estimate)).toBe(true)
+		// The fallback contribution matches the documented constant exactly (no partial/garbage
+		// serialization sneaks through) — the message's total is its overhead plus that fallback.
+		expect(estimate).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
+	})
+
 	it('adds images.length * IMAGE_TOKEN_ESTIMATE when a message has images', () => {
 		const withImages: MessageInterface = {
 			id: 'm',

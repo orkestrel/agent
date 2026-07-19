@@ -1224,16 +1224,32 @@ export interface AgentInterface {
 	 * Run the turn to completion, discarding the live chunks — drains the shared
 	 * stream and resolves the settled outcome.
 	 *
+	 * @remarks
+	 * A concurrent run on a shared accounting agent throws an
+	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) — and it throws
+	 * SYNCHRONOUSLY, before any `Promise` is returned. A fire-and-forget
+	 * `agent.generate().catch(...)` therefore will NOT catch it (the throw happens on the call
+	 * itself, ahead of the `.catch` ever attaching) — `await` the call (inside a `try`/`catch`)
+	 * or wrap the call expression itself in `try`/`catch`.
+	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
+	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
 	 * Run the turn as a live stream — iterate `events` for {@link AgentChunk}s and
 	 * `await result` for the settled outcome.
 	 *
+	 * @remarks
+	 * Like `generate()`, a concurrent run on a shared accounting agent throws an
+	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) SYNCHRONOUSLY — before the
+	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
+	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`.
+	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
+	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
@@ -1768,6 +1784,13 @@ export interface ConversationInterface {
 	 * from the live tail, regenerates the rollup (a second `summarize` over all sections), and
 	 * resolves the new section. Requires a {@link ConversationSummarizer} — THROWS a
 	 * {@link import('./errors.js').ConversationError} when none was supplied.
+	 *
+	 * @remarks
+	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
+	 * merge step folds the oldest sections into one — if THAT merge's `summarize` call throws,
+	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss) but the rollup still
+	 * regenerates over the current unmerged sections (never left stale) before the error
+	 * propagates; the next successful `compact()` self-heals the section count back to `cap`.
 	 *
 	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
 	 * @returns The new {@link SectionInterface}, or `undefined` when nothing folded

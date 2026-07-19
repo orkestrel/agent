@@ -1,3 +1,4 @@
+import type { MessageInterface } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -740,6 +741,49 @@ describe('Conversation — sections cap (F2)', () => {
 		}
 
 		expect(conversation.sections).toHaveLength(4)
+	})
+
+	// F4 — cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
+	// (and its splice) is skipped — sections transiently sit at `cap + 1`, no loss — but the
+	// rollup regeneration still runs over the CURRENT (unmerged) sections so it is never left
+	// stale, and the error propagates (a manual `compact()` always surfaces a summarizer
+	// failure). The section fold + rollup calls both succeed; only the merge call (identified by
+	// call count) throws.
+	it('regenerates a fresh rollup over the unmerged sections when the overflow merge throws, then propagates the error', async () => {
+		const boom = new Error('merge summarizer boom')
+		let calls = 0
+		// Calls per compact() round without overflow: 1 (fold) + 1 (rollup) = 2 — so rounds 1 and 2
+		// consume calls 1-2 and 3-4. Round 3 overflows the cap of 2: its fold is call 5, its
+		// overflow MERGE is call 6 (before the rollup) — make only that merge call throw.
+		const summarize = async (messages: readonly MessageInterface[]): Promise<string> => {
+			calls += 1
+			if (calls === 6) throw boom
+			return `recap of ${messages.length}`
+		}
+		const conversation = new Conversation({ summarize, sections: 2 })
+
+		conversation.add({ role: 'user', content: 'round-1' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'round-2' })
+		await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
+
+		// Round 3 overflows the cap — the merge call throws.
+		conversation.add({ role: 'user', content: 'round-3' })
+		const rollupBeforeAttempt = conversation.summary
+		await expect(conversation.compact()).rejects.toBe(boom)
+
+		// No splice, no loss: 3 sections remain (transiently over the cap of 2), unmerged.
+		expect(conversation.sections).toHaveLength(3)
+		// The rollup is FRESH — regenerated over the current (unmerged) 3 sections, so it
+		// differs from whatever it was before this failed attempt (never left stale).
+		expect(conversation.summary).not.toBe(rollupBeforeAttempt)
+		expect(conversation.summary).toBe('recap of 3')
+
+		// A subsequent successful compact() restores the cap.
+		conversation.add({ role: 'user', content: 'round-4' })
+		await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
 	})
 })
 

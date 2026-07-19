@@ -129,7 +129,10 @@ export function estimateTokens(text: string): number {
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
  * turn's new messages through; a caller wanting a sharper count supplies its own `consume` to
- * `createBudget` instead. Total — never throws.
+ * `createBudget` instead. Total — never throws: a `calls` `JSON.stringify` that throws (a
+ * circular `ToolCall.arguments`) is caught and replaced with a conservative fixed contribution of
+ * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
+ * instead of estimating the (unreachable) serialized length.
  *
  * @param messages - The messages to estimate (a turn's appended assistant + tool messages)
  * @returns The summed estimated token count (`0` when empty)
@@ -143,7 +146,19 @@ export function estimateTokens(text: string): number {
 export function estimateMessages(messages: readonly MessageInterface[]): number {
 	return messages.reduce((sum, message) => {
 		const content = estimateTokens(message.content) + MESSAGE_TOKEN_OVERHEAD
-		const calls = message.calls?.length ? estimateTokens(JSON.stringify(message.calls)) : 0
+		let calls = 0
+		if (message.calls?.length) {
+			// `JSON.stringify` over `ToolCall.arguments` can throw (a circular reference) even
+			// though this function promises never to throw — so the serialization is wrapped; a
+			// throw falls back to a conservative fixed contribution (the same per-message overhead
+			// scale) instead of an unreachable serialized-length estimate. The happy path (no
+			// throw) is byte-identical to the bare estimate below.
+			try {
+				calls = estimateTokens(JSON.stringify(message.calls))
+			} catch {
+				calls = MESSAGE_TOKEN_OVERHEAD
+			}
+		}
 		const images = (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE
 		return sum + content + calls + images
 	}, 0)

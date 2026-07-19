@@ -3649,3 +3649,36 @@ describe('Agent �€” abort usage sanitize (F6)', () => {
 		expect(budget.consumed).toBe(12)
 	})
 })
+
+// ── Normal usage sanitize (F1) — a provider's NORMAL post-turn `result.usage` is sanitized
+// (`sanitizeUsage`) BEFORE it is charged against the budget / folded into the run's reported
+// usage: a non-finite or negative field floors to 0, a fractional field floors to its integer
+// part — mirroring the abort-path F6 sanitize above so a buggy provider's dirty usage on a
+// natural finish can never poison `budget.consumed` (or silently produce a NaN charge that
+// never trips exhaustion).
+describe('Agent — normal usage sanitize (F1)', () => {
+	it('sanitizes a provider normal-turn usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
+		const budget = createRecordingBudget(1_000_000)
+		const provider = createScriptedProvider(
+			[{ content: 'full', usage: { prompt: -5, completion: Number.NaN, total: 12.7 } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate()
+
+		expect(result.partial).toBe(false)
+		// The reported usage is SANITIZED: negative prompt -> 0, NaN completion -> 0, fractional
+		// total floored to its integer part.
+		expect(result.usage).toEqual({ prompt: 0, completion: 0, total: 12 })
+		// The budget was charged the SANITIZED residual, never the raw negative/NaN/fractional
+		// values (`toEqual` on each `consume()` call rules out any NaN / negative field ever
+		// reaching it), and the consumes sum to the sanitized total (never NaN/negative).
+		const midStream = estimateTokens('full')
+		expect(budget.consumes).toEqual([
+			{ prompt: 0, completion: midStream, total: midStream },
+			{ prompt: 0, completion: 0, total: 12 - midStream },
+		])
+		expect(budget.consumed).toBe(12)
+	})
+})

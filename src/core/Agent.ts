@@ -480,22 +480,28 @@ export class Agent implements AgentInterface {
 				thinking = this.#thought(thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
+				// F1 — sanitize the provider's normal post-turn usage before charging/folding it,
+				// exactly like the abort path above: a non-finite or negative field floors to `0`, a
+				// fractional field floors to its integer part. Unsanitized, a buggy provider's
+				// NaN/negative usage would poison `budget.consumed` and `#sum`, and never trip
+				// exhaustion (`Math.max(0, NaN - charged)` is `NaN`).
+				const resultUsage = sanitizeUsage(result.usage)
 				// RESIDUAL reconcile — the mid-stream charges above already consumed `charged` worth
 				// of budget against this turn's completion; charge only what remains of the FULL
-				// reported usage so the turn's total budget draw matches `result.usage` exactly (never
+				// reported usage so the turn's total budget draw matches `resultUsage` exactly (never
 				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
 				// exists), so it is charged here in full. `#sum` / the emitted `usage` chunk below
-				// still carry the FULL authoritative `result.usage` — reconciliation affects only the
+				// still carry the FULL sanitized `resultUsage` — reconciliation affects only the
 				// budget charge, never the reported usage.
 				budget?.consume({
-					prompt: result.usage.prompt,
-					completion: Math.max(0, result.usage.completion - charged),
-					total: Math.max(0, result.usage.total - charged),
+					prompt: resultUsage.prompt,
+					completion: Math.max(0, resultUsage.completion - charged),
+					total: Math.max(0, resultUsage.total - charged),
 				})
-				usage = this.#sum(usage, result.usage)
+				usage = this.#sum(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
-				this.#emitter.emit('usage', result.usage)
-				yield { type: 'usage', usage: result.usage }
+				this.#emitter.emit('usage', resultUsage)
+				yield { type: 'usage', usage: resultUsage }
 			}
 			if (result.tools !== undefined && result.tools.length > 0) {
 				const assistant = this.#context.messages.add({

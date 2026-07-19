@@ -211,13 +211,24 @@ export class Conversation implements ConversationInterface {
 		if (cap !== undefined && this.#sections.length > cap) {
 			const overflow = this.#sections.length - cap + 1
 			const folded = this.#sections.slice(0, overflow)
-			const merged: SectionInterface = {
-				id: crypto.randomUUID(),
-				summary: await summarize(folded.map((one) => this.#summaryMessage(one))),
-				messages: folded.flatMap((one) => one.messages),
+			try {
+				const merged: SectionInterface = {
+					id: crypto.randomUUID(),
+					summary: await summarize(folded.map((one) => this.#summaryMessage(one))),
+					messages: folded.flatMap((one) => one.messages),
+				}
+				this.#sections.splice(0, overflow, merged)
+				this.#emitter.emit('collapse', merged)
+			} catch (error) {
+				// The merge summarizer call threw — the sections stay transiently at `cap + 1`
+				// (no splice, no loss), but the rollup below still regenerates over the CURRENT
+				// (unmerged) sections so it is never left stale, then the error propagates
+				// (manual `compact()` always surfaces a summarizer failure to its caller; the
+				// next successful `compact()` self-heals the over-cap count).
+				this.#summary = await summarize(this.#sections.map((one) => this.#summaryMessage(one)))
+				this.#emitter.emit('summary', this.#summary)
+				throw error
 			}
-			this.#sections.splice(0, overflow, merged)
-			this.#emitter.emit('collapse', merged)
 		}
 		// 4. Regenerate the rollup — a summary-of-summaries over ALL (now-capped) sections
 		// — then observe it, AFTER the mutation, through the guarded path.
