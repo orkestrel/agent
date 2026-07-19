@@ -71,6 +71,26 @@ export const THINK_CLOSE = '</think>'
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
 
 /**
+ * The estimated per-message role/framing overhead {@link import('./helpers.js').estimateMessages}
+ * adds on top of a message's content estimate — accounts for the fixed wire framing every
+ * conversation turn carries (its role tag, delimiters) that {@link import('./helpers.js').estimateTokens}'s
+ * content-only heuristic does not otherwise capture.
+ */
+export const MESSAGE_TOKEN_OVERHEAD = 4
+
+/**
+ * The coarse, deliberately-approximate per-image token cost {@link import('./helpers.js').estimateMessages}
+ * charges for each attached image.
+ *
+ * @remarks
+ * A base64 image payload's LENGTH is NOT a reliable token proxy (a vision model's actual image
+ * token cost depends on resolution / tiling, not byte size), so this is a fixed, coarse
+ * per-image estimate rather than a derivation from `image.length` — a planning heuristic, not an
+ * exact count.
+ */
+export const IMAGE_TOKEN_ESTIMATE = 512
+
+/**
  * The extension→language table {@link import('./helpers.js').inferLanguage} reads to
  * map a file path's extension to a fenced-code language tag. Covers the common source /
  * markup / data extensions; an unlisted extension falls back to `'text'`.

@@ -3,6 +3,7 @@ import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type {
 	AgentResult,
+	AgentStreamInterface,
 	ContextFormatInterface,
 	MessageInterface,
 	ProviderDelta,
@@ -20,6 +21,8 @@ import {
 	createTool,
 	createToolManager,
 	estimateMessages,
+	estimateTokens,
+	isAgentError,
 	isProviderAbortError,
 	ProviderAbortError,
 	Scope,
@@ -39,6 +42,7 @@ import {
 	recordEmitterEvents,
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
+	type TestGateInterface,
 	waitForDelay,
 } from '../../setup.js'
 
@@ -1795,6 +1799,46 @@ describe('Agent �€” provider failure modes', () => {
 		const result = await stream.result
 		expect(result.content).toBe('ab')
 	})
+
+	it('T2 -- a genuine (non-abort) provider fault on a LATER turn rejects the run, keeping turn 1s tool results in the conversation', async () => {
+		// Turn 1 completes WITH a tool call (so the loop continues, appending the assistant call +
+		// the tool result to the conversation); turn 2 throws a PLAIN Error (not a cancel, not a
+		// ProviderAbortError) -- a genuine infrastructure fault mid-loop. The run must reject (status
+		// error, an `error` event), and the turn-1 tool results already landed in the conversation
+		// must survive the rejection (the loop never unwinds them).
+		const tools = createToolManager()
+		tools.add(addTool())
+		let calls = 0
+		const provider: ProviderInterface = {
+			id: 'fault',
+			name: 'fault',
+			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+				calls += 1
+				if (calls === 1) {
+					yield { type: 'content', text: '' }
+					return { content: '', tools: [createToolCall()] }
+				}
+				throw new Error('turn 2 boom')
+			},
+			async generate() {
+				throw new Error('turn 2 boom')
+			},
+		}
+		const agent = createAgent(provider, { tools, limit: 5 })
+		const events = recordEmitterEvents(agent.emitter, ['error', 'finish'])
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		await expect(agent.generate()).rejects.toThrow('turn 2 boom')
+
+		expect(agent.status).toBe('error')
+		expect(events.error.count).toBe(1)
+		expect(events.error.calls[0]?.[0]).toBeInstanceOf(Error)
+		expect(events.finish.count).toBe(0)
+		// Turn 1's tool call + tool result are still present in the conversation, untouched by the
+		// turn-2 rejection.
+		const contents = agent.context.messages.messages().map((message) => message.content)
+		expect(contents).toContain(JSON.stringify(5))
+	})
 })
 
 // �”€�”€ scheduler edge cases �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
@@ -2686,7 +2730,8 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 	it('does NOT fire when the prompt stays below the window (same answer, budget holds the FULL prompt size)', async () => {
 		// A HIGH max (10_000) the prompt never reaches �†’ no fold, yet the multi-turn run still
 		// produces the same answer. With NO compaction the working array only grows, so the LAST
-		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x, "5", 40y, "5"]`.
+		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x(+calls), "5",
+		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
 		const window = contextBudget(10_000)
 		const { agent, conversation } = compactionAgent(window)
 		const compacted = recordEmitterEvents(conversation.emitter, ['compact'])
@@ -2698,17 +2743,25 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		// The budget was re-measured each turn against the ABSOLUTE prompt and never crossed the
-		// ceiling. Its final value is turn 2's FULL prompt �€” 1 + 10 + 1 + 10 + 1 = 23 �€” NOT a
-		// cumulative 2�—delta (the old per-turn-delta model). This is the absolute-measure assertion.
+		// ceiling. Its final value is turn 2's FULL prompt. `estimateMessages` now adds
+		// MESSAGE_TOKEN_OVERHEAD (4) per message PLUS a JSON-stringified `calls` estimate for each
+		// tool-call-bearing assistant turn (both COMPACT_SCRIPT assistant turns carry one tool call
+		// each), so the assistant messages below reproduce that shape exactly rather than the
+		// content-only reconstruction the old estimator tolerated.
 		const turn2Prompt: readonly MessageInterface[] = [
 			{ id: 'u', role: 'user', content: 'go' },
-			{ id: 'a1', role: 'assistant', content: 'x'.repeat(40) },
+			{ id: 'a1', role: 'assistant', content: 'x'.repeat(40), calls: [createToolCall()] },
 			{ id: 't1', role: 'tool', content: JSON.stringify(5) },
-			{ id: 'a2', role: 'assistant', content: 'y'.repeat(40) },
+			{
+				id: 'a2',
+				role: 'assistant',
+				content: 'y'.repeat(40),
+				calls: [createToolCall({ id: 'c2' })],
+			},
 			{ id: 't2', role: 'tool', content: JSON.stringify(5) },
 		]
 		expect(window.consumed).toBe(estimateMessages(turn2Prompt))
-		expect(window.consumed).toBe(23)
+		expect(window.consumed).toBe(65)
 		expect(window.exhausted).toBe(false)
 	})
 
@@ -3013,12 +3066,14 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 			record: true,
 			exhaust: 'repeat',
 		})
-		// A window small enough that a 2nd-request prompt (prior user + 'ok' answer + new user �‰ˆ 5 tok)
-		// exceeds it, but a 1st-request prompt (one short user turn �‰ˆ 2 tok) does not (max 4). The
-		// manager (with its summarizer) is the agent's OWN registry, so each thread is summarizable.
+		// A window small enough that a 2nd-request prompt (prior user "alpha-1"/"bravo-1" + 'ok' answer
+		// + new user turn �€” three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
+		// old thresholds under the new estimator) exceeds it, but a 1st-request prompt (one short user
+		// turn: content ~2 tok + 4 overhead = ~6) does not (max 10). The manager (with its summarizer)
+		// is the agent's OWN registry, so each thread is summarizable.
 		const agent = createAgent(provider, {
 			conversations: manager,
-			window: contextBudget(4),
+			window: contextBudget(10),
 			limit: 5,
 		})
 
@@ -3391,5 +3446,239 @@ describe('Agent - F4 per-run schema', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await agent.generate()
 		expect(provider.calls[0]?.options).toBeUndefined()
+	})
+})
+
+// �”€�”€ Concurrency guard �€” a shared construction-level accounting instance (a `window` context
+// budget, or a construction `budget` with no per-run override) would race a second concurrent run's
+// charges against the same instance; `stream()` (and thus `generate()`) THROWS an `AgentError`
+// ('CONCURRENCY') SYNCHRONOUSLY when a run is already in flight AND that hazard applies. A run with
+// no window and a per-run `budget` override is exempt (nothing shared to race), and sequential
+// (awaited) runs on a construction-budget agent are unaffected (never concurrent).
+describe('Agent �€” concurrency guard (construction window/budget)', () => {
+	// A provider whose stream yields one delta then parks on a shared gate, so a test can hold a run
+	// "in flight" (its `#runs` handle already added) across a synchronous second `stream()` call.
+	const gatedProvider = (gate: TestGateInterface<void>): ProviderInterface => ({
+		id: 'gated',
+		name: 'gated',
+		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+			yield { type: 'content', text: 'part' }
+			await gate.promise
+			return { content: 'full' }
+		},
+		async generate() {
+			return { content: 'full' }
+		},
+	})
+
+	it('a construction `window` -- starting a 2nd run while the 1st is in flight throws AgentError(CONCURRENCY); the 1st still completes', async () => {
+		const gate = createGate()
+		const agent = createAgent(gatedProvider(gate), { window: contextBudget(1_000_000) })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+
+		const run1 = agent.stream()
+		let caught: unknown
+		try {
+			agent.stream()
+		} catch (error) {
+			caught = error
+		}
+		if (!isAgentError(caught)) throw new Error('expected an AgentError')
+		expect(caught.code).toBe('CONCURRENCY')
+
+		const drained = collect(run1.events)
+		gate.resolve()
+		await drained
+		const result1 = await run1.result
+		expect(result1).toEqual({ content: 'full', partial: false })
+	})
+
+	it('a construction `budget` with NO per-run override on the 2nd call throws AgentError(CONCURRENCY)', async () => {
+		const gate = createGate()
+		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
+		const agent = createAgent(gatedProvider(gate), { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+
+		const run1 = agent.stream()
+		let caught: unknown
+		try {
+			agent.stream()
+		} catch (error) {
+			caught = error
+		}
+		if (!isAgentError(caught)) throw new Error('expected an AgentError')
+		expect(caught.code).toBe('CONCURRENCY')
+
+		const drained = collect(run1.events)
+		gate.resolve()
+		await drained
+		await run1.result
+	})
+
+	it('a construction `budget` with a per-run `budget` override and NO window -- both concurrent runs settle', async () => {
+		const gate = createGate()
+		const agent = createAgent(gatedProvider(gate), {
+			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
+		})
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+
+		const run1 = agent.stream()
+		let run2: AgentStreamInterface | undefined
+		expect(() => {
+			run2 = agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) })
+		}).not.toThrow()
+		if (run2 === undefined) throw new Error('run2 was not started')
+		const started2 = run2
+
+		const drain1 = collect(run1.events)
+		const drain2 = collect(started2.events)
+		gate.resolve()
+		await Promise.all([drain1, drain2])
+		const [result1, result2] = await Promise.all([run1.result, started2.result])
+		expect(result1).toEqual({ content: 'full', partial: false })
+		expect(result2).toEqual({ content: 'full', partial: false })
+	})
+
+	it('a construction `budget` -- sequential (awaited) runs never overlap, so both settle and the budget accumulates', async () => {
+		const budget = createRecordingBudget(1_000_000)
+		const usage: TokenUsage = { prompt: 1, completion: 1, total: 2 }
+		const provider = createScriptedProvider(
+			[{ result: { content: 'first', usage } }, { result: { content: 'second', usage } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result1 = await agent.generate()
+		agent.context.messages.add({ role: 'user', content: 'again' })
+		const result2 = await agent.generate()
+
+		expect(result1.content).toBe('first')
+		expect(result2.content).toBe('second')
+		// Sequential (awaited, never overlapping) runs never trip the concurrency guard, and the
+		// SAME construction budget accumulates charges across both.
+		expect(budget.consumed).toBeGreaterThanOrEqual(usage.total * 2)
+	})
+})
+
+// �”€�”€ Strict compaction (F5) �€” a summarizer failure during AUTOMATIC window compaction; strict:
+// true emits `compactError` THEN rethrows (the run rejects, status error, an `error` event). The
+// lenient default (`strict` omitted) emits `compactError` and continues -- already covered by
+// 'NON-FATAL summarizer failure' in the 'automatic compaction (production hardening)' block above.
+describe('Agent �€” strict compaction (F5)', () => {
+	it('strict: true -- a throwing auto-compact summarizer emits compactError THEN rethrows, rejecting the run', async () => {
+		const boom = new Error('strict summarizer exploded')
+		const conversations = createConversationManager({
+			summarize: async () => {
+				throw boom
+			},
+			keep: 0,
+		})
+		conversations.add() // auto-activates �€” the agent's message source
+		const tools = createToolManager()
+		tools.add(addTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: contextBudget(12),
+			limit: 5,
+			strict: true,
+		})
+		const events = recordEmitterEvents(agent.emitter, ['compactError', 'error', 'finish'])
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		await expect(agent.generate()).rejects.toThrow('strict summarizer exploded')
+
+		expect(agent.status).toBe('error')
+		// `compactError` fired BEFORE the rejection (the loop surfaces it observably, then rethrows).
+		expect(events.compactError.count).toBe(1)
+		expect(events.compactError.calls[0]?.[0]).toBe(boom)
+		expect(events.error.count).toBe(1)
+		expect(events.error.calls[0]?.[0]).toBe(boom)
+		expect(events.finish.count).toBe(0)
+	})
+})
+
+// �”€�”€ Abort-usage sanitize (F6) �€” a provider's ProviderAbortError partial `usage` is sanitized
+// (`sanitizeUsage`) BEFORE it is charged against the budget / folded into the run's reported usage:
+// a non-finite or negative field floors to 0, a fractional field floors to its integer part.
+describe('Agent �€” abort usage sanitize (F6)', () => {
+	it('sanitizes a provider abort partial usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
+		const gate = createGate()
+		const budget = createRecordingBudget(1_000_000)
+		const provider: ProviderInterface = {
+			id: 'dirty',
+			name: 'dirty',
+			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
+				yield { type: 'content', text: 'part' }
+				await gate.promise
+				if (signal.aborted) {
+					throw new ProviderAbortError({
+						content: 'part',
+						usage: { prompt: -5, completion: Number.NaN, total: 12.7 },
+					})
+				}
+				return { content: 'full' }
+			},
+			async generate() {
+				return { content: 'full' }
+			},
+		}
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const stream = agent.stream()
+		const drained = collect(stream.events)
+		await waitForDelay()
+		agent.abort()
+		gate.resolve()
+		await drained
+		const result = await stream.result
+
+		expect(result.partial).toBe(true)
+		expect(result.content).toBe('part')
+		// The reported usage is SANITIZED: negative prompt -> 0, NaN completion -> 0, fractional total
+		// floored to its integer part.
+		expect(result.usage).toEqual({ prompt: 0, completion: 0, total: 12 })
+		// The budget was charged the SANITIZED residual, never the raw negative/NaN/fractional values
+		// (`toEqual` on each `consume()` call rules out any NaN / negative field ever reaching it).
+		const midStream = estimateTokens('part')
+		expect(budget.consumes).toEqual([
+			{ prompt: 0, completion: midStream, total: midStream },
+			{ prompt: 0, completion: 0, total: 12 - midStream },
+		])
+		expect(budget.consumed).toBe(12)
+	})
+})
+
+// ── Normal usage sanitize (F1) — a provider's NORMAL post-turn `result.usage` is sanitized
+// (`sanitizeUsage`) BEFORE it is charged against the budget / folded into the run's reported
+// usage: a non-finite or negative field floors to 0, a fractional field floors to its integer
+// part — mirroring the abort-path F6 sanitize above so a buggy provider's dirty usage on a
+// natural finish can never poison `budget.consumed` (or silently produce a NaN charge that
+// never trips exhaustion).
+describe('Agent — normal usage sanitize (F1)', () => {
+	it('sanitizes a provider normal-turn usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
+		const budget = createRecordingBudget(1_000_000)
+		const provider = createScriptedProvider(
+			[{ content: 'full', usage: { prompt: -5, completion: Number.NaN, total: 12.7 } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { budget })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate()
+
+		expect(result.partial).toBe(false)
+		// The reported usage is SANITIZED: negative prompt -> 0, NaN completion -> 0, fractional
+		// total floored to its integer part.
+		expect(result.usage).toEqual({ prompt: 0, completion: 0, total: 12 })
+		// The budget was charged the SANITIZED residual, never the raw negative/NaN/fractional
+		// values (`toEqual` on each `consume()` call rules out any NaN / negative field ever
+		// reaching it), and the consumes sum to the sanitized total (never NaN/negative).
+		const midStream = estimateTokens('full')
+		expect(budget.consumes).toEqual([
+			{ prompt: 0, completion: midStream, total: midStream },
+			{ prompt: 0, completion: 0, total: 12 - midStream },
+		])
+		expect(budget.consumed).toBe(12)
 	})
 })

@@ -13,20 +13,23 @@ import {
 	estimateTokens,
 	fencedFile,
 	filterAllowList,
+	IMAGE_TOKEN_ESTIMATE,
 	inferLanguage,
 	isAgentJobError,
 	isBinary,
 	isImage,
 	isText,
 	isValidRange,
+	MESSAGE_TOKEN_OVERHEAD,
 	offsetAt,
 	rangeOf,
+	sanitizeUsage,
 	settleAgentJob,
 	sliceRange,
 	spliceRange,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createScriptedProvider, createTokenUsage } from '../../setup.js'
+import { createScriptedProvider, createToolCall, createTokenUsage } from '../../setup.js'
 
 // The pure derivation helper behind a file's inferred fenced-code language (AGENTS §16 —
 // real behavior, no mocks). Total: a known extension maps to its value, an unknown
@@ -119,24 +122,79 @@ describe('filterAllowList', () => {
 })
 
 describe('estimateMessages', () => {
-	it('sums estimateTokens over each message content', () => {
+	it('sums estimateTokens over each message content plus the per-message overhead', () => {
 		const messages = [message('hello'), message('a'.repeat(40))]
-		// ceil(5/4)=2 + ceil(40/4)=10 = 12 — the per-message estimateTokens sum.
+		// (ceil(5/4)=2 + overhead) + (ceil(40/4)=10 + overhead) — content + fixed framing per message.
 		expect(estimateMessages(messages)).toBe(
-			estimateTokens('hello') + estimateTokens('a'.repeat(40)),
+			estimateTokens('hello') +
+				MESSAGE_TOKEN_OVERHEAD +
+				(estimateTokens('a'.repeat(40)) + MESSAGE_TOKEN_OVERHEAD),
 		)
-		expect(estimateMessages(messages)).toBe(12)
+		expect(estimateMessages(messages)).toBe(12 + 2 * MESSAGE_TOKEN_OVERHEAD)
 	})
 
 	it('is 0 for an empty batch', () => {
 		expect(estimateMessages([])).toBe(0)
 	})
 
-	it('treats empty-content messages as 0 (the additive identity)', () => {
-		// An empty content contributes nothing, so a batch of empties sums to 0.
-		expect(estimateMessages([message(''), message('')])).toBe(0)
-		// And a mix is exactly the non-empty member's estimate.
-		expect(estimateMessages([message(''), message('hello')])).toBe(estimateTokens('hello'))
+	it('treats empty-content messages as just the per-message overhead', () => {
+		// An empty content contributes 0 content tokens, so each message is exactly its overhead.
+		expect(estimateMessages([message(''), message('')])).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
+		// And a mix is the non-empty member's content estimate plus both messages' overhead.
+		expect(estimateMessages([message(''), message('hello')])).toBe(
+			estimateTokens('hello') + 2 * MESSAGE_TOKEN_OVERHEAD,
+		)
+	})
+
+	it('counts the per-message overhead for N messages (N * MESSAGE_TOKEN_OVERHEAD)', () => {
+		const messages = [message(''), message(''), message(''), message('')]
+		expect(estimateMessages(messages)).toBe(4 * MESSAGE_TOKEN_OVERHEAD)
+	})
+
+	it('adds the JSON-stringified calls estimate when a message has calls', () => {
+		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: { q: 'acme' } })]
+		const withCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls }
+		expect(estimateMessages([withCalls])).toBe(
+			MESSAGE_TOKEN_OVERHEAD + estimateTokens(JSON.stringify(calls)),
+		)
+	})
+
+	it('does not add a calls estimate for an empty calls array', () => {
+		const withEmptyCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls: [] }
+		expect(estimateMessages([withEmptyCalls])).toBe(MESSAGE_TOKEN_OVERHEAD)
+	})
+
+	// F5 — a circular `ToolCall.arguments` makes `JSON.stringify` throw; estimateMessages'
+	// TSDoc promises it "never throws", so the circular case must not reject/throw and instead
+	// falls back to a conservative fixed contribution (MESSAGE_TOKEN_OVERHEAD-scale).
+	it('never throws on a circular calls argument — falls back to the documented fixed contribution', () => {
+		const circular: Record<string, unknown> = { q: 'acme' }
+		circular.self = circular
+		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: circular })]
+		const withCircularCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls }
+
+		let estimate = 0
+		expect(() => {
+			estimate = estimateMessages([withCircularCalls])
+		}).not.toThrow()
+		expect(Number.isFinite(estimate)).toBe(true)
+		// The fallback contribution matches the documented constant exactly (no partial/garbage
+		// serialization sneaks through) — the message's total is its overhead plus that fallback.
+		expect(estimate).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
+	})
+
+	it('adds images.length * IMAGE_TOKEN_ESTIMATE when a message has images', () => {
+		const withImages: MessageInterface = {
+			id: 'm',
+			role: 'user',
+			content: '',
+			images: ['aaaa', 'bbbb', 'cccc'],
+		}
+		expect(estimateMessages([withImages])).toBe(MESSAGE_TOKEN_OVERHEAD + 3 * IMAGE_TOKEN_ESTIMATE)
+	})
+
+	it('is 0 for an empty array (no messages)', () => {
+		expect(estimateMessages([])).toBe(0)
 	})
 })
 
@@ -417,5 +475,60 @@ describe('fencedFile', () => {
 		expect(fencedFile(file.path, file.content.language, file.content.text)).toBe(
 			'File: x.ts\n```typescript\nconst y = 2\n```',
 		)
+	})
+})
+
+describe('sanitizeUsage', () => {
+	it('is the identity on a well-formed non-negative integer usage', () => {
+		expect(sanitizeUsage({ prompt: 5, completion: 7, total: 12 })).toEqual({
+			prompt: 5,
+			completion: 7,
+			total: 12,
+		})
+		expect(sanitizeUsage({ prompt: 0, completion: 0, total: 0 })).toEqual({
+			prompt: 0,
+			completion: 0,
+			total: 0,
+		})
+	})
+
+	it('floors a NaN field to 0', () => {
+		expect(sanitizeUsage({ prompt: NaN, completion: 7, total: 12 })).toEqual({
+			prompt: 0,
+			completion: 7,
+			total: 12,
+		})
+	})
+
+	it('floors a negative field to 0', () => {
+		expect(sanitizeUsage({ prompt: -5, completion: 7, total: 12 })).toEqual({
+			prompt: 0,
+			completion: 7,
+			total: 12,
+		})
+	})
+
+	it('floors Infinity and -Infinity fields to 0', () => {
+		expect(sanitizeUsage({ prompt: Infinity, completion: -Infinity, total: 12 })).toEqual({
+			prompt: 0,
+			completion: 0,
+			total: 12,
+		})
+	})
+
+	it('floors a fractional field to its integer part', () => {
+		expect(sanitizeUsage({ prompt: 5.9, completion: 7.1, total: 12.7 })).toEqual({
+			prompt: 5,
+			completion: 7,
+			total: 12,
+		})
+	})
+
+	it('sanitizes a mix of non-finite, negative, and fractional fields independently', () => {
+		expect(sanitizeUsage({ prompt: -5, completion: NaN, total: 12.7 })).toEqual({
+			prompt: 0,
+			completion: 0,
+			total: 12,
+		})
 	})
 })

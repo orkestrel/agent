@@ -1,6 +1,8 @@
+import type { MessageInterface } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
+	ConversationError,
 	estimateMessages,
 	isConversationError,
 } from '@src/core'
@@ -613,6 +615,175 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 
 		const snapshot = conversation.snapshot()
 		expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot)
+	})
+})
+
+describe('Conversation — sections cap (F2)', () => {
+	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
+		const zero = (): Conversation => new Conversation({ sections: 0 })
+		const negative = (): Conversation => new Conversation({ sections: -1 })
+
+		expect(zero).toThrow(ConversationError)
+		expect(negative).toThrow(ConversationError)
+		expect(zero).toThrowError(expect.objectContaining({ code: 'SECTIONS' }))
+	})
+
+	it('accepts a fractional cap >= 1 (only the >= 1 bound is validated)', () => {
+		expect(() => new Conversation({ sections: 1.5 })).not.toThrow()
+	})
+
+	it('throws ConversationError code SECTIONS for a zero or negative per-compact override', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add({ role: 'user', content: 'a' })
+
+		await expect(conversation.compact({ sections: 0 })).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SECTIONS',
+		)
+	})
+
+	it('with sections: 2, three compact() rounds leave exactly 2 sections; the oldest merge folds their originals in order', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
+
+		conversation.add({ role: 'user', content: 'round-1' })
+		const first = await conversation.compact()
+		conversation.add({ role: 'user', content: 'round-2' })
+		const second = await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
+		expect(conversation.sections.map((one) => one.id)).toEqual([first?.id, second?.id])
+
+		// Third round pushes a THIRD section, overflowing the cap of 2 — the two oldest
+		// (round-1, round-2) fold into ONE merged section, leaving [merged, round-3].
+		conversation.add({ role: 'user', content: 'round-3' })
+		const third = await conversation.compact()
+
+		expect(conversation.sections).toHaveLength(2)
+		const [merged, kept] = conversation.sections
+		expect(kept?.id).toBe(third?.id)
+		expect(merged?.id).not.toBe(first?.id)
+		expect(merged?.id).not.toBe(second?.id)
+		// The merged section's messages are the folded originals, concatenated IN ORDER.
+		expect(merged?.messages.map((one) => one.content)).toEqual(['round-1', 'round-2'])
+	})
+
+	it("fires a 'collapse' event carrying the merged section when the cap forces a fold", async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
+		const events = recordEmitterEvents(conversation.emitter, ['collapse'])
+
+		conversation.add({ role: 'user', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'b' })
+		await conversation.compact()
+		expect(events.collapse.count).toBe(0) // no overflow yet (2 sections === cap)
+
+		conversation.add({ role: 'user', content: 'c' })
+		await conversation.compact()
+
+		expect(events.collapse.count).toBe(1)
+		const merged = conversation.sections[0]
+		expect(events.collapse.calls[0]?.[0]).toBe(merged)
+	})
+
+	it('view() length stays bounded to the capped sections + the live tail', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 2, keep: 1 })
+
+		for (let n = 0; n < 5; n += 1) {
+			conversation.add({ role: 'user', content: `msg-${n}` })
+			await conversation.compact()
+		}
+
+		// Never more than 2 section recaps + the live tail (1, per keep:1).
+		expect(conversation.sections).toHaveLength(2)
+		expect(conversation.view()).toHaveLength(3)
+	})
+
+	it('search() still finds a message that was folded through a merge', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
+
+		conversation.add({ role: 'user', content: 'the needle is here' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'second batch' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'third batch triggers the merge' })
+		await conversation.compact()
+
+		// The first section (containing 'the needle is here') was merged into a new section —
+		// its original message must still be found via search.
+		const hits = conversation.search('needle')
+		expect(hits.map((one) => one.content)).toEqual(['the needle is here'])
+	})
+
+	it('a per-compact CompactOptions.sections override wins over the constructor cap', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 5 })
+
+		conversation.add({ role: 'user', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'b' })
+		// Override to a cap of 1 for this compaction — forces an immediate merge despite the
+		// constructor's cap of 5.
+		await conversation.compact({ sections: 1 })
+
+		expect(conversation.sections).toHaveLength(1)
+	})
+
+	it('DEFAULT unset sections: repeated compacts grow the sections list unbounded (regression guard)', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+
+		for (let n = 0; n < 4; n += 1) {
+			conversation.add({ role: 'user', content: `turn-${n}` })
+			await conversation.compact()
+		}
+
+		expect(conversation.sections).toHaveLength(4)
+	})
+
+	// F4 — cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
+	// (and its splice) is skipped — sections transiently sit at `cap + 1`, no loss — but the
+	// rollup regeneration still runs over the CURRENT (unmerged) sections so it is never left
+	// stale, and the error propagates (a manual `compact()` always surfaces a summarizer
+	// failure). The section fold + rollup calls both succeed; only the merge call (identified by
+	// call count) throws.
+	it('regenerates a fresh rollup over the unmerged sections when the overflow merge throws, then propagates the error', async () => {
+		const boom = new Error('merge summarizer boom')
+		let calls = 0
+		// Calls per compact() round without overflow: 1 (fold) + 1 (rollup) = 2 — so rounds 1 and 2
+		// consume calls 1-2 and 3-4. Round 3 overflows the cap of 2: its fold is call 5, its
+		// overflow MERGE is call 6 (before the rollup) — make only that merge call throw.
+		const summarize = async (messages: readonly MessageInterface[]): Promise<string> => {
+			calls += 1
+			if (calls === 6) throw boom
+			return `recap of ${messages.length}`
+		}
+		const conversation = new Conversation({ summarize, sections: 2 })
+
+		conversation.add({ role: 'user', content: 'round-1' })
+		await conversation.compact()
+		conversation.add({ role: 'user', content: 'round-2' })
+		await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
+
+		// Round 3 overflows the cap — the merge call throws.
+		conversation.add({ role: 'user', content: 'round-3' })
+		const rollupBeforeAttempt = conversation.summary
+		await expect(conversation.compact()).rejects.toBe(boom)
+
+		// No splice, no loss: 3 sections remain (transiently over the cap of 2), unmerged.
+		expect(conversation.sections).toHaveLength(3)
+		// The rollup is FRESH — regenerated over the current (unmerged) 3 sections, so it
+		// differs from whatever it was before this failed attempt (never left stale).
+		expect(conversation.summary).not.toBe(rollupBeforeAttempt)
+		expect(conversation.summary).toBe('recap of 3')
+
+		// A subsequent successful compact() restores the cap.
+		conversation.add({ role: 'user', content: 'round-4' })
+		await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
 	})
 })
 

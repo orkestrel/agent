@@ -1082,6 +1082,16 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   reaches the window AND the active conversation is summarizable, COMPACTS the active
  *   conversation + continues on the rebuilt smaller view — compact-and-continue, distinct from
  *   `budget`'s hard abort. Omitted ⇒ no auto-compaction.
+ * - `strict` — when `true`, a summarizer failure during AUTOMATIC compaction ABORTS the run
+ *   (rethrown after the `compactError` event, propagating through `#run` to a genuine `error`
+ *   settle) instead of skipping compaction and continuing over-window. Defaults to `false`
+ *   (lenient — the prior, byte-for-byte behavior).
+ * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
+ *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
+ * - `workspaces` — an optional pre-built {@link WorkspaceManagerInterface} forwarded to the
+ *   agent's context; a fresh empty one is created when omitted (mirrors {@link AgentContextOptions.workspaces}).
+ * - `scope` — an optional initial active {@link ScopeInterface} forwarded to the agent's context
+ *   (the build-time filter); `undefined` ⇒ no filtering (mirrors {@link AgentContextOptions.scope}).
  * - `on` — the reserved {@link EmitterHooks} key (§8): initial listeners for the agent's
  *   {@link AgentEventMap}, wired at construction (e.g. `{ finish: (r) => log(r) }`).
  */
@@ -1092,6 +1102,12 @@ export interface AgentOptions {
 	readonly system?: string
 	/** A pre-built tool registry the loop dispatches calls through; an empty one is created when omitted. */
 	readonly tools?: ToolManagerInterface
+	/** A pre-built instruction registry forwarded to the agent's context; an empty one is created when omitted. */
+	readonly instructions?: InstructionManagerInterface
+	/** A pre-built workspace registry forwarded to the agent's context; a fresh empty one is created when omitted. */
+	readonly workspaces?: WorkspaceManagerInterface
+	/** The initial active scope forwarded to the agent's context (the build-time filter); `undefined` ⇒ no filtering. */
+	readonly scope?: ScopeInterface
 	/** Max tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
 	readonly limit?: number
 	/** A wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
@@ -1129,6 +1145,13 @@ export interface AgentOptions {
 	 * as the cost `budget`, but compaction is the ceiling action instead of abort. Omit to disable.
 	 */
 	readonly window?: BudgetInterface<readonly MessageInterface[]>
+	/**
+	 * When `true`, a summarizer failure during AUTOMATIC compaction ABORTS the run — the
+	 * `compactError` event still fires, then the caught error is RETHROWN so the run settles
+	 * `error` instead of continuing over-window. Defaults to `false` (lenient — the run
+	 * continues over-window, byte-for-byte the prior behavior).
+	 */
+	readonly strict?: boolean
 }
 
 /**
@@ -1201,16 +1224,32 @@ export interface AgentInterface {
 	 * Run the turn to completion, discarding the live chunks — drains the shared
 	 * stream and resolves the settled outcome.
 	 *
+	 * @remarks
+	 * A concurrent run on a shared accounting agent throws an
+	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) — and it throws
+	 * SYNCHRONOUSLY, before any `Promise` is returned. A fire-and-forget
+	 * `agent.generate().catch(...)` therefore will NOT catch it (the throw happens on the call
+	 * itself, ahead of the `.catch` ever attaching) — `await` the call (inside a `try`/`catch`)
+	 * or wrap the call expression itself in `try`/`catch`.
+	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
+	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
 	 * Run the turn as a live stream — iterate `events` for {@link AgentChunk}s and
 	 * `await result` for the settled outcome.
 	 *
+	 * @remarks
+	 * Like `generate()`, a concurrent run on a shared accounting agent throws an
+	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) SYNCHRONOUSLY — before the
+	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
+	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`.
+	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
+	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
@@ -1526,9 +1565,11 @@ export interface SectionInterface {
  * moments a fire-and-forget observer subscribes to via `conversation.emitter.on`.
  *
  * @remarks
- * `compact` carries the newly-folded {@link SectionInterface}; `summary` carries the
- * regenerated conversation rollup (refreshed on each compaction); `rehydrate` carries the
- * `id` of a section whose originals were pulled back. Listener isolation is the emitter's
+ * `compact` carries the newly-folded {@link SectionInterface}; `collapse` carries a section
+ * created by folding multiple OLDER sections together (a bounded-`sections` cap enforcement,
+ * distinct from `compact`'s fresh live-tail fold); `summary` carries the regenerated
+ * conversation rollup (refreshed on each compaction); `rehydrate` carries the `id` of a
+ * section whose originals were pulled back. Listener isolation is the emitter's
  * (§13): every event is emitted directly and a listener throw is routed to the emitter's
  * `error` handler (the `error` option), never onto this map, so a buggy observer can never
  * corrupt a compaction. A `type` alias (not `interface extends EventMap`, §4.5) so the
@@ -1541,6 +1582,11 @@ export type ConversationEventMap = {
 	readonly summary: readonly [summary: string]
 	/** A section's original messages were pulled back — the section's `id`. */
 	readonly rehydrate: readonly [id: string]
+	/**
+	 * The bounded-`sections` cap folded the oldest sections into ONE merged section — the
+	 * merged {@link SectionInterface} that replaced them.
+	 */
+	readonly collapse: readonly [section: SectionInterface]
 }
 
 /**
@@ -1555,7 +1601,10 @@ export type ConversationEventMap = {
  * live tail, it just cannot fold). `keep` is how many recent live messages a `compact()`
  * retains VERBATIM (folding only the older ones); it defaults to
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
- * folds the WHOLE current live tail into one section).
+ * folds the WHOLE current live tail into one section). `sections` is an optional cap on the
+ * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
+ * `sections` sections FOLDS the oldest overflow into ONE merged section so the list never
+ * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited (the prior behavior).
  */
 export interface ConversationOptions {
 	readonly id?: string
@@ -1566,6 +1615,8 @@ export interface ConversationOptions {
 	readonly summarize?: ConversationSummarizer
 	/** Recent live messages kept verbatim on `compact`; defaults to `DEFAULT_CONVERSATION_KEEP` (`0`). */
 	readonly keep?: number
+	/** A cap (`>= 1`) on the compacted `sections` list; overflow folds into one merged section. Omitted ⇒ unlimited. */
+	readonly sections?: number
 }
 
 /**
@@ -1575,11 +1626,16 @@ export interface ConversationOptions {
  * `keep` overrides the conversation's configured retained-tail size for THIS compaction only
  * (the older `count - keep` live messages fold; when `count <= keep` nothing folds and
  * `compact()` is a no-op returning `undefined`). Omitted ⇒ the conversation's own `keep`
- * (its option, or `DEFAULT_CONVERSATION_KEEP`) applies.
+ * (its option, or `DEFAULT_CONVERSATION_KEEP`) applies. `sections` overrides the conversation's
+ * configured `sections` cap for THIS compaction only — after the new section is pushed, an
+ * overflow past `sections` folds the oldest sections into one merged section. Omitted ⇒ the
+ * conversation's own `sections` cap (or unlimited) applies.
  */
 export interface CompactOptions {
 	/** Override the retained-tail size for this compaction; omitted ⇒ the conversation's own `keep`. */
 	readonly keep?: number
+	/** Override the `sections` cap for this compaction; omitted ⇒ the conversation's own cap (or unlimited). */
+	readonly sections?: number
 }
 
 /**
@@ -1728,6 +1784,13 @@ export interface ConversationInterface {
 	 * from the live tail, regenerates the rollup (a second `summarize` over all sections), and
 	 * resolves the new section. Requires a {@link ConversationSummarizer} — THROWS a
 	 * {@link import('./errors.js').ConversationError} when none was supplied.
+	 *
+	 * @remarks
+	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
+	 * merge step folds the oldest sections into one — if THAT merge's `summarize` call throws,
+	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss) but the rollup still
+	 * regenerates over the current unmerged sections (never left stale) before the error
+	 * propagates; the next successful `compact()` self-heals the section count back to `cap`.
 	 *
 	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
 	 * @returns The new {@link SectionInterface}, or `undefined` when nothing folded
@@ -1894,7 +1957,8 @@ export interface ConversationSnapshotRow {
  * `id` is the conversation's identity (minted when omitted). `summarize` OVERRIDES the
  * manager's default {@link ConversationSummarizer} for this conversation (omitted ⇒ the
  * manager's default flows in). `keep` overrides the manager's default retained-tail size.
- * `on` is the §8 reserved key (initial {@link ConversationEventMap} listeners). `snapshot` is
+ * `sections` overrides the manager's default `sections` cap. `on` is the §8 reserved key
+ * (initial {@link ConversationEventMap} listeners). `snapshot` is
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are RESTORED into the new conversation (the live `summarize` / `keep` /
  * `on` re-supplied alongside it), the conversation analogue of {@link WorkspaceInput.seed} that a
@@ -1908,6 +1972,8 @@ export interface ConversationInput {
 	readonly summarize?: ConversationSummarizer
 	/** Overrides the manager's default retained-tail size for this conversation. */
 	readonly keep?: number
+	/** Overrides the manager's default `sections` cap for this conversation. */
+	readonly sections?: number
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** A {@link ConversationSnapshot} to hydrate FROM (its `id` / `summary` / `sections` / live tail restored); the analogue of `WorkspaceInput.seed`. */
 	readonly snapshot?: ConversationSnapshot
@@ -1922,13 +1988,17 @@ export interface ConversationInput {
  * (a per-`add` {@link ConversationInput.summarize} overrides it); a conversation created
  * with neither cannot `compact` (it throws a `ConversationError`). `keep` is the default
  * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it), defaulting
- * to {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}.
+ * to {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
+ * on a created conversation's compacted `sections` list (a per-`add` {@link ConversationInput.sections}
+ * overrides it); omitted ⇒ unlimited.
  */
 export interface ConversationManagerOptions {
 	/** The default summarizer for conversations this manager creates (a per-`add` override wins). */
 	readonly summarize?: ConversationSummarizer
 	/** The default retained-tail size (a per-`add` override wins); defaults to `DEFAULT_CONVERSATION_KEEP`. */
 	readonly keep?: number
+	/** The default `sections` cap for conversations this manager creates (a per-`add` override wins); omitted ⇒ unlimited. */
+	readonly sections?: number
 	/**
 	 * The optional durable {@link ConversationStoreInterface} backing
 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory

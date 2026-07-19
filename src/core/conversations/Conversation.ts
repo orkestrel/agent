@@ -72,6 +72,9 @@ export class Conversation implements ConversationInterface {
 	readonly #summarize: ConversationSummarizer | undefined
 	// How many recent live messages a `compact()` retains verbatim (older ones fold).
 	readonly #keep: number
+	// The optional cap (§F2) on the compacted sections list — `undefined` ⇒ unlimited. Enforced
+	// AFTER pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
+	readonly #cap: number | undefined
 	// The compacted history, oldest → newest — each summarized slice RETAINS its originals.
 	readonly #sections: SectionInterface[] = []
 	// The rollup (a summary-of-summaries over all sections), regenerated on each compaction.
@@ -90,6 +93,10 @@ export class Conversation implements ConversationInterface {
 		this.#emitter = new Emitter<ConversationEventMap>({ on: options?.on, error: options?.error })
 		this.#summarize = options?.summarize
 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+		if (options?.sections !== undefined && options.sections < 1) {
+			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
+		}
+		this.#cap = options?.sections
 		if (seed) {
 			this.#summary = seed.summary
 			for (const section of seed.sections) this.#sections.push(section)
@@ -178,6 +185,10 @@ export class Conversation implements ConversationInterface {
 				'cannot compact a conversation without a summarizer',
 			)
 		}
+		const cap = options?.sections ?? this.#cap
+		if (cap !== undefined && cap < 1) {
+			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
+		}
 		const keep = options?.keep ?? this.#keep
 		const live = [...this.#messages.values()]
 		// Fold the OLDEST `count - keep` live messages; nothing to fold ⇒ a no-op.
@@ -194,11 +205,36 @@ export class Conversation implements ConversationInterface {
 		// 2. Remove the folded messages from the live tail (by their ids) and push the section.
 		for (const message of slice) this.#messages.delete(message.id)
 		this.#sections.push(section)
-		// 3. Regenerate the rollup — a summary-of-summaries over ALL sections (the SECOND
-		// summarizer call) — then observe it, AFTER the mutation, through the guarded path.
+		// 3. F2 — enforce the bounded-`sections` cap: an overflow past `cap` folds the OLDEST
+		// overflow sections into ONE merged section (a THIRD summarizer call over the folded
+		// section summaries), so `#sections.length === cap` afterward.
+		if (cap !== undefined && this.#sections.length > cap) {
+			const overflow = this.#sections.length - cap + 1
+			const folded = this.#sections.slice(0, overflow)
+			try {
+				const merged: SectionInterface = {
+					id: crypto.randomUUID(),
+					summary: await summarize(folded.map((one) => this.#summaryMessage(one))),
+					messages: folded.flatMap((one) => one.messages),
+				}
+				this.#sections.splice(0, overflow, merged)
+				this.#emitter.emit('collapse', merged)
+			} catch (error) {
+				// The merge summarizer call threw — the sections stay transiently at `cap + 1`
+				// (no splice, no loss), but the rollup below still regenerates over the CURRENT
+				// (unmerged) sections so it is never left stale, then the error propagates
+				// (manual `compact()` always surfaces a summarizer failure to its caller; the
+				// next successful `compact()` self-heals the over-cap count).
+				this.#summary = await summarize(this.#sections.map((one) => this.#summaryMessage(one)))
+				this.#emitter.emit('summary', this.#summary)
+				throw error
+			}
+		}
+		// 4. Regenerate the rollup — a summary-of-summaries over ALL (now-capped) sections
+		// — then observe it, AFTER the mutation, through the guarded path.
 		this.#summary = await summarize(this.#sections.map((one) => this.#summaryMessage(one)))
 		this.#emitter.emit('summary', this.#summary)
-		// 4. Observe the new section last, so a swallowed listener throw can't perturb the fold.
+		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
 		this.#emitter.emit('compact', section)
 		return section
 	}

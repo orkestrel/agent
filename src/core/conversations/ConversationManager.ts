@@ -55,12 +55,15 @@ export class ConversationManager implements ConversationManagerInterface {
 	readonly #summarize: ConversationSummarizer | undefined
 	// The default retained-tail size flowed into every conversation `add` creates (overridable).
 	readonly #keep: number
+	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.
+	readonly #sections: number | undefined
 	// The optional durable store backing `open` / `save`; `undefined` ⇒ registry-only (both lenient).
 	readonly #store: ConversationStoreInterface | undefined
 
 	constructor(options?: ConversationManagerOptions) {
 		this.#summarize = options?.summarize
 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+		this.#sections = options?.sections
 		this.#store = options?.store
 	}
 
@@ -86,12 +89,14 @@ export class ConversationManager implements ConversationManagerInterface {
 		// `snapshot` HYDRATES the conversation through the constructor `seed` (the second arg) —
 		// its `id` / `summary` / `sections` / live tail restored, the live summarize / keep above
 		// re-supplied alongside it (mirroring how WorkspaceManager threads `seed`).
+		const sections = input?.sections ?? this.#sections
 		const conversation = new Conversation(
 			{
 				...(input?.id === undefined ? {} : { id: input.id }),
 				...(input?.on === undefined ? {} : { on: input.on }),
 				summarize: input?.summarize ?? this.#summarize,
 				keep: input?.keep ?? this.#keep,
+				...(sections === undefined ? {} : { sections }),
 			},
 			input?.snapshot,
 		)

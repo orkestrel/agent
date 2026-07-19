@@ -31,8 +31,8 @@ import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from './AgentContext.js'
 import { Channel } from './Channel.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
-import { isProviderAbortError } from './errors.js'
-import { estimateTokens, filterAllowList } from './helpers.js'
+import { AgentError, isProviderAbortError } from './errors.js'
+import { estimateTokens, filterAllowList, sanitizeUsage } from './helpers.js'
 
 /**
  * The agent loop — composes a {@link ProviderInterface}, an {@link AgentContext}, and
@@ -91,6 +91,9 @@ export class Agent implements AgentInterface {
 	// conversation switch. NOT the hard cost `budget` ceiling — when the prompt reaches its `max`
 	// this COMPACTS + continues (non-fatal on a summarizer throw, futile-guarded), never aborts.
 	readonly #window: BudgetInterface<readonly MessageInterface[]> | undefined
+	// F5 — when true, a summarizer failure during AUTOMATIC compaction rethrows (after the
+	// `compactError` event) instead of skipping compaction and continuing over-window.
+	readonly #strict: boolean
 	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
 	// `destroy()`: the Agent holds no other teardownable resources, and an `Emitter` owns
@@ -112,6 +115,9 @@ export class Agent implements AgentInterface {
 		this.#context = new AgentContext({
 			system: options?.system,
 			tools: options?.tools,
+			instructions: options?.instructions,
+			workspaces: options?.workspaces,
+			scope: options?.scope,
 			conversations: options?.conversations,
 		})
 		this.#limit = options?.limit ?? DEFAULT_AGENT_LIMIT
@@ -121,6 +127,7 @@ export class Agent implements AgentInterface {
 		this.#signal = options?.signal
 		this.#authority = options?.authority
 		this.#window = options?.window
+		this.#strict = options?.strict ?? false
 		this.#emitter = new Emitter<AgentEventMap>({ on: options?.on, error: options?.error })
 	}
 
@@ -144,6 +151,21 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
+		// F4 — concurrency guard: a run already in flight PLUS a shared construction-level
+		// accounting instance (a `window` context budget, or a construction `budget` with no
+		// per-run override) would race its charges against that shared instance — corrupting
+		// the accounting. Thrown SYNCHRONOUSLY, before any state mutation or emit, so a
+		// sequential/awaited caller is never affected and a concurrent run with no `window` and
+		// a per-run `budget` override is still allowed.
+		if (
+			this.#runs.size > 0 &&
+			(this.#window !== undefined || (this.#budget !== undefined && options?.budget === undefined))
+		) {
+			throw new AgentError(
+				'CONCURRENCY',
+				'concurrent runs on one agent with a shared construction window/budget corrupt accounting; use separate agents or per-run budgets',
+			)
+		}
 		// Resolve effective per-run bounds — a per-run override (§F3) wins, else the
 		// construction default. `limit` and `budget` also thread into `#run` (the loop bound
 		// + F2's mid-stream charging); `budget` here is the SAME instance folded into `#parents`
@@ -436,7 +458,10 @@ export class Agent implements AgentInterface {
 						// double-counted). A provider that can't observe usage mid-stream (its
 						// final counts never arrive) reports none, and none is fabricated here.
 						if (error.partial.usage !== undefined) {
-							const abortUsage = error.partial.usage
+							// F6 — sanitize the provider's partial usage before charging/folding it: a
+							// non-finite or negative field floors to `0`, a fractional field floors to its
+							// integer part. The normal post-turn usage path is untouched.
+							const abortUsage = sanitizeUsage(error.partial.usage)
 							budget?.consume({
 								prompt: abortUsage.prompt,
 								completion: Math.max(0, abortUsage.completion - charged),
@@ -455,22 +480,28 @@ export class Agent implements AgentInterface {
 				thinking = this.#thought(thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
+				// F1 — sanitize the provider's normal post-turn usage before charging/folding it,
+				// exactly like the abort path above: a non-finite or negative field floors to `0`, a
+				// fractional field floors to its integer part. Unsanitized, a buggy provider's
+				// NaN/negative usage would poison `budget.consumed` and `#sum`, and never trip
+				// exhaustion (`Math.max(0, NaN - charged)` is `NaN`).
+				const resultUsage = sanitizeUsage(result.usage)
 				// RESIDUAL reconcile — the mid-stream charges above already consumed `charged` worth
 				// of budget against this turn's completion; charge only what remains of the FULL
-				// reported usage so the turn's total budget draw matches `result.usage` exactly (never
+				// reported usage so the turn's total budget draw matches `resultUsage` exactly (never
 				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
 				// exists), so it is charged here in full. `#sum` / the emitted `usage` chunk below
-				// still carry the FULL authoritative `result.usage` — reconciliation affects only the
+				// still carry the FULL sanitized `resultUsage` — reconciliation affects only the
 				// budget charge, never the reported usage.
 				budget?.consume({
-					prompt: result.usage.prompt,
-					completion: Math.max(0, result.usage.completion - charged),
-					total: Math.max(0, result.usage.total - charged),
+					prompt: resultUsage.prompt,
+					completion: Math.max(0, resultUsage.completion - charged),
+					total: Math.max(0, resultUsage.total - charged),
 				})
-				usage = this.#sum(usage, result.usage)
+				usage = this.#sum(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
-				this.#emitter.emit('usage', result.usage)
-				yield { type: 'usage', usage: result.usage }
+				this.#emitter.emit('usage', resultUsage)
+				yield { type: 'usage', usage: resultUsage }
 			}
 			if (result.tools !== undefined && result.tools.length > 0) {
 				const assistant = this.#context.messages.add({
@@ -583,8 +614,11 @@ export class Agent implements AgentInterface {
 		try {
 			section = await conversation.compact()
 		} catch (error) {
-			// NON-FATAL: surface the summarizer failure observably, skip compaction this turn, continue.
+			// Surface the summarizer failure observably first (always). Lenient (default): skip
+			// compaction this turn and continue over-window. F5 STRICT: rethrow after the event so
+			// the caught error propagates through `#run` and the run settles `error` instead.
 			this.#emitter.emit('compactError', error)
+			if (this.#strict) throw error
 			return
 		}
 		if (section === undefined) {
