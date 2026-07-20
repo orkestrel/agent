@@ -16,7 +16,7 @@ A provider turns a conversation (plus optional tools) into a turn: `generate` re
 
 ```ts
 import { createAbort } from '@orkestrel/abort'
-import type { ProviderInterface } from '@src/core'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface // any concrete implementation supplied by the host app
 const abort = createAbort()
@@ -41,7 +41,7 @@ Pass `tools` (a non-empty `ToolDefinition[]`) to advertise callable tools for th
 Register the callable tools in a `ToolManager` (a `Tool` binds the schema the model sees to the handler that runs it). `definitions()` yields the `ToolDefinition[]` to hand the provider; when the model emits a `ToolCall`, `execute` runs it with per-call error isolation — a handler throw becomes a `ToolResult.error` (the model can react to it, the call never escapes), an unknown name a not-found error, and the batch form never fails as a whole:
 
 ```ts
-import { createTool, createToolManager } from '@src/core'
+import { createTool, createToolManager } from '@orkestrel/agent'
 
 const tools = createToolManager()
 tools.add([
@@ -64,8 +64,8 @@ const results = await tools.execute([
 Collect a turn's conversation in an `AgentContext` — the lean `system` + `messages` + `tools` composition. Add turns through `context.messages` (the ACTIVE conversation's live tail — a default conversation is always present; it satisfies `MessageManagerInterface`, minting each `id` on `add` and keeping messages immutable + in insertion order), then `build()` the provider input: `[systemMessage?, ...messages]`. Tools are advertised structurally via `context.tools.definitions()` (handed to `generate` / `stream`), never serialized into the message array:
 
 ```ts
-import { createAgentContext, createToolManager } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgentContext, createToolManager } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 import { createAbort } from '@orkestrel/abort'
 
 declare const provider: ProviderInterface
@@ -86,8 +86,8 @@ const result = await provider.generate(input, abort.signal, definitions)
 Drive the whole turn with an `Agent` (`createAgent`) — it composes the provider, its `AgentContext`, and the tool registry into the bounded context → provider → tools → repeat loop. Seed the conversation through `agent.context.messages`, then either `generate()` for a one-shot `AgentResult` or `stream()` for a live `AgentChunk` stream (`token` answer deltas, `think` reasoning deltas, `tool` dispatches, `usage`) whose `result` resolves the same `AgentResult`. `generate` DRAINS that same stream, so the two can't diverge:
 
 ```ts
-import { createAgent, createTool, createToolManager } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent, createTool, createToolManager } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 import { createTokenBudget } from '@orkestrel/budget'
 
 declare const provider: ProviderInterface
@@ -133,7 +133,7 @@ The turn is bounded by ONE cancel folded from the external `signal` + the `timeo
 Gate the model's tool calls with an optional `Authority` (`createAuthority`) — a synchronous policy gate the loop consults BEFORE each call runs, passed via `AgentOptions.authority`. It walks ordered `rules` first-match-wins (a matched rule allows unless its `allowed` is `false`), falling back to a configurable default when none match — allow-unmatched by default (a denylist), or deny-by-default when its `fallback` denies (an allowlist). A DENIED call is fed back to the model as a denial `ToolResult` (a `tool` chunk + a tool message carrying `denied: <reason>`) instead of being executed — no tool run, no budget cost — so the model sees the denial and can react; an ALLOWED call dispatches normally. Without an `authority`, every call dispatches as before:
 
 ```ts
-import { createAgent, createAuthority, createTool, createToolManager } from '@src/core'
+import { createAgent, createAuthority, createTool, createToolManager } from '@orkestrel/agent'
 
 const tools = createToolManager()
 tools.add([
@@ -160,7 +160,7 @@ agent.context.messages.add({ role: 'user', content: 'Delete record 42.' })
 Alongside the conversation store sits the STANDALONE `InstructionManager` a richer context assembles a prompt from — named directives, keyed by `name`, listed by descending `priority`. It mirrors the registry shape — `add` (one or a batch, §9.2) MINTS each `id` and OVERWRITES a same-key entry (last write wins), an `instruction(name)` / `instructions()` accessor pair, `remove` (one or a batch) / `clear` / `count` — holds IMMUTABLE entries, and is observable (`emitter` with an `add` / `remove` / `clear` event map, wired via the reserved `on` option; an `error` option receives a listener's throw, §13). It carries the two **build-contract** members a context's assembly step calls: `description` (the section header text, `'## Instructions'`) and `format(instruction)` (per-item rendering — the instruction's `content`):
 
 ```ts
-import { createInstructionManager } from '@src/core'
+import { createInstructionManager } from '@orkestrel/agent'
 
 const instructions = createInstructionManager()
 const safety = instructions.add({
@@ -175,7 +175,7 @@ instructions.format(safety) // 'Refuse unsafe requests.'
 Documents and images reach a turn through the ACTIVE WORKSPACE — the SOLE document/image context (see [Workspaces](#workspaces--the-file-edit-surface) below): a workspace's TEXT files render as fenced reference blocks in a `## Workspace` system section, its IMAGE files' base64 `data` attaches to the last user message. For a multimodal turn, a message carries base64 image data on its optional `images` field — `MessageInterface` / `MessageInput` both accept `readonly images?: readonly string[]`, which a vision-capable provider forwards onto the wire message (an empty / absent array is never sent). It is INPUT-only; `ProviderResult` is unchanged.
 
 ```ts
-import type { ProviderInterface } from '@src/core'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface // a vision-capable model
 const result = await provider.generate(
@@ -187,7 +187,7 @@ const result = await provider.generate(
 `AgentContext` WIRES the instruction manager + the workspace registry in. Beyond `system` + `messages` + `tools`, a context exposes its own `instructions` manager and `workspaces` registry (pass pre-built ones via `AgentContextOptions`, or fresh empty ones are created), and `build()` folds them into the turn. The assembly order is: ONE leading `system` message whose content is the system prompt, then the non-empty instructions block (its `description` header followed by every item's `format`), then the ACTIVE workspace's text files (a `## Workspace` section of fenced reference blocks) — joined by blank lines; then the conversation. With no instructions, no active workspace, and no scope it builds exactly the lean `[systemMessage?, ...messages]`. The active workspace's scoped-in image files' base64 `data` is attached to the LAST user message (a vision provider reads images off a user turn) — the text files ride the system block, the image payload rides the message:
 
 ````ts
-import { createAgentContext } from '@src/core'
+import { createAgentContext } from '@orkestrel/agent'
 
 const context = createAgentContext({ system: 'You are a code reviewer.' })
 context.instructions.add({ name: 'tone', content: 'Be terse.', priority: 10 })
@@ -205,8 +205,8 @@ const input = context.build()
 Above the flat `MessageManager` sits the `Conversation` (`createConversation` / a `ConversationManager`) — it OWNS its messages DIRECTLY (the flat store verbs folded in, like a `Workspace` owns its files) and COMPACTS the older ones into summarized `sections` so a long history fits a turn's context window without discarding the originals. Append turns through the conversation's own `add` (the LIVE uncompacted tail; `message` / `messages` / `remove` / `clear` / `count` round it out); `compact()` folds the older live messages into a summarized `SectionInterface` (retaining their originals), regenerates the conversation rollup `summary`, and shrinks `view()` — the model input, where each section becomes ONE summary message followed by the live tail. Compaction is driven by a **provider-agnostic** `ConversationSummarizer` seam (`(messages) => Promise<string>`) the agent RUNTIME supplies — core never imports a provider — so a `compact()` without one throws a `ConversationError`. `keep` retains a recent tail (default `DEFAULT_CONVERSATION_KEEP` = `0`, fold all); `rehydrate(id)` / `search(query)` read the retained originals:
 
 ```ts
-import { createConversation } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createConversation } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 // The summarizer seam — built from the provider by the runtime; core stays provider-agnostic.
@@ -243,7 +243,7 @@ Inject a `Conversation` into an `AgentContext` (`AgentContextOptions.conversatio
 Pass that same `conversation` to `createAgent` (`AgentOptions.conversation`, forwarded into the agent's context) together with an `AgentOptions.window` — a CONTEXT [`Budget`](budget.md) — to enable AUTOMATIC compaction: its `consume` is a token estimator (e.g. the exported `estimateMessages`) and its `max` is the context window. Each turn the loop estimates the CURRENT FULL prompt (the system block + the conversation's view + the turn's new messages — the exact next request) against this budget and, the moment that prompt REACHES the window, COMPACTS the conversation then continues on the rebuilt (smaller) view — the same consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action is compaction (compact-and-continue) instead of abort. Omit `window` (or inject no conversation) and the loop is byte-for-byte unchanged; observe folds via the conversation's `compact` / `summary` events (there is no new agent event). See the [Contract](#contract) (clause 26) for the exact trigger point and the v1 single-level limitation.
 
 ```ts
-import { createAgent, createConversation, estimateMessages } from '@src/core'
+import { createAgent, createConversation, estimateMessages } from '@orkestrel/agent'
 import { createBudget } from '@orkestrel/budget'
 
 const conversation = createConversation({ summarize, keep: 2 }) // summarize: the runtime's seam
@@ -263,7 +263,7 @@ await agent.generate() // folds older turns into a section mid-run when the prom
 `agent.context.conversations` is the message-source registry (a SETTABLE mutable property like `context.scope`) — switch its ACTIVE conversation with `conversations.switch(id)` to switch the agent's message source. `context.messages` is DYNAMIC: it always points at the CURRENT active conversation's live tail (the SAME reference, no duplication) and follows a switch. The registry ALWAYS has an active conversation (a default is added when it has none). This is the real app pattern: ONE `Agent` over a `ConversationManager` of threads, switching the active conversation PER REQUEST — not an agent per thread. Each conversation accumulates its OWN history and compacts INDEPENDENTLY (one thread's sections never leak into another). The agent reads `context.conversations` / `context.messages` fresh on each run, so switching BETWEEN runs just works:
 
 ```ts
-import { createAgent, createConversationManager, estimateMessages } from '@src/core'
+import { createAgent, createConversationManager, estimateMessages } from '@orkestrel/agent'
 import { createBudget } from '@orkestrel/budget'
 
 const threads = createConversationManager({ summarize, keep: 2 }) // its defaults flow into each thread
@@ -306,7 +306,7 @@ agent.emitter.on('compactError', (error) =>
 A `Scope` (`createScope` / a `ScopeManager`) is a NAMED allow-list filter the context applies at `build()` time AND at the loop's tool-advertise step. It carries three optional per-category lists keyed by each category's identity — `instructions` (by `name`), `tools` (by `name`), `files` (the active workspace's files, by `path`) — each THREE-WAY: `undefined` ⇒ NO constraint (all pass), `[]` ⇒ NONE pass, a non-empty list ⇒ only the listed keys. Conversation messages are NOT scoped — the active conversation owns message inclusion via compaction (`view()`), so there is no `messages` allow-list. Set the active filter through the mutable `context.scope` (default `undefined` ⇒ no filtering); `build()` reflects whatever scope is active when it runs (recomputed fresh each call). `narrow(config)` composes a tighter child scope by set-INTERSECTION (an `undefined` side imposes no constraint), so narrowing can only tighten — a parent-excluded key never returns:
 
 ```ts
-import { createAgent, createScope } from '@src/core'
+import { createAgent, createScope } from '@orkestrel/agent'
 
 const agent = createAgent(provider, { tools }) // tools holds `search` + `delete`
 agent.context.instructions.add([
@@ -336,7 +336,7 @@ Each context section frames as `[open, ...items.map(render), close]` — a top l
 So for a section kind `K`, manager `M`, and a provider format `F`: **open** = `M.framing?.open ?? F?.[K]?.open ?? M.description` (manager-options > provider > built-in — the leading text has no per-item level); **per item** `I` = `I.format ?? M.framing?.render?.(I) ?? F?.[K]?.render?.(I) ?? M.format(I)` (item > manager-options > provider > built-in); **close** = `M.framing?.close ?? F?.[K]?.close` (manager-options > provider, NO built-in ⇒ no closing line when unset). The three resolve INDEPENDENTLY, so an override may set only the open, only the rendering, only the close, or any mix — and `open` + `close` together WRAP the whole group. (The `## Workspace` text section has no cascade level of its own — it renders with the fixed `fencedFile` framing.)
 
 ```ts
-import { createAgentContext, createInstructionManager } from '@src/core'
+import { createAgentContext, createInstructionManager } from '@orkestrel/agent'
 
 // Manager-options override — wrap the instructions as a closed XML group for this manager.
 const instructions = createInstructionManager({
@@ -823,7 +823,7 @@ These invariants hold across `src/core` ↔ `agents.md`:
 `ProviderInterface.generate` / `.stream` take a plain `AbortSignal`, so fold an [abort](abort.md), a [timeout](timeout.md), and a token [budget](budget.md) into one bound via `AbortSignal.any` — whichever trips first cancels the call. This works for ANY provider; constructing the concrete one is a host application's job.
 
 ```ts
-import type { ProviderInterface } from '@src/core'
+import type { ProviderInterface } from '@orkestrel/agent'
 import { createAbort } from '@orkestrel/abort'
 import { createTimeout } from '@orkestrel/timeout'
 import { createTokenBudget } from '@orkestrel/budget'
@@ -845,8 +845,8 @@ budget.consume(result.usage ?? { prompt: 0, completion: 0, total: 0 })
 Register the callable tools in a `ToolManager`, hand `definitions()` to the provider, and feed the model's emitted `ToolCall`s back through `execute` — per-call error isolation means a handler throw becomes a `ToolResult.error` the model can react to, never an escape.
 
 ```ts
-import { createToolManager, createTool } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createToolManager, createTool } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const tools = createToolManager()
@@ -864,8 +864,8 @@ if (turn.tools) {
 The two patterns above are what an `Agent` does for you turn after turn — bounding the call, dispatching the model's tools, feeding the results back, and repeating until the model stops (or `limit` is hit). Reach for `createAgent` rather than hand-rolling the loop; bound and pace it through `AgentOptions`, and recover a cancel's partial from `result` (which resolves, never rejects, on a cancel).
 
 ```ts
-import { createAgent } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const agent = createAgent(provider, { timeout: 30_000, limit: 6 })
@@ -885,7 +885,7 @@ An `AgentOptions.budget` (or a per-run override) is not only charged from each t
 Once a turn DOES complete, the loop RECONCILES: it charges the budget the REMAINDER of the turn's authoritative `usage` (`completion - alreadyCharged`, `total - alreadyCharged`, plus the full `prompt` — which is never estimated mid-stream, having no live delta channel) — so the turn's TOTAL budget draw always nets to exactly the reported usage, never double-charged and never under-charged. The `AgentResult.usage` / the `usage` chunks you observe stay the FULL authoritative usage regardless — this reconcile affects only what the `budget` itself was charged, never what you're told the turn cost. This mid-stream enforcement is BOUNDED, not exact — the estimate can under- or over-shoot the eventual real usage by a turn's tail, so treat the `budget.max` as a firm ceiling with some slack, not a byte-exact cutoff.
 
 ```ts
-import { createAgent } from '@src/core'
+import { createAgent } from '@orkestrel/agent'
 import { createTokenBudget } from '@orkestrel/budget'
 
 const budget = createTokenBudget({ max: 2_000, scope: 'completion' })
@@ -902,8 +902,8 @@ const result = await agent.generate() // partial: true if the story ran the budg
 An `Agent` exposes TWO observation surfaces. PULL — the `AgentChunk` stream (`stream().events`) — is for a LIVE consumer rendering per-token answer deltas and per-think reasoning deltas as they arrive. PUSH — the `emitter` (`AgentEventMap`) — is for FIRE-AND-FORGET observers (logging, metrics, tracing) that want the loop's lifecycle moments WITHOUT draining the stream: `start` (a run begins), `turn` (each iteration), `tool` (a dispatched call + its result), `usage` (a turn's token usage), `deny` (an authority denial — which never reaches the chunk stream), `finish` (the settled result), `error` (a genuine failure), `abort` (a cancel), and `exhaust` (the limit was reached while the model still held unresolved tool intent — fires INSTEAD of `abort`, still followed by `finish`). Per-token / per-thinking deltas stay the STREAM's job exclusively — there is deliberately no `token` or `think` event on the emitter; reach for the stream when you need live output, the emitter when you need lifecycle.
 
 ```ts
-import { createAgent } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 // Wire fire-and-forget observers at construction via the reserved `on` option (§8) …
@@ -930,8 +930,8 @@ One agent serves MANY conversations by switching the active conversation between
 The flow is **summary → search / rehydrate → reference → write-to-workspace** — and CHERRY-PICK, never dump:
 
 ```ts
-import { createAgent, createConversationManager } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent, createConversationManager } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const conversations = createConversationManager({
@@ -963,8 +963,8 @@ Why this shape: `reference()` leads with `[Reference — conversation "<label>" 
 When you need MANY agents — bounded, retried, surviving a crash — describe each as a serializable `AgentJobInput` (names for the live pieces, data for the rest), register the live pieces once, and run them through a `createAgentQueue` (durable, bounded) or a `createAgentRunner` (one-shot, ordered, fail-fast, with sub-agent fan-out). The layer COMPOSES the workers `Queue` / `Runner` — it adds only rehydration + the partial policy, no new engine.
 
 ```ts
-import { createAgentQueue, createAgentRegistry } from '@src/core'
-import type { AgentJobInput } from '@src/core'
+import { createAgentQueue, createAgentRegistry } from '@orkestrel/agent'
+import type { AgentJobInput } from '@orkestrel/agent'
 import { createMemoryQueueStore } from '@orkestrel/queue'
 
 declare const store: ReturnType<typeof createMemoryQueueStore> // or a server JSON / SQLite store
@@ -986,7 +986,7 @@ await queue.restore()
 Fan out sub-agents by declaring `children` on a parent job; `createAgentRunner` `controller.spawn`s each through the same bounded queue, so the children run as sibling sub-agents:
 
 ```ts
-import { createAgentRunner } from '@src/core'
+import { createAgentRunner } from '@orkestrel/agent'
 
 const runner = createAgentRunner({ registry, concurrency: 4 })
 const parent: AgentJobInput = {
@@ -1002,7 +1002,7 @@ const results = await runner.execute([parent]) // [parent result, …then spawne
 Build a content arm with its split constructor, wrap it in an immutable `File`, and edit through a `Workspace` — every edit MINTS a fresh `File` and swaps it in at the path, so any reference you already hold keeps its old value. Each verb batches BY OVERLOAD (a `string` path → one file, a `Record` → a batch); the range edit is FLAT (four caret ints, never a nested object):
 
 ```ts
-import { createWorkspace } from '@src/core'
+import { createWorkspace } from '@orkestrel/agent'
 
 const workspace = createWorkspace()
 workspace.write({ 'a.ts': 'const x = 1', 'b.ts': 'const y = 2' }) // batch whole-file write
@@ -1016,7 +1016,7 @@ workspace.search('let') // SearchMatches, each carrying its 1-based line/column 
 `workspace.search` (and `replace`) treat their `query` as a regex source, so a user-supplied literal string must be escaped before it reaches either — `escapeRegExp` backslash-escapes every regex-special character so the compiled pattern matches only its own literal text:
 
 ```ts
-import { escapeRegExp } from '@src/core'
+import { escapeRegExp } from '@orkestrel/agent'
 
 const userQuery = 'a.b*c' // untrusted literal text, not a regex
 const pattern = new RegExp(escapeRegExp(userQuery))
@@ -1029,8 +1029,8 @@ workspace.search(escapeRegExp(userQuery)) // safe literal-text search, even if u
 The context's `workspaces` registry is the READ surface — and the SOLE document/image context: its ACTIVE workspace `build()` renders BY CARRIER every turn (active-only, scope-filtered) — so the agent's _current_ workspace is always reflected in the prompt as it edits, without re-mounting. Register a workspace on `context.workspaces` (the first `add` auto-activates it), and its TEXT files fold into a `## Workspace` system section (fenced reference blocks) while its IMAGE files' base64 attaches to the last user message.
 
 ```ts
-import { createAgent, createToolManager } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent, createToolManager } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const agent = createAgent(provider, { tools: createToolManager() })
@@ -1048,8 +1048,8 @@ The EDIT surface — a MANAGER-DRIVEN, `operation`-keyed `ToolInterface` wired o
 Only the ACTIVE workspace renders — the other registered workspaces never reach the model. `switch` (or swap the whole registry) changes which workspace the model sees between runs:
 
 ```ts
-import { createAgent, createScope } from '@src/core'
-import type { ProviderInterface } from '@src/core'
+import { createAgent, createScope } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const agent = createAgent(provider)
@@ -1086,8 +1086,8 @@ import {
 	createThinkSplitter,
 	createToolManager,
 	createWorkspaceManager,
-} from '@src/core'
-import type { ProviderInterface } from '@src/core'
+} from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 
