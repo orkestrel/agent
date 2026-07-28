@@ -69,9 +69,9 @@
 		"@orkestrel/contract": "^0.0.8",
 		"@orkestrel/database": "^0.0.6",
 		"@orkestrel/emitter": "^0.0.4",
-		"@orkestrel/queue": "^0.0.3",
+		"@orkestrel/queue": "^0.0.4",
 		"@orkestrel/timeout": "^0.0.4",
-		"@orkestrel/workflow": "^0.0.6"
+		"@orkestrel/workflow": "^0.0.7"
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.58.12",
