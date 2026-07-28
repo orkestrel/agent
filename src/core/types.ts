@@ -749,7 +749,7 @@ export interface AgentContextOptions {
  * @remarks
  * The richer context — `system` (the optional system prompt), the context managers
  * (`instructions` / `tools` / `workspaces` / `conversations`), `messages` (the active
- * conversation's live tail, satisfying {@link MessageManagerInterface}), and a mutable `scope`
+ * conversation's live tail, satisfying {@link MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
  * scoped instructions into ONE leading `system` message (under the manager's `description`,
  * each item via its `format`) — PLUS the ACTIVE workspace's scope-filtered text files
@@ -767,13 +767,12 @@ export interface AgentContextInterface {
 	 * The {@link WorkspaceManagerInterface} whose ACTIVE workspace `build()` renders by carrier —
 	 * its text files folded into the system block (fenced reference blocks) and its image files'
 	 * base64 `data` attached to the LAST user message. The active workspace is the SOLE
-	 * document/image context. ALWAYS present (a fresh empty manager when none was supplied). A
-	 * SETTABLE mutable property (a getter + setter, like {@link scope} / {@link conversations}, NOT a
-	 * method): assign it to swap the whole workspace registry; `build()` reads its `active` (and the
-	 * active workspace's `files()`) FRESH each call. With NO active workspace, nothing is rendered for
-	 * workspaces. Active-only — never the other registered workspaces.
+	 * document/image context. ALWAYS present (a fresh empty manager when none was supplied).
+	 * `build()` reads its `active` (and the active workspace's `files()`) FRESH each call. With NO
+	 * active workspace, nothing is rendered for workspaces. Active-only — never the other registered
+	 * workspaces.
 	 */
-	workspaces: WorkspaceManagerInterface
+	readonly workspaces: WorkspaceManagerInterface
 	/**
 	 * The active conversation's LIVE tail — the agent's message source, ALWAYS defined (the
 	 * {@link conversations} registry always has an active conversation; a default is added at
@@ -788,16 +787,15 @@ export interface AgentContextInterface {
 	 * The {@link ConversationManagerInterface} the message source flows from — `messages` IS its
 	 * ACTIVE conversation's live tail and `build()` folds that conversation's `view()`. ALWAYS holds
 	 * an active conversation (a default is added at construction when none was supplied), so
-	 * `messages` is always defined. A SETTABLE mutable property (a getter + setter, like
-	 * {@link scope} / {@link workspaces}, NOT a method): assign it to swap the whole conversation
-	 * registry between runs; switch the active conversation through `conversations.switch(id)` — so
-	 * one agent can serve MANY conversations (set the active one per request). Switch BETWEEN runs,
-	 * not during one; for CONCURRENT threads use separate agents (see clause 25).
+	 * `messages` is always defined. Switch the active conversation through
+	 * `conversations.switch(id)` — so one agent can serve MANY conversations (set the active one per
+	 * request). Switch BETWEEN runs, not during one; for CONCURRENT threads use separate agents (see
+	 * clause 25).
 	 */
-	conversations: ConversationManagerInterface
+	readonly conversations: ConversationManagerInterface
 	readonly tools: ToolManagerInterface
-	/** The active scope applied at `build()` time + the loop's tool-advertise step; mutable (`undefined` ⇒ no filtering). */
-	scope: ScopeInterface | undefined
+	/** The active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */
+	readonly scope: ScopeInterface | undefined
 	/**
 	 * The provider input for the next turn: a leading `system` message folding the prompt
 	 * + the scoped instructions + the ACTIVE workspace's scoped-in TEXT files (rendered as
@@ -917,12 +915,12 @@ export interface AgentResult {
 }
 
 /**
- * The mutable per-run sink an {@link AgentInterface}'s loop fills as it runs — the
- * assembled outcome its `stream`'s `result` promise resolves into a settled
+ * The immutable per-run outcome value an {@link AgentInterface}'s loop replaces as it runs — the
+ * assembled value its `stream`'s `result` promise resolves into a settled
  * {@link AgentResult} once the run completes.
  *
  * @remarks
- * Created fresh per run (so concurrent runs never share state) and threaded through
+ * Created fresh per run (so concurrent runs never share state) and replaced through
  * the loop: `content` accumulates the streamed assistant text, `thinking` the
  * reasoning the provider calls separated from it ({@link ProviderResult.thinking},
  * joined across calls — `undefined` until one surfaces it), `usage` the summed
@@ -934,16 +932,16 @@ export interface AgentResult {
  * loop reads it back to assemble the public result — not a caller-facing shape.
  */
 export interface RunOutcome {
-	content: string
-	thinking: string | undefined
-	usage: TokenUsage | undefined
-	partial: boolean
-	exhausted: boolean
+	readonly content: string
+	readonly thinking: string | undefined
+	readonly usage: TokenUsage | undefined
+	readonly partial: boolean
+	readonly exhausted: boolean
 }
 
 /**
  * The PER-RUN auto-compaction state threaded through an {@link AgentInterface}'s loop —
- * a tiny mutable holder created fresh per run (so no state leaks across runs or a
+ * a tiny immutable value replaced within a holder created fresh per run (so no state leaks across runs or a
  * conversation switch), mirroring how {@link RunOutcome} is the per-run sink.
  *
  * @remarks
@@ -951,10 +949,10 @@ export interface RunOutcome {
  * the prompt is still over the context window (the v1 single-level limit — the live tail
  * is at/below `keep` and the over-window is structural), so auto-compaction STOPS for the
  * rest of that run (no per-turn churn). Like {@link RunOutcome}, it is INTERNAL loop state
- * — the loop reads + flips it as it runs, not a caller-facing shape.
+ * — the loop reads + replaces it as it runs, not a caller-facing shape.
  */
 export interface CompactionState {
-	futile: boolean
+	readonly futile: boolean
 }
 
 /**

@@ -59,8 +59,8 @@ export class InstructionManager implements InstructionManagerInterface {
 
 	constructor(options?: InstructionManagerOptions) {
 		this.#emitter = new Emitter<InstructionManagerEventMap>({
-			on: options?.on,
-			error: options?.error,
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
 		})
 		this.#format = options?.format
 	}

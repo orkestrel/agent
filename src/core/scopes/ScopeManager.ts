@@ -43,7 +43,10 @@ export class ScopeManager implements ScopeManagerInterface {
 	readonly #emitter: Emitter<ScopeManagerEventMap>
 
 	constructor(on?: EmitterHooks<ScopeManagerEventMap>, error?: EmitterErrorHandler) {
-		this.#emitter = new Emitter<ScopeManagerEventMap>({ on, error })
+		this.#emitter = new Emitter<ScopeManagerEventMap>({
+			...(on === undefined ? {} : { on }),
+			...(error === undefined ? {} : { error }),
+		})
 	}
 
 	get emitter(): EmitterInterface<ScopeManagerEventMap> {

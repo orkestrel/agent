@@ -90,11 +90,12 @@ export class ConversationManager implements ConversationManagerInterface {
 		// its `id` / `summary` / `sections` / live tail restored, the live summarize / keep above
 		// re-supplied alongside it (mirroring how WorkspaceManager threads `seed`).
 		const sections = input?.sections ?? this.#sections
+		const summarize = input?.summarize ?? this.#summarize
 		const conversation = new Conversation(
 			{
 				...(input?.id === undefined ? {} : { id: input.id }),
 				...(input?.on === undefined ? {} : { on: input.on }),
-				summarize: input?.summarize ?? this.#summarize,
+				...(summarize === undefined ? {} : { summarize }),
 				keep: input?.keep ?? this.#keep,
 				...(sections === undefined ? {} : { sections }),
 			},

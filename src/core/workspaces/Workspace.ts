@@ -77,7 +77,10 @@ export class Workspace implements WorkspaceInterface {
 
 	constructor(options?: WorkspaceOptions, seed?: Iterable<readonly [string, FileInterface]>) {
 		this.#id = options?.id ?? crypto.randomUUID()
-		this.#emitter = new Emitter<WorkspaceEventMap>({ on: options?.on, error: options?.error })
+		this.#emitter = new Emitter<WorkspaceEventMap>({
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
+		})
 		// An optional pre-seeded set of files (path → File) — the hydration seam a future
 		// FileStore reads a snapshot into, and the only way to seat a non-text (binary) file
 		// (the edit surface itself only ever mints text Files). Seeding is silent — it places

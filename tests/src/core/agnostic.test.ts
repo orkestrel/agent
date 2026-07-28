@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ContextFormatInterface, ProviderInterface } from '@src/core'
 import { createAgent, createTool, createToolManager } from '@src/core'
-import { collect, createScriptedProvider, createTokenUsage, type DeltasOf } from '../../setup.js'
+import {
+	collect,
+	createScriptedProvider,
+	createTokenUsage,
+	requireValue,
+	type DeltasOf,
+} from '../../setup.js'
 
 // PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
 // on Ollama (or any concrete backend). This cross-cutting proof (structure-exempt name)
@@ -171,7 +177,7 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		const buildWith = (provider: ProviderInterface): string => {
 			const agent = createAgent(provider)
 			agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
-			return agent.context.build(provider.format)[0].content
+			return requireValue(agent.context.build(provider.format)[0]).content
 		}
 
 		// The framed provider's default reframes the instructions section (XML, not Markdown).

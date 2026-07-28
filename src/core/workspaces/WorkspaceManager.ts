@@ -87,11 +87,13 @@ export class WorkspaceManager implements WorkspaceManagerInterface {
 	add(input?: WorkspaceInput): WorkspaceInterface {
 		// The manager's defaults flow in unless the input overrides them — so a workspace created
 		// through the manager inherits its `on` / `error` by default.
+		const on = input?.on ?? this.#on
+		const error = input?.error ?? this.#error
 		const workspace = new Workspace(
 			{
 				...(input?.id === undefined ? {} : { id: input.id }),
-				on: input?.on ?? this.#on,
-				error: input?.error ?? this.#error,
+				...(on === undefined ? {} : { on }),
+				...(error === undefined ? {} : { error }),
 			},
 			input?.seed,
 		)

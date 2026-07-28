@@ -100,17 +100,19 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// collisions in the shared store) — omitted when no store is set, so the shape stays
 	// byte-identical to a registry with no `store`.
 	#options(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
+		const budget = this.#budget(input.budget)
 		return {
-			system: input.system,
 			tools: this.#manager(input.tools),
-			limit: input.limit,
-			timeout: input.timeout,
-			budget: this.#budget(input.budget),
-			authority: input.authority === undefined ? undefined : this.authority(input.authority),
-			scheduler: input.scheduler === undefined ? undefined : this.scheduler(input.scheduler),
-			conversations:
-				this.#store === undefined ? undefined : new ConversationManager({ store: this.#store }),
-			signal,
+			...(input.system === undefined ? {} : { system: input.system }),
+			...(input.limit === undefined ? {} : { limit: input.limit }),
+			...(input.timeout === undefined ? {} : { timeout: input.timeout }),
+			...(budget === undefined ? {} : { budget }),
+			...(input.authority === undefined ? {} : { authority: this.authority(input.authority) }),
+			...(input.scheduler === undefined ? {} : { scheduler: this.scheduler(input.scheduler) }),
+			...(this.#store === undefined
+				? {}
+				: { conversations: new ConversationManager({ store: this.#store }) }),
+			...(signal === undefined ? {} : { signal }),
 		}
 	}
 

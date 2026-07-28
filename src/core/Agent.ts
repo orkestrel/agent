@@ -113,12 +113,12 @@ export class Agent implements AgentInterface {
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
 		this.#provider = provider
 		this.#context = new AgentContext({
-			system: options?.system,
-			tools: options?.tools,
-			instructions: options?.instructions,
-			workspaces: options?.workspaces,
-			scope: options?.scope,
-			conversations: options?.conversations,
+			...(options?.system === undefined ? {} : { system: options.system }),
+			...(options?.tools === undefined ? {} : { tools: options.tools }),
+			...(options?.instructions === undefined ? {} : { instructions: options.instructions }),
+			...(options?.workspaces === undefined ? {} : { workspaces: options.workspaces }),
+			...(options?.scope === undefined ? {} : { scope: options.scope }),
+			...(options?.conversations === undefined ? {} : { conversations: options.conversations }),
 		})
 		this.#limit = options?.limit ?? DEFAULT_AGENT_LIMIT
 		this.#timeoutMs = options?.timeout
@@ -128,7 +128,10 @@ export class Agent implements AgentInterface {
 		this.#authority = options?.authority
 		this.#window = options?.window
 		this.#strict = options?.strict ?? false
-		this.#emitter = new Emitter<AgentEventMap>({ on: options?.on, error: options?.error })
+		this.#emitter = new Emitter<AgentEventMap>({
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
+		})
 	}
 
 	get emitter(): EmitterInterface<AgentEventMap> {
@@ -182,18 +185,21 @@ export class Agent implements AgentInterface {
 		const limit = options?.limit ?? this.#limit
 		// Fold every present bound (external signal + a per-run signal + deadline + budget)
 		// into one cancel the run races against; this run's own `abort()` fires this handle.
-		const abort = createAbort({ signal: this.#parents(timeout, budget, options?.signal) })
+		const signal = this.#parents(timeout, budget, options?.signal)
+		const abort = createAbort(signal === undefined ? {} : { signal })
 		this.#runs.add(abort)
 		this.#status = 'running'
 		// Observe the run begin — AFTER the `running` transition, so a swallowed listener
 		// throw can't perturb the state the pump is about to drive.
 		this.#emitter.emit('start', this.id)
-		const outcome: RunOutcome = {
-			content: '',
-			thinking: undefined,
-			usage: undefined,
-			partial: false,
-			exhausted: false,
+		const state: { outcome: RunOutcome } = {
+			outcome: {
+				content: '',
+				thinking: undefined,
+				usage: undefined,
+				partial: false,
+				exhausted: false,
+			},
 		}
 		const channel = new Channel<AgentChunk>()
 		const settled: DeferredInterface<AgentResult> = createDeferred<AgentResult>()
@@ -203,7 +209,7 @@ export class Agent implements AgentInterface {
 		// `provider.stream`; `limit` / `budget` ride through as the effective run bounds.
 		void this.#pump(
 			abort,
-			outcome,
+			state,
 			timeout,
 			channel,
 			settled,
@@ -224,9 +230,7 @@ export class Agent implements AgentInterface {
 			// Fire THIS run's own handle (the closed-over `abort`), never a shared field a
 			// later `stream()` could have replaced — so a handle's `abort()` always cancels
 			// the run it belongs to, even when runs overlap.
-			abort: (reason) => {
-				abort.abort(reason)
-			},
+			abort: abort.abort.bind(abort),
 		}
 	}
 
@@ -249,7 +253,7 @@ export class Agent implements AgentInterface {
 	// underlying promise obeys native settle-once — the first resolve / reject wins).
 	async #pump(
 		abort: AbortInterface,
-		outcome: RunOutcome,
+		state: { outcome: RunOutcome },
 		timeout: TimeoutInterface | undefined,
 		channel: Channel<AgentChunk>,
 		settled: DeferredInterface<AgentResult>,
@@ -260,7 +264,7 @@ export class Agent implements AgentInterface {
 	): Promise<void> {
 		let failure: { error: unknown } | undefined
 		try {
-			for await (const chunk of this.#run(abort, outcome, think, schema, limit, budget)) {
+			for await (const chunk of this.#run(abort, state, think, schema, limit, budget)) {
 				channel.push(chunk)
 			}
 		} catch (error) {
@@ -271,6 +275,7 @@ export class Agent implements AgentInterface {
 			// fires it (and the set never leaks finished runs).
 			this.#runs.delete(abort)
 			if (failure === undefined) {
+				const outcome = state.outcome
 				this.#status = 'done'
 				channel.close()
 				const result = this.#result(outcome)
@@ -323,7 +328,7 @@ export class Agent implements AgentInterface {
 	// only a genuine provider / tool error propagates.
 	async *#run(
 		abort: AbortInterface,
-		outcome: RunOutcome,
+		state: { outcome: RunOutcome },
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
 		limit: number,
@@ -349,7 +354,7 @@ export class Agent implements AgentInterface {
 		// conversation switch). `futile` is the single-level guard (clause 26): once a `compact()`
 		// returns `undefined` while still over the window, the prompt can't shrink further, so
 		// auto-compaction STOPS for the rest of THIS run (no per-turn churn).
-		const compaction: CompactionState = { futile: false }
+		const compaction = { state: { futile: false } }
 		// AUTO-COMPACTION is enabled only when BOTH a `#window` budget is set AND the active
 		// conversation CAN summarize (`summarizable` — it has a summarizer). There is now ALWAYS an
 		// active conversation, but the DEFAULT one has no summarizer, so this gate preserves the shipped
@@ -387,7 +392,7 @@ export class Agent implements AgentInterface {
 					await this.#scheduler?.yield({ signal: abort.signal })
 				} catch (error) {
 					if (abort.signal.aborted) {
-						outcome.partial = true
+						state.outcome = { ...state.outcome, partial: true }
 						broke = true
 						break
 					}
@@ -395,7 +400,7 @@ export class Agent implements AgentInterface {
 				}
 			}
 			if (abort.signal.aborted) {
-				outcome.partial = true
+				state.outcome = { ...state.outcome, partial: true }
 				broke = true
 				break
 			}
@@ -470,7 +475,7 @@ export class Agent implements AgentInterface {
 							usage = this.#sum(usage, abortUsage)
 						}
 					}
-					outcome.partial = true
+					state.outcome = { ...state.outcome, partial: true }
 					broke = true
 					break
 				}
@@ -554,12 +559,13 @@ export class Agent implements AgentInterface {
 		// then emits `abort` (the cancel reason), never `exhaust`. A `limit: 0` run never enters the
 		// loop (`pending` stays `false`), so it stays non-partial either way.
 		if (!broke && pending) {
-			outcome.partial = true
-			outcome.exhausted = !abort.signal.aborted
+			state.outcome = {
+				...state.outcome,
+				partial: true,
+				exhausted: !abort.signal.aborted,
+			}
 		}
-		outcome.content = content
-		outcome.thinking = thinking
-		outcome.usage = usage
+		state.outcome = { ...state.outcome, content, thinking, usage }
 	}
 
 	// AUTOMATIC compaction — the production-hardened context-budget check (§ auto-compact). Called
@@ -597,14 +603,18 @@ export class Agent implements AgentInterface {
 	// (best-effort) one, NOT separately bound to this run's abort signal (a future tier can thread it).
 	async #trim(
 		messages: MessageInterface[],
-		compaction: CompactionState,
+		compaction: { state: CompactionState },
 		latchFutile: boolean,
 	): Promise<void> {
 		const conversation = this.#context.conversations.active
 		// No window, a non-summarizable active conversation (the default one can't fold), or
 		// already-futile this run ⇒ the additive no-op. (Both call sites are gated by `compacting`, so
 		// here `conversation` is the active, summarizable one; this guard keeps `#trim` total.)
-		if (this.#window === undefined || conversation?.summarizable !== true || compaction.futile) {
+		if (
+			this.#window === undefined ||
+			conversation?.summarizable !== true ||
+			compaction.state.futile
+		) {
 			return
 		}
 		this.#window.clear()
@@ -626,7 +636,7 @@ export class Agent implements AgentInterface {
 			// still won't fold ⇒ genuinely FUTILE: latch so the run stops churning and the over-window
 			// prompt reaches the provider. On the PRE-FIRST-TURN check (no latch) the tail is simply too
 			// short YET ⇒ skip without latching, leaving later turns free to fold as the tail grows.
-			if (latchFutile) compaction.futile = true
+			if (latchFutile) compaction.state = { futile: true }
 			return
 		}
 		// REBUILD the working array from the (now smaller) compacted view via the SAME projection the

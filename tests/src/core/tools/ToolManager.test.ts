@@ -1,6 +1,7 @@
 import type { ToolCall } from '@src/core'
 import { Tool, ToolManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
+import { requireValue } from '../../../setup.js'
 
 // ToolManager is the tool registry + per-call error-isolated dispatch the agent loop
 // runs model tool-calls through (AGENTS §16 — real Tool handlers, no mocks). Covers
@@ -134,11 +135,11 @@ describe('ToolManager — registry', () => {
 		const definitions = manager.definitions()
 
 		expect(definitions).toHaveLength(2)
-		const first = definitions[0]
+		const first = requireValue(definitions[0])
 		expect(first).toEqual({ name: 'add', description: 'Add', parameters })
 		expect('execute' in first).toBe(false)
 		// A bare tool's optional fields are omitted, not present-but-undefined.
-		expect(definitions[1]).toEqual({ name: 'bare' })
+		expect(requireValue(definitions[1])).toEqual({ name: 'bare' })
 	})
 
 	it('omits each optional definition field independently (description-only / parameters-only)', () => {
@@ -150,11 +151,14 @@ describe('ToolManager — registry', () => {
 		const definitions = manager.definitions()
 
 		// description present, parameters absent — and the absent key is omitted, not undefined.
-		expect(definitions[0]).toEqual({ name: 'desc-only', description: 'has a description' })
-		expect('parameters' in definitions[0]).toBe(false)
+		expect(requireValue(definitions[0])).toEqual({
+			name: 'desc-only',
+			description: 'has a description',
+		})
+		expect('parameters' in requireValue(definitions[0])).toBe(false)
 		// parameters present, description absent.
-		expect(definitions[1]).toEqual({ name: 'params-only', parameters })
-		expect('description' in definitions[1]).toBe(false)
+		expect(requireValue(definitions[1])).toEqual({ name: 'params-only', parameters })
+		expect('description' in requireValue(definitions[1])).toBe(false)
 	})
 
 	it('definitions carry the parameters object by reference (forwarded verbatim)', () => {
@@ -162,7 +166,7 @@ describe('ToolManager — registry', () => {
 		const manager = new ToolManager()
 		manager.add(new Tool({ name: 'add', parameters, execute: () => 0 }))
 
-		expect(manager.definitions()[0].parameters).toBe(parameters)
+		expect(requireValue(manager.definitions()[0]).parameters).toBe(parameters)
 	})
 })
 
@@ -201,7 +205,7 @@ describe('ToolManager — summary advertisement', () => {
 		manager.add(new Tool({ name: 'bare', execute: () => 0 }))
 
 		expect(manager.definitions()).toEqual([{ name: 'bare' }])
-		expect('description' in manager.definitions()[0]).toBe(false)
+		expect('description' in requireValue(manager.definitions()[0])).toBe(false)
 	})
 })
 

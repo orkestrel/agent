@@ -32,9 +32,9 @@ export class Tool implements ToolInterface {
 
 	constructor(options: ToolOptions) {
 		this.name = options.name
-		this.description = options.description
-		this.summary = options.summary
-		this.parameters = options.parameters
+		if (options.description !== undefined) this.description = options.description
+		if (options.summary !== undefined) this.summary = options.summary
+		if (options.parameters !== undefined) this.parameters = options.parameters
 		this.#execute = options.execute
 	}
 

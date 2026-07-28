@@ -90,7 +90,10 @@ export class Conversation implements ConversationInterface {
 		// (a summarizer is a function, not serialized — re-supplied as config). The hydration analogue
 		// of a `Workspace`'s `seed`; restoring is SILENT (no events — nothing was edited).
 		this.#id = seed?.id ?? options?.id ?? crypto.randomUUID()
-		this.#emitter = new Emitter<ConversationEventMap>({ on: options?.on, error: options?.error })
+		this.#emitter = new Emitter<ConversationEventMap>({
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
+		})
 		this.#summarize = options?.summarize
 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
 		if (options?.sections !== undefined && options.sections < 1) {

@@ -52,7 +52,11 @@ export class Authority implements AuthorityInterface {
 	evaluate(context: AuthorityContextInterface): AuthorityDecision {
 		for (const rule of this.#rules) {
 			if (rule.match(context))
-				return { zone: rule.zone, allowed: rule.allowed ?? true, reason: rule.reason }
+				return {
+					zone: rule.zone,
+					allowed: rule.allowed ?? true,
+					...(rule.reason === undefined ? {} : { reason: rule.reason }),
+				}
 		}
 		return this.#fallback
 	}

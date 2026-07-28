@@ -15,7 +15,7 @@ import {
 	createWorkspaceManager,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../setup.js'
+import { createStubSummarizer, requireValue } from '../../setup.js'
 
 // AgentContext assembles a turn's provider input — the leading system block (the prompt
 // + the scoped instructions, each under its manager's description, then the ACTIVE
@@ -34,9 +34,9 @@ describe('AgentContext — build with a system prompt', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(3)
-		expect(built[0].role).toBe('system')
-		expect(built[0].content).toBe('You are concise.')
-		expect(built[0].id.length).toBeGreaterThan(0)
+		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).content).toBe('You are concise.')
+		expect(requireValue(built[0]).id.length).toBeGreaterThan(0)
 		expect(built.slice(1).map((message) => message.content)).toEqual(['one', 'two'])
 	})
 
@@ -117,14 +117,14 @@ describe('AgentContext — build is fresh each call', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0].content).toBe('later')
+		expect(requireValue(built[0]).content).toBe('later')
 	})
 
 	it('mints a new system message each build (no caching)', () => {
 		const context = new AgentContext({ system: 'sys' })
 
-		const first = context.build()[0]
-		const second = context.build()[0]
+		const first = requireValue(context.build()[0])
+		const second = requireValue(context.build()[0])
 
 		expect(first.content).toBe(second.content)
 		expect(first.id).not.toBe(second.id)
@@ -139,7 +139,7 @@ describe('AgentContext — system boundary', () => {
 		const built = context.build()
 
 		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
-		expect(built[0].role).toBe('system')
+		expect(requireValue(built[0]).role).toBe('system')
 		expect(built.slice(1).every((message) => message.role !== 'system')).toBe(true)
 	})
 
@@ -149,8 +149,8 @@ describe('AgentContext — system boundary', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0]).toMatchObject({ role: 'system', content: 'only-system' })
-		expect(built[0].id.length).toBeGreaterThan(0)
+		expect(requireValue(built[0])).toMatchObject({ role: 'system', content: 'only-system' })
+		expect(requireValue(built[0]).id.length).toBeGreaterThan(0)
 	})
 
 	it('treats an explicit empty-string system as a real (empty) system message', () => {
@@ -163,8 +163,8 @@ describe('AgentContext — system boundary', () => {
 		expect(context.system).toBe('')
 		const built = context.build()
 		expect(built).toHaveLength(2)
-		expect(built[0].role).toBe('system')
-		expect(built[0].content).toBe('')
+		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).content).toBe('')
 	})
 
 	it('treats a whitespace-only system as a real system message (preserved verbatim)', () => {
@@ -173,8 +173,8 @@ describe('AgentContext — system boundary', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0].role).toBe('system')
-		expect(built[0].content).toBe('   ')
+		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).content).toBe('   ')
 	})
 
 	it('omits the system message entirely when no system is configured', () => {
@@ -184,8 +184,8 @@ describe('AgentContext — system boundary', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0].role).toBe('user')
-		expect(built[0].content).not.toBeUndefined()
+		expect(requireValue(built[0]).role).toBe('user')
+		expect(requireValue(built[0]).content).not.toBeUndefined()
 	})
 })
 
@@ -205,8 +205,8 @@ describe('AgentContext — build snapshot independence (§11)', () => {
 
 		// A later build is unaffected by the mutation of the earlier one.
 		expect(second).toHaveLength(2)
-		expect(second[0].role).toBe('system')
-		expect(second[1].content).toBe('a')
+		expect(requireValue(second[0]).role).toBe('system')
+		expect(requireValue(second[1]).content).toBe('a')
 		expect(second.some((message) => message.id === 'rogue')).toBe(false)
 	})
 
@@ -309,7 +309,7 @@ describe('AgentContext — long conversation', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(201)
-		expect(built[0].role).toBe('system')
+		expect(requireValue(built[0]).role).toBe('system')
 		expect(built.slice(1).map((message) => message.content)).toEqual(
 			turns.map((turn) => turn.content),
 		)
@@ -340,8 +340,8 @@ describe('AgentContext — context managers', () => {
 
 		// Identical to the original lean behavior: just [system, user].
 		expect(built).toHaveLength(2)
-		expect(built[0]).toMatchObject({ role: 'system', content: 'sys' })
-		expect(built[1]).toMatchObject({ role: 'user', content: 'hi' })
+		expect(requireValue(built[0])).toMatchObject({ role: 'system', content: 'sys' })
+		expect(requireValue(built[1])).toMatchObject({ role: 'user', content: 'hi' })
 	})
 
 	it('folds the instructions into the system block under the prompt', () => {
@@ -353,7 +353,7 @@ describe('AgentContext — context managers', () => {
 
 		// One system message, then the user turn.
 		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
-		const system = built[0]
+		const system = requireValue(built[0])
 		expect(system.role).toBe('system')
 		expect(system.content).toBe(
 			[
@@ -375,8 +375,8 @@ describe('AgentContext — context managers', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(2)
-		expect(built[0].role).toBe('system')
-		expect(built[0].content).toBe('## Instructions\n\ndo this')
+		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).content).toBe('## Instructions\n\ndo this')
 	})
 
 	it('orders multiple instructions by descending priority inside the block', () => {
@@ -386,7 +386,7 @@ describe('AgentContext — context managers', () => {
 			{ name: 'high', content: 'high', priority: 10 },
 		])
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		expect(block.indexOf('high')).toBeLessThan(block.indexOf('low'))
 	})
@@ -423,11 +423,11 @@ describe('AgentContext — workspaces accessor & construction', () => {
 
 		context.workspaces = a
 		expect(context.workspaces).toBe(a)
-		expect(context.build()[0].content).toContain('in-a')
+		expect(requireValue(context.build()[0]).content).toContain('in-a')
 
 		// Swap to b — the NEXT build reflects b's active workspace (recomputed fresh, no stale a).
 		context.workspaces = b
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 		expect(block).toContain('in-b')
 		expect(block).not.toContain('in-a')
 	})
@@ -441,8 +441,8 @@ describe('AgentContext — workspaces accessor & construction', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(2)
-		expect(built[0].content).toBe('sys')
-		expect(built[0].content).not.toContain(WORKSPACE_SECTION_HEADER)
+		expect(requireValue(built[0]).content).toBe('sys')
+		expect(requireValue(built[0]).content).not.toContain(WORKSPACE_SECTION_HEADER)
 	})
 })
 
@@ -454,7 +454,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		context.messages.add({ role: 'user', content: 'hi' })
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		// The dedicated workspace section header + the fenced reference block: `File: <path>` then a
 		// ```<language> fence (inferred typescript), verbatim.
@@ -470,7 +470,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const workspace = context.workspaces.add()
 		workspace.write('notes.txt', 'WORKSPACE TEXT')
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		// instructions → workspace (the in-prompt text content grouped after the instructions).
 		expect(block.indexOf('## Instructions')).toBeLessThan(block.indexOf(WORKSPACE_SECTION_HEADER))
@@ -500,7 +500,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		expect(lastUser?.images).toEqual(['ICONB64'])
 		// The base64 never appears in the system block (an image file emits NO text marker — it is
 		// not rendered into the `## Workspace` text section, only attached).
-		expect(built[0].images ?? []).not.toContain('ICONB64')
+		expect(requireValue(built[0]).images ?? []).not.toContain('ICONB64')
 	})
 
 	it('attaches MULTIPLE workspace image files’ data to the last user turn, in order', () => {
@@ -533,7 +533,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const built = context.build()
 
 		// Text file → fenced system section; image file → last user message.
-		expect(built[0].content).toContain('File: a.ts\n```typescript\nconst z = 9\n```')
+		expect(requireValue(built[0]).content).toContain('File: a.ts\n```typescript\nconst z = 9\n```')
 		expect(built.at(-1)?.images).toEqual(['IMGB'])
 	})
 
@@ -544,7 +544,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const second = context.workspaces.add() // NOT active
 		second.write('other.txt', 'OTHER CONTENT')
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		expect(context.workspaces.active).toBe(first)
 		expect(block).toContain('ACTIVE CONTENT')
@@ -552,7 +552,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 
 		// Switch active to the second — the next build renders ITS file, not the first's.
 		context.workspaces.switch(second.id)
-		const after = context.build()[0].content
+		const after = requireValue(context.build()[0]).content
 		expect(after).toContain('OTHER CONTENT')
 		expect(after).not.toContain('ACTIVE CONTENT')
 	})
@@ -564,8 +564,8 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0].role).toBe('system')
-		expect(built[0].content).toBe(
+		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).content).toBe(
 			`${WORKSPACE_SECTION_HEADER}\n\nFile: only.txt\n\`\`\`text\nlonely\n\`\`\``,
 		)
 	})
@@ -576,7 +576,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		workspace.write('one.txt', 'FIRST')
 		workspace.write('two.txt', 'SECOND')
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		expect(block).toBe(
 			`${WORKSPACE_SECTION_HEADER}\n\nFile: one.txt\n\`\`\`text\nFIRST\n\`\`\`\n\nFile: two.txt\n\`\`\`text\nSECOND\n\`\`\``,
@@ -618,7 +618,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		const context = seed()
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		expect(block).toContain('KEPT FILE')
 		expect(block).toContain('DROPPED FILE')
@@ -631,7 +631,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		context.scope = new Scope({ name: 'narrowed', files: ['keep.txt', 'keep.png'] })
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		expect(block).toContain('KEPT FILE')
 		expect(block).not.toContain('DROPPED FILE')
@@ -644,7 +644,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		context.scope = new Scope({ name: 'no-files', files: [] })
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		expect(block).not.toContain(WORKSPACE_SECTION_HEADER)
 		expect(block).not.toContain('KEPT FILE')
@@ -752,7 +752,7 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(built[0].images).toBeUndefined()
+		expect(requireValue(built[0]).images).toBeUndefined()
 	})
 })
 
@@ -800,7 +800,7 @@ describe('AgentContext — scope filtering in build()', () => {
 		const context = seed()
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		expect(block).toContain('KEPT INSTRUCTION')
 		expect(block).toContain('DROPPED INSTRUCTION')
@@ -812,7 +812,7 @@ describe('AgentContext — scope filtering in build()', () => {
 		context.scope = new Scope({ name: 'narrowed', instructions: ['keep-i'] })
 
 		const built = context.build()
-		const block = built[0].content
+		const block = requireValue(built[0]).content
 
 		expect(block).toContain('KEPT INSTRUCTION')
 		expect(block).not.toContain('DROPPED INSTRUCTION')
@@ -822,7 +822,7 @@ describe('AgentContext — scope filtering in build()', () => {
 		const context = seed()
 		context.scope = new Scope({ name: 'no-instructions', instructions: [] })
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		// The whole Instructions section vanishes.
 		expect(block).not.toContain('## Instructions')
@@ -833,11 +833,11 @@ describe('AgentContext — scope filtering in build()', () => {
 		const context = seed()
 
 		context.scope = new Scope({ name: 'only-keep', instructions: ['keep-i'] })
-		expect(context.build()[0].content).not.toContain('DROPPED INSTRUCTION')
+		expect(requireValue(context.build()[0]).content).not.toContain('DROPPED INSTRUCTION')
 
 		// Swap to no scope — the dropped instruction reappears on the next build.
 		context.scope = undefined
-		expect(context.build()[0].content).toContain('DROPPED INSTRUCTION')
+		expect(requireValue(context.build()[0]).content).toContain('DROPPED INSTRUCTION')
 	})
 })
 
@@ -861,8 +861,8 @@ describe('AgentContext — format cascade: the instructions open (header)', () =
 				: new InstructionManager({ format: { open: managerOpen } })
 		const context = new AgentContext({ instructions })
 		context.instructions.add({ name: 'a', content: 'X' })
-		const block = context.build(format)[0].content
-		return block.split('\n\n')[0]
+		const block = requireValue(context.build(format)[0]).content
+		return requireValue(block.split('\n\n')[0])
 	}
 
 	it('(a) built-in floor — no provider format, no manager override', () => {
@@ -896,8 +896,8 @@ describe('AgentContext — format cascade: an instruction item (render)', () => 
 			content: 'BUILTIN',
 			...(options?.itemFormat === undefined ? {} : { format: options.itemFormat }),
 		})
-		const block = context.build(format)[0].content
-		return block.split('\n\n')[1]
+		const block = requireValue(context.build(format)[0]).content
+		return requireValue(block.split('\n\n')[1])
 	}
 
 	it('(a) built-in floor — the instruction content', () => {
@@ -952,7 +952,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		])
 
 		// The system block is the single instructions section — byte-for-byte the wrapped group.
-		expect(context.build()[0].content).toBe(
+		expect(requireValue(context.build()[0]).content).toBe(
 			'<instructions>\n\n<i>a</i>\n\n<i>b</i>\n\n</instructions>',
 		)
 	})
@@ -964,7 +964,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		const context = new AgentContext({ instructions })
 		context.instructions.add({ name: 'a', content: 'X' })
 
-		expect(context.build()[0].content).toBe('## Instructions\n\nX\n\n</instructions>')
+		expect(requireValue(context.build()[0]).content).toBe('## Instructions\n\nX\n\n</instructions>')
 	})
 
 	it('a close with ZERO items omits the section entirely — no stray open/close', () => {
@@ -975,11 +975,11 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		})
 		const context = new AgentContext({ system: 'sys', instructions })
 		// No instructions added ⇒ the section is silent; only the system prompt remains.
-		expect(context.build()[0].content).toBe('sys')
+		expect(requireValue(context.build()[0]).content).toBe('sys')
 		// And with a scope that fully excludes the (now-present) instruction, still silent.
 		context.instructions.add({ name: 'a', content: 'X' })
 		context.scope = new Scope({ name: 'none', instructions: [] })
-		expect(context.build()[0].content).toBe('sys')
+		expect(requireValue(context.build()[0]).content).toBe('sys')
 	})
 
 	it('the close cascade — manager-options close BEATS the provider close', () => {
@@ -989,7 +989,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		const context = new AgentContext({ instructions })
 		context.instructions.add({ name: 'a', content: 'X' })
 
-		const block = context.build({ instructions: { close: '</P>' } })[0].content
+		const block = requireValue(context.build({ instructions: { close: '</P>' } })[0]).content
 		expect(block.endsWith('</M>')).toBe(true)
 		expect(block).not.toContain('</P>')
 	})
@@ -999,7 +999,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		const context = new AgentContext()
 		context.instructions.add({ name: 'a', content: 'X' })
 
-		const block = context.build({ instructions: { close: '</P>' } })[0].content
+		const block = requireValue(context.build({ instructions: { close: '</P>' } })[0]).content
 		expect(block.endsWith('</P>')).toBe(true)
 	})
 
@@ -1009,7 +1009,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		const context = new AgentContext()
 		context.instructions.add({ name: 'a', content: 'X' })
 
-		expect(context.build()[0].content).toBe('## Instructions\n\nX')
+		expect(requireValue(context.build()[0]).content).toBe('## Instructions\n\nX')
 	})
 })
 
@@ -1027,16 +1027,20 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 			`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
 		].join('\n\n')
 
-		expect(context.build()[0].content).toBe(expected)
+		expect(requireValue(context.build()[0]).content).toBe(expected)
 		// And explicitly: it equals the hardcoded built-in strings (no override anywhere).
-		expect(context.build()[0].content).toBe('You are concise.\n\n## Instructions\n\nBe terse.')
+		expect(requireValue(context.build()[0]).content).toBe(
+			'You are concise.\n\n## Instructions\n\nBe terse.',
+		)
 	})
 
 	it('passing an EMPTY provider format ({}) is identical to passing none', () => {
 		const context = new AgentContext({ system: 'sys' })
 		context.instructions.add({ name: 'a', content: 'do this' })
 
-		expect(context.build({})[0].content).toBe(context.build()[0].content)
+		expect(requireValue(context.build({})[0]).content).toBe(
+			requireValue(context.build()[0]).content,
+		)
 	})
 
 	it('a per-item format reaches build() and overrides for that item only', () => {
@@ -1046,7 +1050,7 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 			{ name: 'b', content: 'plain-b' },
 		])
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		// 'a' renders via its per-item override; 'b' via the built-in content — same section.
 		expect(block).toContain('OVERRIDE-A')
@@ -1077,7 +1081,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 		// The array is the assembled system block followed by the conversation, in order —
 		// exactly one leading system message, then each turn's id/role/content verbatim.
 		expect(built).toHaveLength(4)
-		expect(built[0].role).toBe('system')
+		expect(requireValue(built[0]).role).toBe('system')
 		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user'])
 		expect(
 			built
@@ -1086,7 +1090,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 		).toEqual(turns.map((turn) => ({ id: turn.id, role: turn.role, content: turn.content })))
 		// The system block content is the prompt + the instructions section + the workspace section,
 		// in the canonical order, blank-line separated — the precise concatenation, byte-for-byte.
-		expect(built[0].content).toBe(
+		expect(requireValue(built[0]).content).toBe(
 			[
 				'You are concise.',
 				`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
@@ -1108,7 +1112,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 		const built = context.build()
 
 		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'assistant'])
-		expect(built[0].content).toBe('## Instructions\n\ndo this')
+		expect(requireValue(built[0]).content).toBe('## Instructions\n\ndo this')
 		expect(built.slice(1).map((message) => message.content)).toEqual(['q', 'a'])
 	})
 })
@@ -1122,7 +1126,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 		const context = new AgentContext()
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 
-		expect(context.build()[0].content).toBe('## Instructions\n\nBe terse.')
+		expect(requireValue(context.build()[0]).content).toBe('## Instructions\n\nBe terse.')
 	})
 
 	it('workspace text: `## Workspace` header + a fenced `File: <path>` block in the inferred language', () => {
@@ -1131,7 +1135,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 
 		// The fenced block: `File: <path>` then a ```<language> … ``` fence (language inferred from
 		// the extension — `.md` ⇒ markdown), the content verbatim inside.
-		expect(context.build()[0].content).toBe(
+		expect(requireValue(context.build()[0]).content).toBe(
 			`${WORKSPACE_SECTION_HEADER}\n\nFile: README.md\n\`\`\`markdown\n# Title\n\`\`\``,
 		)
 	})
@@ -1140,7 +1144,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 		const context = new AgentContext()
 		context.workspaces.add().write('src/main.ts', 'const x = 1')
 
-		expect(context.build()[0].content).toBe(
+		expect(requireValue(context.build()[0]).content).toBe(
 			`${WORKSPACE_SECTION_HEADER}\n\nFile: src/main.ts\n\`\`\`typescript\nconst x = 1\n\`\`\``,
 		)
 	})
@@ -1239,7 +1243,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 		context.messages.add({ role: 'user', content: 'hi' })
 		context.scope = new Scope({ name: 'instr', instructions: ['keep'] })
 
-		const block = context.build()[0].content
+		const block = requireValue(context.build()[0]).content
 
 		// Instructions are still scope-filtered (the conversation only governs MESSAGES).
 		expect(block).toContain('KEPT')
@@ -1292,7 +1296,7 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 
 		// Identical to the established shape: [system-block, ...conversation].
 		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'assistant'])
-		expect(built[0].content).toBe(
+		expect(requireValue(built[0]).content).toBe(
 			[
 				'You are concise.',
 				`${context.instructions.description}\n\n${context.instructions.format(tone)}`,

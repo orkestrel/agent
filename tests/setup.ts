@@ -42,6 +42,18 @@ export function waitForDelay(ms = 0): Promise<void> {
 }
 
 /**
+ * Return a value after narrowing away `undefined`, or fail the current test setup loudly.
+ *
+ * @typeParam T - The expected value type
+ * @param value - The value to require
+ * @returns The defined value
+ */
+export function requireValue<T>(value: T | undefined): T {
+	if (value === undefined) throw new Error('expected a defined value')
+	return value
+}
+
+/**
  * Round-trip a value through `JSON.parse(JSON.stringify(...))`, returning the structurally
  * identical clone — the one shared form of the "driver-swap parity" check the store / snapshot
  * tests repeat (AGENTS §16.1). A JSON-backed store persists a snapshot AS JSON, so a
@@ -773,4 +785,10 @@ export function assertWorkspaceStoreContract(
 			expect(await store.get('beta')).toEqual(beta)
 		})
 	})
+}
+
+/** Whether a repository-relative Vue SFC path belongs to the private browser application. */
+export function isBrowserVuePath(path: string): boolean {
+	const normalized = path.replaceAll('\\', '/')
+	return normalized.startsWith('app/browser/')
 }

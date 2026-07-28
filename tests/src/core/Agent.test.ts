@@ -282,9 +282,11 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 			createTool({ name: 'beta', execute: () => 2 }),
 		])
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { tools })
 		// Only `alpha` is in scope; `beta` is scoped out.
-		agent.context.scope = new Scope({ name: 'alpha-only', tools: ['alpha'] })
+		const agent = createAgent(provider, {
+			tools,
+			scope: new Scope({ name: 'alpha-only', tools: ['alpha'] }),
+		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		await agent.generate()
@@ -298,8 +300,10 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'alpha', execute: () => 1 }))
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { tools })
-		agent.context.scope = new Scope({ name: 'no-tools', tools: [] })
+		const agent = createAgent(provider, {
+			tools,
+			scope: new Scope({ name: 'no-tools', tools: [] }),
+		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		await agent.generate()
@@ -339,8 +343,10 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 			],
 			SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
-		agent.context.scope = new Scope({ name: 'safe-only', tools: ['safe'] })
+		const agent = createAgent(provider, {
+			tools,
+			scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
+		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		await agent.generate()
@@ -2677,7 +2683,12 @@ function compactionAgent(
 	const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
 	// The registry is injected through the AGENT (forwarded to its context), so
 	// `agent.context.messages` IS the active conversation's live tail �€” seed the user turn there.
-	const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
+	const agent = createAgent(provider, {
+		conversations,
+		tools,
+		...(window === undefined ? {} : { window }),
+		limit: 5,
+	})
 	agent.context.messages.add({ role: 'user', content: 'go' })
 	return { agent, conversation, provider }
 }

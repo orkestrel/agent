@@ -1,5 +1,7 @@
 import type {
 	AgentInterface,
+	AgentJobInput,
+	AgentRegistryInterface,
 	AgentResult,
 	BinaryMIME,
 	ConversationSnapshot,
@@ -15,6 +17,8 @@ import type {
 	WorkspaceSnapshot,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
+import type { QueueExecution } from '@orkestrel/queue'
+import type { ControllerInterface } from '@orkestrel/workflow'
 import { isArray, isNumber, isRecord, isString } from '@orkestrel/contract'
 import { EXTENSION_TO_LANGUAGE, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentJobError } from './errors.js'
@@ -193,6 +197,49 @@ export async function settleAgentJob(
 	const result = await agent.generate()
 	if (result.partial && !allowPartial) throw new AgentJobError('agent job ended partial', result)
 	return result
+}
+
+/**
+ * Handle one queued agent job by rehydrating it through a registry with the queue
+ * attempt's signal, then applying the shared partial-result policy.
+ *
+ * @param registry - The registry that rehydrates the serializable job
+ * @param allowPartial - Whether a partial result resolves instead of throwing
+ * @param input - The serializable agent job
+ * @param execution - The queue attempt whose signal bounds the agent
+ * @returns The settled agent result
+ */
+export function handleAgentQueueJob(
+	registry: AgentRegistryInterface,
+	allowPartial: boolean,
+	input: AgentJobInput,
+	execution: QueueExecution,
+): Promise<AgentResult> {
+	return settleAgentJob(registry.build(input, execution.signal), allowPartial)
+}
+
+/**
+ * Handle one runner agent job by fanning out its declared children, rehydrating the
+ * parent through a registry with the controller signal, and applying the shared
+ * partial-result policy.
+ *
+ * @remarks
+ * Children are fired and tracked through the runner controller without awaiting them
+ * inline, preserving bounded-runner progress.
+ *
+ * @param registry - The registry that rehydrates serializable jobs
+ * @param allowPartial - Whether a partial result resolves instead of throwing
+ * @param controller - The runner controller for this parent job
+ * @returns The settled parent agent result
+ */
+export function handleAgentRunnerJob(
+	registry: AgentRegistryInterface,
+	allowPartial: boolean,
+	controller: ControllerInterface<AgentJobInput, AgentResult>,
+): Promise<AgentResult> {
+	const children = controller.input.children
+	if (children !== undefined) for (const child of children) void controller.spawn(child)
+	return settleAgentJob(registry.build(controller.input, controller.signal), allowPartial)
 }
 
 // Workspaces — the FileContent narrowing surface (the `isText` / `isBinary` / `isImage` guards that
@@ -823,6 +870,16 @@ export function escapeRegExp(value: string): string {
 }
 
 /**
+ * Sanitize one reported token count into a safe non-negative integer.
+ *
+ * @param value - The token count to sanitize
+ * @returns The floored count, or `0` when the value is non-finite or non-positive
+ */
+export function sanitizeToken(value: number): number {
+	return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+}
+
+/**
  * Sanitize a {@link TokenUsage} into safe, non-negative integers — the guard an agent's
  * abort-usage path applies to a provider's partial usage before it is charged against a
  * budget or folded into the run total.
@@ -841,11 +898,9 @@ export function escapeRegExp(value: string): string {
  * ```
  */
 export function sanitizeUsage(usage: TokenUsage): TokenUsage {
-	const clean = (value: number): number =>
-		Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
 	return {
-		prompt: clean(usage.prompt),
-		completion: clean(usage.completion),
-		total: clean(usage.total),
+		prompt: sanitizeToken(usage.prompt),
+		completion: sanitizeToken(usage.completion),
+		total: sanitizeToken(usage.total),
 	}
 }

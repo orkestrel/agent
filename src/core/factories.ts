@@ -56,7 +56,7 @@ import { Conversation } from './conversations/Conversation.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 import { DatabaseConversationStore } from './conversations/stores/DatabaseConversationStore.js'
 import { MemoryConversationStore } from './conversations/stores/MemoryConversationStore.js'
-import { settleAgentJob } from './helpers.js'
+import { computeSize, countLines, handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { Scope } from './scopes/Scope.js'
@@ -64,7 +64,6 @@ import { ScopeManager } from './scopes/ScopeManager.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
 import { Tool } from './tools/Tool.js'
 import { ToolManager } from './tools/ToolManager.js'
-import { computeSize, countLines } from './helpers.js'
 import { Workspace } from './workspaces/Workspace.js'
 import { WorkspaceManager } from './workspaces/WorkspaceManager.js'
 import { DatabaseWorkspaceStore } from './workspaces/stores/DatabaseWorkspaceStore.js'
@@ -610,12 +609,11 @@ export function createAgentQueue(
 ): QueueInterface<AgentJobInput, AgentResult> {
 	const { registry, allowPartial = false, concurrency, retries, timeout, store } = options
 	return createQueue<AgentJobInput, AgentResult>({
-		concurrency,
-		retries,
-		timeout,
-		store,
-		handler: (input, execution) =>
-			settleAgentJob(registry.build(input, execution.signal), allowPartial),
+		...(concurrency === undefined ? {} : { concurrency }),
+		...(retries === undefined ? {} : { retries }),
+		...(timeout === undefined ? {} : { timeout }),
+		...(store === undefined ? {} : { store }),
+		handler: handleAgentQueueJob.bind(undefined, registry, allowPartial),
 	})
 }
 
@@ -660,19 +658,10 @@ export function createAgentRunner(
 ): RunnerInterface<AgentJobInput, AgentResult> {
 	const { registry, allowPartial = false, concurrency, retries, timeout } = options
 	return createRunner<AgentJobInput, AgentResult>({
-		concurrency,
-		retries,
-		timeout,
-		handler: (controller) => {
-			// Fan out this job's declared sub-agents FIRST (fire-and-track): spawn each child
-			// through the same bounded queue and DON'T await it here — the runner awaits the
-			// whole spawn closure via its count gate, and inline-awaiting a spawn from a
-			// slot-holding handler on a bounded runner can deadlock (see ControllerInterface).
-			const children = controller.input.children
-			if (children !== undefined) for (const child of children) void controller.spawn(child)
-			// Then run THIS (parent) job's agent and apply the partial policy.
-			return settleAgentJob(registry.build(controller.input, controller.signal), allowPartial)
-		},
+		...(concurrency === undefined ? {} : { concurrency }),
+		...(retries === undefined ? {} : { retries }),
+		...(timeout === undefined ? {} : { timeout }),
+		handler: handleAgentRunnerJob.bind(undefined, registry, allowPartial),
 	})
 }
 

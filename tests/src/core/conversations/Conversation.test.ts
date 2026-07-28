@@ -7,7 +7,12 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, createStubSummarizer, recordEmitterEvents } from '../../../setup.js'
+import {
+	createErrorRecorder,
+	createStubSummarizer,
+	recordEmitterEvents,
+	requireValue,
+} from '../../../setup.js'
 
 // The framed recap content a section's summary renders as in view() — the lean RECAP label
 // prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
@@ -60,11 +65,14 @@ describe('Conversation — construction & accessors', () => {
 	it('add(batch) mints each id + returns the array; remove + clear drop from the live tail (§9.2)', () => {
 		const conversation = new Conversation()
 
-		const [a, b, c] = conversation.add([
+		const messages = conversation.add([
 			{ role: 'user', content: 'a' },
 			{ role: 'assistant', content: 'b' },
 			{ role: 'user', content: 'c' },
 		])
+		const a = requireValue(messages[0])
+		const b = requireValue(messages[1])
+		const c = requireValue(messages[2])
 		expect(conversation.count).toBe(3)
 		expect(new Set([a.id, b.id, c.id]).size).toBe(3) // each id distinct
 

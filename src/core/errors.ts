@@ -176,7 +176,7 @@ export class WorkspaceError extends Error {
 		super(message)
 		this.name = 'WorkspaceError'
 		this.code = code
-		this.context = context
+		if (context !== undefined) this.context = context
 	}
 }
 

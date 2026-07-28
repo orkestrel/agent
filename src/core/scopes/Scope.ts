@@ -33,27 +33,30 @@ import type { ScopeConfiguration, ScopeInput, ScopeInterface } from '../types.js
 export class Scope implements ScopeInterface {
 	readonly id: string = crypto.randomUUID()
 	readonly name: string
-	readonly instructions: readonly string[] | undefined
-	readonly tools: readonly string[] | undefined
-	readonly files: readonly string[] | undefined
+	readonly instructions?: readonly string[]
+	readonly tools?: readonly string[]
+	readonly files?: readonly string[]
 
 	constructor(input: ScopeInput) {
 		this.name = input.name
 		// Copy each supplied list in (a later mutation of the caller's array can't leak in);
 		// an omitted list stays `undefined` — the "no constraint" sentinel.
-		this.instructions = input.instructions === undefined ? undefined : [...input.instructions]
-		this.tools = input.tools === undefined ? undefined : [...input.tools]
-		this.files = input.files === undefined ? undefined : [...input.files]
+		if (input.instructions !== undefined) this.instructions = [...input.instructions]
+		if (input.tools !== undefined) this.tools = [...input.tools]
+		if (input.files !== undefined) this.files = [...input.files]
 	}
 
 	narrow(config: ScopeConfiguration): ScopeInterface {
 		// A child = the per-category set-intersection of this scope and the config, keeping
 		// THIS scope's name. Immutable: a brand-new Scope, this one untouched.
+		const instructions = Scope.#intersect(this.instructions, config.instructions)
+		const tools = Scope.#intersect(this.tools, config.tools)
+		const files = Scope.#intersect(this.files, config.files)
 		return new Scope({
 			name: this.name,
-			instructions: Scope.#intersect(this.instructions, config.instructions),
-			tools: Scope.#intersect(this.tools, config.tools),
-			files: Scope.#intersect(this.files, config.files),
+			...(instructions === undefined ? {} : { instructions }),
+			...(tools === undefined ? {} : { tools }),
+			...(files === undefined ? {} : { files }),
 		})
 	}
 

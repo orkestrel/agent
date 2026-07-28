@@ -23,6 +23,7 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 	offsetAt,
 	rangeOf,
+	sanitizeToken,
 	sanitizeUsage,
 	settleAgentJob,
 	sliceRange,
@@ -479,6 +480,12 @@ describe('fencedFile', () => {
 })
 
 describe('sanitizeUsage', () => {
+	it('sanitizes an individual token count through the shared primitive', () => {
+		expect(sanitizeToken(5.9)).toBe(5)
+		expect(sanitizeToken(-1)).toBe(0)
+		expect(sanitizeToken(Infinity)).toBe(0)
+	})
+
 	it('is the identity on a well-formed non-negative integer usage', () => {
 		expect(sanitizeUsage({ prompt: 5, completion: 7, total: 12 })).toEqual({
 			prompt: 5,
