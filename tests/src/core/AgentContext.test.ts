@@ -1,4 +1,9 @@
-import type { ContextFormatInterface, MessageInput, MessageInterface } from '@src/core'
+import type {
+	AgentContextInterface,
+	ContextFormatInterface,
+	MessageInput,
+	MessageInterface,
+} from '@src/core'
 import {
 	AgentContext,
 	CONVERSATION_RECAP_PREFIX,
@@ -396,8 +401,8 @@ describe('AgentContext — context managers', () => {
 // `workspaces.active`'s TEXT files fold into a `## Workspace` system section (fenced), its
 // IMAGE files' base64 data attaches to the last user message. It is ACTIVE-ONLY (never the
 // other workspaces), scope-filtered by `scope.files`, and renders NOTHING when no workspace is
-// active. `context.workspaces` is ALWAYS present + SETTABLE (AGENTS §16 — real behavior, no
-// mocks; a real Workspace + WorkspaceManager, no provider needed).
+// active. `context.workspaces` is ALWAYS present and supplied structurally through options
+// (AGENTS §16 — real behavior, no mocks; a real Workspace + WorkspaceManager, no provider needed).
 describe('AgentContext — workspaces accessor & construction', () => {
 	it('constructs a fresh empty WorkspaceManager when none is passed (always present)', () => {
 		const context = new AgentContext()
@@ -414,20 +419,18 @@ describe('AgentContext — workspaces accessor & construction', () => {
 		expect(context.workspaces).toBe(workspaces)
 	})
 
-	it('is settable — swapping the registry redirects the active-workspace render', () => {
-		const context = new AgentContext()
+	it('uses the registry supplied through options for the active-workspace render', () => {
 		const a = createWorkspaceManager()
 		a.add().write('a.txt', 'in-a')
 		const b = createWorkspaceManager()
 		b.add().write('b.txt', 'in-b')
 
-		context.workspaces = a
-		expect(context.workspaces).toBe(a)
-		expect(requireValue(context.build()[0]).content).toContain('in-a')
-
-		// Swap to b — the NEXT build reflects b's active workspace (recomputed fresh, no stale a).
-		context.workspaces = b
-		const block = requireValue(context.build()[0]).content
+		const contextA = new AgentContext({ workspaces: a })
+		const contextB = new AgentContext({ workspaces: b })
+		expect(contextA.workspaces).toBe(a)
+		expect(requireValue(contextA.build()[0]).content).toContain('in-a')
+		expect(contextB.workspaces).toBe(b)
+		const block = requireValue(contextB.build()[0]).content
 		expect(block).toContain('in-b')
 		expect(block).not.toContain('in-a')
 	})
@@ -628,7 +631,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 
 	it('a named allow-list keeps only the listed files (filters BOTH the text section and the image attach)', () => {
 		const context = seed()
-		context.scope = new Scope({ name: 'narrowed', files: ['keep.txt', 'keep.png'] })
+		context.apply(new Scope({ name: 'narrowed', files: ['keep.txt', 'keep.png'] }))
 
 		const built = context.build()
 		const block = requireValue(built[0]).content
@@ -641,7 +644,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 
 	it('an empty allow-list ([]) drops EVERY workspace file (the whole `## Workspace` section vanishes)', () => {
 		const context = seed()
-		context.scope = new Scope({ name: 'no-files', files: [] })
+		context.apply(new Scope({ name: 'no-files', files: [] }))
 
 		const built = context.build()
 		const block = requireValue(built[0]).content
@@ -756,7 +759,7 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 	})
 })
 
-describe('AgentContext — scope getter/setter', () => {
+describe('AgentContext — scope access and application', () => {
 	it('defaults to no scope (undefined)', () => {
 		const context = new AgentContext()
 
@@ -770,14 +773,14 @@ describe('AgentContext — scope getter/setter', () => {
 		expect(context.scope).toBe(scope)
 	})
 
-	it('is mutable through the setter', () => {
-		const context = new AgentContext()
+	it('applies and removes the active scope through the interface', () => {
+		const context: AgentContextInterface = new AgentContext()
 		const scope = new Scope({ name: 's' })
 
-		context.scope = scope
+		context.apply(scope)
 		expect(context.scope).toBe(scope)
 
-		context.scope = undefined
+		context.apply(undefined)
 		expect(context.scope).toBeUndefined()
 	})
 })
@@ -809,7 +812,7 @@ describe('AgentContext — scope filtering in build()', () => {
 
 	it('a named allow-list keeps only the listed instructions', () => {
 		const context = seed()
-		context.scope = new Scope({ name: 'narrowed', instructions: ['keep-i'] })
+		context.apply(new Scope({ name: 'narrowed', instructions: ['keep-i'] }))
 
 		const built = context.build()
 		const block = requireValue(built[0]).content
@@ -820,7 +823,7 @@ describe('AgentContext — scope filtering in build()', () => {
 
 	it('an empty allow-list ([]) drops EVERY item of that category', () => {
 		const context = seed()
-		context.scope = new Scope({ name: 'no-instructions', instructions: [] })
+		context.apply(new Scope({ name: 'no-instructions', instructions: [] }))
 
 		const block = requireValue(context.build()[0]).content
 
@@ -832,11 +835,11 @@ describe('AgentContext — scope filtering in build()', () => {
 	it('reflects a scope swapped between builds (recomputed fresh, no shared state)', () => {
 		const context = seed()
 
-		context.scope = new Scope({ name: 'only-keep', instructions: ['keep-i'] })
+		context.apply(new Scope({ name: 'only-keep', instructions: ['keep-i'] }))
 		expect(requireValue(context.build()[0]).content).not.toContain('DROPPED INSTRUCTION')
 
 		// Swap to no scope — the dropped instruction reappears on the next build.
-		context.scope = undefined
+		context.apply(undefined)
 		expect(requireValue(context.build()[0]).content).toContain('DROPPED INSTRUCTION')
 	})
 })
@@ -978,7 +981,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		expect(requireValue(context.build()[0]).content).toBe('sys')
 		// And with a scope that fully excludes the (now-present) instruction, still silent.
 		context.instructions.add({ name: 'a', content: 'X' })
-		context.scope = new Scope({ name: 'none', instructions: [] })
+		context.apply(new Scope({ name: 'none', instructions: [] }))
 		expect(requireValue(context.build()[0]).content).toBe('sys')
 	})
 
@@ -1241,7 +1244,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 			{ name: 'drop', content: 'DROPPED' },
 		])
 		context.messages.add({ role: 'user', content: 'hi' })
-		context.scope = new Scope({ name: 'instr', instructions: ['keep'] })
+		context.apply(new Scope({ name: 'instr', instructions: ['keep'] }))
 
 		const block = requireValue(context.build()[0]).content
 
@@ -1307,11 +1310,10 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 })
 
 // The MESSAGE SOURCE switches by re-pointing the registry's ACTIVE conversation
-// (`conversations.switch(id)`) OR swapping the whole registry (`context.conversations = ...`, a
-// settable mutable property like `scope` / `workspaces`). The DYNAMIC `messages` getter then points
-// at the new active conversation's live tail (the SAME reference, no duplication) and `build()` folds
-// its `view()`. This is the multi-conversation mechanism: ONE agent serving many threads by switching
-// the active conversation between runs (AGENTS §16 — real behavior, a data-stub summarizer).
+// (`conversations.switch(id)`). The DYNAMIC `messages` getter then points at the new active
+// conversation's live tail (the SAME reference, no duplication) and `build()` folds its `view()`.
+// This is the multi-conversation mechanism: ONE agent serving many threads by switching the active
+// conversation between runs (AGENTS §16 — real behavior, a data-stub summarizer).
 describe('AgentContext — switching the active conversation (multi-conversation)', () => {
 	it('conversations.switch(id) swaps messages to the NEW active conversation (same reference)', () => {
 		const conversations = new ConversationManager()
@@ -1332,33 +1334,28 @@ describe('AgentContext — switching the active conversation (multi-conversation
 		expect(a.count).toBe(0)
 	})
 
-	it('setting context.conversations swaps the whole registry (and ensures an active conversation)', () => {
-		const context = new AgentContext()
+	it('uses the conversation registry supplied through options', () => {
+		const originalContext = new AgentContext()
 		// Author some history on the original default conversation.
-		context.messages.add({ role: 'user', content: 'original' })
-		const original = context.messages
+		originalContext.messages.add({ role: 'user', content: 'original' })
+		const original = originalContext.messages
 
-		// Swap to a fresh registry — `messages` redirects to its active conversation; the original
-		// conversation is untouched (a different registry).
 		const next = new ConversationManager()
 		const conv = next.add()
 		conv.add({ role: 'user', content: 'next-1' })
-		context.conversations = next
+		const context = new AgentContext({ conversations: next })
 		expect(context.conversations).toBe(next)
 		expect(context.messages).toBe(conv)
 		expect(context.build().map((message) => message.content)).toEqual(['next-1'])
-		// The original conversation (no longer the message source) kept its own history intact.
+		// The separately constructed original context kept its own history intact.
 		expect(original.messages().map((message) => message.content)).toEqual(['original'])
 	})
 
-	it('setting an EMPTY registry adds a default active conversation (messages stays defined)', () => {
-		const context = new AgentContext()
-		context.messages.add({ role: 'user', content: 'x' })
-
+	it('supplying an EMPTY registry adds a default active conversation (messages stays defined)', () => {
 		const empty = new ConversationManager() // no active
-		context.conversations = empty
+		const context = new AgentContext({ conversations: empty })
 
-		// The setter ensured an active conversation, so messages is still defined + empty.
+		// Construction ensured an active conversation, so messages is defined + empty.
 		expect(empty.count).toBe(1)
 		expect(context.messages).toBe(empty.active)
 		expect(context.messages.count).toBe(0)

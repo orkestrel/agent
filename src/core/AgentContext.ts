@@ -24,15 +24,17 @@ import { WorkspaceManager } from './workspaces/WorkspaceManager.js'
  * The richer turn context the agent loop assembles a provider request from — the optional
  * system prompt, the observable context managers (instructions / workspaces), the
  * {@link ConversationManagerInterface} message source (whose active conversation IS `messages`),
- * the {@link ToolManagerInterface} registry, and a mutable active {@link ScopeInterface}.
+ * the {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
+ * {@link AgentContextInterface.apply}.
  *
  * @remarks
  * - **Composition.** `system` is the optional system prompt; `instructions` / `tools` /
  *   `workspaces` / `conversations` are the registries passed in `options` (bring your own), or
  *   fresh empty ones when omitted (so `workspaces` is ALWAYS present); `messages` is the ACTIVE
  *   conversation's live tail (ALWAYS defined — see below). `scope` is the active filter —
- *   `undefined` (the default) ⇒ no filtering; settable afterwards. `workspaces` / `conversations`
- *   are likewise SETTABLE (swap the whole registry between runs).
+ *   `undefined` (the default) ⇒ no filtering; change it through `apply(scope)`. The structural
+ *   `workspaces` / `conversations` registries are fixed at construction; switch their active
+ *   members through their own `switch(id)` methods.
  * - **The message source — the conversation registry's ACTIVE conversation.** `conversations` is a
  *   {@link ConversationManagerInterface}; the context ENSURES it always has an active conversation
  *   (at construction it `add`s a default when the manager has none), so the DYNAMIC `messages`
@@ -90,17 +92,14 @@ export class AgentContext implements AgentContextInterface {
 	readonly #instructions: InstructionManagerInterface
 	// The workspace registry whose ACTIVE workspace `build()` renders by carrier (text files →
 	// the system block, image files → the last user message). ALWAYS present (a fresh empty
-	// manager when none was supplied), and SETTABLE (the `workspaces` setter) — swap the whole
-	// registry between runs; `build()` reads `active` / its `files()` fresh each call. Mutable
-	// (not `readonly`) because the setter reassigns it, mirroring `#conversations` / `#scope`.
-	#workspaces: WorkspaceManagerInterface
+	// manager when none was supplied). The registry is structural; switch its active workspace
+	// through `workspaces.switch(id)`. `build()` reads `active` / its `files()` fresh each call.
+	readonly #workspaces: WorkspaceManagerInterface
 	// The conversation registry whose ACTIVE conversation is the message source: the dynamic
 	// `messages` getter returns `#conversations.active` (always defined — the constructor ensures one)
-	// and `build()` folds that conversation's `view()`. ALWAYS present + SETTABLE (the `conversations`
-	// setter) — swap the whole registry between runs; switch the active conversation through
-	// `conversations.switch(id)`. Mutable (not `readonly`) because the setter reassigns it, mirroring
-	// `#workspaces` / `#scope`.
-	#conversations: ConversationManagerInterface
+	// and `build()` folds that conversation's `view()`. ALWAYS present. The registry is structural;
+	// switch its active conversation through `conversations.switch(id)`.
+	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
 	#scope: ScopeInterface | undefined
 
@@ -135,40 +134,20 @@ export class AgentContext implements AgentContextInterface {
 		return this.#workspaces
 	}
 
-	// SWAP the whole workspace registry (mirroring the settable `conversation` / `scope`): assigning
-	// redirects `build()`'s active-workspace render at the new registry's `active` (read fresh each
-	// call, so a later `switch` / `add` on it reflects through). The active workspace is the SOLE
-	// document/image context.
-	set workspaces(value: WorkspaceManagerInterface) {
-		this.#workspaces = value
-	}
-
 	// DYNAMIC — the active conversation ITSELF (it owns its live tail + the message verbs directly,
-	// like a `Workspace` owns its files), ALWAYS defined: the constructor (and the `conversations`
-	// setter) ENSURE the registry has an active conversation. Computed on every read (never captured),
-	// so `context.messages` ALWAYS points at the CURRENT active conversation (the SAME reference — no
-	// duplication) and FOLLOWS a `conversations.switch(id)` or a `conversations` swap. The active
-	// `Conversation` satisfies the message-verb contract directly, so this stays a
-	// `MessageManagerInterface`. The `?? this.#ensure()` fallback re-seats a default if a caller's
-	// supplied manager was somehow emptied (e.g. `clear()`), so the getter is total — never undefined.
+	// like a `Workspace` owns its files), ALWAYS defined: the constructor ENSURES the registry has an
+	// active conversation. Computed on every read (never captured), so `context.messages` ALWAYS
+	// points at the CURRENT active conversation (the SAME reference — no duplication) and FOLLOWS a
+	// `conversations.switch(id)`. The active `Conversation` satisfies the message-verb contract
+	// directly, so this stays a `MessageManagerInterface`. The `?? this.#ensure()` fallback re-seats
+	// a default if a caller's supplied manager was somehow emptied (e.g. `clear()`), so the getter is
+	// total — never undefined.
 	get messages(): MessageManagerInterface {
 		return this.#conversations.active ?? this.#ensure()
 	}
 
 	get conversations(): ConversationManagerInterface {
 		return this.#conversations
-	}
-
-	// SWAP the whole conversation registry (mirroring the settable `workspaces` / `scope`): assigning
-	// redirects the dynamic `messages` getter + `build()` at the NEW registry's ACTIVE conversation
-	// (switch the active one through `value.switch(id)`). ENSURE the new registry has an active
-	// conversation so `messages` stays defined. This is the multi-conversation mechanism — one agent
-	// serving many threads. Swap / switch BETWEEN runs, NOT during a run (the loop reads
-	// `context.conversations` / `context.messages` fresh each run); for CONCURRENT threads use separate
-	// agents — the framework ships the mechanism, the app owns concurrency policy.
-	set conversations(value: ConversationManagerInterface) {
-		this.#conversations = value
-		if (this.#conversations.active === undefined) this.#conversations.add()
 	}
 
 	get tools(): ToolManagerInterface {
@@ -179,8 +158,8 @@ export class AgentContext implements AgentContextInterface {
 		return this.#scope
 	}
 
-	set scope(value: ScopeInterface | undefined) {
-		this.#scope = value
+	apply(scope: ScopeInterface | undefined): void {
+		this.#scope = scope
 	}
 
 	build(format?: ContextFormatInterface): readonly MessageInterface[] {
@@ -238,8 +217,8 @@ export class AgentContext implements AgentContextInterface {
 		// 4. The conversation. The ACTIVE conversation's `view()` is AUTHORITATIVE (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion via compaction, so the
 		// scope does NOT filter the conversation here (scope filters only instructions / tools /
-		// workspace files, above). The active conversation is ALWAYS present (the constructor / setter
-		// ensure one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
+		// workspace files, above). The active conversation is ALWAYS present (the constructor ensures
+		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
 		const active = this.#conversations.active ?? this.#ensure()
 		const conversation = active.view()
 		// 5. Attach the active workspace's scoped-in IMAGE files' base64 `data` to the LAST user
@@ -395,7 +374,7 @@ export class AgentContext implements AgentContextInterface {
 	// default (auto-activating it when the registry is empty) and return it. Returns the
 	// `ConversationInterface` (which satisfies `MessageManagerInterface` structurally for the
 	// `messages` getter AND carries `view()` for `build()`). Normally never reached — the constructor
-	// + the `conversations` setter already seed an active conversation.
+	// already seeds an active conversation.
 	#ensure(): ConversationInterface {
 		const conversation = this.#conversations.add()
 		return this.#conversations.active ?? conversation

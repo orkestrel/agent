@@ -704,10 +704,10 @@ export interface ScopeManagerInterface {
  * `instructions` / `workspaces` are optional pre-built managers to reuse (bring your own
  * registry); when one is omitted, the context creates a fresh empty one. `scope` is the
  * initial active filter applied at `build()` time (and at the loop's tool-advertise step); it
- * defaults to `undefined` — no filtering — and is mutable through the context's `scope` setter
- * afterwards. `conversations` is the {@link ConversationManagerInterface} the context's message
- * source flows from: `messages` IS the manager's ACTIVE conversation's live tail and `build()`
- * folds that conversation's `view()` (section summaries + live). When omitted, a fresh
+ * defaults to `undefined` — no filtering — and can be changed through the context's `apply`
+ * method afterwards. `conversations` is the structural {@link ConversationManagerInterface} the
+ * context's message source flows from: `messages` IS the manager's ACTIVE conversation's live tail
+ * and `build()` folds that conversation's `view()` (section summaries + live). When omitted, a fresh
  * {@link ConversationManagerInterface} is created and a default conversation is added (so
  * `messages` is ALWAYS defined). All default to a context with no system prompt, empty registries,
  * no scope, and a fresh conversation registry holding one default conversation.
@@ -722,8 +722,8 @@ export interface AgentContextOptions {
 	 * A pre-built {@link WorkspaceManagerInterface} to reuse; a fresh empty one is created when
 	 * omitted (so `context.workspaces` is ALWAYS present). `build()` renders the ACTIVE workspace's
 	 * files by carrier — text files into the system block (fenced), image files attached to the last
-	 * user message — and is mutable through the context's `workspaces` setter afterwards. The active
-	 * workspace is the SOLE document/image context.
+	 * user message. The registry is structural; change its active workspace through
+	 * `workspaces.switch(id)`. The active workspace is the SOLE document/image context.
 	 */
 	readonly workspaces?: WorkspaceManagerInterface
 	/** The initial active scope (the build-time filter); `undefined` ⇒ no filtering. */
@@ -735,9 +735,8 @@ export interface AgentContextOptions {
 	 * conversation's LIVE tail — is ALWAYS defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail) as its AUTHORITATIVE message inclusion —
 	 * the scope does NOT filter the conversation (it owns inclusion via compaction; scope filters
-	 * only instructions / tools / workspace files). A SETTABLE mutable
-	 * property afterwards (the context's `conversations` setter — swap the whole registry between
-	 * runs), and the active conversation is switchable through the manager's `switch(id)`.
+	 * only instructions / tools / workspace files). The registry is structural; change its active
+	 * conversation through the manager's `switch(id)`.
 	 */
 	readonly conversations?: ConversationManagerInterface
 }
@@ -779,8 +778,8 @@ export interface AgentContextInterface {
 	 * construction). It IS the active {@link ConversationInterface} itself (which satisfies
 	 * {@link MessageManagerInterface} structurally), so appends through `messages` route to the
 	 * active conversation's tail and `build()` folds its `view()`. Computed dynamically (it follows
-	 * a `conversations.switch(id)` or a `conversations` swap), the SAME reference the active
-	 * conversation exposes — no duplication.
+	 * `conversations.switch(id)`), the SAME reference the active conversation exposes — no
+	 * duplication.
 	 */
 	readonly messages: MessageManagerInterface
 	/**
@@ -796,6 +795,18 @@ export interface AgentContextInterface {
 	readonly tools: ToolManagerInterface
 	/** The active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */
 	readonly scope: ScopeInterface | undefined
+	/**
+	 * Apply the active per-turn scope filter. Passing `undefined` removes filtering.
+	 *
+	 * @param scope - The scope to apply, or `undefined` to remove the active filter
+	 *
+	 * @example
+	 * ```ts
+	 * context.apply(scope)
+	 * context.apply(undefined)
+	 * ```
+	 */
+	apply(scope: ScopeInterface | undefined): void
 	/**
 	 * The provider input for the next turn: a leading `system` message folding the prompt
 	 * + the scoped instructions + the ACTIVE workspace's scoped-in TEXT files (rendered as

@@ -397,8 +397,8 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  * @remarks
  * `system` is the optional system prompt; `tools` / `instructions` / `workspaces` are pre-built
  * managers to reuse (empty ones are created when omitted, so `context.workspaces` is ALWAYS
- * present); `scope` is the initial active filter (`undefined` ⇒ no filtering, mutable afterwards
- * via `context.scope`). The `messages` store is always fresh. `build()` folds the scoped
+ * present); `scope` is the initial active filter (`undefined` ⇒ no filtering, changeable afterwards
+ * via `context.apply(...)`). The `messages` store is always fresh. `build()` folds the scoped
  * instructions — PLUS the ACTIVE workspace's scope-filtered text files (fenced) — into ONE leading
  * `system` message and appends the scoped conversation (attaching the active workspace's
  * scope-filtered image files' `data` to the last user message), built fresh each call; the active
