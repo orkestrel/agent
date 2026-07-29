@@ -1193,6 +1193,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 		expect(context.conversations).toBe(conversations)
 		expect(conversations.count).toBe(1)
 		expect(context.messages).toBe(conversations.active)
+		expect(context.messages.count).toBe(0)
 	})
 
 	it('build() folds the active conversation view() — the live tail before any compaction', () => {
@@ -1332,33 +1333,6 @@ describe('AgentContext — switching the active conversation (multi-conversation
 		context.messages.add({ role: 'user', content: 'for-b' })
 		expect(b.messages().map((message) => message.content)).toEqual(['for-b'])
 		expect(a.count).toBe(0)
-	})
-
-	it('uses the conversation registry supplied through options', () => {
-		const originalContext = new AgentContext()
-		// Author some history on the original default conversation.
-		originalContext.messages.add({ role: 'user', content: 'original' })
-		const original = originalContext.messages
-
-		const next = new ConversationManager()
-		const conv = next.add()
-		conv.add({ role: 'user', content: 'next-1' })
-		const context = new AgentContext({ conversations: next })
-		expect(context.conversations).toBe(next)
-		expect(context.messages).toBe(conv)
-		expect(context.build().map((message) => message.content)).toEqual(['next-1'])
-		// The separately constructed original context kept its own history intact.
-		expect(original.messages().map((message) => message.content)).toEqual(['original'])
-	})
-
-	it('supplying an EMPTY registry adds a default active conversation (messages stays defined)', () => {
-		const empty = new ConversationManager() // no active
-		const context = new AgentContext({ conversations: empty })
-
-		// Construction ensured an active conversation, so messages is defined + empty.
-		expect(empty.count).toBe(1)
-		expect(context.messages).toBe(empty.active)
-		expect(context.messages.count).toBe(0)
 	})
 
 	it('build() reflects whichever conversation is active when it runs (recomputed fresh)', () => {
