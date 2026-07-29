@@ -281,7 +281,7 @@ export interface ProviderInterface {
 	 * built-in framing, beaten by a manager-options or per-item override). Omitted ⇒ the
 	 * provider is framing-agnostic and the managers' built-in defaults apply unchanged.
 	 */
-	readonly format?: ContextFormatInterface
+	readonly format?: ContextFormatInterface | undefined
 	/**
 	 * Generate one complete turn — resolves the assembled {@link ProviderResult}.
 	 *
