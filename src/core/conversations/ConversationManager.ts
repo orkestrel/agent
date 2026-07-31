@@ -14,7 +14,7 @@ import { Conversation } from './Conversation.js'
  * The registry of {@link Conversation}s keyed by `id`, in insertion order, WITH an active pointer
  * — the §9 store over the conversation layer PLUS the `active` / `switch` seam the
  * {@link import('../AgentContext.js').AgentContext} renders. Event-free (a registry, like
- * {@link import('../workspaces/WorkspaceManager.js').WorkspaceManager}); the observability lives
+ * {@link import('@orkestrel/workspace').WorkspaceManager}); the observability lives
  * on each {@link Conversation}.
  *
  * @remarks

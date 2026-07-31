@@ -1,4 +1,5 @@
-import { createMemoryConversationStore, isConversationSnapshot, isToolCall } from '@src/core'
+import { createMemoryConversationStore, isConversationSnapshot } from '@src/core'
+import { isToolCall } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
 import {
 	assertConversationStoreContract,

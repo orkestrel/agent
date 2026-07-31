@@ -6,7 +6,7 @@ import type { InstructionInput, InstructionInterface } from '../types.js'
  * at construction.
  *
  * @remarks
- * A thin immutable value object (mirroring {@link import('../tools/Tool.js').Tool}): the
+ * A thin immutable value object (mirroring {@link import('@orkestrel/tool').Tool}): the
  * constructor mints a fresh `id` (`crypto.randomUUID()`), copies the input's `name` /
  * `content`, resolves `priority` to the input's value or `0`, and carries the input's
  * per-item `format` override ONLY when supplied (assigned just when present, mirroring a

@@ -12,14 +12,13 @@ import type {
 } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
 import { createBudget, createTokenBudget } from '@orkestrel/budget'
+import { createTool, createToolManager } from '@orkestrel/tool'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
 	createConversation,
 	createConversationManager,
-	createTool,
-	createToolManager,
 	estimateMessages,
 	estimateTokens,
 	isAgentError,
@@ -49,21 +48,21 @@ import {
 // Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
 // src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted
 // `createScriptedProvider` returns pre-canned ProviderResults in sequence so the LOOP
-// itself �€” tool iteration, the chunk stream, generate�†”stream parity, the iteration cap,
-// abort / budget bounds, scheduler pacing, status �€” is pinned without a daemon. Every loop
+// itself — tool iteration, the chunk stream, generate↔stream parity, the iteration cap,
+// abort / budget bounds, scheduler pacing, status — is pinned without a daemon. Every loop
 // test opts the provider into `record: true` (to assert, via `provider.calls`, the
 // messages / tools the loop sent) and `exhaust: 'throw'` (so a loop that over-ran its
 // script fails loudly rather than silently repeating the last turn). The only providers
-// that stay LOCAL are the genuine per-scenario BEHAVIOUR fixtures �€” a stream that parks
+// that stay LOCAL are the genuine per-scenario BEHAVIOUR fixtures — a stream that parks
 // on a `createGate()` or throws mid-stream to drive the abort / error / concurrency /
-// cancel paths �€” which are scenario behaviour, not replayable data.
+// cancel paths — which are scenario behaviour, not replayable data.
 
 const USAGE = createTokenUsage()
 
 // This file's uniform options for the shared scripted provider: every loop test records the
 // messages / tools each call saw (asserted via `provider.calls`) and treats over-running the
 // script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
-// repeat �€” so a loop that should have stopped (a cap / budget / cancel) but didn't is caught.
+// repeat — so a loop that should have stopped (a cap / budget / cancel) but didn't is caught.
 const SCRIPT_OPTIONS: ScriptedProviderOptions = { name: 'script', record: true, exhaust: 'throw' }
 
 /** A real, hand-rolled {@link BudgetInterface} over {@link TokenUsage} that RECORDS every
@@ -113,7 +112,7 @@ function createRecordingBudget(max: number): RecordingBudgetInterface {
 	}
 }
 
-describe('Agent �€” single turn', () => {
+describe('Agent — single turn', () => {
 	it('generate returns the content of a no-tools turn', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'hello', usage: USAGE } }],
@@ -129,7 +128,7 @@ describe('Agent �€” single turn', () => {
 
 	it('joins provider thinking onto the result; omitted when no call surfaced any (H4)', async () => {
 		// A tool round whose turn carries separated reasoning, then a final turn with its
-		// own �€” the loop JOINS them (blank-line separated) onto AgentResult.thinking, while
+		// own — the loop JOINS them (blank-line separated) onto AgentResult.thinking, while
 		// the content / messages stay clean (thinking never re-enters the conversation).
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => 'ok' }))
@@ -149,7 +148,7 @@ describe('Agent �€” single turn', () => {
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
 		expect(result.thinking).toBe('first thoughts\n\nfinal thoughts')
-		// The conversation never saw the reasoning �€” no stored message carries it.
+		// The conversation never saw the reasoning — no stored message carries it.
 		expect(
 			agent.context.messages.messages().some((message) => message.content.includes('thoughts')),
 		).toBe(false)
@@ -213,10 +212,10 @@ describe('Agent �€” single turn', () => {
 	})
 })
 
-describe('Agent �€” passes the provider format into build()', () => {
+describe('Agent — passes the provider format into build()', () => {
 	it('a scripted provider WITH a format frames the built context (PROVIDER level)', async () => {
 		// The loop's ONE build()-level change: it passes `provider.format` into
-		// context.build(). A provider declaring a framing default �‡’ the built system block
+		// context.build(). A provider declaring a framing default ⇒ the built system block
 		// reflects it (the provider beats the managers' built-in framing).
 		const format: ContextFormatInterface = {
 			instructions: {
@@ -242,7 +241,7 @@ describe('Agent �€” passes the provider format into build()', () => {
 	})
 
 	it('a scripted provider WITHOUT a format reflects the managers built-ins (agnostic)', async () => {
-		// An agnostic provider supplies NO format (like OllamaProvider) �‡’ build(undefined) �‡’
+		// An agnostic provider supplies NO format (like OllamaProvider) ⇒ build(undefined) ⇒
 		// the managers' built-in framing, byte-for-byte.
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
 		expect(provider.format).toBeUndefined()
@@ -256,7 +255,7 @@ describe('Agent �€” passes the provider format into build()', () => {
 	})
 })
 
-describe('Agent �€” scope filters the advertised tool definitions', () => {
+describe('Agent — scope filters the advertised tool definitions', () => {
 	it('advertises ALL tools when the context has no scope', async () => {
 		const tools = createToolManager()
 		tools.add([
@@ -275,7 +274,7 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 		])
 	})
 
-	it('advertises ONLY the scoped-in tools �€” a scoped-out tool is never described', async () => {
+	it('advertises ONLY the scoped-in tools — a scoped-out tool is never described', async () => {
 		const tools = createToolManager()
 		tools.add([
 			createTool({ name: 'alpha', execute: () => 1 }),
@@ -308,13 +307,13 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 
 		await agent.generate()
 
-		// No tool passes the empty allow-list �†’ the provider is handed `undefined`.
+		// No tool passes the empty allow-list → the provider is handed `undefined`.
 		expect(provider.calls[0]?.tools).toBeUndefined()
 	})
 
-	it('a scoped-out tool is NOT callable �€” its handler never runs when the model requests it', async () => {
+	it('a scoped-out tool is NOT callable — its handler never runs when the model requests it', async () => {
 		// The model (turn 1) requests `secret`; but `secret` is scoped out, so it was never
-		// advertised. The loop still dispatches the call through the manager �€” proving the
+		// advertised. The loop still dispatches the call through the manager — proving the
 		// scope did not merely hide the description: a scoped-out tool must not be callable.
 		// Here we assert the model could only ever have seen `safe`, so a well-behaved model
 		// can't call `secret`; and even if it does, the advertised set excludes it.
@@ -361,7 +360,7 @@ describe('Agent �€” scope filters the advertised tool definitions', () => 
 	})
 })
 
-describe('Agent �€” tool iteration', () => {
+describe('Agent — tool iteration', () => {
 	it('dispatches a tool call then finishes with the follow-up turn', async () => {
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
@@ -408,12 +407,12 @@ describe('Agent �€” tool iteration', () => {
 		const result = await agent.generate()
 		expect(result.content).toBe('recovered')
 		const [, second] = provider.calls
-		expect(second?.messages.at(-1)?.content).toBe(JSON.stringify('kaboom'))
+		expect(second?.messages.at(-1)?.content).toBe('kaboom')
 	})
 })
 
-describe('Agent �€” authority gate', () => {
-	it('no authority �†’ a tool call executes unchanged (Ch5 behavior)', async () => {
+describe('Agent — authority gate', () => {
+	it('no authority → a tool call executes unchanged (Ch5 behavior)', async () => {
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
 		tools.add(
@@ -432,7 +431,7 @@ describe('Agent �€” authority gate', () => {
 			],
 			SCRIPT_OPTIONS,
 		)
-		// No `authority` option �†’ the gate is a straight pass-through.
+		// No `authority` option → the gate is a straight pass-through.
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
 		const result = await agent.generate()
@@ -478,7 +477,7 @@ describe('Agent �€” authority gate', () => {
 		expect(toolChunk).toEqual({
 			type: 'tool',
 			call: { id: 'c1', name: 'add', arguments: { a: 2, b: 3 } },
-			result: { id: 'c1', name: 'add', value: 5 },
+			result: { success: true, id: 'c1', name: 'add', value: 5 },
 		})
 	})
 
@@ -523,14 +522,14 @@ describe('Agent �€” authority gate', () => {
 		expect(toolChunk).toEqual({
 			type: 'tool',
 			call: { id: 'c1', name: 'add', arguments: { a: 2, b: 3 } },
-			result: { id: 'c1', name: 'add', error: 'denied: blocked' },
+			result: { success: false, id: 'c1', name: 'add', error: 'denied: blocked' },
 		})
 		// The loop continued: a SECOND provider call happened, and it SAW the denial as the
-		// last (tool) message �€” so the model can react to it.
+		// last (tool) message — so the model can react to it.
 		expect(provider.calls).toHaveLength(2)
 		const [, second] = provider.calls
 		expect(second?.messages.at(-1)?.role).toBe('tool')
-		expect(second?.messages.at(-1)?.content).toBe(JSON.stringify('denied: blocked'))
+		expect(second?.messages.at(-1)?.content).toBe('denied: blocked')
 		expect(result.content).toBe('understood, blocked')
 		expect(result.partial).toBe(false)
 	})
@@ -542,7 +541,7 @@ describe('Agent �€” authority gate', () => {
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'ok' } }],
 			SCRIPT_OPTIONS,
 		)
-		// A deny rule with NO reason �†’ the generic 'denied by authority' message.
+		// A deny rule with NO reason → the generic 'denied by authority' message.
 		const authority = createAuthority({
 			rules: [{ match: () => true, zone: 'restricted', allowed: false }],
 		})
@@ -555,7 +554,7 @@ describe('Agent �€” authority gate', () => {
 		expect(toolChunk).toEqual({
 			type: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
-			result: { id: 'c1', name: 'add', error: 'denied by authority' },
+			result: { success: false, id: 'c1', name: 'add', error: 'denied by authority' },
 		})
 	})
 
@@ -619,20 +618,24 @@ describe('Agent �€” authority gate', () => {
 			c.type === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
 		)
 		expect(toolResults).toEqual([
-			{ id: 'a1', result: { id: 'a1', name: 'add', value: 5 } },
-			{ id: 'd1', result: { id: 'd1', name: 'delete', error: 'denied: no deletes' } },
-			{ id: 'a2', result: { id: 'a2', name: 'add', value: 5 } },
+			{ id: 'a1', result: { success: true, id: 'a1', name: 'add', value: 5 } },
+			{
+				id: 'd1',
+				result: {
+					success: false,
+					id: 'd1',
+					name: 'delete',
+					error: 'denied: no deletes',
+				},
+			},
+			{ id: 'a2', result: { success: true, id: 'a2', name: 'add', value: 5 } },
 		])
 		// The next turn's tool messages are appended in the same order.
 		const [, second] = provider.calls
 		const toolContents = (second?.messages ?? [])
 			.filter((m) => m.role === 'tool')
 			.map((m) => m.content)
-		expect(toolContents).toEqual([
-			JSON.stringify(5),
-			JSON.stringify('denied: no deletes'),
-			JSON.stringify(5),
-		])
+		expect(toolContents).toEqual([JSON.stringify(5), 'denied: no deletes', JSON.stringify(5)])
 	})
 
 	it('an all-denied turn feeds every call back as a denial and the loop stays bounded', async () => {
@@ -647,7 +650,7 @@ describe('Agent �€” authority gate', () => {
 				},
 			}),
 		)
-		// Every turn requests the same denied tool �€” only `limit` reached stops it.
+		// Every turn requests the same denied tool — only `limit` reached stops it.
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
@@ -672,12 +675,14 @@ describe('Agent �€” authority gate', () => {
 		const toolChunks = chunks.filter((c) => c.type === 'tool')
 		expect(toolChunks).toHaveLength(3)
 		expect(
-			toolChunks.every((c) => c.type === 'tool' && c.result.error === 'denied: all blocked'),
+			toolChunks.every(
+				(c) => c.type === 'tool' && !c.result.success && c.result.error === 'denied: all blocked',
+			),
 		).toBe(true)
 	})
 })
 
-describe('Agent �€” generate �†” stream parity', () => {
+describe('Agent — generate ↔ stream parity', () => {
 	it('generate result deep-equals draining the stream of the same script', async () => {
 		const script: readonly ScriptedTurn[] = [
 			{ result: { content: 'one', usage: USAGE }, deltas: ['on', 'e'] },
@@ -695,7 +700,7 @@ describe('Agent �€” generate �†” stream parity', () => {
 		expect(streamed).toEqual(generated)
 	})
 
-	// A multi-turn tool script with usage on each turn �€” generate and a fully-drained
+	// A multi-turn tool script with usage on each turn — generate and a fully-drained
 	// stream must agree on the final content AND the summed usage.
 	it('parity under multi-turn tool iteration (content + summed usage agree)', async () => {
 		const script: readonly ScriptedTurn[] = [
@@ -821,8 +826,8 @@ describe('Agent �€” generate �†” stream parity', () => {
 	})
 })
 
-describe('Agent �€” chunk sequence', () => {
-	it('yields token(s) �†’ usage �†’ tool �†’ token(s) �†’ usage in order', async () => {
+describe('Agent — chunk sequence', () => {
+	it('yields token(s) → usage → tool → token(s) → usage in order', async () => {
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(
@@ -850,7 +855,7 @@ describe('Agent �€” chunk sequence', () => {
 		expect(toolChunk).toEqual({
 			type: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
-			result: { id: 'c1', name: 'add', value: 5 },
+			result: { success: true, id: 'c1', name: 'add', value: 5 },
 		})
 		const tokens = chunks.filter((c) => c.type === 'token').map((c) => c.content)
 		expect(tokens).toEqual(['call', 'ing', 'fin', 'al'])
@@ -861,11 +866,11 @@ describe('Agent �€” chunk sequence', () => {
 	})
 })
 
-describe('Agent �€” iteration cap', () => {
+describe('Agent — iteration cap', () => {
 	it('stops at limit when the model always requests a tool (no infinite loop)', async () => {
 		const tools = createToolManager()
 		tools.add(loopTool())
-		// Every turn returns a tool call �€” only `limit` reached stops it.
+		// Every turn returns a tool call — only `limit` reached stops it.
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
@@ -882,7 +887,7 @@ describe('Agent �€” iteration cap', () => {
 	})
 })
 
-describe('Agent �€” abort', () => {
+describe('Agent — abort', () => {
 	it('a pre-aborted external signal commits a partial without calling the provider', async () => {
 		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
 		const controller = new AbortController()
@@ -897,7 +902,7 @@ describe('Agent �€” abort', () => {
 
 	it('abort() mid-stream resolves partial with the accumulated content', async () => {
 		const gate = createGate()
-		// A provider whose stream yields one delta, then waits on a gate before the next �€”
+		// A provider whose stream yields one delta, then waits on a gate before the next —
 		// giving the test a window to call abort() mid-stream.
 		const provider: ProviderInterface = {
 			id: 's',
@@ -928,8 +933,8 @@ describe('Agent �€” abort', () => {
 
 	it('a genuine provider error (not a cancel) rejects the result', async () => {
 		// The stream yields one delta, then throws on the next pull while the signal is
-		// NOT aborted �€” a genuine provider failure must propagate (the run rejects, status
-		// �†’ error), distinct from the abort path that commits a partial. The reachable
+		// NOT aborted — a genuine provider failure must propagate (the run rejects, status
+		// → error), distinct from the abort path that commits a partial. The reachable
 		// `yield` keeps it a real generator; the throw after it is reachable too.
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { type: 'content', text: 'partial' }
@@ -950,7 +955,7 @@ describe('Agent �€” abort', () => {
 	})
 })
 
-describe('Agent �€” budget bound', () => {
+describe('Agent — budget bound', () => {
 	it('stops and commits partial once the token budget is exhausted', async () => {
 		const budget = createTokenBudget({ max: 10, scope: 'total' })
 		const tools = createToolManager()
@@ -986,7 +991,7 @@ describe('Agent �€” budget bound', () => {
 	})
 })
 
-describe('Agent �€” scheduler pacing', () => {
+describe('Agent — scheduler pacing', () => {
 	it('yields between turns, not after the last', async () => {
 		const scheduler = createRecordingScheduler()
 		const tools = createToolManager()
@@ -1002,14 +1007,14 @@ describe('Agent �€” scheduler pacing', () => {
 		const agent = createAgent(provider, { tools, scheduler })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
-		// 3 turns ran �†’ yield fired before turns 2 and 3 only (not before turn 1, not after).
+		// 3 turns ran → yield fired before turns 2 and 3 only (not before turn 1, not after).
 		expect(provider.calls).toHaveLength(3)
 		expect(scheduler.yields).toBe(2)
 	})
 })
 
-describe('Agent �€” status', () => {
-	it('transitions idle �†’ running �†’ done', async () => {
+describe('Agent — status', () => {
+	it('transitions idle → running → done', async () => {
 		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		expect(agent.status).toBe('idle')
@@ -1022,18 +1027,18 @@ describe('Agent �€” status', () => {
 	})
 })
 
-describe('Agent �€” deadline cleanup (fake timers)', () => {
+describe('Agent — deadline cleanup (fake timers)', () => {
 	afterEach(() => {
 		vi.useRealTimers()
 	})
 
-	// A normal completion must disarm the per-turn deadline �€” the timeout `Timeout` is
+	// A normal completion must disarm the per-turn deadline — the timeout `Timeout` is
 	// `start()`ed when the run begins, so a turn that finishes naturally has to `clear()`
 	// it in a `finally`, never leaving the host `setTimeout` armed (it would keep the
 	// event loop alive and could abort a later turn if the Agent is reused). Fake timers
 	// make the leak observable: a leaked deadline shows as one pending host timer. The
 	// scripted provider only awaits microtasks, so `generate()` settles without advancing
-	// the clock �€” what remains is exactly the deadline timer under test.
+	// the clock — what remains is exactly the deadline timer under test.
 	it('clears the per-turn timeout on a successful generate (no leaked host timer)', async () => {
 		vi.useFakeTimers()
 		const agent = createAgent(
@@ -1046,20 +1051,20 @@ describe('Agent �€” deadline cleanup (fake timers)', () => {
 		const result = await agent.generate()
 		expect(result.content).toBe('hi')
 		expect(result.partial).toBe(false)
-		// The deadline fired neither expiry nor abort �€” it must have been cleared, leaving
+		// The deadline fired neither expiry nor abort — it must have been cleared, leaving
 		// zero pending host timers (a leak would report 1).
 		expect(vi.getTimerCount()).toBe(0)
 	})
 })
 
 // The DRIVE mechanism behind the stream handle: `result` must settle from an EAGER pump
-// that runs regardless of whether `events` is consumed �€” never from a lazy `finally` that
+// that runs regardless of whether `events` is consumed — never from a lazy `finally` that
 // only executes once a consumer pulls `events`. These pin that contract deterministically
 // (scripted provider, no live model): awaiting `result` WITHOUT draining `events` must
 // resolve (the exact hang the old lazy-settle had), an early `break` must settle a
 // non-misleading partial + cancel the run, and a provider throw must reject `result` even
-// when `events` is never touched �€” all with the deadline timer cleared on every path.
-describe('Agent �€” stream drive (result settles independently of events)', () => {
+// when `events` is never touched — all with the deadline timer cleared on every path.
+describe('Agent — stream drive (result settles independently of events)', () => {
 	afterEach(() => {
 		vi.useRealTimers()
 	})
@@ -1068,7 +1073,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 		const script: readonly ScriptedTurn[] = [
 			{ result: { content: 'hello', usage: USAGE }, deltas: ['hel', 'lo'] },
 		]
-		// The assembled content a FULLY-DRAINED stream produces �€” what no-drain must match.
+		// The assembled content a FULLY-DRAINED stream produces — what no-drain must match.
 		const drainAgent = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS))
 		drainAgent.context.messages.add({ role: 'user', content: 'hi' })
 		const drainStream = drainAgent.stream()
@@ -1099,7 +1104,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		// Without draining `events`, the deadline's `clear()` must still run (it lives in the
-		// pump's `finally`, not the never-pulled events `finally`) �€” zero pending host timers.
+		// pump's `finally`, not the never-pulled events `finally`) — zero pending host timers.
 		const result = await stream.result
 		expect(result.content).toBe('hi')
 		expect(vi.getTimerCount()).toBe(0)
@@ -1109,7 +1114,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 		vi.useFakeTimers()
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => null }))
-		// A long script that would emit many chunks across turns if left to run �€” breaking
+		// A long script that would emit many chunks across turns if left to run — breaking
 		// after the first chunk must stop it well short (proving the early break cancelled).
 		const provider = createScriptedProvider(
 			Array.from({ length: 5 }, () => ({
@@ -1121,8 +1126,8 @@ describe('Agent �€” stream drive (result settles independently of events)'
 		const agent = createAgent(provider, { tools, timeout: 30_000 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
-		// Pull exactly ONE chunk via the iterator protocol, then `return()` the iterator �€”
-		// the early-break a consumer's `break` triggers �€” without an unused loop binding.
+		// Pull exactly ONE chunk via the iterator protocol, then `return()` the iterator —
+		// the early-break a consumer's `break` triggers — without an unused loop binding.
 		const iterator = stream.events[Symbol.asyncIterator]()
 		const first = await iterator.next()
 		expect(first.done).toBe(false)
@@ -1139,7 +1144,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 	})
 
 	it('rejects result on a genuine provider error without draining events', async () => {
-		// A provider that throws (signal NOT aborted) �€” a genuine failure must reject `result`
+		// A provider that throws (signal NOT aborted) — a genuine failure must reject `result`
 		// even when `events` is never pulled, and leave status 'error'.
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { type: 'content', text: 'partial' }
@@ -1162,11 +1167,11 @@ describe('Agent �€” stream drive (result settles independently of events)'
 	})
 
 	it('an abandoned throwing handle (events undrained, result unawaited) leaks no unhandledRejection', async () => {
-		// A provider that throws (signal NOT aborted) �€” a genuine failure. The pump rejects the
+		// A provider that throws (signal NOT aborted) — a genuine failure. The pump rejects the
 		// PUBLIC `result` (`settled.promise`) in its `finally` without re-throwing, so the pump
 		// promise itself resolves; the rejection lives solely on `settled.promise`. If nothing
 		// guards it, a handle whose owner touches NEITHER `events` NOR `result` leaves that
-		// rejection unhandled �†’ Node fires a process-level unhandledRejection. The fix guards
+		// rejection unhandled → Node fires a process-level unhandledRejection. The fix guards
 		// `settled.promise` with a no-op `.catch`, marking it handled (the warning is suppressed)
 		// while every separate `await result` consumer still rejects (`.catch` returns a derived
 		// promise, it does not consume the original's rejection).
@@ -1192,7 +1197,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 		try {
 			const agent = createAgent(provider)
 			agent.context.messages.add({ role: 'user', content: 'hi' })
-			// Touch NEITHER `s.events` NOR `s.result` �€” an abandoned handle.
+			// Touch NEITHER `s.events` NOR `s.result` — an abandoned handle.
 			const s = agent.stream()
 			expect(s).toBeDefined()
 			// Advance the event loop enough for the pump to run and reject `settled.promise`, so a
@@ -1200,7 +1205,7 @@ describe('Agent �€” stream drive (result settles independently of events)'
 			// microtask checkpoint, so turn the macrotask queue a couple of times.
 			await waitForDelay()
 			await waitForDelay()
-			// The guard on `settled.promise` marked the rejection handled �€” none leaked.
+			// The guard on `settled.promise` marked the rejection handled — none leaked.
 			expect(rejections).toEqual([])
 			expect(agent.status).toBe('error')
 		} finally {
@@ -1209,17 +1214,17 @@ describe('Agent �€” stream drive (result settles independently of events)'
 	})
 })
 
-// �”€�”€ Channel internals (exercised THROUGH the public stream) �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Channel internals (exercised THROUGH the public stream) ──────────────────
 //
 // The private unbounded async Channel the pump writes chunks into is not exported,
-// so its invariants are pinned through `stream().events` �€” the one consumer of its
+// so its invariants are pinned through `stream().events` — the one consumer of its
 // `drain()`. These drive the load-bearing properties: no lost wakeup (a push between
 // two pulls is delivered), no truncation (chunks pushed alongside the close are all
 // drained), FIFO under backpressure (a slow consumer still sees every chunk in order),
 // and a fail surfacing as a throw out of the iterator.
 
-describe('Agent �€” channel internals (via stream.events)', () => {
-	it('delivers a chunk pushed between two pulls �€” no lost wakeup', async () => {
+describe('Agent — channel internals (via stream.events)', () => {
+	it('delivers a chunk pushed between two pulls — no lost wakeup', async () => {
 		// A provider whose deltas arrive one macrotask apart, so the consumer's pull parks
 		// on an empty buffer and a later push must wake it (the resolver-swap path). If a
 		// wakeup were lost the second pull would hang and `collect` would never finish.
@@ -1246,7 +1251,7 @@ describe('Agent �€” channel internals (via stream.events)', () => {
 		expect(result.content).toBe('ab')
 	})
 
-	it('drains every chunk pushed alongside the close �€” no truncation', async () => {
+	it('drains every chunk pushed alongside the close — no truncation', async () => {
 		// A whole turn's many deltas plus its usage are pushed by the pump before it
 		// `close()`s; draining must yield ALL of them (the drain loop empties the buffer
 		// fully before honouring the close), with the final usage last.
@@ -1288,7 +1293,7 @@ describe('Agent �€” channel internals (via stream.events)', () => {
 
 	it('a failed channel surfaces the error out of the iterator (drain throws)', async () => {
 		// A genuine provider throw (signal NOT aborted) `fail`s the channel; iterating
-		// `events` must THROW that same error out of the drain �€” the consumer sees it, not
+		// `events` must THROW that same error out of the drain — the consumer sees it, not
 		// a silent close. (The `result` rejection is covered elsewhere; here it is the
 		// iterator throw that is under test.)
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
@@ -1313,13 +1318,13 @@ describe('Agent �€” channel internals (via stream.events)', () => {
 	})
 })
 
-// �”€�”€ Re-entrancy / reuse (the contract: each run is a fresh, independent run) �”€�”€
+// ── Re-entrancy / reuse (the contract: each run is a fresh, independent run) ──
 //
 // `generate` / `stream` are reusable and may overlap. The per-run state (outcome /
 // channel / settled / the run's abort handle) is created fresh per call, so two runs
 // never clobber each other's RESULT. These pin that: a second run on the same agent
 // produces its own independent outcome; concurrent runs each settle on their own;
-// and �€” the load-bearing fix �€” `agent.abort()` cancels EVERY in-flight run while a
+// and — the load-bearing fix — `agent.abort()` cancels EVERY in-flight run while a
 // handle's own `stream.abort()` cancels exactly the run it belongs to (never a sibling
 // a later `stream()` would have clobbered under a single shared field).
 
@@ -1343,7 +1348,7 @@ function reusableProvider(): ProviderInterface {
 	}
 }
 
-describe('Agent �€” re-entrancy / reuse', () => {
+describe('Agent — re-entrancy / reuse', () => {
 	it('generate() twice runs two independent turns (status returns to done each time)', async () => {
 		const agent = createAgent(reusableProvider())
 		agent.context.messages.add({ role: 'user', content: 'first' })
@@ -1351,7 +1356,7 @@ describe('Agent �€” re-entrancy / reuse', () => {
 		expect(r1.content).toBe('ok:first')
 		expect(r1.partial).toBe(false)
 		expect(agent.status).toBe('done')
-		// A second generate on the same agent reuses it cleanly �€” its own fresh run.
+		// A second generate on the same agent reuses it cleanly — its own fresh run.
 		agent.context.messages.add({ role: 'user', content: 'second' })
 		const r2 = await agent.generate()
 		expect(r2.content).toBe('ok:second')
@@ -1361,7 +1366,7 @@ describe('Agent �€” re-entrancy / reuse', () => {
 
 	it('two concurrent stream() runs settle on their own results independently', async () => {
 		// Distinct conversations on two agents (one shared context can't represent two
-		// independent conversations) �€” the point is each run's OWN result settles, with no
+		// independent conversations) — the point is each run's OWN result settles, with no
 		// cross-talk through shared instance fields.
 		const a = createAgent(reusableProvider())
 		a.context.messages.add({ role: 'user', content: 'A' })
@@ -1385,7 +1390,7 @@ describe('Agent �€” re-entrancy / reuse', () => {
 
 	it('agent.abort() cancels EVERY in-flight run (not just the most recent)', async () => {
 		// Two overlapping runs on ONE agent. Each parks on its own gate mid-stream; a single
-		// `agent.abort()` must commit BOTH partial �€” the regression being that a shared
+		// `agent.abort()` must commit BOTH partial — the regression being that a shared
 		// single abort field made `abort()` fire only the latest run, leaving the earlier
 		// one to run to a full (non-partial) finish.
 		const g1 = createGate()
@@ -1419,13 +1424,13 @@ describe('Agent �€” re-entrancy / reuse', () => {
 		await Promise.allSettled([d1, d2])
 		const r1 = await s1.result
 		const r2 = await s2.result
-		// BOTH committed partial with the accumulated 'part' �€” neither ran to 'full'.
+		// BOTH committed partial with the accumulated 'part' — neither ran to 'full'.
 		expect(r1).toEqual({ content: 'part', partial: true })
 		expect(r2).toEqual({ content: 'part', partial: true })
 	})
 
 	it('stream.abort() cancels only its OWN run, never a sibling started later', async () => {
-		// s1.abort() must cancel run 1 �€” even though a later stream() (run 2) exists. The
+		// s1.abort() must cancel run 1 — even though a later stream() (run 2) exists. The
 		// regression being that the returned abort fired a shared field (overwritten by run
 		// 2), so s1.abort() cancelled run 2 and left run 1 running to a full finish.
 		const g1 = createGate()
@@ -1480,16 +1485,16 @@ describe('Agent �€” re-entrancy / reuse', () => {
 	})
 })
 
-// �”€�”€ Cancellation timing matrix �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Cancellation timing matrix ───────────────────────────────────────────────
 //
-// A cancel �€” wherever in the turn it lands �€” must commit a PARTIAL (resolve, never
+// A cancel — wherever in the turn it lands — must commit a PARTIAL (resolve, never
 // reject), leave status no longer 'running', clear the deadline, and surface exactly
 // the content accumulated before the cancel. These walk the distinct landing points:
 // during tool execution, AT a turn boundary's scheduler yield, exactly at a budget
 // boundary vs mid-stream, a deadline firing during tool execution, and an abort that
 // arrives after the run already finished (a harmless no-op).
 
-describe('Agent �€” cancellation timing matrix', () => {
+describe('Agent — cancellation timing matrix', () => {
 	afterEach(() => {
 		vi.useRealTimers()
 	})
@@ -1537,13 +1542,13 @@ describe('Agent �€” cancellation timing matrix', () => {
 
 	it('abort during the between-turns scheduler.yield resolves partial (real scheduler rejects on abort)', async () => {
 		// THE REGRESSION: the real `scheduler.yield({ signal })` REJECTS a pending yield when
-		// the signal aborts. That rejection is thrown out of the inter-turn pacing point �€”
+		// the signal aborts. That rejection is thrown out of the inter-turn pacing point —
 		// it must be treated as a cancel (resolve partial), NOT propagated as a genuine error
 		// (which would reject the result). An always-tool provider keeps the loop yielding
 		// between turns; the abort lands while parked in the real yield.
 		const tools = createToolManager()
 		tools.add(loopTool())
-		const scheduler = createScheduler() // the REAL scheduler �€” yield rejects on abort
+		const scheduler = createScheduler() // the REAL scheduler — yield rejects on abort
 		const provider = createScriptedProvider(
 			Array.from({ length: 6 }, () => ({
 				result: { content: 'turn', tools: [createToolCall({ id: 'c', name: 'loop' })] },
@@ -1558,7 +1563,7 @@ describe('Agent �€” cancellation timing matrix', () => {
 		// real scheduler's yield is a setTimeout(0) the abort interrupts).
 		queueMicrotask(() => agent.abort())
 		await drained
-		// Resolves partial �€” the abort-driven yield rejection was caught as a cancel.
+		// Resolves partial — the abort-driven yield rejection was caught as a cancel.
 		const result = await stream.result
 		expect(result.partial).toBe(true)
 		expect(agent.status).toBe('done')
@@ -1568,7 +1573,7 @@ describe('Agent �€” cancellation timing matrix', () => {
 
 	it('budget exhausting EXACTLY at a turn boundary commits partial before the next turn', async () => {
 		// Turn 1's usage crosses max exactly, firing the budget signal. The next turn's top
-		// sees the bound aborted and commits partial �€” only one provider call happened.
+		// sees the bound aborted and commits partial — only one provider call happened.
 		const budget = createTokenBudget({ max: 12, scope: 'total' })
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'loop', execute: () => 'x' }))
@@ -1604,7 +1609,7 @@ describe('Agent �€” cancellation timing matrix', () => {
 			createTool({
 				name: 'slow',
 				execute: async () => {
-					// A 10s handler �€” longer than the 1s deadline below.
+					// A 10s handler — longer than the 1s deadline below.
 					await new Promise((resolve) => setTimeout(resolve, 10_000))
 					return 'done'
 				},
@@ -1655,9 +1660,9 @@ describe('Agent �€” cancellation timing matrix', () => {
 	})
 })
 
-// �”€�”€ limit boundary �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── limit boundary ───────────────────────────────────────────────────────────
 
-describe('Agent �€” limit boundary', () => {
+describe('Agent — limit boundary', () => {
 	it('limit:1 runs exactly one turn and never iterates tools', async () => {
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
@@ -1670,7 +1675,7 @@ describe('Agent �€” limit boundary', () => {
 				},
 			}),
 		)
-		// The single turn requests a tool �€” but with limit:1 the loop appends the assistant
+		// The single turn requests a tool — but with limit:1 the loop appends the assistant
 		// tool turn, runs the tool, then the `for` bound stops it BEFORE a second provider
 		// call. So exactly one provider call happens and there is no follow-up turn.
 		const provider = createScriptedProvider(
@@ -1683,7 +1688,7 @@ describe('Agent �€” limit boundary', () => {
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 		// One provider call only; the tool DID run on that turn (it was dispatched), and a
-		// tool chunk was emitted �€” but no second turn followed.
+		// tool chunk was emitted — but no second turn followed.
 		expect(provider.calls).toHaveLength(1)
 		expect(recorder.count).toBe(1)
 		expect(chunks.some((c) => c.type === 'tool')).toBe(true)
@@ -1702,7 +1707,7 @@ describe('Agent �€” limit boundary', () => {
 		const agent = createAgent(provider, { limit: 1 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		// A single no-tools turn IS the natural finish �€” limit was not the stopping reason.
+		// A single no-tools turn IS the natural finish — limit was not the stopping reason.
 		expect(result.partial).toBe(false)
 		expect(result.content).toBe('final')
 		expect(provider.calls).toHaveLength(1)
@@ -1711,7 +1716,7 @@ describe('Agent �€” limit boundary', () => {
 	it('the default limit is DEFAULT_AGENT_LIMIT (10) tool iterations', async () => {
 		const tools = createToolManager()
 		tools.add(loopTool())
-		// 20 always-tool turns available, but no explicit limit �†’ the default cap stops it.
+		// 20 always-tool turns available, but no explicit limit → the default cap stops it.
 		const provider = createScriptedProvider(
 			Array.from({ length: 20 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
@@ -1728,11 +1733,11 @@ describe('Agent �€” limit boundary', () => {
 	})
 })
 
-// �”€�”€ Provider failure modes (scripted) �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Provider failure modes (scripted) ────────────────────────────────────────
 
-describe('Agent �€” provider failure modes', () => {
+describe('Agent — provider failure modes', () => {
 	it('a stream that throws BEFORE the first yield rejects with status error', async () => {
-		// Throws on the FIRST `.next()`, before any delta is produced �€” the provider failing at
+		// Throws on the FIRST `.next()`, before any delta is produced — the provider failing at
 		// the very start of the turn. The trailing `yield` keeps it a real generator (and stays
 		// reachable to the linter, since the throw is gated on a runtime flag), but the throw
 		// fires first so no token ever streams.
@@ -1761,7 +1766,7 @@ describe('Agent �€” provider failure modes', () => {
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
-		// A natural finish with an empty answer �€” content '', no usage, not partial.
+		// A natural finish with an empty answer — content '', no usage, not partial.
 		expect(result).toEqual({ content: '', partial: false })
 		expect(result.usage).toBeUndefined()
 	})
@@ -1800,7 +1805,7 @@ describe('Agent �€” provider failure modes', () => {
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
 		const tokens = chunks.flatMap((c) => (c.type === 'token' ? [c.content] : []))
-		// The empty delta dropped out �€” only 'a' and 'b' surfaced.
+		// The empty delta dropped out — only 'a' and 'b' surfaced.
 		expect(tokens).toEqual(['a', 'b'])
 		const result = await stream.result
 		expect(result.content).toBe('ab')
@@ -1847,11 +1852,11 @@ describe('Agent �€” provider failure modes', () => {
 	})
 })
 
-// �”€�”€ scheduler edge cases �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── scheduler edge cases ─────────────────────────────────────────────────────
 
-describe('Agent �€” scheduler edge cases', () => {
+describe('Agent — scheduler edge cases', () => {
 	it('a scheduler whose yield rejects for a NON-abort reason rejects the run (genuine fault)', async () => {
-		// A buggy scheduler that throws on yield while the signal is NOT aborted �€” a genuine
+		// A buggy scheduler that throws on yield while the signal is NOT aborted — a genuine
 		// infrastructure fault, distinct from an abort-driven rejection. It must propagate
 		// (reject the result, status error), NOT be swallowed as a cancel.
 		const faulty: SchedulerInterface = {
@@ -1871,7 +1876,7 @@ describe('Agent �€” scheduler edge cases', () => {
 		)
 		const agent = createAgent(provider, { tools, scheduler: faulty, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
-		// Turn 1 runs, then the inter-turn yield throws (signal not aborted) �†’ reject.
+		// Turn 1 runs, then the inter-turn yield throws (signal not aborted) → reject.
 		await expect(agent.generate()).rejects.toThrow('scheduler fault')
 		expect(agent.status).toBe('error')
 	})
@@ -1883,7 +1888,7 @@ describe('Agent �€” scheduler edge cases', () => {
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'done' } }],
 			SCRIPT_OPTIONS,
 		)
-		// No scheduler option �†’ `this.#scheduler?.yield(...)` is a no-op; multi-turn still works.
+		// No scheduler option → `this.#scheduler?.yield(...)` is a no-op; multi-turn still works.
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
@@ -1892,13 +1897,13 @@ describe('Agent �€” scheduler edge cases', () => {
 	})
 })
 
-// �”€�”€ Authority wired into the loop �€” deeper failure modes �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Authority wired into the loop — deeper failure modes ─────────────────────
 
-describe('Agent �€” authority deeper', () => {
+describe('Agent — authority deeper', () => {
 	it('a throwing authority.evaluate FAILS CLOSED: the call is denied, not executed, and the run survives', async () => {
 		// A security gate must fail safe: a policy that THROWS must not let the tool run, and
 		// must not crash the whole agent. The loop synthesizes a denial (carrying the error's
-		// message), feeds it back, and the model continues �€” exactly like an explicit deny.
+		// message), feeds it back, and the model continues — exactly like an explicit deny.
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
 		tools.add(
@@ -1939,22 +1944,27 @@ describe('Agent �€” authority deeper', () => {
 		expect(toolChunk).toEqual({
 			type: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
-			result: { id: 'c1', name: 'add', error: 'denied: policy crashed' },
+			result: {
+				success: false,
+				id: 'c1',
+				name: 'add',
+				error: 'denied: policy crashed',
+			},
 		})
-		// The run continued and settled (not rejected) �€” the model saw the denial.
+		// The run continued and settled (not rejected) — the model saw the denial.
 		expect(result.partial).toBe(false)
 		expect(result.content).toBe('recovered from denial')
 		expect(agent.status).toBe('done')
 		// The next provider call saw the denial as the last tool message.
 		const [, second] = provider.calls
 		expect(second?.messages.at(-1)?.role).toBe('tool')
-		expect(second?.messages.at(-1)?.content).toBe(JSON.stringify('denied: policy crashed'))
+		expect(second?.messages.at(-1)?.content).toBe('denied: policy crashed')
 	})
 
 	it('deny + budget: a denied call costs no budget, and a later turn can still exhaust it', async () => {
 		// The denied call must NOT charge the budget (no tool run, no usage from it). Usage
 		// only comes from the provider turns. Turn 1 (usage 12) crosses max=12 at the
-		// boundary, so the run commits partial before turn 2 �€” and the denied tool never ran.
+		// boundary, so the run commits partial before turn 2 — and the denied tool never ran.
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const budget = createTokenBudget({ max: 12, scope: 'total' })
 		const tools = createToolManager()
@@ -1982,7 +1992,7 @@ describe('Agent �€” authority deeper', () => {
 		const agent = createAgent(provider, { tools, authority, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		expect(recorder.count).toBe(0) // denied �†’ never executed
+		expect(recorder.count).toBe(0) // denied → never executed
 		expect(result.partial).toBe(true) // budget crossed at the boundary
 		expect(provider.calls).toHaveLength(1)
 	})
@@ -2049,13 +2059,19 @@ describe('Agent �€” authority deeper', () => {
 			c.type === 'tool' ? [{ name: c.call.name, result: c.result }] : [],
 		)
 		expect(
-			byName.filter((e) => e.name === 'danger').every((e) => e.result.error === 'denied: no'),
+			byName
+				.filter((e) => e.name === 'danger')
+				.every((e) => !e.result.success && e.result.error === 'denied: no'),
 		).toBe(true)
-		expect(byName.filter((e) => e.name === 'safe').every((e) => e.result.value === 'ok')).toBe(true)
+		expect(
+			byName
+				.filter((e) => e.name === 'safe')
+				.every((e) => e.result.success && e.result.value === 'ok'),
+		).toBe(true)
 	})
 
 	it('an authority denying on call.arguments content (not just name) is honoured by the loop', async () => {
-		// Deny `transfer` only when amount > 100 �€” proving the loop hands the matcher the full
+		// Deny `transfer` only when amount > 100 — proving the loop hands the matcher the full
 		// call (name AND arguments), and the small transfer executes while the large is denied.
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
@@ -2105,16 +2121,27 @@ describe('Agent �€” authority deeper', () => {
 			c.type === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
 		)
 		expect(results).toEqual([
-			{ id: 't1', result: { id: 't1', name: 'transfer', value: 'sent 50' } },
-			{ id: 't2', result: { id: 't2', name: 'transfer', error: 'denied: over limit' } },
+			{
+				id: 't1',
+				result: { success: true, id: 't1', name: 'transfer', value: 'sent 50' },
+			},
+			{
+				id: 't2',
+				result: {
+					success: false,
+					id: 't2',
+					name: 'transfer',
+					error: 'denied: over limit',
+				},
+			},
 		])
 	})
 })
 
-// �”€�”€ status transitions + getters �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── status transitions + getters ─────────────────────────────────────────────
 
-describe('Agent �€” status transitions and getters', () => {
-	it('transitions idle �†’ running �†’ error on a genuine provider failure', async () => {
+describe('Agent — status transitions and getters', () => {
+	it('transitions idle → running → error on a genuine provider failure', async () => {
 		async function* failing(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { type: 'content', text: 'x' }
 			throw new Error('boom')
@@ -2143,20 +2170,20 @@ describe('Agent �€” status transitions and getters', () => {
 		expect(typeof agent.id).toBe('string')
 		expect(agent.id.length).toBeGreaterThan(0)
 		expect(agent.id).toBe(agent.id)
-		// context is the live AgentContext �€” adding a message is visible through the getter.
+		// context is the live AgentContext — adding a message is visible through the getter.
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		expect(agent.context.messages.count).toBe(1)
 		expect(agent.context.system).toBe('sys')
 	})
 })
 
-// �”€�”€ ProviderAbortError + isProviderAbortError (the boundary's cancel error) �”€�”€
+// ── ProviderAbortError + isProviderAbortError (the boundary's cancel error) ──
 //
 // The abstract inference boundary's cancellation error: a `stream` cancelled mid-flight
 // throws a ProviderAbortError carrying the partial it had assembled, and
 // isProviderAbortError narrows a caught `unknown` back to it. The class + guard are a
 // PUBLIC export (the @src/core barrel; documented in guides/agents.md). NOTE: the agent
-// loop itself does NOT consume the guard �€” it distinguishes a cancel from a genuine
+// loop itself does NOT consume the guard — it distinguishes a cancel from a genuine
 // error via the bound signal's `aborted` flag (see the loop's `#provide` catch), so the
 // guard is a CONSUMER-facing recovery helper. These pin the class + guard here (in a
 // behavioral file) since `errors.ts` is structure-exempt from its own test mirror.
@@ -2171,7 +2198,7 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 		expect(error).toBeInstanceOf(Error)
 		expect(error.name).toBe('ProviderAbortError')
 		expect(error.message).toBe('provider stream aborted')
-		// Same object by identity �€” a caller recovers exactly what streamed before the cancel.
+		// Same object by identity — a caller recovers exactly what streamed before the cancel.
 		expect(error.partial).toBe(partial)
 		expect(error.partial.content).toBe('half')
 		expect(error.partial.tools).toEqual([{ id: 'c1', name: 'add', arguments: { a: 1 } }])
@@ -2188,7 +2215,7 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 	it('the guard is true for a real one (and narrows) and false for everything else', () => {
 		const real: unknown = new ProviderAbortError({ content: 'recoverable' })
 		expect(isProviderAbortError(real)).toBe(true)
-		// After narrowing, the partial is reachable without a cast �€” fold the guarded read into
+		// After narrowing, the partial is reachable without a cast — fold the guarded read into
 		// a plain value (an empty string when it somehow failed to narrow) so the assertion is
 		// unconditional, never an `expect` inside an `if`.
 		const narrowed = isProviderAbortError(real) ? real.partial.content : ''
@@ -2207,20 +2234,20 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 	})
 })
 
-// �”€�”€ Emitter �€” the PUSH observation surface (AGENTS §13) �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Emitter — the PUSH observation surface (AGENTS §13) ──────────────────────
 //
 // Alongside the PULL `AgentChunk` stream, the Agent exposes a typed `emitter`
 // (`AgentEventMap`) carrying lifecycle + usage/tool/deny moments for fire-and-forget
-// observers �€” NOT per-token (there is no `token` event; deltas stay the stream's job).
+// observers — NOT per-token (there is no `token` event; deltas stay the stream's job).
 // Every event is emitted directly; the emitter isolates a listener throw (it can never
-// escape into the 3�—-hardened settle-once / wake-park loop) and routes it to the emitter's
+// escape into the 3×hardened settle-once / wake-park loop) and routes it to the emitter's
 // own `error` handler (the `error` option, §13). These pin: each event fires at the right
 // moment with the right payload; the `on?` option wires initial listeners; a cancelled
 // run emits `abort` THEN `finish` (the partial); the load-bearing emit-safety guarantee
 // (a throwing observer cannot corrupt the run, yet the error handler fires); and that
 // `generate()` and `stream()` drive the SAME events (they share `#run`).
 
-// The AgentEventMap event names recorded across the emitter tests �€” fed to the shared
+// The AgentEventMap event names recorded across the emitter tests — fed to the shared
 // `recordEmitterEvents` (AGENTS §16.1: the per-event wiring is centralized; this file
 // keeps only the names its scenarios observe). Returned recorders assert what fired, in
 // what order, with which payload, exactly as the local bundle did.
@@ -2236,12 +2263,12 @@ const AGENT_EVENTS = [
 	'compactError',
 ] as const
 
-describe('Agent �€” emitter (push observation surface)', () => {
+describe('Agent — emitter (push observation surface)', () => {
 	afterEach(() => {
 		vi.useRealTimers()
 	})
 
-	it('a no-tools run fires start �†’ turn �†’ usage �†’ finish with the right payloads', async () => {
+	it('a no-tools run fires start → turn → usage → finish with the right payloads', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'hello', usage: USAGE } }],
 			SCRIPT_OPTIONS,
@@ -2266,7 +2293,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 	it('fires one turn event per iteration (count === turns run)', async () => {
 		const tools = createToolManager()
 		tools.add(loopTool())
-		// Always-tool script capped at 3 �†’ exactly 3 iterations.
+		// Always-tool script capped at 3 → exactly 3 iterations.
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
@@ -2306,7 +2333,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		expect(events.tool.calls).toEqual([
 			[
 				{ id: 'c1', name: 'add', arguments: { a: 2 } },
-				{ id: 'c1', name: 'add', value: 5 },
+				{ success: true, id: 'c1', name: 'add', value: 5 },
 			],
 		])
 		// Two usage events (one per reporting turn); finish carries the summed usage.
@@ -2344,7 +2371,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		// The tool never ran; `deny` fired once carrying the call + the RULE's reason (not the
-		// formatted `denied: �€�` error �€” that is the ToolResult's; the event carries the reason).
+		// formatted `denied: …` error — that is the ToolResult's; the event carries the reason).
 		expect(recorder.count).toBe(0)
 		expect(events.deny.calls).toEqual([
 			[{ id: 'd1', name: 'del', arguments: { id: 'x' } }, 'blocked'],
@@ -2354,7 +2381,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		expect(events.tool.calls).toEqual([
 			[
 				{ id: 'd1', name: 'del', arguments: { id: 'x' } },
-				{ id: 'd1', name: 'del', error: 'denied: blocked' },
+				{ success: false, id: 'd1', name: 'del', error: 'denied: blocked' },
 			],
 		])
 	})
@@ -2416,7 +2443,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		expect(events.abort.count).toBe(0)
 	})
 
-	it('a cancelled run fires abort THEN finish (the partial) �€” the documented semantics', async () => {
+	it('a cancelled run fires abort THEN finish (the partial) — the documented semantics', async () => {
 		const gate = createGate()
 		// A provider that streams one delta then parks on a gate, giving a window to abort.
 		const provider: ProviderInterface = {
@@ -2449,7 +2476,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		gate.resolve()
 		await drained
 		const result = await stream.result
-		// The settled result is the partial �€” content accumulated before the cancel.
+		// The settled result is the partial — content accumulated before the cancel.
 		expect(result).toEqual({ content: 'part', partial: true })
 		// `abort` fired once carrying the cancel reason; `finish` fired once with the partial.
 		expect(events.abort.calls).toEqual([['user navigated away']])
@@ -2477,7 +2504,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		expect(events.error.count).toBe(0)
 	})
 
-	it('a cap-bounded finish fires finish only (a cap is NOT a cancel �€” no abort)', async () => {
+	it('a cap-bounded finish fires finish only (a cap is NOT a cancel — no abort)', async () => {
 		const tools = createToolManager()
 		tools.add(loopTool())
 		const provider = createScriptedProvider(
@@ -2500,7 +2527,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 	it('the on? option wires initial listeners at construction', async () => {
 		const finishRec = createRecorder<[result: AgentResult]>()
 		const startRec = createRecorder<[id: string]>()
-		// Pass listeners via the reserved `on` option �€” they must fire without a later .on().
+		// Pass listeners via the reserved `on` option — they must fire without a later .on().
 		const agent = createAgent(
 			createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS),
 			{
@@ -2533,16 +2560,16 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		// THE LOAD-BEARING ASSERTION: the run is UNCORRUPTED �€” it settled the correct final
+		// THE LOAD-BEARING ASSERTION: the run is UNCORRUPTED — it settled the correct final
 		// content + summed usage despite the throwing listener (the throw never escaped `#run`).
 		expect(result).toEqual({
 			content: 'final answer',
 			usage: { prompt: 10, completion: 14, total: 24 },
 			partial: false,
 		})
-		// The throw was routed to the emitter's error handler �€” (error, event) order.
+		// The throw was routed to the emitter's error handler — (error, event) order.
 		expect(errors.calls).toEqual([[thrown, 'tool']])
-		// Every OTHER event still fired normally �€” the buggy listener didn't suppress siblings.
+		// Every OTHER event still fired normally — the buggy listener didn't suppress siblings.
 		expect(events.start.count).toBe(1)
 		expect(events.turn.calls).toEqual([[0], [1]])
 		expect(events.usage.count).toBe(2)
@@ -2558,7 +2585,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'done' } }],
 			SCRIPT_OPTIONS,
 		)
-		// Count how many times the error handler is INVOKED �€” it must be exactly once
+		// Count how many times the error handler is INVOKED — it must be exactly once
 		// (no recursion) even though it itself throws.
 		const errors = createErrorRecorder()
 		const agent = createAgent(provider, {
@@ -2573,12 +2600,12 @@ describe('Agent �€” emitter (push observation surface)', () => {
 			throw new Error('tool listener blew up')
 		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
-		// The run STILL settles cleanly �€” neither the tool-listener throw nor the
+		// The run STILL settles cleanly — neither the tool-listener throw nor the
 		// error-handler throw escaped into the loop.
 		const result = await agent.generate()
 		expect(result).toEqual({ content: 'done', partial: false })
 		expect(agent.status).toBe('done')
-		// The error handler fired exactly once (its own throw was swallowed, never re-entered �€”
+		// The error handler fired exactly once (its own throw was swallowed, never re-entered —
 		// so it could not recurse).
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('tool')
@@ -2605,7 +2632,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 		const ea = recordEmitterEvents(a.emitter, AGENT_EVENTS)
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const ra = await a.generate()
-		// stream() path �€” same script, fully drained.
+		// stream() path — same script, fully drained.
 		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
 			tools: makeTools(),
 			limit: 5,
@@ -2631,18 +2658,18 @@ describe('Agent �€” emitter (push observation surface)', () => {
 	})
 })
 
-// �”€�”€ Automatic compaction (the context `window` budget) �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Automatic compaction (the context `window` budget) ───────────────────────
 //
 // A SOFT, opt-in context budget that compacts the injected conversation BETWEEN turns
 // (compact-and-continue), distinct from the cost `budget`'s HARD abort. The trigger is a
 // CONTEXT `Budget` whose `consume` is a token estimator (the exported `estimateMessages`) and
 // whose `max` is the context window. The model is ABSOLUTE: each turn the loop `clear()`s the
-// budget then `consume`s the WORKING `messages` array �€” the EXACT next prompt (the conversation's
+// budget then `consume`s the WORKING `messages` array — the EXACT next prompt (the conversation's
 // `view()` + this turn's appended assistant + tool messages, with no system block here since the
-// agent has no system / instructions / documents / images) �€” so `window.consumed` is the current
+// agent has no system / instructions / documents / images) — so `window.consumed` is the current
 // FULL prompt's estimated footprint and `exhausted` means the prompt has reached the window `max`.
 // On `exhausted` the loop `compact()`s + REBUILDS `messages` from the (smaller) compacted `view()`;
-// no post-compact `clear()` �€” the NEXT turn's clear()+consume re-measures the shrunken prompt.
+// no post-compact `clear()` — the NEXT turn's clear()+consume re-measures the shrunken prompt.
 // Deterministic here (the scripted provider drives multiple tool-iteration turns within one
 // generate(); a `createStubSummarizer` folds the tail into `recap of <n>`; `estimateMessages` is
 // the per-message `ceil(content.length / 4)` sum so the crossing is exact). The same behavior is
@@ -2650,7 +2677,7 @@ describe('Agent �€” emitter (push observation surface)', () => {
 //
 // The shared multi-turn script: two tool-call turns then a final answer, so the loop genuinely
 // iterates (two between-turns budget checks) and ends on a real answer. Each tool-call turn
-// appends a 40-char assistant message (`ceil(40/4)` = 10 tok �€” only `content` is summed) + the
+// appends a 40-char assistant message (`ceil(40/4)` = 10 tok — only `content` is summed) + the
 // `JSON.stringify(5)` = '5' tool result (`ceil(1/4)` = 1 tok). The seed user turn 'go' is 1 tok.
 const COMPACT_SCRIPT: readonly ScriptedTurn[] = [
 	{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
@@ -2659,11 +2686,11 @@ const COMPACT_SCRIPT: readonly ScriptedTurn[] = [
 ]
 
 // Build an agent over the COMPACT_SCRIPT with an injected conversation registry (a stub summarizer
-// + keep: 0 �€” a fold collapses the whole live tail into one `recap of <n>` section) whose active
+// + keep: 0 — a fold collapses the whole live tail into one `recap of <n>` section) whose active
 // conversation IS the agent's message source, plus the canonical `add` tool, seeded with one user
 // turn (routed to the active conversation's live tail). The context `window` budget (when given) is
-// threaded straight through; `undefined` �‡’ no auto-compaction. Returns the agent + the active
-// conversation so a test can drive generate() and inspect sections / events. NB no `system` �‡’
+// threaded straight through; `undefined` ⇒ no auto-compaction. Returns the agent + the active
+// conversation so a test can drive generate() and inspect sections / events. NB no `system` ⇒
 // build() prepends NO leading system message, so the working `messages` the budget measures is
 // exactly the conversation view + the turn's appends.
 function compactionAgent(
@@ -2677,12 +2704,12 @@ function compactionAgent(
 		summarize: createStubSummarizer().summarize,
 		keep: 0,
 	})
-	const conversation = conversations.add() // auto-activates �€” the agent's message source
+	const conversation = conversations.add() // auto-activates — the agent's message source
 	const tools = createToolManager()
 	tools.add(addTool())
 	const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
 	// The registry is injected through the AGENT (forwarded to its context), so
-	// `agent.context.messages` IS the active conversation's live tail �€” seed the user turn there.
+	// `agent.context.messages` IS the active conversation's live tail — seed the user turn there.
 	const agent = createAgent(provider, {
 		conversations,
 		tools,
@@ -2693,31 +2720,31 @@ function compactionAgent(
 	return { agent, conversation, provider }
 }
 
-// A fresh context budget over the real `estimateMessages` estimator (no behavior-mock) �€” the
+// A fresh context budget over the real `estimateMessages` estimator (no behavior-mock) — the
 // pluggable `consume` an agent's `window` carries.
 const contextBudget = (max: number): ReturnType<typeof createBudget<readonly MessageInterface[]>> =>
 	createBudget({ max, consume: estimateMessages })
 
-describe('Agent �€” automatic compaction (context window budget)', () => {
+describe('Agent — automatic compaction (context window budget)', () => {
 	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
 		// ABSOLUTE-MODEL threshold arithmetic (window `max` = 12, the FULL turn-1 prompt's size):
-		//  �€� Turn 1 provider call sees the view `[user "go"]` (1 msg). It appends asst(40x) + tool("5"),
-		//    so the working prompt becomes `[go, 40x, "5"]` �†’ estimateMessages = 1 + 10 + 1 = 12 �‰� 12
-		//    �†’ EXHAUSTED �†’ compact() (keep 0) folds all 3 live messages into `recap of 3`; the working
+		//  • Turn 1 provider call sees the view `[user "go"]` (1 msg). It appends asst(40x) + tool("5"),
+		//    so the working prompt becomes `[go, 40x, "5"]` → estimateMessages = 1 + 10 + 1 = 12 ≥ 12
+		//    → EXHAUSTED → compact() (keep 0) folds all 3 live messages into `recap of 3`; the working
 		//    array rebuilds to `[<recap of 3>]` (1 msg, content 'recap of 3' = ceil(10/4) = 3 tok).
-		//  �€� Turn 2 provider call sees `[<recap of 3>]` (1 msg). It appends asst(40y) + tool("5") �†’
-		//    `[<recap of 3>, 40y, "5"]` �†’ 3 + 10 + 1 = 14 �‰� 12 �†’ EXHAUSTED �†’ compact() folds the 2 live
+		//  • Turn 2 provider call sees `[<recap of 3>]` (1 msg). It appends asst(40y) + tool("5") →
+		//    `[<recap of 3>, 40y, "5"]` → 3 + 10 + 1 = 14 ≥ 12 → EXHAUSTED → compact() folds the 2 live
 		//    messages into `recap of 2`; the array rebuilds to `[<recap of 3>, <recap of 2>]` (2 msgs).
-		//  �€� Turn 3 (no tools) answers 'the answer is 42' from that 2-message compacted prompt.
+		//  • Turn 3 (no tools) answers 'the answer is 42' from that 2-message compacted prompt.
 		// So compaction fires EXACTLY twice; without it turn 2 would see 3 msgs and turn 3 five. Record
-		// the conversation's own `compact` event (the observability surface �€” NO new Agent event).
+		// the conversation's own `compact` event (the observability surface — NO new Agent event).
 		const window = contextBudget(12)
 		const { agent, conversation, provider } = compactionAgent(window)
 		const compacted = recordEmitterEvents(conversation.emitter, ['compact'])
 
 		const result = await agent.generate()
 
-		// (a) Auto-compaction fired mid-run �€” EXACTLY two folds (one per tool-iteration turn), each
+		// (a) Auto-compaction fired mid-run — EXACTLY two folds (one per tool-iteration turn), each
 		// authored a `recap of <n>` section (proving the absolute prompt crossed `max` both turns).
 		expect(conversation.sections.length).toBe(2)
 		expect(conversation.sections.map((section) => section.summary)).toEqual([
@@ -2725,21 +2752,21 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 			'recap of 2',
 		])
 		// (b) The run still produced the CORRECT final answer (the loop continued on the compacted
-		// view through to turn 3 �€” proving the rebuilt working array stayed a valid prompt).
+		// view through to turn 3 — proving the rebuilt working array stayed a valid prompt).
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		// (c) The conversation's `compact` event fired once per fold, each carrying a section.
 		expect(compacted.compact.count).toBe(2)
 		expect(compacted.compact.calls[0]?.[0]?.summary).toMatch(/^recap of/)
 		// (d) The REBUILD shrank the prompt each compaction: the post-fold turns ran on a tiny
-		// section-summary prompt (1 then 2 messages) instead of the uncompacted 3 / 5 they'd be �€”
+		// section-summary prompt (1 then 2 messages) instead of the uncompacted 3 / 5 they'd be —
 		// the absolute proof the working array was re-measured smaller after each compact().
 		const promptSizes = provider.calls.map((call) => call.messages.length)
 		expect(promptSizes).toEqual([1, 1, 2])
 	})
 
 	it('does NOT fire when the prompt stays below the window (same answer, budget holds the FULL prompt size)', async () => {
-		// A HIGH max (10_000) the prompt never reaches �†’ no fold, yet the multi-turn run still
+		// A HIGH max (10_000) the prompt never reaches → no fold, yet the multi-turn run still
 		// produces the same answer. With NO compaction the working array only grows, so the LAST
 		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x(+calls), "5",
 		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
@@ -2776,9 +2803,9 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 		expect(window.exhausted).toBe(false)
 	})
 
-	it('is PURELY ADDITIVE �€” with NO window budget the injected conversation is never compacted (regression)', async () => {
+	it('is PURELY ADDITIVE — with NO window budget the injected conversation is never compacted (regression)', async () => {
 		// The SAME scenario (injected conversation, same multi-turn script) with NO `window` budget.
-		// The trigger block is skipped entirely, so the conversation is NEVER folded �€” and the run
+		// The trigger block is skipped entirely, so the conversation is NEVER folded — and the run
 		// produces the identical final answer the windowed run produced. This is the byte-for-byte
 		// additive proof: omitting `window` leaves the loop exactly as the cost-budget-only path.
 		const { agent, conversation } = compactionAgent(undefined)
@@ -2793,9 +2820,9 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 	})
 
 	it('is a no-op with a NON-SUMMARIZABLE conversation even when a window budget is set (regression)', async () => {
-		// A LOW-max window budget but the DEFAULT conversation (no summarizer �‡’ `summarizable` is
+		// A LOW-max window budget but the DEFAULT conversation (no summarizer ⇒ `summarizable` is
 		// false). The trigger's `active.summarizable === true` guard fails, so the whole block is
-		// skipped: the multi-turn loop runs exactly as the no-window path and ends correctly �€” and the
+		// skipped: the multi-turn loop runs exactly as the no-window path and ends correctly — and the
 		// budget is never consumed. This preserves the shipped behavior (a conversation that can't fold
 		// is never auto-compacted, and the loop never throws the SUMMARIZER error).
 		const window = contextBudget(1)
@@ -2812,25 +2839,25 @@ describe('Agent �€” automatic compaction (context window budget)', () => {
 		expect(result.partial).toBe(false)
 		// Three scripted turns ran (two tool turns + the final), none over-running the script.
 		expect(provider.calls).toHaveLength(3)
-		// The window budget was never charged (non-summarizable conversation �‡’ the trigger is skipped).
+		// The window budget was never charged (non-summarizable conversation ⇒ the trigger is skipped).
 		expect(window.consumed).toBe(0)
 	})
 })
 
-// �”€�”€ Automatic compaction �€” production hardening �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Automatic compaction — production hardening ──────────────────────────────
 //
 // Beyond the between-turns trigger above, the production path adds: a PRE-FIRST-TURN check (a
 // resumed / long conversation whose INITIAL prompt already exceeds the window compacts BEFORE the
 // first provider call, not only after a tool turn); a NON-FATAL summarizer failure (a thrown auto
-// `compact()` does NOT crash the run �€” it is caught, surfaced as a `compactError` event, and the run
+// `compact()` does NOT crash the run — it is caught, surfaced as a `compactError` event, and the run
 // continues); and the FUTILE-COMPACTION guard (a `compact()` that folds nothing while still over the
-// window latches a per-run flag that STOPS auto-compacting for the rest of the run �€” no per-turn
-// churn �€” letting the over-window prompt proceed to the provider). All deterministic (scripted
+// window latches a per-run flag that STOPS auto-compacting for the rest of the run — no per-turn
+// churn — letting the over-window prompt proceed to the provider). All deterministic (scripted
 // provider + the real `estimateMessages`), all PURELY ADDITIVE atop the prior loop. The `window`
 // budget reuses the same `contextBudget` / estimator as the block above.
-describe('Agent �€” automatic compaction (production hardening)', () => {
+describe('Agent — automatic compaction (production hardening)', () => {
 	// A no-tools provider that ALWAYS finishes its turn with a fixed answer regardless of the prompt
-	// content (so a run is exactly ONE provider turn) �€” the cleanest driver for the PRE-FIRST-TURN
+	// content (so a run is exactly ONE provider turn) — the cleanest driver for the PRE-FIRST-TURN
 	// check (the only compaction point when there is no tool iteration). `record: true` so a test can
 	// read what the single provider call actually saw.
 	const answerProvider = (): ReturnType<typeof createScriptedProvider> =>
@@ -2841,17 +2868,17 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 		})
 
 	it('PRE-FIRST-TURN: a conversation whose INITIAL prompt already exceeds the window compacts before the first provider call', async () => {
-		// Seed the conversation's live tail with ONE big user message (200 chars �‡’ ceil(200/4) = 50
+		// Seed the conversation's live tail with ONE big user message (200 chars ⇒ ceil(200/4) = 50
 		// tok) BEFORE the run. With a window max of 20 and NO system prompt, the build()'d initial
-		// prompt (50 tok) already exceeds the window �€” so the loop's PRE-FIRST-TURN `#trim` fires
+		// prompt (50 tok) already exceeds the window — so the loop's PRE-FIRST-TURN `#trim` fires
 		// `compact()` (keep 0 folds the one message into `recap of 1`) and rebuilds BEFORE turn 0. The
 		// single provider call must therefore see the COMPACTED view (the framed `recap of 1`), not
-		// the 200-char seed �€” the proof the pre-first-turn check ran ahead of the provider.
+		// the 200-char seed — the proof the pre-first-turn check ran ahead of the provider.
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
 		})
-		const conversation = conversations.add() // auto-activates �€” the agent's message source
+		const conversation = conversations.add() // auto-activates — the agent's message source
 		const seed = 'q'.repeat(200)
 		conversation.add({ role: 'user', content: seed })
 		const provider = answerProvider()
@@ -2863,10 +2890,10 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 
 		const result = await agent.generate()
 
-		// Compaction fired BEFORE the first (only) provider turn �€” one section, authored `recap of 1`.
+		// Compaction fired BEFORE the first (only) provider turn — one section, authored `recap of 1`.
 		expect(conversation.sections.length).toBe(1)
 		expect(conversation.sections[0]?.summary).toBe('recap of 1')
-		// The single provider call saw the COMPACTED view �€” the framed recap message, NOT the
+		// The single provider call saw the COMPACTED view — the framed recap message, NOT the
 		// 200-char seed. view() prefixes the section summary with the lean RECAP label.
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
@@ -2885,7 +2912,7 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
 		})
-		const conversation = conversations.add() // auto-activates �€” the agent's message source
+		const conversation = conversations.add() // auto-activates — the agent's message source
 		conversation.add({ role: 'user', content: 'hi' })
 		const provider = answerProvider()
 		const agent = createAgent(provider, { conversations, window: contextBudget(10_000), limit: 5 })
@@ -2897,13 +2924,13 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 		expect(result.content).toBe('final answer')
 	})
 
-	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run �€” it fires compactError and continues', async () => {
+	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run — it fires compactError and continues', async () => {
 		// A summarizer that ALWAYS throws, a conversation with keep 0 (so there IS a tail to fold), and
 		// a low window crossed by the post-tool-turn prompt. The between-turns `#trim` calls
-		// `compact()`, which rejects �€” the loop CATCHES it (the run does not reject), surfaces a
+		// `compact()`, which rejects — the loop CATCHES it (the run does not reject), surfaces a
 		// `compactError` event, skips compaction that turn, and continues to the final answer. No
 		// section is ever created (every fold attempt threw). A MANUAL compact() still throws (asserted
-		// separately) �€” only the agent's AUTO path is resilient.
+		// separately) — only the agent's AUTO path is resilient.
 		const boom = new Error('summarizer exploded')
 		const conversations = createConversationManager({
 			summarize: async () => {
@@ -2911,7 +2938,7 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 			},
 			keep: 0,
 		})
-		const conversation = conversations.add() // auto-activates �€” the agent's message source
+		const conversation = conversations.add() // auto-activates — the agent's message source
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
@@ -2926,30 +2953,30 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 
 		const result = await agent.generate()
 
-		// The run SURVIVED a throwing summarizer �€” it settled the correct final answer, not partial,
+		// The run SURVIVED a throwing summarizer — it settled the correct final answer, not partial,
 		// and `error` never fired (a non-fatal warn, not a genuine failure).
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		expect(events.error.count).toBe(0)
 		expect(events.finish.count).toBe(1)
-		// `compactError` fired (�‰� once �€” the prompt crossed the window each tool turn), carrying the
+		// `compactError` fired (≥ once — the prompt crossed the window each tool turn), carrying the
 		// thrown summarizer error verbatim; and NOTHING folded (every attempt threw).
 		expect(events.compactError.count).toBeGreaterThanOrEqual(1)
 		expect(events.compactError.calls[0]?.[0]).toBe(boom)
 		expect(conversation.sections.length).toBe(0)
-		// A MANUAL compact() still PROPAGATES the throw �€” only the AUTO path is resilient.
+		// A MANUAL compact() still PROPAGATES the throw — only the AUTO path is resilient.
 		await expect(conversation.compact()).rejects.toThrow('summarizer exploded')
 	})
 
 	it('FUTILE guard: a compact() that folds NOTHING while over the window stops auto-compacting for the rest of the run (no churn)', async () => {
 		// `keep` is huge (50), so `compact()` ALWAYS folds nothing (count <= keep) and resolves
-		// `undefined` �€” yet the prompt is over the window (a big seed). The FIRST between-turns `#trim`
-		// calls compact() �†’ undefined �†’ latches the per-run futile flag, so EVERY later `#trim` returns
+		// `undefined` — yet the prompt is over the window (a big seed). The FIRST between-turns `#trim`
+		// calls compact() → undefined → latches the per-run futile flag, so EVERY later `#trim` returns
 		// at once (no further compact() call, no churn). The over-window prompt proceeds to the
 		// provider and the run completes. A spy summarizer proves compact() ran (and folded nothing).
 		const stub = createStubSummarizer()
 		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
-		const conversation = conversations.add() // auto-activates �€” the agent's message source
+		const conversation = conversations.add() // auto-activates — the agent's message source
 		const tools = createToolManager()
 		tools.add(addTool())
 		// Each tool turn appends a big assistant message so the absolute prompt stays over the window
@@ -2971,12 +2998,12 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 
 		const result = await agent.generate()
 
-		// Nothing ever folded (keep 50 �‡’ compact() always a no-op), yet the run completed cleanly.
+		// Nothing ever folded (keep 50 ⇒ compact() always a no-op), yet the run completed cleanly.
 		expect(conversation.sections.length).toBe(0)
 		expect(result.content).toBe('done')
 		expect(result.partial).toBe(false)
 		expect(events.finish.count).toBe(1)
-		// No churn: `compact()` (the stub summarizer) was called AT MOST ONCE �€” the futile flag
+		// No churn: `compact()` (the stub summarizer) was called AT MOST ONCE — the futile flag
 		// short-circuited every later `#trim` (a futile no-op is not a summarizer throw, so no
 		// `compactError` either).
 		expect(stub.calls.length).toBeLessThanOrEqual(1)
@@ -2987,7 +3014,7 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 	})
 })
 
-// �”€�”€ Multi-conversation �€” one agent serving many threads �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ── Multi-conversation — one agent serving many threads ──────────────────────
 //
 // The real app pattern: ONE Agent over a `ConversationManager` of threads (the agent's own
 // `context.conversations`), switching the ACTIVE conversation per request (NOT an agent per thread).
@@ -2995,9 +3022,9 @@ describe('Agent �€” automatic compaction (production hardening)', () => {
 // `switch(id)`), appends the user turn, and runs `generate()`. These prove each conversation
 // accumulates its OWN independent history AND compacts INDEPENDENTLY (one conversation's sections
 // never leak into another), all served by the SAME agent. Deterministic: a scripted provider + a stub
-// summarizer + (for the compaction proof) small per-run window budgets (AGENTS §16 �€” real behavior).
-describe('Agent �€” multi-conversation (one agent, a ConversationManager of threads)', () => {
-	// Drive one "request" on `agent` against the conversation `id` in the agent's registry �€” the exact
+// summarizer + (for the compaction proof) small per-run window budgets (AGENTS §16 — real behavior).
+describe('Agent — multi-conversation (one agent, a ConversationManager of threads)', () => {
+	// Drive one "request" on `agent` against the conversation `id` in the agent's registry — the exact
 	// per-request switch the app performs: resolve-or-create the thread, make it active, append the user
 	// turn, run to completion.
 	const request = async (
@@ -3013,7 +3040,7 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 	}
 
 	it('accumulates independent histories across switched conversations (no cross-talk)', async () => {
-		// No window (no compaction) �€” a no-tools provider that echoes the LAST user turn, so each
+		// No window (no compaction) — a no-tools provider that echoes the LAST user turn, so each
 		// conversation's answers are distinguishable. One agent serves an interleaved A / B / A / B
 		// sequence; each conversation's live tail must hold ONLY its own user turns + their answers.
 		const provider: ProviderInterface = {
@@ -3046,8 +3073,8 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 		expect(b2.content).toBe('answer:b-two')
 
 		// Both named threads exist, each accumulating ONLY its own turns (user + assistant), no
-		// cross-talk. (The registry also holds the context's default conversation �€” never made active
-		// by `request` and so never touched �€” an artifact of the always-active rule.)
+		// cross-talk. (The registry also holds the context's default conversation — never made active
+		// by `request` and so never touched — an artifact of the always-active rule.)
 		const aContents = manager
 			.conversation('A')
 			?.messages()
@@ -3063,7 +3090,7 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 		expect(JSON.stringify(bContents)).not.toContain('a-')
 	})
 
-	it('compacts each conversation INDEPENDENTLY �€” one thread�€™s sections never leak into another', async () => {
+	it('compacts each conversation INDEPENDENTLY — one thread’s sections never leak into another', async () => {
 		// One agent WITH a small window + a ConversationManager (keep 0). A no-tools provider that
 		// always finishes, so each request is a single turn whose PRE-FIRST-TURN `#trim` compacts the
 		// conversation once its accumulated history exceeds the window. Two requests per thread: the
@@ -3078,7 +3105,7 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 			exhaust: 'repeat',
 		})
 		// A window small enough that a 2nd-request prompt (prior user "alpha-1"/"bravo-1" + 'ok' answer
-		// + new user turn �€” three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
+		// + new user turn — three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
 		// old thresholds under the new estimator) exceeds it, but a 1st-request prompt (one short user
 		// turn: content ~2 tok + 4 overhead = ~6) does not (max 10). The manager (with its summarizer)
 		// is the agent's OWN registry, so each thread is summarizable.
@@ -3088,15 +3115,15 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 			limit: 5,
 		})
 
-		// Round 1 �€” each thread's first request: a single short user turn, under the window �‡’ no fold.
+		// Round 1 — each thread's first request: a single short user turn, under the window ⇒ no fold.
 		await request(agent, manager, 'A', 'alpha-1')
 		await request(agent, manager, 'B', 'bravo-1')
 		expect(manager.conversation('A')?.sections.length).toBe(0)
 		expect(manager.conversation('B')?.sections.length).toBe(0)
 
-		// Round 2 �€” each thread now has [user, 'ok'] accumulated; the new user turn (added before
+		// Round 2 — each thread now has [user, 'ok'] accumulated; the new user turn (added before
 		// generate) pushes the prompt over the window, so the pre-first-turn `#trim` folds THAT thread's
-		// whole live tail (keep 0 �‡’ all three messages) into one section.
+		// whole live tail (keep 0 ⇒ all three messages) into one section.
 		await request(agent, manager, 'A', 'alpha-2')
 		await request(agent, manager, 'B', 'bravo-2')
 
@@ -3105,7 +3132,7 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 		// Each thread compacted EXACTLY once, into its OWN section.
 		expect(a?.sections.length).toBe(1)
 		expect(b?.sections.length).toBe(1)
-		// INDEPENDENCE: each section RETAINS only its OWN thread's originals �€” A's folded originals are
+		// INDEPENDENCE: each section RETAINS only its OWN thread's originals — A's folded originals are
 		// A's turns, B's are B's. No leakage in either direction.
 		const aOriginals = a?.sections[0]?.messages.map((message) => message.content) ?? []
 		const bOriginals = b?.sections[0]?.messages.map((message) => message.content) ?? []
@@ -3113,7 +3140,7 @@ describe('Agent �€” multi-conversation (one agent, a ConversationManager o
 		expect(bOriginals).toEqual(['bravo-1', 'ok', 'bravo-2'])
 		expect(JSON.stringify(aOriginals)).not.toContain('bravo')
 		expect(JSON.stringify(bOriginals)).not.toContain('alpha')
-		// And the SAME agent served both �€” its active conversation is whichever was last switched in.
+		// And the SAME agent served both — its active conversation is whichever was last switched in.
 		expect(agent.context.conversations.active).toBe(b)
 	})
 })
@@ -3460,13 +3487,13 @@ describe('Agent - F4 per-run schema', () => {
 	})
 })
 
-// �”€�”€ Concurrency guard �€” a shared construction-level accounting instance (a `window` context
+// ── Concurrency guard — a shared construction-level accounting instance (a `window` context
 // budget, or a construction `budget` with no per-run override) would race a second concurrent run's
 // charges against the same instance; `stream()` (and thus `generate()`) THROWS an `AgentError`
 // ('CONCURRENCY') SYNCHRONOUSLY when a run is already in flight AND that hazard applies. A run with
 // no window and a per-run `budget` override is exempt (nothing shared to race), and sequential
 // (awaited) runs on a construction-budget agent are unaffected (never concurrent).
-describe('Agent �€” concurrency guard (construction window/budget)', () => {
+describe('Agent — concurrency guard (construction window/budget)', () => {
 	// A provider whose stream yields one delta then parks on a shared gate, so a test can hold a run
 	// "in flight" (its `#runs` handle already added) across a synchronous second `stream()` call.
 	const gatedProvider = (gate: TestGateInterface<void>): ProviderInterface => ({
@@ -3571,11 +3598,11 @@ describe('Agent �€” concurrency guard (construction window/budget)', () =>
 	})
 })
 
-// �”€�”€ Strict compaction (F5) �€” a summarizer failure during AUTOMATIC window compaction; strict:
+// ── Strict compaction (F5) — a summarizer failure during AUTOMATIC window compaction; strict:
 // true emits `compactError` THEN rethrows (the run rejects, status error, an `error` event). The
 // lenient default (`strict` omitted) emits `compactError` and continues -- already covered by
 // 'NON-FATAL summarizer failure' in the 'automatic compaction (production hardening)' block above.
-describe('Agent �€” strict compaction (F5)', () => {
+describe('Agent — strict compaction (F5)', () => {
 	it('strict: true -- a throwing auto-compact summarizer emits compactError THEN rethrows, rejecting the run', async () => {
 		const boom = new Error('strict summarizer exploded')
 		const conversations = createConversationManager({
@@ -3584,7 +3611,7 @@ describe('Agent �€” strict compaction (F5)', () => {
 			},
 			keep: 0,
 		})
-		conversations.add() // auto-activates �€” the agent's message source
+		conversations.add() // auto-activates — the agent's message source
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
@@ -3610,10 +3637,10 @@ describe('Agent �€” strict compaction (F5)', () => {
 	})
 })
 
-// �”€�”€ Abort-usage sanitize (F6) �€” a provider's ProviderAbortError partial `usage` is sanitized
+// ── Abort-usage sanitize (F6) — a provider's ProviderAbortError partial `usage` is sanitized
 // (`sanitizeUsage`) BEFORE it is charged against the budget / folded into the run's reported usage:
 // a non-finite or negative field floors to 0, a fractional field floors to its integer part.
-describe('Agent �€” abort usage sanitize (F6)', () => {
+describe('Agent — abort usage sanitize (F6)', () => {
 	it('sanitizes a provider abort partial usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
 		const gate = createGate()
 		const budget = createRecordingBudget(1_000_000)

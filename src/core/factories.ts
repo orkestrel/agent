@@ -11,16 +11,12 @@ import type {
 	AgentRunnerOptions,
 	AuthorityInterface,
 	AuthorityOptions,
-	BinaryMIME,
 	ConversationInterface,
 	ConversationManagerInterface,
 	ConversationManagerOptions,
 	ConversationOptions,
 	ConversationSnapshotRow,
 	ConversationStoreInterface,
-	FileContent,
-	FileInput,
-	FileInterface,
 	InstructionInput,
 	InstructionInterface,
 	InstructionManagerInterface,
@@ -31,15 +27,6 @@ import type {
 	ScopeManagerInterface,
 	ScopeManagerOptions,
 	ThinkSplitterInterface,
-	ToolInterface,
-	ToolManagerInterface,
-	ToolOptions,
-	WorkspaceInterface,
-	WorkspaceManagerInterface,
-	WorkspaceManagerOptions,
-	WorkspaceOptions,
-	WorkspaceSnapshotRow,
-	WorkspaceStoreInterface,
 } from './types.js'
 import type { DriverInterface, TableInterface } from '@orkestrel/database'
 import type { QueueInterface } from '@orkestrel/queue'
@@ -56,76 +43,12 @@ import { Conversation } from './conversations/Conversation.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 import { DatabaseConversationStore } from './conversations/stores/DatabaseConversationStore.js'
 import { MemoryConversationStore } from './conversations/stores/MemoryConversationStore.js'
-import { computeSize, countLines, handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
+import { handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
-import { Tool } from './tools/Tool.js'
-import { ToolManager } from './tools/ToolManager.js'
-import { Workspace } from './workspaces/Workspace.js'
-import { WorkspaceManager } from './workspaces/WorkspaceManager.js'
-import { DatabaseWorkspaceStore } from './workspaces/stores/DatabaseWorkspaceStore.js'
-import { MemoryWorkspaceStore } from './workspaces/stores/MemoryWorkspaceStore.js'
-
-/**
- * Create a tool — a {@link ToolInterface} binding a {@link ToolDefinition} schema
- * (the `name` / `description` / `parameters` the model sees) to the `execute` handler
- * that runs a call.
- *
- * @remarks
- * Only `name` is required (it keys the tool in a {@link ToolManagerInterface} and is
- * what the model calls); `description` / `parameters` are the optional JSON-Schema the
- * provider advertises (forwarded verbatim). The handler's `args` is the model-supplied
- * `unknown` arguments record — narrow it inside (§14); a `createToolManager` registry
- * isolates a throw into a `ToolResult.error`.
- *
- * @param options - `name` (required), optional `description` / `parameters`, and the
- *   `execute` handler (see {@link ToolOptions})
- * @returns A working {@link ToolInterface}
- *
- * @example
- * ```ts
- * import { createTool } from '@src/core'
- *
- * const add = createTool({
- * 	name: 'add',
- * 	description: 'Add two numbers',
- * 	execute: (args) => Number(args.a) + Number(args.b),
- * })
- * ```
- */
-export function createTool(options: ToolOptions): ToolInterface {
-	return new Tool(options)
-}
-
-/**
- * Create a tool registry — a {@link ToolManagerInterface} that resolves tool names,
- * lists {@link ToolDefinition}s for the provider, and executes calls with per-call
- * error isolation.
- *
- * @remarks
- * Starts empty; `add` registers one tool or a batch (§9.2), `definitions()` yields the
- * schemas to hand a provider, and `execute` runs a {@link ToolCall} (or a batch),
- * ALWAYS resolving a {@link ToolResult} — a handler throw becomes an `error` result and
- * an unknown name a not-found `error`, so a tool throw never escapes and a batch never
- * fails as a whole.
- *
- * @returns An empty {@link ToolManagerInterface}
- *
- * @example
- * ```ts
- * import { createTool, createToolManager } from '@src/core'
- *
- * const tools = createToolManager()
- * tools.add(createTool({ name: 'add', execute: (a) => Number(a.x) + Number(a.y) }))
- * const result = await tools.execute({ id: '1', name: 'add', arguments: { x: 1, y: 2 } })
- * ```
- */
-export function createToolManager(): ToolManagerInterface {
-	return new ToolManager()
-}
 
 /**
  * Create a conversation — a {@link ConversationInterface} grouping messages above a flat
@@ -205,11 +128,13 @@ export function createConversationManager(
  * Create the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
  * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot}s keyed by conversation
  * id, the DEFAULT backing for the durable {@link ConversationManagerInterface.open} /
- * {@link ConversationManagerInterface.save} seam. The EXACT twin of {@link createMemoryWorkspaceStore}.
+ * {@link ConversationManagerInterface.save} seam. The exact twin of
+ * {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
  *
  * @remarks
  * A plain `Map` (the snapshot is already pure JSON, so no encoding is needed for the memory tier),
- * the structural twin of {@link createMemoryWorkspaceStore}. `get` / `set` / `delete` are async (the
+ * the structural twin of {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
+ * `get` / `set` / `delete` are async (the
  * same shape a durable backend fits); UNLIKE a session store there is NO idle-TTL / eviction — a
  * persisted conversation lives until an explicit `delete`. Its driver-pluggable twin is
  * {@link createDatabaseConversationStore} (the snapshot as one opaque JSON column over a `databases`
@@ -238,12 +163,14 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
 /**
  * Create a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
  * driver-pluggable backing for the conversation persistence seam, the opt-in twin of
- * {@link createMemoryConversationStore}. The EXACT twin of {@link createDatabaseWorkspaceStore}.
+ * {@link createMemoryConversationStore}. The exact twin of
+ * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore}.
  *
  * @remarks
  * Builds a one-table database (`conversations`, keyed by `id`) over the supplied driver, the snapshot
  * held as ONE OPAQUE JSON COLUMN — the column map is `{ id; snapshot }` where `snapshot` is a
- * `rawShape` (a JSON blob), exactly as {@link createDatabaseWorkspaceStore} stores its snapshot. The
+ * `rawShape` (a JSON blob), exactly as
+ * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore} stores its snapshot. The
  * snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is lossless
  * AND keeps the row type FLAT (the column reads back as `unknown`, narrowed on `get` by
  * {@link import('./helpers.js').isConversationSnapshot}). The `driver` DEFAULTS to
@@ -552,8 +479,9 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  *
  * @example
  * ```ts
+ * import { createAgentRegistry } from '@src/core'
  * import type { ProviderInterface } from '@src/core'
- * import { createAgentRegistry, createTool } from '@src/core'
+ * import { createTool } from '@orkestrel/tool'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const registry = createAgentRegistry({
@@ -663,215 +591,4 @@ export function createAgentRunner(
 		...(timeout === undefined ? {} : { timeout }),
 		handler: handleAgentRunnerJob.bind(undefined, registry, allowPartial),
 	})
-}
-
-/**
- * Create a file — an immutable {@link FileInterface} from its `path` + {@link FileContent}
- * and optional {@link import('./types.js').FileState}, with `size` / `lines` DERIVED from the
- * content.
- *
- * @remarks
- * Returns a PLAIN `Object.freeze`d record (NOT a class instance) — the `path` IS its identity
- * (there is no `id`). Only `path` / `content` are required; `state` defaults to `'created'`
- * when omitted. `size` (via {@link computeSize}) and `lines` (via {@link countLines}) are
- * computed from the content here (so they never drift from it). Frozen + plain, so it
- * `structuredClone`s losslessly and is never mutated after creation.
- *
- * @param input - `path` / `content` (required) and an optional `state` (see {@link FileInput})
- * @returns A frozen {@link FileInterface} record
- *
- * @example
- * ```ts
- * import { createFile, createTextContent } from '@src/core'
- *
- * const file = createFile({ path: 'src/main.ts', content: createTextContent('const x = 1', 'typescript') })
- * file.lines // 1
- * ```
- */
-export function createFile(input: FileInput): FileInterface {
-	return Object.freeze({
-		path: input.path,
-		content: input.content,
-		state: input.state ?? 'created',
-		size: computeSize(input.content),
-		lines: countLines(input.content),
-	})
-}
-
-/**
- * Build the TEXT {@link FileContent} arm — the §4.2.3 split constructor for text (a separate
- * function per arm, not one constructor dispatching on a discriminator parameter).
- *
- * @param text - The literal text body
- * @param language - The fenced-code language the text renders as (e.g. `'typescript'`)
- * @returns A `{ text; language }` content arm
- *
- * @example
- * ```ts
- * import { createTextContent } from '@src/core'
- *
- * createTextContent('const x = 1', 'typescript') // { text: 'const x = 1', language: 'typescript' }
- * ```
- */
-export function createTextContent(text: string, language: string): FileContent {
-	return { text, language }
-}
-
-/**
- * Build the BINARY {@link FileContent} arm — the §4.2.3 split constructor for binary (a
- * separate function per arm, not one constructor dispatching on a discriminator parameter).
- * An image is just a binary with an image {@link BinaryMIME}.
- *
- * @param data - The base64-encoded binary payload
- * @param mime - The {@link BinaryMIME} that labels the payload
- * @returns A `{ data; mime }` content arm
- *
- * @example
- * ```ts
- * import { createBinaryContent } from '@src/core'
- *
- * createBinaryContent('<base64>', 'image/png') // { data: '<base64>', mime: 'image/png' }
- * ```
- */
-export function createBinaryContent(data: string, mime: BinaryMIME): FileContent {
-	return { data, mime }
-}
-
-/**
- * Create a workspace — a mutable, `path`-keyed working set of immutable
- * {@link FileInterface}s with the in-memory edit surface (read / write / search / replace /
- * move / remove), observable through its `EmitterInterface` (from `@orkestrel/emitter`).
- *
- * @param options - Optional initial {@link import('./types.js').WorkspaceEventMap} listeners (`on`) and the emitter's `error` handler (see {@link WorkspaceOptions})
- * @returns A working {@link WorkspaceInterface}
- *
- * @example
- * ```ts
- * import { createWorkspace } from '@src/core'
- *
- * const workspace = createWorkspace({ on: { write: (file) => console.log(file.path) } })
- * workspace.write('src/main.ts', 'const x = 1')
- * workspace.file('src/main.ts')?.state // 'created'
- * ```
- */
-export function createWorkspace(options?: WorkspaceOptions): WorkspaceInterface {
-	return new Workspace(options)
-}
-
-/**
- * Create the in-memory workspace store — a {@link WorkspaceStoreInterface} backed by a
- * process-lifetime `Map` of {@link import('./types.js').WorkspaceSnapshot}s keyed by workspace id,
- * the DEFAULT backing for the durable {@link WorkspaceManagerInterface.open} /
- * {@link WorkspaceManagerInterface.save} seam.
- *
- * @remarks
- * A plain `Map` (the snapshot is already pure JSON, so no encoding is needed for the memory tier),
- * the structural twin of the analogous `createMemoryWorkflowStore` in `@orkestrel/workflow`.
- * `get` / `set` / `delete` are async (the same shape a durable backend fits); UNLIKE a session
- * store there is NO idle-TTL / eviction — a persisted workspace lives until an explicit `delete`.
- * Its driver-pluggable twin is {@link createDatabaseWorkspaceStore} (the snapshot as one opaque
- * JSON column over a `databases` table) — for a DURABLE store pass it a JSON / SQLite / IndexedDB
- * driver, and it swaps in WITHOUT touching the manager or the workspace. Hydration stays a manager
- * concern: read a snapshot back and rebuild the live workspace through the constructor `seed`.
- *
- * @returns A memory-backed {@link WorkspaceStoreInterface}
- *
- * @example
- * ```ts
- * import { createMemoryWorkspaceStore, createWorkspaceManager } from '@src/core'
- *
- * const store = createMemoryWorkspaceStore()
- * const manager = createWorkspaceManager({ store })
- * const workspace = manager.add()
- * workspace.write('notes.txt', 'hello')
- * await manager.save(workspace.id)               // persist the workspace
- * ```
- */
-export function createMemoryWorkspaceStore(): WorkspaceStoreInterface {
-	return new MemoryWorkspaceStore()
-}
-
-/**
- * Create a {@link DatabaseWorkspaceStore} over any {@link DriverInterface} — the durable,
- * driver-pluggable backing for the workspace persistence seam, the opt-in twin of
- * {@link createMemoryWorkspaceStore}.
- *
- * @remarks
- * Builds a one-table database (`workspaces`, keyed by `id`) over the supplied driver, the snapshot
- * held as ONE OPAQUE JSON COLUMN — the column map is `{ id; snapshot }` where `snapshot` is a
- * `rawShape` (a JSON blob), exactly as
- * the analogous `createDatabaseWorkflowStore` in `@orkestrel/workflow` stores its snapshot. The
- * snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is lossless
- * AND keeps the row type FLAT (the column reads back as `unknown`, narrowed on `get` by
- * {@link import('./helpers.js').isWorkspaceSnapshot}). The `driver` DEFAULTS to
- * {@link createMemoryDriver}, so the store ALSO works in memory out of the box; pass a server
- * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
- * the durability is the driver's job, the store engine is shared. It swaps in behind
- * {@link WorkspaceStoreInterface} WITHOUT touching the manager or the workspace.
- *
- * @param driver - The storage backend the snapshots persist to (defaults to {@link createMemoryDriver})
- * @returns A {@link WorkspaceStoreInterface} over the driver
- *
- * @example
- * ```ts
- * import { createDatabaseWorkspaceStore, createMemoryDriver, createWorkspaceManager } from '@src/core'
- *
- * const store = createDatabaseWorkspaceStore(createMemoryDriver()) // a durable driver swaps in here
- * const manager = createWorkspaceManager({ store })
- * const workspace = manager.add()
- * workspace.write('notes.txt', 'hello')
- * await manager.save(workspace.id)               // persist the workspace (one JSON column)
- * ```
- */
-export function createDatabaseWorkspaceStore(
-	driver: DriverInterface = createMemoryDriver(),
-): WorkspaceStoreInterface {
-	// The snapshot is stored as ONE OPAQUE JSON column (`rawShape`), so the row infers FLAT —
-	// `{ id: string; snapshot: unknown }` = `WorkspaceSnapshotRow` — and the File-list snapshot
-	// shape never forces a contract `Infer`.
-	const columns = { id: stringShape(), snapshot: rawShape({}) }
-	const database = createDatabase({ driver, tables: { workspaces: columns } })
-	const table: TableInterface<WorkspaceSnapshotRow> = database.table('workspaces')
-	return new DatabaseWorkspaceStore(table)
-}
-
-/**
- * Create a workspace registry — a {@link WorkspaceManagerInterface} holding
- * {@link WorkspaceInterface}s keyed by their `id` (in insertion order) WITH an active pointer:
- * the §9 store over the workspace layer plus the `active` / `switch` seam the context renders.
- *
- * @remarks
- * Starts empty; `add(input?)` mints a {@link WorkspaceInterface} (its `id` from the input or a
- * random UUID), flowing the manager's default `on` / `error` in unless the input overrides them,
- * and stores it (an already-present `id` overwrites — last write wins) — and AUTO-ACTIVATES the
- * FIRST one (a registry with workspaces always has one `active`); a later `add` leaves `active`
- * unchanged. `switch(id)` re-points `active` (an unknown `id` returns `undefined`, leaving
- * `active` unchanged — lenient, never throws); `workspace(id)` / `workspaces()` look up;
- * `remove` (one or a batch, §9.2) reports whether any was removed AND clears `active` if it was
- * the removed one; `clear` empties it and clears `active`. Event-free (each workspace owns its
- * own observable `emitter`).
- *
- * With the optional `store` ({@link WorkspaceStoreInterface}, e.g. `createMemoryWorkspaceStore` /
- * `createDatabaseWorkspaceStore`), `open(id)` HYDRATES a workspace on a registry miss (rebuilding it
- * through the constructor `seed` from the snapshot's `files`, then activating it) and `save(id)`
- * PERSISTS a registered workspace's `snapshot()`. Both are LENIENT without a store (open resolves
- * only registered ids, save is a no-op `false`).
- *
- * @param options - Optional default `on` / `error` for created workspaces + the durable `store`
- *   (see {@link WorkspaceManagerOptions})
- * @returns An empty {@link WorkspaceManagerInterface}
- *
- * @example
- * ```ts
- * import { createWorkspaceManager } from '@src/core'
- *
- * const workspaces = createWorkspaceManager()
- * const scratch = workspaces.add() // auto-activates — workspaces.active === scratch
- * scratch.write('notes.txt', 'hello')
- * ```
- */
-export function createWorkspaceManager(
-	options?: WorkspaceManagerOptions,
-): WorkspaceManagerInterface {
-	return new WorkspaceManager(options)
 }

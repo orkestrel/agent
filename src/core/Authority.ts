@@ -22,8 +22,8 @@ import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
  *   (an ALLOWLIST — only matched rules that allow get through), pass an `allowed: false`
  *   `fallback`.
  * - **Consulted before each tool call.** The agent loop calls `evaluate({ call })` for
- *   every {@link import('./types.js').ToolCall} the model emits; a denied call is fed
- *   back to the model as a denial {@link import('./types.js').ToolResult} (a `tool`
+ *   every {@link import('@orkestrel/tool').ToolCall} the model emits; a denied call is fed
+ *   back to the model as a denial {@link import('@orkestrel/tool').ToolResult} (a `tool`
  *   chunk + a tool message) instead of being executed — no tool run, no budget cost —
  *   so the model sees the denial and can react.
  * - **Synchronous now.** The async human-approval handshake (request / grant / deny) is

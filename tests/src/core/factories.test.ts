@@ -5,6 +5,8 @@ import type {
 	ProviderInterface,
 	ProviderResult,
 } from '@src/core'
+import { createTool, createToolManager } from '@orkestrel/tool'
+import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
 	AgentJobError,
 	createAgent,
@@ -12,18 +14,9 @@ import {
 	createAgentQueue,
 	createAgentRegistry,
 	createAgentRunner,
-	createBinaryContent,
-	createFile,
 	createInstructionManager,
 	createScope,
-	createTextContent,
-	createTool,
-	createToolManager,
-	createWorkspace,
-	createWorkspaceManager,
 	isAgentJobError,
-	isBinary,
-	isText,
 	ProviderAbortError,
 } from '@src/core'
 import {
@@ -46,37 +39,10 @@ import {
 } from '../../setup.js'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
-// createAgent, all needing no daemon (AGENTS �16). `createOllama` (the live-Ollama
+// createAgent, all needing no daemon (AGENTS §16). `createOllama` (the live-Ollama
 // factory) is split out to the dedicated `src:ollama` project. createAgent's loop
 // logic is pinned in Agent.test.ts; here we only assert the factory wires a provider
 // into a working AgentInterface that runs one turn to its result.
-
-describe('createTool', () => {
-	it('returns a working ToolInterface that executes to its value', () => {
-		const tool = createTool({
-			name: 'add',
-			description: 'Add two numbers',
-			execute: (args) => Number(args.a) + Number(args.b),
-		})
-
-		expect(tool.name).toBe('add')
-		expect(tool.description).toBe('Add two numbers')
-		expect(tool.execute({ a: 3, b: 4 })).toBe(7)
-	})
-})
-
-describe('createToolManager', () => {
-	it('round-trips a tool: added, listed in definitions, executed to a result', async () => {
-		const manager = createToolManager()
-		manager.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
-
-		expect(manager.count).toBe(1)
-		expect(manager.definitions()).toEqual([{ name: 'add' }])
-
-		const result = await manager.execute({ id: 'r1', name: 'add', arguments: { a: 2, b: 6 } })
-		expect(result).toEqual({ id: 'r1', name: 'add', value: 8 })
-	})
-})
 
 describe('createAgentContext', () => {
 	it('builds [system?, ...messages] from a system prompt + a couple messages', () => {
@@ -474,7 +440,7 @@ describe('createAgentRunner', () => {
 
 // -- AgentJobError / isAgentJobError (the partial-carrying failure) ------------
 //
-// The real error type the shared `settle` throws on a default-partial job (�12: a
+// The real error type the shared `settle` throws on a default-partial job (§12: a
 // real Error, not a sentinel) — it CARRIES the partial AgentResult so a caller can
 // still inspect what accumulated. Mirrors ProviderAbortError / isProviderAbortError.
 
@@ -598,7 +564,7 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 	})
 })
 
-// -- createAgentQueue — lifecycle (�10) + batch over agent jobs ----------------
+// -- createAgentQueue — lifecycle (§10) + batch over agent jobs ----------------
 //
 // The substrate's lifecycle + bounded concurrency carry through the agent-job handler
 // unchanged: a paused queue parks jobs without starting their agents, `stop` rejects
@@ -877,106 +843,5 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		])
 		expect(ran).toEqual(['parent', 'child'])
 		expect(provider.started).toBe(2)
-	})
-})
-
-// The workspace factories (relocated from the dissolved files/ module): createFile (an immutable
-// PLAIN frozen FileInterface record with derived size/lines and NO id), the §4.2.3 split
-// arm-constructors createTextContent / createBinaryContent, and createWorkspace (a working
-// in-memory WorkspaceInterface). The workspace-editing tool now lives in @orkestrel/tool
-// (AGENTS §16 — real data, no mocks).
-
-describe('createFile', () => {
-	it('returns a FileInterface with derived size/lines and the default state', () => {
-		const file = createFile({
-			path: 'src/main.ts',
-			content: createTextContent('const x = 1\nconst y = 2', 'typescript'),
-		})
-
-		expect(file.path).toBe('src/main.ts')
-		expect(file.state).toBe('created')
-		expect(file.size).toBe(23) // UTF-8 byte length of the two 11-char ASCII lines + the newline
-		expect(file.lines).toBe(2)
-	})
-
-	it('honors an explicit state', () => {
-		const file = createFile({
-			path: 'a.txt',
-			content: createTextContent('x', 'text'),
-			state: 'loaded',
-		})
-
-		expect(file.state).toBe('loaded')
-	})
-
-	it('derives size from a binary content as its decoded payload bytes', () => {
-		const file = createFile({ path: 'icon.png', content: createBinaryContent('AAAA', 'image/png') })
-
-		expect(file.size).toBe(3)
-		expect(file.lines).toBe(0)
-	})
-
-	it('is a PLAIN frozen record — no id, no class instance, structuredClone round-trips it', () => {
-		const file = createFile({
-			path: 'src/main.ts',
-			content: createTextContent('const x = 1', 'typescript'),
-		})
-
-		// A plain object, NOT a class instance — its prototype is Object.prototype.
-		expect(Object.getPrototypeOf(file)).toBe(Object.prototype)
-		expect(file.constructor).toBe(Object)
-		// The path is the identity — there is NO id field.
-		expect('id' in file).toBe(false)
-		// Frozen — never mutated after creation.
-		expect(Object.isFrozen(file)).toBe(true)
-		// structuredClone round-trips EVERY field identically (the plain-record proof).
-		const clone = structuredClone(file)
-		expect(clone).toEqual(file)
-		expect(clone.path).toBe(file.path)
-		expect(clone.content).toEqual(file.content)
-		expect(clone.state).toBe(file.state)
-		expect(clone.size).toBe(file.size)
-		expect(clone.lines).toBe(file.lines)
-	})
-})
-
-describe('createTextContent', () => {
-	it('produces the text arm (narrows via isText, not isBinary)', () => {
-		const content = createTextContent('hello', 'markdown')
-
-		expect(content).toEqual({ text: 'hello', language: 'markdown' })
-		expect(isText(content)).toBe(true)
-		expect(isBinary(content)).toBe(false)
-	})
-})
-
-describe('createBinaryContent', () => {
-	it('produces the binary arm (narrows via isBinary, not isText)', () => {
-		const content = createBinaryContent('<base64>', 'image/jpeg')
-
-		expect(content).toEqual({ data: '<base64>', mime: 'image/jpeg' })
-		expect(isBinary(content)).toBe(true)
-		expect(isText(content)).toBe(false)
-	})
-})
-
-describe('createWorkspace', () => {
-	it('returns a working WorkspaceInterface (empty, editable, observable)', () => {
-		const workspace = createWorkspace()
-
-		expect(workspace.count).toBe(0)
-		workspace.write('a.ts', 'const x = 1')
-		expect(workspace.read('a.ts')).toBe('const x = 1')
-		expect(workspace.count).toBe(1)
-		expect(workspace.emitter.destroyed).toBe(false)
-	})
-
-	it('wires initial event listeners from the on option', () => {
-		const written: string[] = []
-		const workspace = createWorkspace({ on: { write: (file) => written.push(file.path) } })
-
-		workspace.write('a.ts', 'x')
-
-		expect(written).toEqual(['a.ts'])
 	})
 })

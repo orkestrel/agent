@@ -5,20 +5,19 @@ import type {
 	ContextSectionFormat,
 	ConversationInterface,
 	ConversationManagerInterface,
-	FileInterface,
 	InstructionManagerInterface,
 	MessageInterface,
 	MessageManagerInterface,
 	ScopeInterface,
-	ToolManagerInterface,
-	WorkspaceManagerInterface,
 } from './types.js'
+import type { ToolManagerInterface } from '@orkestrel/tool'
+import type { FileInterface, WorkspaceManagerInterface } from '@orkestrel/workspace'
+import { ToolManager } from '@orkestrel/tool'
+import { isBinary, isText, WorkspaceManager } from '@orkestrel/workspace'
 import { WORKSPACE_SECTION_HEADER } from './constants.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
-import { fencedFile, filterAllowList, isBinary, isImage, isText } from './helpers.js'
+import { fencedFile, filterAllowList } from './helpers.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
-import { ToolManager } from './tools/ToolManager.js'
-import { WorkspaceManager } from './workspaces/WorkspaceManager.js'
 
 /**
  * The richer turn context the agent loop assembles a provider request from — the optional
@@ -358,13 +357,15 @@ export class AgentContext implements AgentContextInterface {
 
 	// The base64 `data` of the ACTIVE-workspace IMAGE files (already scope-filtered) — collected for
 	// the last-user-message attach (the active workspace is the SOLE image source). `isBinary` NARROWS
-	// the tagless content to the binary arm (`{ data, mime }`, §14: narrow, never assert) and `isImage`
-	// gates it to an `image/*` MIME; a text / non-image file is skipped. A future non-image binary (a
+	// the tagless content to the binary arm (`{ data, mime }`, §14: narrow, never assert), then the
+	// MIME prefix gates it to an image; a text / non-image file is skipped. A future non-image binary (a
 	// PDF) is excluded here.
 	#workspaceImages(files: readonly FileInterface[]): readonly string[] {
 		const data: string[] = []
 		for (const file of files) {
-			if (isBinary(file.content) && isImage(file.content)) data.push(file.content.data)
+			if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
+				data.push(file.content.data)
+			}
 		}
 		return data
 	}

@@ -9,24 +9,13 @@ import type {
 	ProviderInterface,
 	ProviderResult,
 	ProviderStreamOptions,
-	ToolCall,
-	ToolDefinition,
-	ToolInterface,
-	WorkspaceSnapshot,
-	WorkspaceStoreInterface,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterInterface, EventMap } from '@orkestrel/emitter'
+import type { ToolCall, ToolDefinition, ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
-import {
-	createBinaryContent,
-	createConversation,
-	createFile,
-	createTextContent,
-	createTool,
-	createWorkspace,
-	ProviderAbortError,
-} from '@src/core'
+import { createConversation, ProviderAbortError } from '@src/core'
+import { createTool } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -671,110 +660,6 @@ export function assertConversationStoreContract(
 			const store = makeStore()
 			const alpha = await build('alpha')
 			const beta = await build('beta')
-			await store.set(alpha)
-			await store.set(beta)
-			expect(await store.get('alpha')).toEqual(alpha)
-			expect(await store.get('beta')).toEqual(beta)
-			// Dropping one leaves the other intact.
-			await store.delete('alpha')
-			expect(await store.get('alpha')).toBeUndefined()
-			expect(await store.get('beta')).toEqual(beta)
-		})
-	})
-}
-
-/**
- * Build a REAL {@link WorkspaceSnapshot} carrying a TEXT file (written through the edit surface)
- * AND a BINARY file (`icon.png`, seated through `createFile` — the edit surface only ever mints
- * text). The genuine durable payload, built the way a real workspace produces it (both real Files,
- * pure JSON DATA by construction). The shared store-test fixture both `{Memory,Database}
- * WorkspaceStore` twins drive (AGENTS §16.1 — one builder, not a per-file copy).
- *
- * @param id - The workspace id (and snapshot key); defaults to `'scratch'`
- * @returns The workspace snapshot (one text file + one binary file)
- */
-export function buildWorkspaceSnapshot(id = 'scratch'): WorkspaceSnapshot {
-	const icon = createFile({ path: 'icon.png', content: createBinaryContent('AAAA', 'image/png') })
-	const workspace = createWorkspace({ id })
-	workspace.write('src/main.ts', 'const x = 1')
-	const written = workspace.snapshot()
-	// Compose the durable payload: the written text file + the seeded binary file (both real Files).
-	return { id: written.id, files: [...written.files, icon] }
-}
-
-/**
- * Run the SHARED `WorkspaceStoreInterface` contract battery against a store factory — the four
- * common describe blocks both `{Memory,Database}WorkspaceStore` twins prove identically
- * (AGENTS §16.1): round-trip (set → get returns an equal snapshot, text + binary files surviving),
- * upsert (re-setting the same id REPLACES), delete & absent (set → delete → get is `undefined`; a
- * delete of an absent id is a no-op; get of an absent id is `undefined`), and two-ids-coexist
- * (distinct ids never clobber each other). Each twin calls this ONCE with its own factory and keeps
- * its twin-specific blocks local. OWNS its `describe` / `it` — invoke inside a test file, never at
- * the setup module's top level.
- *
- * @param makeStore - Builds a fresh, empty store for each assertion (the twin's own factory)
- * @param build - The snapshot builder ({@link buildWorkspaceSnapshot}); takes an optional id
- */
-export function assertWorkspaceStoreContract(
-	makeStore: () => WorkspaceStoreInterface,
-	build: (id?: string) => WorkspaceSnapshot,
-): void {
-	describe('set → get round-trip (text + binary files)', () => {
-		it('set → get returns an equal snapshot (text + binary files survive)', async () => {
-			const store = makeStore()
-			const snapshot = build()
-			await store.set(snapshot)
-			const got = await store.get(snapshot.id)
-			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
-			expect(got).toEqual(snapshot)
-			// It carries BOTH a text and a binary file (the round-trip is non-vacuous).
-			expect(got?.files.map((file) => file.path)).toEqual(['src/main.ts', 'icon.png'])
-		})
-	})
-
-	describe('upsert (set replaces under the same id)', () => {
-		it('set replaces an existing snapshot under the same id', async () => {
-			// `set` keys off the snapshot's OWN id (no separate id param), so re-setting the same id
-			// REPLACES — proving insert-or-replace semantics, not an append (one entry, latest wins).
-			const store = makeStore()
-			const first = build('w')
-			const second: WorkspaceSnapshot = {
-				id: 'w',
-				files: [createFile({ path: 'only.txt', content: createTextContent('only', 'text') })],
-			}
-			await store.set(first)
-			await store.set(second)
-			expect(await store.get('w')).toEqual(second)
-		})
-	})
-
-	describe('delete & absent', () => {
-		it('set → delete → get returns undefined', async () => {
-			const store = makeStore()
-			const snapshot = build()
-			await store.set(snapshot)
-			expect(await store.get(snapshot.id)).toBeDefined()
-			await store.delete(snapshot.id)
-			expect(await store.get(snapshot.id)).toBeUndefined()
-		})
-
-		it('deleting an absent id does not throw (a no-op)', async () => {
-			const store = makeStore()
-			await expect(store.delete('never-stored')).resolves.toBeUndefined()
-		})
-
-		it('get of an absent id returns undefined', async () => {
-			const store = makeStore()
-			expect(await store.get('never-stored')).toBeUndefined()
-		})
-	})
-
-	describe('two distinct workspace ids coexist', () => {
-		it('two distinct workspace ids coexist without cross-contamination', async () => {
-			// A real durable store holds many workspaces; distinct ids must not clobber each other.
-			const store = makeStore()
-			const alpha = build('alpha')
-			const beta = build('beta')
 			await store.set(alpha)
 			await store.set(beta)
 			expect(await store.get('alpha')).toEqual(alpha)

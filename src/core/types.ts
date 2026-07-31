@@ -1,7 +1,15 @@
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { QueueStoreInterface } from '@orkestrel/queue'
+import type {
+	ToolCall,
+	ToolDefinition,
+	ToolInterface,
+	ToolManagerInterface,
+	ToolResult,
+} from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
+import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 
 /** The role a {@link MessageInterface} plays in a conversation turn. */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
@@ -44,148 +52,6 @@ export interface MessageInput {
 	 * vision-capable provider (carried verbatim onto the stored {@link MessageInterface}).
 	 */
 	readonly images?: readonly string[]
-}
-
-/**
- * A tool the model may call — its name, an optional description, and an optional
- * JSON-Schema `parameters` object describing its arguments.
- *
- * @remarks
- * Passed to a {@link ProviderInterface}'s `generate` / `stream`; the provider maps
- * each into the wire's function-tool shape. `parameters` is an open JSON-Schema
- * record (the provider forwards it verbatim).
- */
-export interface ToolDefinition {
-	readonly name: string
-	readonly description?: string
-	readonly parameters?: Readonly<Record<string, unknown>>
-}
-
-/**
- * A tool call the model emitted — the tool `name` and its parsed `arguments`.
- *
- * @remarks
- * `id` correlates the call with its later {@link ToolResult}; when the wire omits an
- * id the provider mints one (a random UUID) so every call is addressable. `arguments`
- * is always a record — the provider narrows the wire value (an object, or a JSON
- * string it parses) to one, defaulting to `{}` when neither.
- */
-export interface ToolCall {
-	readonly id: string
-	readonly name: string
-	readonly arguments: Readonly<Record<string, unknown>>
-}
-
-/**
- * The outcome of executing a {@link ToolCall} — keyed back to the call by `id` and
- * `name`, carrying either a `value` (the result) or an `error` string (the failure).
- */
-export interface ToolResult {
-	readonly id: string
-	readonly name: string
-	readonly value?: unknown
-	readonly error?: string
-}
-
-/**
- * One block of an MCP-shaped tool call response — plain text, the only content kind
- * {@link buildToolResult} emits.
- */
-export interface ToolResultContent {
-	readonly type: 'text'
-	readonly text: string
-}
-
-/**
- * The MCP `CallToolResult` shape a {@link ToolResult} maps to via {@link buildToolResult} —
- * `content` blocks plus an `isError` flag set ONLY on failure (never `false`).
- */
-export interface ToolCallResult {
-	readonly content: readonly ToolResultContent[]
-	readonly isError?: true
-}
-
-/**
- * A registered tool: its {@link ToolDefinition} (the schema the model sees) plus the
- * handler that runs a call.
- *
- * @remarks
- * The definition fields (`name` / `description` / `parameters`) are what a
- * {@link ProviderInterface} advertises to the model; `execute` is the local handler a
- * {@link ToolManagerInterface} invokes when the model calls the tool. The handler's
- * `args` is the model-supplied `unknown` JSON object — narrow it inside the handler
- * (§14), never assert; the manager isolates a throw into a {@link ToolResult} `error`.
- */
-export interface ToolInterface extends ToolDefinition {
-	/**
-	 * A one-or-two-sentence concise description advertised to the model IN PLACE of the
-	 * full `description` (which stays on the tool for on-demand retrieval, e.g. a
-	 * describe tool); absent ⇒ the full `description` is advertised exactly as today.
-	 */
-	readonly summary?: string
-	/**
-	 * Run the tool. `args` is the model-supplied `unknown` JSON object — narrow it
-	 * inside (§14); the manager isolates a throw into a {@link ToolResult} `error`.
-	 *
-	 * @param args - The model-supplied arguments record (an open `unknown` object)
-	 * @returns The tool's result (sync or async) — folded into a `ToolResult.value`
-	 */
-	execute(args: Readonly<Record<string, unknown>>): Promise<unknown> | unknown
-}
-
-/**
- * Options for `createTool` — the schema the model sees (`name` / `description` /
- * `parameters`) plus the `execute` handler that runs a call.
- *
- * @remarks
- * `name` is required (it keys the tool in a {@link ToolManagerInterface} and is what
- * the model calls); `description` and `parameters` are the optional JSON-Schema the
- * provider advertises (forwarded verbatim). `summary`, when set, is a lean
- * one-or-two-sentence advertisement used IN PLACE of `description` in a
- * {@link ToolManagerInterface.definitions} listing — `description` stays available on
- * the tool for on-demand retrieval. `execute` receives the model-supplied arguments
- * record and returns the tool's result (sync or async).
- */
-export interface ToolOptions {
-	readonly name: string
-	readonly description?: string
-	readonly summary?: string
-	readonly parameters?: Readonly<Record<string, unknown>>
-	readonly execute: (args: Readonly<Record<string, unknown>>) => Promise<unknown> | unknown
-}
-
-/**
- * A registry of tools — resolves names, lists definitions for the provider, and
- * executes calls with per-call error isolation.
- *
- * @remarks
- * - **Registry.** `add` registers one tool or a batch (§9.2), keyed by `tool.name`
- *   (a re-`add` of the same name overwrites — last write wins); `count` is the number
- *   registered. `tool(name)` looks one up; `tools()` lists them in insertion order;
- *   `definitions()` strips each to a plain {@link ToolDefinition} for the provider,
- *   advertising `tool.summary ?? tool.description` in the definition's `description`
- *   field — a lean `summary` stands in for the full `description` when set.
- * - **Per-call error isolation.** `execute` resolves a {@link ToolCall}'s tool by name
- *   and runs it, ALWAYS resolving a {@link ToolResult}: a success carries `value`, a
- *   handler throw is caught into `error`, and an unknown name becomes a not-found
- *   `error`. A tool throw NEVER escapes — it becomes a result the model can react to.
- * - **Batch never fails as a whole.** The array `execute` runs every call (via
- *   `Promise.all`) and resolves results correlated by `id` in order — one bad call
- *   (throw or not-found) does not fail the batch.
- * - **Event-free.** A purely functional registry — no Emitter, no events.
- */
-export interface ToolManagerInterface {
-	readonly count: number
-	add(tool: ToolInterface): void
-	add(tools: readonly ToolInterface[]): void
-	tool(name: string): ToolInterface | undefined
-	tools(): readonly ToolInterface[]
-	definitions(): readonly ToolDefinition[]
-	execute(call: ToolCall): Promise<ToolResult>
-	execute(calls: readonly ToolCall[]): Promise<readonly ToolResult[]>
-	remove(name: string): boolean
-	remove(names: readonly string[]): boolean
-	clear(): void
 }
 
 /**
@@ -603,7 +469,7 @@ export interface ScopeConfiguration {
 	/**
 	 * Allowed ACTIVE-workspace file `path`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
 	 * the filter {@link AgentContextInterface.build} applies to the active workspace's
-	 * {@link WorkspaceInterface.files} before rendering them (text → the system block, image →
+	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the system block, image →
 	 * the last user message).
 	 */
 	readonly files?: readonly string[]
@@ -700,9 +566,10 @@ export interface ScopeManagerInterface {
  * Options for `createAgentContext` — the richer context's configuration.
  *
  * @remarks
- * `system` is the optional system prompt prepended to the turn's input. `tools` /
- * `instructions` / `workspaces` are optional pre-built managers to reuse (bring your own
- * registry); when one is omitted, the context creates a fresh empty one. `scope` is the
+ * `system` is the optional system prompt prepended to the turn's input. `instructions` /
+ * `workspaces` are optional pre-built context managers to reuse (bring your own registry);
+ * when one is omitted, the context creates a fresh empty one. `tools` supplies the loop's
+ * call-dispatch and provider-advertising registry; it never renders into the prompt. `scope` is the
  * initial active filter applied at `build()` time (and at the loop's tool-advertise step); it
  * defaults to `undefined` — no filtering — and can be changed through the context's `apply`
  * method afterwards. `conversations` is the structural {@link ConversationManagerInterface} the
@@ -714,7 +581,10 @@ export interface ScopeManagerInterface {
  */
 export interface AgentContextOptions {
 	readonly system?: string
-	/** A pre-built tool registry to reuse; an empty one is created when omitted. */
+	/**
+	 * The loop's pre-built tool registry for provider advertising and call dispatch; an empty one is
+	 * created when omitted. Tools never render into `build()`'s prompt.
+	 */
 	readonly tools?: ToolManagerInterface
 	/** A pre-built instruction registry to reuse; an empty one is created when omitted. */
 	readonly instructions?: InstructionManagerInterface
@@ -746,8 +616,8 @@ export interface AgentContextOptions {
  * the conversation, applying the active scope per category.
  *
  * @remarks
- * The richer context — `system` (the optional system prompt), the context managers
- * (`instructions` / `tools` / `workspaces` / `conversations`), `messages` (the active
+ * The richer context — `system` (the optional system prompt), the prompt context managers
+ * (`instructions` / `workspaces` / `conversations`), `messages` (the active
  * conversation's live tail, satisfying {@link MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
  * scoped instructions into ONE leading `system` message (under the manager's `description`,
@@ -792,6 +662,10 @@ export interface AgentContextInterface {
 	 * clause 25).
 	 */
 	readonly conversations: ConversationManagerInterface
+	/**
+	 * The loop's tool registry for provider advertising and call dispatch. Tools are structural
+	 * loop machinery and never render into `build()`'s prompt.
+	 */
 	readonly tools: ToolManagerInterface
 	/** The active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */
 	readonly scope: ScopeInterface | undefined
@@ -816,12 +690,13 @@ export interface AgentContextInterface {
 	 *
 	 * @remarks
 	 * **The active workspace (rendered by carrier) — the SOLE document/image context.** When
-	 * `workspaces.active` is set, its {@link WorkspaceInterface.files} are filtered by
+	 * `workspaces.active` is set, its
+	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} are filtered by
 	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
-	 * carrier: TEXT files ({@link import('./helpers.js').isText}) render into a dedicated
+	 * carrier: TEXT files ({@link import('@orkestrel/workspace').isText}) render into a dedicated
 	 * `## Workspace` section in the system block — each a fenced
 	 * `` File: <path>\n```<language>\n<text>\n``` `` block — placed just after the instructions
-	 * section; IMAGE files ({@link import('./helpers.js').isImage}) have their base64 `data`
+	 * section; binary files whose MIME starts with `image/` have their base64 `data`
 	 * attached to the LAST user message (a vision provider reads images off a user turn).
 	 * ACTIVE-ONLY — never the other registered workspaces; with NO active workspace nothing is
 	 * rendered for workspaces.
@@ -1847,8 +1722,9 @@ export interface ConversationInterface {
 	 *
 	 * @remarks
 	 * The container serializes ITSELF (`{ id, summary, sections, messages: this.messages() }`) — the
-	 * {@link ConversationStoreInterface} persistence seam's payload, the EXACT analogue of
-	 * {@link WorkspaceInterface.snapshot}. The summarizer / `keep` are NOT serialized — they are live
+	 * {@link ConversationStoreInterface} persistence seam's payload, the exact analogue of
+	 * {@link import('@orkestrel/workspace').WorkspaceInterface}'s `snapshot`. The summarizer /
+	 * `keep` are NOT serialized — they are live
 	 * CONFIG re-supplied on hydrate (a `ConversationSummarizer` is a function, not data). The snapshot
 	 * is the durable analogue of the constructor `seed`: a {@link ConversationManagerInterface}
 	 * HYDRATES a conversation from it through that seam (see {@link ConversationManagerInterface.open}).
@@ -1863,7 +1739,8 @@ export interface ConversationInterface {
 /**
  * A JSON-serializable snapshot of a conversation's state — its `id`, the rollup `summary`, the
  * compacted `sections`, and the live tail `messages` — the durable payload the
- * {@link ConversationStoreInterface} persists. The EXACT analogue of {@link WorkspaceSnapshot}.
+ * {@link ConversationStoreInterface} persists. The exact analogue of
+ * {@link import('@orkestrel/workspace').WorkspaceSnapshot}.
  *
  * @remarks
  * Pure JSON DATA (no class instances, no functions): each {@link SectionInterface} and
@@ -1890,8 +1767,8 @@ export interface ConversationSnapshot {
 
 /**
  * The durable persistence seam for a {@link ConversationSnapshot} — three async primitives
- * (`get` / `set` / `delete`) keyed by a conversation id, the EXACT analogue of
- * {@link WorkspaceStoreInterface}.
+ * (`get` / `set` / `delete`) keyed by a conversation id, the exact analogue of
+ * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}.
  *
  * @remarks
  * The store persists the {@link ConversationSnapshot} — the self-contained, pure-JSON conversation
@@ -1907,7 +1784,9 @@ export interface ConversationSnapshot {
  *
  * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
  * same shape as the memory one. The snapshot carries its OWN id, so `set` takes no separate id
- * param (mirroring {@link WorkspaceStoreInterface.set}). UNLIKE a session store there is NO idle-TTL
+ * param (mirroring
+ * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`). UNLIKE a session store
+ * there is NO idle-TTL
  * / eviction — a persisted conversation lives until an explicit `delete`. It is concrete over
  * {@link ConversationSnapshot} — no generic parameter (AGENTS §21 minimal-interface), since the
  * snapshot is the ONE payload a conversation store persists.
@@ -1922,7 +1801,7 @@ export interface ConversationStoreInterface {
 	get(id: string): Promise<ConversationSnapshot | undefined>
 	/**
 	 * Insert or replace a snapshot under its own `snapshot.id` (no separate id param —
-	 * mirroring {@link WorkspaceStoreInterface.set}).
+	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
 	 *
 	 * @param snapshot - The snapshot to store (keyed by its `id`)
 	 */
@@ -1939,12 +1818,13 @@ export interface ConversationStoreInterface {
  * One row of the table a
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
  * persists — a conversation `id` plus its {@link ConversationSnapshot} held as ONE OPAQUE JSON
- * column. The EXACT analogue of {@link WorkspaceSnapshotRow}.
+ * column. The exact analogue of {@link import('@orkestrel/workspace').WorkspaceSnapshotRow}.
  *
  * @remarks
  * The Database twin of {@link ConversationStoreInterface} stores the snapshot whole (the `snapshot`
- * column is a `rawShape`, an opaque JSON blob — exactly as {@link WorkspaceSnapshotRow} stores a
- * workspace snapshot), so the row type stays FLAT and the sections/messages snapshot shape never
+ * column is a `rawShape`, an opaque JSON blob — exactly as
+ * {@link import('@orkestrel/workspace').WorkspaceSnapshotRow} stores a workspace snapshot), so the
+ * row type stays FLAT and the sections/messages snapshot shape never
  * forces the contract to `Infer` it. The column therefore reads back as the broad `unknown`; the
  * store narrows it to a {@link ConversationSnapshot} on `get`
  * ({@link import('./helpers.js').isConversationSnapshot}, the AGENTS §14 boundary narrow). `id`
@@ -1970,7 +1850,8 @@ export interface ConversationSnapshotRow {
  * (initial {@link ConversationEventMap} listeners). `snapshot` is
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are RESTORED into the new conversation (the live `summarize` / `keep` /
- * `on` re-supplied alongside it), the conversation analogue of {@link WorkspaceInput.seed} that a
+ * `on` re-supplied alongside it), the conversation analogue of
+ * {@link import('@orkestrel/workspace').WorkspaceInput}'s `seed` that a
  * {@link ConversationManagerInterface.open} reads a stored snapshot back through; hydration is
  * silent (no events). When both `snapshot.id` and `id` are given, `snapshot.id` wins (the snapshot
  * IS the conversation's identity).
@@ -1984,7 +1865,7 @@ export interface ConversationInput {
 	/** Overrides the manager's default `sections` cap for this conversation. */
 	readonly sections?: number
 	readonly on?: EmitterHooks<ConversationEventMap>
-	/** A {@link ConversationSnapshot} to hydrate FROM (its `id` / `summary` / `sections` / live tail restored); the analogue of `WorkspaceInput.seed`. */
+	/** A {@link ConversationSnapshot} to hydrate from, analogous to the workspace package's seed input. */
 	readonly snapshot?: ConversationSnapshot
 }
 
@@ -2013,8 +1894,8 @@ export interface ConversationManagerOptions {
 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory
 	 * / JSON / SQLite / IndexedDB store a conversation is HYDRATED from (`open` a registry-miss) and
 	 * PERSISTED to (`save`). Omitted ⇒ the manager is registry-only: `open` resolves only what is
-	 * already registered, and `save` is a no-op (`false`). The EXACT analogue of
-	 * {@link WorkspaceManagerOptions.store}.
+	 * already registered, and `save` is a no-op (`false`). The exact analogue of
+	 * {@link import('@orkestrel/workspace').WorkspaceManagerOptions}'s `store`.
 	 */
 	readonly store?: ConversationStoreInterface
 }
@@ -2023,7 +1904,7 @@ export interface ConversationManagerOptions {
  * A registry of {@link ConversationInterface}s keyed by their `id`, in insertion order, WITH an
  * active pointer — the §9 store over the conversation layer PLUS the `active` / `switch` seam the
  * {@link AgentContextInterface} renders. Event-free (a registry, like
- * {@link WorkspaceManagerInterface}); the observability lives on each
+ * {@link import('@orkestrel/workspace').WorkspaceManagerInterface}); the observability lives on each
  * {@link ConversationInterface}.
  *
  * @remarks
@@ -2046,8 +1927,8 @@ export interface ConversationManagerOptions {
  *   miss (rebuilding it through the constructor `seed` from the snapshot, flowing the manager's
  *   default `summarize` / `keep` in) and `save(id)` PERSISTS a registered conversation's
  *   {@link ConversationInterface.snapshot}. Both are LENIENT without a store — `open` resolves only
- *   registered ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. The EXACT
- *   analogue of {@link WorkspaceManagerInterface.open} / {@link WorkspaceManagerInterface.save}.
+ *   registered ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. It mirrors
+ *   the workspace package manager's `open` / `save` seam.
  * - **Event-free.** A purely registry store — no Emitter, no events (each conversation owns
  *   its own).
  */
@@ -2085,520 +1966,6 @@ export interface ConversationManagerInterface {
 	 * `false` — never a throw, consistent with the lenient `switch`.
 	 *
 	 * @param id - The id of the registered conversation to persist
-	 * @returns `true` when the snapshot was persisted; `false` when no store / unknown id
-	 */
-	save(id: string): Promise<boolean>
-	remove(ids: readonly string[]): boolean
-	remove(id: string): boolean
-	clear(): void
-}
-
-// Workspaces — the immutable file primitive + the in-memory Workspace edit surface (relocated
-// from the dissolved files/ module). A `File` is a PLAIN frozen record (no `id` — the `path` IS
-// its identity); its content is a TAGLESS text-vs-binary union narrowed by the isText / isBinary /
-// isImage guards (no `modality` discriminant). The Workspace is a mutable, `path`-keyed working
-// set of immutable Files with the full edit surface, observable through its emitter (§13).
-// `BinaryMIME` (the binary arm's MIME) is the canonical file-content MIME — the active workspace
-// is the SOLE document/image context, rendered into the turn by `AgentContext.build()`.
-
-/**
- * The binary MIME types a {@link FileContent} binary arm carries — the labels for a
- * base64-encoded payload.
- *
- * @remarks
- * Initialized to the four image MIMEs a vision-capable provider accepts; the union is OPEN
- * by design — a future binary MIME (e.g. `'application/pdf'`) slots in purely additively (a
- * new member), with nothing above it changed. {@link import('./helpers.js').isImage}
- * narrows a binary arm to an image by the `image/` prefix, so an image is just a binary with
- * an image MIME.
- */
-export type BinaryMIME = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'
-
-/**
- * A {@link FileInterface}'s content — a TAGLESS union of a TEXT arm and a BINARY arm, narrowed
- * by the {@link import('./helpers.js').isText} / {@link import('./helpers.js').isBinary}
- * guards (AGENTS §14: an untyped arm is narrowed via a guard, never an `as`).
- *
- * @remarks
- * - The TEXT arm carries the literal `text` plus the fenced-code `language` it renders as.
- * - The BINARY arm carries the base64-encoded `data` plus the {@link BinaryMIME} that labels it.
- *
- * There is no `modality` discriminant — the arms are told apart structurally
- * (`'text' in content` vs `'data' in content`) by the guards. A binary arm whose `mime`
- * starts with `image/` IS an image ({@link import('./helpers.js').isImage}). A future
- * non-image binary (a PDF) is the same binary arm with a new {@link BinaryMIME} — additive,
- * with nothing above it changed.
- */
-export type FileContent =
-	| { readonly text: string; readonly language: string }
-	| { readonly data: string; readonly mime: BinaryMIME }
-
-/**
- * The lifecycle state of a {@link FileInterface} relative to its (future) durable backing
- * — a multi-value lifecycle union (AGENTS §10), not a boolean.
- *
- * @remarks
- * `'created'` is a brand-new file not yet persisted; `'modified'` has unsaved edits over a
- * persisted original; `'loaded'` was read from the backing and is unchanged; `'deleted'`
- * is tombstoned. A `File` authored without a `state` defaults to `'created'`.
- */
-export type FileState = 'created' | 'modified' | 'loaded' | 'deleted'
-
-/**
- * The minimal data to author a {@link FileInterface} — `size` / `lines` are DERIVED from the
- * `content`, so a caller supplies only `path` / `content` (and an optional `state`, defaulting
- * to `'created'`).
- */
-export interface FileInput {
-	readonly path: string
-	readonly content: FileContent
-	/** The lifecycle state; defaults to `'created'` when omitted. */
-	readonly state?: FileState
-}
-
-/**
- * An immutable file value object — a `path`-addressed {@link FileContent} carrying a
- * lifecycle {@link FileState}, with `size` / `lines` DERIVED once when built.
- *
- * @remarks
- * A PLAIN frozen record (not a class instance) produced by
- * {@link import('./factories.js').createFile} — the `path` IS its identity (there is no
- * `id`). `size` and `lines` are computed from `content` when built (so they can never drift
- * from it) and re-read for free thereafter. Never mutated — a Workspace REPLACES a file
- * rather than editing it in place. A DATA-ONLY value object — no methods, plus it
- * `structuredClone`s losslessly (every field is a plain primitive / record).
- */
-export interface FileInterface {
-	readonly path: string
-	readonly content: FileContent
-	readonly state: FileState
-	/** Derived byte size: UTF-8 byte length (text) / decoded payload bytes (binary). */
-	readonly size: number
-	/** Derived line count: the text line count; `0` for a binary arm. */
-	readonly lines: number
-}
-
-/**
- * A 1-based caret position inside a text file — `line` and `column` both count from `1`
- * (column `1` is the first character of the line), matching an editor's gutter.
- *
- * @remarks
- * The {@link import('./workspaces/Workspace.js').Workspace} edit surface speaks 1-based
- * positions end to end ({@link Range}, {@link ReadResult}, {@link SearchMatch}). A
- * structurally invalid component (`line < 1` or `column < 1`) is rejected by a range op
- * (`RANGE`); an in-bounds-but-past-the-end one is CLAMPED to the nearest valid caret rather
- * than rejected.
- */
-export interface Position {
-	readonly line: number
-	readonly column: number
-}
-
-/**
- * A half-open span of text between two {@link Position}s — `start` INCLUSIVE, `end`
- * EXCLUSIVE (the character at `end` is not part of the span).
- *
- * @remarks
- * A range whose `start` is at or before its `end` is valid; an inverted range
- * (`start` after `end`) or one with a sub-1 component is structurally invalid and a range
- * op throws `RANGE`. Each in-bounds component is clamped to the text before it is applied,
- * so a range reaching past the end of the content reads / splices up to the end.
- */
-export interface Range {
-	readonly start: Position
-	readonly end: Position
-}
-
-/**
- * The outcome of a ranged {@link WorkspaceInterface.read} — the sliced `content` plus the
- * `range` actually applied after clamping (so a caller learns the real span it got).
- *
- * @remarks
- * `range` is the input {@link Range} CLAMPED to the file's bounds — when the requested
- * span reached past the end of the text, `range` reflects the trimmed span that was read,
- * never the original out-of-bounds request.
- */
-export interface ReadResult {
-	readonly content: string
-	/** The actual (clamped) range applied to produce `content`. */
-	readonly range: Range
-}
-
-/**
- * Options for {@link WorkspaceInterface.search} — how the `query` matches.
- *
- * @param options - The search options
- *
- * @remarks
- * - `regex` — treat `query` as a regular expression source rather than a literal substring; defaults to `false`.
- * - `exact` — match case-sensitively; defaults to `true` (set `false` for a case-insensitive scan).
- * - `limit` — stop after this many matches across all files; defaults to unlimited.
- */
-export interface SearchOptions {
-	readonly regex?: boolean
-	readonly exact?: boolean
-	readonly limit?: number
-}
-
-/**
- * One hit from {@link WorkspaceInterface.search} — where the match was found and the line
- * that carried it.
- *
- * @remarks
- * `line` / `column` are 1-based (column `1` is the first character of the line); `length`
- * is the matched substring's length; `content` is the FULL line the match sits on (not
- * just the matched fragment), so a caller can render the hit in context.
- */
-export interface SearchMatch {
-	readonly path: string
-	readonly line: number
-	readonly column: number
-	readonly length: number
-	/** The full text of the line the match was found on. */
-	readonly content: string
-}
-
-/**
- * Options for {@link WorkspaceInterface.replace} — how the `query` matches (the same axes
- * as {@link SearchOptions}).
- *
- * @param options - The replace options
- *
- * @remarks
- * - `regex` — treat `query` as a regular expression source rather than a literal substring; defaults to `false`.
- * - `exact` — match case-sensitively; defaults to `true`.
- * - `limit` — stop after this many replacements across all files; defaults to unlimited.
- */
-export interface ReplaceOptions {
-	readonly regex?: boolean
-	readonly exact?: boolean
-	readonly limit?: number
-}
-
-/**
- * The tally returned by {@link WorkspaceInterface.replace} — the `query` that ran, how
- * many occurrences were `replaced`, and the number of `files` changed.
- */
-export interface ReplaceResult {
-	readonly query: string
-	readonly replaced: number
-	readonly files: number
-}
-
-/**
- * The observable events a {@link import('./workspaces/Workspace.js').Workspace} emits
- * (AGENTS §13) — each fired AFTER the corresponding mutation completes.
- *
- * @remarks
- * - `write` — a file was written / edited, carrying the resulting {@link FileInterface}.
- * - `remove` — a single file was dropped, carrying its `path`.
- * - `move` — a file was re-keyed, carrying `{ from, to }`.
- * - `clear` — the workspace was emptied (the canonical "emptied" signal, fired by both `remove()` and `clear()`).
- */
-export type WorkspaceEventMap = {
-	readonly write: readonly [file: FileInterface]
-	readonly remove: readonly [path: string]
-	readonly move: readonly [move: { readonly from: string; readonly to: string }]
-	readonly clear: readonly []
-}
-
-/**
- * Options for {@link import('./factories.js').createWorkspace} / the
- * {@link import('./workspaces/Workspace.js').Workspace} constructor.
- *
- * @param options - The workspace options
- *
- * @remarks
- * - `id` — the workspace's identity (its key in a {@link WorkspaceManagerInterface}); MINTED via `crypto.randomUUID()` when omitted.
- * - `on` — initial {@link WorkspaceEventMap} listeners (AGENTS §8), wired at construction.
- * - `error` — the emitter's listener-error handler (AGENTS §13); a throw from any listener is routed here instead of rethrown.
- */
-export interface WorkspaceOptions {
-	readonly id?: string
-	readonly on?: EmitterHooks<WorkspaceEventMap>
-	readonly error?: EmitterErrorHandler
-}
-
-/**
- * A JSON-serializable snapshot of a workspace's state — its `id` plus a FLAT list of its
- * {@link FileInterface}s — the durable payload the {@link WorkspaceStoreInterface} persists.
- *
- * @remarks
- * Pure JSON DATA (no class instances, no functions): each {@link FileInterface} is already a
- * PLAIN frozen record that `structuredClone`s / JSON-round-trips losslessly, and a `File` carries
- * its OWN `path`, so a flat `files` list is enough to reconstruct the path-keyed map (no nested
- * `path → File` object needed for serialization). The snapshot the container produces from itself
- * ({@link WorkspaceInterface.snapshot}); the durable analogue of the constructor `seed`. A
- * {@link WorkspaceManagerInterface} hydrates a workspace from `snapshot.files` through the seed
- * seam (see {@link WorkspaceManagerInterface.open}). It is narrowed back from an untrusted storage
- * read by {@link import('./helpers.js').isWorkspaceSnapshot} (the AGENTS §14 boundary narrow).
- */
-export interface WorkspaceSnapshot {
-	readonly id: string
-	readonly files: readonly FileInterface[]
-}
-
-/**
- * The durable persistence seam for a {@link WorkspaceSnapshot} — three async primitives
- * (`get` / `set` / `delete`) keyed by a workspace id, mirroring the analogous
- * `WorkflowStoreInterface` in `@orkestrel/workflow` (and the driver-swap pattern a server
- * surface's session store would follow).
- *
- * @remarks
- * The store persists the {@link WorkspaceSnapshot} — the self-contained, pure-JSON workspace
- * state — so a JSON / SQLite / IndexedDB backend swaps in WITHOUT touching the manager or the
- * workspace: the in-memory default
- * {@link import('./workspaces/stores/MemoryWorkspaceStore.js').MemoryWorkspaceStore} and its
- * driver-pluggable twin
- * {@link import('./workspaces/stores/DatabaseWorkspaceStore.js').DatabaseWorkspaceStore} (the
- * snapshot as one opaque JSON column) share THIS one interface. Hydration is NOT a store concern
- * — a {@link WorkspaceManagerInterface} reads a snapshot back and rebuilds the live workspace
- * through the constructor `seed` (see {@link WorkspaceManagerInterface.open} /
- * {@link WorkspaceManagerInterface.save}).
- *
- * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
- * same shape as the memory one. The snapshot carries its OWN id, so `set` takes no separate id
- * param (mirroring the analogous `WorkflowStoreInterface.set` in `@orkestrel/workflow`). UNLIKE a
- * session store there is NO idle-TTL / eviction — a persisted workspace lives until an explicit
- * `delete`. It is concrete over {@link WorkspaceSnapshot} — no generic parameter (AGENTS §21
- * minimal-interface), since the snapshot is the ONE payload a workspace store persists.
- */
-export interface WorkspaceStoreInterface {
-	/**
-	 * Resolve the persisted snapshot for `id`, or `undefined` if none is stored.
-	 *
-	 * @param id - The workspace id to resolve (a {@link WorkspaceSnapshot.id})
-	 * @returns The persisted snapshot, or `undefined` if absent
-	 */
-	get(id: string): Promise<WorkspaceSnapshot | undefined>
-	/**
-	 * Insert or replace a snapshot under its own `snapshot.id` (no separate id param —
-	 * mirroring the analogous `WorkflowStoreInterface.set` in `@orkestrel/workflow`).
-	 *
-	 * @param snapshot - The snapshot to store (keyed by its `id`)
-	 */
-	set(snapshot: WorkspaceSnapshot): Promise<void>
-	/**
-	 * Drop a snapshot by id; an absent id is a no-op (no throw).
-	 *
-	 * @param id - The workspace id to drop
-	 */
-	delete(id: string): Promise<void>
-}
-
-/**
- * One row of the table a
- * {@link import('./workspaces/stores/DatabaseWorkspaceStore.js').DatabaseWorkspaceStore} persists
- * — a workspace `id` plus its {@link WorkspaceSnapshot} held as ONE OPAQUE JSON column.
- *
- * @remarks
- * The Database twin of {@link WorkspaceStoreInterface} stores the snapshot whole (the `snapshot`
- * column is a `rawShape`, an opaque JSON blob — exactly as the analogous
- * `WorkflowSnapshotRow` in `@orkestrel/workflow` stores a workflow snapshot), so the
- * row type stays FLAT and the `File`-list snapshot shape never forces the contract to `Infer` it.
- * The column therefore reads back as the broad `unknown`; the store narrows it to a
- * {@link WorkspaceSnapshot} on `get` ({@link import('./helpers.js').isWorkspaceSnapshot}, the
- * AGENTS §14 boundary narrow). `id` mirrors {@link WorkspaceSnapshot.id} (the primary key), so a
- * `set` writes `{ id: snapshot.id, snapshot }`.
- */
-export interface WorkspaceSnapshotRow {
-	readonly id: string
-	/** The whole {@link WorkspaceSnapshot} as one opaque JSON blob — read back as `unknown`, narrowed on `get`. */
-	readonly snapshot: unknown
-}
-
-/**
- * The machine-readable code a {@link import('./errors.js').WorkspaceError} carries
- * (AGENTS §12) — a `catch` branches on `error.code` instead of parsing the message.
- *
- * @remarks
- * - `MODALITY` — a text-only op (ranged read/write, `prepend`, `append`) was aimed at a binary file.
- * - `PATTERN` — a `search` / `replace` `query` was an invalid regular expression (with `regex: true`).
- * - `RANGE` — a ranged `write` got a structurally invalid {@link Range} (inverted, or a sub-1 line/column).
- * - `TOOL` — a handler-level validation fault raised by a workspace-editing tool boundary (see
- *   `@orkestrel/tool`) when the agent-supplied args were malformed / unknown. Distinct from the
- *   surface faults above (which the live workspace raises) — this is the tool boundary rejecting an
- *   un-parseable operation before any workspace call.
- */
-export type WorkspaceErrorCode = 'MODALITY' | 'PATTERN' | 'RANGE' | 'TOOL'
-
-/**
- * A mutable, `path`-keyed working set of immutable {@link FileInterface}s — the in-memory
- * editing surface over the file primitive.
- *
- * @remarks
- * Files live in an insertion-ordered map keyed by `path`. Every edit REPLACES the
- * immutable {@link FileInterface} at a path with a new one (transitioning its `state` to
- * `'created'` for a fresh path or `'modified'` for an existing one) rather than mutating in
- * place. The disk/sync lifecycle (`load` / `revert` / `accept` / `purge` / `dirty`) is
- * deliberately NOT part of this surface — it is deferred to a future FileStore. Text-only
- * operations on a binary file are governed by the modality rules (a ranged read/write,
- * `prepend`, and `append` throw `MODALITY`; a plain `read` returns `undefined`; `search` /
- * `replace` skip the file). Observe mutations through the owned {@link emitter} (AGENTS §13).
- */
-export interface WorkspaceInterface {
-	/** The workspace's identity — its key in a {@link WorkspaceManagerInterface}; minted when not supplied. */
-	readonly id: string
-	/** The push observation surface (AGENTS §13) — `write` / `remove` / `move` / `clear`. */
-	readonly emitter: EmitterInterface<WorkspaceEventMap>
-	/** The number of files currently held. */
-	readonly count: number
-	/** Look up one file by path, or `undefined` when absent. */
-	file(path: string): FileInterface | undefined
-	/** List every file in insertion order. */
-	files(): readonly FileInterface[]
-	// Read a whole text file's text, a clamped range of it, or a batch of text files.
-	read(path: string): string | undefined
-	read(path: string, range: Range): ReadResult | undefined
-	read(paths: readonly string[]): Readonly<Record<string, string>>
-	// Whether a path (or every path in a batch) is present.
-	has(path: string): boolean
-	has(paths: readonly string[]): boolean
-	/** Scan every text file's lines for `query`, returning each hit in insertion order. */
-	search(query: string, options?: SearchOptions): readonly SearchMatch[]
-	/** Replace `query` with `replacement` across every text file, returning the tally. */
-	replace(query: string, replacement: string, options?: ReplaceOptions): ReplaceResult
-	// Write a whole file, splice a range of an existing text file, or write a batch.
-	write(path: string, content: string): void
-	write(path: string, content: string, range: Range): void
-	write(files: Readonly<Record<string, string>>): void
-	// Prepend text to a file (creating it when absent), or to a batch.
-	prepend(path: string, content: string): void
-	prepend(files: Readonly<Record<string, string>>): void
-	// Append text to a file (creating it when absent), or to a batch.
-	append(path: string, content: string): void
-	append(files: Readonly<Record<string, string>>): void
-	// Re-key one file (overwriting an occupied target), or a batch; `true` if any moved.
-	move(from: string, to: string): boolean
-	move(mapping: Readonly<Record<string, string>>): boolean
-	// Empty the workspace, or drop one / a listed batch of files.
-	remove(): void
-	remove(path: string): boolean
-	remove(paths: readonly string[]): boolean
-	/** Empty the workspace (emits `clear`). */
-	clear(): void
-	/**
-	 * Serialize this workspace to a plain, JSON-serializable {@link WorkspaceSnapshot} — its
-	 * `id` plus a flat list of its {@link FileInterface}s (each already carries its `path`).
-	 *
-	 * @remarks
-	 * The container serializes ITSELF (`{ id: this.id, files: this.files() }`) — the
-	 * {@link WorkspaceStoreInterface} persistence seam's payload, paralleling the
-	 * {@link ConversationInterface}'s own snapshot a later track adds. The snapshot is the
-	 * durable analogue of the constructor `seed`: a {@link WorkspaceManagerInterface} HYDRATES a
-	 * workspace from `snapshot.files` through that seam (see {@link WorkspaceManagerInterface.open}).
-	 * Pure — the `File`s are already frozen plain records (so the snapshot `structuredClone`s /
-	 * JSON-round-trips losslessly), and snapshotting mutates nothing.
-	 *
-	 * @returns The {@link WorkspaceSnapshot} (`{ id, files }`)
-	 */
-	snapshot(): WorkspaceSnapshot
-}
-
-/**
- * The data to author a {@link WorkspaceInterface} through a
- * {@link WorkspaceManagerInterface} — the optional `id`, the reserved `on` hooks + `error`
- * handler (§13), and an optional `seed` of initial files.
- *
- * @remarks
- * `id` is the workspace's identity (minted when omitted). `on` / `error` are the §8/§13
- * keys (initial {@link WorkspaceEventMap} listeners + the listener-error handler), flowing
- * the manager's defaults in unless overridden. `seed` is the construction-time hydration
- * seam (path → {@link FileInterface}) — the only way to seat a non-text (binary) file, and
- * what a future FileStore reads a snapshot into; seeding is silent (no `write` events).
- */
-export interface WorkspaceInput {
-	readonly id?: string
-	readonly on?: EmitterHooks<WorkspaceEventMap>
-	readonly error?: EmitterErrorHandler
-	/** Pre-seeded initial files (path → File), placed silently at construction. */
-	readonly seed?: Iterable<readonly [string, FileInterface]>
-}
-
-/**
- * Options for `createWorkspaceManager` — the per-workspace `on` / `error` defaults the
- * workspaces it creates inherit.
- *
- * @remarks
- * `on` / `error` are the default {@link WorkspaceEventMap} listeners + the emitter's
- * listener-error handler (§13) flowed into every workspace the manager `add`s (a per-`add`
- * {@link WorkspaceInput.on} / `.error` overrides them). Kept minimal (AGENTS §21) — a
- * registry needs no more.
- */
-export interface WorkspaceManagerOptions {
-	/** The default event listeners for workspaces this manager creates (a per-`add` override wins). */
-	readonly on?: EmitterHooks<WorkspaceEventMap>
-	/** The default listener-error handler (a per-`add` override wins). */
-	readonly error?: EmitterErrorHandler
-	/**
-	 * The optional durable {@link WorkspaceStoreInterface} backing {@link WorkspaceManagerInterface.open}
-	 * / {@link WorkspaceManagerInterface.save} — a memory / JSON / SQLite / IndexedDB store a workspace
-	 * is HYDRATED from (`open` a registry-miss) and PERSISTED to (`save`). Omitted ⇒ the manager is
-	 * registry-only: `open` resolves only what is already registered, and `save` is a no-op (`false`).
-	 */
-	readonly store?: WorkspaceStoreInterface
-}
-
-/**
- * A registry of {@link WorkspaceInterface}s keyed by their `id`, in insertion order, WITH an
- * active pointer — the §9 store over the workspace layer PLUS the `active` / `switch` seam the
- * context renders. Event-free (each {@link WorkspaceInterface} owns its own `emitter`).
- *
- * @remarks
- * - **Registry.** `count` is how many are stored. `add(input?)` mints a
- *   {@link WorkspaceInterface} (its `id` from `input` or a random UUID), flowing the manager's
- *   default `on` / `error` in unless the `input` overrides them; `add` of an already-present
- *   `id` OVERWRITES it (last write wins). `workspace(id)` looks one up (`undefined` when
- *   absent); `workspaces()` lists them in insertion order.
- * - **Active pointer.** `active` is the active workspace (what the context renders), `undefined`
- *   until the FIRST `add` (which auto-activates it). A later `add` leaves `active` unchanged.
- *   `switch(id)` re-points `active` to the workspace with `id` and returns it; an unknown `id`
- *   returns `undefined` and leaves `active` unchanged (the lenient lookup style — never throws).
- * - **Removal.** `remove` drops one by id, or a batch (§9.2, array overload FIRST) — `true`
- *   when any was removed; removing the ACTIVE workspace sets `active` to `undefined`. `clear`
- *   empties the registry and sets `active` to `undefined`.
- * - **Durable open / save (the optional `store` seam).** When a {@link WorkspaceStoreInterface}
- *   is supplied (the `store` option), `open(id)` HYDRATES a workspace from the store on a registry
- *   miss (rebuilding it through the constructor `seed` from `snapshot.files`) and `save(id)`
- *   PERSISTS a registered workspace's {@link WorkspaceInterface.snapshot}. Both are LENIENT without
- *   a store — `open` resolves only registered ids, `save` is a no-op (`false`) — consistent with
- *   the lenient `switch`.
- * - **Event-free.** A purely registry store — no Emitter, no events (each workspace owns its own).
- */
-export interface WorkspaceManagerInterface {
-	readonly count: number
-	/** The active workspace — what the context renders; `undefined` until the first `add`. */
-	readonly active: WorkspaceInterface | undefined
-	workspace(id: string): WorkspaceInterface | undefined
-	workspaces(): readonly WorkspaceInterface[]
-	add(input?: WorkspaceInput): WorkspaceInterface
-	switch(id: string): WorkspaceInterface | undefined
-	/**
-	 * Resolve a workspace by id, ACTIVATING it — from the registry if present, else HYDRATED from
-	 * the optional {@link WorkspaceStoreInterface} (`store`).
-	 *
-	 * @remarks
-	 * - If `id` is ALREADY registered, it is ACTIVATED (`switch`ed to) and returned — no store hit.
-	 * - Else if a `store` is set, `store.get(id)` is awaited; on a HIT the snapshot is rehydrated
-	 *   into a fresh {@link WorkspaceInterface} through the constructor `seed`
-	 *   (`add({ id, seed: snapshot.files.map((file) => [file.path, file]) })`), which registers AND
-	 *   auto-activates it (or activates it explicitly), and it is returned.
-	 * - Else (no store, or a store MISS) ⇒ `undefined` (lenient — no throw).
-	 *
-	 * @param id - The workspace id to open
-	 * @returns The activated {@link WorkspaceInterface}, or `undefined` when neither registered nor stored
-	 */
-	open(id: string): Promise<WorkspaceInterface | undefined>
-	/**
-	 * Persist a REGISTERED workspace's {@link WorkspaceInterface.snapshot} to the optional
-	 * {@link WorkspaceStoreInterface} (`store`).
-	 *
-	 * @remarks
-	 * Lenient: when a `store` is set AND `id` is registered, `store.set(workspace.snapshot())` is
-	 * awaited and `true` is returned; otherwise (no store, OR an unknown id) it is a NO-OP returning
-	 * `false` — never a throw, consistent with the lenient `switch`.
-	 *
-	 * @param id - The id of the registered workspace to persist
 	 * @returns `true` when the snapshot was persisted; `false` when no store / unknown id
 	 */
 	save(id: string): Promise<boolean>

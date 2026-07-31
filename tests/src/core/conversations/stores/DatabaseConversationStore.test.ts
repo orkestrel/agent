@@ -1,6 +1,7 @@
-import { createDatabaseConversationStore, createDatabaseWorkspaceStore } from '@src/core'
+import { createDatabaseConversationStore } from '@src/core'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { rawShape, stringShape } from '@orkestrel/contract'
+import { createDatabaseWorkspaceStore } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../setup.js'
 

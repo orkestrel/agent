@@ -11,7 +11,7 @@ import { isConversationSnapshot } from '../../helpers.js'
  * conversation's durable state IS a row, so persistence reduces to keyed point-access (`get` / `set`
  * / `delete`) over a {@link TableInterface}, the driver-pluggable twin of the plain-`Map`
  * {@link import('./MemoryConversationStore.js').MemoryConversationStore}. The EXACT twin of
- * {@link import('../../workspaces/stores/DatabaseWorkspaceStore.js').DatabaseWorkspaceStore}.
+ * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}.
  *
  * @remarks
  * The store is driver-agnostic: it holds a single {@link TableInterface} whose backend (memory,
@@ -19,7 +19,7 @@ import { isConversationSnapshot } from '../../helpers.js'
  * IndexedDB backend swaps in WITHOUT touching the
  * {@link import('../ConversationManager.js').ConversationManager} or the
  * {@link import('../Conversation.js').Conversation} — the same seam as
- * {@link import('../../workspaces/stores/DatabaseWorkspaceStore.js').DatabaseWorkspaceStore}. The
+ * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. The
  * driver defaults to memory ({@link import('../../factories.js').createDatabaseConversationStore}
  * passes `createMemoryDriver()`), so it ALSO works in memory out of the box; you opt into the
  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.

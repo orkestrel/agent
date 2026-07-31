@@ -1,10 +1,10 @@
 # @orkestrel/agent
 
-A typed **agent runtime** for the `@orkestrel` line — providers, tools,
-conversations, workspaces, and a composable agent context. `createAgent`
-composes a `ProviderInterface`, an `AgentContextInterface`, and a tool
-registry into a bounded context → provider → tools → repeat turn, exposed as
-a one-shot `generate` and a live `stream`. Part of the `@orkestrel` line.
+A typed **agent runtime** for the `@orkestrel` line — providers,
+conversations, authority, durable jobs, and a composable agent context.
+`createAgent` consumes tool and workspace registries from their originating
+packages, composing a bounded context → provider → tools → repeat turn as a
+one-shot `generate` or live `stream`. Part of the `@orkestrel` line.
 
 ## Install
 
@@ -20,7 +20,8 @@ npm install @orkestrel/agent
 ## Usage
 
 ```ts
-import { createAgent, createTool, createToolManager } from '@orkestrel/agent'
+import { createAgent } from '@orkestrel/agent'
+import { createTool, createToolManager } from '@orkestrel/tool'
 
 const tools = createToolManager()
 tools.add(
@@ -44,9 +45,11 @@ const result = await stream.result // { content, usage?, partial }
 
 ## Guide
 
-For the full surface — providers, the agent loop, tools, conversations,
-workspaces, and the composable `AgentContext` — see
-[`guides/src/agent.md`](guides/src/agent.md).
+For the agent-owned surface — providers, conversations, authority, durable
+jobs, the loop, and `AgentContext` — see
+[`guides/src/agent.md`](guides/src/agent.md). Its consumed dependency
+surfaces are mirrored in [`guides/src/tool.md`](guides/src/tool.md) and
+[`guides/src/workspace.md`](guides/src/workspace.md).
 
 ## Package
 

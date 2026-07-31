@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentJobInput } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
-import {
-	createAgentRegistry,
-	createAuthority,
-	createMemoryConversationStore,
-	createTool,
-} from '@src/core'
+import { createTool } from '@orkestrel/tool'
+import { createAgentRegistry, createAuthority, createMemoryConversationStore } from '@src/core'
 import {
 	addTool,
 	createRecordingScheduler,

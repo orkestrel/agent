@@ -4,20 +4,21 @@ import type {
 	MessageInput,
 	MessageInterface,
 } from '@src/core'
+import { Tool, ToolManager } from '@orkestrel/tool'
+import {
+	WorkspaceManager,
+	createBinaryContent,
+	createFile,
+	createTextContent,
+	createWorkspaceManager,
+} from '@orkestrel/workspace'
 import {
 	AgentContext,
 	CONVERSATION_RECAP_PREFIX,
 	ConversationManager,
 	InstructionManager,
 	Scope,
-	Tool,
-	ToolManager,
 	WORKSPACE_SECTION_HEADER,
-	WorkspaceManager,
-	createBinaryContent,
-	createFile,
-	createTextContent,
-	createWorkspaceManager,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createStubSummarizer, requireValue } from '../../setup.js'
@@ -487,7 +488,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 			path: 'icon.png',
 			content: createBinaryContent('ICONB64', 'image/png'),
 		})
-		const seeded = context.workspaces.add({ seed: [['icon.png', icon]] })
+		const seeded = context.workspaces.add({ seed: [icon] })
 		context.workspaces.switch(seeded.id)
 		context.messages.add([
 			{ role: 'user', content: 'first' },
@@ -511,10 +512,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const a = createFile({ path: 'a.png', content: createBinaryContent('AIMG', 'image/png') })
 		const b = createFile({ path: 'b.png', content: createBinaryContent('BIMG', 'image/png') })
 		context.workspaces.add({
-			seed: [
-				['a.png', a],
-				['b.png', b],
-			],
+			seed: [a, b],
 		})
 		context.messages.add({ role: 'user', content: 'see' })
 
@@ -529,7 +527,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		// One active workspace holding BOTH a text file (added via write) and an image file (seeded,
 		// since write() only ever mints text files).
 		const image = createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') })
-		const workspace = context.workspaces.add({ seed: [['b.png', image]] })
+		const workspace = context.workspaces.add({ seed: [image] })
 		workspace.write('a.ts', 'const z = 9')
 		context.messages.add({ role: 'user', content: 'hi' })
 
@@ -595,22 +593,16 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		const context = new AgentContext({ system: 'sys' })
 		context.workspaces.add({
 			seed: [
-				[
-					'keep.txt',
-					createFile({ path: 'keep.txt', content: createTextContent('KEPT FILE', 'text') }),
-				],
-				[
-					'drop.txt',
-					createFile({ path: 'drop.txt', content: createTextContent('DROPPED FILE', 'text') }),
-				],
-				[
-					'keep.png',
-					createFile({ path: 'keep.png', content: createBinaryContent('KEEPIMG', 'image/png') }),
-				],
-				[
-					'drop.png',
-					createFile({ path: 'drop.png', content: createBinaryContent('DROPIMG', 'image/png') }),
-				],
+				createFile({ path: 'keep.txt', content: createTextContent('KEPT FILE', 'text') }),
+				createFile({ path: 'drop.txt', content: createTextContent('DROPPED FILE', 'text') }),
+				createFile({
+					path: 'keep.png',
+					content: createBinaryContent('KEEPIMG', 'image/png'),
+				}),
+				createFile({
+					path: 'drop.png',
+					content: createBinaryContent('DROPIMG', 'image/png'),
+				}),
 			],
 		})
 		context.messages.add({ role: 'user', content: 'hi' })
@@ -670,8 +662,8 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		const context = new AgentContext()
 		context.workspaces.add({
 			seed: [
-				['a.png', createFile({ path: 'a.png', content: createBinaryContent('IMGA', 'image/png') })],
-				['b.png', createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') })],
+				createFile({ path: 'a.png', content: createBinaryContent('IMGA', 'image/png') }),
+				createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') }),
 			],
 		})
 		return context
@@ -702,12 +694,7 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		// appends the workspace image data after — own-first, then workspace.
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [
-				[
-					'ctx.png',
-					createFile({ path: 'ctx.png', content: createBinaryContent('CTX', 'image/png') }),
-				],
-			],
+			seed: [createFile({ path: 'ctx.png', content: createBinaryContent('CTX', 'image/png') })],
 		})
 		context.messages.add({ role: 'user', content: 'see this', images: ['OWN'] })
 
@@ -719,9 +706,7 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 	it('does not mutate the stored message when attaching (immutability)', () => {
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [
-				['x.png', createFile({ path: 'x.png', content: createBinaryContent('X', 'image/png') })],
-			],
+			seed: [createFile({ path: 'x.png', content: createBinaryContent('X', 'image/png') })],
 		})
 		const stored = context.messages.add({ role: 'user', content: 'hi' })
 
@@ -736,9 +721,7 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 	it('skips attachment (no throw) when there is no user message', () => {
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [
-				['x.png', createFile({ path: 'x.png', content: createBinaryContent('X', 'image/png') })],
-			],
+			seed: [createFile({ path: 'x.png', content: createBinaryContent('X', 'image/png') })],
 		})
 		context.messages.add({ role: 'assistant', content: 'no user here' })
 
@@ -1257,12 +1240,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 	it('attaches the active workspace’s image data to the LAST user message of the conversation view', () => {
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [
-				[
-					'pic.png',
-					createFile({ path: 'pic.png', content: createBinaryContent('IMG', 'image/png') }),
-				],
-			],
+			seed: [createFile({ path: 'pic.png', content: createBinaryContent('IMG', 'image/png') })],
 		})
 		context.messages.add([
 			{ role: 'user', content: 'first' },

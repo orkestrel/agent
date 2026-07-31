@@ -1,4 +1,4 @@
-import type { AgentResult, ProviderResult, WorkspaceErrorCode } from './types.js'
+import type { AgentResult, ProviderResult } from './types.js'
 
 // AGENTS §12: a real error type, not a sentinel. `stream` throws a
 // ProviderAbortError when its bound signal aborts mid-flight, carrying the partial
@@ -145,58 +145,6 @@ export class ConversationError extends Error {
  */
 export function isConversationError(value: unknown): value is ConversationError {
 	return value instanceof ConversationError
-}
-
-// AGENTS §12: a text-only edit aimed at an image file, an invalid search/replace pattern,
-// or a structurally invalid edit range `throw`s a `WorkspaceError` carrying a
-// machine-readable `code`, so a `catch` branches on `error.code` instead of parsing the
-// message. The optional `context` bag names the offending path / range. Optional lookups
-// (`file`, a plain `read` of an absent or image path) return `undefined` — they never throw.
-
-/**
- * An error thrown by the in-memory {@link import('./workspaces/Workspace.js').Workspace} edit
- * surface.
- *
- * @remarks
- * Carries a {@link WorkspaceErrorCode} and an optional `context` bag naming the offending
- * path / range. Thrown for a text-only operation aimed at an image file (`MODALITY` — a
- * ranged read / write, `prepend`, or `append`), an invalid `search` / `replace` regular
- * expression (`PATTERN`), and a structurally invalid ranged-write {@link import('./types.js').Range}
- * (`RANGE` — inverted, or a sub-1 line / column).
- */
-export class WorkspaceError extends Error {
-	readonly code: WorkspaceErrorCode
-	readonly context?: Readonly<Record<string, unknown>>
-
-	constructor(
-		code: WorkspaceErrorCode,
-		message: string,
-		context?: Readonly<Record<string, unknown>>,
-	) {
-		super(message)
-		this.name = 'WorkspaceError'
-		this.code = code
-		if (context !== undefined) this.context = context
-	}
-}
-
-/**
- * Narrow an unknown caught value to a {@link WorkspaceError}.
- *
- * @param value - The value to test (typically a `catch` binding)
- * @returns `true` when `value` is a {@link WorkspaceError}
- *
- * @example
- * ```ts
- * try {
- * 	workspace.prepend('icon.png', '// header')
- * } catch (error) {
- * 	if (isWorkspaceError(error) && error.code === 'MODALITY') skipBinary()
- * }
- * ```
- */
-export function isWorkspaceError(value: unknown): value is WorkspaceError {
-	return value instanceof WorkspaceError
 }
 
 // AGENTS §12: a real error type, not a sentinel. Concurrent runs on one Agent whose

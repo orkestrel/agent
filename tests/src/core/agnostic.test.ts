@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ContextFormatInterface, ProviderInterface } from '@src/core'
-import { createAgent, createTool, createToolManager } from '@src/core'
+import { createAgent } from '@src/core'
+import { createTool, createToolManager } from '@orkestrel/tool'
 import {
 	collect,
 	createScriptedProvider,
@@ -97,7 +98,9 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		// The real tool executed exactly once, with the fed-in arguments → 5.
 		expect(executed).toBe(1)
 		const dispatched = chunks.flatMap((chunk) =>
-			chunk.type === 'tool' ? [{ name: chunk.call.name, value: chunk.result.value }] : [],
+			chunk.type === 'tool' && chunk.result.success
+				? [{ name: chunk.call.name, value: chunk.result.value }]
+				: [],
 		)
 		expect(dispatched).toEqual([{ name: 'add', value: 5 }])
 		// The loop fed the result back and the fake's SECOND turn produced the final answer.

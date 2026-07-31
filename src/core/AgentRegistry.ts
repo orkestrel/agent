@@ -7,14 +7,14 @@ import type {
 	AuthorityInterface,
 	ConversationStoreInterface,
 	ProviderInterface,
-	ToolInterface,
 } from './types.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import { createTokenBudget } from '@orkestrel/budget'
+import { ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
-import { ToolManager } from './tools/ToolManager.js'
 
 /**
  * The bridge that makes a durable, JSON-serializable {@link AgentJobInput} runnable —

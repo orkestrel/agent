@@ -38,19 +38,30 @@ parsers, and the shape DSL), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitives it is built from
 without leaving this guide set.
 
+[`src/tool.md`](src/tool.md) is a byte-identical mirror of the guide for
+`@orkestrel/tool` — a runtime dependency, the callable-tool registry the
+agent loop uses for provider advertising and call dispatch. It documents
+**that package's** tool definitions, results, execution, and workspace-editing
+integration, not anything sourced in this repo.
+
+[`src/workspace.md`](src/workspace.md) is a byte-identical mirror of the guide
+for `@orkestrel/workspace` — a runtime dependency, the file and workspace
+registries `AgentContext` consumes for prompt-carrier rendering. It documents
+**that package's** files, editing, persistence, and manager surface, not
+anything sourced in this repo.
+
 [`src/database.md`](src/database.md) is a byte-identical mirror of the guide
 for `@orkestrel/database` — a runtime dependency, the storage layer
-`DatabaseConversationStore` / `DatabaseWorkspaceStore` persist a snapshot
-over. It documents **that package's** surface (the database, tables, and
-driver layer), not anything sourced in this repo; it is kept here so a
-reader of this guide can see the persistence layer without leaving this
-guide set.
+`DatabaseConversationStore` persists a conversation snapshot over. It
+documents **that package's** surface (the database, tables, and driver layer),
+not anything sourced in this repo; it is kept here so a reader of this guide
+can see the persistence layer without leaving this guide set.
 
 [`src/emitter.md`](src/emitter.md) is a byte-identical mirror of the guide
 for `@orkestrel/emitter` — a runtime dependency, the typed push-observation
-surface the `Agent` / `Workspace` / `Conversation` / each manager exposes as
-`emitter`. It documents **that package's** surface, not anything sourced in
-this repo; it is kept here for the same reason.
+surface the `Agent`, `Conversation`, and observable agent-owned managers
+expose as `emitter`. It documents **that package's** surface, not anything
+sourced in this repo; it is kept here for the same reason.
 
 [`src/queue.md`](src/queue.md) is a byte-identical mirror of the guide for
 `@orkestrel/queue` — a runtime dependency, the bounded-concurrency, retrying,

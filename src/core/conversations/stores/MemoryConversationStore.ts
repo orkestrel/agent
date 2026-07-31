@@ -4,12 +4,12 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
  * The in-memory {@link ConversationStoreInterface} — a process-lifetime `Map` of
  * {@link ConversationSnapshot}s keyed by conversation id, the DEFAULT store
  * {@link import('../../factories.js').createMemoryConversationStore} builds. The EXACT twin of
- * {@link import('../../workspaces/stores/MemoryWorkspaceStore.js').MemoryWorkspaceStore}.
+ * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.
  *
  * @remarks
  * A plain `Map<string, ConversationSnapshot>` (AGENTS §21 — the snapshot is already pure,
  * self-contained JSON, so no encoding is needed for the memory tier). Like the
- * {@link import('../../workspaces/stores/MemoryWorkspaceStore.js').MemoryWorkspaceStore} it twins,
+ * {@link import('@orkestrel/workspace').MemoryWorkspaceStore} it twins,
  * there is NO idle-TTL and NO eviction: a persisted conversation lives until an explicit `delete`. A
  * durable backend (JSON / SQLite / IndexedDB) swaps in through the SAME interface without touching
  * the {@link import('../ConversationManager.js').ConversationManager} or the

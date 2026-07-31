@@ -15,13 +15,11 @@ import type {
 	ProviderInterface,
 	ProviderResult,
 	RunOutcome,
-	ToolCall,
-	ToolManagerInterface,
-	ToolResult,
 } from './types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterInterface } from '@orkestrel/emitter'
+import type { ToolCall, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
 import type { DeferredInterface, SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
@@ -526,7 +524,9 @@ export class Agent implements AgentInterface {
 					yield { type: 'tool', call, result: outcomeResult }
 					const toolMessage = this.#context.messages.add({
 						role: 'tool',
-						content: JSON.stringify(outcomeResult.value ?? outcomeResult.error),
+						content: outcomeResult.success
+							? JSON.stringify(outcomeResult.value)
+							: outcomeResult.error,
 					})
 					messages.push(toolMessage)
 				}
@@ -694,6 +694,7 @@ export class Agent implements AgentInterface {
 	// generic message). No `value`, so the loop feeds it back exactly like a tool error.
 	#denial(call: ToolCall, reason: string | undefined): ToolResult {
 		return {
+			success: false,
 			id: call.id,
 			name: call.name,
 			error: reason !== undefined ? `denied: ${reason}` : 'denied by authority',

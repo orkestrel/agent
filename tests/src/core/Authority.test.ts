@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AuthorityContextInterface, ToolCall } from '@src/core'
+import type { AuthorityContextInterface } from '@src/core'
+import type { ToolCall } from '@orkestrel/tool'
 import { createAuthority } from '@src/core'
 
 // Deterministic, Ollama-free unit tests for the Authority policy gate (the mirror of
