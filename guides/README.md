@@ -32,7 +32,7 @@ repo; it is kept here for the same reason.
 
 [`src/contract.md`](src/contract.md) is a byte-identical mirror of the guide
 for `@orkestrel/contract` — a runtime dependency, the shape DSL other tools
-(e.g. the `@orkestrel/tool` workspace-editing tool) compile their contracts
+(e.g. `@orkestrel/toolbox`'s `createWorkspaceTool`) compile their contracts
 through. It documents **that package's** surface (guards, combinators,
 parsers, and the shape DSL), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitives it is built from
@@ -41,8 +41,8 @@ without leaving this guide set.
 [`src/tool.md`](src/tool.md) is a byte-identical mirror of the guide for
 `@orkestrel/tool` — a runtime dependency, the callable-tool runtime the agent
 loop advertises definitions from and dispatches calls through. It documents
-**that package's** tool definitions, results, execution, and workspace-editing
-integration, not anything sourced in this repo.
+**that package's** tool definitions, results, and execution, not anything
+sourced in this repo.
 
 [`src/workspace.md`](src/workspace.md) is a byte-identical mirror of the guide
 for `@orkestrel/workspace` — a runtime dependency, the file domain whose active
