@@ -39,16 +39,17 @@ here so a reader of this package can see the primitives it is built from
 without leaving this guide set.
 
 [`src/tool.md`](src/tool.md) is a byte-identical mirror of the guide for
-`@orkestrel/tool` — a runtime dependency, the callable-tool registry the
-agent loop uses for provider advertising and call dispatch. It documents
+`@orkestrel/tool` — a runtime dependency, the callable-tool runtime the agent
+loop advertises definitions from and dispatches calls through. It documents
 **that package's** tool definitions, results, execution, and workspace-editing
 integration, not anything sourced in this repo.
 
 [`src/workspace.md`](src/workspace.md) is a byte-identical mirror of the guide
-for `@orkestrel/workspace` — a runtime dependency, the file and workspace
-registries `AgentContext` consumes for prompt-carrier rendering. It documents
-**that package's** files, editing, persistence, and manager surface, not
-anything sourced in this repo.
+for `@orkestrel/workspace` — a runtime dependency, the file domain whose active
+workspace `AgentContext` renders into a turn. It documents **that package's**
+files, editing, persistence, and manager surface, not anything sourced in this
+repo; the carrier split that turns those files into prompt content is agent's
+own and is documented in [`src/agent.md`](src/agent.md).
 
 [`src/database.md`](src/database.md) is a byte-identical mirror of the guide
 for `@orkestrel/database` — a runtime dependency, the storage layer
@@ -78,9 +79,11 @@ here so a reader of this package can see the primitive it is built from
 without leaving this guide set.
 
 [`src/workflow.md`](src/workflow.md) is a byte-identical mirror of the guide
-for `@orkestrel/workflow` — a runtime dependency. It documents **that
-package's** surface, not anything sourced in this repo; it is kept here for
-the same reason.
+for `@orkestrel/workflow` — a runtime dependency, the source of the
+`SchedulerInterface` the agent loop yields to between turns and of the
+`Runner` `createAgentRunner` composes. It documents **that package's**
+surface, not anything sourced in this repo; it is kept here for the same
+reason.
 
 [`src/guide.md`](src/guide.md) is a byte-identical mirror of the guide for
 `@orkestrel/guide` — the devDependency powering this repo's guides-parity
@@ -89,6 +92,13 @@ package's** surface (`Guide` / `Source`, the manifest and comparison
 helpers), not anything sourced in this repo; it is kept here so a reader of
 the parity suite can see the primitives it is built from without leaving
 this guide set.
+
+[`src/scaffold.md`](src/scaffold.md) is a byte-identical mirror of the guide
+for `@orkestrel/scaffold` — the devDependency whose blueprint compiler keeps
+this repository's own structure, configuration, and tooling on the shared
+canon. It documents **that package's** surface (blueprints, plans, artifacts,
+and the projections over them), not anything sourced in this repo; it is kept
+here for the same reason.
 
 ## See also
 

@@ -484,7 +484,7 @@ export interface ScopeInput extends ScopeConfiguration {
 }
 
 /**
- * A named, immutable filter over a richer context's items — the four per-category
+ * A named, immutable filter over a richer context's items — the three per-category
  * allow-lists ({@link ScopeConfiguration}) plus an `id` / `name`, and a `narrow` that
  * composes a tighter child by set-INTERSECTION.
  *
@@ -659,7 +659,7 @@ export interface AgentContextInterface {
 	 * `messages` is always defined. Switch the active conversation through
 	 * `conversations.switch(id)` — so one agent can serve MANY conversations (set the active one per
 	 * request). Switch BETWEEN runs, not during one; for CONCURRENT threads use separate agents (see
-	 * clause 25).
+	 * clause 23).
 	 */
 	readonly conversations: ConversationManagerInterface
 	/**

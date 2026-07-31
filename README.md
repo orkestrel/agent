@@ -1,10 +1,14 @@
 # @orkestrel/agent
 
-A typed **agent runtime** for the `@orkestrel` line — providers,
-conversations, authority, durable jobs, and a composable agent context.
-`createAgent` consumes tool and workspace registries from their originating
-packages, composing a bounded context → provider → tools → repeat turn as a
-one-shot `generate` or live `stream`. Part of the `@orkestrel` line.
+A typed **conversation runtime** for the `@orkestrel` line. An agent is a
+conversation with a model and the loop that carries it forward: messages,
+conversations and their compaction, instructions, scopes, prompt assembly, the
+authority gate, durable jobs, and a bounded context → provider → tools → repeat
+turn you can run as a one-shot `generate` or a live `stream`. The model itself
+is the one piece this package does not supply — any backend implementing
+`ProviderInterface` drops in. Callable tools come from `@orkestrel/tool` and
+documents from `@orkestrel/workspace`; the agent advertises the first to the
+model and renders the second into the prompt. Part of the `@orkestrel` line.
 
 ## Install
 
@@ -45,11 +49,11 @@ const result = await stream.result // { content, usage?, partial }
 
 ## Guide
 
-For the agent-owned surface — providers, conversations, authority, durable
-jobs, the loop, and `AgentContext` — see
-[`guides/src/agent.md`](guides/src/agent.md). Its consumed dependency
-surfaces are mirrored in [`guides/src/tool.md`](guides/src/tool.md) and
-[`guides/src/workspace.md`](guides/src/workspace.md).
+[`guides/src/agent.md`](guides/src/agent.md) documents the agent-owned surface:
+the provider boundary, conversations, instructions, scopes, authority, durable
+jobs, the loop, and `AgentContext`. The two packages it consumes are mirrored
+alongside it — [`guides/src/tool.md`](guides/src/tool.md) for callable tools and
+[`guides/src/workspace.md`](guides/src/workspace.md) for files.
 
 ## Package
 
