@@ -542,7 +542,7 @@ export interface ScopeManagerOptions {
  * mints + stores one (never overwrites), `scopes()` lists them in insertion order.
  *
  * @remarks
- * - **Registry.** `create(input)` mints a scope (an `id` + the four allow-lists) and
+ * - **Registry.** `create(input)` mints a scope (an `id` + the three allow-lists) and
  *   stores it; `count` is how many are stored. `scope(id)` looks one up; `scopes()` lists
  *   them in insertion order. (Keyed by minted `id`, not `name`, so two scopes may share a
  *   `name` and `create` always adds.)
@@ -1851,7 +1851,7 @@ export interface ConversationSnapshotRow {
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are RESTORED into the new conversation (the live `summarize` / `keep` /
  * `on` re-supplied alongside it), the conversation analogue of
- * {@link import('@orkestrel/workspace').WorkspaceInput}'s `seed` that a
+ * {@link import('@orkestrel/workspace').WorkspaceOptions}'s `seed` that a
  * {@link ConversationManagerInterface.open} reads a stored snapshot back through; hydration is
  * silent (no events). When both `snapshot.id` and `id` are given, `snapshot.id` wins (the snapshot
  * IS the conversation's identity).
