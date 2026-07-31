@@ -8,12 +8,80 @@ import type {
 	SectionInterface,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
+import type { JSONValue } from '@orkestrel/contract'
 import type { QueueExecution } from '@orkestrel/queue'
 import type { ControllerInterface } from '@orkestrel/workflow'
-import { isArray, isRecord, isString } from '@orkestrel/contract'
+import {
+	attempt,
+	isArray,
+	isBoolean,
+	isFiniteNumber,
+	isObject,
+	isRecord,
+	isString,
+	parseJSONValue,
+} from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentJobError } from './errors.js'
+
+/**
+ * Project an unknown value onto the canonical JSON representation of an
+ * {@link AgentResult}.
+ *
+ * @remarks
+ * This is a total hostile-boundary projection. Each structural field is captured once
+ * through Contract's sanctioned exception boundary, so conforming accessors and inherited
+ * properties are supported while a throwing getter or revoked proxy returns `undefined`.
+ * Present usage counts must be finite numbers; negative and fractional values are preserved,
+ * not normalized. Extra input properties are dropped while a fresh exact plain object is rebuilt
+ * and deep-gated through
+ * {@link import('@orkestrel/contract').parseJSONValue}.
+ *
+ * @param value - The unknown value to project
+ * @returns A fresh JSON value containing only AgentResult fields, or `undefined` when invalid
+ *
+ * @example
+ * ```ts
+ * import { agentResultToJSON } from '@orkestrel/agent'
+ *
+ * agentResultToJSON({ content: 'done', usage: { prompt: 2, completion: 1, total: 3 }, partial: false })
+ * // { content: 'done', usage: { prompt: 2, completion: 1, total: 3 }, partial: false }
+ * ```
+ */
+export function agentResultToJSON(value: unknown): JSONValue | undefined {
+	const captured = attempt(() => {
+		if (!isObject(value)) return undefined
+
+		const content = Reflect.get(value, 'content')
+		const thinking = Reflect.get(value, 'thinking')
+		const usage = Reflect.get(value, 'usage')
+		const partial = Reflect.get(value, 'partial')
+		if (!isString(content) || !isBoolean(partial)) return undefined
+		if (thinking !== undefined && !isString(thinking)) return undefined
+
+		let projectedUsage: TokenUsage | undefined
+		if (usage !== undefined) {
+			if (!isObject(usage)) return undefined
+			const prompt = Reflect.get(usage, 'prompt')
+			const completion = Reflect.get(usage, 'completion')
+			const total = Reflect.get(usage, 'total')
+			if (!isFiniteNumber(prompt) || !isFiniteNumber(completion) || !isFiniteNumber(total)) {
+				return undefined
+			}
+			projectedUsage = { prompt, completion, total }
+		}
+
+		return {
+			content,
+			...(thinking === undefined ? {} : { thinking }),
+			...(projectedUsage === undefined ? {} : { usage: projectedUsage }),
+			partial,
+		}
+	})
+
+	return captured.success ? parseJSONValue(captured.value) : undefined
+}
 
 /**
  * Filter a list of items by a {@link import('./types.js').ScopeInterface} allow-list of

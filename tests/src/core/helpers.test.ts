@@ -1,5 +1,6 @@
-import type { MessageInterface } from '@src/core'
+import type { AgentResult, MessageInterface } from '@src/core'
 import {
+	agentResultToJSON,
 	createAgentRegistry,
 	estimateMessages,
 	estimateTokens,
@@ -28,6 +29,241 @@ import { createScriptedProvider, createToolCall, createTokenUsage } from '../../
 // A minimal MessageInterface fixture — only the fields estimateMessages reads (content);
 // id/role round out the shape so it is a real message, not a partial.
 const message = (content: string): MessageInterface => ({ id: 'm', role: 'user', content })
+
+function returnUndefined(): undefined {
+	return undefined
+}
+
+class AgentResultAccessCounter {
+	content = 0
+	thinking = 0
+	usage = 0
+	partial = 0
+	prompt = 0
+	completion = 0
+	total = 0
+}
+
+class CountingTokenUsage {
+	#counter: AgentResultAccessCounter
+
+	constructor(counter: AgentResultAccessCounter) {
+		this.#counter = counter
+	}
+
+	get prompt(): number {
+		this.#counter.prompt += 1
+		return 2
+	}
+
+	get completion(): number {
+		this.#counter.completion += 1
+		return 1
+	}
+
+	get total(): number {
+		this.#counter.total += 1
+		return 3
+	}
+}
+
+class CountingAgentResult {
+	readonly counter = new AgentResultAccessCounter()
+	#usage = new CountingTokenUsage(this.counter)
+
+	get content(): string {
+		this.counter.content += 1
+		return 'done'
+	}
+
+	get thinking(): string {
+		this.counter.thinking += 1
+		return 'reasoning'
+	}
+
+	get usage(): CountingTokenUsage {
+		this.counter.usage += 1
+		return this.#usage
+	}
+
+	get partial(): boolean {
+		this.counter.partial += 1
+		return false
+	}
+}
+
+describe('agentResultToJSON', () => {
+	it('keeps the projection field map exhaustive over AgentResult', () => {
+		const fields = {
+			content: true,
+			thinking: true,
+			usage: true,
+			partial: true,
+		} satisfies Readonly<Record<keyof AgentResult, true>>
+
+		expect(Object.keys(fields)).toEqual(['content', 'thinking', 'usage', 'partial'])
+	})
+
+	it('projects a full result to a fresh exact JSON object', () => {
+		const source = {
+			content: 'done',
+			thinking: 'reasoning',
+			usage: { prompt: 2, completion: 1, total: 3, extra: 'drop' },
+			partial: false,
+			extra: 'drop',
+		}
+
+		const projected = agentResultToJSON(source)
+
+		expect(projected).not.toBe(source)
+		expect(projected).toEqual({
+			content: 'done',
+			thinking: 'reasoning',
+			usage: { prompt: 2, completion: 1, total: 3 },
+			partial: false,
+		})
+		source.usage.prompt = 99
+		expect(projected).toEqual({
+			content: 'done',
+			thinking: 'reasoning',
+			usage: { prompt: 2, completion: 1, total: 3 },
+			partial: false,
+		})
+		if (typeof projected !== 'object' || projected === null || Array.isArray(projected)) {
+			throw new Error('expected a projected record')
+		}
+		const projectedUsage = Reflect.get(projected, 'usage')
+		if (typeof projectedUsage !== 'object' || projectedUsage === null) {
+			throw new Error('expected projected usage')
+		}
+		expect(Object.getPrototypeOf(projected)).toBe(Object.prototype)
+		expect(Object.getPrototypeOf(projectedUsage)).toBe(Object.prototype)
+	})
+
+	it('omits absent optional fields', () => {
+		expect(agentResultToJSON({ content: '', partial: true })).toEqual({
+			content: '',
+			partial: true,
+		})
+		expect(
+			agentResultToJSON({ content: 'done', thinking: undefined, usage: undefined, partial: false }),
+		).toEqual({ content: 'done', partial: false })
+	})
+
+	it('captures conforming accessors, inherited fields, and every finite usage number', () => {
+		const accessor = { partial: false }
+		Object.defineProperty(accessor, 'content', {
+			enumerable: true,
+			get: () => 'done',
+		})
+		const inherited = { usage: { prompt: -1, completion: 1.5, total: 0 } }
+		Object.setPrototypeOf(inherited, { content: 'inherited', partial: true })
+
+		expect(agentResultToJSON(accessor)).toEqual({ content: 'done', partial: false })
+		expect(agentResultToJSON(inherited)).toEqual({
+			content: 'inherited',
+			usage: { prompt: -1, completion: 1.5, total: 0 },
+			partial: true,
+		})
+	})
+
+	it('reads each result and usage field exactly once', () => {
+		const source = new CountingAgentResult()
+
+		expect(agentResultToJSON(source)).toEqual({
+			content: 'done',
+			thinking: 'reasoning',
+			usage: { prompt: 2, completion: 1, total: 3 },
+			partial: false,
+		})
+		expect(source.counter).toEqual({
+			content: 1,
+			thinking: 1,
+			usage: 1,
+			partial: 1,
+			prompt: 1,
+			completion: 1,
+			total: 1,
+		})
+	})
+
+	const throwingAccessor = { partial: false }
+	const throwingGetter = Proxy.revocable(() => 'done', {})
+	throwingGetter.revoke()
+	Object.defineProperty(throwingAccessor, 'content', {
+		enumerable: true,
+		get: throwingGetter.proxy,
+	})
+
+	const usageAccessor = { content: 'done', partial: false, usage: { completion: 1, total: 2 } }
+	const usageGetter = Proxy.revocable(() => 1, {})
+	usageGetter.revoke()
+	Object.defineProperty(usageAccessor.usage, 'prompt', {
+		enumerable: true,
+		get: usageGetter.proxy,
+	})
+
+	const revokedRoot = Proxy.revocable({ content: 'done', partial: false }, {})
+	revokedRoot.revoke()
+	const getTrap = Proxy.revocable(() => undefined, {})
+	getTrap.revoke()
+	const throwingGet = new Proxy({}, { get: getTrap.proxy })
+	const revokedUsage = Proxy.revocable({ prompt: 1, completion: 1, total: 2 }, {})
+	const nestedRevoked = { content: 'done', usage: revokedUsage.proxy, partial: false }
+	revokedUsage.revoke()
+
+	const invalid: readonly (readonly [string, unknown])[] = [
+		['missing content', { partial: false }],
+		['missing partial', { content: 'done' }],
+		['wrong content type', { content: 1, partial: false }],
+		['wrong partial type', { content: 'done', partial: 'false' }],
+		['wrong thinking type', { content: 'done', thinking: 1, partial: false }],
+		['null usage', { content: 'done', usage: null, partial: false }],
+		['wrong usage type', { content: 'done', usage: 'tokens', partial: false }],
+		[
+			'NaN usage',
+			{ content: 'done', usage: { prompt: NaN, completion: 1, total: 2 }, partial: false },
+		],
+		[
+			'positive-infinite usage',
+			{
+				content: 'done',
+				usage: { prompt: 1, completion: Infinity, total: 2 },
+				partial: false,
+			},
+		],
+		[
+			'negative-infinite usage',
+			{
+				content: 'done',
+				usage: { prompt: 1, completion: 1, total: -Infinity },
+				partial: false,
+			},
+		],
+		['missing usage field', { content: 'done', usage: { prompt: 1, total: 2 }, partial: false }],
+		['throwing root accessor', throwingAccessor],
+		['nested usage accessor', usageAccessor],
+		['throwing get trap', throwingGet],
+		['revoked root proxy', revokedRoot.proxy],
+		['revoked nested usage proxy', nestedRevoked],
+		['undefined input', undefined],
+		['null input', null],
+		['string input', 'done'],
+		['number input', 1],
+		['boolean input', false],
+		['function input', returnUndefined],
+		['symbol input', Symbol('result')],
+		['bigint input', 1n],
+	]
+
+	it.each(invalid)('returns undefined without throwing for %s', (_label, input) => {
+		let projected: unknown = 'not called'
+		expect(() => {
+			projected = agentResultToJSON(input)
+		}).not.toThrow()
+		expect(projected).toBeUndefined()
+	})
+})
 
 describe('filterAllowList', () => {
 	const items = [{ name: 'a' }, { name: 'b' }, { name: 'c' }] as const
