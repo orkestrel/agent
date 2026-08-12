@@ -1339,7 +1339,7 @@ A successful run fires `start` → `unit`/`settle` per unit → `finish`. A fail
 
 ## Tests
 
-- [`tests/guides/parity.test.ts`](../../tests/guides/src/parity.test.ts) — the `## Surface` ↔ source bijection across `src/core` (value + type exports), plus each behavioral interface's `## Methods` ↔ source-method bijection and each implementing-class ↔ interface method parity.
+- [`tests/guides.test.ts`](../../tests/guides.test.ts) — the `## Surface` ↔ source bijection across `src/core` (value + type exports), plus each behavioral interface's `## Methods` ↔ source-method bijection and each implementing-class ↔ interface method parity.
 - [`tests/src/core/helpers.test.ts`](../../tests/src/core/helpers.test.ts) — status/lineage/snapshot helpers and bounded silence inheritance.
 - [`tests/src/core/cloners.test.ts`](../../tests/src/core/cloners.test.ts) — immutable activity cloning, hostile/revoked proxy containment, one-read getters, no alias retention, and stamp-vs-restore `updated` handling.
 - [`tests/src/core/validators.test.ts`](../../tests/src/core/validators.test.ts) — total activity, task-failure, task-result, and owned-snapshot guards over valid, malformed, cyclic, throwing-proxy/getter/ownKeys, and revoked inputs.

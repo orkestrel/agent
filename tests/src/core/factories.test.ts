@@ -27,7 +27,7 @@ import {
 	optionalShape,
 	stringShape,
 } from '@orkestrel/contract'
-import { createMemoryQueueStore } from '@orkestrel/queue'
+import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
 import {
 	createAgentJob,
@@ -544,7 +544,12 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 			.catch((error: unknown) => error)
 		expect(caught).toBeInstanceOf(Error)
 		expect(isAgentJobError(caught)).toBe(false)
-		expect(caught instanceof Error ? caught.message : '').toBe('attempt timed out')
+		// The fault belongs to the substrate, so it is asserted as the substrate's
+		// own error rather than as a message this package could not change. The
+		// wording is queue's to name; what agent promises is that its own job error
+		// is not what surfaces here.
+		expect(isQueueError(caught)).toBe(true)
+		expect(caught instanceof Error ? caught.message : '').toBe('queue attempt timed out')
 		expect(provider.started).toBe(2) // retried once
 	})
 
@@ -556,10 +561,14 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		const caught = await queue
 			.enqueue(createAgentJob(), { signal: AbortSignal.abort(reason) })
 			.catch((error: unknown) => error)
-		// A queue/entry abort is the hard-cancel path: it rejects directly with the signal's
-		// reason (not an AgentJobError), the handler never runs, and it is never retried.
-		expect(caught).toBe(reason)
+		// A queue/entry abort is the hard-cancel path: the handler never runs and it is
+		// never retried. The substrate reports the cancellation as its own coded error
+		// and carries what the caller aborted with on `cause`, so the reason is still
+		// reachable without this package unwrapping or restating it.
 		expect(isAgentJobError(caught)).toBe(false)
+		expect(isQueueError(caught)).toBe(true)
+		expect(isQueueError(caught) ? caught.code : undefined).toBe('aborted')
+		expect(caught instanceof Error ? caught.cause : undefined).toBe(reason)
 		expect(provider.started).toBe(0)
 	})
 })
