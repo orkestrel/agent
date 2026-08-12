@@ -11,8 +11,9 @@ import {
 } from '../../setup.js'
 
 // PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
-// on Ollama (or any concrete backend). This cross-cutting proof (structure-exempt name)
-// drives the FULL Agent loop with the shared scripted provider — no daemon, no `@src/ollama`
+// on Ollama (or any concrete backend). This is the `src/core` scope proof — `integration.test.ts`
+// is the reserved scope filename the mirror rule does not reach, and its scope is the directory
+// it sits in. It drives the FULL Agent loop with the shared scripted provider — no daemon, no `@src/ollama`
 // import at all — proving any conforming provider works with zero core knowledge of it:
 //  • a minimal provider's generate()/stream() drive content + a tool round-trip + summed
 //    usage, and an abort commits a partial;

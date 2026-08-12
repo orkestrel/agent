@@ -212,7 +212,7 @@ describe('agentResultToJSON', () => {
 	const nestedRevoked = { content: 'done', usage: revokedUsage.proxy, partial: false }
 	revokedUsage.revoke()
 
-	const invalid: readonly (readonly [string, unknown])[] = [
+	const invalid: ReadonlyArray<readonly [string, unknown]> = [
 		['missing content', { partial: false }],
 		['missing partial', { content: 'done' }],
 		['wrong content type', { content: 1, partial: false }],

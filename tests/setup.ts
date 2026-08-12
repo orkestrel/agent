@@ -362,9 +362,9 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
  */
 export function createStubSummarizer(): {
 	readonly summarize: ConversationSummarizer
-	readonly calls: readonly (readonly MessageInterface[])[]
+	readonly calls: ReadonlyArray<readonly MessageInterface[]>
 } {
-	const calls: (readonly MessageInterface[])[] = []
+	const calls: Array<readonly MessageInterface[]> = []
 	return {
 		get calls() {
 			return calls

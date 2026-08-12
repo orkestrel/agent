@@ -17,7 +17,7 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
-	createConversation,
+	type createConversation,
 	createConversationManager,
 	estimateMessages,
 	estimateTokens,
