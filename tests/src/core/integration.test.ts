@@ -2,13 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { ContextFormatInterface, ProviderInterface } from '@src/core'
 import { createAgent } from '@src/core'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import {
-	collect,
-	createScriptedProvider,
-	createTokenUsage,
-	requireValue,
-	type DeltasOf,
-} from '../../setup.js'
+import { createScriptedProvider, createTokenUsage, type DeltasOf } from '../../setup.js'
+import { collect, requireValue } from '@orkestrel/test'
 
 // PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
 // on Ollama (or any concrete backend). This is the `src/core` scope proof — `integration.test.ts`

@@ -35,8 +35,8 @@ import {
 	createScriptedProvider,
 	createTokenUsage,
 	loopTool,
-	waitForDelay,
 } from '../../setup.js'
+import { waitForDelay } from '@orkestrel/test'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
 // createAgent, all needing no daemon (AGENTS §16). `createOllama` (the live-Ollama

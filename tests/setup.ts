@@ -12,42 +12,22 @@ import type {
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterInterface, EventMap } from '@orkestrel/emitter'
+import type { RecorderInterface } from '@orkestrel/test'
 import type { ToolCall, ToolDefinition, ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
 import { createConversation, ProviderAbortError } from '@src/core'
+import { createRecorder, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Resolve after `ms` milliseconds — the single shared delay helper (AGENTS §16.1),
- * for letting a real short timer elapse instead of inlining a `setTimeout` promise
- * per test.
+ * Copy a value through `JSON.stringify` / `JSON.parse`, preserving its type.
  *
- * @param ms - Milliseconds to wait; defaults to `0` (a macrotask turn)
- * @returns A promise that resolves once the delay elapses
- */
-export function waitForDelay(ms = 0): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/**
- * Return a value after narrowing away `undefined`, or fail the current test setup loudly.
- *
- * @typeParam T - The expected value type
- * @param value - The value to require
- * @returns The defined value
- */
-export function requireValue<T>(value: T | undefined): T {
-	if (value === undefined) throw new Error('expected a defined value')
-	return value
-}
-
-/**
- * Round-trip a value through `JSON.parse(JSON.stringify(...))`, returning the structurally
- * identical clone — the one shared form of the "driver-swap parity" check the store / snapshot
- * tests repeat (AGENTS §16.1). A JSON-backed store persists a snapshot AS JSON, so a
- * structurally-faithful, pure-JSON payload must survive the round-trip byte-for-byte; a test
- * asserts `roundTripJSON(snapshot)` deep-equals the original.
+ * Local rather than `@orkestrel/test`'s: the published `roundTripJSON` constrains its
+ * argument to `JSONValue`, whose object arm needs an index signature. TypeScript grants
+ * one to a type alias and never to an `interface`, so a `ConversationSnapshot` — an
+ * interface, as `AGENTS.md` requires of a public type — cannot satisfy it. Adopt the
+ * published helper once that constraint is lifted.
  *
  * @typeParam T - The value's type, preserved across the clone
  * @param value - The (JSON-serializable) value to round-trip
@@ -376,59 +356,17 @@ export function createStubSummarizer(): {
 	}
 }
 
-// ── Call recorder (a real callback, not a mock) ──────────────────────────────
-//
-// AGENTS §16.1: when a test only needs to count calls or inspect arguments, use a
-// recorder — a real listener that records every invocation — rather than a test-
-// framework spy. `handler` is a genuine callback; `calls` is each invocation's
-// argument tuple, in order.
-
-/** A real call-recording callback over an argument tuple (AGENTS §16.1). */
-export interface TestRecorderInterface<TArgs extends readonly unknown[]> {
-	readonly calls: readonly TArgs[]
-	readonly count: number
-	readonly handler: (...args: TArgs) => void
-	clear(): void
-}
-
-/**
- * Create a {@link TestRecorderInterface} — a real callback that records each
- * invocation's arguments, for asserting what fired and with what (AGENTS §16.1).
- *
- * @typeParam TArgs - The argument tuple the recorded handler receives
- * @returns A recorder whose `handler` records into `calls`
- */
-export function createRecorder<TArgs extends readonly unknown[]>(): TestRecorderInterface<TArgs> {
-	const calls: TArgs[] = []
-	return {
-		get calls() {
-			return calls
-		},
-		get count() {
-			return calls.length
-		},
-		handler(...args: TArgs) {
-			calls.push(args)
-		},
-		clear() {
-			calls.length = 0
-		},
-	}
-}
-
 /**
  * Create a recorder for an {@link import('@orkestrel/emitter').EmitterErrorHandler} — the
- * emitter's own listener-error channel (AGENTS §13): a `TestRecorderInterface<[error, event]>`
+ * emitter's own listener-error channel (AGENTS §13): a `RecorderInterface<[error, event]>`
  * whose `handler` is wired as the `error` option, so an emit-safety test asserts a buggy
  * listener's throw was routed here (with the offending event name) instead of corrupting the
  * entity. Argument order is `(error, event)`, matching `EmitterErrorHandler`. A thin alias over
- * {@link createRecorder} (AGENTS §16.1 — extract-once over the per-entity emit-safety blocks).
+ * `createRecorder` (AGENTS §16.1 — extract-once over the per-entity emit-safety blocks).
  *
  * @returns A recorder of `[error: unknown, event: string]` calls
  */
-export function createErrorRecorder(): TestRecorderInterface<
-	readonly [error: unknown, event: string]
-> {
+export function createErrorRecorder(): RecorderInterface<readonly [error: unknown, event: string]> {
 	return createRecorder<readonly [error: unknown, event: string]>()
 }
 
@@ -438,7 +376,7 @@ export function createErrorRecorder(): TestRecorderInterface<
  * `destroyed` is the companion recorder a caller wires as the pool's `destroy` hook.
  */
 export type EmitterRecorders<TMap extends EventMap, TName extends keyof TMap> = {
-	readonly [K in TName]: TestRecorderInterface<TMap[K]>
+	readonly [K in TName]: RecorderInterface<TMap[K]>
 }
 
 /**
@@ -493,20 +431,6 @@ export function isTotal<TMap extends EventMap, TName extends keyof TMap>(
 	events: readonly TName[],
 ): recorders is EmitterRecorders<TMap, TName> {
 	return events.every((name) => recorders[name] !== undefined)
-}
-
-/**
- * Drain an `AsyncIterable<T>` (an agent chunk stream) into an array — the
- * assertion-friendly counterpart to a streaming read (AGENTS §16.1).
- *
- * @typeParam T - The element type yielded by the iterable
- * @param iterable - The async source to consume to completion
- * @returns Every yielded value, in iteration order
- */
-export async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
-	const values: T[] = []
-	for await (const value of iterable) values.push(value)
-	return values
 }
 
 /** A {@link SchedulerInterface} that records how many turn boundaries its `yield` paced. */

@@ -28,10 +28,8 @@ import {
 } from '@src/core'
 import {
 	addTool,
-	collect,
 	createErrorRecorder,
 	createGate,
-	createRecorder,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createStubSummarizer,
@@ -42,8 +40,8 @@ import {
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 	type TestGateInterface,
-	waitForDelay,
 } from '../../setup.js'
+import { collect, createRecorder, waitForDelay } from '@orkestrel/test'
 
 // Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
 // src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted
