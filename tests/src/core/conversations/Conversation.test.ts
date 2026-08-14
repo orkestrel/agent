@@ -629,7 +629,7 @@ describe('Conversation — sections cap (F2)', () => {
 
 		expect(zero).toThrow(ConversationError)
 		expect(negative).toThrow(ConversationError)
-		expect(zero).toThrowError(expect.objectContaining({ code: 'SECTIONS' }))
+		expect(zero).toThrow(expect.objectContaining({ code: 'SECTIONS' }))
 	})
 
 	it('accepts a fractional cap >= 1 (only the >= 1 bound is validated)', () => {
