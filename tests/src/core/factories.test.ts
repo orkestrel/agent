@@ -29,14 +29,8 @@ import {
 } from '@orkestrel/contract'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
-import {
-	createAgentJob,
-	createGate,
-	createScriptedProvider,
-	createTokenUsage,
-	loopTool,
-} from '../../setup.js'
-import { waitForDelay } from '@orkestrel/test'
+import { createAgentJob, createScriptedProvider, createTokenUsage, loopTool } from '../../setup.js'
+import { roundTripJSON, waitForDelay } from '@orkestrel/test'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
 // createAgent, all needing no daemon (AGENTS §16). `createOllama` (the live-Ollama
@@ -272,7 +266,7 @@ describe('createAgentQueue', () => {
 	})
 
 	it("threads the queue cancel into the agent — abort() fires the agent's (provider's) signal", async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		let providerSawAbort = false
 		// A provider that parks mid-call so the test can abort the queue while the agent is in
 		// flight, then records whether ITS signal aborted — proving the queue's cancel reached
@@ -332,7 +326,7 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 			limit: 4,
 			budget: 50_000,
 		}
-		const roundTripped: unknown = JSON.parse(JSON.stringify(input))
+		const roundTripped: AgentJobInput = roundTripJSON(input)
 		expect(roundTripped).toEqual(input)
 	})
 
@@ -407,7 +401,7 @@ describe('createAgentRunner', () => {
 	})
 
 	it("threads the runner cancel — abort() rejects the run and fires the agent's signal", async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		let providerSawAbort = false
 		const provider: ProviderInterface = {
 			id: 'p',

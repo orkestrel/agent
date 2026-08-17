@@ -20,49 +20,6 @@ import { createRecorder, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
 
-/**
- * Copy a value through `JSON.stringify` / `JSON.parse`, preserving its type.
- *
- * Local rather than `@orkestrel/test`'s: the published `roundTripJSON` constrains its
- * argument to `JSONValue`, whose object arm needs an index signature. TypeScript grants
- * one to a type alias and never to an `interface`, so a `ConversationSnapshot` — an
- * interface, as `AGENTS.md` requires of a public type — cannot satisfy it. Adopt the
- * published helper once that constraint is lifted.
- *
- * @typeParam T - The value's type, preserved across the clone
- * @param value - The (JSON-serializable) value to round-trip
- * @returns A structurally identical deep clone of `value`
- */
-export function roundTripJSON<T>(value: T): T {
-	return JSON.parse(JSON.stringify(value))
-}
-
-/** A manually-settled promise — the `resolve` / `reject` lifted out of its executor. */
-export interface TestGateInterface<T> {
-	readonly promise: Promise<T>
-	readonly resolve: (value: T) => void
-	readonly reject: (error: unknown) => void
-}
-
-/**
- * Create a {@link TestGateInterface} — a deferred whose `promise` settles only when
- * the test calls `resolve` / `reject`. Lets a test gate a real handler on a signal it
- * controls, to prove ordering / concurrency / pause behaviour without racing wall-clock
- * timers (AGENTS §16.1).
- *
- * @typeParam T - The value the gate's `promise` resolves with
- * @returns A gate exposing its `promise` and its `resolve` / `reject`
- */
-export function createGate<T = void>(): TestGateInterface<T> {
-	let resolve: (value: T) => void = () => {}
-	let reject: (error: unknown) => void = () => {}
-	const promise = new Promise<T>((res, rej) => {
-		resolve = res
-		reject = rej
-	})
-	return { promise, resolve, reject }
-}
-
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
 // AGENTS §16.1: the ONE general scripted `ProviderInterface` every Ollama-free agent
@@ -357,20 +314,6 @@ export function createStubSummarizer(): {
 }
 
 /**
- * Create a recorder for an {@link import('@orkestrel/emitter').EmitterErrorHandler} — the
- * emitter's own listener-error channel (AGENTS §13): a `RecorderInterface<[error, event]>`
- * whose `handler` is wired as the `error` option, so an emit-safety test asserts a buggy
- * listener's throw was routed here (with the offending event name) instead of corrupting the
- * entity. Argument order is `(error, event)`, matching `EmitterErrorHandler`. A thin alias over
- * `createRecorder` (AGENTS §16.1 — extract-once over the per-entity emit-safety blocks).
- *
- * @returns A recorder of `[error: unknown, event: string]` calls
- */
-export function createErrorRecorder(): RecorderInterface<readonly [error: unknown, event: string]> {
-	return createRecorder<readonly [error: unknown, event: string]>()
-}
-
-/**
  * A monotonic numeric resource allocator plus the recorders the pool / worker tests
  * assert against: `create` hands out `0, 1, 2, …` recording each into `created`, and
  * `destroyed` is the companion recorder a caller wires as the pool's `destroy` hook.
@@ -594,10 +537,4 @@ export function assertConversationStoreContract(
 			expect(await store.get('beta')).toEqual(beta)
 		})
 	})
-}
-
-/** Whether a repository-relative Vue SFC path belongs to the private browser application. */
-export function isBrowserVuePath(path: string): boolean {
-	const normalized = path.replaceAll('\\', '/')
-	return normalized.startsWith('app/browser/')
 }

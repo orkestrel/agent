@@ -28,8 +28,6 @@ import {
 } from '@src/core'
 import {
 	addTool,
-	createErrorRecorder,
-	createGate,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createStubSummarizer,
@@ -39,7 +37,6 @@ import {
 	recordEmitterEvents,
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
-	type TestGateInterface,
 } from '../../setup.js'
 import { collect, createRecorder, waitForDelay } from '@orkestrel/test'
 
@@ -52,7 +49,7 @@ import { collect, createRecorder, waitForDelay } from '@orkestrel/test'
 // messages / tools the loop sent) and `exhaust: 'throw'` (so a loop that over-ran its
 // script fails loudly rather than silently repeating the last turn). The only providers
 // that stay LOCAL are the genuine per-scenario BEHAVIOUR fixtures — a stream that parks
-// on a `createGate()` or throws mid-stream to drive the abort / error / concurrency /
+// on a `Promise.withResolvers<void>()` or throws mid-stream to drive the abort / error / concurrency /
 // cancel paths — which are scenario behaviour, not replayable data.
 
 const USAGE = createTokenUsage()
@@ -899,7 +896,7 @@ describe('Agent — abort', () => {
 	})
 
 	it('abort() mid-stream resolves partial with the accumulated content', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		// A provider whose stream yields one delta, then waits on a gate before the next —
 		// giving the test a window to call abort() mid-stream.
 		const provider: ProviderInterface = {
@@ -1391,8 +1388,8 @@ describe('Agent — re-entrancy / reuse', () => {
 		// `agent.abort()` must commit BOTH partial — the regression being that a shared
 		// single abort field made `abort()` fire only the latest run, leaving the earlier
 		// one to run to a full (non-partial) finish.
-		const g1 = createGate()
-		const g2 = createGate()
+		const g1 = Promise.withResolvers<void>()
+		const g2 = Promise.withResolvers<void>()
 		let started = 0
 		const provider: ProviderInterface = {
 			id: 'm',
@@ -1431,8 +1428,8 @@ describe('Agent — re-entrancy / reuse', () => {
 		// s1.abort() must cancel run 1 — even though a later stream() (run 2) exists. The
 		// regression being that the returned abort fired a shared field (overwritten by run
 		// 2), so s1.abort() cancelled run 2 and left run 1 running to a full finish.
-		const g1 = createGate()
-		const g2 = createGate()
+		const g1 = Promise.withResolvers<void>()
+		const g2 = Promise.withResolvers<void>()
 		let started = 0
 		const provider: ProviderInterface = {
 			id: 'own',
@@ -1501,7 +1498,7 @@ describe('Agent — cancellation timing matrix', () => {
 		// Turn 1 streams a delta + requests a tool whose handler parks on a gate; aborting
 		// while the handler is in flight must stop the loop and commit partial. The first
 		// turn's content delta was accumulated, so it surfaces as the partial content.
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const tools = createToolManager()
 		tools.add(
 			createTool({
@@ -2442,7 +2439,7 @@ describe('Agent — emitter (push observation surface)', () => {
 	})
 
 	it('a cancelled run fires abort THEN finish (the partial) — the documented semantics', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		// A provider that streams one delta then parks on a gate, giving a window to abort.
 		const provider: ProviderInterface = {
 			id: 's',
@@ -2548,7 +2545,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			],
 			SCRIPT_OPTIONS,
 		)
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const agent = createAgent(provider, { tools, limit: 5, error: errors.handler })
 		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
 		const thrown = new Error('observer blew up')
@@ -2585,7 +2582,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		)
 		// Count how many times the error handler is INVOKED — it must be exactly once
 		// (no recursion) even though it itself throws.
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const agent = createAgent(provider, {
 			tools,
 			limit: 5,
@@ -3315,7 +3312,7 @@ describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
 	// abort path must fold it into `result.usage` (mirroring the normal post-turn path) rather
 	// than silently dropping the aborted turn's tokens.
 	it('a cancel mid-stream carrying partial usage folds it into the settled result.usage', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
 		const provider: ProviderInterface = {
 			id: 's',
@@ -3345,7 +3342,7 @@ describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
 	})
 
 	it('a cancel mid-stream reconciles the budget to the reported partial usage (no double-charge, no loss)', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
 		const provider: ProviderInterface = {
 			id: 's',
@@ -3494,7 +3491,7 @@ describe('Agent - F4 per-run schema', () => {
 describe('Agent — concurrency guard (construction window/budget)', () => {
 	// A provider whose stream yields one delta then parks on a shared gate, so a test can hold a run
 	// "in flight" (its `#runs` handle already added) across a synchronous second `stream()` call.
-	const gatedProvider = (gate: TestGateInterface<void>): ProviderInterface => ({
+	const gatedProvider = (gate: PromiseWithResolvers<void>): ProviderInterface => ({
 		id: 'gated',
 		name: 'gated',
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
@@ -3508,7 +3505,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 	})
 
 	it('a construction `window` -- starting a 2nd run while the 1st is in flight throws AgentError(CONCURRENCY); the 1st still completes', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const agent = createAgent(gatedProvider(gate), { window: contextBudget(1_000_000) })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -3530,7 +3527,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 	})
 
 	it('a construction `budget` with NO per-run override on the 2nd call throws AgentError(CONCURRENCY)', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
 		const agent = createAgent(gatedProvider(gate), { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -3552,7 +3549,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 	})
 
 	it('a construction `budget` with a per-run `budget` override and NO window -- both concurrent runs settle', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const agent = createAgent(gatedProvider(gate), {
 			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
 		})
@@ -3640,7 +3637,7 @@ describe('Agent — strict compaction (F5)', () => {
 // a non-finite or negative field floors to 0, a fractional field floors to its integer part.
 describe('Agent — abort usage sanitize (F6)', () => {
 	it('sanitizes a provider abort partial usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
-		const gate = createGate()
+		const gate = Promise.withResolvers<void>()
 		const budget = createRecordingBudget(1_000_000)
 		const provider: ProviderInterface = {
 			id: 'dirty',

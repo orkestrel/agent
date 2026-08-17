@@ -1,7 +1,7 @@
 import type { ScopeInterface } from '@src/core'
 import { ScopeManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, recordEmitterEvents } from '../../../setup.js'
+import { recordEmitterEvents } from '../../../setup.js'
 import { createRecorder } from '@orkestrel/test'
 
 // ScopeManager is the id-keyed registry of reusable named scopes (AGENTS §16 — real
@@ -144,7 +144,7 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 	})
 
 	it('EMIT SAFETY: a throwing create listener cannot corrupt the registry, and routes to the error handler', () => {
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const manager = new ScopeManager(undefined, errors.handler)
 		manager.emitter.on('create', () => {
 			throw new Error('create observer blew up')
@@ -162,7 +162,7 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 	})
 
 	it('EMIT SAFETY: a throwing error handler neither escapes nor recurses', () => {
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const manager = new ScopeManager(undefined, (error, event) => {
 			errors.handler(error, event)
 			throw new Error('error handler blew up too')

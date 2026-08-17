@@ -7,8 +7,8 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, createStubSummarizer, recordEmitterEvents } from '../../../setup.js'
-import { requireValue } from '@orkestrel/test'
+import { createStubSummarizer, recordEmitterEvents } from '../../../setup.js'
+import { createRecorder, requireValue, roundTripJSON } from '@orkestrel/test'
 
 // The framed recap content a section's summary renders as in view() — the lean RECAP label
 // prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
@@ -409,7 +409,7 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
 describe('Conversation — observation is side-effect-free (§13)', () => {
 	it('a throwing compact listener is isolated + routed to the error handler; the fold still completes', async () => {
 		const stub = createStubSummarizer()
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const conversation = new Conversation({
 			summarize: stub.summarize,
 			error: errors.handler,
@@ -618,7 +618,7 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 		await conversation.compact()
 
 		const snapshot = conversation.snapshot()
-		expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot)
+		expect(roundTripJSON(snapshot)).toEqual(snapshot)
 	})
 })
 

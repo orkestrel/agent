@@ -1,7 +1,7 @@
 import type { ContextSectionFormat, InstructionInterface } from '@src/core'
 import { InstructionManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createErrorRecorder, recordEmitterEvents } from '../../../setup.js'
+import { recordEmitterEvents } from '../../../setup.js'
 import { createRecorder } from '@orkestrel/test'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
@@ -264,7 +264,7 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 	})
 
 	it('EMIT SAFETY: a throwing add listener cannot corrupt the registry, and routes to the error handler', () => {
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const manager = new InstructionManager({ error: errors.handler })
 		manager.emitter.on('add', () => {
 			throw new Error('add observer blew up')
@@ -282,7 +282,7 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 	})
 
 	it('EMIT SAFETY: a throwing error handler neither escapes nor recurses', () => {
-		const errors = createErrorRecorder()
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const manager = new InstructionManager({
 			error: (error, event) => {
 				errors.handler(error, event)

@@ -1,11 +1,8 @@
 import { createMemoryConversationStore, isConversationSnapshot } from '@src/core'
+import { roundTripJSON } from '@orkestrel/test'
 import { isToolCall } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
-import {
-	assertConversationStoreContract,
-	buildConversationSnapshot,
-	roundTripJSON,
-} from '../../../../setup.js'
+import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../setup.js'
 
 // The C-c MemoryConversationStore — the in-memory default behind the ConversationStoreInterface
 // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the
