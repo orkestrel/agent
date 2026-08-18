@@ -47,11 +47,19 @@ export type ScriptedTurn =
 			readonly thoughts?: readonly string[]
 	  }
 
-/** One recorded `generate` / `stream` call on a {@link createScriptedProvider} (when `record`). */
+/**
+ * One recorded `generate` / `stream` call on a {@link createScriptedProvider} (when `record`).
+ *
+ * @remarks
+ * `signal` is the live bound the call was handed — the agent's composed run signal (external
+ * signal + the run's own handle + the `timeout` deadline + the `budget`). A test holds it past
+ * the call to prove which bounds did, or did not, trip afterwards.
+ */
 export interface ScriptedCall {
 	readonly messages: readonly MessageInterface[]
 	readonly tools: readonly ToolDefinition[] | undefined
 	readonly options: ProviderStreamOptions | undefined
+	readonly signal: AbortSignal
 }
 
 /** How a {@link createScriptedProvider} chunks a turn's content into stream deltas. */
@@ -74,7 +82,7 @@ export type DeltasOf = (content: string) => readonly string[]
  * - `exhaust` — what happens once the turn list is consumed: `'repeat'` (the DEFAULT — the
  *   last turn repeats, so a job with extra tool-iterations still resolves) or `'throw'` (a
  *   call past the end throws, to assert a bounded loop never over-ran the script).
- * - `record` — when `true`, every call appends its `messages` / `tools` to `calls`.
+ * - `record` — when `true`, every call appends its `messages` / `tools` / `signal` to `calls`.
  */
 export interface ScriptedProviderOptions {
 	readonly delay?: number
@@ -89,14 +97,14 @@ export interface ScriptedProviderOptions {
  * A scripted {@link ProviderInterface} plus its live recorders — `maxInFlight` is the
  * high-water mark of concurrent calls (so a test can prove a queue / runner bounded the
  * agent jobs, e.g. `concurrency: 2` ⇒ `maxInFlight <= 2`), `started` counts calls, and
- * `calls` records each call's `messages` / `tools` (populated only under `record: true`).
+ * `calls` records each call's `messages` / `tools` / `signal` (populated only under `record: true`).
  */
 export interface ScriptedProviderInterface extends ProviderInterface {
 	/** The highest number of `stream` calls in flight at once across this provider's life. */
 	readonly maxInFlight: number
 	/** How many `stream` calls have started in total. */
 	readonly started: number
-	/** Each call's `messages` / `tools`, in order — populated only when `record: true`. */
+	/** Each call's `messages` / `tools` / `signal`, in order — populated only when `record: true`. */
 	readonly calls: readonly ScriptedCall[]
 }
 
@@ -154,7 +162,9 @@ export function createScriptedProvider(
 		tools?: readonly ToolDefinition[],
 		run?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
-		if (options?.record === true) calls.push({ messages: [...messages], tools, options: run })
+		if (options?.record === true) {
+			calls.push({ messages: [...messages], tools, options: run, signal })
+		}
 		started += 1
 		inFlight += 1
 		maxInFlight = Math.max(maxInFlight, inFlight)

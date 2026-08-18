@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type {
@@ -59,6 +59,11 @@ const USAGE = createTokenUsage()
 // script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
 // repeat — so a loop that should have stopped (a cap / budget / cancel) but didn't is caught.
 const SCRIPT_OPTIONS: ScriptedProviderOptions = { name: 'script', record: true, exhaust: 'throw' }
+
+// The real per-turn deadline every timeout test arms, in milliseconds. Real host timers
+// throughout — no test here replaces the clock — so the period is short enough that a test can
+// wait several of them out and the timeout tests together still cost a fraction of a second.
+const DEADLINE = 25
 
 /** A real, hand-rolled {@link BudgetInterface} over {@link TokenUsage} that RECORDS every
  * `consume()` call verbatim (AGENTS §16.1 recorder pattern) instead of extracting a single
@@ -1022,33 +1027,28 @@ describe('Agent — status', () => {
 	})
 })
 
-describe('Agent — deadline cleanup (fake timers)', () => {
-	afterEach(() => {
-		vi.useRealTimers()
-	})
-
+describe('Agent — deadline cleanup', () => {
 	// A normal completion must disarm the per-turn deadline — the timeout `Timeout` is
 	// `start()`ed when the run begins, so a turn that finishes naturally has to `clear()`
-	// it in a `finally`, never leaving the host `setTimeout` armed (it would keep the
-	// event loop alive and could abort a later turn if the Agent is reused). Fake timers
-	// make the leak observable: a leaked deadline shows as one pending host timer. The
-	// scripted provider only awaits microtasks, so `generate()` settles without advancing
-	// the clock — what remains is exactly the deadline timer under test.
-	it('clears the per-turn timeout on a successful generate (no leaked host timer)', async () => {
-		vi.useFakeTimers()
-		const agent = createAgent(
-			createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS),
-			{
-				timeout: 30_000,
-			},
-		)
+	// it in a `finally`, never leaving the host `setTimeout` armed. What makes the leak
+	// OBSERVABLE is what an armed deadline does when it expires: it aborts the composed run
+	// signal — the very signal the provider was handed and recorded on its call. So arm a
+	// real short deadline, let the run finish naturally, then wait several periods of real
+	// time. A cleared deadline never fires and that recorded signal stays unaborted; a
+	// leaked one fires during the wait and aborts it.
+	it('clears the per-turn deadline on a successful generate (it never fires afterwards)', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { timeout: DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.content).toBe('hi')
 		expect(result.partial).toBe(false)
-		// The deadline fired neither expiry nor abort — it must have been cleared, leaving
-		// zero pending host timers (a leak would report 1).
-		expect(vi.getTimerCount()).toBe(0)
+		// Well past the deadline — an uncleared one has long since expired by now.
+		await waitForDelay(DEADLINE * 3)
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.signal.aborted).toBe(false)
+		// And the settled result is untouched by the elapsed period.
+		expect(agent.status).toBe('done')
 	})
 })
 
@@ -1060,10 +1060,6 @@ describe('Agent — deadline cleanup (fake timers)', () => {
 // non-misleading partial + cancel the run, and a provider throw must reject `result` even
 // when `events` is never touched — all with the deadline timer cleared on every path.
 describe('Agent — stream drive (result settles independently of events)', () => {
-	afterEach(() => {
-		vi.useRealTimers()
-	})
-
 	it('settles result without draining events (the no-drain hang repro)', async () => {
 		const script: readonly ScriptedTurn[] = [
 			{ result: { content: 'hello', usage: USAGE }, deltas: ['hel', 'lo'] },
@@ -1088,25 +1084,30 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		expect(agent.status).toBe('done')
 	})
 
-	it('leaks no host timer when result is awaited without draining events', async () => {
-		vi.useFakeTimers()
-		const agent = createAgent(
-			createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS),
-			{
-				timeout: 30_000,
-			},
-		)
+	it('clears the deadline when result is awaited without draining events', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { timeout: DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
-		// Without draining `events`, the deadline's `clear()` must still run (it lives in the
-		// pump's `finally`, not the never-pulled events `finally`) — zero pending host timers.
+		// Without draining `events`, the deadline's `clear()` must still run — it lives in the
+		// pump's `finally`, not the never-pulled events `finally`.
 		const result = await stream.result
 		expect(result.content).toBe('hi')
-		expect(vi.getTimerCount()).toBe(0)
+		// Same observable as the successful-generate case: wait several real periods, and a
+		// deadline that was never cleared expires and aborts the recorded run signal.
+		await waitForDelay(DEADLINE * 3)
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.signal.aborted).toBe(false)
 	})
 
 	it('breaking out of events early settles a partial, cancels the run, and leaks no timer', async () => {
-		vi.useFakeTimers()
+		// The early break aborts the run signal deliberately, so — unlike the two cases above —
+		// "did the deadline fire?" is invisible on that signal. The remaining observable is the
+		// host's own live resource list: a deadline left armed IS a pending `Timeout` on the
+		// event loop, which is the leak this test names. Read the host's count before and after
+		// and require no net gain. The deadline below is far longer than the run, so a leaked
+		// one is guaranteed still pending at the second reading.
+		const before = process.getActiveResourcesInfo().filter((one) => one === 'Timeout').length
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => null }))
 		// A long script that would emit many chunks across turns if left to run — breaking
@@ -1118,7 +1119,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 			})),
 			SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, timeout: 30_000 })
+		const agent = createAgent(provider, { tools, timeout: 5_000 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		// Pull exactly ONE chunk via the iterator protocol, then `return()` the iterator —
@@ -1135,7 +1136,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		// status left 'running' (a cancel finishes the turn as 'done'), and no leaked deadline.
 		expect(agent.status).not.toBe('running')
 		expect(agent.status).toBe('done')
-		expect(vi.getTimerCount()).toBe(0)
+		expect(process.getActiveResourcesInfo().filter((one) => one === 'Timeout').length).toBe(before)
 	})
 
 	it('rejects result on a genuine provider error without draining events', async () => {
@@ -1490,10 +1491,6 @@ describe('Agent — re-entrancy / reuse', () => {
 // arrives after the run already finished (a harmless no-op).
 
 describe('Agent — cancellation timing matrix', () => {
-	afterEach(() => {
-		vi.useRealTimers()
-	})
-
 	it('abort DURING tool execution commits a partial (the tool turn already streamed)', async () => {
 		// Turn 1 streams a delta + requests a tool whose handler parks on a gate; aborting
 		// while the handler is in flight must stop the loop and commit partial. The first
@@ -1594,18 +1591,18 @@ describe('Agent — cancellation timing matrix', () => {
 		expect(result.content).toBe('a')
 	})
 
-	it('a deadline firing DURING tool execution commits partial (fake timers)', async () => {
-		vi.useFakeTimers()
-		// Turn 1 streams + requests a tool whose handler awaits a real timer; advancing the
-		// clock past the deadline while the handler is pending fires the timeout, so the loop
-		// commits partial rather than running turn 2.
+	it('a deadline firing DURING tool execution commits partial', async () => {
+		// Turn 1 streams + requests a tool whose handler outlives the deadline on real host
+		// timers: the deadline expires while the handler is still pending, so the loop commits
+		// partial rather than running turn 2. Both periods are real and short — the handler
+		// waits several deadlines, which is the only ordering the test depends on.
 		const tools = createToolManager()
 		tools.add(
 			createTool({
 				name: 'slow',
 				execute: async () => {
-					// A 10s handler — longer than the 1s deadline below.
-					await new Promise((resolve) => setTimeout(resolve, 10_000))
+					// A handler far longer than the deadline armed below.
+					await waitForDelay(DEADLINE * 6)
 					return 'done'
 				},
 			}),
@@ -1620,15 +1617,12 @@ describe('Agent — cancellation timing matrix', () => {
 			],
 			SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, timeout: 1_000 })
+		const agent = createAgent(provider, { tools, timeout: DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
-		// Let turn 1 stream + dispatch the tool (microtasks), then fire the deadline while
-		// the tool handler is still parked on its 10s timer.
-		await vi.advanceTimersByTimeAsync(1_001)
-		// Let the tool's own timer elapse so the handler resolves and the loop unwinds.
-		await vi.advanceTimersByTimeAsync(10_000)
+		// Turn 1 streams + dispatches the tool on microtasks, the deadline expires while the
+		// handler is still parked, then the handler's own wait elapses and the loop unwinds.
 		await drained
 		const result = await stream.result
 		expect(result.partial).toBe(true)
@@ -2259,10 +2253,6 @@ const AGENT_EVENTS = [
 ] as const
 
 describe('Agent — emitter (push observation surface)', () => {
-	afterEach(() => {
-		vi.useRealTimers()
-	})
-
 	it('a no-tools run fires start → turn → usage → finish with the right payloads', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'hello', usage: USAGE } }],
