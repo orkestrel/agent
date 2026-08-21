@@ -1,4 +1,4 @@
-import type { MessageInterface } from '@src/core'
+import type { ConversationEventMap, MessageInterface } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -7,8 +7,8 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer, recordEmitterEvents } from '../../../setup.js'
-import { createRecorder, requireValue, roundTripJSON } from '@orkestrel/test'
+import { createStubSummarizer } from '../../../setup.js'
+import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@orkestrel/test'
 
 // The framed recap content a section's summary renders as in view() — the lean RECAP label
 // prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
@@ -117,7 +117,10 @@ describe('Conversation — compact() with the default keep (0) folds all', () =>
 	it('folds the whole live tail into ONE section, empties the tail, sets the rollup, emits', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = recordEmitterEvents(conversation.emitter, ['compact', 'summary', 'rehydrate'])
+		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
+			conversation.emitter,
+			['compact', 'summary', 'rehydrate'],
+		)
 		conversation.add([
 			{ role: 'user', content: 'a' },
 			{ role: 'assistant', content: 'b' },
@@ -230,7 +233,10 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 	it('returns undefined and emits nothing when count <= keep', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = recordEmitterEvents(conversation.emitter, ['compact', 'summary'])
+		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
+			conversation.emitter,
+			['compact', 'summary'],
+		)
 		conversation.add([
 			{ role: 'user', content: 'a' },
 			{ role: 'user', content: 'b' },
@@ -308,7 +314,9 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 	it("returns a section's full original messages and emits rehydrate", async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = recordEmitterEvents(conversation.emitter, ['rehydrate'])
+		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
+			'rehydrate',
+		])
 		const originals = conversation.add([
 			{ role: 'user', content: 'remember me' },
 			{ role: 'assistant', content: 'and me' },
@@ -329,7 +337,9 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 	it('returns [] for an unknown section id (still emits rehydrate)', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = recordEmitterEvents(conversation.emitter, ['rehydrate'])
+		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
+			'rehydrate',
+		])
 
 		expect(conversation.rehydrate('nope')).toEqual([])
 		expect(events.rehydrate.calls).toEqual([['nope']])
@@ -674,7 +684,9 @@ describe('Conversation — sections cap (F2)', () => {
 	it("fires a 'collapse' event carrying the merged section when the cap forces a fold", async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
-		const events = recordEmitterEvents(conversation.emitter, ['collapse'])
+		const events = createRecorders<ConversationEventMap, 'collapse'>(conversation.emitter, [
+			'collapse',
+		])
 
 		conversation.add({ role: 'user', content: 'a' })
 		await conversation.compact()
@@ -887,7 +899,10 @@ describe('Conversation — hydrate seam (the constructor seed restores from a sn
 			{ summarize: createStubSummarizer().summarize },
 			source.snapshot(),
 		)
-		const events = recordEmitterEvents(restored.emitter, ['compact', 'summary', 'rehydrate'])
+		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
+			restored.emitter,
+			['compact', 'summary', 'rehydrate'],
+		)
 		// No event fires merely from construction — the recorder saw nothing post-hydrate.
 		expect(events.compact.count).toBe(0)
 		expect(events.summary.count).toBe(0)

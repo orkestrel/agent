@@ -1,8 +1,7 @@
-import type { ScopeInterface } from '@src/core'
+import type { ScopeInterface, ScopeManagerEventMap } from '@src/core'
 import { ScopeManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { recordEmitterEvents } from '../../../setup.js'
-import { createRecorder } from '@orkestrel/test'
+import { createRecorder, createRecorders } from '@orkestrel/test'
 
 // ScopeManager is the id-keyed registry of reusable named scopes (AGENTS §16 — real
 // behavior, no mocks). Covers create (minting an id, always adding — never overwriting),
@@ -11,10 +10,14 @@ import { createRecorder } from '@orkestrel/test'
 // listener can't corrupt a mutation + routes to the emitter's `error` handler, with no
 // recursion) mirroring the Table / InstructionManager §13 convention.
 
-// The ScopeManagerEventMap event names recorded across the emitter tests — fed to the
-// shared `recordEmitterEvents` (AGENTS §16.1: the per-event wiring is centralized; this
-// file keeps only the names its scenarios observe).
+// The ScopeManagerEventMap event names recorded across the emitter tests — fed to
+// `createRecorders` from @orkestrel/test (AGENTS §16.1: the per-event wiring lives in the
+// package; this file keeps only the names its scenarios observe). `createRecorders` takes
+// its event map from an explicit type argument: `TMap` appears only inside the generic `on`
+// method of its source parameter, which yields no inference candidate, so both arguments are
+// named at every call site.
 const SCOPE_EVENTS = ['create', 'remove', 'clear'] as const
+type ScopeEventName = (typeof SCOPE_EVENTS)[number]
 
 describe('ScopeManager — create & lookup', () => {
 	it('starts empty', () => {
@@ -98,7 +101,10 @@ describe('ScopeManager — remove & clear', () => {
 describe('ScopeManager — emitter (push observation surface §13)', () => {
 	it('fires create on each created scope, in order', () => {
 		const manager = new ScopeManager()
-		const events = recordEmitterEvents(manager.emitter, SCOPE_EVENTS)
+		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
+			manager.emitter,
+			SCOPE_EVENTS,
+		)
 		const one = manager.create({ name: 'a' })
 		const two = manager.create({ name: 'b' })
 
@@ -108,7 +114,10 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 	it('fires remove on a real removal; a miss emits nothing', () => {
 		const manager = new ScopeManager()
 		const scope = manager.create({ name: 'a' })
-		const events = recordEmitterEvents(manager.emitter, SCOPE_EVENTS)
+		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
+			manager.emitter,
+			SCOPE_EVENTS,
+		)
 
 		expect(manager.remove(scope.id)).toBe(true)
 		expect(manager.remove('missing')).toBe(false)
@@ -119,7 +128,10 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 		const manager = new ScopeManager()
 		const a = manager.create({ name: 'a' })
 		const b = manager.create({ name: 'b' })
-		const events = recordEmitterEvents(manager.emitter, SCOPE_EVENTS)
+		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
+			manager.emitter,
+			SCOPE_EVENTS,
+		)
 
 		manager.remove([a.id, 'missing', b.id])
 		expect(events.remove.calls).toEqual([[a.id], [b.id]])
@@ -128,7 +140,10 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 	it('fires clear when emptied', () => {
 		const manager = new ScopeManager()
 		manager.create({ name: 'a' })
-		const events = recordEmitterEvents(manager.emitter, SCOPE_EVENTS)
+		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
+			manager.emitter,
+			SCOPE_EVENTS,
+		)
 
 		manager.clear()
 		expect(events.clear.calls).toEqual([[]])

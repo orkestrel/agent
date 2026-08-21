@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type {
+	AgentEventMap,
 	AgentResult,
 	AgentStreamInterface,
 	ContextFormatInterface,
+	ConversationEventMap,
 	MessageInterface,
 	ProviderDelta,
 	ProviderInterface,
@@ -34,11 +36,10 @@ import {
 	createToolCall,
 	createTokenUsage,
 	loopTool,
-	recordEmitterEvents,
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 } from '../../setup.js'
-import { collect, createRecorder, waitForDelay } from '@orkestrel/test'
+import { collect, createRecorder, createRecorders, waitForDelay } from '@orkestrel/test'
 
 // Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
 // src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted
@@ -1825,7 +1826,10 @@ describe('Agent — provider failure modes', () => {
 			},
 		}
 		const agent = createAgent(provider, { tools, limit: 5 })
-		const events = recordEmitterEvents(agent.emitter, ['error', 'finish'])
+		const events = createRecorders<AgentEventMap, 'error' | 'finish'>(agent.emitter, [
+			'error',
+			'finish',
+		])
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		await expect(agent.generate()).rejects.toThrow('turn 2 boom')
@@ -2236,10 +2240,13 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 // (a throwing observer cannot corrupt the run, yet the error handler fires); and that
 // `generate()` and `stream()` drive the SAME events (they share `#run`).
 
-// The AgentEventMap event names recorded across the emitter tests — fed to the shared
-// `recordEmitterEvents` (AGENTS §16.1: the per-event wiring is centralized; this file
+// The AgentEventMap event names recorded across the emitter tests — fed to `createRecorders`
+// from @orkestrel/test (AGENTS §16.1: the per-event wiring lives in the package; this file
 // keeps only the names its scenarios observe). Returned recorders assert what fired, in
-// what order, with which payload, exactly as the local bundle did.
+// what order, with which payload, exactly as the local bundle did. `createRecorders` takes its
+// event map from an explicit type argument: `TMap` appears only inside the generic `on` method
+// of its source parameter, which yields no inference candidate, so both arguments are named at
+// every call site.
 const AGENT_EVENTS = [
 	'start',
 	'turn',
@@ -2251,6 +2258,7 @@ const AGENT_EVENTS = [
 	'abort',
 	'compactError',
 ] as const
+type AgentEventName = (typeof AGENT_EVENTS)[number]
 
 describe('Agent — emitter (push observation surface)', () => {
 	it('a no-tools run fires start → turn → usage → finish with the right payloads', async () => {
@@ -2259,7 +2267,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		// `start` once, carrying the agent id; one `turn` (index 0); usage once; finish once.
@@ -2286,7 +2294,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 3 })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		expect(provider.calls).toHaveLength(3)
@@ -2311,7 +2319,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 5 })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		// One `tool` event, carrying the executed call + its real result (mirrors the chunk).
@@ -2352,7 +2360,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		// The tool never ran; `deny` fired once carrying the call + the RULE's reason (not the
@@ -2392,7 +2400,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		// Fail-closed: `deny` carries the thrown error's message as the reason.
@@ -2415,7 +2423,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			},
 		}
 		const agent = createAgent(provider)
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await expect(agent.generate()).rejects.toThrow('boom')
 		// `error` fired once carrying the thrown value; `finish` / `abort` did NOT fire.
@@ -2452,7 +2460,7 @@ describe('Agent — emitter (push observation surface)', () => {
 				finish: () => order.push('finish'),
 			},
 		})
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -2476,7 +2484,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		controller.abort('preempted')
 		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
 		const agent = createAgent(provider, { signal: controller.signal })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result).toEqual({ content: '', partial: true })
@@ -2499,7 +2507,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 3 })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		// F1: limit-exhaustion with unresolved tool intent is NOT a cancel — `finish` fires,
@@ -2537,7 +2545,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		)
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const agent = createAgent(provider, { tools, limit: 5, error: errors.handler })
-		const events = recordEmitterEvents(agent.emitter, AGENT_EVENTS)
+		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		const thrown = new Error('observer blew up')
 		// A buggy `tool` observer that throws every time it fires.
 		agent.emitter.on('tool', () => {
@@ -2614,7 +2622,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			tools: makeTools(),
 			limit: 5,
 		})
-		const ea = recordEmitterEvents(a.emitter, AGENT_EVENTS)
+		const ea = createRecorders<AgentEventMap, AgentEventName>(a.emitter, AGENT_EVENTS)
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const ra = await a.generate()
 		// stream() path — same script, fully drained.
@@ -2622,7 +2630,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			tools: makeTools(),
 			limit: 5,
 		})
-		const eb = recordEmitterEvents(b.emitter, AGENT_EVENTS)
+		const eb = createRecorders<AgentEventMap, AgentEventName>(b.emitter, AGENT_EVENTS)
 		b.context.messages.add({ role: 'user', content: 'go' })
 		const stream = b.stream()
 		await collect(stream.events)
@@ -2725,7 +2733,9 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// the conversation's own `compact` event (the observability surface — NO new Agent event).
 		const window = contextBudget(12)
 		const { agent, conversation, provider } = compactionAgent(window)
-		const compacted = recordEmitterEvents(conversation.emitter, ['compact'])
+		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
 
 		const result = await agent.generate()
 
@@ -2757,7 +2767,9 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
 		const window = contextBudget(10_000)
 		const { agent, conversation } = compactionAgent(window)
-		const compacted = recordEmitterEvents(conversation.emitter, ['compact'])
+		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
 
 		const result = await agent.generate()
 
@@ -2794,7 +2806,9 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// produces the identical final answer the windowed run produced. This is the byte-for-byte
 		// additive proof: omitting `window` leaves the loop exactly as the cost-budget-only path.
 		const { agent, conversation } = compactionAgent(undefined)
-		const compacted = recordEmitterEvents(conversation.emitter, ['compact'])
+		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
 
 		const result = await agent.generate()
 
@@ -2933,7 +2947,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			window: contextBudget(12),
 			limit: 5,
 		})
-		const events = recordEmitterEvents(agent.emitter, ['compactError', 'error', 'finish'])
+		const events = createRecorders<AgentEventMap, 'compactError' | 'error' | 'finish'>(
+			agent.emitter,
+			['compactError', 'error', 'finish'],
+		)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const result = await agent.generate()
@@ -2978,7 +2995,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			window: contextBudget(12),
 			limit: 5,
 		})
-		const events = recordEmitterEvents(agent.emitter, ['compactError', 'finish'])
+		const events = createRecorders<AgentEventMap, 'compactError' | 'finish'>(agent.emitter, [
+			'compactError',
+			'finish',
+		])
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const result = await agent.generate()
@@ -3607,7 +3627,10 @@ describe('Agent — strict compaction (F5)', () => {
 			limit: 5,
 			strict: true,
 		})
-		const events = recordEmitterEvents(agent.emitter, ['compactError', 'error', 'finish'])
+		const events = createRecorders<AgentEventMap, 'compactError' | 'error' | 'finish'>(
+			agent.emitter,
+			['compactError', 'error', 'finish'],
+		)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		await expect(agent.generate()).rejects.toThrow('strict summarizer exploded')

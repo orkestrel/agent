@@ -1,8 +1,11 @@
-import type { ContextSectionFormat, InstructionInterface } from '@src/core'
+import type {
+	ContextSectionFormat,
+	InstructionInterface,
+	InstructionManagerEventMap,
+} from '@src/core'
 import { InstructionManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { recordEmitterEvents } from '../../../setup.js'
-import { createRecorder } from '@orkestrel/test'
+import { createRecorder, createRecorders } from '@orkestrel/test'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
 // directives block from (AGENTS §16 — real behavior, no mocks). Covers add (single +
@@ -13,9 +16,13 @@ import { createRecorder } from '@orkestrel/test'
 // emitter's `error` handler, with no recursion) mirroring Table's §13 convention.
 
 // The InstructionManagerEventMap event names recorded across the emitter tests — fed to
-// the shared `recordEmitterEvents` (AGENTS §16.1: the per-event wiring is centralized;
-// this file keeps only the names its scenarios observe).
+// `createRecorders` from @orkestrel/test (AGENTS §16.1: the per-event wiring lives in the
+// package; this file keeps only the names its scenarios observe). `createRecorders` takes its
+// event map from an explicit type argument: `TMap` appears only inside the generic `on` method
+// of its source parameter, which yields no inference candidate, so both arguments are named at
+// every call site.
 const INSTRUCTION_EVENTS = ['add', 'remove', 'clear'] as const
+type InstructionEventName = (typeof INSTRUCTION_EVENTS)[number]
 
 describe('InstructionManager — add & lookup', () => {
 	it('starts empty', () => {
@@ -203,7 +210,10 @@ describe('InstructionManager — remove & clear', () => {
 describe('InstructionManager — emitter (push observation surface §13)', () => {
 	it('fires add on each created instruction (single + batch), in order', () => {
 		const manager = new InstructionManager()
-		const events = recordEmitterEvents(manager.emitter, INSTRUCTION_EVENTS)
+		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(
+			manager.emitter,
+			INSTRUCTION_EVENTS,
+		)
 		const one = manager.add({ name: 'a', content: 'a' })
 		const [two, three] = manager.add([
 			{ name: 'b', content: 'b' },
@@ -215,7 +225,10 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 
 	it('fires add again on an overwrite (last write wins)', () => {
 		const manager = new InstructionManager()
-		const events = recordEmitterEvents(manager.emitter, INSTRUCTION_EVENTS)
+		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(
+			manager.emitter,
+			INSTRUCTION_EVENTS,
+		)
 		manager.add({ name: 'tone', content: 'v1' })
 		manager.add({ name: 'tone', content: 'v2' })
 
@@ -226,7 +239,10 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 	it('fires remove on a real removal; a miss emits nothing', () => {
 		const manager = new InstructionManager()
 		manager.add({ name: 'a', content: 'a' })
-		const events = recordEmitterEvents(manager.emitter, INSTRUCTION_EVENTS)
+		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(
+			manager.emitter,
+			INSTRUCTION_EVENTS,
+		)
 
 		expect(manager.remove('a')).toBe(true)
 		expect(manager.remove('missing')).toBe(false)
@@ -239,7 +255,10 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 			{ name: 'a', content: 'a' },
 			{ name: 'b', content: 'b' },
 		])
-		const events = recordEmitterEvents(manager.emitter, INSTRUCTION_EVENTS)
+		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(
+			manager.emitter,
+			INSTRUCTION_EVENTS,
+		)
 
 		manager.remove(['a', 'missing', 'b'])
 		expect(events.remove.calls).toEqual([['a'], ['b']])
@@ -248,7 +267,10 @@ describe('InstructionManager — emitter (push observation surface §13)', () =>
 	it('fires clear when emptied', () => {
 		const manager = new InstructionManager()
 		manager.add({ name: 'a', content: 'a' })
-		const events = recordEmitterEvents(manager.emitter, INSTRUCTION_EVENTS)
+		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(
+			manager.emitter,
+			INSTRUCTION_EVENTS,
+		)
 
 		manager.clear()
 		expect(events.clear.calls).toEqual([[]])
