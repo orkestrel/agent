@@ -304,13 +304,10 @@ describe('AgentContext — long conversation', () => {
 	it('prepends a single system message ahead of a long conversation in order', () => {
 		const context = new AgentContext({ system: 'sys' })
 		const turns: readonly MessageInterface[] = context.messages.add(
-			Array.from(
-				{ length: 200 },
-				(_, index): MessageInput => ({
-					role: index % 2 === 0 ? 'user' : 'assistant',
-					content: `turn-${index}`,
-				}),
-			),
+			Array.from({ length: 200 }, (_, index): MessageInput => ({
+				role: index % 2 === 0 ? 'user' : 'assistant',
+				content: `turn-${index}`,
+			})),
 		)
 
 		const built = context.build()
