@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { Channel } from '@src/core'
 import { collect, waitForDelay } from '@orkestrel/test'
 
-// The Channel is MODULE-INTERNAL to the agents surface (not barrel-exported), so it is
-// imported by its relative source path — the same way the server worker fixtures reach
-// an un-exported source file (no `@src/core/*` wildcard alias exists). These tests pin
-// the SUBTLE write/read decoupling the Agent relies on indirectly: a producer (`push` /
-// `close` / `fail`) and a consumer (`drain`) interleave through the resolver-swap park
-// without dropping, truncating, or re-ordering a chunk. Real async iteration, no mocks.
+// These tests pin the SUBTLE write/read decoupling the Agent relies on indirectly: a
+// producer (`push` / `close` / `fail`) and a consumer (`drain`) interleave through the
+// resolver-swap park without dropping, truncating, or re-ordering a chunk — including the
+// lost-wakeup case, where a push must wake a consumer already parked on an empty buffer.
+// Real async iteration, no mocks.
 
 describe('Channel — lost-wakeup (park then push)', () => {
 	it('delivers a value pushed while a consumer is parked', async () => {

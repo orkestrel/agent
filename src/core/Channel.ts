@@ -9,6 +9,18 @@
  * `push` / `close` / `fail` enqueue/flag, then fire `#wake` so the parked reader wakes,
  * re-reads the buffer, and either yields the next chunk, returns (on `close`), or throws
  * (on `fail`). Event-free, no `!` / `as` / `any`.
+ *
+ * @example
+ * ```ts
+ * import { Channel } from '@orkestrel/agent'
+ *
+ * const channel = new Channel<number>()
+ * channel.push(1)
+ * channel.close()
+ * for await (const value of channel.drain()) {
+ * 	value // 1
+ * }
+ * ```
  */
 export class Channel<T> {
 	readonly #buffer: T[] = []
