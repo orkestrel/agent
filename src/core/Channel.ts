@@ -49,11 +49,7 @@ export class Channel<T> {
 		for (;;) {
 			// Yield everything buffered before checking for end, so a close / fail that
 			// arrives alongside the last chunks still delivers those chunks first.
-			for (
-				let cell = this.#buffer.shift();
-				cell !== undefined;
-				cell = this.#buffer.shift()
-			)
+			for (let cell = this.#buffer.shift(); cell !== undefined; cell = this.#buffer.shift())
 				yield cell.value
 			if (this.#failure !== undefined) throw this.#failure.error
 			if (this.#closed) return
