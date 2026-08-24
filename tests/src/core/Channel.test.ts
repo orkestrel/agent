@@ -42,6 +42,26 @@ describe('Channel — lost-wakeup (park then push)', () => {
 	})
 })
 
+describe('Channel — undefined values', () => {
+	it('drains pushed undefined values in FIFO order', async () => {
+		const channel = new Channel<number | undefined>()
+		channel.push(1)
+		channel.push(undefined)
+		channel.push(3)
+		channel.close()
+		expect(await collect(channel.drain())).toStrictEqual([1, undefined, 3])
+	})
+
+	it('delivers undefined pushed while a consumer is parked', async () => {
+		const channel = new Channel<undefined>()
+		const drained = collect(channel.drain())
+		await waitForDelay(10)
+		channel.push(undefined)
+		channel.close()
+		expect(await drained).toStrictEqual([undefined])
+	})
+})
+
 describe('Channel — buffer-before-close (no truncation)', () => {
 	it('drains every chunk pushed before close, then ends', async () => {
 		const channel = new Channel<number>()

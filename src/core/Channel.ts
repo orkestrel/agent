@@ -23,13 +23,13 @@
  * ```
  */
 export class Channel<T> {
-	readonly #buffer: T[] = []
+	readonly #buffer: Array<{ value: T }> = []
 	#wake: (() => void) | undefined
 	#closed = false
 	#failure: { error: unknown } | undefined
 
 	push(value: T): void {
-		this.#buffer.push(value)
+		this.#buffer.push({ value })
 		this.#signal()
 	}
 
@@ -49,10 +49,12 @@ export class Channel<T> {
 		for (;;) {
 			// Yield everything buffered before checking for end, so a close / fail that
 			// arrives alongside the last chunks still delivers those chunks first.
-			while (this.#buffer.length > 0) {
-				const next = this.#buffer.shift()
-				if (next !== undefined) yield next
-			}
+			for (
+				let cell = this.#buffer.shift();
+				cell !== undefined;
+				cell = this.#buffer.shift()
+			)
+				yield cell.value
 			if (this.#failure !== undefined) throw this.#failure.error
 			if (this.#closed) return
 			await this.#parked()
