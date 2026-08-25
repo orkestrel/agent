@@ -16,7 +16,6 @@ import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
 import { createConversation, ProviderAbortError } from '@src/core'
 import { waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
-import { describe, expect, it } from 'vitest'
 
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
@@ -390,96 +389,162 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 	return conversation.snapshot()
 }
 
+// A `makeStore` builds a fresh, empty store for one scenario; `build` is
+// {@link buildConversationSnapshot}. Every scenario below RUNS the store operations and RETURNS
+// their plain results — it asserts nothing, since NO `describe` / `it` / `expect` may enter this
+// module. A consuming suite's own `it` block calls the scenario, then asserts on what it returns.
+export type MakeConversationStore = () => ConversationStoreInterface
+export type BuildConversationSnapshot = (id?: string) => Promise<ConversationSnapshot>
+
+/** The literal values a {@link conversationStoreRoundTrip} result must carry, shared by every twin. */
+export interface ConversationStoreRoundTripExpectation {
+	readonly sectionSummary: string
+	readonly sectionMessages: readonly string[]
+	readonly liveTail: readonly string[]
+	readonly rollupSummary: string
+}
+
 /**
- * Run the SHARED `ConversationStoreInterface` contract battery against a store factory — the four
- * common describe blocks both `{Memory,Database}ConversationStore` twins prove identically
- * (AGENTS §16.1): round-trip (set → get returns an equal snapshot, sections + live tail + rollup
- * summary all surviving), upsert (set keys off the snapshot's own id, so re-setting REPLACES),
- * delete & absent (set → delete → get is `undefined`; a delete of an absent id is a no-op; get of
- * an absent id is `undefined`), and two-ids-coexist (distinct ids never clobber each other; dropping
- * one leaves the other intact). Each twin calls this ONCE with its own factory and keeps its
- * twin-specific blocks local. This helper OWNS its `describe` / `it` calls — invoke it inside a test
- * file, never at the setup module's top level.
- *
- * @param makeStore - Builds a fresh, empty store for each assertion (the twin's own factory)
- * @param build - The snapshot builder ({@link buildConversationSnapshot}); takes an optional id
+ * The literal values `buildConversationSnapshot()`'s round trip must reproduce — the fold's section
+ * summary + retained messages, the live tail, and the rollup summary. Shared so both twin suites (and
+ * `setup.test.ts`'s own proof) assert the SAME literals rather than each retyping them.
  */
-export function assertConversationStoreContract(
-	makeStore: () => ConversationStoreInterface,
-	build: (id?: string) => Promise<ConversationSnapshot>,
-): void {
-	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
-		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
-			const store = makeStore()
-			const snapshot = await build()
-			await store.set(snapshot)
-			const got = await store.get(snapshot.id)
-			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
-			expect(got).toEqual(snapshot)
-			// It carries a compacted section, a live tail, AND a rollup summary (round-trip is non-vacuous).
-			expect(got?.sections).toHaveLength(1)
-			expect(got?.sections[0]?.summary).toBe('recap(first|second)')
-			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual([
-				'first',
-				'second',
-			])
-			expect(got?.messages.map((message) => message.content)).toEqual(['third'])
-			expect(got?.summary).toBe('recap(recap(first|second))')
-		})
-	})
+export const conversationStoreRoundTripExpectation: ConversationStoreRoundTripExpectation = {
+	sectionSummary: 'recap(first|second)',
+	sectionMessages: ['first', 'second'],
+	liveTail: ['third'],
+	rollupSummary: 'recap(recap(first|second))',
+}
 
-	describe('upsert (set replaces under the same id)', () => {
-		it('set replaces an existing snapshot under the same id', async () => {
-			// `set` keys off the snapshot's OWN id (no separate id param), so re-setting the same id
-			// REPLACES — proving insert-or-replace semantics, not an append (one entry, latest wins).
-			const store = makeStore()
-			const first = await build('c')
-			const second: ConversationSnapshot = {
-				id: 'c',
-				sections: [],
-				messages: [{ id: 'm1', role: 'user', content: 'only' }],
-			}
-			await store.set(first)
-			await store.set(second)
-			expect(await store.get('c')).toEqual(second)
-		})
-	})
+/**
+ * Run the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
+ * {@link buildConversationSnapshot} snapshot, then get it back. Returns what was stored and what came
+ * back, sections + live tail + rollup summary intact, so the caller's `it` block asserts the equality
+ * (and the literals in {@link conversationStoreRoundTripExpectation}) itself.
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param build - The snapshot builder ({@link buildConversationSnapshot})
+ * @returns The stored `snapshot` and the retrieved `got`
+ */
+export async function conversationStoreRoundTrip(
+	makeStore: MakeConversationStore,
+	build: BuildConversationSnapshot,
+): Promise<{
+	readonly snapshot: ConversationSnapshot
+	readonly got: ConversationSnapshot | undefined
+}> {
+	const store = makeStore()
+	const snapshot = await build()
+	await store.set(snapshot)
+	const got = await store.get(snapshot.id)
+	return { snapshot, got }
+}
 
-	describe('delete & absent', () => {
-		it('set → delete → get returns undefined', async () => {
-			const store = makeStore()
-			const snapshot = await build()
-			await store.set(snapshot)
-			expect(await store.get(snapshot.id)).toBeDefined()
-			await store.delete(snapshot.id)
-			expect(await store.get(snapshot.id)).toBeUndefined()
-		})
+/**
+ * Run the upsert scenario: `set` keys off the snapshot's OWN id (no separate id param), so
+ * re-setting the same id REPLACES — insert-or-replace semantics, not an append (one entry, latest
+ * wins). Returns the replacement and what `get` reads back, for the caller to assert equal.
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param build - The snapshot builder ({@link buildConversationSnapshot})
+ * @returns The replacement `second` snapshot and the retrieved `got`
+ */
+export async function conversationStoreUpsert(
+	makeStore: MakeConversationStore,
+	build: BuildConversationSnapshot,
+): Promise<{
+	readonly second: ConversationSnapshot
+	readonly got: ConversationSnapshot | undefined
+}> {
+	const store = makeStore()
+	const first = await build('c')
+	const second: ConversationSnapshot = {
+		id: 'c',
+		sections: [],
+		messages: [{ id: 'm1', role: 'user', content: 'only' }],
+	}
+	await store.set(first)
+	await store.set(second)
+	return { second, got: await store.get('c') }
+}
 
-		it('deleting an absent id does not throw (a no-op)', async () => {
-			const store = makeStore()
-			await expect(store.delete('never-stored')).resolves.toBeUndefined()
-		})
+/**
+ * Run the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
+ * again — the caller asserts `beforeDelete` is defined and `afterDelete` is `undefined`.
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param build - The snapshot builder ({@link buildConversationSnapshot})
+ * @returns The snapshot read before and after the delete
+ */
+export async function conversationStoreDeleteThenAbsent(
+	makeStore: MakeConversationStore,
+	build: BuildConversationSnapshot,
+): Promise<{
+	readonly beforeDelete: ConversationSnapshot | undefined
+	readonly afterDelete: ConversationSnapshot | undefined
+}> {
+	const store = makeStore()
+	const snapshot = await build()
+	await store.set(snapshot)
+	const beforeDelete = await store.get(snapshot.id)
+	await store.delete(snapshot.id)
+	const afterDelete = await store.get(snapshot.id)
+	return { beforeDelete, afterDelete }
+}
 
-		it('get of an absent id returns undefined', async () => {
-			const store = makeStore()
-			expect(await store.get('never-stored')).toBeUndefined()
-		})
-	})
+/**
+ * Run the absent-delete scenario: deleting an id that was never stored — the caller asserts the
+ * settled promise resolves `undefined` rather than rejecting (a no-op).
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @returns The store's own `delete` promise, unsettled
+ */
+export function conversationStoreDeleteAbsent(makeStore: MakeConversationStore): Promise<void> {
+	return makeStore().delete('never-stored')
+}
 
-	describe('two distinct conversation ids coexist', () => {
-		it('two distinct conversation ids coexist without cross-contamination', async () => {
-			// A real durable store holds many conversations; distinct ids must not clobber each other.
-			const store = makeStore()
-			const alpha = await build('alpha')
-			const beta = await build('beta')
-			await store.set(alpha)
-			await store.set(beta)
-			expect(await store.get('alpha')).toEqual(alpha)
-			expect(await store.get('beta')).toEqual(beta)
-			// Dropping one leaves the other intact.
-			await store.delete('alpha')
-			expect(await store.get('alpha')).toBeUndefined()
-			expect(await store.get('beta')).toEqual(beta)
-		})
-	})
+/**
+ * Run the absent-get scenario: getting an id that was never stored — the caller asserts the result
+ * is `undefined`.
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @returns What `get` resolves for an id the store never saw
+ */
+export function conversationStoreGetAbsent(
+	makeStore: MakeConversationStore,
+): Promise<ConversationSnapshot | undefined> {
+	return makeStore().get('never-stored')
+}
+
+/**
+ * Run the two-ids-coexist scenario: a real durable store holds many conversations, so distinct ids
+ * must not clobber each other, and dropping one must leave the other intact. Returns every snapshot
+ * and every read, before and after the `alpha` delete, for the caller to assert.
+ *
+ * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param build - The snapshot builder ({@link buildConversationSnapshot})
+ * @returns The two stored snapshots and the reads before/after dropping `alpha`
+ */
+export async function conversationStoreTwoIds(
+	makeStore: MakeConversationStore,
+	build: BuildConversationSnapshot,
+): Promise<{
+	readonly alpha: ConversationSnapshot
+	readonly beta: ConversationSnapshot
+	readonly gotAlpha: ConversationSnapshot | undefined
+	readonly gotBeta: ConversationSnapshot | undefined
+	readonly gotAlphaAfterDelete: ConversationSnapshot | undefined
+	readonly gotBetaAfterDelete: ConversationSnapshot | undefined
+}> {
+	const store = makeStore()
+	const alpha = await build('alpha')
+	const beta = await build('beta')
+	await store.set(alpha)
+	await store.set(beta)
+	const gotAlpha = await store.get('alpha')
+	const gotBeta = await store.get('beta')
+	await store.delete('alpha')
+	const gotAlphaAfterDelete = await store.get('alpha')
+	const gotBetaAfterDelete = await store.get('beta')
+	return { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete }
 }

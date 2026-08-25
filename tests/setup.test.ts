@@ -11,8 +11,14 @@ import { isProviderAbortError } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
 	addTool,
-	assertConversationStoreContract,
 	buildConversationSnapshot,
+	conversationStoreDeleteAbsent,
+	conversationStoreDeleteThenAbsent,
+	conversationStoreGetAbsent,
+	conversationStoreRoundTrip,
+	conversationStoreRoundTripExpectation,
+	conversationStoreTwoIds,
+	conversationStoreUpsert,
 	createAgentJob,
 	createRecordingScheduler,
 	createScriptedProvider,
@@ -406,10 +412,67 @@ describe('buildConversationSnapshot', () => {
 	})
 })
 
-// The exported store battery, driven once against a conforming boundary. Registering it here is
-// the proof: the helper's whole behaviour IS the block of cases it registers, so a battery that
-// stopped registering, or that registered a contract a conforming store cannot satisfy, reddens
-// this file. The store twins keep their own invocation and their own twin-specific blocks.
-describe('assertConversationStoreContract registers a contract a conforming store passes', () => {
-	assertConversationStoreContract(createFixtureStore, buildConversationSnapshot)
+// The exported store contract scenarios, driven once each against a conforming boundary. Running them
+// here is the proof: the helper's whole behaviour IS what each scenario returns, so a scenario that
+// stopped returning a real result, or returned one a conforming store cannot satisfy, reddens this
+// file. The store twins keep their own registration and their own twin-specific blocks.
+describe('conversation-store contract scenarios run against a conforming store', () => {
+	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
+		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+			const { snapshot, got } = await conversationStoreRoundTrip(
+				createFixtureStore,
+				buildConversationSnapshot,
+			)
+			expect(got).toEqual(snapshot)
+			expect(got?.sections).toHaveLength(1)
+			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
+			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.sectionMessages,
+			)
+			expect(got?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.liveTail,
+			)
+			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+		})
+	})
+
+	describe('upsert (set replaces under the same id)', () => {
+		it('set replaces an existing snapshot under the same id', async () => {
+			const { second, got } = await conversationStoreUpsert(
+				createFixtureStore,
+				buildConversationSnapshot,
+			)
+			expect(got).toEqual(second)
+		})
+	})
+
+	describe('delete & absent', () => {
+		it('set → delete → get returns undefined', async () => {
+			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+				createFixtureStore,
+				buildConversationSnapshot,
+			)
+			expect(beforeDelete).toBeDefined()
+			expect(afterDelete).toBeUndefined()
+		})
+
+		it('deleting an absent id does not throw (a no-op)', async () => {
+			await expect(conversationStoreDeleteAbsent(createFixtureStore)).resolves.toBeUndefined()
+		})
+
+		it('get of an absent id returns undefined', async () => {
+			expect(await conversationStoreGetAbsent(createFixtureStore)).toBeUndefined()
+		})
+	})
+
+	describe('two distinct conversation ids coexist', () => {
+		it('two distinct conversation ids coexist without cross-contamination', async () => {
+			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
+				await conversationStoreTwoIds(createFixtureStore, buildConversationSnapshot)
+			expect(gotAlpha).toEqual(alpha)
+			expect(gotBeta).toEqual(beta)
+			expect(gotAlphaAfterDelete).toBeUndefined()
+			expect(gotBetaAfterDelete).toEqual(beta)
+		})
+	})
 })

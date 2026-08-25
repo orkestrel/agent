@@ -3,7 +3,19 @@ import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { rawShape, stringShape } from '@orkestrel/contract'
 import { createDatabaseWorkspaceStore } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
-import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../setup.js'
+import {
+	buildConversationSnapshot,
+	conversationStoreDeleteAbsent,
+	conversationStoreDeleteThenAbsent,
+	conversationStoreGetAbsent,
+	conversationStoreRoundTrip,
+	conversationStoreRoundTripExpectation,
+	conversationStoreTwoIds,
+	conversationStoreUpsert,
+} from '../../../../setup.js'
+
+const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
+	createDatabaseConversationStore(createMemoryDriver())
 
 // src/core/agents/conversations/stores/DatabaseConversationStore.ts — the durable, driver-pluggable
 // twin of the plain-Map MemoryConversationStore behind the ConversationStoreInterface seam (get /
@@ -13,16 +25,72 @@ import { assertConversationStoreContract, buildConversationSnapshot } from '../.
 // memory driver, with REAL ConversationSnapshot values (§16 NO mocks) — a genuine `compact()`
 // produces real sections + a rollup, plus a live tail.
 
-// The shared `ConversationStoreInterface` contract battery (round-trip / upsert / delete & absent /
+// The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
-// tests/setup.ts (AGENTS §16.1). This file invokes that battery against the database factory (over a
-// REAL memory driver) and keeps only its TWIN-SPECIFIC blocks below: the default-driver overload,
-// cross-instance durability over a shared driver, and sibling-store non-collision.
+// tests/setup.ts (AGENTS §16.1). `setup.ts` exports each scenario as a plain function returning its
+// result (NO `describe` / `it` / `expect` bound in), so THIS file registers the battery against the
+// database factory (over a REAL memory driver) and asserts on what each scenario returns, keeping only
+// its TWIN-SPECIFIC blocks below: the default-driver overload, cross-instance durability over a shared
+// driver, and sibling-store non-collision.
 describe('DatabaseConversationStore', () => {
-	assertConversationStoreContract(
-		() => createDatabaseConversationStore(createMemoryDriver()),
-		buildConversationSnapshot,
-	)
+	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
+		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+			const { snapshot, got } = await conversationStoreRoundTrip(
+				makeStore,
+				buildConversationSnapshot,
+			)
+			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
+			expect(got).toEqual(snapshot)
+			// It carries a compacted section, a live tail, AND a rollup summary (round-trip is non-vacuous).
+			expect(got?.sections).toHaveLength(1)
+			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
+			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.sectionMessages,
+			)
+			expect(got?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.liveTail,
+			)
+			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+		})
+	})
+
+	describe('upsert (set replaces under the same id)', () => {
+		it('set replaces an existing snapshot under the same id', async () => {
+			const { second, got } = await conversationStoreUpsert(makeStore, buildConversationSnapshot)
+			expect(got).toEqual(second)
+		})
+	})
+
+	describe('delete & absent', () => {
+		it('set → delete → get returns undefined', async () => {
+			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+				makeStore,
+				buildConversationSnapshot,
+			)
+			expect(beforeDelete).toBeDefined()
+			expect(afterDelete).toBeUndefined()
+		})
+
+		it('deleting an absent id does not throw (a no-op)', async () => {
+			await expect(conversationStoreDeleteAbsent(makeStore)).resolves.toBeUndefined()
+		})
+
+		it('get of an absent id returns undefined', async () => {
+			expect(await conversationStoreGetAbsent(makeStore)).toBeUndefined()
+		})
+	})
+
+	describe('two distinct conversation ids coexist', () => {
+		it('two distinct conversation ids coexist without cross-contamination', async () => {
+			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
+				await conversationStoreTwoIds(makeStore, buildConversationSnapshot)
+			expect(gotAlpha).toEqual(alpha)
+			expect(gotBeta).toEqual(beta)
+			// Dropping one leaves the other intact.
+			expect(gotAlphaAfterDelete).toBeUndefined()
+			expect(gotBetaAfterDelete).toEqual(beta)
+		})
+	})
 })
 
 describe('DatabaseConversationStore — driver overloads & durability', () => {

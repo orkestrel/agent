@@ -2,7 +2,19 @@ import { createMemoryConversationStore, isConversationSnapshot } from '@src/core
 import { roundTripJSON } from '@orkestrel/test'
 import { isToolCall } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
-import { assertConversationStoreContract, buildConversationSnapshot } from '../../../../setup.js'
+import {
+	buildConversationSnapshot,
+	conversationStoreDeleteAbsent,
+	conversationStoreDeleteThenAbsent,
+	conversationStoreGetAbsent,
+	conversationStoreRoundTrip,
+	conversationStoreRoundTripExpectation,
+	conversationStoreTwoIds,
+	conversationStoreUpsert,
+} from '../../../../setup.js'
+
+const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
+	createMemoryConversationStore()
 
 // The C-c MemoryConversationStore — the in-memory default behind the ConversationStoreInterface
 // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the
@@ -10,13 +22,72 @@ import { assertConversationStoreContract, buildConversationSnapshot } from '../.
 // (AGENTS §16) — a real Conversation's `snapshot()` carrying BOTH compacted sections AND a live tail
 // AND a rollup `summary` (produced by a genuine compaction over a data-stub summarizer), NO mocks.
 
-// The shared `ConversationStoreInterface` contract battery (round-trip / upsert / delete & absent /
+// The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
-// tests/setup.ts (AGENTS §16.1), so the contract + snapshot stay in ONE place. This file invokes
-// that battery against the memory factory and keeps only its TWIN-SPECIFIC blocks below: the JSON
-// driver-swap-parity round-trip and the `isConversationSnapshot` read-boundary guard.
+// tests/setup.ts (AGENTS §16.1), so the scenario + snapshot logic stay in ONE place. `setup.ts` exports
+// each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
+// THIS file registers the battery against the memory factory and asserts on what each scenario
+// returns, keeping only its TWIN-SPECIFIC blocks below: the JSON driver-swap-parity round-trip and the
+// `isConversationSnapshot` read-boundary guard.
 describe('MemoryConversationStore', () => {
-	assertConversationStoreContract(() => createMemoryConversationStore(), buildConversationSnapshot)
+	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
+		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+			const { snapshot, got } = await conversationStoreRoundTrip(
+				makeStore,
+				buildConversationSnapshot,
+			)
+			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
+			expect(got).toEqual(snapshot)
+			// It carries a compacted section, a live tail, AND a rollup summary (round-trip is non-vacuous).
+			expect(got?.sections).toHaveLength(1)
+			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
+			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.sectionMessages,
+			)
+			expect(got?.messages.map((message) => message.content)).toEqual(
+				conversationStoreRoundTripExpectation.liveTail,
+			)
+			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+		})
+	})
+
+	describe('upsert (set replaces under the same id)', () => {
+		it('set replaces an existing snapshot under the same id', async () => {
+			const { second, got } = await conversationStoreUpsert(makeStore, buildConversationSnapshot)
+			expect(got).toEqual(second)
+		})
+	})
+
+	describe('delete & absent', () => {
+		it('set → delete → get returns undefined', async () => {
+			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+				makeStore,
+				buildConversationSnapshot,
+			)
+			expect(beforeDelete).toBeDefined()
+			expect(afterDelete).toBeUndefined()
+		})
+
+		it('deleting an absent id does not throw (a no-op)', async () => {
+			await expect(conversationStoreDeleteAbsent(makeStore)).resolves.toBeUndefined()
+		})
+
+		it('get of an absent id returns undefined', async () => {
+			expect(await conversationStoreGetAbsent(makeStore)).toBeUndefined()
+		})
+	})
+
+	describe('two distinct conversation ids coexist', () => {
+		it('two distinct conversation ids coexist without cross-contamination', async () => {
+			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
+				await conversationStoreTwoIds(makeStore, buildConversationSnapshot)
+			expect(gotAlpha).toEqual(alpha)
+			expect(gotBeta).toEqual(beta)
+			// Dropping one leaves the other intact.
+			expect(gotAlphaAfterDelete).toBeUndefined()
+			expect(gotBetaAfterDelete).toEqual(beta)
+		})
+	})
 })
 
 describe('MemoryConversationStore — JSON driver-swap parity', () => {
