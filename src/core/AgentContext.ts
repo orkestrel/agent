@@ -2,7 +2,6 @@ import type {
 	AgentContextInterface,
 	AgentContextOptions,
 	ContextFormatInterface,
-	ContextSectionFormat,
 	ConversationInterface,
 	ConversationManagerInterface,
 	InstructionManagerInterface,
@@ -11,12 +10,21 @@ import type {
 	ScopeInterface,
 } from './types.js'
 import type { ToolManagerInterface } from '@orkestrel/tool'
-import type { FileInterface, WorkspaceManagerInterface } from '@orkestrel/workspace'
+import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 import { ToolManager } from '@orkestrel/tool'
-import { isBinary, isText, WorkspaceManager } from '@orkestrel/workspace'
+import { isText, WorkspaceManager } from '@orkestrel/workspace'
 import { WORKSPACE_SECTION_HEADER } from './constants.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
-import { fencedFile, filterAllowList } from './helpers.js'
+import {
+	attachImages,
+	collectImageData,
+	fencedFile,
+	filterAllowList,
+	renderSection,
+	resolveClose,
+	resolveItem,
+	resolveOpen,
+} from './helpers.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 
 /**
@@ -66,7 +74,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   always reflects the current managers / messages / scope / active workspace; it never mutates a
  *   manager or the stored messages.
  * - **The ACTIVE workspace, rendered BY CARRIER — the SOLE document/image context.**
- *   `workspaces.active` (when set) has its {@link FileInterface}s scope-filtered by `scope.files`,
+ *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface}s scope-filtered by `scope.files`,
  *   then split: TEXT files fold into a dedicated `## Workspace` system section (fenced reference
  *   blocks — placed right after the instructions section), and IMAGE files' base64 `data` attaches
  *   to the last user message. ACTIVE-ONLY — never the other registered workspaces; with no active
@@ -166,8 +174,8 @@ export class AgentContext implements AgentContextInterface {
 		// 1–2. Assemble the system block parts: the prompt, then each scoped manager's
 		// section (its resolved `open` + each item's resolved rendering + any resolved
 		// `close`) when it has any scoped-in items. Tools are NOT folded in — they reach the
-		// provider structurally. Each slot resolves through the FORMAT CASCADE (`#header` /
-		// `#render` / `#footer`): open = manager-options-override > provider-default >
+		// provider structurally. Each slot resolves through the FORMAT CASCADE (`resolveOpen` /
+		// `resolveItem` / `resolveClose`): open = manager-options-override > provider-default >
 		// built-in; per item = item-override > manager-options-override > provider-default >
 		// built-in; close = manager-options-override > provider-default (NO built-in ⇒ no
 		// closing line). With no `format` arg + no overrides + no per-item format it is
@@ -182,13 +190,13 @@ export class AgentContext implements AgentContextInterface {
 			this.#instructions.instructions(),
 			(one) => one.name,
 		)
-		this.#section(
-			parts,
-			this.#header(this.#instructions, format?.instructions),
+		const instructed = renderSection(
+			resolveOpen(this.#instructions, format?.instructions),
 			instructions,
-			(one) => this.#render(this.#instructions, format?.instructions, one),
-			this.#footer(this.#instructions, format?.instructions),
+			(one) => resolveItem(this.#instructions, format?.instructions, one),
+			resolveClose(this.#instructions, format?.instructions),
 		)
+		if (instructed !== undefined) parts.push(instructed)
 		// The ACTIVE workspace's files, rendered BY CARRIER — the SOLE document/image context.
 		// Filter `active.files()` by `scope.files`, then split: TEXT files fold into the
 		// `## Workspace` system section (fenced reference blocks, the `fencedFile` framing — placed
@@ -204,14 +212,19 @@ export class AgentContext implements AgentContextInterface {
 		const workspaceTexts = files.filter((file) => isText(file.content))
 		// The text files have NO format-cascade level of their own (they are not a manager) — the
 		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders via `fencedFile`
-		// off its own text arm (`{ text, language }`). An empty set contributes nothing (`#section`).
-		this.#section(
-			parts,
+		// off its own text arm (`{ text, language }`), narrowed by `isText` (§14: narrow, never
+		// assert; the pre-filter above means the defensive arm is never reached). An empty set
+		// contributes nothing (`renderSection` returns `undefined`).
+		const documented = renderSection(
 			WORKSPACE_SECTION_HEADER,
 			workspaceTexts,
-			(file) => this.#fenced(file),
+			(file) =>
+				isText(file.content)
+					? fencedFile(file.path, file.content.language, file.content.text)
+					: fencedFile(file.path, 'text', ''),
 			undefined,
 		)
+		if (documented !== undefined) parts.push(documented)
 
 		// 4. The conversation. The ACTIVE conversation's `view()` is AUTHORITATIVE (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion via compaction, so the
@@ -223,7 +236,7 @@ export class AgentContext implements AgentContextInterface {
 		// 5. Attach the active workspace's scoped-in IMAGE files' base64 `data` to the LAST user
 		// message (a vision provider reads images off a user turn) — the active workspace is the
 		// SOLE image source. Skipped when there is none. (Applies to the conversation's view too.)
-		const tail = this.#attach(conversation, this.#workspaceImages(files))
+		const tail = this.#attach(conversation, collectImageData(files))
 
 		// 3. Prepend ONE assembled system message only when some part exists.
 		if (parts.length === 0) return tail
@@ -233,77 +246,6 @@ export class AgentContext implements AgentContextInterface {
 			content: parts.join('\n\n'),
 		}
 		return [system, ...tail]
-	}
-
-	// Append a section to the system parts — the resolved `open` (the leading text),
-	// then each (already scope-filtered) item's resolved rendering, then the resolved
-	// `close` (the trailing text) WHEN one resolved, all blank-line joined. A section with
-	// no items contributes nothing (so an empty / fully scoped-out manager is silent — the
-	// `open` / `close` never appear without items). `close` is the only optional slot:
-	// `open` is always the resolved header string, and an unset `close` (no built-in) drops
-	// the trailing line, keeping the no-arg default byte-for-byte the prior output.
-	#section<T>(
-		parts: string[],
-		open: string,
-		items: readonly T[],
-		format: (item: T) => string,
-		close: string | undefined,
-	): void {
-		if (items.length === 0) return
-		const lines = [open, ...items.map(format)]
-		if (close !== undefined) lines.push(close)
-		parts.push(lines.join('\n\n'))
-	}
-
-	// Resolve ONE section's OPEN (its leading text — the header or a group's opening tag)
-	// per the cascade — manager-options override > provider default > built-in. The
-	// manager's `framing` is the raw options override; its `description` already
-	// encapsulates `[options-override → built-in]`, so the trailing `?? manager.description`
-	// is reached ONLY when neither the override's `open` nor the provider's `open` applies —
-	// and there it equals the built-in header (the leading text has no per-item level). With
-	// no provider `format` and no override it is the built-in.
-	#header<T>(
-		manager: {
-			readonly description: string
-			readonly framing: ContextSectionFormat<T> | undefined
-		},
-		provider: ContextSectionFormat<T> | undefined,
-	): string {
-		return manager.framing?.open ?? provider?.open ?? manager.description
-	}
-
-	// Resolve ONE section's CLOSE (its trailing text — a group's closing tag) per the
-	// cascade — manager-options override > provider default. There is NO built-in close, so
-	// when neither level sets one this returns `undefined` and `#section` appends no closing
-	// line (the no-arg default stays byte-for-byte the prior built-in output). Paired with
-	// `#header`'s `open`, a level can WRAP the group (`open: '<docs>'` … `close: '</docs>'`).
-	#footer<T>(
-		manager: { readonly framing: ContextSectionFormat<T> | undefined },
-		provider: ContextSectionFormat<T> | undefined,
-	): string | undefined {
-		return manager.framing?.close ?? provider?.close
-	}
-
-	// Resolve ONE item's RENDERING per the cascade — item override > manager-options override
-	// > provider default > built-in. `item.format` is the most-specific per-item override;
-	// the manager's `framing` is the raw options override; its `format(item)` already
-	// encapsulates `[options-override → built-in]`, so the trailing `?? manager.format(item)`
-	// is reached ONLY when no higher level applies — and there it equals the built-in
-	// rendering. With no item format, no provider `format`, and no override it is the built-in.
-	#render<T extends { readonly format?: string }>(
-		manager: {
-			readonly framing: ContextSectionFormat<T> | undefined
-			format(item: T): string
-		},
-		provider: ContextSectionFormat<T> | undefined,
-		item: T,
-	): string {
-		return (
-			item.format ??
-			manager.framing?.render?.(item) ??
-			provider?.render?.(item) ??
-			manager.format(item)
-		)
 	}
 
 	// Attach image data to the last user message — returns a NEW array with that one
@@ -325,49 +267,8 @@ export class AgentContext implements AgentContextInterface {
 		}
 		if (target === -1) return conversation
 		return conversation.map((message, index) =>
-			index === target ? this.#withImages(message, data) : message,
+			index === target ? attachImages(message, data) : message,
 		)
-	}
-
-	// A copy of a message carrying the merged image data on `images` (its existing images
-	// first, then the attached data) — `calls` is carried only when present (kept omitted
-	// otherwise, mirroring the store's present-when-given convention), never mutating the
-	// original.
-	#withImages(message: MessageInterface, data: readonly string[]): MessageInterface {
-		const images = [...(message.images ?? []), ...data]
-		return message.calls === undefined
-			? { id: message.id, role: message.role, content: message.content, images }
-			: {
-					id: message.id,
-					role: message.role,
-					content: message.content,
-					calls: message.calls,
-					images,
-				}
-	}
-
-	// Render one ACTIVE-workspace TEXT file as a fenced reference block — the `fencedFile` framing,
-	// off the file's OWN text arm (`{ text, language }`), narrowed via `isText` (§14: narrow, never
-	// assert). A non-text file (never passed here — the caller pre-filters by `isText`) renders its
-	// `path` with no body, a defensive total fallback.
-	#fenced(file: FileInterface): string {
-		if (isText(file.content)) return fencedFile(file.path, file.content.language, file.content.text)
-		return fencedFile(file.path, 'text', '')
-	}
-
-	// The base64 `data` of the ACTIVE-workspace IMAGE files (already scope-filtered) — collected for
-	// the last-user-message attach (the active workspace is the SOLE image source). `isBinary` NARROWS
-	// the tagless content to the binary arm (`{ data, mime }`, §14: narrow, never assert), then the
-	// MIME prefix gates it to an image; a text / non-image file is skipped. A future non-image binary (a
-	// PDF) is excluded here.
-	#workspaceImages(files: readonly FileInterface[]): readonly string[] {
-		const data: string[] = []
-		for (const file of files) {
-			if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
-				data.push(file.content.data)
-			}
-		}
-		return data
 	}
 
 	// The total fallback that keeps `messages` / `build()` defined even if a caller's supplied

@@ -1,17 +1,31 @@
-import type { AgentResult, MessageInterface } from '@src/core'
+import type { AgentResult, ContextSectionSourceInterface, MessageInterface } from '@src/core'
 import {
 	agentResultToJSON,
+	assembleResult,
+	attachImages,
+	buildRecapMessage,
+	buildSummaryMessage,
+	collectImageData,
+	CONVERSATION_RECAP_PREFIX,
 	createAgentRegistry,
+	denyCall,
 	estimateMessages,
 	estimateTokens,
 	fencedFile,
 	filterAllowList,
 	IMAGE_TOKEN_ESTIMATE,
+	intersectKeys,
 	isAgentJobError,
+	joinThinking,
 	MESSAGE_TOKEN_OVERHEAD,
+	renderSection,
+	resolveClose,
+	resolveItem,
+	resolveOpen,
 	sanitizeToken,
 	sanitizeUsage,
 	settleAgentJob,
+	sumUsage,
 } from '@src/core'
 import { createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
@@ -525,5 +539,280 @@ describe('sanitizeUsage', () => {
 			completion: 0,
 			total: 12,
 		})
+	})
+})
+
+// The pure leaves the agent loop, the context cascade, the conversation view, and a scope's
+// narrow compose from — each extracted from a private method so it can be exercised directly
+// on real values rather than only through the entity that calls it.
+
+describe('joinThinking — the separated reasoning across a run', () => {
+	it('seeds the accumulation with the first reasoning verbatim', () => {
+		expect(joinThinking(undefined, 'first')).toBe('first')
+	})
+
+	it('appends a later call blank-line separated', () => {
+		expect(joinThinking('first', 'second')).toBe('first\n\nsecond')
+	})
+
+	it('keeps an empty accumulated string as the running value', () => {
+		expect(joinThinking('', 'next')).toBe('\n\nnext')
+	})
+})
+
+describe('sumUsage — the running token total across a turn', () => {
+	it('returns the first usage unchanged', () => {
+		const first = createTokenUsage({ prompt: 2, completion: 1, total: 3 })
+		expect(sumUsage(undefined, first)).toEqual(first)
+	})
+
+	it('adds each field of a later usage', () => {
+		expect(
+			sumUsage(
+				createTokenUsage({ prompt: 2, completion: 1, total: 3 }),
+				createTokenUsage({ prompt: 1, completion: 4, total: 5 }),
+			),
+		).toEqual({ prompt: 3, completion: 5, total: 8 })
+	})
+
+	it('never mutates either input', () => {
+		const running = createTokenUsage({ prompt: 2, completion: 1, total: 3 })
+		const next = createTokenUsage({ prompt: 1, completion: 1, total: 2 })
+		sumUsage(running, next)
+		expect(running).toEqual({ prompt: 2, completion: 1, total: 3 })
+		expect(next).toEqual({ prompt: 1, completion: 1, total: 2 })
+	})
+})
+
+describe('assembleResult — the settled result from a run outcome', () => {
+	it('omits an absent thinking and usage rather than storing undefined', () => {
+		const result = assembleResult({
+			content: 'hi',
+			thinking: undefined,
+			usage: undefined,
+			partial: false,
+			exhausted: false,
+		})
+		expect(result).toEqual({ content: 'hi', partial: false })
+		expect(Object.keys(result)).toEqual(['content', 'partial'])
+	})
+
+	it('carries a present thinking and usage', () => {
+		expect(
+			assembleResult({
+				content: 'hi',
+				thinking: 'plan',
+				usage: createTokenUsage({ prompt: 2, completion: 1, total: 3 }),
+				partial: true,
+				exhausted: true,
+			}),
+		).toEqual({
+			content: 'hi',
+			thinking: 'plan',
+			usage: { prompt: 2, completion: 1, total: 3 },
+			partial: true,
+		})
+	})
+
+	it('leaves the loop-internal exhausted flag out of the public result', () => {
+		const result = assembleResult({
+			content: '',
+			thinking: undefined,
+			usage: undefined,
+			partial: true,
+			exhausted: true,
+		})
+		expect('exhausted' in result).toBe(false)
+	})
+})
+
+describe('denyCall — the synthesized denial result', () => {
+	it('renders a rule reason into the denial error', () => {
+		expect(denyCall(createToolCall({ id: '1', name: 'drop' }), 'read-only mode')).toEqual({
+			success: false,
+			id: '1',
+			name: 'drop',
+			error: 'denied: read-only mode',
+		})
+	})
+
+	it('falls back to the generic denial when no reason was given', () => {
+		expect(denyCall(createToolCall({ id: '2', name: 'drop' }), undefined)).toEqual({
+			success: false,
+			id: '2',
+			name: 'drop',
+			error: 'denied by authority',
+		})
+	})
+})
+
+describe('renderSection — one assembled context section', () => {
+	it('joins the open and each item with blank lines', () => {
+		expect(
+			renderSection('## Instructions', ['Be terse.', 'Cite sources.'], (one) => one, undefined),
+		).toBe('## Instructions\n\nBe terse.\n\nCite sources.')
+	})
+
+	it('appends a resolved close as the trailing line', () => {
+		expect(renderSection('<rules>', ['Be terse.'], (one) => one, '</rules>')).toBe(
+			'<rules>\n\nBe terse.\n\n</rules>',
+		)
+	})
+
+	it('renders nothing for an empty item list, so open and close never appear alone', () => {
+		expect(renderSection('<rules>', [], (one: string) => one, '</rules>')).toBeUndefined()
+	})
+})
+
+describe('resolveOpen / resolveClose / resolveItem — the format cascade', () => {
+	// A section item is anything carrying the per-item `format` override — an instruction here,
+	// declared locally so the cascade is exercised on its own contract, not an entity's.
+	interface CascadeItem {
+		readonly content: string
+		readonly format?: string
+	}
+	const manager: ContextSectionSourceInterface<CascadeItem> = {
+		description: '## Instructions',
+		framing: undefined,
+		format: (one) => one.content,
+	}
+	const overridden: ContextSectionSourceInterface<CascadeItem> = {
+		description: '<rules>',
+		framing: {
+			open: '<rules>',
+			render: (one) => `<rule>${one.content}</rule>`,
+			close: '</rules>',
+		},
+		format: (one) => one.content,
+	}
+	const item: CascadeItem = { content: 'Be terse.' }
+
+	it('falls through to the built-in header with no override and no provider default', () => {
+		expect(resolveOpen(manager, undefined)).toBe('## Instructions')
+	})
+
+	it('prefers the provider default over the built-in header', () => {
+		expect(resolveOpen(manager, { open: '<docs>' })).toBe('<docs>')
+	})
+
+	it('prefers the manager-options override over the provider default', () => {
+		expect(resolveOpen(overridden, { open: '<docs>' })).toBe('<rules>')
+	})
+
+	it('resolves no close when neither level sets one', () => {
+		expect(resolveClose(manager, undefined)).toBeUndefined()
+	})
+
+	it('takes the provider close, then the manager-options close', () => {
+		expect(resolveClose(manager, { close: '</docs>' })).toBe('</docs>')
+		expect(resolveClose(overridden, { close: '</docs>' })).toBe('</rules>')
+	})
+
+	it('renders an item through the built-in when no level applies', () => {
+		expect(resolveItem(manager, undefined, item)).toBe('Be terse.')
+	})
+
+	it('prefers the provider render, then the manager-options render', () => {
+		expect(resolveItem(manager, { render: (one) => `- ${one.content}` }, item)).toBe('- Be terse.')
+		expect(resolveItem(overridden, { render: (one) => `- ${one.content}` }, item)).toBe(
+			'<rule>Be terse.</rule>',
+		)
+	})
+
+	it("prefers the item's own format over every other level", () => {
+		expect(
+			resolveItem(
+				overridden,
+				{ render: (one) => `- ${one.content}` },
+				{
+					content: 'ignored',
+					format: '<rule priority="high">Escalate.</rule>',
+				},
+			),
+		).toBe('<rule priority="high">Escalate.</rule>')
+	})
+})
+
+describe('attachImages — the image payload on a copied message', () => {
+	it('merges the attached data after the message own images', () => {
+		expect(
+			attachImages({ id: 'm', role: 'user', content: 'Describe', images: ['own'] }, ['attached']),
+		).toEqual({ id: 'm', role: 'user', content: 'Describe', images: ['own', 'attached'] })
+	})
+
+	it('never mutates the source message', () => {
+		const source: MessageInterface = { id: 'm', role: 'user', content: 'Describe' }
+		attachImages(source, ['attached'])
+		expect(source.images).toBeUndefined()
+	})
+
+	it('carries calls only when the source message has them', () => {
+		const call = createToolCall({ id: 'c1' })
+		expect(
+			attachImages({ id: 'm', role: 'assistant', content: '', calls: [call] }, ['a']).calls,
+		).toEqual([call])
+		expect('calls' in attachImages({ id: 'm', role: 'user', content: 'x' }, ['a'])).toBe(false)
+	})
+})
+
+describe('collectImageData — the image carrier split', () => {
+	it('collects each image file base64 data in file order', () => {
+		const files = [
+			createFile({ path: 'a.png', content: { data: 'first', mime: 'image/png' } }),
+			createFile({ path: 'b.jpg', content: { data: 'second', mime: 'image/jpeg' } }),
+		]
+		expect(collectImageData(files)).toEqual(['first', 'second'])
+	})
+
+	it('skips a text file — only the binary image arm carries data', () => {
+		const files = [createFile({ path: 'note.md', content: createTextContent('hello', 'markdown') })]
+		expect(collectImageData(files)).toEqual([])
+	})
+
+	it('returns an empty list for no files at all', () => {
+		expect(collectImageData([])).toEqual([])
+	})
+})
+
+describe('buildSummaryMessage / buildRecapMessage — a section as a message', () => {
+	const section = { id: 's1', summary: 'recap of 2', messages: [] }
+
+	it('carries the section summary verbatim, keyed by the section id', () => {
+		expect(buildSummaryMessage(section)).toEqual({
+			id: 's1',
+			role: 'assistant',
+			content: 'recap of 2',
+		})
+	})
+
+	it('frames the recap with the prefix a small model reads it by', () => {
+		expect(buildRecapMessage(section)).toEqual({
+			id: 's1',
+			role: 'assistant',
+			content: `${CONVERSATION_RECAP_PREFIX}recap of 2`,
+		})
+	})
+})
+
+describe('intersectKeys — the scope narrow primitive', () => {
+	it('keeps only the child keys the parent also allows', () => {
+		expect(intersectKeys(['read', 'write'], ['write', 'admin'])).toEqual(['write'])
+	})
+
+	it('treats an undefined side as the universal set', () => {
+		expect(intersectKeys(undefined, ['read'])).toEqual(['read'])
+		expect(intersectKeys(['read'], undefined)).toEqual(['read'])
+		expect(intersectKeys(undefined, undefined)).toBeUndefined()
+	})
+
+	it('returns a copy, so a later mutation of an input cannot leak in', () => {
+		const parent = ['read', 'write']
+		const result = intersectKeys(parent, undefined)
+		parent.push('admin')
+		expect(result).toEqual(['read', 'write'])
+	})
+
+	it('yields an empty list when nothing is shared', () => {
+		expect(intersectKeys(['read'], ['write'])).toEqual([])
 	})
 })

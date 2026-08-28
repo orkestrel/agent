@@ -13,9 +13,12 @@ import type { AgentResult, ProviderResult } from './types.js'
  * @remarks
  * Lets a caller recover the partial content (and any tool calls / usage seen so far)
  * on cancellation: `catch` the throw, narrow with {@link isProviderAbortError}, and
- * read `partial`.
+ * read `partial`. `code` is the machine-readable condition (`'ABORT'` — the only one this
+ * error reports), so a `catch` branches on it rather than on the message string.
  */
 export class ProviderAbortError extends Error {
+	/** The machine-readable condition — `'ABORT'`: a stream cancelled mid-flight. */
+	readonly code = 'ABORT' as const
 	readonly partial: ProviderResult
 
 	constructor(partial: ProviderResult) {
@@ -64,9 +67,13 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
  * lets the Queue's retries re-run the job and a Runner's fail-fast abort its siblings.
  * Set `allowPartial: true` (see `AgentQueueOptions` / `AgentRunnerOptions`) to treat a
  * partial as success instead, in which case this is never thrown. Narrow a caught value
- * with {@link isAgentJobError} to read `partial`.
+ * with {@link isAgentJobError} to read `partial`. `code` is the machine-readable condition
+ * (`'PARTIAL'` — the only one this error reports), so a `catch` branches on it rather than on
+ * the message string.
  */
 export class AgentJobError extends Error {
+	/** The machine-readable condition — `'PARTIAL'`: a job that ended partial under a disallowing policy. */
+	readonly code = 'PARTIAL' as const
 	/** The partial {@link AgentResult} the cancelled job produced. */
 	readonly partial: AgentResult
 

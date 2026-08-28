@@ -85,7 +85,7 @@ export interface ProviderResult {
  * channels separately (answer content vs. live reasoning) as it pumps.
  *
  * @remarks
- * The discriminant `type` names the CHANNEL axis (AGENTS §4.4 — never `kind`): a
+ * The discriminant `type` names the CHANNEL axis: a
  * `'content'` delta is a chunk of the assistant ANSWER (the deltas that accumulate into
  * {@link ProviderResult.content}); a `'thinking'` delta is a chunk of the model's
  * REASONING the provider separated from the answer (the daemon's native
@@ -426,6 +426,31 @@ export interface ContextSectionFormat<T> {
 }
 
 /**
+ * The manager surface one context section's format cascade reads — its built-in
+ * `description` / `format`, plus the raw options override the cascade layers a provider
+ * default beneath.
+ *
+ * @remarks
+ * The narrow contract the cascade resolvers
+ * ({@link import('./helpers.js').resolveOpen} / {@link import('./helpers.js').resolveClose} /
+ * {@link import('./helpers.js').resolveItem}) take, so they stay independent of WHICH manager
+ * supplies the section: an {@link InstructionManagerInterface} satisfies it structurally.
+ * `description` and `format` already encapsulate `[options-override → built-in]` (so a manager
+ * used standalone renders correctly), and `framing` exposes the raw override so `build()` can
+ * interleave the provider default BENEATH it.
+ *
+ * @typeParam T - The section item this source renders
+ */
+export interface ContextSectionSourceInterface<T> {
+	/** The built-in section header (already resolved against the manager-options override). */
+	readonly description: string
+	/** The raw manager-options override, or `undefined` when none was supplied. */
+	readonly framing: ContextSectionFormat<T> | undefined
+	/** Render one item (already resolved against the manager-options override). */
+	format(item: T): string
+}
+
+/**
  * A provider's OPTIONAL context-framing default, keyed by section kind — the framing a
  * model prefers (e.g. XML tags vs. Markdown headers), declared by a
  * {@link ProviderInterface} that opts in.
@@ -438,7 +463,7 @@ export interface ContextSectionFormat<T> {
  * manager's built-in default but is BEATEN by a manager-options override and by a per-item
  * override (see {@link AgentContextInterface.build}). It references the ABSTRACT core
  * item interface ({@link InstructionInterface}), so a provider opting in imports it from
- * `@src/core` — the type is provider-agnostic, with no backend coupling. Omitting it
+ * `@orkestrel/agent` — the type is provider-agnostic, with no backend coupling. Omitting it
  * entirely (the default for an agnostic provider) leaves every section on its manager's
  * built-in framing.
  */
@@ -907,6 +932,45 @@ export type AgentEventMap = {
 }
 
 /**
+ * An unbounded async channel — a producer WRITES values into it (`push`) and ends it
+ * (`close` / `fail`) regardless of consumption, while a consumer READS them back live
+ * through `drain`.
+ *
+ * @remarks
+ * Decoupling the write from the read is what lets a producer make progress with nobody
+ * pulling: an agent's eager pump writes each {@link AgentChunk} into one, so the run's
+ * `result` settles whether or not `events` is ever drained. A waiting `drain` parks on a
+ * resolver the next `push` / `close` / `fail` fires, so a value pushed at a parked reader is
+ * delivered rather than dropped. Buffered values are always yielded BEFORE the end is
+ * reported, so a `close` arriving alongside the last values still delivers them. The FIRST
+ * failure wins — a later `close` / `fail` cannot override a recorded error. Event-free.
+ *
+ * @typeParam T - The value type the channel carries
+ */
+export interface ChannelInterface<T> {
+	/**
+	 * Write one value — buffered, then handed to a parked consumer.
+	 *
+	 * @param value - The value to enqueue
+	 */
+	push(value: T): void
+	/** End the channel normally — a draining consumer returns once the buffer is empty. */
+	close(): void
+	/**
+	 * End the channel with a failure — a draining consumer throws it once the buffer is empty.
+	 *
+	 * @param error - The failure to surface (the first one recorded wins)
+	 */
+	fail(error: unknown): void
+	/**
+	 * Read the values back live, in write order.
+	 *
+	 * @returns A generator yielding each pushed value, returning on `close` and throwing on `fail`
+	 */
+	drain(): AsyncGenerator<T, void>
+}
+
+/**
  * A live event stream paired with the eventual settled result and a cancel — the
  * generic pull/streaming handle a long-running operation hands back.
  *
@@ -1039,26 +1103,17 @@ export interface AgentOptions {
 }
 
 /**
- * The agent loop — composes a {@link ProviderInterface}, an
- * {@link AgentContextInterface}, and a {@link ToolManagerInterface} into a bounded
- * context → provider → tools → repeat turn.
+ * The per-run override bag an {@link AgentInterface}'s `generate` / `stream` accepts — each
+ * member overrides the matching {@link AgentOptions} value for ONE run.
  *
  * @remarks
- * - **One loop, two faces.** `generate` and `stream` share ONE private run, so they
- *   can never diverge: `generate` drains the same stream `stream` exposes, then
- *   resolves its settled {@link AgentResult}.
- * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
- *   `timeout` deadline, and the `budget` signal (via `AbortSignal.any`); any of them —
- *   or `abort()` — stops the loop and settles the result `partial: true`.
- * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
- *   iteration is capped at `limit` so the loop always terminates.
- * - **Two observation surfaces.** PULL: the {@link AgentChunk} stream (`stream().events`)
- *   carries per-token answer deltas, per-think reasoning deltas, and usage/tool chunks for a live consumer. PUSH: the
- *   {@link emitter} ({@link AgentEventMap}) carries lifecycle + usage/tool/deny moments
- *   for fire-and-forget observers — the emitter isolates a listener throw and routes it to
- *   its `error` handler (the `error` option, §13), so a buggy observer can NEVER corrupt the
- *   loop. Per-token / per-thinking deltas are the stream's job exclusively; there is no
- *   `token` or `think` event.
+ * Every member is optional and resolved independently, so an omitted member leaves the
+ * agent's constructed value in force and a caller that passes no options runs exactly the
+ * agent it configured. `think` / `schema` ride through to the provider as
+ * {@link ProviderStreamOptions}; `limit` / `timeout` / `budget` replace their construction
+ * defaults for this run only; `signal` COMPOSES with the constructed `signal` (both fold into
+ * the run's bound abort) rather than replacing it. Nothing here mutates the agent — the next
+ * run reads the construction defaults again.
  */
 export interface AgentRunOptions {
 	/**
@@ -1099,6 +1154,30 @@ export interface AgentRunOptions {
 	readonly signal?: AbortSignal
 }
 
+/**
+ * The agent loop — composes a {@link ProviderInterface}, an
+ * {@link AgentContextInterface}, and a {@link ToolManagerInterface} into a bounded
+ * context → provider → tools → repeat turn.
+ *
+ * @remarks
+ * - **One loop, two faces.** `generate` and `stream` share ONE private run, so they
+ *   can never diverge: `generate` drains the same stream `stream` exposes, then
+ *   resolves its settled {@link AgentResult}.
+ * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
+ *   `timeout` deadline, and the `budget` signal (via `AbortSignal.any`); any of them —
+ *   or `abort()` — stops the loop and settles the result `partial: true`.
+ * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
+ *   iteration is capped at `limit` so the loop always terminates.
+ * - **Two observation surfaces.** PULL: the {@link AgentChunk} stream (`stream().events`)
+ *   carries per-token answer deltas, per-think reasoning deltas, and usage/tool chunks for a live consumer. PUSH: the
+ *   {@link emitter} ({@link AgentEventMap}) carries lifecycle + usage/tool/deny moments
+ *   for fire-and-forget observers — the emitter isolates a listener throw and routes it to
+ *   its `error` handler (the `error` option, §13), so a buggy observer can NEVER corrupt the
+ *   loop. Per-token / per-thinking deltas are the stream's job exclusively; there is no
+ *   `token` or `think` event.
+ * - **Per-run overrides.** Both faces accept an optional {@link AgentRunOptions} bag whose
+ *   members override the construction {@link AgentOptions} for that one run.
+ */
 export interface AgentInterface {
 	readonly emitter: EmitterInterface<AgentEventMap>
 	readonly id: string
@@ -1489,6 +1568,13 @@ export type ConversationEventMap = {
  * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
  * `sections` sections FOLDS the oldest overflow into ONE merged section so the list never
  * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited (the prior behavior).
+ * `snapshot` is the HYDRATION seam — a {@link ConversationSnapshot} whose `id`, rollup
+ * `summary`, compacted `sections`, and live tail are RESTORED into the new conversation, with
+ * the live `summarize` / `keep` / `on` supplied alongside it (a summarizer is a function, not
+ * serialized data). Restoring is SILENT (no events — nothing was edited), and a `snapshot.id`
+ * WINS over `id` (the snapshot IS the conversation's identity). It is what lets
+ * `createConversation` hydrate, and what a {@link ConversationManagerInterface.open} reads a
+ * stored snapshot back through.
  */
 export interface ConversationOptions {
 	readonly id?: string
@@ -1501,6 +1587,8 @@ export interface ConversationOptions {
 	readonly keep?: number
 	/** A cap (`>= 1`) on the compacted `sections` list; overflow folds into one merged section. Omitted ⇒ unlimited. */
 	readonly sections?: number
+	/** A {@link ConversationSnapshot} to hydrate from — its `id` wins over `id`; restoring is silent. */
+	readonly snapshot?: ConversationSnapshot
 }
 
 /**
@@ -1726,7 +1814,7 @@ export interface ConversationInterface {
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface}'s `snapshot`. The summarizer /
 	 * `keep` are NOT serialized — they are live
 	 * CONFIG re-supplied on hydrate (a `ConversationSummarizer` is a function, not data). The snapshot
-	 * is the durable analogue of the constructor `seed`: a {@link ConversationManagerInterface}
+	 * is the durable analogue of the `snapshot` option: a {@link ConversationManagerInterface}
 	 * HYDRATES a conversation from it through that seam (see {@link ConversationManagerInterface.open}).
 	 * Pure — the sections + messages are already plain immutable records (so the snapshot
 	 * `structuredClone`s / JSON-round-trips losslessly), and snapshotting mutates nothing.
@@ -1750,9 +1838,9 @@ export interface ConversationInterface {
  * live uncompacted tail `messages` — but NOT the `summarize` / `keep`, which are live CONFIG
  * re-supplied on hydrate (a summarizer is a function, not serializable data). The snapshot the
  * container produces from itself ({@link ConversationInterface.snapshot}); the durable analogue of
- * the constructor `seed`. A {@link ConversationManagerInterface} hydrates a conversation from it
- * through the seed seam (see {@link ConversationManagerInterface.open}). It is narrowed back from an
- * untrusted storage read by {@link import('./helpers.js').isConversationSnapshot} (the AGENTS §14
+ * the {@link ConversationOptions.snapshot} hydration seam. A {@link ConversationManagerInterface}
+ * hydrates a conversation from it through that seam (see {@link ConversationManagerInterface.open}). It is narrowed back from an
+ * untrusted storage read by {@link import('./validators.js').isConversationSnapshot} (the AGENTS §14
  * boundary narrow).
  */
 export interface ConversationSnapshot {
@@ -1779,7 +1867,7 @@ export interface ConversationSnapshot {
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore} (the
  * snapshot as one opaque JSON column) share THIS one interface. Hydration is NOT a store concern
  * — a {@link ConversationManagerInterface} reads a snapshot back and rebuilds the live conversation
- * through the constructor `seed` (re-supplying the live `summarize` / `keep`; see
+ * through the {@link ConversationOptions.snapshot} seam (re-supplying the live `summarize` / `keep`; see
  * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save}).
  *
  * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
@@ -1827,7 +1915,7 @@ export interface ConversationStoreInterface {
  * row type stays FLAT and the sections/messages snapshot shape never
  * forces the contract to `Infer` it. The column therefore reads back as the broad `unknown`; the
  * store narrows it to a {@link ConversationSnapshot} on `get`
- * ({@link import('./helpers.js').isConversationSnapshot}, the AGENTS §14 boundary narrow). `id`
+ * ({@link import('./validators.js').isConversationSnapshot}, the AGENTS §14 boundary narrow). `id`
  * mirrors {@link ConversationSnapshot.id} (the primary key), so a `set` writes
  * `{ id: snapshot.id, snapshot }`.
  */
@@ -1851,7 +1939,8 @@ export interface ConversationSnapshotRow {
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are RESTORED into the new conversation (the live `summarize` / `keep` /
  * `on` re-supplied alongside it), the conversation analogue of
- * {@link import('@orkestrel/workspace').WorkspaceOptions}'s `seed` that a
+ * {@link import('@orkestrel/workspace').WorkspaceOptions}'s `seed`, carried onto
+ * {@link ConversationOptions.snapshot}, that a
  * {@link ConversationManagerInterface.open} reads a stored snapshot back through; hydration is
  * silent (no events). When both `snapshot.id` and `id` are given, `snapshot.id` wins (the snapshot
  * IS the conversation's identity).
@@ -1865,7 +1954,7 @@ export interface ConversationInput {
 	/** Overrides the manager's default `sections` cap for this conversation. */
 	readonly sections?: number
 	readonly on?: EmitterHooks<ConversationEventMap>
-	/** A {@link ConversationSnapshot} to hydrate from, analogous to the workspace package's seed input. */
+	/** A {@link ConversationSnapshot} to hydrate from, passed on as {@link ConversationOptions.snapshot}. */
 	readonly snapshot?: ConversationSnapshot
 }
 
@@ -1924,7 +2013,7 @@ export interface ConversationManagerOptions {
  *   empties the registry and sets `active` to `undefined`.
  * - **Durable open / save (the optional `store` seam).** When a {@link ConversationStoreInterface}
  *   is supplied (the `store` option), `open(id)` HYDRATES a conversation from the store on a registry
- *   miss (rebuilding it through the constructor `seed` from the snapshot, flowing the manager's
+ *   miss (rebuilding it through the `snapshot` option, flowing the manager's
  *   default `summarize` / `keep` in) and `save(id)` PERSISTS a registered conversation's
  *   {@link ConversationInterface.snapshot}. Both are LENIENT without a store — `open` resolves only
  *   registered ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. It mirrors
@@ -1947,7 +2036,7 @@ export interface ConversationManagerInterface {
 	 * @remarks
 	 * - If `id` is ALREADY registered, it is ACTIVATED (`switch`ed to) and returned — no store hit.
 	 * - Else if a `store` is set, `store.get(id)` is awaited; on a HIT the snapshot is rehydrated
-	 *   into a fresh {@link ConversationInterface} through the constructor `seed`
+	 *   into a fresh {@link ConversationInterface} through the `snapshot` option
 	 *   (`add({ snapshot, ... })`, flowing the manager's default `summarize` / `keep` in), which
 	 *   registers AND activates it, and it is returned.
 	 * - Else (no store, or a store MISS) ⇒ `undefined` (lenient — no throw).

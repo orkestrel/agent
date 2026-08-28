@@ -1,4 +1,5 @@
 import type { ScopeConfiguration, ScopeInput, ScopeInterface } from '../types.js'
+import { intersectKeys } from '../helpers.js'
 
 /**
  * A named, immutable filter over a richer context's items — three optional allow-lists,
@@ -49,28 +50,14 @@ export class Scope implements ScopeInterface {
 	narrow(config: ScopeConfiguration): ScopeInterface {
 		// A child = the per-category set-intersection of this scope and the config, keeping
 		// THIS scope's name. Immutable: a brand-new Scope, this one untouched.
-		const instructions = Scope.#intersect(this.instructions, config.instructions)
-		const tools = Scope.#intersect(this.tools, config.tools)
-		const files = Scope.#intersect(this.files, config.files)
+		const instructions = intersectKeys(this.instructions, config.instructions)
+		const tools = intersectKeys(this.tools, config.tools)
+		const files = intersectKeys(this.files, config.files)
 		return new Scope({
 			name: this.name,
 			...(instructions === undefined ? {} : { instructions }),
 			...(tools === undefined ? {} : { tools }),
 			...(files === undefined ? {} : { files }),
 		})
-	}
-
-	// Intersect two category lists under the "undefined = universal set (no constraint)"
-	// rule: undefined ∩ undefined = undefined; undefined ∩ list = a copy of the list (the
-	// undefined side imposes nothing); list ∩ list = the child keys that are also in the
-	// parent (so narrowing can only TIGHTEN — a parent-excluded key never returns).
-	static #intersect(
-		parent: readonly string[] | undefined,
-		child: readonly string[] | undefined,
-	): readonly string[] | undefined {
-		if (parent === undefined) return child === undefined ? undefined : [...child]
-		if (child === undefined) return [...parent]
-		const allowed = new Set(parent)
-		return child.filter((key) => allowed.has(key))
 	}
 }

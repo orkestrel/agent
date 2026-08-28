@@ -12,9 +12,10 @@ import type {
 	SectionInterface,
 } from '../types.js'
 import { isArray } from '@orkestrel/contract'
-import { CONVERSATION_RECAP_PREFIX, DEFAULT_CONVERSATION_KEEP } from '../constants.js'
+import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
 import { Emitter } from '@orkestrel/emitter'
 import { ConversationError } from '../errors.js'
+import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
 
 /**
  * A conversation grouping messages ABOVE a flat message store — a live uncompacted tail it
@@ -89,7 +90,12 @@ export class Conversation implements ConversationInterface {
 		// restored, with the live `summarize` / `keep` / `on` supplied through `options` alongside it
 		// (a summarizer is a function, not serialized — re-supplied as config). The hydration analogue
 		// of a `Workspace`'s `seed`; restoring is SILENT (no events — nothing was edited).
-		this.#id = seed?.id ?? options?.id ?? crypto.randomUUID()
+		// `ConversationOptions.snapshot` is the DECLARED seam every caller reaches it through —
+		// `createConversation(options)` hydrates through it, and `ConversationManager.add` passes a
+		// stored snapshot in the one options object. The positional `seed` is the older spelling of
+		// the same value and wins when both are supplied.
+		const snapshot = seed ?? options?.snapshot
+		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>({
 			...(options?.on === undefined ? {} : { on: options.on }),
 			...(options?.error === undefined ? {} : { error: options.error }),
@@ -100,10 +106,10 @@ export class Conversation implements ConversationInterface {
 			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
 		}
 		this.#cap = options?.sections
-		if (seed) {
-			this.#summary = seed.summary
-			for (const section of seed.sections) this.#sections.push(section)
-			for (const message of seed.messages) this.#messages.set(message.id, message)
+		if (snapshot !== undefined) {
+			this.#summary = snapshot.summary
+			for (const section of snapshot.sections) this.#sections.push(section)
+			for (const message of snapshot.messages) this.#messages.set(message.id, message)
 		}
 	}
 
@@ -175,7 +181,7 @@ export class Conversation implements ConversationInterface {
 		// CONDENSED RECAP of prior turns, not as a literal assistant turn it must echo / treat as
 		// the latest answer — a lean label (a handful of tokens), proven no-bloat by a test guard.
 		return [
-			...this.#sections.map((section) => this.#recapMessage(section)),
+			...this.#sections.map((section) => buildRecapMessage(section)),
 			...this.#messages.values(),
 		]
 	}
@@ -217,7 +223,7 @@ export class Conversation implements ConversationInterface {
 			try {
 				const merged: SectionInterface = {
 					id: crypto.randomUUID(),
-					summary: await summarize(folded.map((one) => this.#summaryMessage(one))),
+					summary: await summarize(folded.map((one) => buildSummaryMessage(one))),
 					messages: folded.flatMap((one) => one.messages),
 				}
 				this.#sections.splice(0, overflow, merged)
@@ -228,14 +234,14 @@ export class Conversation implements ConversationInterface {
 				// (unmerged) sections so it is never left stale, then the error propagates
 				// (manual `compact()` always surfaces a summarizer failure to its caller; the
 				// next successful `compact()` self-heals the over-cap count).
-				this.#summary = await summarize(this.#sections.map((one) => this.#summaryMessage(one)))
+				this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
 				this.#emitter.emit('summary', this.#summary)
 				throw error
 			}
 		}
 		// 4. Regenerate the rollup — a summary-of-summaries over ALL (now-capped) sections
 		// — then observe it, AFTER the mutation, through the guarded path.
-		this.#summary = await summarize(this.#sections.map((one) => this.#summaryMessage(one)))
+		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
 		this.#emitter.emit('summary', this.#summary)
 		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
 		this.#emitter.emit('compact', section)
@@ -294,27 +300,6 @@ export class Conversation implements ConversationInterface {
 			...(this.#summary === undefined ? {} : { summary: this.#summary }),
 			sections: this.sections,
 			messages: this.messages(),
-		}
-	}
-
-	// One section rendered as a RAW synthetic summary message — role `'assistant'`, keyed by the
-	// section's stable `id`, carrying its `summary` VERBATIM as content. Used by the rollup
-	// regeneration (a summary-of-summaries over the unframed section summaries — the recap LABEL
-	// is a `view()`-only presentation concern, kept OUT of the digest the summarizer re-reads).
-	#summaryMessage(section: SectionInterface): MessageInterface {
-		return { id: section.id, role: 'assistant', content: section.summary }
-	}
-
-	// One section rendered as a FRAMED RECAP message for `view()` (the model input) — same role +
-	// stable `id` as `#summaryMessage`, but its content is prefixed with `RECAP_PREFIX` so a small
-	// model reads it as a CONDENSED RECAP of earlier turns rather than a literal assistant turn to
-	// echo or treat as the live answer. The prefix is a fixed handful of tokens (no per-section
-	// growth beyond the constant), keeping `view()` lean — asserted by the no-bloat test guard.
-	#recapMessage(section: SectionInterface): MessageInterface {
-		return {
-			id: section.id,
-			role: 'assistant',
-			content: `${CONVERSATION_RECAP_PREFIX}${section.summary}`,
 		}
 	}
 

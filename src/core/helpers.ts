@@ -3,26 +3,32 @@ import type {
 	AgentJobInput,
 	AgentRegistryInterface,
 	AgentResult,
-	ConversationSnapshot,
+	ContextSectionFormat,
+	ContextSectionSourceInterface,
 	MessageInterface,
+	RunOutcome,
 	SectionInterface,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
 import type { QueueExecution } from '@orkestrel/queue'
+import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import type { ControllerInterface } from '@orkestrel/workflow'
+import type { FileInterface } from '@orkestrel/workspace'
 import {
 	attempt,
-	isArray,
 	isBoolean,
 	isFiniteNumber,
 	isObject,
-	isRecord,
 	isString,
 	parseJSONValue,
 } from '@orkestrel/contract'
-import { isToolCall } from '@orkestrel/tool'
-import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
+import { isBinary } from '@orkestrel/workspace'
+import {
+	CONVERSATION_RECAP_PREFIX,
+	IMAGE_TOKEN_ESTIMATE,
+	MESSAGE_TOKEN_OVERHEAD,
+} from './constants.js'
 import { AgentJobError } from './errors.js'
 
 /**
@@ -273,111 +279,6 @@ export function handleAgentRunnerJob(
 }
 
 /**
- * Whether an `unknown` is structurally a {@link MessageInterface} record — the per-message step of
- * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
- * read via a guard, never an `as`). The conversation analogue of
- * {@link import('@orkestrel/workspace').isFile}.
- *
- * @remarks
- * A total guard (it NEVER throws — adversarial input returns `false`). It checks the message's
- * SHAPE: a record with a `string` `id`, a `string` `role`, a `string` `content`, and — WHEN present
- * — a `calls` array EVERY element of which is a valid
- * {@link import('@orkestrel/tool').ToolCall} ({@link isToolCall} — the
- * ASI06 fail-closed deepening: a tampered `calls` element rejects the message, so the snapshot
- * reads back as absent rather than replaying a malformed call) and an `images` that is an array
- * (an absent optional passes). The `role` is left as a broad `string` here (an open
- * {@link import('./types.js').MessageRole}, so any storage-read role string is accepted
- * defensively rather than rejected against the current literal set). Enough to safely impose the
- * {@link MessageInterface} type at
- * a storage boundary WITHOUT a cast.
- *
- * @param value - The value to test (one element of a snapshot's `messages` / a section's `messages`)
- * @returns `true` when `value` has the structural shape of a {@link MessageInterface}
- *
- * @example
- * ```ts
- * isMessage({ id: '1', role: 'user', content: 'hi' }) // true
- * isMessage({ id: '1', role: 'assistant', content: '', calls: [] }) // true
- * isMessage({ id: '1', role: 'user' }) // false (missing content)
- * isMessage({ id: '1', role: 'assistant', content: '', calls: [null] }) // false (malformed call)
- * ```
- */
-export function isMessage(value: unknown): value is MessageInterface {
-	if (!isRecord(value)) return false
-	if (!isString(value.id) || !isString(value.role) || !isString(value.content)) return false
-	if (value.calls !== undefined && !(isArray(value.calls) && value.calls.every(isToolCall))) {
-		return false
-	}
-	return value.images === undefined || isArray(value.images)
-}
-
-/**
- * Whether an `unknown` is structurally a {@link SectionInterface} record — the per-section step of
- * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
- * read via a guard, never an `as`).
- *
- * @remarks
- * A total guard (it NEVER throws — adversarial input returns `false`). It checks the section's
- * SHAPE: a record with a `string` `id`, a `string` `summary`, and a `messages` array EVERY element
- * of which is a valid {@link MessageInterface} record ({@link isMessage}). Enough to safely impose
- * the {@link SectionInterface} type at a storage boundary WITHOUT a cast.
- *
- * @param value - The value to test (one element of a snapshot's `sections` array)
- * @returns `true` when `value` has the structural shape of a {@link SectionInterface}
- *
- * @example
- * ```ts
- * isSection({ id: 's', summary: 'recap', messages: [{ id: '1', role: 'user', content: 'hi' }] }) // true
- * isSection({ id: 's', summary: 'recap', messages: 'nope' }) // false
- * isSection({ id: 's', messages: [] }) // false (missing summary)
- * ```
- */
-export function isSection(value: unknown): value is SectionInterface {
-	if (!isRecord(value)) return false
-	if (!isString(value.id) || !isString(value.summary)) return false
-	return isArray(value.messages) && value.messages.every(isMessage)
-}
-
-/**
- * Narrow an `unknown` to a {@link ConversationSnapshot} — the AGENTS §14 boundary guard for an
- * UNTRUSTED snapshot read (a storage row a
- * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * reads back from its opaque JSON column, a snapshot loaded from disk). The EXACT analogue of
- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
- *
- * @remarks
- * A total guard (it NEVER throws — adversarial input returns `false`). It checks the snapshot's
- * SHAPE: a `string` `id`, an OPTIONAL `string` `summary` (present-or-absent — the rollup is
- * `undefined` until the first compaction), a `sections` array EVERY element of which is a valid
- * {@link SectionInterface} ({@link isSection}), and a `messages` array EVERY element of which is a
- * valid {@link MessageInterface} ({@link isMessage}) — enough to safely impose the
- * {@link ConversationSnapshot} type at a storage boundary WITHOUT a cast. The structural twin of
- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. A malformed blob (a non-record, a missing / non-string `id`, a
- * non-string `summary` when present, a non-array `sections` / `messages`, or any malformed
- * element) resolves `false`, so a
- * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * read yields `undefined` rather than a broken conversation.
- *
- * @param value - The value to test (an opaque storage read)
- * @returns `true` when `value` has the structural shape of a {@link ConversationSnapshot}
- *
- * @example
- * ```ts
- * isConversationSnapshot({ id: 'c1', sections: [], messages: [] }) // true
- * isConversationSnapshot({ id: 'c1', summary: 'recap', sections: [], messages: [] }) // true
- * isConversationSnapshot({ id: 'c1', sections: 'nope', messages: [] }) // false
- * isConversationSnapshot({ sections: [], messages: [] }) // false (missing id)
- * ```
- */
-export function isConversationSnapshot(value: unknown): value is ConversationSnapshot {
-	if (!isRecord(value)) return false
-	if (!isString(value.id)) return false
-	if (value.summary !== undefined && !isString(value.summary)) return false
-	if (!isArray(value.sections) || !value.sections.every(isSection)) return false
-	return isArray(value.messages) && value.messages.every(isMessage)
-}
-
-/**
  * Render a path-addressed text body as a fenced reference block — the framing an
  * {@link import('./AgentContext.js').AgentContext}'s ACTIVE-workspace text-file render emits (the
  * active workspace is the SOLE document/image context).
@@ -396,7 +297,7 @@ export function isConversationSnapshot(value: unknown): value is ConversationSna
  *
  * @example
  * ```ts
- * import { fencedFile } from '@src/core'
+ * import { fencedFile } from '@orkestrel/agent'
  *
  * fencedFile('src/main.ts', 'typescript', 'const x = 1')
  * // 'File: src/main.ts\n```typescript\nconst x = 1\n```'
@@ -440,4 +341,383 @@ export function sanitizeUsage(usage: TokenUsage): TokenUsage {
 		completion: sanitizeToken(usage.completion),
 		total: sanitizeToken(usage.total),
 	}
+}
+
+/**
+ * Joins the reasoning a run's provider calls separated from the answer — the first call
+ * seeds the accumulation, a later call appends blank-line separated so each turn's reasoning
+ * stays readable.
+ *
+ * @remarks
+ * Pure and total. `running` is `undefined` until a call surfaces reasoning, so the first join
+ * returns `next` verbatim (no leading separator). The result is display/audit metadata that
+ * never re-enters the conversation.
+ *
+ * @param running - The reasoning accumulated so far (`undefined` before the first)
+ * @param next - This call's separated reasoning
+ * @returns The joined reasoning
+ *
+ * @example
+ * ```ts
+ * joinThinking(undefined, 'first') // 'first'
+ * joinThinking('first', 'second') // 'first\n\nsecond'
+ * ```
+ */
+export function joinThinking(running: string | undefined, next: string): string {
+	return running === undefined ? next : `${running}\n\n${next}`
+}
+
+/**
+ * Adds two {@link TokenUsage} values field by field — the running total an agent run keeps
+ * across its provider calls.
+ *
+ * @remarks
+ * Pure and total: the first call seeds the total (`running` `undefined` returns `next`
+ * unchanged), later calls accumulate. No sanitization happens here — charge a provider's
+ * reported usage through {@link sanitizeUsage} first.
+ *
+ * @param running - The total so far (`undefined` before the first usage-bearing call)
+ * @param next - This call's reported usage
+ * @returns The summed usage
+ *
+ * @example
+ * ```ts
+ * sumUsage(undefined, { prompt: 2, completion: 1, total: 3 }) // { prompt: 2, completion: 1, total: 3 }
+ * sumUsage({ prompt: 2, completion: 1, total: 3 }, { prompt: 1, completion: 1, total: 2 })
+ * // { prompt: 3, completion: 2, total: 5 }
+ * ```
+ */
+export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): TokenUsage {
+	if (running === undefined) return next
+	return {
+		prompt: running.prompt + next.prompt,
+		completion: running.completion + next.completion,
+		total: running.total + next.total,
+	}
+}
+
+/**
+ * Assembles the settled {@link AgentResult} from a run's {@link RunOutcome} — `thinking` and
+ * `usage` are carried only when the run surfaced them.
+ *
+ * @remarks
+ * Pure and total. An absent optional is OMITTED rather than stored as `undefined` (the
+ * present-when-given convention the message store follows), so a settled result JSON
+ * round-trips without an explicit `undefined` field. `exhausted` is loop bookkeeping and does
+ * not reach the public result — the `exhaust` event carries it instead.
+ *
+ * @param outcome - The run's settled outcome
+ * @returns The public {@link AgentResult}
+ *
+ * @example
+ * ```ts
+ * assembleResult({ content: 'hi', thinking: undefined, usage: undefined, partial: false, exhausted: false })
+ * // { content: 'hi', partial: false }
+ * ```
+ */
+export function assembleResult(outcome: RunOutcome): AgentResult {
+	const result: { content: string; thinking?: string; usage?: TokenUsage; partial: boolean } = {
+		content: outcome.content,
+		partial: outcome.partial,
+	}
+	if (outcome.thinking !== undefined) result.thinking = outcome.thinking
+	if (outcome.usage !== undefined) result.usage = outcome.usage
+	return result
+}
+
+/**
+ * Synthesizes the denial {@link ToolResult} an authority-blocked call is fed back with — the
+ * call's `id` / `name` keyed back, carrying a denial `error` instead of a value.
+ *
+ * @remarks
+ * Pure and total. The rule's `reason` is rendered as `denied: <reason>` when one was given,
+ * else the generic `denied by authority`. There is no `value`, so the agent loop feeds it back
+ * exactly like a tool error and the model can react to it.
+ *
+ * @param call - The denied {@link ToolCall}
+ * @param reason - The rule's explanation, or `undefined` for the generic denial
+ * @returns The failure-arm {@link ToolResult}
+ *
+ * @example
+ * ```ts
+ * denyCall({ id: '1', name: 'drop', arguments: {} }, 'read-only mode')
+ * // { success: false, id: '1', name: 'drop', error: 'denied: read-only mode' }
+ * ```
+ */
+export function denyCall(call: ToolCall, reason: string | undefined): ToolResult {
+	return {
+		success: false,
+		id: call.id,
+		name: call.name,
+		error: reason !== undefined ? `denied: ${reason}` : 'denied by authority',
+	}
+}
+
+/**
+ * Renders one context section — the resolved `open`, each item's rendering, and the resolved
+ * `close` when one exists, blank-line joined.
+ *
+ * @remarks
+ * Pure and total. A section with NO items renders nothing (`undefined`), so an empty or fully
+ * scoped-out manager stays silent — its `open` / `close` never appear without items. `close`
+ * is the only optional slot: an unset one (there is no built-in close) simply drops the
+ * trailing line.
+ *
+ * @typeParam T - The section item being rendered
+ * @param open - The section's resolved leading text
+ * @param items - The already scope-filtered items
+ * @param render - Renders one item to its prompt text
+ * @param close - The section's resolved trailing text, or `undefined` for none
+ * @returns The rendered section, or `undefined` when there are no items
+ *
+ * @example
+ * ```ts
+ * renderSection('## Instructions', [{ content: 'Be terse.' }], (one) => one.content, undefined)
+ * // '## Instructions\n\nBe terse.'
+ * renderSection('<rules>', [], (one) => one.content, '</rules>') // undefined (no items)
+ * ```
+ */
+export function renderSection<T>(
+	open: string,
+	items: readonly T[],
+	render: (item: T) => string,
+	close: string | undefined,
+): string | undefined {
+	if (items.length === 0) return undefined
+	const lines = [open, ...items.map(render)]
+	if (close !== undefined) lines.push(close)
+	return lines.join('\n\n')
+}
+
+/**
+ * Resolves one section's OPEN text through the format cascade — manager-options override >
+ * provider default > built-in header.
+ *
+ * @remarks
+ * Pure and total. The leading text has NO per-item level. A manager's `description` already
+ * encapsulates `[options-override → built-in]`, so it is reached only when neither the
+ * override's `open` nor the provider's `open` applies — and there it IS the built-in header.
+ *
+ * @typeParam T - The section item the manager renders
+ * @param manager - The section source (its `framing` override + its built-in `description`)
+ * @param provider - The provider-default framing for this section, or `undefined`
+ * @returns The section's leading text
+ *
+ * @example
+ * ```ts
+ * resolveOpen(instructions, undefined) // '## Instructions' (the built-in header)
+ * resolveOpen(instructions, { open: '<rules>' }) // '<rules>' (the provider default)
+ * ```
+ */
+export function resolveOpen<T>(
+	manager: ContextSectionSourceInterface<T>,
+	provider: ContextSectionFormat<T> | undefined,
+): string {
+	return manager.framing?.open ?? provider?.open ?? manager.description
+}
+
+/**
+ * Resolves one section's CLOSE text through the format cascade — manager-options override >
+ * provider default.
+ *
+ * @remarks
+ * Pure and total. There is NO built-in close, so a section with neither level set returns
+ * `undefined` and {@link renderSection} appends no closing line. Paired with
+ * {@link resolveOpen}, one level can WRAP the whole group.
+ *
+ * @typeParam T - The section item the manager renders
+ * @param manager - The section source (its `framing` override)
+ * @param provider - The provider-default framing for this section, or `undefined`
+ * @returns The section's trailing text, or `undefined` when no level sets one
+ *
+ * @example
+ * ```ts
+ * resolveClose(instructions, undefined) // undefined (no built-in close)
+ * resolveClose(instructions, { close: '</rules>' }) // '</rules>'
+ * ```
+ */
+export function resolveClose<T>(
+	manager: ContextSectionSourceInterface<T>,
+	provider: ContextSectionFormat<T> | undefined,
+): string | undefined {
+	return manager.framing?.close ?? provider?.close
+}
+
+/**
+ * Resolves ONE item's rendering through the format cascade — item override >
+ * manager-options override > provider default > built-in rendering.
+ *
+ * @remarks
+ * Pure and total. The item's own `format` is the most-specific level (a fully-rendered
+ * string for that item alone). A manager's `format(item)` already encapsulates
+ * `[options-override → built-in]`, so it is reached only when no higher level applies — and
+ * there it IS the built-in rendering.
+ *
+ * @typeParam T - The section item being rendered (it may carry its own `format` override)
+ * @param manager - The section source (its `framing` override + its built-in `format`)
+ * @param provider - The provider-default framing for this section, or `undefined`
+ * @param item - The item to render
+ * @returns The item's prompt text
+ *
+ * @example
+ * ```ts
+ * resolveItem(instructions, undefined, terse) // 'Be terse.' (the built-in rendering)
+ * resolveItem(instructions, { render: (one) => `<rule>${one.content}</rule>` }, terse)
+ * // '<rule>Be terse.</rule>'
+ * ```
+ */
+export function resolveItem<T extends { readonly format?: string }>(
+	manager: ContextSectionSourceInterface<T>,
+	provider: ContextSectionFormat<T> | undefined,
+	item: T,
+): string {
+	return (
+		item.format ??
+		manager.framing?.render?.(item) ??
+		provider?.render?.(item) ??
+		manager.format(item)
+	)
+}
+
+/**
+ * Copies a message with image data merged onto its `images` — the message's own images
+ * first, then the attached data.
+ *
+ * @remarks
+ * Pure and total: the original message is NEVER mutated. `calls` is carried only when the
+ * source message has one (kept omitted otherwise, mirroring the store's present-when-given
+ * convention).
+ *
+ * @param message - The message to copy (left unchanged)
+ * @param data - The base64 image data to attach
+ * @returns A new message carrying the merged `images`
+ *
+ * @example
+ * ```ts
+ * attachImages({ id: '1', role: 'user', content: 'Describe' }, ['<base64>'])
+ * // { id: '1', role: 'user', content: 'Describe', images: ['<base64>'] }
+ * ```
+ */
+export function attachImages(message: MessageInterface, data: readonly string[]): MessageInterface {
+	const images = [...(message.images ?? []), ...data]
+	return message.calls === undefined
+		? { id: message.id, role: message.role, content: message.content, images }
+		: {
+				id: message.id,
+				role: message.role,
+				content: message.content,
+				calls: message.calls,
+				images,
+			}
+}
+
+/**
+ * Collects the base64 `data` of the IMAGE files in a workspace file list — the payload an
+ * agent context attaches to the last user message.
+ *
+ * @remarks
+ * Pure and total. `isBinary` NARROWS the tagless content to its binary arm (§14: narrow,
+ * never assert), then the MIME prefix gates it to an image, so a text file and a non-image
+ * binary (a PDF) are both skipped. Order follows the file list.
+ *
+ * @param files - The (already scope-filtered) workspace files
+ * @returns The base64 data of the image files, in file order
+ *
+ * @example
+ * ```ts
+ * collectImageData([createFile({ path: 'a.png', content: { data: '<base64>', mime: 'image/png' } })])
+ * // ['<base64>']
+ * ```
+ */
+export function collectImageData(files: readonly FileInterface[]): readonly string[] {
+	const data: string[] = []
+	for (const file of files) {
+		if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
+			data.push(file.content.data)
+		}
+	}
+	return data
+}
+
+/**
+ * Builds the RAW synthetic summary message for one compacted section — role `'assistant'`,
+ * the section's stable `id`, its `summary` VERBATIM as content.
+ *
+ * @remarks
+ * Pure and total. This is the unframed form the rollup regeneration digests (a
+ * summary-of-summaries over the section summaries); the recap LABEL is a `view()`
+ * presentation concern kept out of what the summarizer re-reads — see
+ * {@link buildRecapMessage}.
+ *
+ * @param section - The compacted section to render
+ * @returns The synthetic summary message
+ *
+ * @example
+ * ```ts
+ * buildSummaryMessage({ id: 's1', summary: 'recap', messages: [] })
+ * // { id: 's1', role: 'assistant', content: 'recap' }
+ * ```
+ */
+export function buildSummaryMessage(section: SectionInterface): MessageInterface {
+	return { id: section.id, role: 'assistant', content: section.summary }
+}
+
+/**
+ * Builds the FRAMED recap message for one compacted section — the same role and stable `id`
+ * as {@link buildSummaryMessage}, with the content prefixed by
+ * {@link import('./constants.js').CONVERSATION_RECAP_PREFIX}.
+ *
+ * @remarks
+ * Pure and total. The prefix is what makes a small model read the message as a CONDENSED
+ * RECAP of earlier turns rather than a literal assistant turn to echo or answer from. It is a
+ * fixed handful of tokens, so a conversation's `view()` stays lean however many sections it
+ * carries.
+ *
+ * @param section - The compacted section to render
+ * @returns The framed recap message
+ *
+ * @example
+ * ```ts
+ * buildRecapMessage({ id: 's1', summary: 'recap', messages: [] })
+ * // { id: 's1', role: 'assistant', content: `${CONVERSATION_RECAP_PREFIX}recap` }
+ * ```
+ */
+export function buildRecapMessage(section: SectionInterface): MessageInterface {
+	return {
+		id: section.id,
+		role: 'assistant',
+		content: `${CONVERSATION_RECAP_PREFIX}${section.summary}`,
+	}
+}
+
+/**
+ * Intersects two scope category lists under the "`undefined` is the universal set" rule — the
+ * primitive a scope narrows through.
+ *
+ * @remarks
+ * Pure and total, and it can only TIGHTEN: `undefined` ∩ `undefined` is `undefined` (still no
+ * constraint); `undefined` ∩ a list is a COPY of that list (the `undefined` side imposes
+ * nothing); a list ∩ a list keeps the child keys the parent also allows, so a parent-excluded
+ * key can never be re-admitted. Every returned list is a fresh copy, so a later mutation of
+ * either input cannot leak into the result.
+ *
+ * @param parent - The parent's allow-list (`undefined` ⇒ no constraint)
+ * @param child - The narrowing allow-list (`undefined` ⇒ no constraint)
+ * @returns The intersected allow-list, or `undefined` when neither side constrains
+ *
+ * @example
+ * ```ts
+ * intersectKeys(['read', 'write'], ['write', 'admin']) // ['write']
+ * intersectKeys(undefined, ['read']) // ['read']
+ * intersectKeys(undefined, undefined) // undefined
+ * ```
+ */
+export function intersectKeys(
+	parent: readonly string[] | undefined,
+	child: readonly string[] | undefined,
+): readonly string[] | undefined {
+	if (parent === undefined) return child === undefined ? undefined : [...child]
+	if (child === undefined) return [...parent]
+	const allowed = new Set(parent)
+	return child.filter((key) => allowed.has(key))
 }

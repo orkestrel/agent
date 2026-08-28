@@ -1,3 +1,5 @@
+import type { ChannelInterface } from './types.js'
+
 /**
  * A minimal unbounded async channel — the eager pump WRITES chunks into it (`push`)
  * and ends it (`close` / `fail`) regardless of consumption; a consumer READS them back
@@ -22,7 +24,7 @@
  * }
  * ```
  */
-export class Channel<T> {
+export class Channel<T> implements ChannelInterface<T> {
 	readonly #buffer: Array<{ value: T }> = []
 	#wake: (() => void) | undefined
 	#closed = false

@@ -3,6 +3,7 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
 	ConversationError,
+	createConversation,
 	estimateMessages,
 	isConversationError,
 } from '@src/core'
@@ -616,6 +617,44 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 		expect('summary' in snapshot).toBe(false)
 		expect(snapshot.sections).toEqual([])
 		expect(snapshot.messages.map((one) => one.content)).toEqual(['hi'])
+	})
+
+	it('hydrates from the ConversationOptions snapshot seam, restoring id, sections, and tail', async () => {
+		const stub = createStubSummarizer()
+		const source = new Conversation({ id: 'stored', summarize: stub.summarize, keep: 1 })
+		source.add([
+			{ role: 'user', content: 'first' },
+			{ role: 'assistant', content: 'second' },
+			{ role: 'user', content: 'third' },
+		])
+		await source.compact()
+		const snapshot = source.snapshot()
+
+		// The declared option is the seam a factory reaches — no positional argument needed.
+		const restored = createConversation({ snapshot, summarize: stub.summarize, keep: 1 })
+		expect(restored.id).toBe('stored') // the snapshot IS the identity
+		expect(restored.summary).toBe(source.summary)
+		expect(restored.sections).toEqual(source.sections)
+		expect(restored.messages()).toEqual(source.messages())
+		// The live config rides alongside it: the restored conversation can still fold.
+		expect(restored.summarizable).toBe(true)
+	})
+
+	it('lets a snapshot id win over an options id, and stays silent while restoring', () => {
+		const compacted = createRecorder<ConversationEventMap['compact']>()
+		const restored = createConversation({
+			id: 'ignored',
+			snapshot: {
+				id: 'stored',
+				sections: [],
+				messages: [{ id: 'm', role: 'user', content: 'hi' }],
+			},
+			on: { compact: compacted.handler },
+		})
+
+		expect(restored.id).toBe('stored')
+		expect(restored.messages().map((one) => one.content)).toEqual(['hi'])
+		expect(compacted.count).toBe(0) // hydration edits nothing, so it emits nothing
 	})
 
 	it('snapshot() is pure JSON DATA — it survives a JSON round-trip identically', async () => {

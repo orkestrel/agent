@@ -11,6 +11,7 @@ import type {
 	AgentRunnerOptions,
 	AuthorityInterface,
 	AuthorityOptions,
+	ChannelInterface,
 	ConversationInterface,
 	ConversationManagerInterface,
 	ConversationManagerOptions,
@@ -39,6 +40,7 @@ import { Agent } from './Agent.js'
 import { AgentContext } from './AgentContext.js'
 import { AgentRegistry } from './AgentRegistry.js'
 import { Authority } from './Authority.js'
+import { Channel } from './Channel.js'
 import { Conversation } from './conversations/Conversation.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 import { DatabaseConversationStore } from './conversations/stores/DatabaseConversationStore.js'
@@ -71,8 +73,8 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  *
  * @example
  * ```ts
- * import type { ProviderInterface } from '@src/core'
- * import { createConversation } from '@src/core'
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createConversation } from '@orkestrel/agent'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const conversation = createConversation({
@@ -111,7 +113,7 @@ export function createConversation(options?: ConversationOptions): ConversationI
  *
  * @example
  * ```ts
- * import { createConversationManager } from '@src/core'
+ * import { createConversationManager } from '@orkestrel/agent'
  *
  * const conversations = createConversationManager({ summarize: async (m) => `recap of ${m.length}` })
  * const chat = conversations.add() // auto-activates — conversations.active === chat
@@ -140,14 +142,14 @@ export function createConversationManager(
  * {@link createDatabaseConversationStore} (the snapshot as one opaque JSON column over a `databases`
  * table) — for a DURABLE store pass it a JSON / SQLite / IndexedDB driver, and it swaps in WITHOUT
  * touching the manager or the conversation. Hydration stays a manager concern: read a snapshot back
- * and rebuild the live conversation through the constructor `seed` (re-supplying the live
+ * and rebuild the live conversation through the `snapshot` option (re-supplying the live
  * `summarize` / `keep`).
  *
  * @returns A memory-backed {@link ConversationStoreInterface}
  *
  * @example
  * ```ts
- * import { createConversationManager, createMemoryConversationStore } from '@src/core'
+ * import { createConversationManager, createMemoryConversationStore } from '@orkestrel/agent'
  *
  * const store = createMemoryConversationStore()
  * const manager = createConversationManager({ store })
@@ -173,7 +175,7 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore} stores its snapshot. The
  * snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is lossless
  * AND keeps the row type FLAT (the column reads back as `unknown`, narrowed on `get` by
- * {@link import('./helpers.js').isConversationSnapshot}). The `driver` DEFAULTS to
+ * {@link import('./validators.js').isConversationSnapshot}). The `driver` DEFAULTS to
  * {@link createMemoryDriver}, so the store ALSO works in memory out of the box; pass a server
  * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
  * the durability is the driver's job, the store engine is shared. It swaps in behind
@@ -184,7 +186,8 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
  *
  * @example
  * ```ts
- * import { createConversationManager, createDatabaseConversationStore, createMemoryDriver } from '@src/core'
+ * import { createConversationManager, createDatabaseConversationStore } from '@orkestrel/agent'
+ * import { createMemoryDriver } from '@orkestrel/database'
  *
  * const store = createDatabaseConversationStore(createMemoryDriver()) // a durable driver swaps in here
  * const manager = createConversationManager({ store })
@@ -220,7 +223,7 @@ export function createDatabaseConversationStore(
  *
  * @example
  * ```ts
- * import { createInstruction } from '@src/core'
+ * import { createInstruction } from '@orkestrel/agent'
  *
  * const instruction = createInstruction({ name: 'tone', content: 'Be concise.', priority: 5 })
  * ```
@@ -251,7 +254,7 @@ export function createInstruction(input: InstructionInput): InstructionInterface
  *
  * @example
  * ```ts
- * import { createInstructionManager } from '@src/core'
+ * import { createInstructionManager } from '@orkestrel/agent'
  *
  * const instructions = createInstructionManager()
  * instructions.add({ name: 'tone', content: 'Be concise.', priority: 5 })
@@ -279,7 +282,7 @@ export function createInstructionManager(
  *
  * @example
  * ```ts
- * import { createScope } from '@src/core'
+ * import { createScope } from '@orkestrel/agent'
  *
  * const reader = createScope({ name: 'reader', tools: ['search', 'read'] })
  * reader.narrow({ tools: ['read', 'write'] }).tools // ['read'] — intersection tightens
@@ -306,7 +309,7 @@ export function createScope(input: ScopeInput): ScopeInterface {
  *
  * @example
  * ```ts
- * import { createScopeManager } from '@src/core'
+ * import { createScopeManager } from '@orkestrel/agent'
  *
  * const scopes = createScopeManager()
  * const reader = scopes.create({ name: 'reader', tools: ['search'] })
@@ -338,7 +341,7 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  *
  * @example
  * ```ts
- * import { createAgentContext } from '@src/core'
+ * import { createAgentContext } from '@orkestrel/agent'
  *
  * const context = createAgentContext({ system: 'You are concise.' })
  * context.instructions.add({ name: 'tone', content: 'Be terse.' })
@@ -374,8 +377,9 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
  *
  * @example
  * ```ts
- * import type { ProviderInterface } from '@src/core'
- * import { createAgent, createTokenBudget } from '@src/core'
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createAgent } from '@orkestrel/agent'
+ * import { createTokenBudget } from '@orkestrel/budget'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const agent = createAgent(provider, {
@@ -414,7 +418,7 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
  *
  * @example
  * ```ts
- * import { createThinkSplitter } from '@src/core'
+ * import { createThinkSplitter } from '@orkestrel/agent'
  *
  * const splitter = createThinkSplitter()
  * const clean = splitter.split('<think>plan the answer</think>Here it is.')
@@ -424,6 +428,36 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
  */
 export function createThinkSplitter(): ThinkSplitterInterface {
 	return new ThinkSplitter()
+}
+
+/**
+ * Creates an empty unbounded async channel — a {@link ChannelInterface} a producer writes
+ * values into (`push`) and ends (`close` / `fail`) regardless of consumption, while a
+ * consumer reads them back live through `drain`.
+ *
+ * @remarks
+ * Write and read are decoupled, so the producer never waits for a consumer: an agent's eager
+ * pump writes each chunk into one, which is why a run's `result` settles whether or not the
+ * live events are drained. A value pushed at an already-parked consumer is delivered, buffered
+ * values are yielded before the end is reported, and the FIRST failure wins.
+ *
+ * @typeParam T - The value type the channel carries
+ * @returns A fresh, empty {@link ChannelInterface}
+ *
+ * @example
+ * ```ts
+ * import { createChannel } from '@orkestrel/agent'
+ *
+ * const channel = createChannel<number>()
+ * channel.push(1)
+ * channel.close()
+ * for await (const value of channel.drain()) {
+ * 	value // 1
+ * }
+ * ```
+ */
+export function createChannel<T>(): ChannelInterface<T> {
+	return new Channel<T>()
 }
 
 /**
@@ -446,7 +480,7 @@ export function createThinkSplitter(): ThinkSplitterInterface {
  *
  * @example
  * ```ts
- * import { createAgent, createAuthority } from '@src/core'
+ * import { createAgent, createAuthority } from '@orkestrel/agent'
  *
  * // Deny the `delete` tool, allow everything else.
  * const authority = createAuthority({
@@ -479,8 +513,8 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  *
  * @example
  * ```ts
- * import { createAgentRegistry } from '@src/core'
- * import type { ProviderInterface } from '@src/core'
+ * import { createAgentRegistry } from '@orkestrel/agent'
+ * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createTool } from '@orkestrel/tool'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
@@ -524,7 +558,8 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  *
  * @example
  * ```ts
- * import { createAgentQueue, createAgentRegistry, createMemoryQueueStore } from '@src/core'
+ * import { createAgentQueue, createAgentRegistry } from '@orkestrel/agent'
+ * import { createMemoryQueueStore } from '@orkestrel/queue'
  *
  * const registry = createAgentRegistry({ providers: { main: provider } })
  * const store = createMemoryQueueStore(agentJobShape) // survives a restart via restore()
@@ -571,7 +606,7 @@ export function createAgentQueue(
  *
  * @example
  * ```ts
- * import { createAgentRunner, createAgentRegistry } from '@src/core'
+ * import { createAgentRunner, createAgentRegistry } from '@orkestrel/agent'
  *
  * const registry = createAgentRegistry({ providers: { main: provider } })
  * const runner = createAgentRunner({ registry, concurrency: 2 })

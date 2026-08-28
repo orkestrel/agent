@@ -14,6 +14,7 @@ import {
 	createAgentQueue,
 	createAgentRegistry,
 	createAgentRunner,
+	createChannel,
 	createInstructionManager,
 	createScope,
 	isAgentJobError,
@@ -30,7 +31,7 @@ import {
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
 import { createAgentJob, createScriptedProvider, createTokenUsage, loopTool } from '../../setup.js'
-import { roundTripJSON, waitForDelay } from '@orkestrel/test'
+import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
 // createAgent, all needing no daemon (AGENTS §16). `createOllama` (the live-Ollama
@@ -61,6 +62,30 @@ describe('createAgentContext', () => {
 		expect(context.tools.count).toBe(1)
 		// Tools are structural — the prompt never carries them.
 		expect(context.build()).toEqual([])
+	})
+})
+
+describe('createChannel', () => {
+	it('hands back a working channel — pushed values drain in write order, then close ends it', async () => {
+		const channel = createChannel<number>()
+		channel.push(1)
+		channel.push(2)
+		channel.close()
+
+		expect(await collect(channel.drain())).toEqual([1, 2])
+	})
+
+	it('delivers the buffered values before surfacing a failure', async () => {
+		const channel = createChannel<string>()
+		channel.push('first')
+		channel.fail(new Error('broken'))
+
+		const seen: string[] = []
+		const drain = async (): Promise<void> => {
+			for await (const value of channel.drain()) seen.push(value)
+		}
+		await expect(drain()).rejects.toThrow('broken')
+		expect(seen).toEqual(['first'])
 	})
 })
 

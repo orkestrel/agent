@@ -4,7 +4,7 @@ import type {
 	ConversationStoreInterface,
 } from '../../types.js'
 import type { TableInterface } from '@orkestrel/database'
-import { isConversationSnapshot } from '../../helpers.js'
+import { isConversationSnapshot } from '../../validators.js'
 
 /**
  * A {@link ConversationStoreInterface} backed by one table of the `databases` layer — a
@@ -33,7 +33,7 @@ import { isConversationSnapshot } from '../../helpers.js'
  * - **`set(snapshot)` upserts under the snapshot's OWN `id`** (no separate id param) — it writes
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
- *   a {@link ConversationSnapshot} ({@link import('../../helpers.js').isConversationSnapshot} — the
+ *   a {@link ConversationSnapshot} ({@link import('../../validators.js').isConversationSnapshot} — the
  *   AGENTS §14 boundary narrow for an untrusted storage read), or `undefined` if none is stored.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
@@ -41,11 +41,12 @@ import { isConversationSnapshot } from '../../helpers.js'
  * explicit `delete`. The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the
  * §22 method bijection with {@link ConversationStoreInterface}). Hydration stays a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
- * the live conversation through the constructor `seed` (its `open` / `save`).
+ * the live conversation through the `snapshot` option (its `open` / `save`).
  *
  * @example
  * ```ts
- * import { createConversation, createDatabaseConversationStore, createMemoryDriver } from '@src/core'
+ * import { createConversation, createDatabaseConversationStore } from '@orkestrel/agent'
+ * import { createMemoryDriver } from '@orkestrel/database'
  *
  * const store = createDatabaseConversationStore(createMemoryDriver()) // a durable driver swaps in here
  * const conversation = createConversation()

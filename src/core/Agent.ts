@@ -30,7 +30,15 @@ import { AgentContext } from './AgentContext.js'
 import { Channel } from './Channel.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError, isProviderAbortError } from './errors.js'
-import { estimateTokens, filterAllowList, sanitizeUsage } from './helpers.js'
+import {
+	assembleResult,
+	denyCall,
+	estimateTokens,
+	filterAllowList,
+	joinThinking,
+	sanitizeUsage,
+	sumUsage,
+} from './helpers.js'
 
 /**
  * The agent loop — composes a {@link ProviderInterface}, an {@link AgentContext}, and
@@ -276,7 +284,7 @@ export class Agent implements AgentInterface {
 				const outcome = state.outcome
 				this.#status = 'done'
 				channel.close()
-				const result = this.#result(outcome)
+				const result = assembleResult(outcome)
 				settled.resolve(result)
 				// Observe the settle — AFTER `settled.resolve(...)` (the result is already
 				// settled; emit only OBSERVES it). A cancel still RESOLVES a partial, so a
@@ -452,7 +460,7 @@ export class Agent implements AgentInterface {
 				if (abort.signal.aborted) {
 					if (isProviderAbortError(error)) {
 						if (error.partial.thinking !== undefined) {
-							thinking = this.#thought(thinking, error.partial.thinking)
+							thinking = joinThinking(thinking, error.partial.thinking)
 						}
 						// The abort's partial usage — when the provider observed it mid-stream — is
 						// folded and reconciled exactly like the normal post-turn path below: the
@@ -470,7 +478,7 @@ export class Agent implements AgentInterface {
 								completion: Math.max(0, abortUsage.completion - charged),
 								total: Math.max(0, abortUsage.total - charged),
 							})
-							usage = this.#sum(usage, abortUsage)
+							usage = sumUsage(usage, abortUsage)
 						}
 					}
 					state.outcome = { ...state.outcome, partial: true }
@@ -480,20 +488,20 @@ export class Agent implements AgentInterface {
 				throw error
 			}
 			if (result.thinking !== undefined && result.thinking.length > 0) {
-				thinking = this.#thought(thinking, result.thinking)
+				thinking = joinThinking(thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
 				// F1 — sanitize the provider's normal post-turn usage before charging/folding it,
 				// exactly like the abort path above: a non-finite or negative field floors to `0`, a
 				// fractional field floors to its integer part. Unsanitized, a buggy provider's
-				// NaN/negative usage would poison `budget.consumed` and `#sum`, and never trip
+				// NaN/negative usage would poison `budget.consumed` and `sumUsage`, and never trip
 				// exhaustion (`Math.max(0, NaN - charged)` is `NaN`).
 				const resultUsage = sanitizeUsage(result.usage)
 				// RESIDUAL reconcile — the mid-stream charges above already consumed `charged` worth
 				// of budget against this turn's completion; charge only what remains of the FULL
 				// reported usage so the turn's total budget draw matches `resultUsage` exactly (never
 				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
-				// exists), so it is charged here in full. `#sum` / the emitted `usage` chunk below
+				// exists), so it is charged here in full. `sumUsage` / the emitted `usage` chunk below
 				// still carry the FULL sanitized `resultUsage` — reconciliation affects only the
 				// budget charge, never the reported usage.
 				budget?.consume({
@@ -501,7 +509,7 @@ export class Agent implements AgentInterface {
 					completion: Math.max(0, resultUsage.completion - charged),
 					total: Math.max(0, resultUsage.total - charged),
 				})
-				usage = this.#sum(usage, resultUsage)
+				usage = sumUsage(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
 				this.#emitter.emit('usage', resultUsage)
 				yield { type: 'usage', usage: resultUsage }
@@ -669,8 +677,11 @@ export class Agent implements AgentInterface {
 			try {
 				decision = authority.evaluate({ call })
 			} catch (error) {
-				const reason = this.#reason(error)
-				denials.set(call.id, this.#denial(call, reason))
+				// An `Error`'s message, else the stringified throw (the same extraction
+				// `ToolManager` uses for a thrown tool handler), so a fail-closed denial carries
+				// an explanation the model can read.
+				const reason = error instanceof Error ? error.message : String(error)
+				denials.set(call.id, denyCall(call, reason))
 				// Observe the fail-closed denial (the call + the thrown reason) — the denial is
 				// already synthesized; the guarded emit can't perturb the dispatch that follows.
 				this.#emitter.emit('deny', call, reason)
@@ -678,7 +689,7 @@ export class Agent implements AgentInterface {
 			}
 			if (decision.allowed) allowed.push(call)
 			else {
-				denials.set(call.id, this.#denial(call, decision.reason))
+				denials.set(call.id, denyCall(call, decision.reason))
 				// Observe the explicit denial (the call + the rule's reason).
 				this.#emitter.emit('deny', call, decision.reason)
 			}
@@ -686,26 +697,7 @@ export class Agent implements AgentInterface {
 		const executed = allowed.length > 0 ? await tools.execute(allowed) : []
 		const byId = new Map<string, ToolResult>(denials)
 		for (const result of executed) byId.set(result.id, result)
-		return calls.map((call) => byId.get(call.id) ?? this.#denial(call, undefined))
-	}
-
-	// A denied call's synthesized ToolResult — the call's `id` / `name` keyed back (like
-	// any ToolResult) carrying a denial `error` (the rule's `reason` when given, else a
-	// generic message). No `value`, so the loop feeds it back exactly like a tool error.
-	#denial(call: ToolCall, reason: string | undefined): ToolResult {
-		return {
-			success: false,
-			id: call.id,
-			name: call.name,
-			error: reason !== undefined ? `denied: ${reason}` : 'denied by authority',
-		}
-	}
-
-	// The denial reason for a policy `evaluate` that THREW — an `Error`'s message, else the
-	// stringified throw (the same extraction `ToolManager` uses for a thrown tool handler),
-	// so a fail-closed denial carries a useful explanation the model can read.
-	#reason(error: unknown): string {
-		return error instanceof Error ? error.message : String(error)
+		return calls.map((call) => byId.get(call.id) ?? denyCall(call, undefined))
 	}
 
 	// Drive one provider stream turn: discriminate each {@link ProviderDelta} the provider
@@ -764,34 +756,5 @@ export class Agent implements AgentInterface {
 		if (signals.length === 0) return undefined
 		if (signals.length === 1) return signals[0]
 		return AbortSignal.any(signals)
-	}
-
-	// Join the separated reasoning across a run's provider calls — the first call seeds
-	// it; later calls append blank-line separated (each turn's reasoning stays readable).
-	#thought(running: string | undefined, next: string): string {
-		return running === undefined ? next : `${running}\n\n${next}`
-	}
-
-	// Add two token usages field-by-field — the running total across a turn's provider
-	// calls (the first call seeds it; later calls accumulate).
-	#sum(running: TokenUsage | undefined, next: TokenUsage): TokenUsage {
-		if (running === undefined) return next
-		return {
-			prompt: running.prompt + next.prompt,
-			completion: running.completion + next.completion,
-			total: running.total + next.total,
-		}
-	}
-
-	// Assemble the settled AgentResult from the run's outcome — `thinking` / `usage`
-	// present only when a provider call surfaced / reported one.
-	#result(outcome: RunOutcome): AgentResult {
-		const result: { content: string; thinking?: string; usage?: TokenUsage; partial: boolean } = {
-			content: outcome.content,
-			partial: outcome.partial,
-		}
-		if (outcome.thinking !== undefined) result.thinking = outcome.thinking
-		if (outcome.usage !== undefined) result.usage = outcome.usage
-		return result
 	}
 }

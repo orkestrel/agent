@@ -24,11 +24,11 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
  * The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the §22 method
  * bijection with {@link ConversationStoreInterface}). Hydration is a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
- * the live conversation through the constructor `seed` (its `open` / `save`).
+ * the live conversation through the `snapshot` option (its `open` / `save`).
  *
  * @example
  * ```ts
- * import { createConversation, createMemoryConversationStore } from '@src/core'
+ * import { createConversation, createMemoryConversationStore } from '@orkestrel/agent'
  *
  * const store = createMemoryConversationStore()
  * const conversation = createConversation()

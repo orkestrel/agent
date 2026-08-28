@@ -86,21 +86,19 @@ export class ConversationManager implements ConversationManagerInterface {
 	add(input?: ConversationInput): ConversationInterface {
 		// The manager's defaults flow in unless the input overrides them — so a conversation
 		// created through the manager inherits its summarizer / keep by default. An optional
-		// `snapshot` HYDRATES the conversation through the constructor `seed` (the second arg) —
-		// its `id` / `summary` / `sections` / live tail restored, the live summarize / keep above
-		// re-supplied alongside it (mirroring how WorkspaceManager threads `seed`).
+		// `snapshot` HYDRATES the conversation through the declared `ConversationOptions.snapshot`
+		// seam — its `id` / `summary` / `sections` / live tail restored, the live summarize / keep
+		// above re-supplied alongside it in the SAME options object.
 		const sections = input?.sections ?? this.#sections
 		const summarize = input?.summarize ?? this.#summarize
-		const conversation = new Conversation(
-			{
-				...(input?.id === undefined ? {} : { id: input.id }),
-				...(input?.on === undefined ? {} : { on: input.on }),
-				...(summarize === undefined ? {} : { summarize }),
-				keep: input?.keep ?? this.#keep,
-				...(sections === undefined ? {} : { sections }),
-			},
-			input?.snapshot,
-		)
+		const conversation = new Conversation({
+			...(input?.id === undefined ? {} : { id: input.id }),
+			...(input?.on === undefined ? {} : { on: input.on }),
+			...(summarize === undefined ? {} : { summarize }),
+			keep: input?.keep ?? this.#keep,
+			...(sections === undefined ? {} : { sections }),
+			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
+		})
 		this.#conversations.set(conversation.id, conversation)
 		// First conversation auto-activates: a registry that holds conversations always has one active.
 		if (this.#active === undefined) this.#active = conversation.id
@@ -124,7 +122,7 @@ export class ConversationManager implements ConversationManagerInterface {
 		}
 		// No store ⇒ a registry miss resolves nothing (lenient, like `switch`/`conversation`).
 		if (this.#store === undefined) return undefined
-		// Store hit ⇒ rehydrate through the constructor `seed` (the snapshot restores id / summary /
+		// Store hit ⇒ rehydrate through the `snapshot` option (it restores id / summary /
 		// sections / live tail) by reusing `add`, which registers + auto-activates a fresh
 		// Conversation (flowing the manager's default summarize / keep in); a miss ⇒ undefined.
 		const snapshot = await this.#store.get(id)
