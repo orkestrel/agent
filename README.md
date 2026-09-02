@@ -49,11 +49,11 @@ const result = await stream.result // { content, usage?, partial }
 
 ## Guide
 
-[`guides/src/agent.md`](guides/src/agent.md) documents the agent-owned surface:
+[`guides/agent.md`](guides/agent.md) documents the agent-owned surface:
 the provider boundary, conversations, instructions, scopes, authority, durable
 jobs, the loop, and `AgentContext`. The two packages it consumes are mirrored
-alongside it — [`guides/src/tool.md`](guides/src/tool.md) for callable tools and
-[`guides/src/workspace.md`](guides/src/workspace.md) for files.
+alongside it — [`guides/tool.md`](guides/tool.md) for callable tools and
+[`guides/workspace.md`](guides/workspace.md) for files.
 
 ## Package
 
