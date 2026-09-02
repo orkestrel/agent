@@ -1,7 +1,7 @@
 import type { ConversationSnapshot, ConversationStoreInterface } from '../../types.js'
 
 /**
- * The in-memory {@link ConversationStoreInterface} — a process-lifetime `Map` of
+ * Implements the {@link ConversationStoreInterface} in memory — a process-lifetime `Map` of
  * {@link ConversationSnapshot}s keyed by conversation id, the DEFAULT store
  * {@link import('../../factories.js').createMemoryConversationStore} builds. The EXACT twin of
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.

@@ -53,7 +53,7 @@ import { ScopeManager } from './scopes/ScopeManager.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
 
 /**
- * Create a conversation — a {@link ConversationInterface} grouping messages above a flat
+ * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
  * message store it OWNS DIRECTLY, with compaction into summarized sections, a regenerated
  * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
  * provider-agnostic {@link ConversationSummaryHandler} seam.
@@ -92,7 +92,7 @@ export function createConversation(options?: ConversationOptions): ConversationI
 }
 
 /**
- * Create a conversation registry — a {@link ConversationManagerInterface} holding
+ * Creates a conversation registry — a {@link ConversationManagerInterface} holding
  * {@link ConversationInterface}s keyed by their `id` (in insertion order) WITH an active pointer:
  * the §9 store over the conversation layer plus the `active` / `switch` seam the context renders.
  *
@@ -127,7 +127,7 @@ export function createConversationManager(
 }
 
 /**
- * Create the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
+ * Creates the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
  * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot}s keyed by conversation
  * id, the DEFAULT backing for the durable {@link ConversationManagerInterface.open} /
  * {@link ConversationManagerInterface.save} seam. The exact twin of
@@ -163,7 +163,7 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
 }
 
 /**
- * Create a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
+ * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
  * driver-pluggable backing for the conversation persistence seam, the opt-in twin of
  * {@link createMemoryConversationStore}. The exact twin of
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore}.
@@ -209,7 +209,7 @@ export function createDatabaseConversationStore(
 }
 
 /**
- * Create an instruction — an immutable {@link InstructionInterface} (a named directive)
+ * Creates an instruction — an immutable {@link InstructionInterface} (a named directive)
  * from its `name` / `content` and optional `priority`, the `id` minted at construction.
  *
  * @remarks
@@ -233,7 +233,7 @@ export function createInstruction(input: InstructionInput): InstructionInterface
 }
 
 /**
- * Create an instruction registry — an {@link InstructionManagerInterface} holding
+ * Creates an instruction registry — an {@link InstructionManagerInterface} holding
  * immutable instructions keyed by `name`, listed by descending `priority`.
  *
  * @remarks
@@ -267,7 +267,7 @@ export function createInstructionManager(
 }
 
 /**
- * Create a named scope — an immutable {@link ScopeInterface} from its `name` and the four
+ * Creates a named scope — an immutable {@link ScopeInterface} from its `name` and the four
  * optional per-category allow-lists, the `id` minted at construction.
  *
  * @remarks
@@ -293,7 +293,7 @@ export function createScope(input: ScopeInput): ScopeInterface {
 }
 
 /**
- * Create a scope registry — a {@link ScopeManagerInterface} holding immutable scopes keyed
+ * Creates a scope registry — a {@link ScopeManagerInterface} holding immutable scopes keyed
  * by their minted `id`, in insertion order.
  *
  * @remarks
@@ -320,7 +320,7 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
 }
 
 /**
- * Create a richer turn context — an {@link AgentContextInterface} assembling a provider
+ * Creates a richer turn context — an {@link AgentContextInterface} assembling a provider
  * request from the optional system prompt, the instruction registry, the workspace registry,
  * the conversation store, the tool registry, and the active scope.
  *
@@ -354,7 +354,7 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
 }
 
 /**
- * Create an agent loop — an {@link AgentInterface} composing a
+ * Creates an agent loop — an {@link AgentInterface} composing a
  * {@link ProviderInterface}, its {@link AgentContextInterface}, and a tool registry
  * into a bounded context → provider → tools → repeat turn, exposed as a one-shot
  * `generate` and a live `stream`.
@@ -400,7 +400,7 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
 }
 
 /**
- * Create a stream-stateful `<think>` separator — a {@link ThinkSplitterInterface} that
+ * Creates a stream-stateful `<think>` separator — a {@link ThinkSplitterInterface} that
  * splits a thinking model's in-content `<think>…</think>` reasoning spans away from
  * the answer, delta by delta, so a provider yields ONLY clean content and surfaces the
  * accumulated reasoning as {@link import('./types.js').ProviderResult.thinking}.
@@ -461,7 +461,7 @@ export function createChannel<T>(): ChannelInterface<T> {
 }
 
 /**
- * Create a policy gate — an {@link AuthorityInterface} the agent loop consults before
+ * Creates a policy gate — an {@link AuthorityInterface} the agent loop consults before
  * each tool call runs, evaluating the ordered rules first-match-wins and falling back
  * to the configured default when none match.
  *
@@ -494,7 +494,7 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
 }
 
 /**
- * Create an agent registry — an {@link AgentRegistryInterface} holding the named pools of
+ * Creates an agent registry — an {@link AgentRegistryInterface} holding the named pools of
  * live, non-serializable pieces (providers, tools, authorities, schedulers) that a
  * serializable {@link AgentJobInput}'s names resolve against, and `build`ing a seeded,
  * signal-wired {@link AgentInterface} from a job.
@@ -530,7 +530,7 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 }
 
 /**
- * Create a durable, bounded-concurrency agent-job queue — a {@link QueueInterface} over
+ * Creates a durable, bounded-concurrency agent-job queue — a {@link QueueInterface} over
  * serializable {@link AgentJobInput}s that COMPOSES `createQueue`: each job is rehydrated
  * through the `registry` into a live {@link AgentInterface}, run to its {@link AgentResult},
  * and subjected to the partial-as-configurable-failure policy.
@@ -581,7 +581,7 @@ export function createAgentQueue(
 }
 
 /**
- * Create an agent-job runner — a {@link RunnerInterface} over serializable
+ * Creates an agent-job runner — a {@link RunnerInterface} over serializable
  * {@link AgentJobInput}s that COMPOSES `createRunner` (one-shot, ordered, fail-fast), each
  * unit rehydrated through the `registry` and subjected to the partial policy. The runner
  * enables **sub-agent fan-out**: a parent job's handler can `controller.spawn(childJob)`.

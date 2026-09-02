@@ -11,11 +11,11 @@ import type {
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 
-/** The role a {@link Message} plays in a conversation turn. */
+/** Names the role a {@link Message} plays in a conversation turn. */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
 
 /**
- * One conversation turn fed to a {@link ProviderInterface} — a stored, identified
+ * Represents one conversation turn fed to a {@link ProviderInterface} — a stored, identified
  * message.
  *
  * @remarks
@@ -28,10 +28,10 @@ export interface Message {
 	readonly id: string
 	readonly role: MessageRole
 	readonly content: string
-	/** An assistant turn that requested tools — its `tool_calls`, replayed. */
+	/** Holds an assistant turn's requested tools — its `tool_calls`, replayed. */
 	readonly calls?: readonly ToolCall[]
 	/**
-	 * Multimodal image data attached to this turn — base64-encoded image strings,
+	 * Holds multimodal image data attached to this turn — base64-encoded image strings,
 	 * forwarded to a vision-capable provider (the provider maps them onto the wire's
 	 * per-message `images` array). Present only on a multimodal turn; absent otherwise.
 	 */
@@ -39,7 +39,7 @@ export interface Message {
 }
 
 /**
- * The minimal data needed to author a {@link Message} — the `id` is
+ * Carries the minimal data needed to author a {@link Message} — the `id` is
  * assigned by the layer that stores it, so a caller supplies only role / content
  * (and, for a replayed assistant turn, its `calls`).
  */
@@ -48,14 +48,14 @@ export interface MessageInput {
 	readonly content: string
 	readonly calls?: readonly ToolCall[]
 	/**
-	 * Multimodal image data for this turn — base64-encoded image strings forwarded to a
+	 * Holds multimodal image data for this turn — base64-encoded image strings forwarded to a
 	 * vision-capable provider (carried verbatim onto the stored {@link Message}).
 	 */
 	readonly images?: readonly string[]
 }
 
 /**
- * A single inference turn's structured outcome — the assembled assistant content,
+ * Holds a single inference turn's structured outcome — the assembled assistant content,
  * any reasoning the provider separated from it, any tool calls the model requested,
  * and the token usage it reported.
  *
@@ -71,16 +71,16 @@ export interface MessageInput {
  */
 export interface ProviderResult {
 	readonly content: string
-	/** Present ⇒ reasoning the provider separated from the answer — never re-enters the conversation. */
+	/** Carries reasoning the provider separated from the answer when present — never re-enters the conversation. */
 	readonly thinking?: string
-	/** Present ⇒ the model wants these tool calls. */
+	/** Carries the tool calls the model wants when present. */
 	readonly tools?: readonly ToolCall[]
-	/** Present ⇒ token consumption for this turn (from the wire's `done` line / body). */
+	/** Carries token consumption for this turn when present (from the wire's `done` line / body). */
 	readonly usage?: TokenUsage
 }
 
 /**
- * One streamed delta a {@link ProviderInterface}'s `stream` yields — a TAGGED unit
+ * Represents one streamed delta a {@link ProviderInterface}'s `stream` yields — a TAGGED unit
  * discriminated by the channel it belongs to, so the agent loop can re-surface the two
  * channels separately (answer content vs. live reasoning) as it pumps.
  *
@@ -99,7 +99,7 @@ export type ProviderDelta =
 	| { readonly channel: 'thinking'; readonly text: string }
 
 /**
- * Per-call options threaded into a {@link ProviderInterface}'s `generate` / `stream` —
+ * Carries the per-call options threaded into a {@link ProviderInterface}'s `generate` / `stream` —
  * the bag a caller passes to influence ONE inference call without reconfiguring the
  * provider instance.
  *
@@ -115,14 +115,14 @@ export type ProviderDelta =
  * that passes no options behaves exactly as before.
  */
 export interface ProviderStreamOptions {
-	/** Override the provider's reasoning preference for this call; omitted ⇒ the provider default. */
+	/** Overrides the provider's reasoning preference for this call; omitted ⇒ the provider default. */
 	readonly think?: boolean
-	/** Constrain the response to this JSON-Schema shape (the same open record {@link ToolDefinition.parameters} uses); omitted ⇒ no constraint. */
+	/** Constrains the response to this JSON-Schema shape (the same open record {@link ToolDefinition.parameters} uses); omitted ⇒ no constraint. */
 	readonly schema?: Readonly<Record<string, unknown>>
 }
 
 /**
- * The pluggable LLM inference boundary — the one contract every agent chunk depends
+ * Defines the pluggable LLM inference boundary — the one contract every agent chunk depends
  * on. A provider turns a conversation (plus optional tools) into either a single
  * assembled {@link ProviderResult} (`generate`) or a stream of {@link ProviderDelta}s that
  * RETURNS the assembled result (`stream`).
@@ -141,7 +141,7 @@ export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
 	/**
-	 * The model's preferred context framing, by section kind — an OPTIONAL
+	 * Holds the model's preferred context framing, by section kind — an OPTIONAL
 	 * {@link ContextFormat} an {@link import('./AgentContext.js').AgentContext}
 	 * applies as the PROVIDER-DEFAULT level of its build cascade (beating the managers'
 	 * built-in framing, beaten by a manager-options or per-item override). Omitted ⇒ the
@@ -149,7 +149,7 @@ export interface ProviderInterface {
 	 */
 	readonly format?: ContextFormat | undefined
 	/**
-	 * Generate one complete turn — resolves the assembled {@link ProviderResult}.
+	 * Generates one complete turn — resolves the assembled {@link ProviderResult}.
 	 *
 	 * @param messages - The conversation so far
 	 * @param signal - Bounds the request; an abort rejects the call
@@ -164,7 +164,7 @@ export interface ProviderInterface {
 		options?: ProviderStreamOptions,
 	): Promise<ProviderResult>
 	/**
-	 * Stream one turn — yields {@link ProviderDelta}s (channel-tagged `content` / `thinking`
+	 * Streams one turn — yields {@link ProviderDelta}s (channel-tagged `content` / `thinking`
 	 * chunks) as they arrive and RETURNS the assembled {@link ProviderResult} (the
 	 * concatenated content + any separated reasoning + any tool calls + any usage) when the
 	 * stream completes.
@@ -188,10 +188,9 @@ export interface ProviderInterface {
 }
 
 /**
- * The stream-stateful `<think>` separator — splits a thinking model's in-content
- * `<think>…</think>` reasoning spans away from the answer, delta by delta, so a
- * provider yields ONLY clean content and surfaces the reasoning as
- * {@link ProviderResult.thinking}.
+ * Splits a thinking model's in-content `<think>…</think>` reasoning spans away from the
+ * answer, delta by delta with per-stream state, so a provider yields ONLY clean content
+ * and surfaces the reasoning as {@link ProviderResult.thinking}.
  *
  * @remarks
  * - **Stateful across deltas.** A tag may arrive SPLIT across wire chunks (`'<thi'`
@@ -222,19 +221,18 @@ export interface ProviderInterface {
  *   one per call ({@link import('./factories.js').createThinkSplitter}).
  */
 export interface ThinkSplitterInterface {
-	/** The AUTHORITATIVE clean content accumulated so far (corrected across an implicit-open reclassification). */
+	/** Holds the AUTHORITATIVE clean content accumulated so far (corrected across an implicit-open reclassification). */
 	readonly content: string
-	/** The reasoning text accumulated from every `<think>…</think>` span so far. */
+	/** Holds the reasoning text accumulated from every `<think>…</think>` span so far. */
 	readonly thinking: string
-	/** Feed one raw delta; returns the clean (non-think) content to surface for it. */
+	/** Feeds one raw delta; returns the clean (non-think) content to surface for it. */
 	split(delta: string): string
-	/** Settle the stream end — returns any held clean tail; an unclosed think span lands on `thinking`. */
+	/** Settles the stream end — returns any held clean tail; an unclosed think span lands on `thinking`. */
 	flush(): string
 }
 
 /**
- * The conversation store — immutable {@link Message}s in insertion order;
- * `add` mints the `id`.
+ * Stores immutable {@link Message}s in insertion order; `add` mints the `id`.
  *
  * @remarks
  * - **Store.** Messages live in insertion order; `count` is how many are stored.
@@ -259,7 +257,7 @@ export interface MessageManagerInterface {
 }
 
 /**
- * An immutable instruction — a named directive a richer context places between the
+ * Represents an immutable instruction — a named directive a richer context places between the
  * system prompt and the conversation, ordered by descending {@link priority}.
  *
  * @remarks
@@ -273,10 +271,10 @@ export interface InstructionInterface {
 	readonly id: string
 	readonly name: string
 	readonly content: string
-	/** Higher renders first; defaults to `0`. */
+	/** Ranks the instruction — higher renders first; defaults to `0`. */
 	readonly priority: number
 	/**
-	 * A fully-rendered per-item override of this instruction's prompt text — the
+	 * Holds a fully-rendered per-item override of this instruction's prompt text — the
 	 * MOST-SPECIFIC level of the {@link import('./AgentContext.js').AgentContext} build
 	 * cascade, beating every format level for THIS item. Present only when supplied on the
 	 * {@link InstructionInput} (round-tripped through the manager, like a message's
@@ -286,17 +284,17 @@ export interface InstructionInterface {
 }
 
 /**
- * The minimal data to author an {@link InstructionInterface} — the `id` is minted by
+ * Carries the minimal data to author an {@link InstructionInterface} — the `id` is minted by
  * the {@link InstructionManagerInterface} that stores it, so a caller supplies only
  * `name` / `content` (and an optional `priority`, defaulting to `0`).
  */
 export interface InstructionInput {
 	readonly name: string
 	readonly content: string
-	/** Ordering weight (higher renders first); defaults to `0` when omitted. */
+	/** Weights the ordering (higher renders first); defaults to `0` when omitted. */
 	readonly priority?: number
 	/**
-	 * A fully-rendered override of THIS instruction's prompt text — the most-specific
+	 * Holds a fully-rendered override of THIS instruction's prompt text — the most-specific
 	 * level of the {@link import('./AgentContext.js').AgentContext} build cascade (beats a
 	 * manager-options / provider / built-in format for this item). Round-tripped onto the
 	 * stored {@link InstructionInterface} when given (present-when-supplied, like `images`).
@@ -305,7 +303,7 @@ export interface InstructionInput {
 }
 
 /**
- * The push observation surface (§13) of an {@link InstructionManagerInterface} — the
+ * Maps the push observation surface (§13) of an {@link InstructionManagerInterface} — the
  * mutation moments a fire-and-forget observer subscribes to via `manager.emitter.on`.
  *
  * @remarks
@@ -317,16 +315,16 @@ export interface InstructionInput {
  * extends EventMap`, §4.5) so the type-literal satisfies `EventMap` structurally.
  */
 export type InstructionManagerEventMap = {
-	/** An instruction was added (or a same-name one replaced) — the created instruction. */
+	/** Reports an instruction added (or a same-name one replaced) — the created instruction. */
 	readonly add: readonly [instruction: InstructionInterface]
-	/** An instruction was removed — its `name`. */
+	/** Reports an instruction removed — its `name`. */
 	readonly remove: readonly [name: string]
-	/** Every instruction was removed. */
+	/** Reports every instruction removed. */
 	readonly clear: readonly []
 }
 
 /**
- * Options for `createInstructionManager` — the reserved `on` hooks (§8) plus an optional
+ * Configures `createInstructionManager` — the reserved `on` hooks (§8) plus an optional
  * per-section format override.
  *
  * @remarks
@@ -340,14 +338,14 @@ export type InstructionManagerEventMap = {
  */
 export interface InstructionManagerOptions {
 	readonly on?: EmitterHooks<InstructionManagerEventMap>
-	/** The emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
-	/** A manager-level format override (beats the provider default + built-in); see {@link AgentContextInterface.build}. */
+	/** Holds a manager-level format override (beats the provider default + built-in); see {@link AgentContextInterface.build}. */
 	readonly format?: ContextSectionFormat<InstructionInterface>
 }
 
 /**
- * A registry of {@link InstructionInterface}s keyed by `name` — `add` (one or a batch,
+ * Registers {@link InstructionInterface}s keyed by `name` — `add` (one or a batch,
  * §9.2) mints each `id` and OVERWRITES a same-name instruction (last write wins);
  * `instructions()` lists them SORTED by descending `priority` (stable for ties).
  *
@@ -363,10 +361,10 @@ export interface InstructionManagerOptions {
 export interface InstructionManagerInterface {
 	readonly emitter: EmitterInterface<InstructionManagerEventMap>
 	readonly count: number
-	/** The section header a context renders the instructions under. */
+	/** Names the section header a context renders the instructions under. */
 	readonly open: string
 	/**
-	 * The manager-options format override (the {@link InstructionManagerOptions.format}
+	 * Holds the manager-options format override (the {@link InstructionManagerOptions.format}
 	 * supplied at construction), or `undefined` when none — the MANAGER-OPTIONS level of the
 	 * {@link import('./AgentContext.js').AgentContext} build cascade, exposed so `build()`
 	 * can interleave the provider default BENEATH it (`open` / `render` already
@@ -377,9 +375,9 @@ export interface InstructionManagerInterface {
 	add(input: InstructionInput): InstructionInterface
 	add(inputs: readonly InstructionInput[]): readonly InstructionInterface[]
 	instruction(name: string): InstructionInterface | undefined
-	/** Every instruction, sorted by descending `priority` (stable for equal priorities). */
+	/** Lists every instruction, sorted by descending `priority` (stable for equal priorities). */
 	instructions(): readonly InstructionInterface[]
-	/** Render one instruction for the prompt — its `content`. */
+	/** Renders one instruction for the prompt — its `content`. */
 	render(instruction: InstructionInterface): string
 	remove(name: string): boolean
 	remove(names: readonly string[]): boolean
@@ -387,7 +385,7 @@ export interface InstructionManagerInterface {
 }
 
 /**
- * One context section's optional format override — an `open` / `render` / `close` trio
+ * Overrides one context section's format — an `open` / `render` / `close` trio
  * that frames a section in the {@link import('./AgentContext.js').AgentContext} build
  * cascade: a top line rendered once before the items, a per-item rendering, and a bottom
  * line rendered once after the items.
@@ -411,22 +409,22 @@ export interface InstructionManagerInterface {
  */
 export interface ContextSectionFormat<T> {
 	/**
-	 * Text rendered ONCE before the section's items — the section header or a group's
+	 * Holds text rendered ONCE before the section's items — the section header or a group's
 	 * opening wrapper, e.g. `'<instructions>'`; omitted ⇒ the next cascade level decides
 	 * (defaulting to the built-in header).
 	 */
 	readonly open?: string
-	/** Override one item's rendering; omitted ⇒ the next cascade level decides. */
+	/** Overrides one item's rendering; omitted ⇒ the next cascade level decides. */
 	readonly render?: (item: T) => string
 	/**
-	 * Text rendered ONCE after the section's items — a group's closing wrapper, e.g.
+	 * Holds text rendered ONCE after the section's items — a group's closing wrapper, e.g.
 	 * `'</instructions>'`; omitted ⇒ no closing line (there is no built-in close).
 	 */
 	readonly close?: string
 }
 
 /**
- * The manager surface one context section's format cascade reads — its built-in
+ * Exposes the manager surface one context section's format cascade reads — its built-in
  * `open` / `render`, plus the raw options override the cascade layers a provider
  * default beneath.
  *
@@ -442,16 +440,16 @@ export interface ContextSectionFormat<T> {
  * @typeParam T - The section item this source renders
  */
 export interface ContextSectionSourceInterface<T> {
-	/** The built-in section header (already resolved against the manager-options override). */
+	/** Names the built-in section header (already resolved against the manager-options override). */
 	readonly open: string
-	/** The raw manager-options override, or `undefined` when none was supplied. */
+	/** Holds the raw manager-options override, or `undefined` when none was supplied. */
 	readonly format: ContextSectionFormat<T> | undefined
-	/** Render one item (already resolved against the manager-options override). */
+	/** Renders one item (already resolved against the manager-options override). */
 	render(item: T): string
 }
 
 /**
- * A provider's OPTIONAL context-framing default, keyed by section kind — the framing a
+ * Holds a provider's OPTIONAL context-framing default, keyed by section kind — the framing a
  * model prefers (e.g. XML tags vs. Markdown headers), declared by a
  * {@link ProviderInterface} that opts in.
  *
@@ -468,12 +466,12 @@ export interface ContextSectionSourceInterface<T> {
  * built-in framing.
  */
 export interface ContextFormat {
-	/** The framing for the instructions section; omitted ⇒ that manager's built-in. */
+	/** Frames the instructions section; omitted ⇒ that manager's built-in. */
 	readonly instructions?: ContextSectionFormat<InstructionInterface>
 }
 
 /**
- * The per-category allow-lists a {@link ScopeInterface} carries — three optional
+ * Lists the per-category allow-lists a {@link ScopeInterface} carries — three optional
  * `readonly string[]`s, one per filterable context category, each keyed by that
  * category's identity (an instruction's `name`, a tool's `name`, a workspace file's
  * `path`).
@@ -487,12 +485,12 @@ export interface ContextFormat {
  * the system block and the image files attached to the last user message.
  */
 export interface ScopeFilter {
-	/** Allowed instruction `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	/** Lists the allowed instruction `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly instructions?: readonly string[]
-	/** Allowed tool `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	/** Lists the allowed tool `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly tools?: readonly string[]
 	/**
-	 * Allowed ACTIVE-workspace file `path`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
+	 * Lists the allowed ACTIVE-workspace file `path`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
 	 * the filter {@link AgentContextInterface.build} applies to the active workspace's
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the system block, image →
 	 * the last user message).
@@ -501,7 +499,7 @@ export interface ScopeFilter {
 }
 
 /**
- * The data to author a {@link ScopeInterface} — a {@link ScopeFilter} plus the
+ * Carries the data to author a {@link ScopeInterface} — a {@link ScopeFilter} plus the
  * required `name` (a human label; the `id` is minted by the layer that stores it).
  */
 export interface ScopeInput extends ScopeFilter {
@@ -509,7 +507,7 @@ export interface ScopeInput extends ScopeFilter {
 }
 
 /**
- * A named, immutable filter over a richer context's items — the three per-category
+ * Represents a named, immutable filter over a richer context's items — the three per-category
  * allow-lists ({@link ScopeFilter}) plus an `id` / `name`, and a `narrow` that
  * composes a tighter child by set-INTERSECTION.
  *
@@ -524,7 +522,7 @@ export interface ScopeInterface extends ScopeFilter {
 	readonly id: string
 	readonly name: string
 	/**
-	 * Compose a tighter child scope — its per-category set is the intersection of this
+	 * Composes a tighter child scope — its per-category set is the intersection of this
 	 * scope's list and `config`'s (an `undefined` side imposing no constraint).
 	 *
 	 * @param config - The narrowing allow-lists (a `name`-less {@link ScopeFilter})
@@ -534,7 +532,7 @@ export interface ScopeInterface extends ScopeFilter {
 }
 
 /**
- * The push observation surface (§13) of a {@link ScopeManagerInterface} — analogous to
+ * Maps the push observation surface (§13) of a {@link ScopeManagerInterface} — analogous to
  * {@link InstructionManagerEventMap}, but keyed by the minted `id` and carrying `create`
  * (a scope always mints, never overwrites) rather than `add`.
  *
@@ -544,26 +542,26 @@ export interface ScopeInterface extends ScopeFilter {
  * it to its `error` handler (§13). A `type` alias (§4.5) so it satisfies `EventMap` structurally.
  */
 export type ScopeManagerEventMap = {
-	/** A scope was created — the created scope. */
+	/** Reports a scope created — the created scope. */
 	readonly create: readonly [scope: ScopeInterface]
-	/** A scope was removed — its `id`. */
+	/** Reports a scope removed — its `id`. */
 	readonly remove: readonly [id: string]
-	/** Every scope was removed. */
+	/** Reports every scope removed. */
 	readonly clear: readonly []
 }
 
 /**
- * Options for `createScopeManager` — the reserved `on` hooks (§8): initial listeners for
+ * Configures `createScopeManager` — the reserved `on` hooks (§8): initial listeners for
  * the manager's {@link ScopeManagerEventMap}, wired at construction.
  */
 export interface ScopeManagerOptions {
 	readonly on?: EmitterHooks<ScopeManagerEventMap>
-	/** The emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 }
 
 /**
- * A registry of reusable {@link ScopeInterface}s keyed by their minted `id` — `create`
+ * Registers reusable {@link ScopeInterface}s keyed by their minted `id` — `create`
  * mints + stores one (never overwrites), `scopes()` lists them in insertion order.
  *
  * @remarks
@@ -580,7 +578,7 @@ export interface ScopeManagerInterface {
 	readonly count: number
 	create(input: ScopeInput): ScopeInterface
 	scope(id: string): ScopeInterface | undefined
-	/** Every scope, in insertion order. */
+	/** Lists every scope, in insertion order. */
 	scopes(): readonly ScopeInterface[]
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
@@ -588,7 +586,7 @@ export interface ScopeManagerInterface {
 }
 
 /**
- * Options for `createAgentContext` — the richer context's configuration.
+ * Configures `createAgentContext` — the richer context's configuration.
  *
  * @remarks
  * `system` is the optional system prompt prepended to the turn's input. `instructions` /
@@ -607,24 +605,24 @@ export interface ScopeManagerInterface {
 export interface AgentContextOptions {
 	readonly system?: string
 	/**
-	 * The loop's pre-built tool registry for provider advertising and call dispatch; an empty one is
+	 * Holds the loop's pre-built tool registry for provider advertising and call dispatch; an empty one is
 	 * created when omitted. Tools never render into `build()`'s prompt.
 	 */
 	readonly tools?: ToolManagerInterface
-	/** A pre-built instruction registry to reuse; an empty one is created when omitted. */
+	/** Reuses a pre-built instruction registry; an empty one is created when omitted. */
 	readonly instructions?: InstructionManagerInterface
 	/**
-	 * A pre-built {@link WorkspaceManagerInterface} to reuse; a fresh empty one is created when
+	 * Reuses a pre-built {@link WorkspaceManagerInterface}; a fresh empty one is created when
 	 * omitted (so `context.workspaces` is ALWAYS present). `build()` renders the ACTIVE workspace's
 	 * files by carrier — text files into the system block (fenced), image files attached to the last
 	 * user message. The registry is structural; change its active workspace through
 	 * `workspaces.switch(id)`. The active workspace is the SOLE document/image context.
 	 */
 	readonly workspaces?: WorkspaceManagerInterface
-	/** The initial active scope (the build-time filter); `undefined` ⇒ no filtering. */
+	/** Sets the initial active scope (the build-time filter); `undefined` ⇒ no filtering. */
 	readonly scope?: ScopeInterface
 	/**
-	 * A pre-built {@link ConversationManagerInterface} to reuse as the message source; a fresh
+	 * Reuses a pre-built {@link ConversationManagerInterface} as the message source; a fresh
 	 * empty one is created when omitted. The context ENSURES an active conversation at construction
 	 * (it `add`s a default when the manager has none), so `messages` — the manager's ACTIVE
 	 * conversation's LIVE tail — is ALWAYS defined. `build()` folds the active conversation's
@@ -658,7 +656,7 @@ export interface AgentContextInterface {
 	readonly system: string | undefined
 	readonly instructions: InstructionManagerInterface
 	/**
-	 * The {@link WorkspaceManagerInterface} whose ACTIVE workspace `build()` renders by carrier —
+	 * Holds the {@link WorkspaceManagerInterface} whose ACTIVE workspace `build()` renders by carrier —
 	 * its text files folded into the system block (fenced reference blocks) and its image files'
 	 * `base64` payload attached to the LAST user message. The active workspace is the SOLE
 	 * document/image context. ALWAYS present (a fresh empty manager when none was supplied).
@@ -668,7 +666,7 @@ export interface AgentContextInterface {
 	 */
 	readonly workspaces: WorkspaceManagerInterface
 	/**
-	 * The active conversation's LIVE tail — the agent's message source, ALWAYS defined (the
+	 * Holds the active conversation's LIVE tail — the agent's message source, ALWAYS defined (the
 	 * {@link conversations} registry always has an active conversation; a default is added at
 	 * construction). It IS the active {@link ConversationInterface} itself (which satisfies
 	 * {@link MessageManagerInterface} structurally), so appends through `messages` route to the
@@ -678,7 +676,7 @@ export interface AgentContextInterface {
 	 */
 	readonly messages: MessageManagerInterface
 	/**
-	 * The {@link ConversationManagerInterface} the message source flows from — `messages` IS its
+	 * Holds the {@link ConversationManagerInterface} the message source flows from — `messages` IS its
 	 * ACTIVE conversation's live tail and `build()` folds that conversation's `view()`. ALWAYS holds
 	 * an active conversation (a default is added at construction when none was supplied), so
 	 * `messages` is always defined. Switch the active conversation through
@@ -688,14 +686,14 @@ export interface AgentContextInterface {
 	 */
 	readonly conversations: ConversationManagerInterface
 	/**
-	 * The loop's tool registry for provider advertising and call dispatch. Tools are structural
+	 * Holds the loop's tool registry for provider advertising and call dispatch. Tools are structural
 	 * loop machinery and never render into `build()`'s prompt.
 	 */
 	readonly tools: ToolManagerInterface
-	/** The active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */
+	/** Holds the active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */
 	readonly scope: ScopeInterface | undefined
 	/**
-	 * Apply the active per-turn scope filter. Passing `undefined` removes filtering.
+	 * Applies the active per-turn scope filter. Passing `undefined` removes filtering.
 	 *
 	 * @param scope - The scope to apply, or `undefined` to remove the active filter
 	 *
@@ -707,7 +705,7 @@ export interface AgentContextInterface {
 	 */
 	apply(scope: ScopeInterface | undefined): void
 	/**
-	 * The provider input for the next turn: a leading `system` message folding the prompt
+	 * Builds the provider input for the next turn: a leading `system` message folding the prompt
 	 * + the scoped instructions + the ACTIVE workspace's scoped-in TEXT files (rendered as
 	 * fenced reference blocks), then the ACTIVE conversation's `view()` (with the active workspace's
 	 * scoped-in IMAGE files' `base64` payload attached to the last user message). Tools are advertised
@@ -764,14 +762,14 @@ export interface AgentContextInterface {
 }
 
 /**
- * The lifecycle state of an {@link AgentInterface} turn — `idle` before a run,
+ * Names the lifecycle state of an {@link AgentInterface} turn — `idle` before a run,
  * `running` while the loop is in flight, then the settled `done` (a normal finish or
  * a cancel) or `error` (a genuine provider / tool failure).
  */
 export type AgentStatus = 'idle' | 'running' | 'done' | 'error'
 
 /**
- * A streamed step of an agent turn — the union the loop yields as it runs, discriminated
+ * Represents a streamed step of an agent turn — the union the loop yields as it runs, discriminated
  * by the `category` of step it carries.
  *
  * @remarks
@@ -794,7 +792,7 @@ export type AgentChunk =
 	| { readonly category: 'usage'; readonly usage: TokenUsage }
 
 /**
- * The settled outcome of an agent turn — the assembled assistant `content`, the
+ * Holds the settled outcome of an agent turn — the assembled assistant `content`, the
  * `usage` summed across the turn's provider calls, and whether it was committed
  * `partial`.
  *
@@ -818,15 +816,15 @@ export type AgentChunk =
  */
 export interface AgentResult {
 	readonly content: string
-	/** Reasoning the run's provider calls separated from the answer (present when any surfaced it). */
+	/** Carries reasoning the run's provider calls separated from the answer (present when any surfaced it). */
 	readonly thinking?: string
-	/** The summed {@link TokenUsage} across the turn's provider calls (present when any reported it). */
+	/** Holds the summed {@link TokenUsage} across the turn's provider calls (present when any reported it). */
 	readonly usage?: TokenUsage
 	readonly partial: boolean
 }
 
 /**
- * The immutable per-run outcome an {@link AgentInterface}'s loop settles on — the value its
+ * Holds the immutable per-run outcome an {@link AgentInterface}'s loop settles on — the value its
  * run RETURNS, assembled from there into the {@link AgentResult} its `stream`'s `result`
  * promise resolves.
  *
@@ -850,7 +848,7 @@ export interface RunOutcome {
 }
 
 /**
- * The push observation surface of an {@link AgentInterface} (AGENTS §13) — the
+ * Maps the push observation surface of an {@link AgentInterface} (AGENTS §13) — the
  * lifecycle + usage/tool moments a fire-and-forget observer (logging, metrics,
  * tracing) subscribes to, ALONGSIDE the pull {@link AgentChunk} stream.
  *
@@ -878,31 +876,31 @@ export interface RunOutcome {
  * required index signature.
  */
 export type AgentEventMap = {
-	/** A run begins — emitted at the top of `stream()` once `status` is `running`. */
+	/** Reports a run beginning — emitted at the top of `stream()` once `status` is `running`. */
 	readonly start: readonly [id: string]
-	/** Each `#run` loop iteration begins — the zero-based turn index. */
+	/** Reports each `#run` loop iteration beginning — the zero-based turn index. */
 	readonly turn: readonly [index: number]
-	/** A dispatched {@link ToolCall} paired with its {@link ToolResult} (executed or a denial). */
+	/** Reports a dispatched {@link ToolCall} paired with its {@link ToolResult} (executed or a denial). */
 	readonly tool: readonly [call: ToolCall, result: ToolResult]
-	/** A turn reported {@link TokenUsage} — emitted after a usage-bearing provider call. */
+	/** Reports a turn's {@link TokenUsage} — emitted after a usage-bearing provider call. */
 	readonly usage: readonly [usage: TokenUsage]
-	/** The authority DENIED a call — the call + the optional reason (NOT in the chunk stream). */
+	/** Reports a call the authority DENIED — the call + the optional reason (NOT in the chunk stream). */
 	readonly deny: readonly [call: ToolCall, reason: string | undefined]
-	/** The run settled successfully (a natural finish OR a cancel's partial) — the {@link AgentResult}. */
+	/** Reports the run settled successfully (a natural finish OR a cancel's partial) — the {@link AgentResult}. */
 	readonly finish: readonly [result: AgentResult]
-	/** The run settled with a genuine (non-cancel) error — the thrown value (always `unknown`). */
+	/** Reports the run settled with a genuine (non-cancel) error — the thrown value (always `unknown`). */
 	readonly error: readonly [error: unknown]
-	/** The run was cancelled (external signal / timeout / budget / `abort()`) — the cancel reason. */
+	/** Reports the run cancelled (external signal / timeout / budget / `abort()`) — the cancel reason. */
 	readonly abort: readonly [reason: unknown]
 	/**
-	 * The loop exhausted its `limit` while still holding unresolved tool intent (the model
+	 * Reports the loop exhausting its `limit` while still holding unresolved tool intent (the model
 	 * requested tools on the very last allowed turn) — the turn count reached. Distinct from
 	 * `abort`: exhaustion is NOT a cancel (no external signal / timeout / budget tripped), so
 	 * this fires INSTEAD of `abort`, still followed by `finish` carrying the partial result.
 	 */
 	readonly exhaust: readonly [turns: number]
 	/**
-	 * AUTOMATIC compaction's summarizer THREW — a NON-FATAL warn channel (the run continues; see
+	 * Reports AUTOMATIC compaction's summarizer THROWING — a NON-FATAL warn channel (the run continues; see
 	 * {@link AgentOptions.window}). When the loop's between-turns / pre-first-turn auto-compaction
 	 * (`conversation.compact()`) rejects, the run does NOT crash: the loop skips compaction that
 	 * turn and surfaces the caught error here so the failure is observable, never silently lost.
@@ -917,9 +915,9 @@ export type AgentEventMap = {
 }
 
 /**
- * An unbounded async channel — a producer WRITES values into it (`push`) and ends it
- * (`close` / `fail`) regardless of consumption, while a consumer READS them back live
- * through `drain`.
+ * Buffers values in an unbounded async channel — a producer WRITES them in (`push`) and
+ * ends it (`close` / `fail`) regardless of consumption, while a consumer READS them back
+ * live through `drain`.
  *
  * @remarks
  * Decoupling the write from the read is what lets a producer make progress with nobody
@@ -934,21 +932,21 @@ export type AgentEventMap = {
  */
 export interface ChannelInterface<T> {
 	/**
-	 * Write one value — buffered, then handed to a parked consumer.
+	 * Writes one value — buffered, then handed to a parked consumer.
 	 *
 	 * @param value - The value to enqueue
 	 */
 	push(value: T): void
-	/** End the channel normally — a draining consumer returns once the buffer is empty. */
+	/** Ends the channel normally — a draining consumer returns once the buffer is empty. */
 	close(): void
 	/**
-	 * End the channel with a failure — a draining consumer throws it once the buffer is empty.
+	 * Ends the channel with a failure — a draining consumer throws it once the buffer is empty.
 	 *
 	 * @param error - The failure to surface (the first one recorded wins)
 	 */
 	fail(error: unknown): void
 	/**
-	 * Read the values back live, in write order.
+	 * Reads the values back live, in write order.
 	 *
 	 * @returns A generator yielding each pushed value, returning on `close` and throwing on `fail`
 	 */
@@ -956,7 +954,7 @@ export interface ChannelInterface<T> {
 }
 
 /**
- * A live event stream paired with the eventual settled result and a cancel — the
+ * Pairs a live event stream with the eventual settled result and a cancel — the
  * generic pull/streaming handle a long-running operation hands back.
  *
  * @remarks
@@ -972,7 +970,7 @@ export interface StreamInterface<T, R> {
 	readonly events: AsyncIterable<T>
 	readonly result: Promise<R>
 	/**
-	 * Cancel the in-flight operation — fires its bound signal.
+	 * Cancels the in-flight operation — fires its bound signal.
 	 *
 	 * @param reason - An optional cancellation reason propagated to the signal
 	 */
@@ -980,13 +978,13 @@ export interface StreamInterface<T, R> {
 }
 
 /**
- * The agent turn's live handle — a {@link StreamInterface} of {@link AgentChunk}s
+ * Names the agent turn's live handle — a {@link StreamInterface} of {@link AgentChunk}s
  * resolving an {@link AgentResult}.
  */
 export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
 
 /**
- * Options for `createAgent` — bounds and pacing for the agent loop.
+ * Configures `createAgent` — bounds and pacing for the agent loop.
  *
  * @remarks
  * - `system` — an optional system prompt prepended to the turn (seeds the context).
@@ -1030,29 +1028,29 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  */
 export interface AgentOptions {
 	readonly on?: EmitterHooks<AgentEventMap>
-	/** The emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 	readonly system?: string
-	/** A pre-built tool registry the loop dispatches calls through; an empty one is created when omitted. */
+	/** Reuses a pre-built tool registry the loop dispatches calls through; an empty one is created when omitted. */
 	readonly tools?: ToolManagerInterface
-	/** A pre-built instruction registry forwarded to the agent's context; an empty one is created when omitted. */
+	/** Reuses a pre-built instruction registry forwarded to the agent's context; an empty one is created when omitted. */
 	readonly instructions?: InstructionManagerInterface
-	/** A pre-built workspace registry forwarded to the agent's context; a fresh empty one is created when omitted. */
+	/** Reuses a pre-built workspace registry forwarded to the agent's context; a fresh empty one is created when omitted. */
 	readonly workspaces?: WorkspaceManagerInterface
-	/** The initial active scope forwarded to the agent's context (the build-time filter); `undefined` ⇒ no filtering. */
+	/** Sets the initial active scope forwarded to the agent's context (the build-time filter); `undefined` ⇒ no filtering. */
 	readonly scope?: ScopeInterface
-	/** Max tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
+	/** Caps the tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
 	readonly limit?: number
-	/** A wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
+	/** Sets a wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
 	readonly timeout?: number
-	/** A token cost bound; each provider call's usage is charged and its abort commits a partial. */
+	/** Bounds the token cost; each provider call's usage is charged and its abort commits a partial. */
 	readonly budget?: BudgetInterface<TokenUsage>
 	/** Paces the loop — `yield`ed between turns so the host regains control. */
 	readonly scheduler?: SchedulerInterface
-	/** An external cancel; its abort commits a partial result. */
+	/** Carries an external cancel; its abort commits a partial result. */
 	readonly signal?: AbortSignal
 	/**
-	 * An optional policy gate consulted before each tool call runs — a denied call is
+	 * Holds an optional policy gate consulted before each tool call runs — a denied call is
 	 * fed back to the model as a denial {@link ToolResult} (a `tool` chunk + a tool
 	 * message) rather than executed (no tool run, no budget cost), so the model sees the
 	 * denial and can react; an allowed call dispatches normally. Omitted ⇒ every call
@@ -1060,7 +1058,7 @@ export interface AgentOptions {
 	 */
 	readonly authority?: AuthorityInterface
 	/**
-	 * An optional {@link ConversationManagerInterface} that becomes the agent context's MESSAGE
+	 * Holds an optional {@link ConversationManagerInterface} that becomes the agent context's MESSAGE
 	 * SOURCE — forwarded to the {@link AgentContextInterface} the agent builds, so
 	 * `agent.context.messages` IS its ACTIVE conversation's live tail and `build()` folds that
 	 * conversation's `view()` (the per-section summaries + the live tail). Omitted ⇒ a fresh
@@ -1069,7 +1067,7 @@ export interface AgentOptions {
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
-	 * An optional CONTEXT {@link BudgetInterface} for AUTOMATIC compaction. Its `consumer` is a
+	 * Holds an optional CONTEXT {@link BudgetInterface} for AUTOMATIC compaction. Its `consumer` is a
 	 * token estimator (e.g. the exported {@link import('./helpers.js').estimateMessages}) and
 	 * its `max` is the context window. When set, the loop measures the CURRENT FULL prompt (the
 	 * next provider request) against this budget each turn; when that prompt reaches the window AND
@@ -1079,7 +1077,7 @@ export interface AgentOptions {
 	 */
 	readonly window?: BudgetInterface<readonly Message[]>
 	/**
-	 * When `true`, a summarizer failure during AUTOMATIC compaction ABORTS the run — the
+	 * If `true`, a summarizer failure during AUTOMATIC compaction ABORTS the run — the
 	 * `fault` event still fires, then the caught error is RETHROWN so the run settles
 	 * `error` instead of continuing over-window. Defaults to `false` (lenient — the run
 	 * continues over-window, byte-for-byte the prior behavior).
@@ -1088,7 +1086,7 @@ export interface AgentOptions {
 }
 
 /**
- * The per-run override bag an {@link AgentInterface}'s `generate` / `stream` accepts — each
+ * Carries the per-run override bag an {@link AgentInterface}'s `generate` / `stream` accepts — each
  * member overrides the matching {@link AgentOptions} value for ONE run.
  *
  * @remarks
@@ -1102,7 +1100,7 @@ export interface AgentOptions {
  */
 export interface AgentRunOptions {
 	/**
-	 * The per-run reasoning preference forwarded to the provider's `stream` as
+	 * Sets the per-run reasoning preference forwarded to the provider's `stream` as
 	 * {@link ProviderStreamOptions.think} — `true` asks the backend to separate reasoning
 	 * (surfaced as `think` {@link AgentChunk}s + the settled `thinking`), `false` suppresses
 	 * it. Omitted ⇒ the provider's own default applies (the loop is byte-for-byte the prior
@@ -1110,7 +1108,7 @@ export interface AgentRunOptions {
 	 */
 	readonly think?: boolean
 	/**
-	 * Constrain the response to this JSON-Schema shape, forwarded to the provider's `stream`
+	 * Constrains the response to this JSON-Schema shape, forwarded to the provider's `stream`
 	 * as {@link ProviderStreamOptions.schema} — a per-run structured-output request. Omitted ⇒
 	 * no constraint (the loop is byte-for-byte the prior behaviour).
 	 */
@@ -1132,7 +1130,7 @@ export interface AgentRunOptions {
 	 */
 	readonly budget?: BudgetInterface<TokenUsage>
 	/**
-	 * An additional per-run external cancel, COMPOSED with {@link AgentOptions.signal} (both
+	 * Carries an additional per-run external cancel, COMPOSED with {@link AgentOptions.signal} (both
 	 * fold into the run's bound abort via `AbortSignal.any` — neither is dropped). Omitted ⇒
 	 * only the agent's constructed `signal` (if any) applies.
 	 */
@@ -1140,9 +1138,8 @@ export interface AgentRunOptions {
 }
 
 /**
- * The agent loop — composes a {@link ProviderInterface}, an
- * {@link AgentContextInterface}, and a {@link ToolManagerInterface} into a bounded
- * context → provider → tools → repeat turn.
+ * Composes a {@link ProviderInterface}, an {@link AgentContextInterface}, and a
+ * {@link ToolManagerInterface} into a bounded context → provider → tools → repeat turn.
  *
  * @remarks
  * - **One loop, two faces.** `generate` and `stream` share ONE private run, so they
@@ -1169,7 +1166,7 @@ export interface AgentInterface {
 	readonly status: AgentStatus
 	readonly context: AgentContextInterface
 	/**
-	 * Run the turn to completion, discarding the live chunks — drains the shared
+	 * Runs the turn to completion, discarding the live chunks — drains the shared
 	 * stream and resolves the settled outcome.
 	 *
 	 * @remarks
@@ -1186,7 +1183,7 @@ export interface AgentInterface {
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
-	 * Run the turn as a live stream — iterate `events` for {@link AgentChunk}s and
+	 * Runs the turn as a live stream — iterate `events` for {@link AgentChunk}s and
 	 * `await result` for the settled outcome.
 	 *
 	 * @remarks
@@ -1201,7 +1198,7 @@ export interface AgentInterface {
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
-	 * Cancel the in-flight turn — fires the turn's signal; the `result` settles
+	 * Cancels the in-flight turn — fires the turn's signal; the `result` settles
 	 * `partial: true` with whatever content accumulated.
 	 *
 	 * @param reason - An optional cancellation reason propagated to the signal
@@ -1210,7 +1207,7 @@ export interface AgentInterface {
 }
 
 /**
- * What an {@link AuthorityInterface} evaluates for one tool call — the call under
+ * Carries what an {@link AuthorityInterface} evaluates for one tool call — the call under
  * consideration.
  *
  * @remarks
@@ -1224,7 +1221,7 @@ export interface AuthorityContext {
 }
 
 /**
- * An {@link AuthorityInterface}'s verdict on one tool call.
+ * Holds an {@link AuthorityInterface}'s verdict on one tool call.
  *
  * @remarks
  * `zone` is a project-defined classification (e.g. `'default'` / `'sensitive'` /
@@ -1239,7 +1236,7 @@ export interface AuthorityDecision {
 }
 
 /**
- * One ordered policy rule an {@link AuthorityInterface} evaluates.
+ * Represents one ordered policy rule an {@link AuthorityInterface} evaluates.
  *
  * @remarks
  * The FIRST rule whose `match` returns true decides; if none match, the authority's
@@ -1256,7 +1253,7 @@ export interface AuthorityRule {
 }
 
 /**
- * Options for `createAuthority` — the ordered rules and the no-match fallback.
+ * Configures `createAuthority` — the ordered rules and the no-match fallback.
  *
  * @remarks
  * `rules` are evaluated in order, first match wins (see {@link AuthorityRule}).
@@ -1272,7 +1269,7 @@ export interface AuthorityOptions {
 }
 
 /**
- * A synchronous policy gate consulted before each tool call runs — it turns one
+ * Gates each tool call before it runs — the synchronous policy that turns one
  * {@link AuthorityContext} into an {@link AuthorityDecision}.
  *
  * @remarks
@@ -1283,7 +1280,7 @@ export interface AuthorityOptions {
  */
 export interface AuthorityInterface {
 	/**
-	 * Evaluate one tool call against the ordered rules.
+	 * Evaluates one tool call against the ordered rules.
 	 *
 	 * @param context - The call under consideration (see {@link AuthorityContext})
 	 * @returns The first matching rule's verdict, or the fallback when none match
@@ -1292,7 +1289,7 @@ export interface AuthorityInterface {
 }
 
 /**
- * A JSON-serializable agent job — the descriptor a durable queue / runner runs. Its
+ * Represents a JSON-serializable agent job — the descriptor a durable queue / runner runs. Its
  * non-serializable pieces (the provider, tools, authority, scheduler) are referenced by
  * NAME and resolved to live objects through an {@link AgentRegistryInterface} at handler
  * time; its data fields (the seed `messages`, `system`, `limit`, `timeout`, and a token
@@ -1309,26 +1306,26 @@ export interface AuthorityInterface {
  * `budget` is a token ceiling rebuilt into a `createTokenBudget({ max })`.
  */
 export interface AgentJobInput {
-	/** The registry key of the {@link ProviderInterface} the job runs against. */
+	/** Names the registry key of the {@link ProviderInterface} the job runs against. */
 	readonly provider: string
-	/** The seed conversation added to the rehydrated agent's context (serializable). */
+	/** Holds the seed conversation added to the rehydrated agent's context (serializable). */
 	readonly messages: readonly MessageInput[]
-	/** An optional system prompt seeding the agent's context. */
+	/** Holds an optional system prompt seeding the agent's context. */
 	readonly system?: string
-	/** Registry keys of the {@link ToolInterface}s loaded into the agent's tool manager. */
+	/** Names the registry keys of the {@link ToolInterface}s loaded into the agent's tool manager. */
 	readonly tools?: readonly string[]
-	/** The registry key of an optional {@link AuthorityInterface} policy gate. */
+	/** Names the registry key of an optional {@link AuthorityInterface} policy gate. */
 	readonly authority?: string
-	/** The registry key of an optional {@link SchedulerInterface} pacing the loop. */
+	/** Names the registry key of an optional {@link SchedulerInterface} pacing the loop. */
 	readonly scheduler?: string
-	/** Max tool-iteration turns before the loop stops (see {@link AgentOptions.limit}). */
+	/** Caps the tool-iteration turns before the loop stops (see {@link AgentOptions.limit}). */
 	readonly limit?: number
-	/** A wall-clock deadline (ms) for the whole turn (see {@link AgentOptions.timeout}). */
+	/** Sets a wall-clock deadline (ms) for the whole turn (see {@link AgentOptions.timeout}). */
 	readonly timeout?: number
-	/** A token ceiling rebuilt into a `createTokenBudget({ max })` cost bound. */
+	/** Sets a token ceiling rebuilt into a `createTokenBudget({ max })` cost bound. */
 	readonly budget?: number
 	/**
-	 * Sub-agent jobs this job fans out — each a nested {@link AgentJobInput} (so the whole
+	 * Lists the sub-agent jobs this job fans out — each a nested {@link AgentJobInput} (so the whole
 	 * tree stays serializable). On a `createAgentRunner`, the handler `controller.spawn`s
 	 * each child through the same bounded queue BEFORE running this (parent) job, so the
 	 * children run as sibling sub-agents and their results join the run after the declared
@@ -1357,7 +1354,7 @@ export interface AgentJobInput {
  */
 export interface AgentRegistryInterface {
 	/**
-	 * Resolve a registered {@link ProviderInterface} by name.
+	 * Resolves a registered {@link ProviderInterface} by name.
 	 *
 	 * @param name - The provider's registry key
 	 * @returns The live provider
@@ -1365,7 +1362,7 @@ export interface AgentRegistryInterface {
 	 */
 	provider(name: string): ProviderInterface
 	/**
-	 * Resolve a registered {@link ToolInterface} by name.
+	 * Resolves a registered {@link ToolInterface} by name.
 	 *
 	 * @param name - The tool's registry key
 	 * @returns The live tool
@@ -1373,7 +1370,7 @@ export interface AgentRegistryInterface {
 	 */
 	tool(name: string): ToolInterface
 	/**
-	 * Resolve a registered {@link AuthorityInterface} by name.
+	 * Resolves a registered {@link AuthorityInterface} by name.
 	 *
 	 * @param name - The authority's registry key
 	 * @returns The live authority
@@ -1381,7 +1378,7 @@ export interface AgentRegistryInterface {
 	 */
 	authority(name: string): AuthorityInterface
 	/**
-	 * Resolve a registered {@link SchedulerInterface} by name.
+	 * Resolves a registered {@link SchedulerInterface} by name.
 	 *
 	 * @param name - The scheduler's registry key
 	 * @returns The live scheduler
@@ -1389,7 +1386,7 @@ export interface AgentRegistryInterface {
 	 */
 	scheduler(name: string): SchedulerInterface
 	/**
-	 * Rehydrate a live, seeded {@link AgentInterface} from a serializable job — resolving
+	 * Rehydrates a live, seeded {@link AgentInterface} from a serializable job — resolving
 	 * its names, rebuilding its budget, seeding its conversation, and wiring `signal`.
 	 *
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
@@ -1401,7 +1398,7 @@ export interface AgentRegistryInterface {
 }
 
 /**
- * Options for `createAgentRegistry` — the named pools of live, non-serializable pieces
+ * Configures `createAgentRegistry` — the named pools of live, non-serializable pieces
  * a {@link AgentJobInput}'s names resolve against.
  *
  * @remarks
@@ -1426,7 +1423,7 @@ export interface AgentRegistryOptions {
 }
 
 /**
- * Options for `createAgentQueue` — the registry that rehydrates jobs, the partial-result
+ * Configures `createAgentQueue` — the registry that rehydrates jobs, the partial-result
  * policy, and the substrate knobs threaded into the backing `createQueue`.
  *
  * @remarks
@@ -1443,7 +1440,7 @@ export interface AgentRegistryOptions {
  */
 export interface AgentQueueOptions {
 	readonly registry: AgentRegistryInterface
-	/** A partial `AgentResult` THROWS by default (retries engage); `true` resolves it as success. */
+	/** If `true`, a partial `AgentResult` resolves as success; if `false` (the default), it THROWS and retries engage. */
 	readonly partial?: boolean
 	readonly concurrency?: number
 	readonly retries?: number
@@ -1452,7 +1449,7 @@ export interface AgentQueueOptions {
 }
 
 /**
- * Options for `createAgentRunner` — the registry that rehydrates jobs, the partial-result
+ * Configures `createAgentRunner` — the registry that rehydrates jobs, the partial-result
  * policy, and the substrate knobs threaded into the backing `createRunner`.
  *
  * @remarks
@@ -1465,7 +1462,7 @@ export interface AgentQueueOptions {
  */
 export interface AgentRunnerOptions {
 	readonly registry: AgentRegistryInterface
-	/** A partial `AgentResult` THROWS by default (fail-fast engages); `true` resolves it as success. */
+	/** If `true`, a partial `AgentResult` resolves as success; if `false` (the default), it THROWS and fail-fast engages. */
 	readonly partial?: boolean
 	readonly concurrency?: number
 	readonly retries?: number
@@ -1473,7 +1470,7 @@ export interface AgentRunnerOptions {
 }
 
 /**
- * A provider-agnostic conversation summarizer — the seam the agent RUNTIME supplies so
+ * Summarizes a conversation, provider-agnostically — the seam the agent RUNTIME supplies so
  * core never imports a provider. Given the folded messages, it resolves their digest (the
  * model-written summary), used both to summarize a compacted {@link Section} and
  * to regenerate a {@link ConversationInterface}'s rollup `summary`.
@@ -1491,7 +1488,7 @@ export interface AgentRunnerOptions {
 export type ConversationSummaryHandler = (messages: readonly Message[]) => Promise<string>
 
 /**
- * A slice of folded messages digested into a summary — the unit of compaction a
+ * Holds a slice of folded messages digested into a summary — the unit of compaction a
  * {@link ConversationInterface} produces when it `compact`s its live tail.
  *
  * @remarks
@@ -1502,14 +1499,14 @@ export type ConversationSummaryHandler = (messages: readonly Message[]) => Promi
  */
 export interface Section {
 	readonly id: string
-	/** The model-written digest of this slice (its {@link ConversationSummaryHandler} output). */
+	/** Holds the model-written digest of this slice (its {@link ConversationSummaryHandler} output). */
 	readonly summary: string
-	/** The folded original messages, RETAINED in full for `rehydrate` / `search`. */
+	/** Retains the folded original messages in full for `rehydrate` / `search`. */
 	readonly messages: readonly Message[]
 }
 
 /**
- * The push observation surface (§13) of a {@link ConversationInterface} — the compaction
+ * Maps the push observation surface (§13) of a {@link ConversationInterface} — the compaction
  * moments a fire-and-forget observer subscribes to via `conversation.emitter.on`.
  *
  * @remarks
@@ -1524,21 +1521,21 @@ export interface Section {
  * type-literal satisfies `EventMap` structurally.
  */
 export type ConversationEventMap = {
-	/** A new section was folded from the live tail — the created section. */
+	/** Reports a new section folded from the live tail — the created section. */
 	readonly compact: readonly [section: Section]
-	/** The conversation rollup was regenerated — the new summary text. */
+	/** Reports the conversation rollup regenerated — the new summary text. */
 	readonly summary: readonly [summary: string]
-	/** A section's original messages were pulled back — the section's `id`. */
+	/** Reports a section's original messages pulled back — the section's `id`. */
 	readonly rehydrate: readonly [id: string]
 	/**
-	 * The bounded-`sections` cap folded the oldest sections into ONE merged section — the
+	 * Reports the bounded-`sections` cap folding the oldest sections into ONE merged section — the
 	 * merged {@link Section} that replaced them.
 	 */
 	readonly collapse: readonly [section: Section]
 }
 
 /**
- * Options for `createConversation` — the optional `id`, the reserved `on` hooks (§8), the
+ * Configures `createConversation` — the optional `id`, the reserved `on` hooks (§8), the
  * provider-agnostic `summarize` seam, and the retained-tail size.
  *
  * @remarks
@@ -1564,20 +1561,20 @@ export type ConversationEventMap = {
 export interface ConversationOptions {
 	readonly id?: string
 	readonly on?: EmitterHooks<ConversationEventMap>
-	/** The emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
-	/** The summarizer compaction needs; ABSENT ⇒ `compact()` throws a `ConversationError`. */
+	/** Supplies the summarizer compaction needs; ABSENT ⇒ `compact()` throws a `ConversationError`. */
 	readonly summarize?: ConversationSummaryHandler
-	/** Recent live messages kept verbatim on `compact`; defaults to `DEFAULT_CONVERSATION_KEEP` (`0`). */
+	/** Keeps this many recent live messages verbatim on `compact`; defaults to `DEFAULT_CONVERSATION_KEEP` (`0`). */
 	readonly keep?: number
-	/** A cap (`>= 1`) on the compacted `sections` list; overflow folds into one merged section. Omitted ⇒ unlimited. */
+	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Omitted ⇒ unlimited. */
 	readonly sections?: number
-	/** A {@link ConversationSnapshot} to hydrate from — its `id` wins over `id`; restoring is silent. */
+	/** Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent. */
 	readonly snapshot?: ConversationSnapshot
 }
 
 /**
- * Per-compaction options for {@link ConversationInterface.compact} — overrides for ONE fold.
+ * Configures one {@link ConversationInterface.compact} call — overrides for ONE fold.
  *
  * @remarks
  * `keep` overrides the conversation's configured retained-tail size for THIS compaction only
@@ -1589,14 +1586,14 @@ export interface ConversationOptions {
  * conversation's own `sections` cap (or unlimited) applies.
  */
 export interface CompactOptions {
-	/** Override the retained-tail size for this compaction; omitted ⇒ the conversation's own `keep`. */
+	/** Overrides the retained-tail size for this compaction; omitted ⇒ the conversation's own `keep`. */
 	readonly keep?: number
-	/** Override the `sections` cap for this compaction; omitted ⇒ the conversation's own cap (or unlimited). */
+	/** Overrides the `sections` cap for this compaction; omitted ⇒ the conversation's own cap (or unlimited). */
 	readonly sections?: number
 }
 
 /**
- * Options for {@link ConversationInterface.reference} — how to render ONE conversation as a
+ * Configures {@link ConversationInterface.reference} — how to render ONE conversation as a
  * self-labeled, fenced PROVENANCE block to pull INTO another conversation (by writing it to
  * the active context's active workspace).
  *
@@ -1615,16 +1612,16 @@ export interface CompactOptions {
  *   point (it re-bloats the destination context a small model then has to wade through).
  */
 export interface ConversationReferenceOptions {
-	/** The human provenance label in the block's marker; defaults to the conversation's `id`. */
+	/** Names the human provenance label in the block's marker; defaults to the conversation's `id`. */
 	readonly label?: string
-	/** Include the conversation's rollup `summary` (when one exists); defaults to `true`. */
+	/** Includes the conversation's rollup `summary` (when one exists); defaults to `true`. */
 	readonly summary?: boolean
-	/** The cherry-picked excerpts to include (`role: content`); defaults to none. */
+	/** Lists the cherry-picked excerpts to include (`role: content`); defaults to none. */
 	readonly messages?: readonly Message[]
 }
 
 /**
- * A conversation grouping messages ABOVE the flat {@link MessageManagerInterface} — a live
+ * Groups messages ABOVE the flat {@link MessageManagerInterface} — a live
  * uncompacted tail plus compacted, summarized {@link Section}s and a conversation
  * rollup `summary`, with on-demand `rehydrate` and substring `search`, driven by a
  * provider-agnostic {@link ConversationSummaryHandler} seam.
@@ -1678,21 +1675,21 @@ export interface ConversationReferenceOptions {
 export interface ConversationInterface {
 	readonly id: string
 	readonly emitter: EmitterInterface<ConversationEventMap>
-	/** The conversation rollup (a summary-of-summaries), regenerated on each compaction; `undefined` until the first. */
+	/** Holds the conversation rollup (a summary-of-summaries), regenerated on each compaction; `undefined` until the first. */
 	readonly summary: string | undefined
-	/** The compacted history, oldest → newest. */
+	/** Lists the compacted history, oldest → newest. */
 	readonly sections: readonly Section[]
 	/**
-	 * Whether a `compact()` CAN fold — `true` when a {@link ConversationSummaryHandler} was supplied.
+	 * Reports whether a `compact()` CAN fold — `true` when a {@link ConversationSummaryHandler} was supplied.
 	 * The agent loop's AUTOMATIC compaction (`AgentOptions.window`) gates on it (a non-summarizable
 	 * conversation is never auto-compacted, so the auto path never throws the `SUMMARIZER` error);
 	 * a MANUAL `compact()` still throws without a summarizer.
 	 */
 	readonly summarizable: boolean
-	/** How many LIVE (uncompacted) messages are stored in the tail. */
+	/** Counts the LIVE (uncompacted) messages stored in the tail. */
 	readonly count: number
 	/**
-	 * Append one message to the live tail (or a batch, §9.2) — MINTS each message's `id`
+	 * Appends one message to the live tail (or a batch, §9.2) — MINTS each message's `id`
 	 * (a random UUID) and returns the created message(s); a stored message is immutable.
 	 *
 	 * @param input - One {@link MessageInput}, or a batch
@@ -1701,38 +1698,38 @@ export interface ConversationInterface {
 	add(input: MessageInput): Message
 	add(inputs: readonly MessageInput[]): readonly Message[]
 	/**
-	 * Look up one LIVE message by id.
+	 * Looks up one LIVE message by id.
 	 *
 	 * @param id - The message id to resolve
 	 * @returns The {@link Message}, or `undefined` when absent
 	 */
 	message(id: string): Message | undefined
 	/**
-	 * Every LIVE (uncompacted) message in the tail, in insertion order.
+	 * Lists every LIVE (uncompacted) message in the tail, in insertion order.
 	 *
 	 * @returns The live tail, in insertion order
 	 */
 	messages(): readonly Message[]
 	/**
-	 * Remove one LIVE message by id (or a batch, §9.2) from the tail.
+	 * Removes one LIVE message by id (or a batch, §9.2) from the tail.
 	 *
 	 * @param id - One message id, or a batch
-	 * @returns `true` when any was removed
+	 * @returns True if any was removed; false otherwise
 	 */
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
-	/** Empty the live tail (the compacted `sections` are untouched). */
+	/** Empties the live tail (the compacted `sections` are untouched). */
 	clear(): void
 	/**
-	 * The model input for the next turn — each section as ONE synthetic summary message,
+	 * Builds the model input for the next turn — each section as ONE synthetic summary message,
 	 * then the live messages verbatim (the rollup `summary` is NOT injected).
 	 *
 	 * @returns `[...sections-as-summary-messages, ...live messages]`
 	 */
 	view(): readonly Message[]
 	/**
-	 * Fold the older live messages into a summarized {@link Section}, regenerate the
-	 * rollup, and emit `summary` then `compact`.
+	 * Folds the older live messages into a summarized {@link Section}, regenerates the
+	 * rollup, and emits `summary` then `compact`.
 	 *
 	 * @remarks
 	 * Folds the oldest `count - keep` live messages (`keep` from `options`, else the
@@ -1754,14 +1751,14 @@ export interface ConversationInterface {
 	 */
 	compact(options?: CompactOptions): Promise<Section | undefined>
 	/**
-	 * A section's full original messages — a pure READ that emits `rehydrate`.
+	 * Returns a section's full original messages — a pure READ that emits `rehydrate`.
 	 *
 	 * @param id - The {@link Section} `id` to pull back
 	 * @returns The section's retained original messages (empty when no such section)
 	 */
 	rehydrate(id: string): readonly Message[]
 	/**
-	 * Case-insensitive substring search over `content` across ALL messages — every section's
+	 * Searches `content` for a case-insensitive substring across ALL messages — every section's
 	 * retained originals plus the live tail.
 	 *
 	 * @param query - The substring to match (case-insensitive)
@@ -1769,7 +1766,7 @@ export interface ConversationInterface {
 	 */
 	search(query: string): readonly Message[]
 	/**
-	 * Render THIS conversation as a self-labeled, fenced PROVENANCE block to pull INTO another
+	 * Renders THIS conversation as a self-labeled, fenced PROVENANCE block to pull INTO another
 	 * conversation — a pure string (NO model call), framed so a small model reads it as FOREIGN
 	 * material, not as part of the live thread.
 	 *
@@ -1790,7 +1787,7 @@ export interface ConversationInterface {
 	 */
 	reference(options?: ConversationReferenceOptions): string
 	/**
-	 * Serialize this conversation to a plain, JSON-serializable {@link ConversationSnapshot} — its
+	 * Serializes this conversation to a plain, JSON-serializable {@link ConversationSnapshot} — its
 	 * `id`, the rollup `summary`, the compacted `sections`, and the live tail (its `messages()`).
 	 *
 	 * @remarks
@@ -1810,7 +1807,7 @@ export interface ConversationInterface {
 }
 
 /**
- * A JSON-serializable snapshot of a conversation's state — its `id`, the rollup `summary`, the
+ * Holds a JSON-serializable snapshot of a conversation's state — its `id`, the rollup `summary`, the
  * compacted `sections`, and the live tail `messages` — the durable payload the
  * {@link ConversationStoreInterface} persists. The exact analogue of
  * {@link import('@orkestrel/workspace').WorkspaceSnapshot}.
@@ -1830,16 +1827,16 @@ export interface ConversationInterface {
  */
 export interface ConversationSnapshot {
 	readonly id: string
-	/** The rollup (a summary-of-summaries); `undefined` until the first compaction. */
+	/** Holds the rollup (a summary-of-summaries); `undefined` until the first compaction. */
 	readonly summary?: string
-	/** The compacted history, oldest → newest (each section RETAINS its folded originals). */
+	/** Lists the compacted history, oldest → newest (each section RETAINS its folded originals). */
 	readonly sections: readonly Section[]
-	/** The live uncompacted tail, in insertion order. */
+	/** Lists the live uncompacted tail, in insertion order. */
 	readonly messages: readonly Message[]
 }
 
 /**
- * The durable persistence seam for a {@link ConversationSnapshot} — three async primitives
+ * Persists a {@link ConversationSnapshot} durably — three async primitives
  * (`get` / `set` / `delete`) keyed by a conversation id, the exact analogue of
  * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}.
  *
@@ -1866,21 +1863,21 @@ export interface ConversationSnapshot {
  */
 export interface ConversationStoreInterface {
 	/**
-	 * Resolve the persisted snapshot for `id`, or `undefined` if none is stored.
+	 * Resolves the persisted snapshot for `id`, or `undefined` if none is stored.
 	 *
 	 * @param id - The conversation id to resolve (a {@link ConversationSnapshot.id})
 	 * @returns The persisted snapshot, or `undefined` if absent
 	 */
 	get(id: string): Promise<ConversationSnapshot | undefined>
 	/**
-	 * Insert or replace a snapshot under its own `snapshot.id` (no separate id param —
+	 * Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param —
 	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
 	 *
 	 * @param snapshot - The snapshot to store (keyed by its `id`)
 	 */
 	set(snapshot: ConversationSnapshot): Promise<void>
 	/**
-	 * Drop a snapshot by id; an absent id is a no-op (no throw).
+	 * Drops a snapshot by id; an absent id is a no-op (no throw).
 	 *
 	 * @param id - The conversation id to drop
 	 */
@@ -1888,7 +1885,7 @@ export interface ConversationStoreInterface {
 }
 
 /**
- * One row of the table a
+ * Represents one row of the table a
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
  * persists — a conversation `id` plus its {@link ConversationSnapshot} held as ONE OPAQUE JSON
  * column. The exact analogue of {@link import('@orkestrel/workspace').WorkspaceSnapshotRow}.
@@ -1906,12 +1903,12 @@ export interface ConversationStoreInterface {
  */
 export interface ConversationSnapshotRow {
 	readonly id: string
-	/** The whole {@link ConversationSnapshot} as one opaque JSON blob — read back as `unknown`, narrowed on `get`. */
+	/** Holds the whole {@link ConversationSnapshot} as one opaque JSON blob — read back as `unknown`, narrowed on `get`. */
 	readonly snapshot: unknown
 }
 
 /**
- * The data to author a {@link ConversationInterface} through a
+ * Carries the data to author a {@link ConversationInterface} through a
  * {@link ConversationManagerInterface} — the optional `id`, a `summarize` override, a `keep`
  * override, and the reserved `on` hooks.
  *
@@ -1939,12 +1936,12 @@ export interface ConversationInput {
 	/** Overrides the manager's default `sections` cap for this conversation. */
 	readonly sections?: number
 	readonly on?: EmitterHooks<ConversationEventMap>
-	/** A {@link ConversationSnapshot} to hydrate from, passed on as {@link ConversationOptions.snapshot}. */
+	/** Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot}. */
 	readonly snapshot?: ConversationSnapshot
 }
 
 /**
- * Options for `createConversationManager` — the default {@link ConversationSummaryHandler} and
+ * Configures `createConversationManager` — the default {@link ConversationSummaryHandler} and
  * retained-tail size the conversations it creates inherit.
  *
  * @remarks
@@ -1957,14 +1954,14 @@ export interface ConversationInput {
  * overrides it); omitted ⇒ unlimited.
  */
 export interface ConversationManagerOptions {
-	/** The default summarizer for conversations this manager creates (a per-`add` override wins). */
+	/** Supplies the default summarizer for conversations this manager creates (a per-`add` override wins). */
 	readonly summarize?: ConversationSummaryHandler
-	/** The default retained-tail size (a per-`add` override wins); defaults to `DEFAULT_CONVERSATION_KEEP`. */
+	/** Sets the default retained-tail size (a per-`add` override wins); defaults to `DEFAULT_CONVERSATION_KEEP`. */
 	readonly keep?: number
-	/** The default `sections` cap for conversations this manager creates (a per-`add` override wins); omitted ⇒ unlimited. */
+	/** Sets the default `sections` cap for conversations this manager creates (a per-`add` override wins); omitted ⇒ unlimited. */
 	readonly sections?: number
 	/**
-	 * The optional durable {@link ConversationStoreInterface} backing
+	 * Holds the optional durable {@link ConversationStoreInterface} backing
 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory
 	 * / JSON / SQLite / IndexedDB store a conversation is HYDRATED from (`open` a registry-miss) and
 	 * PERSISTED to (`save`). Omitted ⇒ the manager is registry-only: `open` resolves only what is
@@ -1975,7 +1972,7 @@ export interface ConversationManagerOptions {
 }
 
 /**
- * A registry of {@link ConversationInterface}s keyed by their `id`, in insertion order, WITH an
+ * Registers {@link ConversationInterface}s keyed by their `id`, in insertion order, WITH an
  * active pointer — the §9 store over the conversation layer PLUS the `active` / `switch` seam the
  * {@link AgentContextInterface} renders. Event-free (a registry, like
  * {@link import('@orkestrel/workspace').WorkspaceManagerInterface}); the observability lives on each
@@ -2008,14 +2005,14 @@ export interface ConversationManagerOptions {
  */
 export interface ConversationManagerInterface {
 	readonly count: number
-	/** The active conversation — the agent's message source the context renders; `undefined` until the first `add`. */
+	/** Holds the active conversation — the agent's message source the context renders; `undefined` until the first `add`. */
 	readonly active: ConversationInterface | undefined
 	conversation(id: string): ConversationInterface | undefined
 	conversations(): readonly ConversationInterface[]
 	add(input?: ConversationInput): ConversationInterface
 	switch(id: string): ConversationInterface | undefined
 	/**
-	 * Resolve a conversation by id, ACTIVATING it — from the registry if present, else HYDRATED from
+	 * Resolves a conversation by id, ACTIVATING it — from the registry if present, else HYDRATED from
 	 * the optional {@link ConversationStoreInterface} (`store`).
 	 *
 	 * @remarks
@@ -2031,7 +2028,7 @@ export interface ConversationManagerInterface {
 	 */
 	open(id: string): Promise<ConversationInterface | undefined>
 	/**
-	 * Persist a REGISTERED conversation's {@link ConversationInterface.snapshot} to the optional
+	 * Persists a REGISTERED conversation's {@link ConversationInterface.snapshot} to the optional
 	 * {@link ConversationStoreInterface} (`store`).
 	 *
 	 * @remarks
@@ -2040,7 +2037,7 @@ export interface ConversationManagerInterface {
 	 * `false` — never a throw, consistent with the lenient `switch`.
 	 *
 	 * @param id - The id of the registered conversation to persist
-	 * @returns `true` when the snapshot was persisted; `false` when no store / unknown id
+	 * @returns True if the snapshot was persisted; false otherwise (no store, or an unknown id)
 	 */
 	save(id: string): Promise<boolean>
 	remove(ids: readonly string[]): boolean

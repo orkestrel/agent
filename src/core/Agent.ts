@@ -39,8 +39,8 @@ import {
 } from './helpers.js'
 
 /**
- * The agent loop — composes a {@link ProviderInterface}, an {@link AgentContext}, and
- * a {@link ToolManagerInterface} into a bounded context → provider → tools → repeat
+ * Composes a {@link ProviderInterface}, an {@link AgentContext}, and a
+ * {@link ToolManagerInterface} into a bounded context → provider → tools → repeat
  * turn, exposed as both a one-shot `generate` and a live `stream`.
  *
  * @remarks

@@ -32,7 +32,7 @@ import {
 import { AgentJobError } from './errors.js'
 
 /**
- * Project an unknown value onto the canonical JSON representation of an
+ * Projects an unknown value onto the canonical JSON representation of an
  * {@link AgentResult}.
  *
  * @remarks
@@ -90,7 +90,7 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 }
 
 /**
- * Filter a list of items by a {@link import('./types.js').ScopeInterface} allow-list of
+ * Filters a list of items by a {@link import('./types.js').ScopeInterface} allow-list of
  * keys — the pure, total set-membership primitive the context's build step and the agent
  * loop's tool-advertise step apply a scope through.
  *
@@ -130,7 +130,7 @@ export function filterAllowList<T>(
 }
 
 /**
- * Estimate the context-token footprint of a string — the deterministic char-based heuristic
+ * Estimates the context-token footprint of a string — the deterministic char-based heuristic
  * {@link estimateMessages} sums over a conversation's messages (the default context-budget
  * estimator).
  *
@@ -156,7 +156,7 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Estimate the context-token footprint of a batch of messages — the default `consumer`
+ * Estimates the context-token footprint of a batch of messages — the default `consumer`
  * estimator for an agent's context `BudgetInterface` (a budgets surface's tracking contract)
  * (the {@link import('./types.js').AgentOptions} `window`).
  *
@@ -309,7 +309,7 @@ export function renderFencedFile(path: string, language: string, content: string
 }
 
 /**
- * Sanitize one reported token count into a safe non-negative integer.
+ * Sanitizes one reported token count into a safe non-negative integer.
  *
  * @param value - The token count to sanitize
  * @returns The floored count, or `0` when the value is non-finite or non-positive
@@ -319,7 +319,7 @@ export function sanitizeToken(value: number): number {
 }
 
 /**
- * Sanitize a {@link TokenUsage} into safe, non-negative integers — the guard an agent's
+ * Sanitizes a {@link TokenUsage} into safe, non-negative integers — the guard an agent's
  * abort-usage path applies to a provider's partial usage before it is charged against a
  * budget or folded into the run total.
  *

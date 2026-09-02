@@ -7,7 +7,7 @@ import type { TableInterface } from '@orkestrel/database'
 import { isConversationSnapshot } from '../../validators.js'
 
 /**
- * A {@link ConversationStoreInterface} backed by one table of the `databases` layer — a
+ * Backs a {@link ConversationStoreInterface} with one table of the `databases` layer — a
  * conversation's durable state IS a row, so persistence reduces to keyed point-access (`get` / `set`
  * / `delete`) over a {@link TableInterface}, the driver-pluggable twin of the plain-`Map`
  * {@link import('./MemoryConversationStore.js').MemoryConversationStore}. The EXACT twin of
@@ -60,7 +60,7 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 	readonly #table: TableInterface<ConversationSnapshotRow>
 
 	/**
-	 * Wrap a table as a conversation store.
+	 * Wraps a table as a conversation store.
 	 *
 	 * @param table - The {@link TableInterface} holding the snapshots — its row is the
 	 *   {@link ConversationSnapshotRow} `{ id; snapshot }` shape (the snapshot one opaque JSON column)
@@ -69,7 +69,7 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 		this.#table = table
 	}
 
-	/** Resolve the persisted snapshot for `id`, narrowing the opaque JSON column back to a `ConversationSnapshot`. */
+	/** Resolves the persisted snapshot for `id`, narrowing the opaque JSON column back to a `ConversationSnapshot`. */
 	async get(id: string): Promise<ConversationSnapshot | undefined> {
 		const row = await this.#table.get(id)
 		if (row === undefined) return undefined
@@ -79,12 +79,12 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 		return isConversationSnapshot(row.snapshot) ? row.snapshot : undefined
 	}
 
-	/** Insert or replace under the snapshot's OWN `id` (no separate id param) — the row is `{ id, snapshot }`. */
+	/** Inserts or replaces under the snapshot's OWN `id` (no separate id param) — the row is `{ id, snapshot }`. */
 	async set(snapshot: ConversationSnapshot): Promise<void> {
 		await this.#table.set({ id: snapshot.id, snapshot })
 	}
 
-	/** Drop a snapshot by id; an absent id is a no-op (no throw). */
+	/** Drops a snapshot by id; an absent id is a no-op (no throw). */
 	async delete(id: string): Promise<void> {
 		await this.#table.remove(id)
 	}

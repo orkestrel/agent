@@ -17,10 +17,9 @@ import { Agent } from './Agent.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 
 /**
- * The bridge that makes a durable, JSON-serializable {@link AgentJobInput} runnable —
- * it holds the named pools of live, non-serializable pieces (providers, tools,
- * authorities, schedulers) and rehydrates a seeded, signal-wired {@link Agent} from a
- * job's names + data.
+ * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named
+ * pools of live, non-serializable pieces (providers, tools, authorities, schedulers) and
+ * rehydrates a seeded, signal-wired {@link Agent} from a job's names + data.
  *
  * @remarks
  * - **Why it exists.** An `AgentJobInput` is serializable so it can survive a crash in a

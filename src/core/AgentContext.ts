@@ -28,8 +28,8 @@ import {
 import { InstructionManager } from './instructions/InstructionManager.js'
 
 /**
- * The richer turn context the agent loop assembles a provider request from — the optional
- * system prompt, the observable context managers (instructions / workspaces), the
+ * Assembles a provider request from the richer turn context — the optional system prompt, the
+ * observable context managers (instructions / workspaces), the
  * {@link ConversationManagerInterface} message source (whose active conversation IS `messages`),
  * the {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
  * {@link AgentContextInterface.apply}.

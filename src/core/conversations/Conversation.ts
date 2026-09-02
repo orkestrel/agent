@@ -18,8 +18,8 @@ import { ConversationError } from '../errors.js'
 import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
 
 /**
- * A conversation grouping messages ABOVE a flat message store — a live uncompacted tail it
- * OWNS DIRECTLY plus compacted, summarized {@link Section}s and a regenerated rollup
+ * Represents a conversation — a live uncompacted tail of messages it OWNS DIRECTLY ABOVE a
+ * flat message store, plus compacted, summarized {@link Section}s and a regenerated rollup
  * `summary`, with on-demand `rehydrate` and substring `search`, driven by a provider-agnostic
  * {@link ConversationSummaryHandler} seam (so `core` never imports a provider).
  *

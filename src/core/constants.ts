@@ -1,5 +1,5 @@
 /**
- * The default cap on an {@link AgentInterface} turn's tool iterations — the maximum
+ * Caps an {@link AgentInterface} turn's tool iterations by default — the maximum
  * number of context → provider → tools cycles before the loop stops, so a model that
  * keeps requesting tools can never loop forever. Overridable per agent via
  * `AgentOptions.limit`.
@@ -7,7 +7,7 @@
 export const DEFAULT_AGENT_LIMIT = 10
 
 /**
- * The zone an {@link AuthorityInterface}'s default fallback {@link AuthorityDecision}
+ * Names the zone an {@link AuthorityInterface}'s default fallback {@link AuthorityDecision}
  * carries — the classification for a tool call that matched no rule. Paired with the
  * default `allowed: true` fallback, an unmatched call is allowed under this zone, so a
  * rules list of denials acts as a denylist; a caller wanting deny-by-default supplies
@@ -16,7 +16,7 @@ export const DEFAULT_AGENT_LIMIT = 10
 export const DEFAULT_AUTHORITY_ZONE = 'default'
 
 /**
- * The default number of recent live messages a {@link ConversationInterface}'s `compact()`
+ * Sets the default number of recent live messages a {@link ConversationInterface}'s `compact()`
  * RETAINS verbatim — `0`, so a manual `compact()` folds ALL of the current live messages
  * into one summarized section (no tail kept). A caller retains a recent tail by passing
  * `keep` (on {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold
@@ -26,7 +26,7 @@ export const DEFAULT_AUTHORITY_ZONE = 'default'
 export const DEFAULT_CONVERSATION_KEEP = 0
 
 /**
- * The framing label a {@link ConversationInterface}'s `view()` prefixes onto each compacted
+ * Names the framing label a {@link ConversationInterface}'s `view()` prefixes onto each compacted
  * section's summary so a small model reads it as a CONDENSED RECAP of earlier turns — not a
  * literal assistant turn to echo or treat as the live answer.
  *
@@ -42,7 +42,7 @@ export const DEFAULT_CONVERSATION_KEEP = 0
 export const CONVERSATION_RECAP_PREFIX = '[Summary of earlier messages] '
 
 /**
- * The opening tag a {@link import('./ThinkSplitter.js').ThinkSplitter} recognizes as the start of
+ * Names the opening tag a {@link import('./ThinkSplitter.js').ThinkSplitter} recognizes as the start of
  * an in-content reasoning span — the de-facto wire convention thinking models (qwen3, DeepSeek-R1
  * family) emit their chain-of-thought under when a daemon renders it inline instead of on a
  * separate wire field. Paired with {@link THINK_CLOSE}.
@@ -50,14 +50,14 @@ export const CONVERSATION_RECAP_PREFIX = '[Summary of earlier messages] '
 export const THINK_OPEN = '<think>'
 
 /**
- * The closing tag that ends a {@link THINK_OPEN} reasoning span. A span the stream never closes
+ * Names the closing tag that ends a {@link THINK_OPEN} reasoning span. A span the stream never closes
  * (the model was cut off mid-reasoning) is treated as thinking to its end —
  * {@link import('./types.js').ThinkSplitterInterface.flush} settles it.
  */
 export const THINK_CLOSE = '</think>'
 
 /**
- * The section header {@link import('./AgentContext.js').AgentContext}'s `build()` renders the
+ * Names the section header {@link import('./AgentContext.js').AgentContext}'s `build()` renders the
  * ACTIVE workspace's TEXT files under — the leading line of the dedicated workspace block in the
  * system message, the carrier-split counterpart to the documents / images section headers.
  *
@@ -71,7 +71,7 @@ export const THINK_CLOSE = '</think>'
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
 
 /**
- * The estimated per-message role/framing overhead {@link import('./helpers.js').estimateMessages}
+ * Estimates the per-message role/framing overhead {@link import('./helpers.js').estimateMessages}
  * adds on top of a message's content estimate — accounts for the fixed wire framing every
  * conversation turn carries (its role tag, delimiters) that {@link import('./helpers.js').estimateTokens}'s
  * content-only heuristic does not otherwise capture.
@@ -79,7 +79,7 @@ export const WORKSPACE_SECTION_HEADER = '## Workspace'
 export const MESSAGE_TOKEN_OVERHEAD = 4
 
 /**
- * The coarse, deliberately-approximate per-image token cost {@link import('./helpers.js').estimateMessages}
+ * Names the coarse, deliberately-approximate per-image token cost {@link import('./helpers.js').estimateMessages}
  * charges for each attached image.
  *
  * @remarks

@@ -3,7 +3,7 @@ import { isArray, isRecord, isString } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 
 /**
- * Whether an `unknown` is structurally a {@link Message} record — the per-message step of
+ * Checks whether an `unknown` is structurally a {@link Message} record — the per-message step of
  * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
  * read via a guard, never an `as`). The conversation analogue of
  * {@link import('@orkestrel/workspace').isFile}.
@@ -22,7 +22,7 @@ import { isToolCall } from '@orkestrel/tool'
  * a storage boundary WITHOUT a cast.
  *
  * @param value - The value to test (one element of a snapshot's `messages` / a section's `messages`)
- * @returns `true` when `value` has the structural shape of a {@link Message}
+ * @returns True if `value` has the structural shape of a {@link Message}; false otherwise
  *
  * @example
  * ```ts
@@ -42,7 +42,7 @@ export function isMessage(value: unknown): value is Message {
 }
 
 /**
- * Whether an `unknown` is structurally a {@link Section} record — the per-section step of
+ * Checks whether an `unknown` is structurally a {@link Section} record — the per-section step of
  * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
  * read via a guard, never an `as`).
  *
@@ -53,7 +53,7 @@ export function isMessage(value: unknown): value is Message {
  * the {@link Section} type at a storage boundary WITHOUT a cast.
  *
  * @param value - The value to test (one element of a snapshot's `sections` array)
- * @returns `true` when `value` has the structural shape of a {@link Section}
+ * @returns True if `value` has the structural shape of a {@link Section}; false otherwise
  *
  * @example
  * ```ts
@@ -69,7 +69,7 @@ export function isSection(value: unknown): value is Section {
 }
 
 /**
- * Narrow an `unknown` to a {@link ConversationSnapshot} — the AGENTS §14 boundary guard for an
+ * Narrows an `unknown` to a {@link ConversationSnapshot} — the AGENTS §14 boundary guard for an
  * UNTRUSTED snapshot read (a storage row a
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
  * reads back from its opaque JSON column, a snapshot loaded from disk). The EXACT analogue of
@@ -89,7 +89,7 @@ export function isSection(value: unknown): value is Section {
  * read yields `undefined` rather than a broken conversation.
  *
  * @param value - The value to test (an opaque storage read)
- * @returns `true` when `value` has the structural shape of a {@link ConversationSnapshot}
+ * @returns True if `value` has the structural shape of a {@link ConversationSnapshot}; false otherwise
  *
  * @example
  * ```ts

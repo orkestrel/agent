@@ -8,8 +8,8 @@ import type {
 import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
 
 /**
- * The synchronous policy gate the agent loop consults before each tool call runs —
- * it turns one {@link AuthorityContext} into an {@link AuthorityDecision}.
+ * Gates the agent loop's tool calls — the synchronous policy consulted before each call
+ * runs, turning one {@link AuthorityContext} into an {@link AuthorityDecision}.
  *
  * @remarks
  * - **Ordered, first-match-wins.** `evaluate` walks the configured rules in order and

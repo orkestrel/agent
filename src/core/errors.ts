@@ -6,9 +6,9 @@ import type { AgentResult, ProviderResult } from './types.js'
 // on cancellation. The guard narrows a caught value with `instanceof`.
 
 /**
- * Thrown by a {@link ProviderInterface}'s `stream` when its bound signal aborts
- * mid-flight — carries the {@link ProviderResult} assembled from whatever streamed
- * before the cancel.
+ * Reports a provider stream cancelled mid-flight by its bound signal — thrown by a
+ * {@link ProviderInterface}'s `stream`, carrying the {@link ProviderResult} assembled
+ * from whatever streamed before the cancel.
  *
  * @remarks
  * Lets a caller recover the partial content (and any tool calls / usage seen so far)
@@ -17,7 +17,7 @@ import type { AgentResult, ProviderResult } from './types.js'
  * error reports), so a `catch` branches on it rather than on the message string.
  */
 export class ProviderAbortError extends Error {
-	/** The machine-readable condition — `'ABORT'`: a stream cancelled mid-flight. */
+	/** Names the machine-readable condition — `'ABORT'`: a stream cancelled mid-flight. */
 	readonly code = 'ABORT' as const
 	readonly partial: ProviderResult
 
@@ -29,10 +29,10 @@ export class ProviderAbortError extends Error {
 }
 
 /**
- * Narrow an unknown caught value to a {@link ProviderAbortError}.
+ * Narrows an unknown caught value to a {@link ProviderAbortError}.
  *
  * @param value - The value to test (typically a `catch` binding)
- * @returns `true` when `value` is a {@link ProviderAbortError}
+ * @returns True if `value` is a {@link ProviderAbortError}; false otherwise
  *
  * @example
  * ```ts
@@ -55,9 +55,9 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
 // `instanceof`, mirroring ProviderAbortError / isProviderAbortError above.
 
 /**
- * Thrown by an agent-job handler (a `createAgentQueue` / `createAgentRunner` job) when
- * its {@link AgentInterface} run ended {@link AgentResult.partial} and the job's
- * `partial` policy is `false` (the default) — carries the partial
+ * Reports an {@link AgentInterface} run that ended {@link AgentResult.partial} under a
+ * `partial` policy of `false` (the default) — thrown by an agent-job handler (a
+ * `createAgentQueue` / `createAgentRunner` job), carrying the partial
  * {@link AgentResult} so the failure stays inspectable.
  *
  * @remarks
@@ -72,9 +72,9 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
  * the message string.
  */
 export class AgentJobError extends Error {
-	/** The machine-readable condition — `'PARTIAL'`: a job that ended partial under a disallowing policy. */
+	/** Names the machine-readable condition — `'PARTIAL'`: a job that ended partial under a disallowing policy. */
 	readonly code = 'PARTIAL' as const
-	/** The partial {@link AgentResult} the cancelled job produced. */
+	/** Holds the partial {@link AgentResult} the cancelled job produced. */
 	readonly partial: AgentResult
 
 	constructor(message: string, partial: AgentResult) {
@@ -85,10 +85,10 @@ export class AgentJobError extends Error {
 }
 
 /**
- * Narrow an unknown caught value to an {@link AgentJobError}.
+ * Narrows an unknown caught value to an {@link AgentJobError}.
  *
  * @param value - The value to test (typically a `catch` binding or a rejected enqueue)
- * @returns `true` when `value` is an {@link AgentJobError}
+ * @returns True if `value` is an {@link AgentJobError}; false otherwise
  *
  * @example
  * ```ts
@@ -110,9 +110,9 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // caught value with `instanceof`, mirroring the other errors in this file.
 
 /**
- * Thrown by a {@link ConversationInterface}'s `compact()` when the conversation has no
- * {@link ConversationSummaryHandler} to fold its messages with, or when its `sections` cap is
- * structurally invalid — carries a machine-readable `code`.
+ * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages
+ * with, or with a structurally invalid `sections` cap — thrown by a
+ * {@link ConversationInterface}'s `compact()`, carrying a machine-readable `code`.
  *
  * @remarks
  * Compaction REQUIRES a summarizer (it digests the folded slice into a section summary and
@@ -125,7 +125,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * {@link isConversationError} and branch on `error.code`.
  */
 export class ConversationError extends Error {
-	/** The machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap. */
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap. */
 	readonly code: 'SUMMARIZER' | 'SECTIONS'
 
 	constructor(code: 'SUMMARIZER' | 'SECTIONS', message: string) {
@@ -136,10 +136,10 @@ export class ConversationError extends Error {
 }
 
 /**
- * Narrow an unknown caught value to a {@link ConversationError}.
+ * Narrows an unknown caught value to a {@link ConversationError}.
  *
  * @param value - The value to test (typically a `catch` binding)
- * @returns `true` when `value` is a {@link ConversationError}
+ * @returns True if `value` is a {@link ConversationError}; false otherwise
  *
  * @example
  * ```ts
@@ -162,8 +162,8 @@ export function isConversationError(value: unknown): value is ConversationError 
 // so a `catch` branches on `error.code`, mirroring `ConversationError` above.
 
 /**
- * Thrown synchronously by an {@link AgentInterface}'s `stream()` when a concurrent run would
- * corrupt SHARED per-agent accounting — carries a machine-readable `code`.
+ * Reports a concurrent run that would corrupt SHARED per-agent accounting — thrown
+ * synchronously by an {@link AgentInterface}'s `stream()`, carrying a machine-readable `code`.
  *
  * @remarks
  * A run already in flight on the same agent, PLUS a construction-level `window` (a shared
@@ -174,7 +174,7 @@ export function isConversationError(value: unknown): value is ConversationError 
  * concurrent runs. Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** The machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent. */
+	/** Names the machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent. */
 	readonly code: 'CONCURRENCY'
 
 	constructor(code: 'CONCURRENCY', message: string) {
@@ -185,10 +185,10 @@ export class AgentError extends Error {
 }
 
 /**
- * Narrow an unknown caught value to an {@link AgentError}.
+ * Narrows an unknown caught value to an {@link AgentError}.
  *
  * @param value - The value to test (typically a `catch` binding)
- * @returns `true` when `value` is an {@link AgentError}
+ * @returns True if `value` is an {@link AgentError}; false otherwise
  *
  * @example
  * ```ts

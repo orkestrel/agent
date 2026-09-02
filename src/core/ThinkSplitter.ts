@@ -2,10 +2,10 @@ import type { ThinkSplitterInterface } from './types.js'
 import { THINK_CLOSE, THINK_OPEN } from './constants.js'
 
 /**
- * The stream-stateful `<think>` separator — feeds raw content deltas through a tiny
- * state machine that routes everything inside a `<think>…</think>` span to `thinking`
- * and returns everything outside it as clean content, so a provider yields ONLY the
- * answer and surfaces the reasoning as {@link import('./types.js').ProviderResult.thinking}.
+ * Feeds raw content deltas through a tiny stream-stateful state machine that routes
+ * everything inside a `<think>…</think>` span to `thinking` and returns everything outside
+ * it as clean content, so a provider yields ONLY the answer and surfaces the reasoning as
+ * {@link import('./types.js').ProviderResult.thinking}.
  *
  * @remarks
  * - **Cross-chunk tags.** A tag may arrive split across wire deltas (`'<thi'` then

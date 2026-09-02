@@ -1,9 +1,9 @@
 import type { InstructionInput, InstructionInterface } from '../types.js'
 
 /**
- * An immutable named directive — a {@link InstructionInterface} assembled once from its
- * input (`name` / `content`, an optional `priority` defaulting to `0`), the `id` minted
- * at construction.
+ * Represents an immutable named directive — a {@link InstructionInterface} assembled once
+ * from its input (`name` / `content`, an optional `priority` defaulting to `0`), the `id`
+ * minted at construction.
  *
  * @remarks
  * A thin immutable value object (mirroring {@link import('@orkestrel/tool').Tool}): the

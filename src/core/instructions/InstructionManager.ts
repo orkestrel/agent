@@ -12,8 +12,8 @@ import { Emitter } from '@orkestrel/emitter'
 import { Instruction } from './Instruction.js'
 
 /**
- * The instruction registry a richer context assembles a directives block from —
- * immutable {@link Instruction}s keyed by `name`, listed by descending `priority`.
+ * Registers the immutable {@link Instruction}s a richer context assembles a directives
+ * block from — keyed by `name`, listed by descending `priority`.
  *
  * @remarks
  * - **Registry.** Instructions live in an insertion-ordered `Map` keyed by `name`;
