@@ -390,7 +390,7 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
  *
  * const stream = agent.stream()
  * for await (const chunk of stream.events) {
- * 	if (chunk.type === 'token') process.stdout.write(chunk.content)
+ * 	if (chunk.category === 'token') process.stdout.write(chunk.content)
  * }
  * const result = await stream.result // { content, usage?, partial }
  * ```

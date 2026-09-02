@@ -156,7 +156,7 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Estimate the context-token footprint of a batch of messages — the default `consume`
+ * Estimate the context-token footprint of a batch of messages — the default `consumer`
  * estimator for an agent's context `BudgetInterface` (a budgets surface's tracking contract)
  * (the {@link import('./types.js').AgentOptions} `window`).
  *
@@ -168,7 +168,7 @@ export function estimateTokens(text: string): number {
  * deliberately-approximate per-image cost — a base64 length is NOT a token proxy). Deterministic
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
- * turn's new messages through; a caller wanting a sharper count supplies its own `consume` to
+ * turn's new messages through; a caller wanting a sharper count supplies its own `consumer` to
  * `createBudget` instead. Total — never throws: a `calls` `JSON.stringify` that throws (a
  * circular `ToolCall.arguments`) is caught and replaced with a conservative fixed contribution of
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
@@ -595,8 +595,8 @@ export function resolveItem<T extends { readonly format?: string }>(
  *
  * @example
  * ```ts
- * attachImages({ id: '1', role: 'user', content: 'Describe' }, ['<base64>'])
- * // { id: '1', role: 'user', content: 'Describe', images: ['<base64>'] }
+ * attachImages({ id: '1', role: 'user', content: 'Describe' }, ['<payload>'])
+ * // { id: '1', role: 'user', content: 'Describe', images: ['<payload>'] }
  * ```
  */
 export function attachImages(message: Message, data: readonly string[]): Message {
@@ -665,7 +665,7 @@ export function attachUserImages(
  * @example
  * ```ts
  * collectImageData([createFile({ path: 'a.png', content: { base64: '<payload>', mime: 'image/png' } })])
- * // ['<base64>']
+ * // ['<payload>']
  * ```
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {

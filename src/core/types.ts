@@ -838,8 +838,8 @@ export interface AgentResult {
  * a provider call reported it), `partial` is `true` when a cancel committed the run early OR
  * when the loop exhausted its `limit` with unresolved tool intent, and `exhausted` is `true`
  * in that second case specifically (a distinct, non-cancel cause the {@link AgentEventMap}
- * `exhaust` event observes). It is the INTERNAL precursor to the settled `AgentResult` — the
- * pump reads it to assemble the public result — not a caller-facing shape.
+ * `exhaust` event observes). It is the settled outcome one run returns, before the agent folds
+ * it into the {@link AgentResult} its `stream`'s `result` promise resolves.
  */
 export interface RunOutcome {
 	readonly content: string
