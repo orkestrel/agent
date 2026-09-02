@@ -39,7 +39,7 @@ import { ConversationManager } from './conversations/ConversationManager.js'
  *   `scheduler` names; construct the {@link Agent} with `system` / `limit` / `timeout` /
  *   the threaded `signal`; seed its context with the job's `messages`; return it. The
  *   `signal` is the queue attempt's / runner unit's cancel, so a bounded abort propagates
- *   into the agent (which commits a partial — the job's `allowPartial` policy then
+ *   into the agent (which commits a partial — the job's `partial` policy then
  *   decides success vs. retry).
  * - **Event-free.** A pure resolver — no Emitter, no events.
  *

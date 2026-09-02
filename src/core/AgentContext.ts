@@ -1,11 +1,11 @@
 import type {
 	AgentContextInterface,
 	AgentContextOptions,
-	ContextFormatInterface,
+	ContextFormat,
 	ConversationInterface,
 	ConversationManagerInterface,
 	InstructionManagerInterface,
-	MessageInterface,
+	Message,
 	MessageManagerInterface,
 	ScopeInterface,
 } from './types.js'
@@ -16,10 +16,10 @@ import { isText, WorkspaceManager } from '@orkestrel/workspace'
 import { WORKSPACE_SECTION_HEADER } from './constants.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 import {
-	attachImages,
+	attachUserImages,
 	collectImageData,
-	fencedFile,
 	filterAllowList,
+	renderFencedFile,
 	renderSection,
 	resolveClose,
 	resolveItem,
@@ -68,7 +68,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   manager-options-override > provider (NO built-in ⇒ no closing line when unset) (see
  *   {@link AgentContextInterface.build}). Passing NO `format` (and with no overrides / no per-item
  *   format) reproduces the built-in framing byte-for-byte (each section is its built-in header +
- *   items, no closing line). The active workspace's scoped-in image files' `data` is attached to
+ *   items, no closing line). The active workspace's scoped-in image files' `base64` payload is attached to
  *   the LAST user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
  *   always reflects the current managers / messages / scope / active workspace; it never mutates a
@@ -76,7 +76,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  * - **The ACTIVE workspace, rendered BY CARRIER — the SOLE document/image context.**
  *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface}s scope-filtered by `scope.files`,
  *   then split: TEXT files fold into a dedicated `## Workspace` system section (fenced reference
- *   blocks — placed right after the instructions section), and IMAGE files' base64 `data` attaches
+ *   blocks — placed right after the instructions section), and IMAGE files' `base64` payload attaches
  *   to the last user message. ACTIVE-ONLY — never the other registered workspaces; with no active
  *   workspace nothing renders for workspaces. `build()` OWNS this render (a `Workspace` /
  *   `WorkspaceManager` stays file-focused).
@@ -169,7 +169,7 @@ export class AgentContext implements AgentContextInterface {
 		this.#scope = scope
 	}
 
-	build(format?: ContextFormatInterface): readonly MessageInterface[] {
+	build(format?: ContextFormat): readonly Message[] {
 		const scope = this.#scope
 		// 1–2. Assemble the system block parts: the prompt, then each scoped manager's
 		// section (its resolved `open` + each item's resolved rendering + any resolved
@@ -199,11 +199,12 @@ export class AgentContext implements AgentContextInterface {
 		if (instructed !== undefined) parts.push(instructed)
 		// The ACTIVE workspace's files, rendered BY CARRIER — the SOLE document/image context.
 		// Filter `active.files()` by `scope.files`, then split: TEXT files fold into the
-		// `## Workspace` system section (fenced reference blocks, the `fencedFile` framing — placed
+		// `## Workspace` system section (fenced reference blocks, the `renderFencedFile` framing — placed
 		// right after the instructions section, grouping the in-prompt text content), IMAGE files'
-		// base64 `data` attaches to the last user message (collected below, fed to `#attach`).
-		// `build()` OWNS this render — a `Workspace` / `WorkspaceManager` stays file-focused (no
-		// `description` / `framing` getters). No active workspace ⇒ nothing renders (active-only).
+		// `base64` payload attaches to the last user message (collected below, fed to
+		// `attachUserImages`). `build()` OWNS this render — a `Workspace` / `WorkspaceManager` stays
+		// file-focused (no `open` / `format` getters). No active workspace ⇒ nothing renders
+		// (active-only).
 		const files = filterAllowList(
 			scope?.files,
 			this.#workspaces.active?.files() ?? [],
@@ -211,7 +212,7 @@ export class AgentContext implements AgentContextInterface {
 		)
 		const workspaceTexts = files.filter((file) => isText(file.content))
 		// The text files have NO format-cascade level of their own (they are not a manager) — the
-		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders via `fencedFile`
+		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders via `renderFencedFile`
 		// off its own text arm (`{ text, language }`), narrowed by `isText` (§14: narrow, never
 		// assert; the pre-filter above means the defensive arm is never reached). An empty set
 		// contributes nothing (`renderSection` returns `undefined`).
@@ -220,8 +221,8 @@ export class AgentContext implements AgentContextInterface {
 			workspaceTexts,
 			(file) =>
 				isText(file.content)
-					? fencedFile(file.path, file.content.language, file.content.text)
-					: fencedFile(file.path, 'text', ''),
+					? renderFencedFile(file.path, file.content.language, file.content.text)
+					: renderFencedFile(file.path, 'text', ''),
 			undefined,
 		)
 		if (documented !== undefined) parts.push(documented)
@@ -233,42 +234,19 @@ export class AgentContext implements AgentContextInterface {
 		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
 		const active = this.#conversations.active ?? this.#ensure()
 		const conversation = active.view()
-		// 5. Attach the active workspace's scoped-in IMAGE files' base64 `data` to the LAST user
+		// 5. Attach the active workspace's scoped-in IMAGE files' `base64` payload to the LAST user
 		// message (a vision provider reads images off a user turn) — the active workspace is the
 		// SOLE image source. Skipped when there is none. (Applies to the conversation's view too.)
-		const tail = this.#attach(conversation, collectImageData(files))
+		const tail = attachUserImages(conversation, collectImageData(files))
 
 		// 3. Prepend ONE assembled system message only when some part exists.
 		if (parts.length === 0) return tail
-		const system: MessageInterface = {
+		const system: Message = {
 			id: crypto.randomUUID(),
 			role: 'system',
 			content: parts.join('\n\n'),
 		}
 		return [system, ...tail]
-	}
-
-	// Attach image data to the last user message — returns a NEW array with that one
-	// message replaced by a copy carrying the merged `images` (its own first, then the
-	// attached data), never mutating the stored message. No data ⇒ the conversation is
-	// returned unchanged; no user message ⇒ the attachment is skipped (the conversation is
-	// returned unchanged — the image text markers already rode the system block).
-	#attach(
-		conversation: readonly MessageInterface[],
-		data: readonly string[],
-	): readonly MessageInterface[] {
-		if (data.length === 0) return conversation
-		let target = -1
-		for (let index = conversation.length - 1; index >= 0; index -= 1) {
-			if (conversation[index]?.role === 'user') {
-				target = index
-				break
-			}
-		}
-		if (target === -1) return conversation
-		return conversation.map((message, index) =>
-			index === target ? attachImages(message, data) : message,
-		)
 	}
 
 	// The total fallback that keeps `messages` / `build()` defined even if a caller's supplied

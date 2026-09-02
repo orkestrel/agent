@@ -10,8 +10,7 @@ import type {
 	AgentStreamInterface,
 	AuthorityDecision,
 	AuthorityInterface,
-	CompactionState,
-	MessageInterface,
+	Message,
 	ProviderInterface,
 	ProviderResult,
 	RunOutcome,
@@ -20,11 +19,10 @@ import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import type { ToolCall, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
-import type { DeferredInterface, SchedulerInterface } from '@orkestrel/workflow'
+import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
 import { createTimeout } from '@orkestrel/timeout'
-import { createDeferred } from '@orkestrel/workflow'
 import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from './AgentContext.js'
 import { Channel } from './Channel.js'
@@ -89,16 +87,16 @@ export class Agent implements AgentInterface {
 	readonly #scheduler: SchedulerInterface | undefined
 	readonly #signal: AbortSignal | undefined
 	readonly #authority: AuthorityInterface | undefined
-	// The CONTEXT budget for AUTOMATIC conversation compaction (§ auto-compact) — its `consume`
+	// The CONTEXT budget for AUTOMATIC conversation compaction (§ auto-compact) — its `consumer`
 	// is a token estimator, its `max` the context window. `#trim` re-measures the ABSOLUTE current
 	// prompt against it (clear() + consume(messages)) BEFORE the first provider request AND between
 	// turns; `undefined` ⇒ disabled: `#trim` is a no-op and the loop is byte-for-byte the prior
 	// behavior. Reset (`clear()`) at run entry so no stale `consumed` carries across runs / a
 	// conversation switch. NOT the hard cost `budget` ceiling — when the prompt reaches its `max`
 	// this COMPACTS + continues (non-fatal on a summarizer throw, futile-guarded), never aborts.
-	readonly #window: BudgetInterface<readonly MessageInterface[]> | undefined
+	readonly #window: BudgetInterface<readonly Message[]> | undefined
 	// F5 — when true, a summarizer failure during AUTOMATIC compaction rethrows (after the
-	// `compactError` event) instead of skipping compaction and continuing over-window.
+	// `fault` event) instead of skipping compaction and continuing over-window.
 	readonly #strict: boolean
 	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
@@ -198,24 +196,14 @@ export class Agent implements AgentInterface {
 		// Observe the run begin — AFTER the `running` transition, so a swallowed listener
 		// throw can't perturb the state the pump is about to drive.
 		this.#emitter.emit('start', this.id)
-		const state: { outcome: RunOutcome } = {
-			outcome: {
-				content: '',
-				thinking: undefined,
-				usage: undefined,
-				partial: false,
-				exhausted: false,
-			},
-		}
 		const channel = new Channel<AgentChunk>()
-		const settled: DeferredInterface<AgentResult> = createDeferred<AgentResult>()
+		const settled = Promise.withResolvers<AgentResult>()
 		// Kick off the eager pump SYNCHRONOUSLY (not lazily on first `events` pull): it
 		// drives `#run` into the channel and settles `settled` regardless of whether anyone
 		// drains `events`. The per-run `think` / `schema` preferences ride through to
 		// `provider.stream`; `limit` / `budget` ride through as the effective run bounds.
 		void this.#pump(
 			abort,
-			state,
 			timeout,
 			channel,
 			settled,
@@ -248,31 +236,46 @@ export class Agent implements AgentInterface {
 	}
 
 	// The eager pump — the DRIVE behind both faces. Kicked off synchronously in `stream`
-	// (NOT lazily on an `events` pull), it iterates `#run` and `push`es each chunk into the
-	// channel as it arrives, then settles `result` from the outcome: a normal / cancelled
-	// finish `close`s the channel and RESOLVES the assembled result (status `done`); a
-	// genuine provider / tool error (the bound signal NOT aborted) `fail`s the channel and
-	// REJECTS (status `error`). Because the pump runs regardless of whether anyone drains
-	// `events`, `result` ALWAYS settles — that is the fix for the no-drain hang. The
-	// deadline `clear()` lives in the `finally` so it ALWAYS fires (drained or not), and
-	// `result` settles EXACTLY ONCE via the shared `DeferredInterface` handle (its
-	// underlying promise obeys native settle-once — the first resolve / reject wins).
+	// (NOT lazily on an `events` pull), it drives `#run` and `push`es each chunk into the
+	// channel as it arrives, then settles `result` from the outcome the generator RETURNS: a
+	// normal / cancelled finish `close`s the channel and RESOLVES the assembled result (status
+	// `done`); a genuine provider / tool error (the bound signal NOT aborted) `fail`s the
+	// channel and REJECTS (status `error`). The generator is driven by hand rather than with
+	// `for await`, which discards a generator's return value — the settled `RunOutcome` IS that
+	// return value, so the run owns its state and nothing is threaded through a caller-held box.
+	// Because the pump runs regardless of whether anyone drains `events`, `result` ALWAYS
+	// settles — that is the fix for the no-drain hang. The deadline `clear()` lives in the
+	// `finally` so it ALWAYS fires (drained or not), and `result` settles EXACTLY ONCE through
+	// the shared resolvers (the underlying promise obeys native settle-once — the first resolve
+	// / reject wins).
 	async #pump(
 		abort: AbortInterface,
-		state: { outcome: RunOutcome },
 		timeout: TimeoutInterface | undefined,
 		channel: Channel<AgentChunk>,
-		settled: DeferredInterface<AgentResult>,
+		settled: PromiseWithResolvers<AgentResult>,
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): Promise<void> {
 		let failure: { error: unknown } | undefined
+		// The outcome of a run that produced nothing — replaced by whatever `#run` returns, and
+		// read only on the success path (a genuine failure rejects from `failure` instead).
+		let outcome: RunOutcome = {
+			content: '',
+			thinking: undefined,
+			usage: undefined,
+			partial: false,
+			exhausted: false,
+		}
 		try {
-			for await (const chunk of this.#run(abort, state, think, schema, limit, budget)) {
-				channel.push(chunk)
+			const run = this.#run(abort, think, schema, limit, budget)
+			let next = await run.next()
+			while (next.done !== true) {
+				channel.push(next.value)
+				next = await run.next()
 			}
+			outcome = next.value
 		} catch (error) {
 			failure = { error }
 		} finally {
@@ -281,7 +284,6 @@ export class Agent implements AgentInterface {
 			// fires it (and the set never leaks finished runs).
 			this.#runs.delete(abort)
 			if (failure === undefined) {
-				const outcome = state.outcome
 				this.#status = 'done'
 				channel.close()
 				const result = assembleResult(outcome)
@@ -331,19 +333,20 @@ export class Agent implements AgentInterface {
 	// iterates up to `limit`: stream the provider (yielding token chunks), fold usage,
 	// dispatch any tool calls (yielding tool chunks) and continue, else finish. A cancel
 	// (the bound abort) stops the loop and marks the outcome partial — it never throws;
-	// only a genuine provider / tool error propagates.
+	// only a genuine provider / tool error propagates. The run OWNS its state: every mutable
+	// field lives in these locals for the length of one call (so concurrent runs share
+	// nothing), and the settled `RunOutcome` is what the generator RETURNS to `#pump`.
 	async *#run(
 		abort: AbortInterface,
-		state: { outcome: RunOutcome },
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
-	): AsyncGenerator<AgentChunk, void> {
+	): AsyncGenerator<AgentChunk, RunOutcome> {
 		// Pass the provider's optional context-framing default into `build()` — the
 		// PROVIDER level of the format cascade. An agnostic provider supplies no `format`,
 		// so `build(undefined)` reproduces the managers' built-in framing exactly.
-		const messages: MessageInterface[] = [...this.#context.build(this.#provider.format)]
+		const messages: Message[] = [...this.#context.build(this.#provider.format)]
 		const tools = this.#context.tools
 		let content = ''
 		let thinking: string | undefined
@@ -356,11 +359,13 @@ export class Agent implements AgentInterface {
 		// never enters the loop, so both stay `false` and the outcome is non-partial.
 		let pending = false
 		let broke = false
-		// PER-RUN auto-compaction state — created FRESH each run (never carried across runs or a
-		// conversation switch). `futile` is the single-level guard (clause 26): once a `compact()`
-		// returns `undefined` while still over the window, the prompt can't shrink further, so
-		// auto-compaction STOPS for the rest of THIS run (no per-turn churn).
-		const compaction = { state: { futile: false } }
+		let partial = false
+		let exhausted = false
+		// PER-RUN auto-compaction state — a local, so it starts FRESH each run (never carried
+		// across runs or a conversation switch). `futile` is the single-level guard (clause 26):
+		// once a `compact()` returns `undefined` while still over the window, the prompt can't
+		// shrink further, so auto-compaction STOPS for the rest of THIS run (no per-turn churn).
+		let futile = false
 		// AUTO-COMPACTION is enabled only when BOTH a `#window` budget is set AND the active
 		// conversation CAN summarize (`summarizable` — it has a summarizer). There is now ALWAYS an
 		// active conversation, but the DEFAULT one has no summarizer, so this gate preserves the shipped
@@ -378,10 +383,10 @@ export class Agent implements AgentInterface {
 			this.#window !== undefined && this.#context.conversations.active?.summarizable === true
 		if (compacting) {
 			this.#window?.clear()
-			// PRE-FIRST-TURN: `latchFutile: false` — an `undefined` fold here means the tail is too short
+			// PRE-FIRST-TURN: `latch: false` — an `undefined` fold here means the tail is too short
 			// YET (this run's turns haven't accumulated), NOT permanently futile, so it must not disable
 			// auto-compaction for the run; the growing tail can still fold on the between-turns checks.
-			if (!abort.signal.aborted) await this.#trim(messages, compaction, false)
+			if (!abort.signal.aborted) futile = await this.#trim(messages, false)
 		}
 		for (let turn = 0; turn < limit; turn += 1) {
 			// Observe each iteration begin (the turn index). The emitter isolates a listener
@@ -398,7 +403,7 @@ export class Agent implements AgentInterface {
 					await this.#scheduler?.yield({ signal: abort.signal })
 				} catch (error) {
 					if (abort.signal.aborted) {
-						state.outcome = { ...state.outcome, partial: true }
+						partial = true
 						broke = true
 						break
 					}
@@ -406,7 +411,7 @@ export class Agent implements AgentInterface {
 				}
 			}
 			if (abort.signal.aborted) {
-				state.outcome = { ...state.outcome, partial: true }
+				partial = true
 				broke = true
 				break
 			}
@@ -481,7 +486,7 @@ export class Agent implements AgentInterface {
 							usage = sumUsage(usage, abortUsage)
 						}
 					}
-					state.outcome = { ...state.outcome, partial: true }
+					partial = true
 					broke = true
 					break
 				}
@@ -512,7 +517,7 @@ export class Agent implements AgentInterface {
 				usage = sumUsage(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
 				this.#emitter.emit('usage', resultUsage)
-				yield { type: 'usage', usage: resultUsage }
+				yield { category: 'usage', usage: resultUsage }
 			}
 			if (result.tools !== undefined && result.tools.length > 0) {
 				const assistant = this.#context.messages.add({
@@ -529,7 +534,7 @@ export class Agent implements AgentInterface {
 					// Observe the dispatched tool + its result — beside the existing `tool` yield
 					// (the result already exists). Carries the same pair the chunk carries.
 					this.#emitter.emit('tool', call, outcomeResult)
-					yield { type: 'tool', call, result: outcomeResult }
+					yield { category: 'tool', call, result: outcomeResult }
 					const toolMessage = this.#context.messages.add({
 						role: 'tool',
 						content: outcomeResult.success
@@ -544,9 +549,10 @@ export class Agent implements AgentInterface {
 				// (so a resumed / long conversation whose initial prompt already exceeds the window
 				// compacts at once). Gated behind `compacting` (window + conversation both present), so
 				// with auto-compaction OFF this introduces NO extra `await` — the loop is byte-for-byte
-				// the prior behavior. `latchFutile: true` — by now the tail has accumulated this turn's
-				// appends, so an `undefined` fold here is genuinely futile (clause 26).
-				if (compacting) await this.#trim(messages, compaction, true)
+				// the prior behavior. `latch: true` — by now the tail has accumulated this turn's
+				// appends, so an `undefined` fold here is genuinely futile (clause 26), and the run stops
+				// calling `#trim` for the rest of its turns.
+				if (compacting && !futile) futile = await this.#trim(messages, true)
 				pending = true
 				continue
 			}
@@ -567,13 +573,10 @@ export class Agent implements AgentInterface {
 		// then emits `abort` (the cancel reason), never `exhaust`. A `limit: 0` run never enters the
 		// loop (`pending` stays `false`), so it stays non-partial either way.
 		if (!broke && pending) {
-			state.outcome = {
-				...state.outcome,
-				partial: true,
-				exhausted: !abort.signal.aborted,
-			}
+			partial = true
+			exhausted = !abort.signal.aborted
 		}
-		state.outcome = { ...state.outcome, content, thinking, usage }
+		return { content, thinking, usage, partial, exhausted }
 	}
 
 	// AUTOMATIC compaction — the production-hardened context-budget check (§ auto-compact). Called
@@ -582,7 +585,7 @@ export class Agent implements AgentInterface {
 	// it is a no-op, so the loop is byte-for-byte the prior behavior — and a conversation that cannot
 	// summarize (the default one has no summarizer) is NEVER auto-compacted, so the auto path never
 	// throws the `compact()` SUMMARIZER error. The trigger is the CONTEXT `#window` budget —
-	// its `consume` a token estimator (e.g. `estimateMessages`), its `max` the context window — the
+	// its `consumer` a token estimator (e.g. `estimateMessages`), its `max` the context window — the
 	// SAME consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action is COMPACT, not
 	// abort. It measures the ABSOLUTE current prompt: `clear()` then `consume(messages)` makes
 	// `#window.consumed` the estimated footprint of the EXACT next prompt (the working `messages` array
@@ -590,7 +593,7 @@ export class Agent implements AgentInterface {
 	// the next `provider.stream` will receive), and `exhausted` means that prompt has REACHED `max`.
 	// PRODUCTION HARDENING:
 	//  • NON-FATAL summarizer failure — `conversation.compact()` is wrapped: a thrown summarizer error
-	//    does NOT crash the run; it is surfaced as a `compactError` event (observable, never lost) and
+	//    does NOT crash the run; it is surfaced as a `fault` event (observable, never lost) and
 	//    compaction is skipped THIS turn, then the loop continues (the over-window prompt proceeds to
 	//    the provider). (A MANUAL `conversation.compact()` still propagates — only the AUTO path here is
 	//    resilient.)
@@ -600,34 +603,26 @@ export class Agent implements AgentInterface {
 	//    section summaries) so compaction can't reduce further — set the per-run `futile` flag so
 	//    auto-compaction STOPS for the rest of this run (no per-turn churn). The over-window prompt then
 	//    proceeds to the provider, which surfaces a genuine context-length error if it truly can't fit
-	//    (the real limit). We do NOT loop futilely. `latchFutile` gates this: the BETWEEN-TURNS check
-	//    passes `true`; the PRE-FIRST-TURN check passes `false` — there an `undefined` fold just means
-	//    "nothing to fold YET" (the live tail hasn't accumulated this run's turns), NOT permanently
-	//    futile, so it skips without latching and the run's growing tail can still fold later. (A
-	//    `compact()` that DOES fold a section is never futile — the tail shrank; if the rebuilt prompt is
-	//    still over window the NEXT between-turns `undefined` fold latches.)
+	//    (the real limit). We do NOT loop futilely. The RETURNED flag carries that latch back to
+	//    `#run`, which owns the per-run state and stops calling `#trim` once it is set. `latch`
+	//    gates it: the BETWEEN-TURNS check passes `true`; the PRE-FIRST-TURN check passes `false` —
+	//    there an `undefined` fold just means "nothing to fold YET" (the live tail hasn't
+	//    accumulated this run's turns), NOT permanently futile, so it reports `false` and the run's
+	//    growing tail can still fold later. (A `compact()` that DOES fold a section is never futile
+	//    — the tail shrank; if the rebuilt prompt is still over window the NEXT between-turns
+	//    `undefined` fold latches.)
 	// No post-compact `clear()` is needed: the NEXT check's `clear()` + `consume` re-measures the
 	// now-shrunken prompt from scratch. The summarizer call is the conversation's configured
 	// (best-effort) one, NOT separately bound to this run's abort signal (a future tier can thread it).
-	async #trim(
-		messages: MessageInterface[],
-		compaction: { state: CompactionState },
-		latchFutile: boolean,
-	): Promise<void> {
+	async #trim(messages: Message[], latch: boolean): Promise<boolean> {
 		const conversation = this.#context.conversations.active
-		// No window, a non-summarizable active conversation (the default one can't fold), or
-		// already-futile this run ⇒ the additive no-op. (Both call sites are gated by `compacting`, so
-		// here `conversation` is the active, summarizable one; this guard keeps `#trim` total.)
-		if (
-			this.#window === undefined ||
-			conversation?.summarizable !== true ||
-			compaction.state.futile
-		) {
-			return
-		}
+		// No window or a non-summarizable active conversation (the default one can't fold) ⇒ the
+		// additive no-op. (Both call sites are gated by `compacting`, so here `conversation` is the
+		// active, summarizable one; this guard keeps `#trim` total.)
+		if (this.#window === undefined || conversation?.summarizable !== true) return false
 		this.#window.clear()
 		this.#window.consume(messages)
-		if (!this.#window.exhausted) return
+		if (!this.#window.exhausted) return false
 		let section: Awaited<ReturnType<typeof conversation.compact>>
 		try {
 			section = await conversation.compact()
@@ -635,21 +630,19 @@ export class Agent implements AgentInterface {
 			// Surface the summarizer failure observably first (always). Lenient (default): skip
 			// compaction this turn and continue over-window. F5 STRICT: rethrow after the event so
 			// the caught error propagates through `#run` and the run settles `error` instead.
-			this.#emitter.emit('compactError', error)
+			this.#emitter.emit('fault', error)
 			if (this.#strict) throw error
-			return
+			return false
 		}
-		if (section === undefined) {
-			// Nothing folded. On a BETWEEN-TURNS check (latchFutile) the tail had its chance to grow yet
-			// still won't fold ⇒ genuinely FUTILE: latch so the run stops churning and the over-window
-			// prompt reaches the provider. On the PRE-FIRST-TURN check (no latch) the tail is simply too
-			// short YET ⇒ skip without latching, leaving later turns free to fold as the tail grows.
-			if (latchFutile) compaction.state = { futile: true }
-			return
-		}
+		// Nothing folded. On a BETWEEN-TURNS check (`latch`) the tail had its chance to grow yet
+		// still won't fold ⇒ genuinely FUTILE: report the latch so the run stops churning and the
+		// over-window prompt reaches the provider. On the PRE-FIRST-TURN check the tail is simply
+		// too short YET ⇒ report no latch, leaving later turns free to fold as the tail grows.
+		if (section === undefined) return latch
 		// REBUILD the working array from the (now smaller) compacted view via the SAME projection the
 		// loop opened with — so the run continues on the system block + compacted `view()`.
 		messages.splice(0, messages.length, ...this.#context.build(this.#provider.format))
+		return false
 	}
 
 	// The tool-dispatch gate. With no authority this is byte-identical to the Ch5 path —
@@ -700,8 +693,8 @@ export class Agent implements AgentInterface {
 		return calls.map((call) => byId.get(call.id) ?? denyCall(call, undefined))
 	}
 
-	// Drive one provider stream turn: discriminate each {@link ProviderDelta} the provider
-	// yields — a `'content'` delta is the answer (fed back via `onDelta`, surfaced as a
+	// Drive one provider stream turn: read each {@link ProviderDelta}'s `channel` — a
+	// `'content'` delta is the answer (fed back via `onDelta`, surfaced as a
 	// `token` chunk); a `'thinking'` delta is live reasoning (surfaced as a `think` chunk,
 	// NEVER fed into `onDelta` — reasoning is not answer content) — returning the provider's
 	// assembled result. The per-run `think` / `schema` preferences ride into `provider.stream`
@@ -709,7 +702,7 @@ export class Agent implements AgentInterface {
 	// the provider receives no options object at all when both are absent (preserving the prior
 	// think-only behavior exactly). Kept separate so the loop reads as one straight line.
 	async *#provide(
-		messages: readonly MessageInterface[],
+		messages: readonly Message[],
 		signal: AbortSignal,
 		definitions: ReturnType<ToolManagerInterface['definitions']> | undefined,
 		think: boolean | undefined,
@@ -728,11 +721,11 @@ export class Agent implements AgentInterface {
 		let next = await generator.next()
 		while (!next.done) {
 			const delta = next.value
-			if (delta.type === 'content') {
+			if (delta.channel === 'content') {
 				onDelta(delta.text)
-				yield { type: 'token', content: delta.text }
+				yield { category: 'token', content: delta.text }
 			} else {
-				yield { type: 'think', content: delta.text }
+				yield { category: 'think', content: delta.text }
 			}
 			next = await generator.next()
 		}

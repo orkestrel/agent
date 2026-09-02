@@ -1,9 +1,4 @@
-import type {
-	AgentContextInterface,
-	ContextFormatInterface,
-	MessageInput,
-	MessageInterface,
-} from '@src/core'
+import type { AgentContextInterface, ContextFormat, MessageInput, Message } from '@src/core'
 import { Tool, ToolManager } from '@orkestrel/tool'
 import {
 	WorkspaceManager,
@@ -303,7 +298,7 @@ describe('AgentContext — accessors & construction', () => {
 describe('AgentContext — long conversation', () => {
 	it('prepends a single system message ahead of a long conversation in order', () => {
 		const context = new AgentContext({ system: 'sys' })
-		const turns: readonly MessageInterface[] = context.messages.add(
+		const turns: readonly Message[] = context.messages.add(
 			Array.from({ length: 200 }, (_, index): MessageInput => ({
 				role: index % 2 === 0 ? 'user' : 'assistant',
 				content: `turn-${index}`,
@@ -362,7 +357,7 @@ describe('AgentContext — context managers', () => {
 		expect(system.content).toBe(
 			[
 				'You are concise.',
-				`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
+				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
 			].join('\n\n'),
 		)
 		// Order: prompt → instructions.
@@ -834,10 +829,7 @@ describe('AgentContext — scope filtering in build()', () => {
 describe('AgentContext — format cascade: the instructions open (header)', () => {
 	// Resolve just the instructions `open` at each level. A single instruction so the block is
 	// `<open>\n\n<render>`; we read the open (the part before the render).
-	function openFor(
-		format: ContextFormatInterface | undefined,
-		options?: { managerOpen?: string },
-	): string {
+	function openFor(format: ContextFormat | undefined, options?: { managerOpen?: string }): string {
 		const managerOpen = options?.managerOpen
 		const instructions =
 			managerOpen === undefined
@@ -866,7 +858,7 @@ describe('AgentContext — format cascade: the instructions open (header)', () =
 describe('AgentContext — format cascade: an instruction item (render)', () => {
 	// Resolve just the per-item render at each level (the part after the header).
 	function renderFor(
-		format: ContextFormatInterface | undefined,
+		format: ContextFormat | undefined,
 		options?: { managerRender?: string; itemFormat?: string },
 	): string {
 		const managerRender = options?.managerRender
@@ -1008,7 +1000,7 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 
 		const expected = [
 			'You are concise.',
-			`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
+			`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
 		].join('\n\n')
 
 		expect(requireValue(context.build()[0]).content).toBe(expected)
@@ -1043,7 +1035,7 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 	})
 })
 
-// The CANONICAL build() shape — the exact top-level MessageInterface[] is `[system-block,
+// The CANONICAL build() shape — the exact top-level Message[] is `[system-block,
 // ...conversation]` and NOTHING else: one assembled system message (the prompt + the
 // instructions section + the active workspace's text section, `\n\n`-separated), then the
 // scope-filtered conversation in insertion order. The cascade tests above pin per-section
@@ -1077,7 +1069,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 		expect(requireValue(built[0]).content).toBe(
 			[
 				'You are concise.',
-				`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
+				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
 				`${WORKSPACE_SECTION_HEADER}\n\nFile: notes.md\n\`\`\`markdown\n# Notes\n\`\`\``,
 			].join('\n\n'),
 		)
@@ -1279,7 +1271,7 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 		expect(requireValue(built[0]).content).toBe(
 			[
 				'You are concise.',
-				`${context.instructions.description}\n\n${context.instructions.format(tone)}`,
+				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
 			].join('\n\n'),
 		)
 		expect(built.slice(1).map((message) => message.content)).toEqual(['one', 'two'])

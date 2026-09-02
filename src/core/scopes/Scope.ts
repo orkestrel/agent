@@ -1,4 +1,4 @@
-import type { ScopeConfiguration, ScopeInput, ScopeInterface } from '../types.js'
+import type { ScopeFilter, ScopeInput, ScopeInterface } from '../types.js'
 import { intersectKeys } from '../helpers.js'
 
 /**
@@ -47,7 +47,7 @@ export class Scope implements ScopeInterface {
 		if (input.files !== undefined) this.files = [...input.files]
 	}
 
-	narrow(config: ScopeConfiguration): ScopeInterface {
+	narrow(config: ScopeFilter): ScopeInterface {
 		// A child = the per-category set-intersection of this scope and the config, keeping
 		// THIS scope's name. Immutable: a brand-new Scope, this one untouched.
 		const instructions = intersectKeys(this.instructions, config.instructions)

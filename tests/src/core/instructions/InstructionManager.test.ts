@@ -106,22 +106,22 @@ describe('InstructionManager — ordering', () => {
 })
 
 describe('InstructionManager — build contract', () => {
-	it('format renders the instruction content', () => {
+	it('render returns the instruction content', () => {
 		const manager = new InstructionManager()
 		const instruction = manager.add({ name: 'tone', content: 'Be concise.' })
 
-		expect(manager.format(instruction)).toBe('Be concise.')
+		expect(manager.render(instruction)).toBe('Be concise.')
 	})
 
-	it('description is a stable section header', () => {
+	it('open is a stable section header', () => {
 		const manager = new InstructionManager()
 
-		expect(manager.description).toBe('## Instructions')
+		expect(manager.open).toBe('## Instructions')
 	})
 })
 
 describe('InstructionManager — manager-options format override', () => {
-	it('description / format consult the options override when set, else built-in', () => {
+	it('open / render consult the options override when set, else built-in', () => {
 		const format: ContextSectionFormat<InstructionInterface> = {
 			open: '<<rules>>',
 			render: (one) => `- ${one.content}`,
@@ -130,13 +130,13 @@ describe('InstructionManager — manager-options format override', () => {
 		const one = manager.add({ name: 'tone', content: 'Be terse.' })
 
 		// The override wins over the built-in for BOTH the header and the per-item render.
-		expect(manager.description).toBe('<<rules>>')
-		expect(manager.format(one)).toBe('- Be terse.')
+		expect(manager.open).toBe('<<rules>>')
+		expect(manager.render(one)).toBe('- Be terse.')
 		// A manager with NO override keeps the built-ins.
 		const plain = new InstructionManager()
 		const two = plain.add({ name: 'tone', content: 'Be terse.' })
-		expect(plain.description).toBe('## Instructions')
-		expect(plain.format(two)).toBe('Be terse.')
+		expect(plain.open).toBe('## Instructions')
+		expect(plain.render(two)).toBe('Be terse.')
 	})
 
 	it('a partial override falls back per-member to the built-in', () => {
@@ -144,14 +144,14 @@ describe('InstructionManager — manager-options format override', () => {
 		const manager = new InstructionManager({ format: { render: (one) => `* ${one.content}` } })
 		const one = manager.add({ name: 'tone', content: 'Be terse.' })
 
-		expect(manager.description).toBe('## Instructions')
-		expect(manager.format(one)).toBe('* Be terse.')
+		expect(manager.open).toBe('## Instructions')
+		expect(manager.render(one)).toBe('* Be terse.')
 	})
 
-	it('exposes the raw override via framing (undefined when none)', () => {
+	it('exposes the raw override on format (undefined when none)', () => {
 		const format: ContextSectionFormat<InstructionInterface> = { open: 'X' }
-		expect(new InstructionManager({ format }).framing).toBe(format)
-		expect(new InstructionManager().framing).toBeUndefined()
+		expect(new InstructionManager({ format }).format).toBe(format)
+		expect(new InstructionManager().format).toBeUndefined()
 	})
 
 	it('round-trips a per-item format override through add (present-when-given)', () => {

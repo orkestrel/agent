@@ -1,9 +1,9 @@
-import type { ConversationSnapshot, MessageInterface, SectionInterface } from './types.js'
+import type { ConversationSnapshot, Message, Section } from './types.js'
 import { isArray, isRecord, isString } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 
 /**
- * Whether an `unknown` is structurally a {@link MessageInterface} record — the per-message step of
+ * Whether an `unknown` is structurally a {@link Message} record — the per-message step of
  * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
  * read via a guard, never an `as`). The conversation analogue of
  * {@link import('@orkestrel/workspace').isFile}.
@@ -18,11 +18,11 @@ import { isToolCall } from '@orkestrel/tool'
  * (an absent optional passes). The `role` is left as a broad `string` here (an open
  * {@link import('./types.js').MessageRole}, so any storage-read role string is accepted
  * defensively rather than rejected against the current literal set). Enough to safely impose the
- * {@link MessageInterface} type at
+ * {@link Message} type at
  * a storage boundary WITHOUT a cast.
  *
  * @param value - The value to test (one element of a snapshot's `messages` / a section's `messages`)
- * @returns `true` when `value` has the structural shape of a {@link MessageInterface}
+ * @returns `true` when `value` has the structural shape of a {@link Message}
  *
  * @example
  * ```ts
@@ -32,7 +32,7 @@ import { isToolCall } from '@orkestrel/tool'
  * isMessage({ id: '1', role: 'assistant', content: '', calls: [null] }) // false (malformed call)
  * ```
  */
-export function isMessage(value: unknown): value is MessageInterface {
+export function isMessage(value: unknown): value is Message {
 	if (!isRecord(value)) return false
 	if (!isString(value.id) || !isString(value.role) || !isString(value.content)) return false
 	if (value.calls !== undefined && !(isArray(value.calls) && value.calls.every(isToolCall))) {
@@ -42,18 +42,18 @@ export function isMessage(value: unknown): value is MessageInterface {
 }
 
 /**
- * Whether an `unknown` is structurally a {@link SectionInterface} record — the per-section step of
+ * Whether an `unknown` is structurally a {@link Section} record — the per-section step of
  * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
  * read via a guard, never an `as`).
  *
  * @remarks
  * A total guard (it NEVER throws — adversarial input returns `false`). It checks the section's
  * SHAPE: a record with a `string` `id`, a `string` `summary`, and a `messages` array EVERY element
- * of which is a valid {@link MessageInterface} record ({@link isMessage}). Enough to safely impose
- * the {@link SectionInterface} type at a storage boundary WITHOUT a cast.
+ * of which is a valid {@link Message} record ({@link isMessage}). Enough to safely impose
+ * the {@link Section} type at a storage boundary WITHOUT a cast.
  *
  * @param value - The value to test (one element of a snapshot's `sections` array)
- * @returns `true` when `value` has the structural shape of a {@link SectionInterface}
+ * @returns `true` when `value` has the structural shape of a {@link Section}
  *
  * @example
  * ```ts
@@ -62,7 +62,7 @@ export function isMessage(value: unknown): value is MessageInterface {
  * isSection({ id: 's', messages: [] }) // false (missing summary)
  * ```
  */
-export function isSection(value: unknown): value is SectionInterface {
+export function isSection(value: unknown): value is Section {
 	if (!isRecord(value)) return false
 	if (!isString(value.id) || !isString(value.summary)) return false
 	return isArray(value.messages) && value.messages.every(isMessage)
@@ -79,8 +79,8 @@ export function isSection(value: unknown): value is SectionInterface {
  * A total guard (it NEVER throws — adversarial input returns `false`). It checks the snapshot's
  * SHAPE: a `string` `id`, an OPTIONAL `string` `summary` (present-or-absent — the rollup is
  * `undefined` until the first compaction), a `sections` array EVERY element of which is a valid
- * {@link SectionInterface} ({@link isSection}), and a `messages` array EVERY element of which is a
- * valid {@link MessageInterface} ({@link isMessage}) — enough to safely impose the
+ * {@link Section} ({@link isSection}), and a `messages` array EVERY element of which is a
+ * valid {@link Message} ({@link isMessage}) — enough to safely impose the
  * {@link ConversationSnapshot} type at a storage boundary WITHOUT a cast. The structural twin of
  * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. A malformed blob (a non-record, a missing / non-string `id`, a
  * non-string `summary` when present, a non-array `sections` / `messages`, or any malformed

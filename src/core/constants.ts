@@ -63,7 +63,7 @@ export const THINK_CLOSE = '</think>'
  *
  * @remarks
  * `build()` OWNS the workspace render (a `Workspace` / `WorkspaceManager` stays file-focused — no
- * `description` / `framing` getters), so this header lives here as the agents module's one
+ * `open` / `format` getters), so this header lives here as the agents module's one
  * workspace-section framing constant rather than on a manager. Each workspace text file renders
  * beneath it as a fenced `` File: <path>\n```<language>\n<text>\n``` `` block — the SAME framing
  * the documents section uses — placed just after the documents section in the system block.

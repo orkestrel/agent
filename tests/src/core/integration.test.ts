@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ContextFormatInterface, ProviderInterface } from '@src/core'
+import type { ContextFormat, ProviderInterface } from '@src/core'
 import { createAgent } from '@src/core'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createScriptedProvider, createTokenUsage, type DeltasOf } from '../../setup.js'
@@ -54,11 +54,11 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 
-		const tokens = chunks.flatMap((chunk) => (chunk.type === 'token' ? [chunk.content] : []))
+		const tokens = chunks.flatMap((chunk) => (chunk.category === 'token' ? [chunk.content] : []))
 		expect(tokens.length).toBeGreaterThan(1)
 		expect(tokens.join('')).toBe(result.content)
 		expect(result.content).toBe('one two three')
-		expect(chunks.some((chunk) => chunk.type === 'usage')).toBe(true)
+		expect(chunks.some((chunk) => chunk.category === 'usage')).toBe(true)
 	})
 
 	it('drives a full tool ROUND-TRIP — the fake returns a tool call, the loop dispatches it and feeds the result back, the fake then uses it', async () => {
@@ -94,7 +94,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		// The real tool executed exactly once, with the fed-in arguments → 5.
 		expect(executed).toBe(1)
 		const dispatched = chunks.flatMap((chunk) =>
-			chunk.type === 'tool' && chunk.result.success
+			chunk.category === 'tool' && chunk.result.success
 				? [{ name: chunk.call.name, value: chunk.result.value }]
 				: [],
 		)
@@ -120,7 +120,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const stream = agent.stream()
 		const streamed: string[] = []
 		for await (const chunk of stream.events) {
-			if (chunk.type === 'token') {
+			if (chunk.category === 'token') {
 				streamed.push(chunk.content)
 				agent.abort()
 				break
@@ -159,7 +159,7 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		// One provider declares an XML instructions framing (its provider-default), the other
 		// declares no `format` at all. The SAME agent code drives both; the built system block
 		// reflects each provider's framing — the runtime threads `provider.format` into build().
-		const formatXml: ContextFormatInterface = {
+		const formatXml: ContextFormat = {
 			instructions: {
 				open: '<INSTRUCTIONS>',
 				render: (one) => `<i>${one.content}</i>`,

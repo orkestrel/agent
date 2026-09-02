@@ -1,8 +1,8 @@
 import type {
 	ConversationSnapshot,
 	ConversationStoreInterface,
-	ContextFormatInterface,
-	MessageInterface,
+	ContextFormat,
+	Message,
 	ProviderDelta,
 	ProviderResult,
 } from '@src/core'
@@ -44,7 +44,7 @@ import {
 
 // The messages every scripted call is handed. A provider is framing-agnostic, so one seed turn
 // is enough for every case that does not assert on what was passed through.
-const messages: readonly MessageInterface[] = [{ id: 'm1', role: 'user', content: 'go' }]
+const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
 
 // Proof-local, and deliberately not promoted to `tests/setup.ts`: nothing but this proof drives a
 // provider generator directly for BOTH halves at once (the yielded deltas AND the generator's
@@ -114,7 +114,7 @@ describe('createScriptedProvider streaming', () => {
 		}
 		const provider = createScriptedProvider([result])
 		const drained = await drainProvider(provider.stream(messages, AbortSignal.timeout(1_000)))
-		expect(drained.deltas).toEqual([{ type: 'content', text: 'whole answer' }])
+		expect(drained.deltas).toEqual([{ channel: 'content', text: 'whole answer' }])
 		// The generator RETURNS the turn, so a consumer that only reads the return still gets
 		// the usage and any tool calls the deltas never carried.
 		expect(drained.result).toEqual(result)
@@ -130,7 +130,7 @@ describe('createScriptedProvider streaming', () => {
 		// them back, not by restating whatever `deltasOf` produced.
 		expect(drained.deltas.map((delta) => delta.text).join('')).toBe(content)
 		expect(drained.deltas).toHaveLength(content.length)
-		expect(drained.deltas.every((delta) => delta.type === 'content')).toBe(true)
+		expect(drained.deltas.every((delta) => delta.channel === 'content')).toBe(true)
 	})
 
 	it('lets a per-turn deltas list override deltasOf for that one turn', async () => {
@@ -170,13 +170,13 @@ describe('createScriptedProvider streaming', () => {
 		])
 		const drained = await drainProvider(provider.stream(messages, AbortSignal.timeout(1_000)))
 		// The two channels stay separate and ordered: every thinking delta precedes every content one.
-		expect(drained.deltas.map((delta) => delta.type)).toEqual([
+		expect(drained.deltas.map((delta) => delta.channel)).toEqual([
 			'thinking',
 			'thinking',
 			'content',
 			'content',
 		])
-		const reasoned = drained.deltas.filter((delta) => delta.type === 'thinking')
+		const reasoned = drained.deltas.filter((delta) => delta.channel === 'thinking')
 		expect(reasoned.map((delta) => delta.text).join('')).toBe('weighed')
 		expect(drained.result.thinking).toBe('weighed it')
 	})
@@ -214,7 +214,7 @@ describe('createScriptedProvider abort', () => {
 		const provider = createScriptedProvider([{ result: { content: 'ab' }, deltas: ['a', 'b'] }])
 		const generator = provider.stream(messages, controller.signal)
 		const first = await generator.next()
-		expect(first.value).toEqual({ type: 'content', text: 'a' })
+		expect(first.value).toEqual({ channel: 'content', text: 'a' })
 		controller.abort()
 		let caught: unknown
 		try {
@@ -257,7 +257,7 @@ describe('createScriptedProvider identity and recorders', () => {
 	it('carries a format only when one is supplied', async () => {
 		const agnostic = createScriptedProvider([{ content: 'x' }])
 		expect(agnostic.format).toBeUndefined()
-		const format: ContextFormatInterface = {}
+		const format: ContextFormat = {}
 		const framed = createScriptedProvider([{ content: 'x' }], { format })
 		expect(framed.format).toBe(format)
 	})
@@ -350,11 +350,11 @@ describe('canonical tools', () => {
 describe('createStubSummarizer', () => {
 	it('digests a slice into its folded count and records every slice digested', async () => {
 		const stub = createStubSummarizer()
-		const pair: readonly MessageInterface[] = [
+		const pair: readonly Message[] = [
 			{ id: 'a', role: 'user', content: 'first' },
 			{ id: 'b', role: 'assistant', content: 'second' },
 		]
-		const single: readonly MessageInterface[] = [{ id: 'c', role: 'user', content: 'third' }]
+		const single: readonly Message[] = [{ id: 'c', role: 'user', content: 'third' }]
 		const digests = [await stub.summarize(pair), await stub.summarize(single)]
 		// The digest names the slice's OWN length, so two different slices digest differently —
 		// the property a compaction test leans on when it reads a section summary back.

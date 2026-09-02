@@ -4,7 +4,7 @@ import type {
 	ConversationManagerInterface,
 	ConversationManagerOptions,
 	ConversationStoreInterface,
-	ConversationSummarizer,
+	ConversationSummaryHandler,
 } from '../types.js'
 import { isArray } from '@orkestrel/contract'
 import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
@@ -52,7 +52,7 @@ export class ConversationManager implements ConversationManagerInterface {
 	#active: string | undefined
 	// The default summarizer flowed into every conversation `add` creates (a per-`add` override
 	// wins); a conversation created with neither cannot `compact` (it throws a ConversationError).
-	readonly #summarize: ConversationSummarizer | undefined
+	readonly #summarize: ConversationSummaryHandler | undefined
 	// The default retained-tail size flowed into every conversation `add` creates (overridable).
 	readonly #keep: number
 	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.

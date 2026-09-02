@@ -1,8 +1,9 @@
-import type { AgentResult, ContextSectionSourceInterface, MessageInterface } from '@src/core'
+import type { AgentResult, ContextSectionSourceInterface, Message } from '@src/core'
 import {
 	agentResultToJSON,
 	assembleResult,
 	attachImages,
+	attachUserImages,
 	buildRecapMessage,
 	buildSummaryMessage,
 	collectImageData,
@@ -11,7 +12,7 @@ import {
 	denyCall,
 	estimateMessages,
 	estimateTokens,
-	fencedFile,
+	renderFencedFile,
 	filterAllowList,
 	IMAGE_TOKEN_ESTIMATE,
 	intersectKeys,
@@ -40,9 +41,9 @@ import { createScriptedProvider, createToolCall, createTokenUsage } from '../../
 // an AgentJobError when partials are disallowed and resolves when allowed (driven over a
 // scripted provider — no Ollama, AGENTS §16 real behavior).
 
-// A minimal MessageInterface fixture — only the fields estimateMessages reads (content);
+// A minimal Message fixture — only the fields estimateMessages reads (content);
 // id/role round out the shape so it is a real message, not a partial.
-const message = (content: string): MessageInterface => ({ id: 'm', role: 'user', content })
+const message = (content: string): Message => ({ id: 'm', role: 'user', content })
 
 function returnUndefined(): undefined {
 	return undefined
@@ -353,14 +354,14 @@ describe('estimateMessages', () => {
 
 	it('adds the JSON-stringified calls estimate when a message has calls', () => {
 		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: { q: 'acme' } })]
-		const withCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls }
+		const withCalls: Message = { id: 'm', role: 'assistant', content: '', calls }
 		expect(estimateMessages([withCalls])).toBe(
 			MESSAGE_TOKEN_OVERHEAD + estimateTokens(JSON.stringify(calls)),
 		)
 	})
 
 	it('does not add a calls estimate for an empty calls array', () => {
-		const withEmptyCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls: [] }
+		const withEmptyCalls: Message = { id: 'm', role: 'assistant', content: '', calls: [] }
 		expect(estimateMessages([withEmptyCalls])).toBe(MESSAGE_TOKEN_OVERHEAD)
 	})
 
@@ -371,7 +372,7 @@ describe('estimateMessages', () => {
 		const circular: Record<string, unknown> = { q: 'acme' }
 		circular.self = circular
 		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: circular })]
-		const withCircularCalls: MessageInterface = { id: 'm', role: 'assistant', content: '', calls }
+		const withCircularCalls: Message = { id: 'm', role: 'assistant', content: '', calls }
 
 		let estimate = 0
 		expect(() => {
@@ -384,7 +385,7 @@ describe('estimateMessages', () => {
 	})
 
 	it('adds images.length * IMAGE_TOKEN_ESTIMATE when a message has images', () => {
-		const withImages: MessageInterface = {
+		const withImages: Message = {
 			id: 'm',
 			role: 'user',
 			content: '',
@@ -413,7 +414,7 @@ describe('settleAgentJob', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 		})
-		// allowPartial is irrelevant for a natural finish — it resolves the full result either way.
+		// partial is irrelevant for a natural finish — it resolves the full result either way.
 		const result = await settleAgentJob(agent, false)
 		expect(result.partial).toBe(false)
 		expect(result.content).toBe('done')
@@ -447,35 +448,35 @@ describe('settleAgentJob', () => {
 			{ provider: 'main', messages: [{ role: 'user', content: 'go' }] },
 			controller.signal,
 		)
-		// allowPartial: true ⇒ no throw; the same partial result is returned instead.
+		// partial: true ⇒ no throw; the same partial result is returned instead.
 		const result = await settleAgentJob(agent, true)
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('')
 	})
 })
 
-describe('fencedFile', () => {
+describe('renderFencedFile', () => {
 	it('assembles a `File:` label + a fenced code block tagged with the language', () => {
-		expect(fencedFile('src/main.ts', 'typescript', 'const x = 1')).toBe(
+		expect(renderFencedFile('src/main.ts', 'typescript', 'const x = 1')).toBe(
 			'File: src/main.ts\n```typescript\nconst x = 1\n```',
 		)
 	})
 
 	it('renders the body verbatim inside the fence (multi-line preserved)', () => {
-		expect(fencedFile('a.md', 'markdown', '# Title\n\nbody')).toBe(
+		expect(renderFencedFile('a.md', 'markdown', '# Title\n\nbody')).toBe(
 			'File: a.md\n```markdown\n# Title\n\nbody\n```',
 		)
 	})
 
 	it('frames a workspace text file from its OWN text arm (path + language + text)', () => {
-		// AgentContext.build() renders an active workspace's text files with fencedFile, off each
+		// AgentContext.build() renders an active workspace's text files with renderFencedFile, off each
 		// file's text arm (`{ text, language }`) — the SOLE in-prompt document context now.
 		const file = createFile({
 			path: 'x.ts',
 			content: createTextContent('const y = 2', 'typescript'),
 		})
 		if (!isText(file.content)) throw new Error('expected a text file')
-		expect(fencedFile(file.path, file.content.language, file.content.text)).toBe(
+		expect(renderFencedFile(file.path, file.content.language, file.content.text)).toBe(
 			'File: x.ts\n```typescript\nconst y = 2\n```',
 		)
 	})
@@ -672,18 +673,18 @@ describe('resolveOpen / resolveClose / resolveItem — the format cascade', () =
 		readonly format?: string
 	}
 	const manager: ContextSectionSourceInterface<CascadeItem> = {
-		description: '## Instructions',
-		framing: undefined,
-		format: (one) => one.content,
+		open: '## Instructions',
+		format: undefined,
+		render: (one) => one.content,
 	}
 	const overridden: ContextSectionSourceInterface<CascadeItem> = {
-		description: '<rules>',
-		framing: {
+		open: '<rules>',
+		format: {
 			open: '<rules>',
 			render: (one) => `<rule>${one.content}</rule>`,
 			close: '</rules>',
 		},
-		format: (one) => one.content,
+		render: (one) => one.content,
 	}
 	const item: CascadeItem = { content: 'Be terse.' }
 
@@ -741,7 +742,7 @@ describe('attachImages — the image payload on a copied message', () => {
 	})
 
 	it('never mutates the source message', () => {
-		const source: MessageInterface = { id: 'm', role: 'user', content: 'Describe' }
+		const source: Message = { id: 'm', role: 'user', content: 'Describe' }
 		attachImages(source, ['attached'])
 		expect(source.images).toBeUndefined()
 	})
@@ -755,16 +756,62 @@ describe('attachImages — the image payload on a copied message', () => {
 	})
 })
 
+describe('attachUserImages — the image payload on a conversation last user turn', () => {
+	const conversation: readonly Message[] = [
+		{ id: 'u1', role: 'user', content: 'first' },
+		{ id: 'a1', role: 'assistant', content: 'reply' },
+		{ id: 'u2', role: 'user', content: 'second' },
+		{ id: 'a2', role: 'assistant', content: 'later' },
+	]
+
+	it('replaces the LAST user message with a copy carrying the data', () => {
+		const attached = attachUserImages(conversation, ['payload'])
+
+		expect(attached.map((one) => one.images)).toEqual([
+			undefined,
+			undefined,
+			['payload'],
+			undefined,
+		])
+		// Every other message is the SAME reference — only the target was replaced.
+		expect(attached[0]).toBe(conversation[0])
+		expect(attached[3]).toBe(conversation[3])
+		expect(attached[2]).not.toBe(conversation[2])
+	})
+
+	it('never mutates the source conversation', () => {
+		attachUserImages(conversation, ['payload'])
+
+		expect(conversation[2]?.images).toBeUndefined()
+	})
+
+	it('returns the conversation unchanged for no data', () => {
+		expect(attachUserImages(conversation, [])).toBe(conversation)
+	})
+
+	it('returns the conversation unchanged when it holds no user message', () => {
+		const assistantOnly: readonly Message[] = [{ id: 'a', role: 'assistant', content: 'hi' }]
+
+		expect(attachUserImages(assistantOnly, ['payload'])).toBe(assistantOnly)
+	})
+
+	it('merges after a user turn own images, through attachImages', () => {
+		const own: readonly Message[] = [{ id: 'u', role: 'user', content: 'x', images: ['own'] }]
+
+		expect(attachUserImages(own, ['payload'])[0]?.images).toEqual(['own', 'payload'])
+	})
+})
+
 describe('collectImageData — the image carrier split', () => {
-	it('collects each image file base64 data in file order', () => {
+	it('collects each image file base64 payload in file order', () => {
 		const files = [
-			createFile({ path: 'a.png', content: { data: 'first', mime: 'image/png' } }),
-			createFile({ path: 'b.jpg', content: { data: 'second', mime: 'image/jpeg' } }),
+			createFile({ path: 'a.png', content: { base64: 'first', mime: 'image/png' } }),
+			createFile({ path: 'b.jpg', content: { base64: 'second', mime: 'image/jpeg' } }),
 		]
 		expect(collectImageData(files)).toEqual(['first', 'second'])
 	})
 
-	it('skips a text file — only the binary image arm carries data', () => {
+	it('skips a text file — only the binary image arm carries a base64 payload', () => {
 		const files = [createFile({ path: 'note.md', content: createTextContent('hello', 'markdown') })]
 		expect(collectImageData(files)).toEqual([])
 	})

@@ -1,4 +1,4 @@
-import type { ConversationEventMap, MessageInterface } from '@src/core'
+import type { ConversationEventMap, Message } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -630,12 +630,14 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 		await source.compact()
 		const snapshot = source.snapshot()
 
-		// The declared option is the seam a factory reaches — no positional argument needed.
+		// The declared option is the ONE seam every caller reaches — there is no positional form.
 		const restored = createConversation({ snapshot, summarize: stub.summarize, keep: 1 })
 		expect(restored.id).toBe('stored') // the snapshot IS the identity
 		expect(restored.summary).toBe(source.summary)
 		expect(restored.sections).toEqual(source.sections)
 		expect(restored.messages()).toEqual(source.messages())
+		// A re-snapshot of the restored conversation equals the original (a faithful round-trip).
+		expect(restored.snapshot()).toEqual(snapshot)
 		// The live config rides alongside it: the restored conversation can still fold.
 		expect(restored.summarizable).toBe(true)
 	})
@@ -810,7 +812,7 @@ describe('Conversation — sections cap (F2)', () => {
 		// Calls per compact() round without overflow: 1 (fold) + 1 (rollup) = 2 — so rounds 1 and 2
 		// consume calls 1-2 and 3-4. Round 3 overflows the cap of 2: its fold is call 5, its
 		// overflow MERGE is call 6 (before the rollup) — make only that merge call throw.
-		const summarize = async (messages: readonly MessageInterface[]): Promise<string> => {
+		const summarize = async (messages: readonly Message[]): Promise<string> => {
 			calls += 1
 			if (calls === 6) throw boom
 			return `recap of ${messages.length}`
@@ -842,39 +844,7 @@ describe('Conversation — sections cap (F2)', () => {
 	})
 })
 
-describe('Conversation — hydrate seam (the constructor seed restores from a snapshot, C-c)', () => {
-	it('a Conversation built FROM a snapshot restores id + summary + sections + live tail', async () => {
-		const stub = createStubSummarizer()
-		const source = new Conversation({ id: 'orig', summarize: stub.summarize, keep: 1 })
-		source.add([
-			{ role: 'user', content: 'first' },
-			{ role: 'assistant', content: 'second' },
-			{ role: 'user', content: 'third' },
-		])
-		await source.compact()
-		const snapshot = source.snapshot()
-
-		// Hydrate a NEW conversation FROM the snapshot (the second constructor arg — the `seed`), with
-		// the live summarizer / keep re-supplied through options (a summarizer is config, not data).
-		const restored = new Conversation(
-			{ summarize: createStubSummarizer().summarize, keep: 1 },
-			snapshot,
-		)
-
-		expect(restored.id).toBe('orig') // the snapshot's id is the identity
-		expect(restored.summary).toBe(source.summary)
-		expect(restored.sections).toEqual(source.sections)
-		expect(restored.messages()).toEqual(source.messages())
-		// A re-snapshot of the restored conversation equals the original snapshot (a faithful round-trip).
-		expect(restored.snapshot()).toEqual(snapshot)
-	})
-
-	it('the snapshot id WINS over an options.id (the snapshot IS the identity)', () => {
-		const snapshot = { id: 'from-snapshot', sections: [], messages: [] }
-		const restored = new Conversation({ id: 'from-options' }, snapshot)
-		expect(restored.id).toBe('from-snapshot')
-	})
-
+describe('Conversation — hydrating through the snapshot option (C-c)', () => {
 	it("a restored conversation's view() / search() / count work over the restored state", async () => {
 		const stub = createStubSummarizer()
 		const source = new Conversation({ id: 'r', summarize: stub.summarize, keep: 1 })
@@ -885,10 +855,11 @@ describe('Conversation — hydrate seam (the constructor seed restores from a sn
 		])
 		await source.compact()
 
-		const restored = new Conversation(
-			{ summarize: createStubSummarizer().summarize, keep: 1 },
-			source.snapshot(),
-		)
+		const restored = new Conversation({
+			summarize: createStubSummarizer().summarize,
+			keep: 1,
+			snapshot: source.snapshot(),
+		})
 
 		expect(restored.count).toBe(1) // the live tail
 		// view(): the section recap + the live tail.
@@ -911,10 +882,10 @@ describe('Conversation — hydrate seam (the constructor seed restores from a sn
 		])
 		await source.compact()
 
-		const restored = new Conversation(
-			{ summarize: createStubSummarizer().summarize },
-			source.snapshot(),
-		)
+		const restored = new Conversation({
+			summarize: createStubSummarizer().summarize,
+			snapshot: source.snapshot(),
+		})
 		restored.add({ role: 'user', content: 'c' })
 		const section = await restored.compact()
 
@@ -934,10 +905,10 @@ describe('Conversation — hydrate seam (the constructor seed restores from a sn
 		])
 		await source.compact()
 
-		const restored = new Conversation(
-			{ summarize: createStubSummarizer().summarize },
-			source.snapshot(),
-		)
+		const restored = new Conversation({
+			summarize: createStubSummarizer().summarize,
+			snapshot: source.snapshot(),
+		})
 		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
 			restored.emitter,
 			['compact', 'summary', 'rehydrate'],

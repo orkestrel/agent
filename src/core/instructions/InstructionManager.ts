@@ -21,11 +21,11 @@ import { Instruction } from './Instruction.js'
  *   `id`, and a re-`add` of the same name OVERWRITES it (last write wins). `count` is the
  *   map size, `instruction(name)` looks one up, and `instructions()` lists them SORTED by
  *   descending `priority` (a stable sort, so equal priorities keep insertion order).
- * - **Build contract (with the manager-options override).** `description` is the section
- *   header a context renders the instructions under; `format(instruction)` renders one
+ * - **Build contract (with the manager-options override).** `open` is the section
+ *   header a context renders the instructions under; `render(instruction)` renders one
  *   instruction (its `content`). Each ENCAPSULATES the cascade's `[options-override →
  *   built-in]` half: when `InstructionManagerOptions.format` supplies an `open` /
- *   `render`, `description` / `format` return IT, else the built-in — so a richer context
+ *   `render`, `open` / `render` return IT, else the built-in — so a richer context
  *   reads one consistent pair and layers the provider default + per-item override on top
  *   (see {@link import('../AgentContext.js').AgentContext}). The per-item
  *   {@link InstructionInput.format} is round-tripped onto the stored instruction.
@@ -52,8 +52,8 @@ export class InstructionManager implements InstructionManagerInterface {
 	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<InstructionManagerEventMap>
-	// The MANAGER-OPTIONS level of the build cascade — consulted FIRST by `description` /
-	// `format` (falling back to the built-in), so this manager encapsulates the
+	// The MANAGER-OPTIONS level of the build cascade — consulted FIRST by `open` /
+	// `render` (falling back to the built-in), so this manager encapsulates the
 	// `[options-override → built-in]` half and a context layers the rest on top.
 	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
 
@@ -73,14 +73,14 @@ export class InstructionManager implements InstructionManagerInterface {
 		return this.#instructions.size
 	}
 
-	get description(): string {
+	get open(): string {
 		// Manager-options override first, else the built-in header.
 		return this.#format?.open ?? '## Instructions'
 	}
 
-	get framing(): ContextSectionFormat<InstructionInterface> | undefined {
+	get format(): ContextSectionFormat<InstructionInterface> | undefined {
 		// The raw override — so a context's `build()` can interleave the provider default
-		// beneath it (this getter / `description` / `format` encapsulate override→built-in).
+		// beneath it (this getter / `open` / `render` encapsulate override→built-in).
 		return this.#format
 	}
 
@@ -103,7 +103,7 @@ export class InstructionManager implements InstructionManagerInterface {
 		return [...this.#instructions.values()].sort((a, b) => b.priority - a.priority)
 	}
 
-	format(instruction: InstructionInterface): string {
+	render(instruction: InstructionInterface): string {
 		// Manager-options override first, else the built-in (its `content`).
 		return this.#format?.render?.(instruction) ?? instruction.content
 	}

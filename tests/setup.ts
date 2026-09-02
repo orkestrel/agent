@@ -1,10 +1,10 @@
 import type {
 	AgentJobInput,
-	ContextFormatInterface,
+	ContextFormat,
 	ConversationSnapshot,
 	ConversationStoreInterface,
-	ConversationSummarizer,
-	MessageInterface,
+	ConversationSummaryHandler,
+	Message,
 	ProviderDelta,
 	ProviderInterface,
 	ProviderResult,
@@ -53,7 +53,7 @@ export type ScriptedTurn =
  * the call to prove which bounds did, or did not, trip afterwards.
  */
 export interface ScriptedCall {
-	readonly messages: readonly MessageInterface[]
+	readonly messages: readonly Message[]
 	readonly tools: readonly ToolDefinition[] | undefined
 	readonly options: ProviderStreamOptions | undefined
 	readonly signal: AbortSignal
@@ -71,7 +71,7 @@ export type DeltasOf = (content: string) => readonly string[]
  *   `maxInFlight`); defaults to `0`.
  * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
  *   providers are distinguishable); defaults to `'scripted'`.
- * - `format` — a provider-default {@link ContextFormatInterface}, included on the provider
+ * - `format` — a provider-default {@link ContextFormat}, included on the provider
  *   ONLY when supplied (omitted ⇒ framing-agnostic, like the live OllamaProvider).
  * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
  *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
@@ -84,7 +84,7 @@ export type DeltasOf = (content: string) => readonly string[]
 export interface ScriptedProviderOptions {
 	readonly delay?: number
 	readonly name?: string
-	readonly format?: ContextFormatInterface
+	readonly format?: ContextFormat
 	readonly deltasOf?: DeltasOf
 	readonly exhaust?: 'repeat' | 'throw'
 	readonly record?: boolean
@@ -154,7 +154,7 @@ export function createScriptedProvider(
 		return turn
 	}
 	async function* stream(
-		messages: readonly MessageInterface[],
+		messages: readonly Message[],
 		signal: AbortSignal,
 		tools?: readonly ToolDefinition[],
 		run?: ProviderStreamOptions,
@@ -181,7 +181,7 @@ export function createScriptedProvider(
 					throw new ProviderAbortError(partial)
 				}
 				reasoned += thought
-				if (thought.length > 0) yield { type: 'thinking', text: thought }
+				if (thought.length > 0) yield { channel: 'thinking', text: thought }
 			}
 			for (const delta of chunks) {
 				if (signal.aborted) {
@@ -190,7 +190,7 @@ export function createScriptedProvider(
 					throw new ProviderAbortError(partial)
 				}
 				streamed += delta
-				if (delta.length > 0) yield { type: 'content', text: delta }
+				if (delta.length > 0) yield { channel: 'content', text: delta }
 			}
 			if (signal.aborted) {
 				const partial: ProviderResult =
@@ -295,7 +295,7 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
 }
 
 /**
- * Create a deterministic stub {@link ConversationSummarizer} for the conversation-layer tests
+ * Create a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
  * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
  * folded count), so a `compact()` produces a predictable section summary and the rollup is a
  * predictable summary-of-summaries (AGENTS §16.1: a data-stub, NOT a behavior-mock — the LIVE
@@ -305,10 +305,10 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
  * @returns The summarizer plus a live `calls` recorder of every digested message-slice
  */
 export function createStubSummarizer(): {
-	readonly summarize: ConversationSummarizer
-	readonly calls: ReadonlyArray<readonly MessageInterface[]>
+	readonly summarize: ConversationSummaryHandler
+	readonly calls: ReadonlyArray<readonly Message[]>
 } {
-	const calls: Array<readonly MessageInterface[]> = []
+	const calls: Array<readonly Message[]> = []
 	return {
 		get calls() {
 			return calls

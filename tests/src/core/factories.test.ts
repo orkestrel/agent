@@ -162,7 +162,7 @@ describe('createAgent', () => {
 // The durable, bounded-concurrency agent-job layer COMPOSED over the workers Queue /
 // Runner substrate (no new concurrency engine). A serializable AgentJobInput is
 // rehydrated through the registry into a live Agent; a partial result is a configurable
-// failure (throws by default so retries / fail-fast engage, `allowPartial` opts out);
+// failure (throws by default so retries / fail-fast engage, `partial` opts out);
 // cancellation threads through. All Ollama-free with the scripted provider — the LIVE
 // batch + sub-agent spawn run in the src:ollama project.
 
@@ -258,7 +258,7 @@ describe('createAgentQueue', () => {
 	it('a partial result THROWS by default (an AgentJobError carrying the partial)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
-		const queue = createAgentQueue({ registry }) // allowPartial defaults to false
+		const queue = createAgentQueue({ registry }) // partial defaults to false
 		await expect(queue.enqueue(partialJob('main'))).rejects.toThrow('agent job ended partial')
 		// The rejection is an AgentJobError; extract its partial (or undefined) UNCONDITIONALLY
 		// first, so every assertion is unconditional (no `expect` inside a narrowing branch).
@@ -279,10 +279,10 @@ describe('createAgentQueue', () => {
 		expect(provider.started).toBe(2)
 	})
 
-	it('`allowPartial: true` RESOLVES a partial as success (never throws)', async () => {
+	it('`partial: true` RESOLVES a partial as success (never throws)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
-		const queue = createAgentQueue({ registry, allowPartial: true })
+		const queue = createAgentQueue({ registry, partial: true })
 		const result = await queue.enqueue(partialJob('main'))
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('a')
@@ -300,7 +300,7 @@ describe('createAgentQueue', () => {
 			id: 'p',
 			name: 'p',
 			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				providerSawAbort = signal.aborted
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
@@ -432,7 +432,7 @@ describe('createAgentRunner', () => {
 			id: 'p',
 			name: 'p',
 			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				providerSawAbort = signal.aborted
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
@@ -516,10 +516,10 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		expect(provider.started).toBe(0)
 	})
 
-	it('`allowPartial: true` RESOLVES the budget:0 partial as success (empty content, no throw)', async () => {
+	it('`partial: true` RESOLVES the budget:0 partial as success (empty content, no throw)', async () => {
 		const provider = createScriptedProvider([{ content: 'unused' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
-		const queue = createAgentQueue({ registry, allowPartial: true })
+		const queue = createAgentQueue({ registry, partial: true })
 		const result = await queue.enqueue(budgetZeroJob('main'))
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('')
@@ -782,29 +782,29 @@ describe('createAgentQueue — durability, extended', () => {
 
 // -- createAgentRunner — partial policy parity + sub-agent fan-out, extended ----
 //
-// The runner shares the SAME `settle`, so `allowPartial` must behave identically to the
+// The runner shares the SAME `settle`, so `partial` must behave identically to the
 // queue; and the sub-agent fan-out is hardened for the contracts that matter: an empty
 // run, a TRANSITIVE spawn (a child that itself fans out a grandchild), and the
 // no-deadlock guarantee on a single-slot runner (which would hang if the handler
 // inline-awaited its spawn).
 
 describe('createAgentRunner — partial policy + fan-out, extended', () => {
-	it('`allowPartial: true` RESOLVES a partial (parity with createAgentQueue)', async () => {
+	it('`partial: true` RESOLVES a partial (parity with createAgentQueue)', async () => {
 		const provider = createScriptedProvider([{ content: 'unused' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
-		const runner = createAgentRunner({ registry, allowPartial: true })
+		const runner = createAgentRunner({ registry, partial: true })
 		const results = await runner.execute([budgetZeroJob('main')])
 		expect(results).toHaveLength(1)
 		expect(results[0]?.partial).toBe(true)
 		expect(results[0]?.content).toBe('')
 	})
 
-	it('a budget-via-tool partial RESOLVES under allowPartial — the run completes, not fail-fast', async () => {
-		// Contrast with the existing fail-fast test: with allowPartial the same partial job
+	it('a budget-via-tool partial RESOLVES under partial — the run completes, not fail-fast', async () => {
+		// Contrast with the existing fail-fast test: with partial the same partial job
 		// resolves, so a one-job run completes with a partial result instead of rejecting.
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
-		const runner = createAgentRunner({ registry, allowPartial: true })
+		const runner = createAgentRunner({ registry, partial: true })
 		const results = await runner.execute([partialJob('main')])
 		expect(results).toHaveLength(1)
 		expect(results[0]?.partial).toBe(true)

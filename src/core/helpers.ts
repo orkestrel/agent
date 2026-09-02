@@ -5,9 +5,9 @@ import type {
 	AgentResult,
 	ContextSectionFormat,
 	ContextSectionSourceInterface,
-	MessageInterface,
+	Message,
 	RunOutcome,
-	SectionInterface,
+	Section,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
@@ -183,7 +183,7 @@ export function estimateTokens(text: string): number {
  * estimateMessages([{ id: '1', role: 'user', content: 'hello' }]) // 6  (2 content + 4 overhead)
  * ```
  */
-export function estimateMessages(messages: readonly MessageInterface[]): number {
+export function estimateMessages(messages: readonly Message[]): number {
 	return messages.reduce((sum, message) => {
 		const content = estimateTokens(message.content) + MESSAGE_TOKEN_OVERHEAD
 		let calls = 0
@@ -205,21 +205,22 @@ export function estimateMessages(messages: readonly MessageInterface[]): number 
 }
 
 /**
- * Run one rehydrated agent and apply the partial-as-configurable-failure policy — the
+ * Runs one rehydrated agent and applies the partial-as-configurable-failure policy — the
  * shared job-handler step BOTH `createAgentQueue` and `createAgentRunner` settle each job
  * through, so the policy can never diverge between them.
  *
  * @remarks
  * A turn that committed PARTIAL (a cancel — abort / budget / timeout) is by default a
  * FAILURE, so it THROWS an {@link import('./errors.js').AgentJobError} carrying the partial
- * (the Queue's retries + a Runner's fail-fast then engage); with `allowPartial` it RESOLVES
- * the partial as success instead. A natural finish ALWAYS resolves with its result.
+ * (the Queue's retries + a Runner's fail-fast then engage); the `partial` policy RESOLVES
+ * it as success instead. A natural finish ALWAYS resolves with its result.
  *
  * @param agent - The rehydrated {@link AgentInterface} to run to its {@link AgentResult}
- * @param allowPartial - When `true`, a partial result resolves as success; when `false`
- *   (the default policy), a partial result throws an {@link AgentJobError}
- * @returns The agent's {@link AgentResult} (a natural finish, or a partial when `allowPartial`)
- * @throws {AgentJobError} When the run ended `partial` and `allowPartial` is `false`
+ * @param partial - The partial policy. If `true`, a partial result resolves as success; if
+ *   `false` (the default policy), a partial result throws an {@link AgentJobError}
+ * @returns The agent's {@link AgentResult} (a natural finish, or a partial one under the
+ *   `partial` policy)
+ * @throws {AgentJobError} Thrown when the run ended partial and the `partial` policy is `false`
  *
  * @example
  * ```ts
@@ -228,34 +229,34 @@ export function estimateMessages(messages: readonly MessageInterface[]): number 
  */
 export async function settleAgentJob(
 	agent: AgentInterface,
-	allowPartial: boolean,
+	partial: boolean,
 ): Promise<AgentResult> {
 	const result = await agent.generate()
-	if (result.partial && !allowPartial) throw new AgentJobError('agent job ended partial', result)
+	if (result.partial && !partial) throw new AgentJobError('agent job ended partial', result)
 	return result
 }
 
 /**
- * Handle one queued agent job by rehydrating it through a registry with the queue
+ * Handles one queued agent job by rehydrating it through a registry with the queue
  * attempt's signal, then applying the shared partial-result policy.
  *
  * @param registry - The registry that rehydrates the serializable job
- * @param allowPartial - Whether a partial result resolves instead of throwing
+ * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
  * @param input - The serializable agent job
  * @param execution - The queue attempt whose signal bounds the agent
  * @returns The settled agent result
  */
 export function handleAgentQueueJob(
 	registry: AgentRegistryInterface,
-	allowPartial: boolean,
+	partial: boolean,
 	input: AgentJobInput,
 	execution: QueueExecution,
 ): Promise<AgentResult> {
-	return settleAgentJob(registry.build(input, execution.signal), allowPartial)
+	return settleAgentJob(registry.build(input, execution.signal), partial)
 }
 
 /**
- * Handle one runner agent job by fanning out its declared children, rehydrating the
+ * Handles one runner agent job by fanning out its declared children, rehydrating the
  * parent through a registry with the controller signal, and applying the shared
  * partial-result policy.
  *
@@ -264,22 +265,22 @@ export function handleAgentQueueJob(
  * inline, preserving bounded-runner progress.
  *
  * @param registry - The registry that rehydrates serializable jobs
- * @param allowPartial - Whether a partial result resolves instead of throwing
+ * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
  * @param controller - The runner controller for this parent job
  * @returns The settled parent agent result
  */
 export function handleAgentRunnerJob(
 	registry: AgentRegistryInterface,
-	allowPartial: boolean,
+	partial: boolean,
 	controller: ControllerInterface<AgentJobInput, AgentResult>,
 ): Promise<AgentResult> {
 	const children = controller.input.children
 	if (children !== undefined) for (const child of children) void controller.spawn(child)
-	return settleAgentJob(registry.build(controller.input, controller.signal), allowPartial)
+	return settleAgentJob(registry.build(controller.input, controller.signal), partial)
 }
 
 /**
- * Render a path-addressed text body as a fenced reference block — the framing an
+ * Renders a path-addressed text body as a fenced reference block — the framing an
  * {@link import('./AgentContext.js').AgentContext}'s ACTIVE-workspace text-file render emits (the
  * active workspace is the SOLE document/image context).
  *
@@ -297,13 +298,13 @@ export function handleAgentRunnerJob(
  *
  * @example
  * ```ts
- * import { fencedFile } from '@orkestrel/agent'
+ * import { renderFencedFile } from '@orkestrel/agent'
  *
- * fencedFile('src/main.ts', 'typescript', 'const x = 1')
+ * renderFencedFile('src/main.ts', 'typescript', 'const x = 1')
  * // 'File: src/main.ts\n```typescript\nconst x = 1\n```'
  * ```
  */
-export function fencedFile(path: string, language: string, content: string): string {
+export function renderFencedFile(path: string, language: string, content: string): string {
 	return `File: ${path}\n\`\`\`${language}\n${content}\n\`\`\``
 }
 
@@ -494,12 +495,12 @@ export function renderSection<T>(
  * provider default > built-in header.
  *
  * @remarks
- * Pure and total. The leading text has NO per-item level. A manager's `description` already
+ * Pure and total. The leading text has NO per-item level. A manager's `open` already
  * encapsulates `[options-override → built-in]`, so it is reached only when neither the
  * override's `open` nor the provider's `open` applies — and there it IS the built-in header.
  *
  * @typeParam T - The section item the manager renders
- * @param manager - The section source (its `framing` override + its built-in `description`)
+ * @param manager - The section source (its `format` override + its built-in `open`)
  * @param provider - The provider-default framing for this section, or `undefined`
  * @returns The section's leading text
  *
@@ -513,7 +514,7 @@ export function resolveOpen<T>(
 	manager: ContextSectionSourceInterface<T>,
 	provider: ContextSectionFormat<T> | undefined,
 ): string {
-	return manager.framing?.open ?? provider?.open ?? manager.description
+	return manager.format?.open ?? provider?.open ?? manager.open
 }
 
 /**
@@ -526,7 +527,7 @@ export function resolveOpen<T>(
  * {@link resolveOpen}, one level can WRAP the whole group.
  *
  * @typeParam T - The section item the manager renders
- * @param manager - The section source (its `framing` override)
+ * @param manager - The section source (its `format` override)
  * @param provider - The provider-default framing for this section, or `undefined`
  * @returns The section's trailing text, or `undefined` when no level sets one
  *
@@ -540,7 +541,7 @@ export function resolveClose<T>(
 	manager: ContextSectionSourceInterface<T>,
 	provider: ContextSectionFormat<T> | undefined,
 ): string | undefined {
-	return manager.framing?.close ?? provider?.close
+	return manager.format?.close ?? provider?.close
 }
 
 /**
@@ -549,12 +550,12 @@ export function resolveClose<T>(
  *
  * @remarks
  * Pure and total. The item's own `format` is the most-specific level (a fully-rendered
- * string for that item alone). A manager's `format(item)` already encapsulates
+ * string for that item alone). A manager's `render(item)` already encapsulates
  * `[options-override → built-in]`, so it is reached only when no higher level applies — and
  * there it IS the built-in rendering.
  *
  * @typeParam T - The section item being rendered (it may carry its own `format` override)
- * @param manager - The section source (its `framing` override + its built-in `format`)
+ * @param manager - The section source (its `format` override + its built-in `render`)
  * @param provider - The provider-default framing for this section, or `undefined`
  * @param item - The item to render
  * @returns The item's prompt text
@@ -573,9 +574,9 @@ export function resolveItem<T extends { readonly format?: string }>(
 ): string {
 	return (
 		item.format ??
-		manager.framing?.render?.(item) ??
+		manager.format?.render?.(item) ??
 		provider?.render?.(item) ??
-		manager.format(item)
+		manager.render(item)
 	)
 }
 
@@ -598,7 +599,7 @@ export function resolveItem<T extends { readonly format?: string }>(
  * // { id: '1', role: 'user', content: 'Describe', images: ['<base64>'] }
  * ```
  */
-export function attachImages(message: MessageInterface, data: readonly string[]): MessageInterface {
+export function attachImages(message: Message, data: readonly string[]): Message {
 	const images = [...(message.images ?? []), ...data]
 	return message.calls === undefined
 		? { id: message.id, role: message.role, content: message.content, images }
@@ -612,7 +613,45 @@ export function attachImages(message: MessageInterface, data: readonly string[])
 }
 
 /**
- * Collects the base64 `data` of the IMAGE files in a workspace file list — the payload an
+ * Attaches image data to a conversation's LAST user message — the turn a vision provider
+ * reads images off.
+ *
+ * @remarks
+ * Pure and total: the conversation and its messages are NEVER mutated, and the returned array
+ * replaces exactly the one target message with the copy {@link attachImages} builds. Empty
+ * data returns the conversation unchanged; a conversation with NO user message returns it
+ * unchanged too (there is nowhere to attach, and the images already rode the system block).
+ *
+ * @param conversation - The messages to attach into (left unchanged)
+ * @param data - The base64 image data to attach
+ * @returns The conversation with its last user message replaced by the carrying copy
+ *
+ * @example
+ * ```ts
+ * attachUserImages([{ id: '1', role: 'user', content: 'Describe' }], ['<payload>'])
+ * // [{ id: '1', role: 'user', content: 'Describe', images: ['<payload>'] }]
+ * ```
+ */
+export function attachUserImages(
+	conversation: readonly Message[],
+	data: readonly string[],
+): readonly Message[] {
+	if (data.length === 0) return conversation
+	let target = -1
+	for (let index = conversation.length - 1; index >= 0; index -= 1) {
+		if (conversation[index]?.role === 'user') {
+			target = index
+			break
+		}
+	}
+	if (target === -1) return conversation
+	return conversation.map((message, index) =>
+		index === target ? attachImages(message, data) : message,
+	)
+}
+
+/**
+ * Collects the `base64` payload of the IMAGE files in a workspace file list — the data an
  * agent context attaches to the last user message.
  *
  * @remarks
@@ -621,11 +660,11 @@ export function attachImages(message: MessageInterface, data: readonly string[])
  * binary (a PDF) are both skipped. Order follows the file list.
  *
  * @param files - The (already scope-filtered) workspace files
- * @returns The base64 data of the image files, in file order
+ * @returns The `base64` payload of each image file, in file order
  *
  * @example
  * ```ts
- * collectImageData([createFile({ path: 'a.png', content: { data: '<base64>', mime: 'image/png' } })])
+ * collectImageData([createFile({ path: 'a.png', content: { base64: '<payload>', mime: 'image/png' } })])
  * // ['<base64>']
  * ```
  */
@@ -633,7 +672,7 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
 	const data: string[] = []
 	for (const file of files) {
 		if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
-			data.push(file.content.data)
+			data.push(file.content.base64)
 		}
 	}
 	return data
@@ -658,7 +697,7 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
  * // { id: 's1', role: 'assistant', content: 'recap' }
  * ```
  */
-export function buildSummaryMessage(section: SectionInterface): MessageInterface {
+export function buildSummaryMessage(section: Section): Message {
 	return { id: section.id, role: 'assistant', content: section.summary }
 }
 
@@ -682,7 +721,7 @@ export function buildSummaryMessage(section: SectionInterface): MessageInterface
  * // { id: 's1', role: 'assistant', content: `${CONVERSATION_RECAP_PREFIX}recap` }
  * ```
  */
-export function buildRecapMessage(section: SectionInterface): MessageInterface {
+export function buildRecapMessage(section: Section): Message {
 	return {
 		id: section.id,
 		role: 'assistant',

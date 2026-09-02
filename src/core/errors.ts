@@ -57,7 +57,7 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
 /**
  * Thrown by an agent-job handler (a `createAgentQueue` / `createAgentRunner` job) when
  * its {@link AgentInterface} run ended {@link AgentResult.partial} and the job's
- * `allowPartial` policy is `false` (the default) — carries the partial
+ * `partial` policy is `false` (the default) — carries the partial
  * {@link AgentResult} so the failure stays inspectable.
  *
  * @remarks
@@ -65,7 +65,7 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
  * runner abort threaded in, a `timeout` deadline, or an exhausted token `budget`) rather
  * than finishing naturally. For a durable JOB that is a failure by default: throwing this
  * lets the Queue's retries re-run the job and a Runner's fail-fast abort its siblings.
- * Set `allowPartial: true` (see `AgentQueueOptions` / `AgentRunnerOptions`) to treat a
+ * Set `partial: true` (see `AgentQueueOptions` / `AgentRunnerOptions`) to treat a
  * partial as success instead, in which case this is never thrown. Narrow a caught value
  * with {@link isAgentJobError} to read `partial`. `code` is the machine-readable condition
  * (`'PARTIAL'` — the only one this error reports), so a `catch` branches on it rather than on
@@ -104,14 +104,14 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 }
 
 // AGENTS §12: a real error type, not a sentinel. A `ConversationInterface.compact()` is a
-// PROGRAMMER error when no `ConversationSummarizer` was supplied — there is nothing to fold
+// PROGRAMMER error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
 // the messages with — so it THROWS this, carrying a machine-readable `code` ('SUMMARIZER')
 // so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
 // caught value with `instanceof`, mirroring the other errors in this file.
 
 /**
  * Thrown by a {@link ConversationInterface}'s `compact()` when the conversation has no
- * {@link ConversationSummarizer} to fold its messages with, or when its `sections` cap is
+ * {@link ConversationSummaryHandler} to fold its messages with, or when its `sections` cap is
  * structurally invalid — carries a machine-readable `code`.
  *
  * @remarks

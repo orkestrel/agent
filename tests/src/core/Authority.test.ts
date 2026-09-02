@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AuthorityContextInterface } from '@src/core'
+import type { AuthorityContext } from '@src/core'
 import type { ToolCall } from '@orkestrel/tool'
 import { createAuthority } from '@src/core'
 
@@ -11,10 +11,7 @@ import { createAuthority } from '@src/core'
 // gate wired into the loop is covered in Agent.test.ts.
 
 // Build the `{ call }` context the gate evaluates, from a tool name + optional arguments.
-function context(
-	name: string,
-	args: Readonly<Record<string, unknown>> = {},
-): AuthorityContextInterface {
+function context(name: string, args: Readonly<Record<string, unknown>> = {}): AuthorityContext {
 	const call: ToolCall = { id: 'c1', name, arguments: args }
 	return { call }
 }

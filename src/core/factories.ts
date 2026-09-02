@@ -56,12 +56,12 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * Create a conversation — a {@link ConversationInterface} grouping messages above a flat
  * message store it OWNS DIRECTLY, with compaction into summarized sections, a regenerated
  * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
- * provider-agnostic {@link ConversationSummarizer} seam.
+ * provider-agnostic {@link ConversationSummaryHandler} seam.
  *
  * @remarks
  * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
  * (each section as a summary message, then the live tail). `compact()` folds the older live
- * messages into a summarized {@link SectionInterface} and regenerates the rollup — it REQUIRES
+ * messages into a summarized {@link Section} and regenerates the rollup — it REQUIRES
  * a `summarize` (omitted ⇒ `compact()` throws a `ConversationError`); `keep` retains a recent
  * tail (default `DEFAULT_CONVERSATION_KEEP` — fold ALL). `rehydrate(id)` / `search(query)` read
  * the retained originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
@@ -239,14 +239,14 @@ export function createInstruction(input: InstructionInput): InstructionInterface
  * @remarks
  * Starts empty; `add` (one or a batch, §9.2) MINTS each `id` and OVERWRITES a same-name
  * instruction (last write wins); `instructions()` lists them sorted by descending
- * `priority` (stable for ties); `format` / `description` are the build contract a richer
+ * `priority` (stable for ties); `open` / `render` are the build contract a richer
  * context renders an instructions block with; `remove` (one or a batch) reports whether
  * any was removed; `clear` empties it. Carries an observable `emitter`
  * ({@link import('./types.js').InstructionManagerEventMap}) wired via the reserved `on`
  * option (§8); the emitter isolates a listener throw and routes it to its `error` handler
  * (the `error` option, §13), so it can never corrupt a mutation. An optional `format`
  * override is the manager-options level of the `AgentContext` build cascade (consulted by
- * `description` / `format`, beating the provider default + built-in; a per-item
+ * `open` / `render`, beating the provider default + built-in; a per-item
  * `InstructionInput.format` still beats it).
  *
  * @param options - Optional `on` hooks + a `format` override (see {@link InstructionManagerOptions})
@@ -331,7 +331,7 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  * via `context.apply(...)`). The `messages` store is always fresh. `build()` folds the scoped
  * instructions — PLUS the ACTIVE workspace's scope-filtered text files (fenced) — into ONE leading
  * `system` message and appends the scoped conversation (attaching the active workspace's
- * scope-filtered image files' `data` to the last user message), built fresh each call; the active
+ * scope-filtered image files' `base64` payload to the last user message), built fresh each call; the active
  * workspace is the SOLE document/image context. Tools are advertised STRUCTURALLY (via
  * `tools.definitions()`, scope-filtered by the loop), never serialized into the prompt.
  *
@@ -546,13 +546,13 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  *   live pieces from the names — so a job survives a crash.
  * - **Partial policy.** A partial result THROWS an
  *   {@link import('./errors.js').AgentJobError} by default, so a job cancelled by its
- *   attempt deadline / a queue abort RETRIES while attempts remain; `allowPartial: true`
+ *   attempt deadline / a queue abort RETRIES while attempts remain; `partial: true`
  *   resolves the partial as success instead.
  * - **Cancellation threads through.** The handler passes `execution.signal` into
  *   `registry.build`, so a queue `abort()` or a per-attempt timeout cancels the in-flight
  *   agent (which commits a partial → throws → retries / fails per policy).
  *
- * @param options - The `registry`, the `allowPartial` policy, and the substrate knobs
+ * @param options - The `registry`, the `partial` policy, and the substrate knobs
  *   (`concurrency` / `retries` / `timeout` / `store`) (see {@link AgentQueueOptions})
  * @returns A {@link QueueInterface} of {@link AgentJobInput} → {@link AgentResult}
  *
@@ -570,13 +570,13 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 export function createAgentQueue(
 	options: AgentQueueOptions,
 ): QueueInterface<AgentJobInput, AgentResult> {
-	const { registry, allowPartial = false, concurrency, retries, timeout, store } = options
+	const { registry, partial = false, concurrency, retries, timeout, store } = options
 	return createQueue<AgentJobInput, AgentResult>({
 		...(concurrency === undefined ? {} : { concurrency }),
 		...(retries === undefined ? {} : { retries }),
 		...(timeout === undefined ? {} : { timeout }),
 		...(store === undefined ? {} : { store }),
-		handler: handleAgentQueueJob.bind(undefined, registry, allowPartial),
+		handler: handleAgentQueueJob.bind(undefined, registry, partial),
 	})
 }
 
@@ -596,11 +596,11 @@ export function createAgentQueue(
  *   runner, FAN OUT and return — do NOT inline-`await` a spawn from within the handler (a
  *   slot-holding handler awaiting its own spawn can deadlock; see `ControllerInterface`).
  * - **Partial policy + cancellation.** Same as `createAgentQueue`: a partial result
- *   THROWS by default (the run's fail-fast engages), `allowPartial: true` resolves it; the
+ *   THROWS by default (the run's fail-fast engages), `partial: true` resolves it; the
  *   handler threads `controller.signal` into `registry.build`, so a runner abort / a
  *   per-attempt timeout cancels the agent.
  *
- * @param options - The `registry`, the `allowPartial` policy, and the substrate knobs
+ * @param options - The `registry`, the `partial` policy, and the substrate knobs
  *   (`concurrency` / `retries` / `timeout`) (see {@link AgentRunnerOptions})
  * @returns A {@link RunnerInterface} of {@link AgentJobInput} → {@link AgentResult}
  *
@@ -619,11 +619,11 @@ export function createAgentQueue(
 export function createAgentRunner(
 	options: AgentRunnerOptions,
 ): RunnerInterface<AgentJobInput, AgentResult> {
-	const { registry, allowPartial = false, concurrency, retries, timeout } = options
+	const { registry, partial = false, concurrency, retries, timeout } = options
 	return createRunner<AgentJobInput, AgentResult>({
 		...(concurrency === undefined ? {} : { concurrency }),
 		...(retries === undefined ? {} : { retries }),
 		...(timeout === undefined ? {} : { timeout }),
-		handler: handleAgentRunnerJob.bind(undefined, registry, allowPartial),
+		handler: handleAgentRunnerJob.bind(undefined, registry, partial),
 	})
 }

@@ -1,5 +1,5 @@
 import type {
-	AuthorityContextInterface,
+	AuthorityContext,
 	AuthorityDecision,
 	AuthorityInterface,
 	AuthorityOptions,
@@ -9,7 +9,7 @@ import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
 
 /**
  * The synchronous policy gate the agent loop consults before each tool call runs —
- * it turns one {@link AuthorityContextInterface} into an {@link AuthorityDecision}.
+ * it turns one {@link AuthorityContext} into an {@link AuthorityDecision}.
  *
  * @remarks
  * - **Ordered, first-match-wins.** `evaluate` walks the configured rules in order and
@@ -49,7 +49,7 @@ export class Authority implements AuthorityInterface {
 		this.#fallback = options?.fallback ?? { zone: DEFAULT_AUTHORITY_ZONE, allowed: true }
 	}
 
-	evaluate(context: AuthorityContextInterface): AuthorityDecision {
+	evaluate(context: AuthorityContext): AuthorityDecision {
 		for (const rule of this.#rules) {
 			if (rule.match(context))
 				return {

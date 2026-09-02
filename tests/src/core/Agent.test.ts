@@ -5,9 +5,9 @@ import type {
 	AgentEventMap,
 	AgentResult,
 	AgentStreamInterface,
-	ContextFormatInterface,
+	ContextFormat,
 	ConversationEventMap,
-	MessageInterface,
+	Message,
 	ProviderDelta,
 	ProviderInterface,
 	ProviderResult,
@@ -166,9 +166,9 @@ describe('Agent — single turn', () => {
 			id: 'thinking',
 			name: 'thinking',
 			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { type: 'thinking', text: 'plan ' }
-				yield { type: 'content', text: 'answer' }
-				yield { type: 'thinking', text: 'check' }
+				yield { channel: 'thinking', text: 'plan ' }
+				yield { channel: 'content', text: 'answer' }
+				yield { channel: 'thinking', text: 'check' }
 				return { content: 'answer', thinking: 'plan check' }
 			},
 			async generate() {
@@ -181,9 +181,9 @@ describe('Agent — single turn', () => {
 		const events = await collect(stream.events)
 		const result = await stream.result
 		expect(events).toEqual([
-			{ type: 'think', content: 'plan ' },
-			{ type: 'token', content: 'answer' },
-			{ type: 'think', content: 'check' },
+			{ category: 'think', content: 'plan ' },
+			{ category: 'token', content: 'answer' },
+			{ category: 'think', content: 'check' },
 		])
 		expect(result.content).toBe('answer')
 		expect(result.thinking).toBe('plan check')
@@ -218,7 +218,7 @@ describe('Agent — passes the provider format into build()', () => {
 		// The loop's ONE build()-level change: it passes `provider.format` into
 		// context.build(). A provider declaring a framing default ⇒ the built system block
 		// reflects it (the provider beats the managers' built-in framing).
-		const format: ContextFormatInterface = {
+		const format: ContextFormat = {
 			instructions: {
 				open: '<INSTRUCTIONS>',
 				render: (one) => `<i>${one.content}</i>`,
@@ -474,9 +474,9 @@ describe('Agent — authority gate', () => {
 		expect(result.content).toBe('sum is 5')
 		expect(recorder.count).toBe(1)
 		// The tool chunk carries the executed (real) result, not a denial.
-		const toolChunk = chunks.find((c) => c.type === 'tool')
+		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
-			type: 'tool',
+			category: 'tool',
 			call: { id: 'c1', name: 'add', arguments: { a: 2, b: 3 } },
 			result: { success: true, id: 'c1', name: 'add', value: 5 },
 		})
@@ -519,9 +519,9 @@ describe('Agent — authority gate', () => {
 		// The tool's handler NEVER ran (no execute, no budget cost).
 		expect(recorder.count).toBe(0)
 		// A `tool` chunk still appeared, carrying the denial error result.
-		const toolChunk = chunks.find((c) => c.type === 'tool')
+		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
-			type: 'tool',
+			category: 'tool',
 			call: { id: 'c1', name: 'add', arguments: { a: 2, b: 3 } },
 			result: { success: false, id: 'c1', name: 'add', error: 'denied: blocked' },
 		})
@@ -551,9 +551,9 @@ describe('Agent — authority gate', () => {
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
 		await stream.result
-		const toolChunk = chunks.find((c) => c.type === 'tool')
+		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
-			type: 'tool',
+			category: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
 			result: { success: false, id: 'c1', name: 'add', error: 'denied by authority' },
 		})
@@ -616,7 +616,7 @@ describe('Agent — authority gate', () => {
 		expect(addRecorder.count).toBe(2)
 		// The tool chunks are in ORIGINAL call order, with the denied one carrying the error.
 		const toolResults = chunks.flatMap((c) =>
-			c.type === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
+			c.category === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
 		)
 		expect(toolResults).toEqual([
 			{ id: 'a1', result: { success: true, id: 'a1', name: 'add', value: 5 } },
@@ -673,11 +673,12 @@ describe('Agent — authority gate', () => {
 		// requested the denied tool) — the loop exhausted its limit, so the outcome is partial.
 		expect(result.partial).toBe(true)
 		// Each turn produced exactly one tool chunk carrying a denial.
-		const toolChunks = chunks.filter((c) => c.type === 'tool')
+		const toolChunks = chunks.filter((c) => c.category === 'tool')
 		expect(toolChunks).toHaveLength(3)
 		expect(
 			toolChunks.every(
-				(c) => c.type === 'tool' && !c.result.success && c.result.error === 'denied: all blocked',
+				(c) =>
+					c.category === 'tool' && !c.result.success && c.result.error === 'denied: all blocked',
 			),
 		).toBe(true)
 	})
@@ -849,16 +850,16 @@ describe('Agent — chunk sequence', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
-		const types = chunks.map((c) => c.type)
+		const types = chunks.map((c) => c.category)
 		expect(types).toEqual(['token', 'token', 'usage', 'tool', 'token', 'token', 'usage'])
 		// The tool chunk carries the dispatched call + its executed result.
-		const toolChunk = chunks.find((c) => c.type === 'tool')
+		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
-			type: 'tool',
+			category: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
 			result: { success: true, id: 'c1', name: 'add', value: 5 },
 		})
-		const tokens = chunks.filter((c) => c.type === 'token').map((c) => c.content)
+		const tokens = chunks.filter((c) => c.category === 'token').map((c) => c.content)
 		expect(tokens).toEqual(['call', 'ing', 'fin', 'al'])
 		const result = await stream.result
 		expect(result.content).toBe('final')
@@ -909,7 +910,7 @@ describe('Agent — abort', () => {
 			id: 's',
 			name: 's',
 			async *stream(_messages, signal) {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
 				return { content: 'partfull' }
@@ -938,7 +939,7 @@ describe('Agent — abort', () => {
 		// → error), distinct from the abort path that commits a partial. The reachable
 		// `yield` keeps it a real generator; the throw after it is reachable too.
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'partial' }
+			yield { channel: 'content', text: 'partial' }
 			throw new Error('boom')
 		}
 		const provider: ProviderInterface = {
@@ -1144,7 +1145,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		// A provider that throws (signal NOT aborted) — a genuine failure must reject `result`
 		// even when `events` is never pulled, and leave status 'error'.
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'partial' }
+			yield { channel: 'content', text: 'partial' }
 			throw new Error('boom')
 		}
 		const provider: ProviderInterface = {
@@ -1173,7 +1174,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		// while every separate `await result` consumer still rejects (`.catch` returns a derived
 		// promise, it does not consume the original's rejection).
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'partial' }
+			yield { channel: 'content', text: 'partial' }
 			throw new Error('boom')
 		}
 		const provider: ProviderInterface = {
@@ -1229,9 +1230,9 @@ describe('Agent — channel internals (via stream.events)', () => {
 			id: 'w',
 			name: 'w',
 			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { type: 'content', text: 'a' }
+				yield { channel: 'content', text: 'a' }
 				await waitForDelay() // consumer drains 'a', then parks on the empty buffer
-				yield { type: 'content', text: 'b' }
+				yield { channel: 'content', text: 'b' }
 				return { content: 'ab' }
 			},
 			async generate() {
@@ -1242,7 +1243,7 @@ describe('Agent — channel internals (via stream.events)', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
-		const tokens = chunks.flatMap((c) => (c.type === 'token' ? [c.content] : []))
+		const tokens = chunks.flatMap((c) => (c.category === 'token' ? [c.content] : []))
 		expect(tokens).toEqual(['a', 'b'])
 		const result = await stream.result
 		expect(result.content).toBe('ab')
@@ -1260,9 +1261,9 @@ describe('Agent — channel internals (via stream.events)', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
-		const types = chunks.map((c) => c.type)
+		const types = chunks.map((c) => c.category)
 		expect(types).toEqual(['token', 'token', 'token', 'token', 'token', 'token', 'usage'])
-		const tokens = chunks.flatMap((c) => (c.type === 'token' ? [c.content] : []))
+		const tokens = chunks.flatMap((c) => (c.category === 'token' ? [c.content] : []))
 		expect(tokens).toEqual(['a', 'b', 'c', 'd', 'e', 'f'])
 	})
 
@@ -1280,7 +1281,7 @@ describe('Agent — channel internals (via stream.events)', () => {
 		const stream = agent.stream()
 		const seen: string[] = []
 		for await (const chunk of stream.events) {
-			if (chunk.type === 'token') seen.push(chunk.content)
+			if (chunk.category === 'token') seen.push(chunk.content)
 			await waitForDelay() // pull slower than the producer pushed
 		}
 		expect(seen).toEqual(deltas)
@@ -1294,7 +1295,7 @@ describe('Agent — channel internals (via stream.events)', () => {
 		// a silent close. (The `result` rejection is covered elsewhere; here it is the
 		// iterator throw that is under test.)
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'partial' }
+			yield { channel: 'content', text: 'partial' }
 			throw new Error('channel-fail')
 		}
 		const provider: ProviderInterface = {
@@ -1335,7 +1336,7 @@ function reusableProvider(): ProviderInterface {
 			// Echo the last user message's content into the answer, so two runs with
 			// different conversations produce distinguishable results.
 			const last = messages.at(-1)
-			yield { type: 'content', text: 'ok:' }
+			yield { channel: 'content', text: 'ok:' }
 			return { content: `ok:${last?.content ?? ''}`, usage: USAGE }
 		},
 		async generate(messages) {
@@ -1399,7 +1400,7 @@ describe('Agent — re-entrancy / reuse', () => {
 			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
 				started += 1
 				const gate = started === 1 ? g1 : g2
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
 				return { content: 'full' }
@@ -1440,7 +1441,7 @@ describe('Agent — re-entrancy / reuse', () => {
 				started += 1
 				const me = started
 				const gate = me === 1 ? g1 : g2
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
 				return { content: `full-${me}` }
@@ -1681,7 +1682,7 @@ describe('Agent — limit boundary', () => {
 		// tool chunk was emitted — but no second turn followed.
 		expect(provider.calls).toHaveLength(1)
 		expect(recorder.count).toBe(1)
-		expect(chunks.some((c) => c.type === 'tool')).toBe(true)
+		expect(chunks.some((c) => c.category === 'tool')).toBe(true)
 		// F1: the single allowed turn requested a tool (unresolved intent) and the limit was
 		// then exhausted — the cap-bounded finish reports `partial: true` with whatever the
 		// single turn streamed as its content.
@@ -1734,7 +1735,7 @@ describe('Agent — provider failure modes', () => {
 		const failBeforeYield = true
 		async function* throwsImmediately(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			if (failBeforeYield) throw new Error('pre-yield')
-			yield { type: 'content', text: '' }
+			yield { channel: 'content', text: '' }
 			return { content: '' }
 		}
 		const provider: ProviderInterface = {
@@ -1794,7 +1795,7 @@ describe('Agent — provider failure modes', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
-		const tokens = chunks.flatMap((c) => (c.type === 'token' ? [c.content] : []))
+		const tokens = chunks.flatMap((c) => (c.category === 'token' ? [c.content] : []))
 		// The empty delta dropped out — only 'a' and 'b' surfaced.
 		expect(tokens).toEqual(['a', 'b'])
 		const result = await stream.result
@@ -1816,7 +1817,7 @@ describe('Agent — provider failure modes', () => {
 			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 				calls += 1
 				if (calls === 1) {
-					yield { type: 'content', text: '' }
+					yield { channel: 'content', text: '' }
 					return { content: '', tools: [createToolCall()] }
 				}
 				throw new Error('turn 2 boom')
@@ -1933,9 +1934,9 @@ describe('Agent — authority deeper', () => {
 		// The tool NEVER ran (fail-closed on execution).
 		expect(recorder.count).toBe(0)
 		// A tool chunk carries the fail-closed denial, with the thrown message as the reason.
-		const toolChunk = chunks.find((c) => c.type === 'tool')
+		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
-			type: 'tool',
+			category: 'tool',
 			call: { id: 'c1', name: 'add', arguments: {} },
 			result: {
 				success: false,
@@ -2049,7 +2050,7 @@ describe('Agent — authority deeper', () => {
 		expect(denyRec.count).toBe(0)
 		// Every danger tool chunk is a denial; every safe one a value.
 		const byName = chunks.flatMap((c) =>
-			c.type === 'tool' ? [{ name: c.call.name, result: c.result }] : [],
+			c.category === 'tool' ? [{ name: c.call.name, result: c.result }] : [],
 		)
 		expect(
 			byName
@@ -2111,7 +2112,7 @@ describe('Agent — authority deeper', () => {
 		expect(recorder.count).toBe(1)
 		expect(recorder.calls[0]?.[0]).toEqual({ amount: 50 })
 		const results = chunks.flatMap((c) =>
-			c.type === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
+			c.category === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
 		)
 		expect(results).toEqual([
 			{
@@ -2136,7 +2137,7 @@ describe('Agent — authority deeper', () => {
 describe('Agent — status transitions and getters', () => {
 	it('transitions idle → running → error on a genuine provider failure', async () => {
 		async function* failing(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'x' }
+			yield { channel: 'content', text: 'x' }
 			throw new Error('boom')
 		}
 		const provider: ProviderInterface = {
@@ -2256,7 +2257,7 @@ const AGENT_EVENTS = [
 	'finish',
 	'error',
 	'abort',
-	'compactError',
+	'fault',
 ] as const
 type AgentEventName = (typeof AGENT_EVENTS)[number]
 
@@ -2411,7 +2412,7 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('fires error (not finish) on a genuine provider failure', async () => {
 		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'partial' }
+			yield { channel: 'content', text: 'partial' }
 			throw new Error('boom')
 		}
 		const provider: ProviderInterface = {
@@ -2443,7 +2444,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			id: 's',
 			name: 's',
 			async *stream(_messages, signal) {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
 				return { content: 'partfull' }
@@ -2686,9 +2687,7 @@ const COMPACT_SCRIPT: readonly ScriptedTurn[] = [
 // conversation so a test can drive generate() and inspect sections / events. NB no `system` ⇒
 // build() prepends NO leading system message, so the working `messages` the budget measures is
 // exactly the conversation view + the turn's appends.
-function compactionAgent(
-	window: ReturnType<typeof createBudget<readonly MessageInterface[]>> | undefined,
-): {
+function compactionAgent(window: ReturnType<typeof createBudget<readonly Message[]>> | undefined): {
 	readonly agent: ReturnType<typeof createAgent>
 	readonly conversation: ReturnType<typeof createConversation>
 	readonly provider: ReturnType<typeof createScriptedProvider>
@@ -2714,9 +2713,9 @@ function compactionAgent(
 }
 
 // A fresh context budget over the real `estimateMessages` estimator (no behavior-mock) — the
-// pluggable `consume` an agent's `window` carries.
-const contextBudget = (max: number): ReturnType<typeof createBudget<readonly MessageInterface[]>> =>
-	createBudget({ max, consume: estimateMessages })
+// pluggable `consumer` an agent's `window` carries.
+const contextBudget = (max: number): ReturnType<typeof createBudget<readonly Message[]>> =>
+	createBudget({ max, consumer: estimateMessages })
 
 describe('Agent — automatic compaction (context window budget)', () => {
 	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
@@ -2783,7 +2782,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// tool-call-bearing assistant turn (both COMPACT_SCRIPT assistant turns carry one tool call
 		// each), so the assistant messages below reproduce that shape exactly rather than the
 		// content-only reconstruction the old estimator tolerated.
-		const turn2Prompt: readonly MessageInterface[] = [
+		const turn2Prompt: readonly Message[] = [
 			{ id: 'u', role: 'user', content: 'go' },
 			{ id: 'a1', role: 'assistant', content: 'x'.repeat(40), calls: [createToolCall()] },
 			{ id: 't1', role: 'tool', content: JSON.stringify(5) },
@@ -2848,7 +2847,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 // Beyond the between-turns trigger above, the production path adds: a PRE-FIRST-TURN check (a
 // resumed / long conversation whose INITIAL prompt already exceeds the window compacts BEFORE the
 // first provider call, not only after a tool turn); a NON-FATAL summarizer failure (a thrown auto
-// `compact()` does NOT crash the run — it is caught, surfaced as a `compactError` event, and the run
+// `compact()` does NOT crash the run — it is caught, surfaced as a `fault` event, and the run
 // continues); and the FUTILE-COMPACTION guard (a `compact()` that folds nothing while still over the
 // window latches a per-run flag that STOPS auto-compacting for the rest of the run — no per-turn
 // churn — letting the over-window prompt proceed to the provider). All deterministic (scripted
@@ -2923,11 +2922,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(result.content).toBe('final answer')
 	})
 
-	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run — it fires compactError and continues', async () => {
+	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run — it fires fault and continues', async () => {
 		// A summarizer that ALWAYS throws, a conversation with keep 0 (so there IS a tail to fold), and
 		// a low window crossed by the post-tool-turn prompt. The between-turns `#trim` calls
 		// `compact()`, which rejects — the loop CATCHES it (the run does not reject), surfaces a
-		// `compactError` event, skips compaction that turn, and continues to the final answer. No
+		// `fault` event, skips compaction that turn, and continues to the final answer. No
 		// section is ever created (every fold attempt threw). A MANUAL compact() still throws (asserted
 		// separately) — only the agent's AUTO path is resilient.
 		const boom = new Error('summarizer exploded')
@@ -2947,10 +2946,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			window: contextBudget(12),
 			limit: 5,
 		})
-		const events = createRecorders<AgentEventMap, 'compactError' | 'error' | 'finish'>(
-			agent.emitter,
-			['compactError', 'error', 'finish'],
-		)
+		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
+			'fault',
+			'error',
+			'finish',
+		])
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const result = await agent.generate()
@@ -2961,10 +2961,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(result.partial).toBe(false)
 		expect(events.error.count).toBe(0)
 		expect(events.finish.count).toBe(1)
-		// `compactError` fired (≥ once — the prompt crossed the window each tool turn), carrying the
+		// `fault` fired (≥ once — the prompt crossed the window each tool turn), carrying the
 		// thrown summarizer error verbatim; and NOTHING folded (every attempt threw).
-		expect(events.compactError.count).toBeGreaterThanOrEqual(1)
-		expect(events.compactError.calls[0]?.[0]).toBe(boom)
+		expect(events.fault.count).toBeGreaterThanOrEqual(1)
+		expect(events.fault.calls[0]?.[0]).toBe(boom)
 		expect(conversation.sections.length).toBe(0)
 		// A MANUAL compact() still PROPAGATES the throw — only the AUTO path is resilient.
 		await expect(conversation.compact()).rejects.toThrow('summarizer exploded')
@@ -2995,8 +2995,8 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			window: contextBudget(12),
 			limit: 5,
 		})
-		const events = createRecorders<AgentEventMap, 'compactError' | 'finish'>(agent.emitter, [
-			'compactError',
+		const events = createRecorders<AgentEventMap, 'fault' | 'finish'>(agent.emitter, [
+			'fault',
 			'finish',
 		])
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -3010,9 +3010,9 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(events.finish.count).toBe(1)
 		// No churn: `compact()` (the stub summarizer) was called AT MOST ONCE — the futile flag
 		// short-circuited every later `#trim` (a futile no-op is not a summarizer throw, so no
-		// `compactError` either).
+		// `fault` either).
 		expect(stub.calls.length).toBeLessThanOrEqual(1)
-		expect(events.compactError.count).toBe(0)
+		expect(events.fault.count).toBe(0)
 		// The over-window run still ran all three scripted turns (the futile prompt proceeded to the
 		// provider rather than looping on compaction).
 		expect(provider.calls).toHaveLength(3)
@@ -3053,7 +3053,7 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 			name: 'echo',
 			async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
 				const last = messages.at(-1)
-				yield { type: 'content', text: 'ok' }
+				yield { channel: 'content', text: 'ok' }
 				return { content: `answer:${last?.content ?? ''}` }
 			},
 			async generate(messages) {
@@ -3328,7 +3328,7 @@ describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
 			id: 's',
 			name: 's',
 			async *stream(_messages, signal) {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
 				return { content: 'partfull' }
@@ -3358,7 +3358,7 @@ describe('Agent - F2 mid-stream budget enforcement + reconcile', () => {
 			id: 's',
 			name: 's',
 			async *stream(_messages, signal) {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
 				return { content: 'partfull' }
@@ -3505,7 +3505,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 		id: 'gated',
 		name: 'gated',
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { type: 'content', text: 'part' }
+			yield { channel: 'content', text: 'part' }
 			await gate.promise
 			return { content: 'full' }
 		},
@@ -3604,11 +3604,11 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 })
 
 // ── Strict compaction (F5) — a summarizer failure during AUTOMATIC window compaction; strict:
-// true emits `compactError` THEN rethrows (the run rejects, status error, an `error` event). The
-// lenient default (`strict` omitted) emits `compactError` and continues -- already covered by
+// true emits `fault` THEN rethrows (the run rejects, status error, an `error` event). The
+// lenient default (`strict` omitted) emits `fault` and continues -- already covered by
 // 'NON-FATAL summarizer failure' in the 'automatic compaction (production hardening)' block above.
 describe('Agent — strict compaction (F5)', () => {
-	it('strict: true -- a throwing auto-compact summarizer emits compactError THEN rethrows, rejecting the run', async () => {
+	it('strict: true -- a throwing auto-compact summarizer emits fault THEN rethrows, rejecting the run', async () => {
 		const boom = new Error('strict summarizer exploded')
 		const conversations = createConversationManager({
 			summarize: async () => {
@@ -3627,18 +3627,19 @@ describe('Agent — strict compaction (F5)', () => {
 			limit: 5,
 			strict: true,
 		})
-		const events = createRecorders<AgentEventMap, 'compactError' | 'error' | 'finish'>(
-			agent.emitter,
-			['compactError', 'error', 'finish'],
-		)
+		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
+			'fault',
+			'error',
+			'finish',
+		])
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		await expect(agent.generate()).rejects.toThrow('strict summarizer exploded')
 
 		expect(agent.status).toBe('error')
-		// `compactError` fired BEFORE the rejection (the loop surfaces it observably, then rethrows).
-		expect(events.compactError.count).toBe(1)
-		expect(events.compactError.calls[0]?.[0]).toBe(boom)
+		// `fault` fired BEFORE the rejection (the loop surfaces it observably, then rethrows).
+		expect(events.fault.count).toBe(1)
+		expect(events.fault.calls[0]?.[0]).toBe(boom)
 		expect(events.error.count).toBe(1)
 		expect(events.error.calls[0]?.[0]).toBe(boom)
 		expect(events.finish.count).toBe(0)
@@ -3656,7 +3657,7 @@ describe('Agent — abort usage sanitize (F6)', () => {
 			id: 'dirty',
 			name: 'dirty',
 			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { type: 'content', text: 'part' }
+				yield { channel: 'content', text: 'part' }
 				await gate.promise
 				if (signal.aborted) {
 					throw new ProviderAbortError({
