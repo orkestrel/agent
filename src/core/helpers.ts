@@ -11,7 +11,7 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
-import type { QueueExecution } from '@orkestrel/queue'
+import type { QueueContext } from '@orkestrel/queue'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import type { ControllerInterface } from '@orkestrel/workflow'
 import type { FileInterface } from '@orkestrel/workspace'
@@ -107,7 +107,7 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
  * @typeParam T - The item type being filtered
  * @param allow - The allow-list of keys (`undefined` ⇒ all, `[]` ⇒ none, else only-listed)
  * @param items - The items to filter (returned unchanged when `allow` is `undefined`)
- * @param key - Extracts the key an item is matched on (e.g. an instruction's `name`)
+ * @param key - Extracts the key an item is matched on (for example an instruction's `name`)
  * @returns The items that pass the allow-list, in their original order
  *
  * @example
@@ -243,16 +243,16 @@ export async function settleAgentJob(
  * @param registry - The registry that rehydrates the serializable job
  * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
  * @param input - The serializable agent job
- * @param execution - The queue attempt whose signal bounds the agent
+ * @param context - The queue attempt whose signal bounds the agent
  * @returns The settled agent result
  */
 export function handleAgentQueueJob(
 	registry: AgentRegistryInterface,
 	partial: boolean,
 	input: AgentJobInput,
-	execution: QueueExecution,
+	context: QueueContext,
 ): Promise<AgentResult> {
-	return settleAgentJob(registry.build(input, execution.signal), partial)
+	return settleAgentJob(registry.build(input, context.signal), partial)
 }
 
 /**
@@ -292,7 +292,7 @@ export function handleAgentRunnerJob(
  * {@link import('@orkestrel/workspace').FileContent} text arm).
  *
  * @param path - The file path shown on the `File:` label line
- * @param language - The fenced-code language tag (e.g. `'typescript'`)
+ * @param language - The fenced-code language tag (for example `'typescript'`)
  * @param content - The file body rendered verbatim inside the fence
  * @returns The fenced reference block
  *
@@ -328,7 +328,7 @@ export function sanitizeToken(value: number): number {
  * `-Infinity`) or a negative value floors to `0`; a fractional value floors to its
  * non-negative integer part. No upper cap is applied. Total — never throws.
  *
- * @param usage - The token usage to sanitize (e.g. a provider's abort-partial usage)
+ * @param usage - The token usage to sanitize (for example a provider's abort-partial usage)
  * @returns A new {@link TokenUsage} with every field a safe non-negative integer
  *
  * @example
@@ -461,7 +461,7 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
  * @remarks
  * Pure and total. A section with NO items renders nothing (`undefined`), so an empty or fully
  * scoped-out manager stays silent — its `open` / `close` never appear without items. `close`
- * is the only optional slot: an unset one (there is no built-in close) simply drops the
+ * is the only optional slot: an unset one (there is no built-in close) drops the
  * trailing line.
  *
  * @typeParam T - The section item being rendered
@@ -549,12 +549,12 @@ export function resolveClose<T>(
  * manager-options override > provider default > built-in rendering.
  *
  * @remarks
- * Pure and total. The item's own `format` is the most-specific level (a fully-rendered
+ * Pure and total. The item's own `override` is the most-specific level (a fully-rendered
  * string for that item alone). A manager's `render(item)` already encapsulates
  * `[options-override → built-in]`, so it is reached only when no higher level applies — and
  * there it IS the built-in rendering.
  *
- * @typeParam T - The section item being rendered (it may carry its own `format` override)
+ * @typeParam T - The section item being rendered (it may carry its own `override`)
  * @param manager - The section source (its `format` override + its built-in `render`)
  * @param provider - The provider-default framing for this section, or `undefined`
  * @param item - The item to render
@@ -567,13 +567,13 @@ export function resolveClose<T>(
  * // '<rule>Be terse.</rule>'
  * ```
  */
-export function resolveItem<T extends { readonly format?: string }>(
+export function resolveItem<T extends { readonly override?: string }>(
 	manager: ContextSectionSourceInterface<T>,
 	provider: ContextSectionFormat<T> | undefined,
 	item: T,
 ): string {
 	return (
-		item.format ??
+		item.override ??
 		manager.format?.render?.(item) ??
 		provider?.render?.(item) ??
 		manager.render(item)
@@ -655,8 +655,8 @@ export function attachUserImages(
  * agent context attaches to the last user message.
  *
  * @remarks
- * Pure and total. `isBinary` NARROWS the tagless content to its binary arm (§14: narrow,
- * never assert), then the MIME prefix gates it to an image, so a text file and a non-image
+ * Pure and total. `isBinary` NARROWS the tagless content to its binary arm (a total guard,
+ * never an assertion), then the MIME prefix gates it to an image, so a text file and a non-image
  * binary (a PDF) are both skipped. Order follows the file list.
  *
  * @param files - The (already scope-filtered) workspace files

@@ -14,7 +14,7 @@ import { collect, requireValue } from '@orkestrel/test'
 //    usage, and an abort commits a partial;
 //  • two DIFFERENTLY-NAMED providers are drop-in swappable behind identical agent code;
 //  • the loop passes each provider's `format` (or none) into build() correctly.
-// Per AGENTS §16 the scripted provider is a REAL provider (a real async generator honouring
+// The scripted provider is a REAL provider (a real async generator honouring
 // the signal), never a mock of the agent. The deterministic loop mechanics also live in
 // Agent.test.ts; here the framing is the agnosticism CLAIM (a generic provider, not Ollama,
 // satisfies the contract). A `name` distinguishes the two swap providers; `deltasOf` chunks

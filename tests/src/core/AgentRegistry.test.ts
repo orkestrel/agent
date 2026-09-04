@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { AgentJobInput } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
-import { createAgentRegistry, createAuthority, createMemoryConversationStore } from '@src/core'
+import {
+	createAgentRegistry,
+	createAuthority,
+	createMemoryConversationStore,
+	isAgentError,
+} from '@src/core'
 import {
 	addTool,
 	createRecordingScheduler,
@@ -47,6 +52,22 @@ describe('AgentRegistry — accessors', () => {
 		expect(() => registry.tool('ghost')).toThrow('unknown tool: ghost')
 		expect(() => registry.authority('ghost')).toThrow('unknown authority: ghost')
 		expect(() => registry.scheduler('ghost')).toThrow('unknown scheduler: ghost')
+	})
+
+	it('throws an AgentError carrying code REGISTRY, so a catch branches without parsing the message', () => {
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+		})
+		let caught: unknown
+		try {
+			registry.tool('ghost')
+		} catch (error) {
+			caught = error
+		}
+		if (!isAgentError(caught)) throw new Error('expected an AgentError')
+		expect(caught.code).toBe('REGISTRY')
+		expect(caught.name).toBe('AgentError')
+		expect(caught.message).toBe('unknown tool: ghost')
 	})
 })
 

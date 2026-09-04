@@ -43,10 +43,10 @@ import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
  *   THROWS a {@link ConversationError} when no `#summarize` was supplied. Two summarizer calls
  *   per compaction.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns a section's full original
- *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (v1 never
- *   auto-reinserts). `search` is a case-insensitive substring scan of `content` across ALL
- *   messages (every section's originals + the live tail).
- * - **Observable (§13).** The owned {@link emitter} ({@link ConversationEventMap}) carries
+ *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (the caller decides
+ *   whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
+ *   substring scan of `content` across ALL messages (every section's originals + the live tail).
+ * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries
  *   `compact` / `summary` / `rehydrate`, emitted directly, strictly AFTER the state change;
  *   the emitter isolates a listener throw and routes it to its `error` handler (the `error`
  *   option), so a buggy observer can never corrupt a compaction.
@@ -65,15 +65,15 @@ import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
  */
 export class Conversation implements ConversationInterface {
 	readonly #id: string
-	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
+	// The PUSH observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a compaction.
 	readonly #emitter: Emitter<ConversationEventMap>
 	// The provider-agnostic summarizer seam — `undefined` ⇒ `compact()` throws (a conversation
-	// can still store + view a live tail, it just cannot fold).
+	// can still store + view a live tail; it cannot fold).
 	readonly #summarize: ConversationSummaryHandler | undefined
 	// How many recent live messages a `compact()` retains verbatim (older ones fold).
 	readonly #keep: number
-	// The optional cap (§F2) on the compacted sections list — `undefined` ⇒ unlimited. Enforced
+	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
 	// AFTER pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
 	readonly #cap: number | undefined
 	// The compacted history, oldest → newest — each summarized slice RETAINS its originals.
@@ -157,9 +157,11 @@ export class Conversation implements ConversationInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			let removed = false
+			// True only when EVERY supplied id was present and removed, so a caller can tell a
+			// fully applied batch from a partly applied one.
+			let removed = true
 			for (const id of ids) {
-				if (this.#messages.delete(id)) removed = true
+				if (!this.#messages.delete(id)) removed = false
 			}
 			return removed
 		}
@@ -210,7 +212,7 @@ export class Conversation implements ConversationInterface {
 		// 2. Remove the folded messages from the live tail (by their ids) and push the section.
 		for (const message of slice) this.#messages.delete(message.id)
 		this.#sections.push(section)
-		// 3. F2 — enforce the bounded-`sections` cap: an overflow past `cap` folds the OLDEST
+		// 3. Enforce the bounded-`sections` cap: an overflow past `cap` folds the OLDEST
 		// overflow sections into ONE merged section (a THIRD summarizer call over the folded
 		// section summaries), so `#sections.length === cap` afterward.
 		if (cap !== undefined && this.#sections.length > cap) {
@@ -246,8 +248,8 @@ export class Conversation implements ConversationInterface {
 
 	rehydrate(id: string): readonly Message[] {
 		const section = this.#sections.find((one) => one.id === id)
-		// A pure read — emit `rehydrate` AFTER resolving (no mutation to perturb), and v1 never
-		// auto-reinserts the originals (the caller decides). Unknown id ⇒ an empty list.
+		// A pure read — emit `rehydrate` AFTER resolving (no mutation to perturb); `rehydrate`
+		// never reinserts the originals (the caller decides). Unknown id ⇒ an empty list.
 		this.#emitter.emit('rehydrate', id)
 		return section === undefined ? [] : section.messages
 	}
@@ -272,12 +274,12 @@ export class Conversation implements ConversationInterface {
 		const label = options?.label ?? this.#id
 		const lines = [`[Reference — conversation "${label}" — NOT part of this conversation]`]
 		// The rollup `summary` (a summary-of-summaries) — included WHEN opted in (default true) AND
-		// one exists (`undefined` until the first compaction simply drops the line).
+		// one exists (`undefined` until the first compaction drops the line).
 		if (options?.summary !== false && this.#summary !== undefined) {
 			lines.push(`Summary: ${this.#summary}`)
 		}
 		// The CHERRY-PICKED excerpts (each `- role: content`) — the few relevant turns the caller
-		// selected (via this conversation's own `search` / `rehydrate`), NOT the whole history.
+		// selected (through this conversation's own `search` / `rehydrate`), NOT the whole history.
 		const messages = options?.messages ?? []
 		if (messages.length > 0) {
 			lines.push('Relevant messages:')

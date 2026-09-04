@@ -2,14 +2,14 @@ import type { ScopeFilter, ScopeInput, ScopeInterface } from '../types.js'
 import { intersectKeys } from '../helpers.js'
 
 /**
- * Represents a named, immutable filter over a richer context's items — three optional
- * allow-lists, one per category (`instructions` / `tools` / `files`), each keyed by that
+ * Represents a named, immutable filter over a richer context's items — an optional
+ * allow-list per category (`instructions` / `tools` / `files`), each keyed by that
  * category's identity (an instruction's `name`, a tool's `name`, a workspace file's `path`).
  *
  * @remarks
  * - **A category list is three-way.** `undefined` ⇒ NO constraint on that category (all
  *   pass); `[]` ⇒ NONE pass; a non-empty list ⇒ only the listed keys pass. The build
- *   step / loop apply this via `filterAllowList`.
+ *   step / loop apply this through `filterAllowList`.
  * - **Immutable.** The `id` is minted at construction; every supplied list is COPIED in
  *   (so a later mutation of the caller's array can't leak in), and the lists are
  *   `readonly`. A `Scope` is never mutated after construction — `narrow` returns a NEW

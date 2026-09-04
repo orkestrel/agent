@@ -12,7 +12,7 @@ import { Conversation } from './Conversation.js'
 
 /**
  * Registers {@link Conversation}s keyed by `id`, in insertion order, WITH an active pointer
- * — the §9 store over the conversation layer PLUS the `active` / `switch` seam the
+ * — the id-keyed store over the conversation layer PLUS the `active` / `switch` seam the
  * {@link import('../AgentContext.js').AgentContext} renders. Event-free (a registry, like
  * {@link import('@orkestrel/workspace').WorkspaceManager}); the observability lives
  * on each {@link Conversation}.
@@ -29,8 +29,8 @@ import { Conversation } from './Conversation.js'
  *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown `id`
  *   returns `undefined` and leaves `active` unchanged (the lenient lookup style — never throws,
  *   no new error code).
- * - **Removal.** `remove` drops one by id, or a batch (§9.2) — `true` when any was removed;
- *   removing the ACTIVE conversation sets `active` to `undefined`. `clear` empties the registry
+ * - **Removal.** `remove` drops one by id, or a batch — `true` only when EVERY supplied id was
+ *   removed; removing the ACTIVE conversation sets `active` to `undefined`. `clear` empties the registry
  *   and sets `active` to `undefined`.
  * - **Event-free.** A purely registry store — no Emitter, no events (each conversation owns
  *   its own observable `emitter`).
@@ -114,7 +114,7 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	async open(id: string): Promise<ConversationInterface | undefined> {
-		// Already registered ⇒ just activate it (no store hit) — the registry is the live source.
+		// Already registered ⇒ activate it (no store hit) — the registry is the live source.
 		const existing = this.#conversations.get(id)
 		if (existing !== undefined) {
 			this.#active = id
@@ -142,16 +142,19 @@ export class ConversationManager implements ConversationManagerInterface {
 		return true
 	}
 
-	// §9.2: the array overload FIRST, so a list resolves to the batch form (an `id` is a string,
+	// The array overload FIRST, so a list resolves to the batch form (an `id` is a string,
 	// never an array, so the two never overlap — but the project declares the array overload
 	// first by convention).
 	remove(ids: readonly string[]): boolean
 	remove(id: string): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			let removed = false
+			// True only when EVERY supplied id was present and removed, so a caller can tell a
+			// fully applied batch from a partly applied one. Each present id still clears `active`
+			// when it was the active conversation.
+			let removed = true
 			for (const id of ids) {
-				if (this.#drop(id)) removed = true
+				if (!this.#drop(id)) removed = false
 			}
 			return removed
 		}

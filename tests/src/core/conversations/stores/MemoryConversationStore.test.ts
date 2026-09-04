@@ -1,4 +1,4 @@
-import { createMemoryConversationStore, isConversationSnapshot } from '@src/core'
+import { createMemoryConversationStore } from '@src/core'
 import { roundTripJSON } from '@orkestrel/test'
 import { isToolCall } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
@@ -19,16 +19,17 @@ const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
 // The C-c MemoryConversationStore — the in-memory default behind the ConversationStoreInterface
 // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the
 // ConversationSnapshot (the self-contained, pure-JSON conversation state) UNCHANGED. REAL data only
-// (AGENTS §16) — a real Conversation's `snapshot()` carrying BOTH compacted sections AND a live tail
+// — a real Conversation's `snapshot()` carrying BOTH compacted sections AND a live tail
 // AND a rollup `summary` (produced by a genuine compaction over a data-stub summarizer), NO mocks.
 
 // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
-// tests/setup.ts (AGENTS §16.1), so the scenario + snapshot logic stay in ONE place. `setup.ts` exports
+// tests/setup.ts, so the scenario + snapshot logic stay in ONE place. `setup.ts` exports
 // each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
 // THIS file registers the battery against the memory factory and asserts on what each scenario
-// returns, keeping only its TWIN-SPECIFIC blocks below: the JSON driver-swap-parity round-trip and the
-// `isConversationSnapshot` read-boundary guard.
+// returns, keeping only its TWIN-SPECIFIC blocks: the JSON driver-swap-parity round-trip and the
+// per-call element guard the snapshot's assistant `calls` rests on. The core snapshot / message /
+// section guards live in tests/src/core/validators.test.ts, their module's own mirror.
 describe('MemoryConversationStore', () => {
 	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
 		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
@@ -105,82 +106,7 @@ describe('MemoryConversationStore — JSON driver-swap parity', () => {
 	})
 })
 
-describe('isConversationSnapshot — the §14 read-boundary guard (total + defensive)', () => {
-	it('accepts a real snapshot (sections + tail + summary)', async () => {
-		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
-		// An empty-sections + empty-tail snapshot is still valid (a fresh conversation, no summary).
-		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(true)
-		// An optional rollup `summary` (present) is accepted.
-		expect(isConversationSnapshot({ id: 'c', summary: 'rollup', sections: [], messages: [] })).toBe(
-			true,
-		)
-	})
-
-	it('rejects malformed input without throwing (total guard)', () => {
-		// Non-records / primitives / nullish.
-		expect(isConversationSnapshot(undefined)).toBe(false)
-		expect(isConversationSnapshot(null)).toBe(false)
-		expect(isConversationSnapshot(42)).toBe(false)
-		expect(isConversationSnapshot('snapshot')).toBe(false)
-		// Missing / wrong-typed `id`.
-		expect(isConversationSnapshot({ sections: [], messages: [] })).toBe(false)
-		expect(isConversationSnapshot({ id: 1, sections: [], messages: [] })).toBe(false)
-		// A non-string `summary` when present.
-		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(false)
-		// `sections` / `messages` not arrays.
-		expect(isConversationSnapshot({ id: 'c', sections: 'nope', messages: [] })).toBe(false)
-		expect(isConversationSnapshot({ id: 'c', sections: [], messages: { a: 1 } })).toBe(false)
-		// `messages` carries a malformed message element (missing content).
-		expect(
-			isConversationSnapshot({ id: 'c', sections: [], messages: [{ id: 'm', role: 'user' }] }),
-		).toBe(false)
-		// `sections` carries a malformed section element (missing summary).
-		expect(
-			isConversationSnapshot({ id: 'c', sections: [{ id: 's', messages: [] }], messages: [] }),
-		).toBe(false)
-		// A section whose `messages` carries a malformed element.
-		expect(
-			isConversationSnapshot({
-				id: 'c',
-				sections: [{ id: 's', summary: 'r', messages: [{ id: 'm', role: 'user' }] }],
-				messages: [],
-			}),
-		).toBe(false)
-	})
-
-	it('rejects a snapshot whose assistant calls[] carries a tampered element (ASI06 fail-closed)', () => {
-		// A message-level helper: the snapshot is valid EXCEPT for the planted calls value, so a
-		// rejection isolates the deepened per-call check (isToolCall), not some sibling field.
-		const withCalls = (calls: unknown): unknown => ({
-			id: 'c',
-			sections: [],
-			messages: [{ id: 'a1', role: 'assistant', content: '', calls }],
-		})
-		// A null / bare-string element, a missing-arguments call, a non-string name, and a
-		// non-record arguments are each rejected WITHOUT throwing — the poisoned row reads
-		// back as absent and hydrate mints a fresh thread (the absent-on-tamper posture).
-		expect(isConversationSnapshot(withCalls([null]))).toBe(false)
-		expect(isConversationSnapshot(withCalls(['x']))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool' }]))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 123, arguments: {} }]))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: null }]))).toBe(
-			false,
-		)
-		// A well-formed calls[] still passes (the deepening rejects only real tampering).
-		expect(
-			isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }])),
-		).toBe(true)
-	})
-
-	it('accepts a snapshot revived from JSON (the storage-read shape the DB store narrows)', async () => {
-		// The exact value a DatabaseConversationStore reads back from its opaque JSON column — a plain
-		// object the guard must accept structurally (no class instances required).
-		const revived = roundTripJSON(await buildConversationSnapshot())
-		expect(isConversationSnapshot(revived)).toBe(true)
-	})
-})
-
-describe('isToolCall — the per-call §14 guard (the ASI06 fail-closed element check)', () => {
+describe('isToolCall — the per-call guard (the fail-closed element check)', () => {
 	it('accepts the real ToolCall shape (string id / name + a record arguments)', () => {
 		expect(isToolCall({ id: 'c1', name: 'search', arguments: { q: 'acme' } })).toBe(true)
 		expect(isToolCall({ id: 'c1', name: 'search', arguments: {} })).toBe(true)

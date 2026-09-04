@@ -7,11 +7,13 @@ import type {
 	ProviderResult,
 } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { isProviderAbortError } from '@src/core'
+import { ConversationManager, isProviderAbortError } from '@src/core'
+import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	addTool,
 	buildConversationSnapshot,
+	chunkWholeDelta,
 	conversationStoreDeleteAbsent,
 	conversationStoreDeleteThenAbsent,
 	conversationStoreGetAbsent,
@@ -22,10 +24,17 @@ import {
 	createAgentJob,
 	createRecordingScheduler,
 	createScriptedProvider,
+	createSeededToolManager,
 	createStubSummarizer,
 	createToolCall,
 	createTokenUsage,
 	loopTool,
+	resolveSectionOpen,
+	resolveSectionRender,
+	seedConversation,
+	seedInstructionContext,
+	seedWorkspaceContext,
+	turnParts,
 } from './setup.js'
 
 // setup.test.ts — the proof of `tests/setup.ts`, the workspace's ONE shared test-infrastructure
@@ -474,5 +483,131 @@ describe('conversation-store contract scenarios run against a conforming store',
 			expect(gotAlphaAfterDelete).toBeUndefined()
 			expect(gotBetaAfterDelete).toEqual(beta)
 		})
+	})
+})
+
+describe('turnParts', () => {
+	it('reports a bare ProviderResult with no per-turn deltas and no thoughts', () => {
+		const result: ProviderResult = { content: 'plain' }
+		const parts = turnParts(result)
+
+		expect(parts.result).toBe(result)
+		expect(parts.deltas).toBeUndefined()
+		expect(parts.thoughts).toBeUndefined()
+	})
+
+	it('carries a pair turn’s result, deltas, and thoughts through unchanged', () => {
+		const result: ProviderResult = { content: 'ab' }
+		const parts = turnParts({ result, deltas: ['a', 'b'], thoughts: ['plan'] })
+
+		expect(parts.result).toBe(result)
+		expect(parts.deltas).toEqual(['a', 'b'])
+		expect(parts.thoughts).toEqual(['plan'])
+		// A pair turn carrying only some of the optionals leaves the rest absent.
+		expect(turnParts({ result, deltas: [] }).thoughts).toBeUndefined()
+		expect(turnParts({ result, thoughts: ['plan'] }).deltas).toBeUndefined()
+	})
+})
+
+describe('chunkWholeDelta', () => {
+	it('reports the whole content as one delta — the provider’s default chunking', () => {
+		expect(chunkWholeDelta('hello world')).toEqual(['hello world'])
+		expect(chunkWholeDelta('')).toEqual([''])
+		// The default a scripted provider applies when no per-turn `deltas` and no `deltasOf` override.
+		expect(chunkWholeDelta('x').join('')).toBe('x')
+	})
+})
+
+describe('createSeededToolManager', () => {
+	it('seeds the canonical add tool by default', async () => {
+		const manager = createSeededToolManager()
+
+		expect(manager.definitions().map((one) => one.name)).toEqual(['add'])
+		const [result] = await manager.execute([createToolCall()])
+		expect(result).toEqual({ success: true, id: 'c1', name: 'add', value: 5 })
+	})
+
+	it('seeds exactly the supplied tools instead', () => {
+		const manager = createSeededToolManager([loopTool(), addTool()])
+
+		expect(manager.definitions().map((one) => one.name)).toEqual(['loop', 'add'])
+	})
+})
+
+describe('seedWorkspaceContext', () => {
+	it('seeds an active workspace of two text files and two image files, plus one user turn', () => {
+		const context = seedWorkspaceContext()
+
+		expect(context.system).toBe('sys')
+		expect(context.workspaces.active?.files().map((file) => file.path)).toEqual([
+			'keep.txt',
+			'drop.txt',
+			'keep.png',
+			'drop.png',
+		])
+		const built = context.build()
+		// The text files render into the system block; the image data attaches to the last user turn.
+		expect(requireValue(built[0]).content).toContain('KEPT FILE')
+		expect(requireValue(built[0]).content).toContain('DROPPED FILE')
+		expect(built.at(-1)?.content).toBe('hi')
+		expect(built.at(-1)?.images).toEqual(['KEEPIMG', 'DROPIMG'])
+	})
+})
+
+describe('seedInstructionContext', () => {
+	it('seeds two named instructions and two user turns under a system prompt', () => {
+		const context = seedInstructionContext()
+
+		expect(context.system).toBe('sys')
+		expect(context.instructions.instructions().map((one) => one.name)).toEqual(['keep-i', 'drop-i'])
+		const built = context.build()
+		expect(requireValue(built[0]).content).toContain('KEPT INSTRUCTION')
+		expect(requireValue(built[0]).content).toContain('DROPPED INSTRUCTION')
+		expect(built.filter((message) => message.role === 'user').map((one) => one.content)).toEqual([
+			'first',
+			'second',
+		])
+	})
+})
+
+describe('resolveSectionOpen / resolveSectionRender', () => {
+	it('resolves the section header at the built-in floor and at each override level', () => {
+		expect(resolveSectionOpen(undefined)).toBe('## Instructions')
+		expect(resolveSectionOpen({ instructions: { open: 'P' } })).toBe('P')
+		expect(resolveSectionOpen({ instructions: { open: 'P' } }, { managerOpen: 'M' })).toBe('M')
+	})
+
+	it('resolves an item’s rendering at the built-in floor and at each override level', () => {
+		expect(resolveSectionRender(undefined)).toBe('BUILTIN')
+		expect(resolveSectionRender({ instructions: { render: () => 'P' } })).toBe('P')
+		expect(
+			resolveSectionRender({ instructions: { render: () => 'P' } }, { managerRender: 'M' }),
+		).toBe('M')
+		expect(
+			resolveSectionRender(
+				{ instructions: { render: () => 'P' } },
+				{ managerRender: 'M', itemOverride: 'I' },
+			),
+		).toBe('I')
+	})
+})
+
+describe('seedConversation', () => {
+	it('registers a conversation carrying a compacted section, a live tail, and a rollup', async () => {
+		const manager = new ConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 1,
+		})
+		await seedConversation(manager, 'doc')
+
+		const conversation = requireValue(manager.conversation('doc'))
+		// Three turns added, `keep: 1` folds the oldest two into one summarized section.
+		expect(conversation.sections).toHaveLength(1)
+		expect(requireValue(conversation.sections[0]).messages.map((one) => one.content)).toEqual([
+			'first',
+			'second',
+		])
+		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
+		expect(conversation.summary).toBeDefined()
 	})
 })

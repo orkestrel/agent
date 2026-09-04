@@ -1,6 +1,6 @@
 import type { AgentResult, ProviderResult } from './types.js'
 
-// AGENTS §12: a real error type, not a sentinel. `stream` throws a
+// A real error type, not a sentinel. `stream` throws a
 // ProviderAbortError when its bound signal aborts mid-flight, carrying the partial
 // result it had assembled so far so the agent loop can recover the streamed content
 // on cancellation. The guard narrows a caught value with `instanceof`.
@@ -47,7 +47,7 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
 	return value instanceof ProviderAbortError
 }
 
-// AGENTS §12: a real error type, not a sentinel. An agent JOB treats a partial result
+// A real error type, not a sentinel. An agent JOB treats a partial result
 // (a job committed early from an abort / budget / timeout) as a FAILURE by default — the
 // queue / runner handler THROWS this so the Queue's retries + a Runner's fail-fast
 // engage. It carries the partial AgentResult so a caller (or a `retries: 0` enqueue that
@@ -103,7 +103,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 	return value instanceof AgentJobError
 }
 
-// AGENTS §12: a real error type, not a sentinel. A `ConversationInterface.compact()` is a
+// A real error type, not a sentinel. A `ConversationInterface.compact()` is a
 // PROGRAMMER error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
 // the messages with — so it THROWS this, carrying a machine-readable `code` ('SUMMARIZER')
 // so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
@@ -117,8 +117,8 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * @remarks
  * Compaction REQUIRES a summarizer (it digests the folded slice into a section summary and
  * regenerates the rollup); a conversation created without one can still store + `view()` its
- * live tail, but a `compact()` is a programmer error (§12) and throws this with `'SUMMARIZER'`.
- * A `sections` cap (§F2, on {@link import('./types.js').ConversationOptions} /
+ * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
+ * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
  * {@link import('./types.js').ConversationManagerOptions} /
  * {@link import('./types.js').CompactOptions}) must be `>= 1` — a sub-1 cap is a programmer
  * error and throws this with `'SECTIONS'`. Narrow a caught value with
@@ -154,30 +154,34 @@ export function isConversationError(value: unknown): value is ConversationError 
 	return value instanceof ConversationError
 }
 
-// AGENTS §12: a real error type, not a sentinel. Concurrent runs on one Agent whose
+// A real error type, not a sentinel. Concurrent runs on one Agent whose
 // construction carries a SHARED accounting instance (a `window` context budget, or a
 // construction-level `budget` with no per-run override) would corrupt that shared
 // accounting — so `stream()` throws this SYNCHRONOUSLY, before any state mutation or
-// emit, rather than letting the runs race. Carries a machine-readable `code` ('CONCURRENCY')
-// so a `catch` branches on `error.code`, mirroring `ConversationError` above.
+// emit, rather than letting the runs race. An `AgentRegistry` accessor throws it too, when a
+// rehydration name is absent from its pool. Carries a machine-readable `code` so a `catch`
+// branches on `error.code`, mirroring `ConversationError` above.
 
 /**
- * Reports a concurrent run that would corrupt SHARED per-agent accounting — thrown
- * synchronously by an {@link AgentInterface}'s `stream()`, carrying a machine-readable `code`.
+ * Reports a concurrent run that would corrupt SHARED per-agent accounting, or a rehydration
+ * name absent from its registry pool — thrown synchronously by an {@link AgentInterface}'s
+ * `stream()` and by an {@link AgentRegistryInterface}'s accessors, carrying a machine-readable
+ * `code`.
  *
  * @remarks
- * A run already in flight on the same agent, PLUS a construction-level `window` (a shared
- * context budget) or a construction-level `budget` with no per-run override (a shared cost
- * budget), means a second concurrent `stream()` would race its charges against the same
- * shared instance — corrupting the accounting. `code` is `'CONCURRENCY'` (the only condition
- * so far). Use separate agents, or per-run `budget` overrides with no `window`, for genuinely
- * concurrent runs. Narrow a caught value with {@link isAgentError} and branch on `error.code`.
+ * `'CONCURRENCY'` reports a run already in flight on the same agent, PLUS a construction-level
+ * `window` (a shared context budget) or a construction-level `budget` with no per-run override
+ * (a shared cost budget) — a second concurrent `stream()` would race its charges against the
+ * same shared instance, corrupting the accounting. Use separate agents, or per-run `budget`
+ * overrides with no `window`, for genuinely concurrent runs. `'REGISTRY'` reports a rehydration
+ * name absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` /
+ * `build`. Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent. */
-	readonly code: 'CONCURRENCY'
+	/** Names the machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent; `'REGISTRY'`: a rehydration name absent from its registry pool. */
+	readonly code: 'CONCURRENCY' | 'REGISTRY'
 
-	constructor(code: 'CONCURRENCY', message: string) {
+	constructor(code: 'CONCURRENCY' | 'REGISTRY', message: string) {
 		super(message)
 		this.name = 'AgentError'
 		this.code = code

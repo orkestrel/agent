@@ -4,8 +4,8 @@ import { isToolCall } from '@orkestrel/tool'
 
 /**
  * Checks whether an `unknown` is structurally a {@link Message} record — the per-message step of
- * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
- * read via a guard, never an `as`). The conversation analogue of
+ * the {@link isConversationSnapshot} read-boundary narrow (a total guard over an untrusted storage
+ * read, never an assertion). The conversation analogue of
  * {@link import('@orkestrel/workspace').isFile}.
  *
  * @remarks
@@ -13,7 +13,7 @@ import { isToolCall } from '@orkestrel/tool'
  * SHAPE: a record with a `string` `id`, a `string` `role`, a `string` `content`, and — WHEN present
  * — a `calls` array EVERY element of which is a valid
  * {@link import('@orkestrel/tool').ToolCall} ({@link isToolCall} — the
- * ASI06 fail-closed deepening: a tampered `calls` element rejects the message, so the snapshot
+ * fail-closed deepening: a tampered `calls` element rejects the message, so the snapshot
  * reads back as absent rather than replaying a malformed call) and an `images` that is an array
  * (an absent optional passes). The `role` is left as a broad `string` here (an open
  * {@link import('./types.js').MessageRole}, so any storage-read role string is accepted
@@ -43,8 +43,8 @@ export function isMessage(value: unknown): value is Message {
 
 /**
  * Checks whether an `unknown` is structurally a {@link Section} record — the per-section step of
- * the {@link isConversationSnapshot} read-boundary narrow (AGENTS §14: narrow an untrusted storage
- * read via a guard, never an `as`).
+ * the {@link isConversationSnapshot} read-boundary narrow (a total guard over an untrusted storage
+ * read, never an assertion).
  *
  * @remarks
  * A total guard (it NEVER throws — adversarial input returns `false`). It checks the section's
@@ -69,7 +69,7 @@ export function isSection(value: unknown): value is Section {
 }
 
 /**
- * Narrows an `unknown` to a {@link ConversationSnapshot} — the AGENTS §14 boundary guard for an
+ * Narrows an `unknown` to a {@link ConversationSnapshot} — the total boundary guard for an
  * UNTRUSTED snapshot read (a storage row a
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
  * reads back from its opaque JSON column, a snapshot loaded from disk). The EXACT analogue of

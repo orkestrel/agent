@@ -34,7 +34,7 @@ import { createAgentJob, createScriptedProvider, createTokenUsage, loopTool } fr
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
-// createAgent, all needing no daemon (AGENTS §16). `createOllama` (the live-Ollama
+// createAgent, all needing no daemon. `createOllama` (the live-Ollama
 // factory) is split out to the dedicated `src:ollama` project. createAgent's loop
 // logic is pinned in Agent.test.ts; here we only assert the factory wires a provider
 // into a working AgentInterface that runs one turn to its result.
@@ -295,7 +295,7 @@ describe('createAgentQueue', () => {
 		let providerSawAbort = false
 		// A provider that parks mid-call so the test can abort the queue while the agent is in
 		// flight, then records whether ITS signal aborted — proving the queue's cancel reached
-		// the agent through the threaded `execution.signal` (build(input, execution.signal)).
+		// the agent through the threaded `context.signal` (build(input, context.signal)).
 		const provider: ProviderInterface = {
 			id: 'p',
 			name: 'p',
@@ -459,7 +459,7 @@ describe('createAgentRunner', () => {
 
 // -- AgentJobError / isAgentJobError (the partial-carrying failure) ------------
 //
-// The real error type the shared `settle` throws on a default-partial job (§12: a
+// The real error type the shared `settle` throws on a default-partial job (a
 // real Error, not a sentinel) — it CARRIES the partial AgentResult so a caller can
 // still inspect what accumulated. Mirrors ProviderAbortError / isProviderAbortError.
 
@@ -592,7 +592,7 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 	})
 })
 
-// -- createAgentQueue — lifecycle (§10) + batch over agent jobs ----------------
+// -- createAgentQueue — lifecycle + batch over agent jobs ----------------------
 //
 // The substrate's lifecycle + bounded concurrency carry through the agent-job handler
 // unchanged: a paused queue parks jobs without starting their agents, `stop` rejects
@@ -657,7 +657,7 @@ describe('createAgentQueue — lifecycle + batch', () => {
 
 // -- createAgentQueue — durability, extended (restore correctness + loud misses) --
 //
-// The headline Ch7 durability feature, hardened: a restored job actually produces the
+// The headline durability feature, hardened: a restored job actually produces the
 // RIGHT result through the registry, and a job whose names are MISSING from the registry
 // FAILS LOUDLY (never silently passing) — both on a direct enqueue (the catchable path)
 // and on a crash-restore (where the terminal failure drains the row and the valid

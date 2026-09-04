@@ -1,6 +1,8 @@
 import type {
+	AgentContextInterface,
 	AgentJobInput,
 	ContextFormat,
+	ConversationManagerInterface,
 	ConversationSnapshot,
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
@@ -11,15 +13,16 @@ import type {
 	ProviderStreamOptions,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
-import type { ToolCall, ToolDefinition, ToolInterface } from '@orkestrel/tool'
+import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
-import { createConversation, ProviderAbortError } from '@src/core'
-import { waitForDelay } from '@orkestrel/test'
-import { createTool } from '@orkestrel/tool'
+import { AgentContext, createConversation, InstructionManager, ProviderAbortError } from '@src/core'
+import { requireValue, waitForDelay } from '@orkestrel/test'
+import { createTool, ToolManager } from '@orkestrel/tool'
+import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
-// AGENTS §16.1: the ONE general scripted `ProviderInterface` every Ollama-free agent
+// The ONE general scripted `ProviderInterface` every Ollama-free agent
 // test drives — the agent-job tests, the deterministic loop tests (tool iteration, the
 // chunk stream, generate↔stream parity, abort / budget bounds, status, the emitter),
 // and the provider-agnosticism proof. The LIVE model is exercised separately in the
@@ -71,8 +74,8 @@ export type DeltasOf = (content: string) => readonly string[]
  *   `maxInFlight`); defaults to `0`.
  * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
  *   providers are distinguishable); defaults to `'scripted'`.
- * - `format` — a provider-default {@link ContextFormat}, included on the provider
- *   ONLY when supplied (omitted ⇒ framing-agnostic, like the live OllamaProvider).
+ * - `format` — a provider-default {@link ContextFormat}; `undefined` when unset, so an
+ *   agnostic provider reports no framing.
  * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
  *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
  *   form) overrides this for that turn.
@@ -105,9 +108,15 @@ export interface ScriptedProviderInterface extends ProviderInterface {
 	readonly calls: readonly ScriptedCall[]
 }
 
-// Normalize a {@link ScriptedTurn} to its `{ result, deltas? }` parts — a bare result has
-// no per-turn deltas (the `'result' in turn` discriminant narrows the union, §14, no `as`).
-function turnParts(turn: ScriptedTurn): {
+/**
+ * Normalize a {@link ScriptedTurn} to its `{ result, deltas, thoughts }` parts — a bare result
+ * carries no per-turn deltas and no thoughts. The `'result' in turn` discriminant narrows the
+ * union with a guard, never an assertion.
+ *
+ * @param turn - The scripted turn to normalize
+ * @returns The turn's `result` plus its per-turn `deltas` / `thoughts` (`undefined` for a bare result)
+ */
+export function turnParts(turn: ScriptedTurn): {
 	readonly result: ProviderResult
 	readonly deltas: readonly string[] | undefined
 	readonly thoughts: readonly string[] | undefined
@@ -115,6 +124,18 @@ function turnParts(turn: ScriptedTurn): {
 	return 'result' in turn
 		? { result: turn.result, deltas: turn.deltas, thoughts: turn.thoughts }
 		: { result: turn, deltas: undefined, thoughts: undefined }
+}
+
+/**
+ * Chunk a turn's whole content into ONE stream delta — the default {@link DeltasOf} a
+ * {@link ScriptedProvider} applies when neither a per-turn `deltas` nor an options `deltasOf`
+ * overrides it.
+ *
+ * @param content - The turn's content
+ * @returns The content as a single-delta list
+ */
+export function chunkWholeDelta(content: string): readonly string[] {
+	return [content]
 }
 
 /**
@@ -135,43 +156,84 @@ export function createScriptedProvider(
 	turns: readonly ScriptedTurn[],
 	options?: ScriptedProviderOptions,
 ): ScriptedProviderInterface {
-	const delay = options?.delay ?? 0
-	const name = options?.name ?? 'scripted'
-	const deltasOf = options?.deltasOf ?? ((content: string): readonly string[] => [content])
-	const exhaust = options?.exhaust ?? 'repeat'
-	const calls: ScriptedCall[] = []
-	let index = 0
-	let inFlight = 0
-	let maxInFlight = 0
-	let started = 0
-	// Consume the next turn: past the end either repeat the last ('repeat') or throw ('throw').
-	const next = (): ScriptedTurn => {
-		if (index >= turns.length && exhaust === 'throw') {
-			throw new Error(`createScriptedProvider exhausted at turn ${index}`)
-		}
-		const turn = turns[Math.min(index, turns.length - 1)] ?? { content: '' }
-		index += 1
-		return turn
+	return new ScriptedProvider(turns, options)
+}
+
+/**
+ * The scripted {@link ProviderInterface} {@link createScriptedProvider} builds — a REAL provider
+ * that replays its turns, honours its signal between every delta, and records its calls.
+ *
+ * @remarks
+ * Reaches its own turn cursor and its in-flight / started / calls recorders, so it is a class
+ * with `#` state and methods rather than a closure over locals. Construct it through
+ * {@link createScriptedProvider}.
+ */
+export class ScriptedProvider implements ScriptedProviderInterface {
+	readonly #turns: readonly ScriptedTurn[]
+	readonly #deltasOf: DeltasOf
+	readonly #exhaust: 'repeat' | 'throw'
+	readonly #record: boolean
+	readonly #delay: number
+	readonly #name: string
+	readonly #format: ContextFormat | undefined
+	readonly #calls: ScriptedCall[] = []
+	#index = 0
+	#inFlight = 0
+	#maxInFlight = 0
+	#started = 0
+
+	constructor(turns: readonly ScriptedTurn[], options?: ScriptedProviderOptions) {
+		this.#turns = turns
+		this.#deltasOf = options?.deltasOf ?? chunkWholeDelta
+		this.#exhaust = options?.exhaust ?? 'repeat'
+		this.#record = options?.record === true
+		this.#delay = options?.delay ?? 0
+		this.#name = options?.name ?? 'scripted'
+		this.#format = options?.format
 	}
-	async function* stream(
+
+	get id(): string {
+		return this.#name
+	}
+
+	get name(): string {
+		return this.#name
+	}
+
+	get format(): ContextFormat | undefined {
+		return this.#format
+	}
+
+	get maxInFlight(): number {
+		return this.#maxInFlight
+	}
+
+	get started(): number {
+		return this.#started
+	}
+
+	get calls(): readonly ScriptedCall[] {
+		return this.#calls
+	}
+
+	async *stream(
 		messages: readonly Message[],
 		signal: AbortSignal,
 		tools?: readonly ToolDefinition[],
 		run?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
-		if (options?.record === true) {
-			calls.push({ messages: [...messages], tools, options: run, signal })
+		if (this.#record) {
+			this.#calls.push({ messages: [...messages], tools, options: run, signal })
 		}
-		started += 1
-		inFlight += 1
-		maxInFlight = Math.max(maxInFlight, inFlight)
+		this.#started += 1
+		this.#inFlight += 1
+		this.#maxInFlight = Math.max(this.#maxInFlight, this.#inFlight)
 		try {
 			if (signal.aborted) throw new ProviderAbortError({ content: '' })
-			if (delay > 0) await waitForDelay(delay)
-			const turn = next()
-			const { result, deltas, thoughts } = turnParts(turn)
-			// Per-turn `deltas` win; else chunk the content via `deltasOf`.
-			const chunks = deltas ?? deltasOf(result.content)
+			if (this.#delay > 0) await waitForDelay(this.#delay)
+			const { result, deltas, thoughts } = turnParts(this.#next())
+			// Per-turn `deltas` win; else chunk the content through `deltasOf`.
+			const chunks = deltas ?? this.#deltasOf(result.content)
 			let streamed = ''
 			let reasoned = ''
 			for (const thought of thoughts ?? []) {
@@ -199,35 +261,36 @@ export function createScriptedProvider(
 			}
 			return result
 		} finally {
-			inFlight -= 1
+			this.#inFlight -= 1
 		}
 	}
-	return {
-		id: name,
-		name,
-		...(options?.format === undefined ? {} : { format: options.format }),
-		get maxInFlight() {
-			return maxInFlight
-		},
-		get started() {
-			return started
-		},
-		get calls() {
-			return calls
-		},
-		stream,
-		async generate(messages, signal, tools, run) {
-			const generator = stream(messages, signal, tools, run)
-			let step = await generator.next()
-			while (!step.done) step = await generator.next()
-			return step.value
-		},
+
+	async generate(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		run?: ProviderStreamOptions,
+	): Promise<ProviderResult> {
+		const generator = this.stream(messages, signal, tools, run)
+		let step = await generator.next()
+		while (!step.done) step = await generator.next()
+		return step.value
+	}
+
+	// Consume the next turn: past the end either repeat the last ('repeat') or throw ('throw').
+	#next(): ScriptedTurn {
+		if (this.#index >= this.#turns.length && this.#exhaust === 'throw') {
+			throw new Error(`createScriptedProvider exhausted at turn ${this.#index}`)
+		}
+		const turn = this.#turns[Math.min(this.#index, this.#turns.length - 1)] ?? { content: '' }
+		this.#index += 1
+		return turn
 	}
 }
 
 // ── Agent data-stub factories (real shapes + per-test overrides) ─────────────
 //
-// AGENTS §16.1: the repeated agent DATA shapes — a tool call, a token usage, the
+// The repeated agent DATA shapes — a tool call, a token usage, the
 // canonical `add` / `loop` tools, an agent job — built ONCE as parameterized factories
 // so a test stubs the shape it needs and customizes only the bit that matters, instead
 // of re-typing the literal. These are REAL data builders (and, for the tools, real
@@ -298,7 +361,7 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
  * Create a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
  * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
  * folded count), so a `compact()` produces a predictable section summary and the rollup is a
- * predictable summary-of-summaries (AGENTS §16.1: a data-stub, NOT a behavior-mock — the LIVE
+ * predictable summary-of-summaries (a data-stub, NOT a behavior-mock — the LIVE
  * model is exercised separately in the `src:ollama` project). Counts its calls so a test can
  * prove the TWO summarizer calls per compaction (the section digest + the rollup regeneration).
  *
@@ -313,7 +376,7 @@ export function createStubSummarizer(): {
 		get calls() {
 			return calls
 		},
-		summarize: async (messages) => {
+		async summarize(messages) {
 			calls.push(messages)
 			return `recap of ${messages.length}`
 		},
@@ -351,7 +414,7 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 
 // ── Store-pair contract batteries (Memory ⇄ Database twins, environment-agnostic) ──
 //
-// AGENTS §16.1: the `{Memory,Database}{Conversation,Workspace}Store` twins each persist the
+// The `{Memory,Database}{Conversation,Workspace}Store` twins each persist the
 // SAME self-contained, pure-JSON snapshot behind the SAME `{X}StoreInterface` seam (get / set /
 // delete, async, keyed by the snapshot's own id), so the round-trip / upsert / delete / two-ids
 // battery is IDENTICAL across each pair. Each pair's snapshot builder + shared battery are
@@ -365,7 +428,7 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
  * added, then a genuine `compact()` folds the oldest two into one summarized section + regenerates
  * the rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is NON-VACUOUS
  * in BOTH the compacted sections AND the live tail (and carries a rollup summary). The shared
- * store-test fixture both `{Memory,Database}ConversationStore` twins drive (AGENTS §16.1 — one
+ * store-test fixture both `{Memory,Database}ConversationStore` twins drive (one
  * builder, not a per-file copy). The deterministic, provider-free summarizer is folded INSIDE
  * (digesting the slice into `recap(<contents>)` — NOT {@link createStubSummarizer}, whose `recap of
  * <n>` digest text differs), so a `compact()` produces a predictable section + rollup.
@@ -376,7 +439,9 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 export async function buildConversationSnapshot(id = 'chat'): Promise<ConversationSnapshot> {
 	const conversation = createConversation({
 		id,
-		summarize: async (messages) => `recap(${messages.map((message) => message.content).join('|')})`,
+		async summarize(messages) {
+			return `recap(${messages.map((message) => message.content).join('|')})`
+		},
 		keep: 1,
 	})
 	conversation.add([
@@ -547,4 +612,165 @@ export async function conversationStoreTwoIds(
 	const gotAlphaAfterDelete = await store.get('alpha')
 	const gotBetaAfterDelete = await store.get('beta')
 	return { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete }
+}
+
+// ── Scenario builders (the seeded entities several suites drive) ─────────────
+//
+// One general form per scenario, exported here rather than re-declared inside a `describe`
+// callback, so a suite imports the fixture instead of owning a near-duplicate of it. Real
+// entities throughout — no mocks.
+
+/**
+ * Build a {@link ToolManagerInterface} pre-seeded with working tools — the registry the agent
+ * loop tests hand to an agent so the model has SOMETHING callable.
+ *
+ * @param tools - The tools to seed; defaults to the canonical {@link addTool}
+ * @returns A tool manager holding the supplied tools
+ */
+export function createSeededToolManager(tools?: readonly ToolInterface[]): ToolManagerInterface {
+	const manager = new ToolManager()
+	manager.add(tools === undefined ? [addTool()] : [...tools])
+	return manager
+}
+
+/**
+ * Build an {@link AgentContextInterface} whose ACTIVE workspace holds two TEXT files
+ * (`keep.txt` / `drop.txt`) and two IMAGE files (`keep.png` / `drop.png`), plus a system prompt
+ * and one seeded user turn — so a `scope.files` allow-list can be shown filtering BOTH the
+ * rendered text section and the last-user image attach.
+ *
+ * @remarks
+ * The image files are seated through the workspace constructor's `seed` seam, because `write()`
+ * only mints text content.
+ *
+ * @returns The seeded context (system `'sys'`, four active files, one user message)
+ */
+export function seedWorkspaceContext(): AgentContextInterface {
+	const context = new AgentContext({ system: 'sys' })
+	context.workspaces.add({
+		seed: [
+			createFile({ path: 'keep.txt', content: createTextContent('KEPT FILE', 'text') }),
+			createFile({ path: 'drop.txt', content: createTextContent('DROPPED FILE', 'text') }),
+			createFile({ path: 'keep.png', content: createBinaryContent('KEEPIMG', 'image/png') }),
+			createFile({ path: 'drop.png', content: createBinaryContent('DROPIMG', 'image/png') }),
+		],
+	})
+	context.messages.add({ role: 'user', content: 'hi' })
+	return context
+}
+
+/**
+ * Build an {@link AgentContextInterface} carrying a system prompt, two named instructions
+ * (`keep-i` / `drop-i`), and two user turns — the fixture a `scope.instructions` allow-list
+ * filters.
+ *
+ * @returns The seeded context (system `'sys'`, two instructions, two user messages)
+ */
+export function seedInstructionContext(): AgentContextInterface {
+	const context = new AgentContext({ system: 'sys' })
+	context.instructions.add([
+		{ name: 'keep-i', content: 'KEPT INSTRUCTION' },
+		{ name: 'drop-i', content: 'DROPPED INSTRUCTION' },
+	])
+	context.messages.add([
+		{ role: 'user', content: 'first' },
+		{ role: 'user', content: 'second' },
+	])
+	return context
+}
+
+/** Options for {@link resolveSectionOpen} — the manager-options `open` override, when one applies. */
+export interface SectionOpenOptions {
+	readonly managerOpen?: string
+}
+
+/** Options for {@link resolveSectionRender} — the manager-options `render` and the per-item override. */
+export interface SectionRenderOptions {
+	readonly managerRender?: string
+	readonly itemOverride?: string
+}
+
+/**
+ * Resolve the instructions section's `open` (its header) at whichever cascade levels the
+ * arguments set — the built-in floor, a provider default, and a manager-options override.
+ *
+ * @remarks
+ * Builds a context holding ONE instruction, so the rendered block is `<open>\n\n<render>`; the
+ * returned string is the part before the render.
+ *
+ * @param format - The provider-default {@link ContextFormat}, or `undefined` for none
+ * @param options - The manager-options `open` override, when one applies
+ * @returns The resolved section header
+ */
+export function resolveSectionOpen(
+	format: ContextFormat | undefined,
+	options?: SectionOpenOptions,
+): string {
+	const managerOpen = options?.managerOpen
+	const instructions =
+		managerOpen === undefined
+			? new InstructionManager()
+			: new InstructionManager({ format: { open: managerOpen } })
+	const context = new AgentContext({ instructions })
+	context.instructions.add({ name: 'a', content: 'X' })
+	const block = requireValue(context.build(format)[0]).content
+	return requireValue(block.split('\n\n')[0])
+}
+
+/**
+ * Resolve ONE instruction item's rendering at whichever cascade levels the arguments set — the
+ * built-in floor, a provider default, a manager-options override, and the per-item override.
+ *
+ * @remarks
+ * Builds a context holding ONE instruction whose built-in content is `'BUILTIN'`; the returned
+ * string is the part after the header.
+ *
+ * @param format - The provider-default {@link ContextFormat}, or `undefined` for none
+ * @param options - The manager-options `render` override and the per-item `override`
+ * @returns The resolved item rendering
+ */
+export function resolveSectionRender(
+	format: ContextFormat | undefined,
+	options?: SectionRenderOptions,
+): string {
+	const managerRender = options?.managerRender
+	const instructions =
+		managerRender === undefined
+			? new InstructionManager()
+			: new InstructionManager({
+					format: {
+						render() {
+							return managerRender
+						},
+					},
+				})
+	const context = new AgentContext({ instructions })
+	context.instructions.add({
+		name: 'a',
+		content: 'BUILTIN',
+		...(options?.itemOverride === undefined ? {} : { override: options.itemOverride }),
+	})
+	const block = requireValue(context.build(format)[0]).content
+	return requireValue(block.split('\n\n')[1])
+}
+
+/**
+ * Register a conversation on a {@link ConversationManagerInterface} and compact it, so the
+ * registered conversation carries a real compacted section, a live tail, and a rollup summary —
+ * a durable `save` / `open` round trip over it is then NON-VACUOUS in every field.
+ *
+ * @param manager - The manager to register the conversation on (it supplies the summarizer and `keep`)
+ * @param id - The conversation id to register
+ */
+export async function seedConversation(
+	manager: ConversationManagerInterface,
+	id: string,
+): Promise<void> {
+	const conversation = manager.add({ id })
+	conversation.add([
+		{ role: 'user', content: 'first' },
+		{ role: 'assistant', content: 'second' },
+		{ role: 'user', content: 'third' },
+	])
+	await conversation.compact()
 }

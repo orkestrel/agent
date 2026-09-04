@@ -5,14 +5,14 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../../setup.js'
+import { createStubSummarizer, seedConversation } from '../../../setup.js'
 
-// ConversationManager is the §9 registry over the conversation layer WITH an active pointer — an
+// ConversationManager is the id-keyed registry over the conversation layer WITH an active pointer — an
 // insertion-ordered store keyed by id (add / conversation / conversations / count / remove(id|ids[])
 // / clear) PLUS active / switch. Event-free (each Conversation owns its own emitter). The first add
 // auto-activates; a later add leaves active; switch re-points it; removing the active (or clear)
 // clears it. The manager's default summarize / keep flow into every conversation it creates; a
-// per-add override wins (AGENTS §16 — real behavior, a data-stub summarizer, NOT a behavior-mock).
+// per-add override wins — real behavior, a data-stub summarizer, NOT a behavior-mock.
 
 describe('ConversationManager — add / accessors / count', () => {
 	it('starts empty with no active conversation', () => {
@@ -109,7 +109,7 @@ describe('ConversationManager — active pointer + switch + auto-activate', () =
 	})
 })
 
-describe('ConversationManager — remove (§9.2) / clear', () => {
+describe('ConversationManager — remove (single + batch) / clear', () => {
 	it('remove(id) drops one and reports whether any was removed', () => {
 		const manager = new ConversationManager()
 		manager.add({ id: 'a' })
@@ -122,15 +122,20 @@ describe('ConversationManager — remove (§9.2) / clear', () => {
 		expect(manager.conversation('b')).toBeDefined()
 	})
 
-	it('remove(ids[]) drops a batch — true when ANY was removed', () => {
+	it('remove(ids[]) drops a batch — true only when EVERY supplied id was removed', () => {
 		const manager = new ConversationManager()
 		manager.add({ id: 'a' })
 		manager.add({ id: 'b' })
 		manager.add({ id: 'c' })
 
-		expect(manager.remove(['a', 'c', 'ghost'])).toBe(true)
+		// A partly applied batch is distinguishable from a fully applied one.
+		expect(manager.remove(['a', 'c', 'ghost'])).toBe(false)
 		expect(manager.count).toBe(1)
 		expect(manager.conversations().map((one) => one.id)).toEqual(['b'])
+
+		manager.add({ id: 'd' })
+		expect(manager.remove(['b', 'd'])).toBe(true)
+		expect(manager.count).toBe(0)
 	})
 
 	it('remove(ids[]) of only-absent ids returns false', () => {
@@ -315,18 +320,6 @@ describe('ConversationManager — created conversations are independent', () => 
 })
 
 describe('ConversationManager — durable open / save (the optional store seam)', () => {
-	// Seed a registered conversation with a compacted section + a live tail + a rollup summary (a
-	// genuine compaction over the stub summarizer), so a round-trip is NON-VACUOUS in every field.
-	async function seedConversation(manager: ConversationManager, id: string): Promise<void> {
-		const conversation = manager.add({ id })
-		conversation.add([
-			{ role: 'user', content: 'first' },
-			{ role: 'assistant', content: 'second' },
-			{ role: 'user', content: 'third' },
-		])
-		await conversation.compact() // keep defaults to 0 here unless overridden — fold all but...
-	}
-
 	it('open(id) activates an ALREADY-registered conversation WITHOUT a store hit', async () => {
 		// A registry hit short-circuits — no store needed, the live conversation is returned + activated.
 		const store = createMemoryConversationStore()

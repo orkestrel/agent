@@ -1,8 +1,8 @@
 import { Scope } from '@src/core'
 import { describe, expect, it } from 'vitest'
 
-// Scope is the named, immutable allow-list filter over a context's items (AGENTS §16 —
-// real behavior, no mocks). Covers construction (a minted id + the three per-category
+// Scope is the named, immutable allow-list filter over a context's items — real
+// behavior, no mocks. Covers construction (a minted id + the per-category
 // lists, copied in), and narrow's set-INTERSECTION semantics under the "undefined =
 // universal set (no constraint)" rule: undefined ∩ undefined = undefined, undefined ∩
 // list = the list, list ∩ list = the intersection, [] ⇒ none — narrowing only tightens.

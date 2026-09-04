@@ -8,15 +8,15 @@ import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
-// directives block from (AGENTS §16 — real behavior, no mocks). Covers add (single +
-// batch §9.2) minting ids, last-write-wins overwrite by name, instruction/instructions
+// directives block from — real behavior, no mocks. Covers add (single +
+// batch) minting ids, last-write-wins overwrite by name, instruction/instructions
 // lookup with descending-priority (stable) ordering, format/description build contract,
 // remove (single + batch) + clear + count, the add/remove/clear event emissions, and the
 // emit-safety guarantee (a throwing listener can't corrupt a mutation + routes to the
-// emitter's `error` handler, with no recursion) mirroring Table's §13 convention.
+// emitter's `error` handler, with no recursion) mirroring Table's emitter convention.
 
 // The InstructionManagerEventMap event names recorded across the emitter tests — fed to
-// `createRecorders` from @orkestrel/test (AGENTS §16.1: the per-event wiring lives in the
+// `createRecorders` from @orkestrel/test (the per-event wiring lives in the
 // package; this file keeps only the names its scenarios observe). `createRecorders` takes its
 // event map from an explicit type argument: `TMap` appears only inside the generic `on` method
 // of its source parameter, which yields no inference candidate, so both arguments are named at
@@ -44,7 +44,7 @@ describe('InstructionManager — add & lookup', () => {
 		expect(manager.instruction('tone')).toBe(instruction)
 	})
 
-	it('adds a batch (§9.2) and returns the created instructions in order', () => {
+	it('adds a batch and returns the created instructions in order', () => {
 		const manager = new InstructionManager()
 		const created = manager.add([
 			{ name: 'a', content: 'one' },
@@ -154,18 +154,18 @@ describe('InstructionManager — manager-options format override', () => {
 		expect(new InstructionManager().format).toBeUndefined()
 	})
 
-	it('round-trips a per-item format override through add (present-when-given)', () => {
+	it('round-trips a per-item override through add (present-when-given)', () => {
 		const manager = new InstructionManager()
-		const withFormat = manager.add({ name: 'a', content: 'plain', format: 'RENDERED' })
+		const withOverride = manager.add({ name: 'a', content: 'plain', override: 'RENDERED' })
 		const without = manager.add({ name: 'b', content: 'plain' })
 
 		// The per-item override is carried on the stored instruction when given …
-		expect(withFormat.format).toBe('RENDERED')
-		expect(manager.instruction('a')?.format).toBe('RENDERED')
-		// … and `undefined` when absent — so it serializes AWAY (no `format` key survives a
+		expect(withOverride.override).toBe('RENDERED')
+		expect(manager.instruction('a')?.override).toBe('RENDERED')
+		// … and `undefined` when absent — so it serializes AWAY (no `override` key survives a
 		// JSON round-trip), the present-when-given contract like a message's `images`.
-		expect(without.format).toBeUndefined()
-		expect('format' in JSON.parse(JSON.stringify(without))).toBe(false)
+		expect(without.override).toBeUndefined()
+		expect('override' in JSON.parse(JSON.stringify(without))).toBe(false)
 	})
 })
 
@@ -179,7 +179,7 @@ describe('InstructionManager — remove & clear', () => {
 		expect(manager.count).toBe(0)
 	})
 
-	it('removes a batch (§9.2) and returns true when any was removed', () => {
+	it('removes a batch and returns true only when every supplied name was removed', () => {
 		const manager = new InstructionManager()
 		manager.add([
 			{ name: 'a', content: 'a' },
@@ -187,10 +187,14 @@ describe('InstructionManager — remove & clear', () => {
 			{ name: 'c', content: 'c' },
 		])
 
-		expect(manager.remove(['a', 'missing', 'b'])).toBe(true)
+		// A partly applied batch is distinguishable from a fully applied one.
+		expect(manager.remove(['a', 'missing', 'b'])).toBe(false)
 		expect(manager.count).toBe(1)
 		expect(manager.instruction('c')?.content).toBe('c')
 		expect(manager.remove(['nope', 'gone'])).toBe(false)
+
+		manager.add({ name: 'd', content: 'd' })
+		expect(manager.remove(['c', 'd'])).toBe(true)
 	})
 
 	it('clears every instruction', () => {
@@ -207,7 +211,7 @@ describe('InstructionManager — remove & clear', () => {
 	})
 })
 
-describe('InstructionManager — emitter (push observation surface §13)', () => {
+describe('InstructionManager — emitter (the push observation surface)', () => {
 	it('fires add on each created instruction (single + batch), in order', () => {
 		const manager = new InstructionManager()
 		const events = createRecorders<InstructionManagerEventMap, InstructionEventName>(

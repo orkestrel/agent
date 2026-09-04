@@ -1,7 +1,7 @@
 /**
  * Caps an {@link AgentInterface} turn's tool iterations by default — the maximum
  * number of context → provider → tools cycles before the loop stops, so a model that
- * keeps requesting tools can never loop forever. Overridable per agent via
+ * keeps requesting tools can never loop forever. Overridable per agent through
  * `AgentOptions.limit`.
  */
 export const DEFAULT_AGENT_LIMIT = 10
@@ -20,7 +20,7 @@ export const DEFAULT_AUTHORITY_ZONE = 'default'
  * RETAINS verbatim — `0`, so a manual `compact()` folds ALL of the current live messages
  * into one summarized section (no tail kept). A caller retains a recent tail by passing
  * `keep` (on {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold
- * via {@link CompactOptions}), folding only the older `count - keep` messages and leaving
+ * through {@link CompactOptions}), folding only the older `count - keep` messages and leaving
  * the most recent `keep` live for the next turn. Overridable everywhere `keep` is accepted.
  */
 export const DEFAULT_CONVERSATION_KEEP = 0
@@ -66,7 +66,7 @@ export const THINK_CLOSE = '</think>'
  * `open` / `format` getters), so this header lives here as the agents module's one
  * workspace-section framing constant rather than on a manager. Each workspace text file renders
  * beneath it as a fenced `` File: <path>\n```<language>\n<text>\n``` `` block — the SAME framing
- * the documents section uses — placed just after the documents section in the system block.
+ * the documents section uses — placed immediately after the documents section in the system block.
  */
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
 

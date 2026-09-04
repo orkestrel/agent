@@ -1,10 +1,9 @@
-import type { AgentContextInterface, ContextFormat, MessageInput, Message } from '@src/core'
+import type { AgentContextInterface, MessageInput, Message } from '@src/core'
 import { Tool, ToolManager } from '@orkestrel/tool'
 import {
 	WorkspaceManager,
 	createBinaryContent,
 	createFile,
-	createTextContent,
 	createWorkspaceManager,
 } from '@orkestrel/workspace'
 import {
@@ -16,16 +15,22 @@ import {
 	WORKSPACE_SECTION_HEADER,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../setup.js'
+import {
+	createStubSummarizer,
+	resolveSectionOpen,
+	resolveSectionRender,
+	seedInstructionContext,
+	seedWorkspaceContext,
+} from '../../setup.js'
 import { requireValue } from '@orkestrel/test'
 
 // AgentContext assembles a turn's provider input — the leading system block (the prompt
 // + the scoped instructions, each under its manager's description, then the ACTIVE
 // workspace's text files) then the scoped conversation (with the active workspace's image
 // files' data attached to the last user message). The active workspace is the SOLE
-// document/image context. Tools are advertised STRUCTURALLY (via definitions()), never
-// serialized into the prompt, so build() must never carry tool content (AGENTS §16 — real
-// behavior, no mocks). The system-only behavior of the original lean context is preserved.
+// document/image context. Tools are advertised STRUCTURALLY (through definitions()), never
+// serialized into the prompt, so build() must never carry tool content — real
+// behavior, no mocks. The system-only behavior of the original lean context is preserved.
 
 describe('AgentContext — build with a system prompt', () => {
 	it('prepends a system message, then the conversation in order', () => {
@@ -191,7 +196,7 @@ describe('AgentContext — system boundary', () => {
 	})
 })
 
-describe('AgentContext — build snapshot independence (§11)', () => {
+describe('AgentContext — build snapshot independence', () => {
 	it('returns a fresh array each call — mutating one build does not affect a later one', () => {
 		const context = new AgentContext({ system: 'sys' })
 		context.messages.add({ role: 'user', content: 'a' })
@@ -199,7 +204,7 @@ describe('AgentContext — build snapshot independence (§11)', () => {
 		const first = context.build()
 		expect(first).toHaveLength(2)
 		// Corrupt the returned array at runtime — push + splice (the array is typed
-		// `readonly`, so reach the mutators through Reflect, never an assertion §1/§14).
+		// `readonly`, so reach the mutators through Reflect, never an assertion).
 		Reflect.apply(Array.prototype.push, first, [{ id: 'rogue', role: 'user', content: 'injected' }])
 		Reflect.apply(Array.prototype.splice, first, [0, 2])
 
@@ -396,7 +401,7 @@ describe('AgentContext — context managers', () => {
 // IMAGE files' base64 data attaches to the last user message. It is ACTIVE-ONLY (never the
 // other workspaces), scope-filtered by `scope.files`, and renders NOTHING when no workspace is
 // active. `context.workspaces` is ALWAYS present and supplied structurally through options
-// (AGENTS §16 — real behavior, no mocks; a real Workspace + WorkspaceManager, no provider needed).
+// Real behavior, no mocks; a real Workspace + WorkspaceManager, no provider needed.
 describe('AgentContext — workspaces accessor & construction', () => {
 	it('constructs a fresh empty WorkspaceManager when none is passed (always present)', () => {
 		const context = new AgentContext()
@@ -579,31 +584,8 @@ describe('AgentContext — workspaces render by carrier', () => {
 })
 
 describe('AgentContext — workspaces scope.files filtering', () => {
-	// An active workspace holding two TEXT files + two IMAGE files (seeded in one go — write() only
-	// mints text, so an image file is seated through the constructor seed seam), so scope.files can
-	// be shown filtering BOTH the text section and the image attach.
-	function seed(): AgentContext {
-		const context = new AgentContext({ system: 'sys' })
-		context.workspaces.add({
-			seed: [
-				createFile({ path: 'keep.txt', content: createTextContent('KEPT FILE', 'text') }),
-				createFile({ path: 'drop.txt', content: createTextContent('DROPPED FILE', 'text') }),
-				createFile({
-					path: 'keep.png',
-					content: createBinaryContent('KEEPIMG', 'image/png'),
-				}),
-				createFile({
-					path: 'drop.png',
-					content: createBinaryContent('DROPIMG', 'image/png'),
-				}),
-			],
-		})
-		context.messages.add({ role: 'user', content: 'hi' })
-		return context
-	}
-
 	it('an undefined scope.files passes EVERY active file (text + image)', () => {
-		const context = seed()
+		const context = seedWorkspaceContext()
 
 		const built = context.build()
 		const block = requireValue(built[0]).content
@@ -615,7 +597,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 	})
 
 	it('a named allow-list keeps only the listed files (filters BOTH the text section and the image attach)', () => {
-		const context = seed()
+		const context = seedWorkspaceContext()
 		context.apply(new Scope({ name: 'narrowed', files: ['keep.txt', 'keep.png'] }))
 
 		const built = context.build()
@@ -628,7 +610,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 	})
 
 	it('an empty allow-list ([]) drops EVERY workspace file (the whole `## Workspace` section vanishes)', () => {
-		const context = seed()
+		const context = seedWorkspaceContext()
 		context.apply(new Scope({ name: 'no-files', files: [] }))
 
 		const built = context.build()
@@ -651,19 +633,8 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 })
 
 describe('AgentContext — image data attachment (active workspace)', () => {
-	function seedImages(): AgentContext {
-		const context = new AgentContext()
-		context.workspaces.add({
-			seed: [
-				createFile({ path: 'a.png', content: createBinaryContent('IMGA', 'image/png') }),
-				createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') }),
-			],
-		})
-		return context
-	}
-
 	it('attaches the active workspace’s image data to the LAST user message (not the system block)', () => {
-		const context = seedImages()
+		const context = seedWorkspaceContext()
 		context.messages.add([
 			{ role: 'user', content: 'first user' },
 			{ role: 'assistant', content: 'reply' },
@@ -675,8 +646,8 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		const users = built.filter((message) => message.role === 'user')
 		const lastUser = users.at(-1)
 		expect(lastUser?.content).toBe('last user')
-		expect(lastUser?.images).toEqual(['IMGA', 'IMGB'])
-		// The earlier user message carries no images.
+		expect(lastUser?.images).toEqual(['KEEPIMG', 'DROPIMG'])
+		// The earlier user messages carry no images.
 		expect(users[0]?.images).toBeUndefined()
 	})
 
@@ -762,21 +733,8 @@ describe('AgentContext — scope access and application', () => {
 })
 
 describe('AgentContext — scope filtering in build()', () => {
-	function seed(): AgentContext {
-		const context = new AgentContext({ system: 'sys' })
-		context.instructions.add([
-			{ name: 'keep-i', content: 'KEPT INSTRUCTION' },
-			{ name: 'drop-i', content: 'DROPPED INSTRUCTION' },
-		])
-		context.messages.add([
-			{ role: 'user', content: 'first' },
-			{ role: 'user', content: 'second' },
-		])
-		return context
-	}
-
 	it('an undefined scope passes EVERYTHING (no filtering)', () => {
-		const context = seed()
+		const context = seedInstructionContext()
 
 		const built = context.build()
 		const block = requireValue(built[0]).content
@@ -787,7 +745,7 @@ describe('AgentContext — scope filtering in build()', () => {
 	})
 
 	it('a named allow-list keeps only the listed instructions', () => {
-		const context = seed()
+		const context = seedInstructionContext()
 		context.apply(new Scope({ name: 'narrowed', instructions: ['keep-i'] }))
 
 		const built = context.build()
@@ -798,7 +756,7 @@ describe('AgentContext — scope filtering in build()', () => {
 	})
 
 	it('an empty allow-list ([]) drops EVERY item of that category', () => {
-		const context = seed()
+		const context = seedInstructionContext()
 		context.apply(new Scope({ name: 'no-instructions', instructions: [] }))
 
 		const block = requireValue(context.build()[0]).content
@@ -809,7 +767,7 @@ describe('AgentContext — scope filtering in build()', () => {
 	})
 
 	it('reflects a scope swapped between builds (recomputed fresh, no shared state)', () => {
-		const context = seed()
+		const context = seedInstructionContext()
 
 		context.apply(new Scope({ name: 'only-keep', instructions: ['keep-i'] }))
 		expect(requireValue(context.build()[0]).content).not.toContain('DROPPED INSTRUCTION')
@@ -825,67 +783,36 @@ describe('AgentContext — scope filtering in build()', () => {
 // > built-in; render = item override > manager-options > provider > built-in; close =
 // manager-options > provider (NO built-in ⇒ no closing line). These pin the precedence at
 // EACH slot/level over the instructions section + the no-arg regression guard + the per-item
-// round-trip reaching build + the close coverage (AGENTS §16 — real behavior, no mocks).
+// round-trip reaching build + the close coverage — real behavior, no mocks.
 describe('AgentContext — format cascade: the instructions open (header)', () => {
-	// Resolve just the instructions `open` at each level. A single instruction so the block is
-	// `<open>\n\n<render>`; we read the open (the part before the render).
-	function openFor(format: ContextFormat | undefined, options?: { managerOpen?: string }): string {
-		const managerOpen = options?.managerOpen
-		const instructions =
-			managerOpen === undefined
-				? new InstructionManager()
-				: new InstructionManager({ format: { open: managerOpen } })
-		const context = new AgentContext({ instructions })
-		context.instructions.add({ name: 'a', content: 'X' })
-		const block = requireValue(context.build(format)[0]).content
-		return requireValue(block.split('\n\n')[0])
-	}
-
 	it('(a) built-in floor — no provider format, no manager override', () => {
-		expect(openFor(undefined)).toBe('## Instructions')
+		expect(resolveSectionOpen(undefined)).toBe('## Instructions')
 	})
 
 	it('(b) provider default BEATS the built-in', () => {
-		expect(openFor({ instructions: { open: 'P-HEADER' } })).toBe('P-HEADER')
+		expect(resolveSectionOpen({ instructions: { open: 'P-HEADER' } })).toBe('P-HEADER')
 	})
 
 	it('(c) manager-options override BEATS the provider default', () => {
-		const header = openFor({ instructions: { open: 'P-HEADER' } }, { managerOpen: 'M-HEADER' })
+		const header = resolveSectionOpen(
+			{ instructions: { open: 'P-HEADER' } },
+			{ managerOpen: 'M-HEADER' },
+		)
 		expect(header).toBe('M-HEADER')
 	})
 })
 
 describe('AgentContext — format cascade: an instruction item (render)', () => {
-	// Resolve just the per-item render at each level (the part after the header).
-	function renderFor(
-		format: ContextFormat | undefined,
-		options?: { managerRender?: string; itemFormat?: string },
-	): string {
-		const managerRender = options?.managerRender
-		const instructions =
-			managerRender === undefined
-				? new InstructionManager()
-				: new InstructionManager({ format: { render: () => managerRender } })
-		const context = new AgentContext({ instructions })
-		context.instructions.add({
-			name: 'a',
-			content: 'BUILTIN',
-			...(options?.itemFormat === undefined ? {} : { format: options.itemFormat }),
-		})
-		const block = requireValue(context.build(format)[0]).content
-		return requireValue(block.split('\n\n')[1])
-	}
-
 	it('(a) built-in floor — the instruction content', () => {
-		expect(renderFor(undefined)).toBe('BUILTIN')
+		expect(resolveSectionRender(undefined)).toBe('BUILTIN')
 	})
 
 	it('(b) provider default BEATS the built-in', () => {
-		expect(renderFor({ instructions: { render: () => 'P-RENDER' } })).toBe('P-RENDER')
+		expect(resolveSectionRender({ instructions: { render: () => 'P-RENDER' } })).toBe('P-RENDER')
 	})
 
 	it('(c) manager-options override BEATS the provider default', () => {
-		const render = renderFor(
+		const render = resolveSectionRender(
 			{ instructions: { render: () => 'P-RENDER' } },
 			{ managerRender: 'M-RENDER' },
 		)
@@ -893,15 +820,15 @@ describe('AgentContext — format cascade: an instruction item (render)', () => 
 	})
 
 	it('(d) item override BEATS the manager-options override (and everything below)', () => {
-		const render = renderFor(
+		const render = resolveSectionRender(
 			{ instructions: { render: () => 'P-RENDER' } },
-			{ managerRender: 'M-RENDER', itemFormat: 'ITEM' },
+			{ managerRender: 'M-RENDER', itemOverride: 'ITEM' },
 		)
 		expect(render).toBe('ITEM')
 	})
 
 	it('an item override alone beats the built-in (no provider, no manager override)', () => {
-		expect(renderFor(undefined, { itemFormat: 'ITEM' })).toBe('ITEM')
+		expect(resolveSectionRender(undefined, { itemOverride: 'ITEM' })).toBe('ITEM')
 	})
 })
 
@@ -909,7 +836,7 @@ describe('AgentContext — format cascade: an instruction item (render)', () => 
 // WRAP the whole group (`<instructions>` … `</instructions>`). It has NO built-in floor (unlike
 // open / render), so an unset close yields no closing line; it cascades manager-options > provider.
 // These pin the group-wrap assembly, close-without-open, the items-empty guard winning over a
-// set close, and the close cascade (AGENTS §16 — real behavior, no mocks).
+// set close, and the close cascade — real behavior, no mocks.
 describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 	it('open + close WRAP the group — [open, ...items, close] in order, blank-line joined', () => {
 		// A two-instruction section framed by a manager-options open/render/close. The whole section
@@ -992,7 +919,7 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 describe('AgentContext — format cascade: the no-arg regression guard', () => {
 	it('build() with NO format arg reproduces the built-in framing byte-for-byte', () => {
 		// The load-bearing regression: no provider format + no manager overrides + no
-		// per-item format ⇒ today's exact output. Compare build(undefined) to the assembled
+		// per-item override ⇒ today's exact output. Compare build(undefined) to the assembled
 		// built-in strings (the snapshot the prior tests pin).
 		const context = new AgentContext({ system: 'You are concise.' })
 		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
@@ -1019,10 +946,10 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 		)
 	})
 
-	it('a per-item format reaches build() and overrides for that item only', () => {
+	it('a per-item override reaches build() and overrides for that item only', () => {
 		const context = new AgentContext()
 		context.instructions.add([
-			{ name: 'a', content: 'plain-a', format: 'OVERRIDE-A' },
+			{ name: 'a', content: 'plain-a', override: 'OVERRIDE-A' },
 			{ name: 'b', content: 'plain-b' },
 		])
 
@@ -1040,7 +967,7 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 // instructions section + the active workspace's text section, `\n\n`-separated), then the
 // scope-filtered conversation in insertion order. The cascade tests above pin per-section
 // formatting; this pins the WHOLE array's structure verbatim so the canonical order +
-// concatenation can't silently drift (AGENTS §16 — real behavior).
+// concatenation can't silently drift — real behavior.
 describe('AgentContext — the canonical built array (order + exact concatenation)', () => {
 	it('builds EXACTLY [system-block, ...conversation] — the system content is prompt + instructions + workspace', () => {
 		const context = new AgentContext({ system: 'You are concise.' })
@@ -1096,7 +1023,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 // The DEFAULT FORMAT snapshot guard — pins the built-in instructions section's header AND
 // per-item rendering VERBATIM, in isolation, so a silent drift in any default framing fails
 // loudly. (The no-arg regression guard above pins the assembled whole; this pins the piece on
-// its own.) AGENTS §16 — real behavior, no mocks.
+// its own.) Real behavior, no mocks.
 describe('AgentContext — default format snapshot guard (built-ins verbatim)', () => {
 	it('instructions: `## Instructions` header + bare content, no decoration', () => {
 		const context = new AgentContext()
@@ -1132,7 +1059,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 // supplied manager has none), so `messages` is always defined. The scope's instructions still filter
 // the system block; the scope's MESSAGES allow-list is NOT applied (the conversation is
 // authoritative). A manager is supplied via AgentContextOptions.conversations; `manager.add()` mints
-// + auto-activates a conversation we can hold a reference to. AGENTS §16 — real behavior, a data-stub
+// + auto-activates a conversation the test holds a reference to. Real behavior, a data-stub
 // summarizer (not a behavior-mock).
 describe('AgentContext — the active conversation as the message source', () => {
 	it('context.messages IS the active conversation itself (same instance — it owns its messages directly)', () => {
@@ -1282,7 +1209,7 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 // (`conversations.switch(id)`). The DYNAMIC `messages` getter then points at the new active
 // conversation's live tail (the SAME reference, no duplication) and `build()` folds its `view()`.
 // This is the multi-conversation mechanism: ONE agent serving many threads by switching the active
-// conversation between runs (AGENTS §16 — real behavior, a data-stub summarizer).
+// conversation between runs — real behavior, a data-stub summarizer.
 describe('AgentContext — switching the active conversation (multi-conversation)', () => {
 	it('conversations.switch(id) swaps messages to the NEW active conversation (same reference)', () => {
 		const conversations = new ConversationManager()

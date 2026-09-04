@@ -7,8 +7,8 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.
  *
  * @remarks
- * A plain `Map<string, ConversationSnapshot>` (AGENTS §21 — the snapshot is already pure,
- * self-contained JSON, so no encoding is needed for the memory tier). Like the
+ * A plain `Map<string, ConversationSnapshot>` — the snapshot is already pure,
+ * self-contained JSON, so no encoding is needed for the memory tier. Like the
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore} it twins,
  * there is NO idle-TTL and NO eviction: a persisted conversation lives until an explicit `delete`. A
  * durable backend (JSON / SQLite / IndexedDB) swaps in through the SAME interface without touching
@@ -21,7 +21,7 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
  * - **`set` inserts / replaces under the snapshot's OWN `id`** (no separate id param).
  * - **`delete` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
- * The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the §22 method
+ * The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the method
  * bijection with {@link ConversationStoreInterface}). Hydration is a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
  * the live conversation through the `snapshot` option (its `open` / `save`).

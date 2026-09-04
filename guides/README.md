@@ -1,6 +1,6 @@
 # Guides
 
-A dual-axis index into this repository's guides — by concept, and by directory (AGENTS §22).
+A dual-axis index into this repository's guides — by concept, and by directory.
 
 ## By concept
 
@@ -32,7 +32,7 @@ repo; it is kept here for the same reason.
 
 [`contract.md`](contract.md) is a byte-identical mirror of the guide
 for `@orkestrel/contract` — a runtime dependency, the shape DSL other tools
-(e.g. `@orkestrel/toolbox`'s `createWorkspaceTool`) compile their contracts
+(for example `@orkestrel/toolbox`'s `createWorkspaceTool`) compile their contracts
 through. It documents **that package's** surface (guards, combinators,
 parsers, and the shape DSL), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitives it is built from
@@ -102,4 +102,4 @@ here for the same reason.
 
 ## See also
 
-- [`AGENTS.md`](../AGENTS.md) — the rules; §22 documentation-as-contracts.
+- [`AGENTS.md`](../AGENTS.md) — the repository's authority pointer; the coding rules it resolves to live in `@orkestrel/scaffold`.

@@ -39,7 +39,7 @@ import { createScriptedProvider, createToolCall, createTokenUsage } from '../../
 // the shared job-handler step both createAgentQueue / createAgentRunner settle each
 // rehydrated agent through: a natural finish resolves with its result, a PARTIAL throws
 // an AgentJobError when partials are disallowed and resolves when allowed (driven over a
-// scripted provider — no Ollama, AGENTS §16 real behavior).
+// scripted provider — no Ollama, real behavior).
 
 // A minimal Message fixture — only the fields estimateMessages reads (content);
 // id/role round out the shape so it is a real message, not a partial.
@@ -365,7 +365,7 @@ describe('estimateMessages', () => {
 		expect(estimateMessages([withEmptyCalls])).toBe(MESSAGE_TOKEN_OVERHEAD)
 	})
 
-	// F5 — a circular `ToolCall.arguments` makes `JSON.stringify` throw; estimateMessages'
+	// A circular `ToolCall.arguments` makes `JSON.stringify` throw; estimateMessages'
 	// TSDoc promises it "never throws", so the circular case must not reject/throw and instead
 	// falls back to a conservative fixed contribution (MESSAGE_TOKEN_OVERHEAD-scale).
 	it('never throws on a circular calls argument — falls back to the documented fixed contribution', () => {
@@ -666,11 +666,11 @@ describe('renderSection — one assembled context section', () => {
 })
 
 describe('resolveOpen / resolveClose / resolveItem — the format cascade', () => {
-	// A section item is anything carrying the per-item `format` override — an instruction here,
+	// A section item is anything carrying the per-item `override` — an instruction here,
 	// declared locally so the cascade is exercised on its own contract, not an entity's.
 	interface CascadeItem {
 		readonly content: string
-		readonly format?: string
+		readonly override?: string
 	}
 	const manager: ContextSectionSourceInterface<CascadeItem> = {
 		open: '## Instructions',
@@ -720,14 +720,14 @@ describe('resolveOpen / resolveClose / resolveItem — the format cascade', () =
 		)
 	})
 
-	it("prefers the item's own format over every other level", () => {
+	it("prefers the item's own override over every other level", () => {
 		expect(
 			resolveItem(
 				overridden,
 				{ render: (one) => `- ${one.content}` },
 				{
 					content: 'ignored',
-					format: '<rule priority="high">Escalate.</rule>',
+					override: '<rule priority="high">Escalate.</rule>',
 				},
 			),
 		).toBe('<rule priority="high">Escalate.</rule>')

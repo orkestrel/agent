@@ -17,6 +17,8 @@ import {
 	parseManifest,
 	resolveLink,
 } from '@orkestrel/guide'
+import { createTool, createToolManager } from '@orkestrel/tool'
+import { createConversationManager, createInstructionManager, sanitizeToken } from '@src/core'
 import { readFileSync } from 'node:fs'
 import { requireValue } from '@orkestrel/test'
 import { readInventory } from '@orkestrel/test/server'
@@ -117,7 +119,7 @@ for (const entry of manifest) {
 				.map((fence) => fence.code)
 			const names = guide
 				.surface()
-				.filter((symbol) => symbol.kind === 'function')
+				.filter((symbol) => symbol.keyword === 'function')
 				.map((symbol) => symbol.name)
 			expect(findUnexampled(names, fences, source.examples())).toEqual([])
 		})
@@ -168,3 +170,92 @@ for (const entry of manifest) {
 		})
 	})
 }
+
+// The EXECUTED half. Every preceding check reads a NAME — from a barrel, from source
+// text, from a fence's import list — and a name that resolves proves nothing about the
+// sentence beside it, so a fence whose comment claims a value the code contradicts passes
+// all of them. The cases here RUN the flagship fences and assert the values their comments
+// claim, with a presence guard beside each transcription binding every line that carries a
+// claim. Change a fence, change the transcription beside it.
+describe('flagship fences', () => {
+	const guideText = requireValue(files['guides/agent.md'], 'Missing file: guides/agent.md')
+
+	it('answers the instructions fence’s open and per-item rendering', () => {
+		const instructions = createInstructionManager()
+		const safety = instructions.add({
+			name: 'safety',
+			content: 'Refuse unsafe requests.',
+			priority: 10,
+		})
+
+		expect(instructions.open).toBe('## Instructions')
+		expect(instructions.render(safety)).toBe('Refuse unsafe requests.')
+	})
+
+	it('carries the instructions fence lines the transcription copies', () => {
+		expect(guideText).toContain("instructions.open // '## Instructions'")
+		expect(guideText).toContain("instructions.render(safety) // 'Refuse unsafe requests.'")
+	})
+
+	it('answers the tool-dispatch fence’s two ToolResults', async () => {
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'add',
+				description: 'Add two numbers',
+				parameters: {
+					type: 'object',
+					properties: { a: { type: 'number' }, b: { type: 'number' } },
+				},
+				execute: (args) => Number(args.a) + Number(args.b),
+			}),
+		)
+		const results = await tools.execute([
+			{ id: '1', name: 'add', arguments: { a: 2, b: 3 } },
+			{ id: '2', name: 'ghost', arguments: {} },
+		])
+
+		expect(results[0]).toEqual({ success: true, id: '1', name: 'add', value: 5 })
+		expect(results[1]).toEqual({
+			success: false,
+			id: '2',
+			name: 'ghost',
+			error: 'tool not found: ghost',
+		})
+	})
+
+	it('carries the tool-dispatch fence lines the transcription copies', () => {
+		expect(guideText).toContain(
+			"{ id: '1', name: 'add', arguments: { a: 2, b: 3 } }, // → { success: true, id: '1', name: 'add', value: 5 }",
+		)
+		expect(guideText).toContain(
+			"{ id: '2', name: 'ghost', arguments: {} }, // → { success: false, id: '2', name: 'ghost', error: 'tool not found: ghost' }",
+		)
+	})
+
+	it('answers the helper fence’s sanitized token count', () => {
+		expect(sanitizeToken(12.7)).toBe(12)
+	})
+
+	it('carries the helper fence line the transcription copies', () => {
+		expect(guideText).toContain('const tokens = sanitizeToken(12.7) // 12')
+	})
+
+	it('answers the snapshot fence’s durable payload keys', () => {
+		const conversations = createConversationManager()
+		const thread = conversations.add({ id: 'thread-1' })
+		const message = thread.add({ role: 'user', content: 'hi' })
+		thread.remove(message.id)
+		thread.clear()
+
+		// `summary?` is optional and absent until the first compaction, so an uncompacted
+		// conversation's snapshot carries `id` / `sections` / `messages` and omits it.
+		expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages'])
+	})
+
+	it('carries the snapshot fence line the transcription copies', () => {
+		expect(guideText).toContain(
+			'thread.snapshot() // { id, summary?, sections, messages } — the durable payload',
+		)
+	})
+})

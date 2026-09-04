@@ -21,13 +21,13 @@ const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
 // twin of the plain-Map MemoryConversationStore behind the ConversationStoreInterface seam (get /
 // set / delete, async, keyed by a snapshot's own id). It persists the ConversationSnapshot as ONE
 // OPAQUE JSON column over a `databases` table (driver default = createMemoryDriver), narrowing the
-// column back to a ConversationSnapshot on `get` (the §14 boundary narrow). Exercised over a REAL
-// memory driver, with REAL ConversationSnapshot values (§16 NO mocks) — a genuine `compact()`
+// column back to a ConversationSnapshot on `get` (the total boundary guard). Exercised over a REAL
+// memory driver, with REAL ConversationSnapshot values (NO mocks) — a genuine `compact()`
 // produces real sections + a rollup, plus a live tail.
 
 // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
-// tests/setup.ts (AGENTS §16.1). `setup.ts` exports each scenario as a plain function returning its
+// tests/setup.ts. `setup.ts` exports each scenario as a plain function returning its
 // result (NO `describe` / `it` / `expect` bound in), so THIS file registers the battery against the
 // database factory (over a REAL memory driver) and asserts on what each scenario returns, keeping only
 // its TWIN-SPECIFIC blocks below: the default-driver overload, cross-instance durability over a shared
@@ -117,7 +117,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		expect(await reader.get('shared')).toEqual(snapshot)
 	})
 
-	it('a TAMPERED row (a hostile calls[] element) resolves UNDEFINED from get (ASI06 fail-closed)', async () => {
+	it('a TAMPERED row (a hostile calls[] element) resolves UNDEFINED from get (fail-closed)', async () => {
 		// Plant a tampered row OUT-OF-BAND over the store's own driver — the same one-table shape
 		// the factory builds — whose snapshot column smuggles a malformed assistant calls[] element
 		// (the shape a real chat template would otherwise render). The deepened isMessage rejects

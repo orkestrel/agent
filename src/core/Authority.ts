@@ -26,8 +26,7 @@ import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
  *   back to the model as a denial {@link import('@orkestrel/tool').ToolResult} (a `tool`
  *   chunk + a tool message) instead of being executed — no tool run, no budget cost —
  *   so the model sees the denial and can react.
- * - **Synchronous now.** The async human-approval handshake (request / grant / deny) is
- *   deferred to a later chunk; `evaluate` returns a verdict directly.
+ * - **Synchronous.** `evaluate` returns the verdict directly.
  * - **Event-free.** A purely functional gate — no Emitter, no events.
  *
  * @example

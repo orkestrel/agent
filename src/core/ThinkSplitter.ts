@@ -21,7 +21,7 @@ import { THINK_CLOSE, THINK_OPEN } from './constants.js'
  *   prefix cannot be recalled, so `content` is the authoritative accumulation). The
  *   rule is ONE-SHOT: after any tag event a bare `</think>` is plain text.
  * - **Multiple spans** accumulate onto `thinking` in stream order. A nested-looking
- *   `<think>` inside an open span is just thinking text (no nesting is tracked — the
+ *   `<think>` inside an open span is thinking text (no nesting is tracked — the
  *   first `</think>` closes the span), matching how the models emit it.
  * - **Unclosed span at stream end.** `flush()` routes the open span's tail (including
  *   any held partial close tag) to `thinking` — a cut-off model was still reasoning.
@@ -82,7 +82,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 
 	// Drive the state machine over one delta, returning the clean content it surfaces —
 	// the wrapper folds the return into `#content`, which the implicit-open branch may
-	// have just reset (the reclassification).
+	// have reset a moment earlier (the reclassification).
 	#scan(delta: string): string {
 		this.#pending += delta
 		let content = ''

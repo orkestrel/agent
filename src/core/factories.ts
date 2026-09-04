@@ -65,8 +65,8 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * a `summarize` (omitted ⇒ `compact()` throws a `ConversationError`); `keep` retains a recent
  * tail (default `DEFAULT_CONVERSATION_KEEP` — fold ALL). `rehydrate(id)` / `search(query)` read
  * the retained originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
- * via the reserved `on` option (§8); the emitter isolates a listener throw and routes it to
- * its `error` handler (the `error` option, §13), so it can never corrupt a compaction.
+ * through the reserved `on` option; the emitter isolates a listener throw and routes it to
+ * its `error` handler (the `error` option), so it can never corrupt a compaction.
  *
  * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` (see {@link ConversationOptions})
  * @returns A working {@link ConversationInterface}
@@ -94,7 +94,8 @@ export function createConversation(options?: ConversationOptions): ConversationI
 /**
  * Creates a conversation registry — a {@link ConversationManagerInterface} holding
  * {@link ConversationInterface}s keyed by their `id` (in insertion order) WITH an active pointer:
- * the §9 store over the conversation layer plus the `active` / `switch` seam the context renders.
+ * the id-keyed store over the conversation layer plus the `active` / `switch` seam the context
+ * renders.
  *
  * @remarks
  * Starts empty; `add(input?)` mints a {@link ConversationInterface} (its `id` from the input
@@ -103,8 +104,9 @@ export function createConversation(options?: ConversationOptions): ConversationI
  * AUTO-ACTIVATES the FIRST one (a registry with conversations always has one `active`); a later
  * `add` leaves `active` unchanged. `switch(id)` re-points `active` (an unknown `id` returns
  * `undefined`, leaving `active` unchanged — lenient, never throws); `conversation(id)` /
- * `conversations()` look up; `remove` (one or a batch, §9.2) reports whether any was removed AND
- * clears `active` if it was the removed one; `clear` empties it and clears `active`. Event-free
+ * `conversations()` look up; `remove` (one or a batch) reports `true` only when every supplied id
+ * was removed AND clears `active` if it was a removed one; `clear` empties it and clears `active`.
+ * Event-free
  * (each conversation owns its own observable `emitter`). A conversation created with NEITHER a
  * manager default nor a per-`add` `summarize` cannot `compact` (it throws a `ConversationError`).
  *
@@ -237,17 +239,17 @@ export function createInstruction(input: InstructionInput): InstructionInterface
  * immutable instructions keyed by `name`, listed by descending `priority`.
  *
  * @remarks
- * Starts empty; `add` (one or a batch, §9.2) MINTS each `id` and OVERWRITES a same-name
+ * Starts empty; `add` (one or a batch) MINTS each `id` and OVERWRITES a same-name
  * instruction (last write wins); `instructions()` lists them sorted by descending
  * `priority` (stable for ties); `open` / `render` are the build contract a richer
- * context renders an instructions block with; `remove` (one or a batch) reports whether
- * any was removed; `clear` empties it. Carries an observable `emitter`
- * ({@link import('./types.js').InstructionManagerEventMap}) wired via the reserved `on`
- * option (§8); the emitter isolates a listener throw and routes it to its `error` handler
- * (the `error` option, §13), so it can never corrupt a mutation. An optional `format`
+ * context renders an instructions block with; `remove` (one or a batch) reports `true` only
+ * when every supplied name was removed; `clear` empties it. Carries an observable `emitter`
+ * ({@link import('./types.js').InstructionManagerEventMap}) wired through the reserved `on`
+ * option; the emitter isolates a listener throw and routes it to its `error` handler
+ * (the `error` option), so it can never corrupt a mutation. An optional `format`
  * override is the manager-options level of the `AgentContext` build cascade (consulted by
  * `open` / `render`, beating the provider default + built-in; a per-item
- * `InstructionInput.format` still beats it).
+ * `InstructionInput.override` still beats it).
  *
  * @param options - Optional `on` hooks + a `format` override (see {@link InstructionManagerOptions})
  * @returns An empty {@link InstructionManagerInterface}
@@ -267,8 +269,8 @@ export function createInstructionManager(
 }
 
 /**
- * Creates a named scope — an immutable {@link ScopeInterface} from its `name` and the four
- * optional per-category allow-lists, the `id` minted at construction.
+ * Creates a named scope — an immutable {@link ScopeInterface} from its `name` and its
+ * per-category allow-lists, the `id` minted at construction.
  *
  * @remarks
  * Each list is THREE-WAY: `undefined` ⇒ NO constraint on that category (all pass), `[]` ⇒
@@ -276,8 +278,8 @@ export function createInstructionManager(
  * tighter child by set-INTERSECTION (an `undefined` side imposing no constraint). Stored
  * immutable — never mutated after creation (`narrow` returns a new scope).
  *
- * @param input - `name` (required) and the optional `instructions` / `tools` / `messages` /
- *   `files` allow-lists (see {@link ScopeInput})
+ * @param input - `name` (required) and the optional `instructions` / `tools` / `files`
+ *   allow-lists (see {@link ScopeInput})
  * @returns A working {@link ScopeInterface}
  *
  * @example
@@ -299,10 +301,11 @@ export function createScope(input: ScopeInput): ScopeInterface {
  * @remarks
  * Starts empty; `create` mints each scope's `id` and stores it (keyed by `id`, so it
  * always adds — two scopes may share a `name`); `scopes()` lists them in insertion order;
- * `remove` (one or a batch, §9.2) reports whether any was removed; `clear` empties it.
- * Carries an observable `emitter` ({@link import('./types.js').ScopeManagerEventMap}) wired
- * via the reserved `on` option (§8); the emitter isolates a listener throw and routes it to
- * its `error` handler (the `error` option, §13), so it can never corrupt a mutation.
+ * `remove` (one or a batch) reports `true` only when every supplied id was removed; `clear`
+ * empties it. Carries an observable `emitter`
+ * ({@link import('./types.js').ScopeManagerEventMap}) wired through the reserved `on`
+ * option; the emitter isolates a listener throw and routes it to its `error` handler
+ * (the `error` option), so it can never corrupt a mutation.
  *
  * @param options - Optional `on` hooks (see {@link ScopeManagerOptions})
  * @returns An empty {@link ScopeManagerInterface}
@@ -316,7 +319,7 @@ export function createScope(input: ScopeInput): ScopeInterface {
  * ```
  */
 export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerInterface {
-	return new ScopeManager(options?.on, options?.error)
+	return new ScopeManager(options)
 }
 
 /**
@@ -328,11 +331,11 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  * `system` is the optional system prompt; `tools` / `instructions` / `workspaces` are pre-built
  * managers to reuse (empty ones are created when omitted, so `context.workspaces` is ALWAYS
  * present); `scope` is the initial active filter (`undefined` ⇒ no filtering, changeable afterwards
- * via `context.apply(...)`). The `messages` store is always fresh. `build()` folds the scoped
+ * through `context.apply(...)`). The `messages` store is always fresh. `build()` folds the scoped
  * instructions — PLUS the ACTIVE workspace's scope-filtered text files (fenced) — into ONE leading
  * `system` message and appends the scoped conversation (attaching the active workspace's
  * scope-filtered image files' `base64` payload to the last user message), built fresh each call; the active
- * workspace is the SOLE document/image context. Tools are advertised STRUCTURALLY (via
+ * workspace is the SOLE document/image context. Tools are advertised STRUCTURALLY (through
  * `tools.definitions()`, scope-filtered by the loop), never serialized into the prompt.
  *
  * @param options - Optional `system` / `tools` / `instructions` / `workspaces` / `scope`
@@ -362,11 +365,11 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
  * @remarks
  * One private loop drives the turn; `generate` DRAINS the same stream `stream`
  * exposes, so they can never diverge. Each turn is bounded by one cancel folded from
- * `signal` + `timeout` + `budget` (via `AbortSignal.any`) — any trip (or `abort()`)
+ * `signal` + `timeout` + `budget` (through `AbortSignal.any`) — any trip (or `abort()`)
  * commits a PARTIAL result (the stream's `result` RESOLVES on a cancel, rejects only
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
  * iteration is capped at `limit` (default `DEFAULT_AGENT_LIMIT`). Tools are advertised
- * structurally via `context.tools.definitions()`. Two observation surfaces: the
+ * structurally through `context.tools.definitions()`. Two observation surfaces: the
  * {@link AgentChunk} stream (pull — per-token content) and a typed `emitter` (push —
  * lifecycle + `usage` / `tool` / `deny` for fire-and-forget observers).
  *
@@ -411,7 +414,7 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
  * partial open tag that never completed returns as final content; an UNCLOSED think
  * span lands on `thinking`). Tags split ACROSS deltas are held back until
  * disambiguated, multiple spans accumulate in order, and a nested-looking `<think>`
- * inside an open span is just thinking text. One splitter serves ONE stream — create
+ * inside an open span is thinking text. One splitter serves ONE stream — create
  * a fresh one per provider call.
  *
  * @returns A fresh {@link ThinkSplitterInterface} (state empty, outside any span)
@@ -471,9 +474,9 @@ export function createChannel<T>(): ChannelInterface<T> {
  * `fallback` decides; it defaults to `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }`
  * (allow-unmatched — a rules list of denials acts as a DENYLIST). Pass an
  * `allowed: false` `fallback` to flip the gate to deny-by-default (an ALLOWLIST). Wire
- * the result into `createAgent` via `AgentOptions.authority`: a denied call is fed back
+ * the result into `createAgent` through `AgentOptions.authority`: a denied call is fed back
  * to the model as a denial `ToolResult` (not executed, no budget cost), so the model
- * can react. Synchronous now — the async human-approval handshake is deferred.
+ * can react. Synchronous — `evaluate` returns the verdict directly.
  *
  * @param options - Optional `rules` (ordered) and `fallback` (see {@link AuthorityOptions})
  * @returns A working {@link AuthorityInterface}
@@ -501,9 +504,10 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  *
  * @remarks
  * `providers` is required; `tools` / `authorities` / `schedulers` are optional pools.
- * The accessors (`provider` / `tool` / `authority` / `scheduler`) THROW `unknown <category>:
- * <name>` on an unregistered name (§9.1 + §12) — a misconfigured or crash-restored job
- * fails loudly rather than running with a missing dependency. `build(input, signal)`
+ * The accessors (`provider` / `tool` / `authority` / `scheduler`) THROW an
+ * {@link import('./errors.js').AgentError} carrying `code: 'REGISTRY'` and the message
+ * `unknown <category>: <name>` on an unregistered name — a misconfigured or crash-restored
+ * job fails loudly rather than running with a missing dependency. `build(input, signal)`
  * resolves the names, rebuilds the token budget from its ceiling, seeds the agent's
  * context with the job's messages, and threads `signal` so a queue / runner abort
  * propagates. This is the bridge that makes durable, serializable agent jobs runnable.
@@ -538,17 +542,17 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  * @remarks
  * - **Composes the substrate (no new engine).** The handler is the only new logic;
  *   bounded `concurrency`, `retries`, the per-attempt `timeout`, and durable persistence
- *   via `store` (+ `restore()` after a crash) are all the backing Queue's. `enqueue`
+ *   through `store` (+ `restore()` after a crash) are all the backing Queue's. `enqueue`
  *   returns a per-job promise.
  * - **Durable + serializable.** Because `AgentJobInput` is JSON-serializable, a `store`
- *   (e.g. `createMemoryQueueStore` / `createDatabaseQueueStore`) persists outstanding
+ *   (for example `createMemoryQueueStore` / `createDatabaseQueueStore`) persists outstanding
  *   jobs; `restore()` re-enqueues them after a restart and the `registry` rehydrates the
  *   live pieces from the names — so a job survives a crash.
  * - **Partial policy.** A partial result THROWS an
  *   {@link import('./errors.js').AgentJobError} by default, so a job cancelled by its
  *   attempt deadline / a queue abort RETRIES while attempts remain; `partial: true`
  *   resolves the partial as success instead.
- * - **Cancellation threads through.** The handler passes `execution.signal` into
+ * - **Cancellation threads through.** The handler passes `context.signal` into
  *   `registry.build`, so a queue `abort()` or a per-attempt timeout cancels the in-flight
  *   agent (which commits a partial → throws → retries / fails per policy).
  *
@@ -562,7 +566,7 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  * import { createMemoryQueueStore } from '@orkestrel/queue'
  *
  * const registry = createAgentRegistry({ providers: { main: provider } })
- * const store = createMemoryQueueStore(agentJobShape) // survives a restart via restore()
+ * const store = createMemoryQueueStore(agentJobShape) // survives a restart through restore()
  * const queue = createAgentQueue({ registry, concurrency: 2, retries: 1, store })
  * const result = await queue.enqueue({ provider: 'main', messages: [{ role: 'user', content: 'ok?' }] })
  * ```

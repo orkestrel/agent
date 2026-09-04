@@ -3,7 +3,7 @@ import type { ChannelInterface } from './types.js'
 /**
  * Buffers chunks in a minimal unbounded async channel — the eager pump WRITES them in
  * (`push`) and ends it (`close` / `fail`) regardless of consumption; a consumer READS them back
- * live via the `drain` async-iterator. Decoupling write from read is what lets a
+ * live through the `drain` async-iterator. Decoupling write from read is what lets a
  * producer make progress without a consumer pulling.
  *
  * @remarks

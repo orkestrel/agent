@@ -3,15 +3,15 @@ import { ScopeManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
 
-// ScopeManager is the id-keyed registry of reusable named scopes (AGENTS §16 — real
-// behavior, no mocks). Covers create (minting an id, always adding — never overwriting),
-// scope/scopes lookup + insertion order, remove (single + batch §9.2) + clear + count,
+// ScopeManager is the id-keyed registry of reusable named scopes — real
+// behavior, no mocks. Covers create (minting an id, always adding — never overwriting),
+// scope/scopes lookup + insertion order, remove (single + batch) + clear + count,
 // the create/remove/clear event emissions, and the emit-safety guarantee (a throwing
 // listener can't corrupt a mutation + routes to the emitter's `error` handler, with no
-// recursion) mirroring the Table / InstructionManager §13 convention.
+// recursion) mirroring the Table / InstructionManager emitter convention.
 
 // The ScopeManagerEventMap event names recorded across the emitter tests — fed to
-// `createRecorders` from @orkestrel/test (AGENTS §16.1: the per-event wiring lives in the
+// `createRecorders` from @orkestrel/test (the per-event wiring lives in the
 // package; this file keeps only the names its scenarios observe). `createRecorders` takes
 // its event map from an explicit type argument: `TMap` appears only inside the generic `on`
 // method of its source parameter, which yields no inference candidate, so both arguments are
@@ -75,15 +75,20 @@ describe('ScopeManager — remove & clear', () => {
 		expect(manager.count).toBe(0)
 	})
 
-	it('removes a batch (§9.2) and returns true when any was removed', () => {
+	it('removes a batch and returns true only when every supplied id was removed', () => {
 		const manager = new ScopeManager()
 		const a = manager.create({ name: 'a' })
 		const b = manager.create({ name: 'b' })
 		manager.create({ name: 'c' })
 
-		expect(manager.remove([a.id, 'missing', b.id])).toBe(true)
+		// A partly applied batch is distinguishable from a fully applied one.
+		expect(manager.remove([a.id, 'missing', b.id])).toBe(false)
 		expect(manager.count).toBe(1)
 		expect(manager.remove(['nope', 'gone'])).toBe(false)
+
+		const c = manager.create({ name: 'c2' })
+		const d = manager.create({ name: 'd' })
+		expect(manager.remove([c.id, d.id])).toBe(true)
 	})
 
 	it('clears every scope', () => {
@@ -98,7 +103,7 @@ describe('ScopeManager — remove & clear', () => {
 	})
 })
 
-describe('ScopeManager — emitter (push observation surface §13)', () => {
+describe('ScopeManager — emitter (the push observation surface)', () => {
 	it('fires create on each created scope, in order', () => {
 		const manager = new ScopeManager()
 		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
@@ -151,7 +156,7 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 
 	it('wires initial listeners through the reserved on option', () => {
 		const create = createRecorder<[scope: ScopeInterface]>()
-		const manager = new ScopeManager({ create: create.handler })
+		const manager = new ScopeManager({ on: { create: create.handler } })
 		manager.create({ name: 'a' })
 
 		expect(create.count).toBe(1)
@@ -160,7 +165,7 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 
 	it('EMIT SAFETY: a throwing create listener cannot corrupt the registry, and routes to the error handler', () => {
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
-		const manager = new ScopeManager(undefined, errors.handler)
+		const manager = new ScopeManager({ error: errors.handler })
 		manager.emitter.on('create', () => {
 			throw new Error('create observer blew up')
 		})
@@ -178,9 +183,11 @@ describe('ScopeManager — emitter (push observation surface §13)', () => {
 
 	it('EMIT SAFETY: a throwing error handler neither escapes nor recurses', () => {
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
-		const manager = new ScopeManager(undefined, (error, event) => {
-			errors.handler(error, event)
-			throw new Error('error handler blew up too')
+		const manager = new ScopeManager({
+			error: (error, event) => {
+				errors.handler(error, event)
+				throw new Error('error handler blew up too')
+			},
 		})
 		manager.emitter.on('create', () => {
 			throw new Error('create listener blew up')

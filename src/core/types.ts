@@ -131,10 +131,10 @@ export interface ProviderStreamOptions {
  * - `id` is a stable per-instance trace label; `name` identifies the backend
  *   (`'ollama'`).
  * - Both calls take an `AbortSignal` so a caller bounds the request (cancel,
- *   deadline, or budget folded via `AbortSignal.any`); aborting a `stream` mid-flight
+ *   deadline, or budget folded through `AbortSignal.any`); aborting a `stream` mid-flight
  *   surfaces a `ProviderAbortError` carrying the partial result.
  * - `tools`, when given non-empty, advertises the callable tools for this turn.
- * - `options` carries the optional per-call {@link ProviderStreamOptions} (e.g. `think`),
+ * - `options` carries the optional per-call {@link ProviderStreamOptions} (for example `think`),
  *   overriding the provider's constructed defaults for that one call; omitted ⇒ defaults.
  */
 export interface ProviderInterface {
@@ -154,7 +154,7 @@ export interface ProviderInterface {
 	 * @param messages - The conversation so far
 	 * @param signal - Bounds the request; an abort rejects the call
 	 * @param tools - Optional tools the model may call this turn
-	 * @param options - Optional per-call {@link ProviderStreamOptions} (e.g. `think`); omitted ⇒ defaults
+	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The assembled result (content + any tool calls + any usage)
 	 */
 	generate(
@@ -176,7 +176,7 @@ export interface ProviderInterface {
 	 * @param messages - The conversation so far
 	 * @param signal - Bounds the request; an abort throws `ProviderAbortError`
 	 * @param tools - Optional tools the model may call this turn
-	 * @param options - Optional per-call {@link ProviderStreamOptions} (e.g. `think`); omitted ⇒ defaults
+	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A generator of {@link ProviderDelta}s, returning the assembled result
 	 */
 	stream(
@@ -198,9 +198,9 @@ export interface ProviderInterface {
  *   back until the next delta (or `flush`) disambiguates it, so a partial tag is
  *   never leaked as content and never mis-eaten as thinking.
  * - **`split(delta)`** feeds one raw content delta and returns the CLEAN content to
- *   surface for it (possibly `''` — e.g. mid-think). Text inside a
+ *   surface for it (possibly `''` — for example mid-think). Text inside a
  *   `<think>…</think>` span accumulates on `thinking`; multiple spans accumulate in
- *   order; a nested-looking `<think>` inside an open span is just thinking text (no
+ *   order; a nested-looking `<think>` inside an open span is thinking text (no
  *   nesting — the first `</think>` closes).
  * - **The IMPLICIT leading open (the qwen3-template shape).** Some chat templates
  *   PRE-SEED `<think>` into the prompt scaffold, so the wire stream begins
@@ -236,13 +236,13 @@ export interface ThinkSplitterInterface {
  *
  * @remarks
  * - **Store.** Messages live in insertion order; `count` is how many are stored.
- *   `add` takes one {@link MessageInput} or a batch (§9.2) and MINTS each message's
+ *   `add` takes one {@link MessageInput} or a batch and MINTS each message's
  *   `id` (a random UUID), returning the created message(s). A stored message is
  *   immutable — created once from its input, never mutated.
  * - **Lookup.** `message(id)` resolves one by id (`undefined` when absent);
  *   `messages()` lists every message in insertion order.
- * - **Removal.** `remove` drops one by id, or a batch (§9.2) — `true` when any was
- *   removed; `clear` empties the store.
+ * - **Removal.** `remove` drops one by id, or a batch — `true` only when EVERY supplied id
+ *   was removed; `clear` empties the store.
  * - **Event-free.** A purely data store — no Emitter, no events.
  */
 export interface MessageManagerInterface {
@@ -264,7 +264,7 @@ export interface MessageManagerInterface {
  * Assembled once from its {@link InstructionInput} (the `id` minted by the storing
  * layer) and never mutated. `name` keys it in an {@link InstructionManagerInterface}
  * (last write wins); `priority` orders the rendered list (higher first), defaulting to
- * `0`. The {@link import('./AgentContext.js').AgentContext} build step renders it via
+ * `0`. The {@link import('./AgentContext.js').AgentContext} build step renders it through
  * its manager's `render` (`content`) under the manager's `open` header.
  */
 export interface InstructionInterface {
@@ -280,7 +280,7 @@ export interface InstructionInterface {
 	 * {@link InstructionInput} (round-tripped through the manager, like a message's
 	 * `images`); absent ⇒ the cascade decides.
 	 */
-	readonly format?: string
+	readonly override?: string
 }
 
 /**
@@ -299,20 +299,20 @@ export interface InstructionInput {
 	 * manager-options / provider / built-in format for this item). Round-tripped onto the
 	 * stored {@link InstructionInterface} when given (present-when-supplied, like `images`).
 	 */
-	readonly format?: string
+	readonly override?: string
 }
 
 /**
- * Maps the push observation surface (§13) of an {@link InstructionManagerInterface} — the
- * mutation moments a fire-and-forget observer subscribes to via `manager.emitter.on`.
+ * Maps the push observation surface of an {@link InstructionManagerInterface} — the
+ * mutation moments a fire-and-forget observer subscribes to through `manager.emitter.on`.
  *
  * @remarks
  * `add` carries the created (or replaced) {@link InstructionInterface}; `remove`
  * carries the removed instruction's `name`; `clear` is a pure signal (no payload).
- * Listener isolation is the emitter's (AGENTS §13): a listener throw is routed to the
+ * Listener isolation is the emitter's: a listener throw is routed to the
  * emitter's `error` handler (the `error` option), never onto this map, so a buggy
  * observer can never corrupt a mutation. Declared as a `type` alias (not `interface
- * extends EventMap`, §4.5) so the type-literal satisfies `EventMap` structurally.
+ * extends EventMap`) so the type-literal satisfies `EventMap` structurally.
  */
 export type InstructionManagerEventMap = {
 	/** Reports an instruction added (or a same-name one replaced) — the created instruction. */
@@ -324,29 +324,29 @@ export type InstructionManagerEventMap = {
 }
 
 /**
- * Configures `createInstructionManager` — the reserved `on` hooks (§8) plus an optional
+ * Configures `createInstructionManager` — the reserved `on` hooks plus an optional
  * per-section format override.
  *
  * @remarks
- * `on` is the §8 reserved key: initial listeners for the manager's
+ * `on` is the reserved listener key: initial listeners for the manager's
  * {@link InstructionManagerEventMap}, wired at construction. `format` is the
  * MANAGER-OPTIONS level of the {@link import('./AgentContext.js').AgentContext} build
  * cascade — a {@link ContextSectionFormat} the manager consults FIRST in its own
  * `open` / `render` (falling back to the built-in when a member is omitted), so it
  * BEATS the provider default and the built-in, while a per-item
- * {@link InstructionInput.format} still beats it. Omitted ⇒ the built-in framing applies.
+ * {@link InstructionInput.override} still beats it. Omitted ⇒ the built-in framing applies.
  */
 export interface InstructionManagerOptions {
 	readonly on?: EmitterHooks<InstructionManagerEventMap>
-	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 	/** Holds a manager-level format override (beats the provider default + built-in); see {@link AgentContextInterface.build}. */
 	readonly format?: ContextSectionFormat<InstructionInterface>
 }
 
 /**
- * Registers {@link InstructionInterface}s keyed by `name` — `add` (one or a batch,
- * §9.2) mints each `id` and OVERWRITES a same-name instruction (last write wins);
+ * Registers {@link InstructionInterface}s keyed by `name` — `add` (one or a batch)
+ * mints each `id` and OVERWRITES a same-name instruction (last write wins);
  * `instructions()` lists them SORTED by descending `priority` (stable for ties).
  *
  * @remarks
@@ -354,9 +354,9 @@ export interface InstructionManagerOptions {
  *   the instructions under; `render(instruction)` renders one instruction (its
  *   `content`). Together they let an {@link import('./AgentContext.js').AgentContext}
  *   assemble an instructions block.
- * - **Observable (§13).** The owned `emitter` ({@link InstructionManagerEventMap})
+ * - **Observable.** The owned `emitter` ({@link InstructionManagerEventMap})
  *   carries `add` / `remove` / `clear` for fire-and-forget observers; the emitter
- *   isolates a listener throw and routes it to its `error` handler (the `error` option, §13).
+ *   isolates a listener throw and routes it to its `error` handler (the `error` option).
  */
 export interface InstructionManagerInterface {
 	readonly emitter: EmitterInterface<InstructionManagerEventMap>
@@ -391,16 +391,16 @@ export interface InstructionManagerInterface {
  * line rendered once after the items.
  *
  * @remarks
- * All three members are OPTIONAL and resolved INDEPENDENTLY (so an override may set only
+ * `open`, `render`, and `close` are OPTIONAL and resolved INDEPENDENTLY (so an override may set only
  * the top, only the per-item rendering, only the bottom, or any mix). A section assembles
  * as `[open, ...items.map(render), close]` with empty / absent slots dropped, the survivors
  * blank-line (`\n\n`) joined — so `open` + `close` together let a developer WRAP the whole
- * group (e.g. `open: '<instructions>'` … `close: '</instructions>'`). `open` is the section's
- * leading text (the header, or a group's opening tag); `render` turns one section item (an
- * {@link InstructionInterface}) into its prompt text; `close` is the trailing text. `open`
- * and `render` cascade through the
+ * group (for example `open: '<instructions>'` … `close: '</instructions>'`). `open` is the
+ * section's leading text (the header, or a group's opening tag); `render` turns one section
+ * item (an {@link InstructionInterface}) into its prompt text; `close` is the trailing text.
+ * `open` and `render` cascade through the
  * built-in floor (`open` ⇒ the manager's built-in header, `render` ⇒ the manager's built-in
- * rendering); `close` has NO built-in, so an unset `close` simply yields no closing line.
+ * rendering); `close` has NO built-in, so an unset `close` yields no closing line.
  * It is the unit BOTH a provider's {@link ContextFormat} (a per-section-kind
  * default) and a manager's `Options` carry — see {@link AgentContextInterface.build} for
  * the full precedence.
@@ -410,15 +410,15 @@ export interface InstructionManagerInterface {
 export interface ContextSectionFormat<T> {
 	/**
 	 * Holds text rendered ONCE before the section's items — the section header or a group's
-	 * opening wrapper, e.g. `'<instructions>'`; omitted ⇒ the next cascade level decides
+	 * opening wrapper, for example `'<instructions>'`; omitted ⇒ the next cascade level decides
 	 * (defaulting to the built-in header).
 	 */
 	readonly open?: string
 	/** Overrides one item's rendering; omitted ⇒ the next cascade level decides. */
 	readonly render?: (item: T) => string
 	/**
-	 * Holds text rendered ONCE after the section's items — a group's closing wrapper, e.g.
-	 * `'</instructions>'`; omitted ⇒ no closing line (there is no built-in close).
+	 * Holds text rendered ONCE after the section's items — a group's closing wrapper, for
+	 * example `'</instructions>'`; omitted ⇒ no closing line (there is no built-in close).
 	 */
 	readonly close?: string
 }
@@ -450,12 +450,12 @@ export interface ContextSectionSourceInterface<T> {
 
 /**
  * Holds a provider's OPTIONAL context-framing default, keyed by section kind — the framing a
- * model prefers (e.g. XML tags vs. Markdown headers), declared by a
+ * model prefers (for example XML tags against Markdown headers), declared by a
  * {@link ProviderInterface} that opts in.
  *
  * @remarks
  * Each key is a {@link ContextSectionFormat} for one of the observable context sections
- * (currently `instructions`), so a provider can frame each section independently — and any
+ * (the `instructions` section), so a provider can frame each section independently — and any
  * it omits falls through to that manager's built-in default. It is the PROVIDER-DEFAULT
  * level of the {@link import('./AgentContext.js').AgentContext} build cascade: it BEATS a
  * manager's built-in default but is BEATEN by a manager-options override and by a per-item
@@ -471,8 +471,8 @@ export interface ContextFormat {
 }
 
 /**
- * Lists the per-category allow-lists a {@link ScopeInterface} carries — three optional
- * `readonly string[]`s, one per filterable context category, each keyed by that
+ * Lists the per-category allow-lists a {@link ScopeInterface} carries — an optional
+ * `readonly string[]` for `instructions`, for `tools`, and for `files`, each keyed by that
  * category's identity (an instruction's `name`, a tool's `name`, a workspace file's
  * `path`).
  *
@@ -507,7 +507,7 @@ export interface ScopeInput extends ScopeFilter {
 }
 
 /**
- * Represents a named, immutable filter over a richer context's items — the three per-category
+ * Represents a named, immutable filter over a richer context's items — the per-category
  * allow-lists ({@link ScopeFilter}) plus an `id` / `name`, and a `narrow` that
  * composes a tighter child by set-INTERSECTION.
  *
@@ -532,14 +532,14 @@ export interface ScopeInterface extends ScopeFilter {
 }
 
 /**
- * Maps the push observation surface (§13) of a {@link ScopeManagerInterface} — analogous to
+ * Maps the push observation surface of a {@link ScopeManagerInterface} — analogous to
  * {@link InstructionManagerEventMap}, but keyed by the minted `id` and carrying `create`
  * (a scope always mints, never overwrites) rather than `add`.
  *
  * @remarks
  * `create` carries the created {@link ScopeInterface}; `remove` carries the removed
  * scope's `id`; `clear` is a pure signal. The emitter isolates a listener throw and routes
- * it to its `error` handler (§13). A `type` alias (§4.5) so it satisfies `EventMap` structurally.
+ * it to its `error` handler. A `type` alias so it satisfies `EventMap` structurally.
  */
 export type ScopeManagerEventMap = {
 	/** Reports a scope created — the created scope. */
@@ -551,12 +551,12 @@ export type ScopeManagerEventMap = {
 }
 
 /**
- * Configures `createScopeManager` — the reserved `on` hooks (§8): initial listeners for
+ * Configures `createScopeManager` — the reserved `on` hooks: initial listeners for
  * the manager's {@link ScopeManagerEventMap}, wired at construction.
  */
 export interface ScopeManagerOptions {
 	readonly on?: EmitterHooks<ScopeManagerEventMap>
-	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 }
 
@@ -565,13 +565,13 @@ export interface ScopeManagerOptions {
  * mints + stores one (never overwrites), `scopes()` lists them in insertion order.
  *
  * @remarks
- * - **Registry.** `create(input)` mints a scope (an `id` + the three allow-lists) and
+ * - **Registry.** `create(input)` mints a scope (an `id` + the per-category allow-lists) and
  *   stores it; `count` is how many are stored. `scope(id)` looks one up; `scopes()` lists
  *   them in insertion order. (Keyed by minted `id`, not `name`, so two scopes may share a
  *   `name` and `create` always adds.)
- * - **Observable (§13).** The owned `emitter` ({@link ScopeManagerEventMap}) carries
+ * - **Observable.** The owned `emitter` ({@link ScopeManagerEventMap}) carries
  *   `create` / `remove` / `clear` for fire-and-forget observers; the emitter isolates a
- *   listener throw and routes it to its `error` handler (the `error` option, §13).
+ *   listener throw and routes it to its `error` handler (the `error` option).
  */
 export interface ScopeManagerInterface {
 	readonly emitter: EmitterInterface<ScopeManagerEventMap>
@@ -627,7 +627,7 @@ export interface AgentContextOptions {
 	 * (it `add`s a default when the manager has none), so `messages` — the manager's ACTIVE
 	 * conversation's LIVE tail — is ALWAYS defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail) as its AUTHORITATIVE message inclusion —
-	 * the scope does NOT filter the conversation (it owns inclusion via compaction; scope filters
+	 * the scope does NOT filter the conversation (it owns inclusion through compaction; scope filters
 	 * only instructions / tools / workspace files). The registry is structural; change its active
 	 * conversation through the manager's `switch(id)`.
 	 */
@@ -644,11 +644,11 @@ export interface AgentContextOptions {
  * conversation's live tail, satisfying {@link MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
  * scoped instructions into ONE leading `system` message (under the manager's `open`,
- * each item via its `render`) — PLUS the ACTIVE workspace's scope-filtered text files
+ * each item through its `render`) — PLUS the ACTIVE workspace's scope-filtered text files
  * (rendered as fenced reference blocks) — and appends the ACTIVE conversation's `view()`, attaching
  * the active workspace's scope-filtered image files' `base64` payload to the LAST user message. The
  * active workspace is the SOLE document/image context. Tools are advertised to the provider
- * STRUCTURALLY (via `tools.definitions()`, scope-filtered by the loop), NOT serialized into
+ * STRUCTURALLY (through `tools.definitions()`, scope-filtered by the loop), NOT serialized into
  * the prompt, so they never appear in `build()`'s output. The context managers are observable
  * (their own `emitter`s); the context itself is event-free.
  */
@@ -681,8 +681,7 @@ export interface AgentContextInterface {
 	 * an active conversation (a default is added at construction when none was supplied), so
 	 * `messages` is always defined. Switch the active conversation through
 	 * `conversations.switch(id)` — so one agent can serve MANY conversations (set the active one per
-	 * request). Switch BETWEEN runs, not during one; for CONCURRENT threads use separate agents (see
-	 * clause 23).
+	 * request). Switch BETWEEN runs, not during one; for CONCURRENT threads use separate agents.
 	 */
 	readonly conversations: ConversationManagerInterface
 	/**
@@ -718,7 +717,7 @@ export interface AgentContextInterface {
 	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
 	 * carrier: TEXT files ({@link import('@orkestrel/workspace').isText}) render into a dedicated
 	 * `## Workspace` section in the system block — each a fenced
-	 * `` File: <path>\n```<language>\n<text>\n``` `` block — placed just after the instructions
+	 * `` File: <path>\n```<language>\n<text>\n``` `` block — placed immediately after the instructions
 	 * section; binary files whose MIME starts with `image/` have their `base64` payload
 	 * attached to the LAST user message (a vision provider reads images off a user turn).
 	 * ACTIVE-ONLY — never the other registered workspaces; with NO active workspace nothing is
@@ -729,25 +728,25 @@ export interface AgentContextInterface {
 	 * leading text), each item's `render`, and the `close` (the section's trailing text)
 	 * resolve INDEPENDENTLY, MOST-SPECIFIC-FIRST, from a {@link ContextSectionFormat} at each
 	 * level — an item override, a manager-options override, the provider `format` default,
-	 * and the manager's built-in. For a section kind `K` (currently `instructions`), manager
+	 * and the manager's built-in. For the `instructions` section kind `K`, manager
 	 * `M`, and the supplied `format` `F`:
-	 * - **open** = `M.format?.open ?? F?.[K]?.open ?? M.open` — i.e.
+	 * - **open** = `M.format?.open ?? F?.[K]?.open ?? M.open` — that is,
 	 *   **manager-options override > provider default > built-in** (the leading text has no
 	 *   per-item level). The manager ENCAPSULATES the `[options-override → built-in]` half:
 	 *   `M.open` already returns the options override's `open` when one is set, else
 	 *   the built-in header — so `build()` only layers the provider default BETWEEN them.
-	 * - **item** `I` = `I.format ?? M.format?.render?.(I) ?? F?.[K]?.render?.(I) ?? M.render(I)`
-	 *   — i.e. **item override > manager-options override > provider default > built-in**.
+	 * - **item** `I` = `I.override ?? M.format?.render?.(I) ?? F?.[K]?.render?.(I) ?? M.render(I)`
+	 *   — that is, **item override > manager-options override > provider default > built-in**.
 	 *   Again `M.render(I)` already returns the options override when set, else the
-	 *   built-in, so `build()` layers the per-item `I.format` ON TOP and the provider
+	 *   built-in, so `build()` layers the per-item `I.override` ON TOP and the provider
 	 *   default BETWEEN.
-	 * - **close** = `M.format?.close ?? F?.[K]?.close` — i.e. **manager-options
+	 * - **close** = `M.format?.close ?? F?.[K]?.close` — that is, **manager-options
 	 *   override > provider default**, with NO built-in floor (the trailing text has no
 	 *   per-item level): unset at both levels ⇒ `undefined` ⇒ no closing line. Paired with
 	 *   `open`, it lets a level WRAP the group (`open: '<instructions>'` … `close: '</instructions>'`).
 	 *
 	 * Passing NO `format` (the default) leaves the provider-default level empty, so the
-	 * output is BYTE-FOR-BYTE the managers' built-in framing — every section is just its
+	 * output is BYTE-FOR-BYTE the managers' built-in framing — every section is its
 	 * built-in header + items, with no closing line (the regression contract). Scope
 	 * filtering runs BEFORE formatting (unchanged); the workspace image-data attachment to the
 	 * last user message is unchanged.
@@ -808,7 +807,7 @@ export type AgentChunk =
  * present only when at least one provider call reported usage — an aborted run's `usage`
  * INCLUDES the cancelled turn's tokens when the provider reports partial usage on the
  * abort (folded in exactly like a completed turn's); a provider that cannot observe
- * usage mid-stream (e.g. a daemon whose final counts never arrive before the cancel)
+ * usage mid-stream (for example a daemon whose final counts never arrive before the cancel)
  * reports none for that turn, and none is fabricated. `thinking` is present
  * only when a provider call surfaced reasoning it separated from the answer
  * ({@link ProviderResult.thinking}, joined across the run's calls) — display/audit
@@ -848,7 +847,7 @@ export interface RunOutcome {
 }
 
 /**
- * Maps the push observation surface of an {@link AgentInterface} (AGENTS §13) — the
+ * Maps the push observation surface of an {@link AgentInterface} — the
  * lifecycle + usage/tool moments a fire-and-forget observer (logging, metrics,
  * tracing) subscribes to, ALONGSIDE the pull {@link AgentChunk} stream.
  *
@@ -858,10 +857,10 @@ export interface RunOutcome {
  * the chunk stream can't express (a `deny` never reaches the stream) or that a
  * fire-and-forget observer wants without draining the stream. PER-TOKEN deltas stay
  * EXCLUSIVELY the {@link AgentChunk} stream's job (the pull surface) — there is
- * deliberately NO `token` event here. Subscribe via `agent.emitter.on(...)`.
+ * deliberately NO `token` event here. Subscribe through `agent.emitter.on(...)`.
  *
- * Observation is provably side-effect-free on the loop: listener isolation is the emitter's
- * (§13) — every event is emitted directly and a listener throw is routed to the emitter's OWN
+ * Observation is side-effect-free on the loop: listener isolation is the emitter's
+ * — every event is emitted directly and a listener throw is routed to the emitter's OWN
  * `error` handler (the `error` option), never onto this domain map and never into the
  * settle-once / wake-park engine — so a buggy observer can never reorder, throw into, or
  * corrupt the run.
@@ -870,7 +869,7 @@ export interface RunOutcome {
  * PARTIAL result) — so an observer sees both that the run was cancelled and the partial
  * outcome it committed; a genuine error emits `error` instead of `finish`.
  *
- * Declared as a `type` alias (not `interface extends EventMap`, §4.5 — `EventMap` is a
+ * Declared as a `type` alias (not `interface extends EventMap` — `EventMap` is a
  * `type` kind): a type-literal satisfies the `EventMap` constraint
  * (`Record<string, readonly unknown[]>`) structurally, whereas an interface lacks the
  * required index signature.
@@ -1023,12 +1022,12 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   agent's context; a fresh empty one is created when omitted (mirrors {@link AgentContextOptions.workspaces}).
  * - `scope` — an optional initial active {@link ScopeInterface} forwarded to the agent's context
  *   (the build-time filter); `undefined` ⇒ no filtering (mirrors {@link AgentContextOptions.scope}).
- * - `on` — the reserved {@link EmitterHooks} key (§8): initial listeners for the agent's
- *   {@link AgentEventMap}, wired at construction (e.g. `{ finish: (r) => log(r) }`).
+ * - `on` — the reserved {@link EmitterHooks} key: initial listeners for the agent's
+ *   {@link AgentEventMap}, wired at construction (for example `{ finish: (r) => log(r) }`).
  */
 export interface AgentOptions {
 	readonly on?: EmitterHooks<AgentEventMap>
-	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 	readonly system?: string
 	/** Reuses a pre-built tool registry the loop dispatches calls through; an empty one is created when omitted. */
@@ -1068,7 +1067,7 @@ export interface AgentOptions {
 	readonly conversations?: ConversationManagerInterface
 	/**
 	 * Holds an optional CONTEXT {@link BudgetInterface} for AUTOMATIC compaction. Its `consumer` is a
-	 * token estimator (e.g. the exported {@link import('./helpers.js').estimateMessages}) and
+	 * token estimator (for example the exported {@link import('./helpers.js').estimateMessages}) and
 	 * its `max` is the context window. When set, the loop measures the CURRENT FULL prompt (the
 	 * next provider request) against this budget each turn; when that prompt reaches the window AND
 	 * the active conversation is summarizable, it **compacts the active conversation + continues on
@@ -1131,7 +1130,7 @@ export interface AgentRunOptions {
 	readonly budget?: BudgetInterface<TokenUsage>
 	/**
 	 * Carries an additional per-run external cancel, COMPOSED with {@link AgentOptions.signal} (both
-	 * fold into the run's bound abort via `AbortSignal.any` — neither is dropped). Omitted ⇒
+	 * fold into the run's bound abort through `AbortSignal.any` — neither is dropped). Omitted ⇒
 	 * only the agent's constructed `signal` (if any) applies.
 	 */
 	readonly signal?: AbortSignal
@@ -1146,7 +1145,7 @@ export interface AgentRunOptions {
  *   can never diverge: `generate` drains the same stream `stream` exposes, then
  *   resolves its settled {@link AgentResult}.
  * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
- *   `timeout` deadline, and the `budget` signal (via `AbortSignal.any`); any of them —
+ *   `timeout` deadline, and the `budget` signal (through `AbortSignal.any`); any of them —
  *   or `abort()` — stops the loop and settles the result `partial: true`.
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.
@@ -1154,7 +1153,7 @@ export interface AgentRunOptions {
  *   carries per-token answer deltas, per-think reasoning deltas, and usage/tool chunks for a live consumer. PUSH: the
  *   {@link emitter} ({@link AgentEventMap}) carries lifecycle + usage/tool/deny moments
  *   for fire-and-forget observers — the emitter isolates a listener throw and routes it to
- *   its `error` handler (the `error` option, §13), so a buggy observer can NEVER corrupt the
+ *   its `error` handler (the `error` option), so a buggy observer can NEVER corrupt the
  *   loop. Per-token / per-thinking deltas are the stream's job exclusively; there is no
  *   `token` or `think` event.
  * - **Per-run overrides.** Both faces accept an optional {@link AgentRunOptions} bag whose
@@ -1177,7 +1176,7 @@ export interface AgentInterface {
 	 * itself, ahead of the `.catch` ever attaching) — `await` the call (inside a `try`/`catch`)
 	 * or wrap the call expression itself in `try`/`catch`.
 	 *
-	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
+	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
 	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
@@ -1192,7 +1191,7 @@ export interface AgentInterface {
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
 	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`.
 	 *
-	 * @param options - Optional per-run {@link AgentRunOptions} (e.g. `think`); omitted ⇒ defaults
+	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
 	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
 	 */
@@ -1211,10 +1210,9 @@ export interface AgentInterface {
  * consideration.
  *
  * @remarks
- * Lean by design: it carries only the {@link ToolCall} now (the tool `name` and its
+ * Lean by design: it carries the {@link ToolCall} (the tool `name` and its
  * parsed `arguments`), which is enough for a rule to branch on what is being called
- * and with what. It is a seam for richer policy inputs (call history, agent state)
- * later WITHOUT changing the `evaluate` signature — those would join as new fields.
+ * and with what.
  */
 export interface AuthorityContext {
 	readonly call: ToolCall
@@ -1224,7 +1222,7 @@ export interface AuthorityContext {
  * Holds an {@link AuthorityInterface}'s verdict on one tool call.
  *
  * @remarks
- * `zone` is a project-defined classification (e.g. `'default'` / `'sensitive'` /
+ * `zone` is a project-defined classification (for example `'default'` / `'sensitive'` /
  * `'restricted'`) carried for routing + observability; `allowed` is the gate decision
  * (a denied call is fed back to the model, never executed); `reason` is an optional
  * human-readable explanation surfaced in the denial {@link ToolResult}.
@@ -1274,9 +1272,8 @@ export interface AuthorityOptions {
  *
  * @remarks
  * Ordered first-match-wins over the configured rules, falling back to the configured
- * default when none match (see {@link AuthorityOptions}). Synchronous by design now;
- * the async human-approval handshake (request / grant / deny) is deferred to a later
- * chunk. Event-free — no Emitter, no events.
+ * default when none match (see {@link AuthorityOptions}). `evaluate` is synchronous and
+ * returns the verdict directly. Event-free — no Emitter, no events.
  */
 export interface AuthorityInterface {
 	/**
@@ -1340,11 +1337,11 @@ export interface AgentJobInput {
  * durable, serializable job runnable.
  *
  * @remarks
- * - **Accessors throw on a miss (§9.1 + §12).** `provider` / `tool` / `authority` /
- *   `scheduler` look one up by name and THROW a clear `Error` (`unknown provider:
- *   <name>`, etc.) when the name is unregistered — an unknown name in a rehydrated job
- *   must fail loudly, never silently resolve to `undefined`, so a misconfigured job
- *   surfaces at once rather than running with a missing dependency.
+ * - **Accessors throw on a miss.** `provider` / `tool` / `authority` / `scheduler` look one
+ *   up by name and THROW an {@link AgentError} carrying `code: 'REGISTRY'` and the message
+ *   `unknown <category>: <name>` when the name is unregistered — an unknown name in a
+ *   rehydrated job must fail loudly, never silently resolve to `undefined`, so a
+ *   misconfigured job surfaces at once rather than running with a missing dependency.
  * - **`build` rehydrates.** It resolves the job's `provider`, assembles a
  *   {@link ToolManagerInterface} from the `tools` names, rebuilds the token `budget`
  *   from its ceiling, resolves the `authority` / `scheduler` names, seeds the agent's
@@ -1403,13 +1400,13 @@ export interface AgentRegistryInterface {
  *
  * @remarks
  * `providers` is required (a job always names a provider); `tools` / `authorities` /
- * `schedulers` are optional pools, each an entity-keyed record (§8) mapping a registry
+ * `schedulers` are optional pools, each an entity-keyed record mapping a registry
  * name to its live object. A name absent from its pool throws when resolved (see
  * {@link AgentRegistryInterface}). `store` is the durable {@link ConversationStoreInterface}
  * every agent this registry builds carries: each built agent gets its OWN store-backed
  * {@link ConversationManagerInterface} over THIS shared store — a fresh conversation id per
  * build (minted by the seeded `add`), so concurrent builds never collide, and the store
- * simply accumulates one snapshot per built agent that later calls `save`. Persistence
+ * accumulates one snapshot per built agent that later calls `save`. Persistence
  * stays caller-triggered (`open` / `save`) — `build` never hydrates, so `build` stays
  * SYNCHRONOUS. Omitted ⇒ every built agent gets a registry-only manager, byte-identical
  * to today.
@@ -1476,11 +1473,11 @@ export interface AgentRunnerOptions {
  * to regenerate a {@link ConversationInterface}'s rollup `summary`.
  *
  * @remarks
- * The agent runtime builds one from its `ProviderInterface` (e.g.
+ * The agent runtime builds one from its `ProviderInterface` (for example
  * `async (messages) => (await provider.generate([systemPrompt, ...messages], signal)).content`)
  * and hands it to a {@link ConversationInterface} / {@link ConversationManagerInterface}.
- * The core conversation layer treats it as an opaque async function — it neither knows nor
- * cares which backend produced the digest, keeping `core` free of any provider coupling.
+ * The core conversation layer treats it as an opaque async function — it never reads which
+ * backend produced the digest, keeping `core` free of any provider coupling.
  *
  * @param messages - The folded messages to digest into a summary
  * @returns The summary text (the model-written digest of those messages)
@@ -1492,7 +1489,7 @@ export type ConversationSummaryHandler = (messages: readonly Message[]) => Promi
  * {@link ConversationInterface} produces when it `compact`s its live tail.
  *
  * @remarks
- * `summary` is the model-written digest of this slice (via the
+ * `summary` is the model-written digest of this slice (through the
  * {@link ConversationSummaryHandler}); `messages` are the folded ORIGINALS, RETAINED in full so
  * `rehydrate` can pull them back and `search` can scan them (compaction shrinks the model
  * INPUT, never discards history).
@@ -1506,18 +1503,18 @@ export interface Section {
 }
 
 /**
- * Maps the push observation surface (§13) of a {@link ConversationInterface} — the compaction
- * moments a fire-and-forget observer subscribes to via `conversation.emitter.on`.
+ * Maps the push observation surface of a {@link ConversationInterface} — the compaction
+ * moments a fire-and-forget observer subscribes to through `conversation.emitter.on`.
  *
  * @remarks
  * `compact` carries the newly-folded {@link Section}; `collapse` carries a section
  * created by folding multiple OLDER sections together (a bounded-`sections` cap enforcement,
  * distinct from `compact`'s fresh live-tail fold); `summary` carries the regenerated
  * conversation rollup (refreshed on each compaction); `rehydrate` carries the `id` of a
- * section whose originals were pulled back. Listener isolation is the emitter's
- * (§13): every event is emitted directly and a listener throw is routed to the emitter's
+ * section whose originals were pulled back. Listener isolation is the emitter's:
+ * every event is emitted directly and a listener throw is routed to the emitter's
  * `error` handler (the `error` option), never onto this map, so a buggy observer can never
- * corrupt a compaction. A `type` alias (not `interface extends EventMap`, §4.5) so the
+ * corrupt a compaction. A `type` alias (not `interface extends EventMap`) so the
  * type-literal satisfies `EventMap` structurally.
  */
 export type ConversationEventMap = {
@@ -1535,15 +1532,15 @@ export type ConversationEventMap = {
 }
 
 /**
- * Configures `createConversation` — the optional `id`, the reserved `on` hooks (§8), the
+ * Configures `createConversation` — the optional `id`, the reserved `on` hooks, the
  * provider-agnostic `summarize` seam, and the retained-tail size.
  *
  * @remarks
- * `id` is the conversation's identity (a random UUID when omitted). `on` is the §8 reserved
- * key (initial {@link ConversationEventMap} listeners). `summarize` is the
+ * `id` is the conversation's identity (a random UUID when omitted). `on` is the reserved
+ * listener key (initial {@link ConversationEventMap} listeners). `summarize` is the
  * {@link ConversationSummaryHandler} compaction needs — ABSENT ⇒ `compact()` throws a
  * {@link import('./errors.js').ConversationError} (a conversation can still store + view a
- * live tail, it just cannot fold). `keep` is how many recent live messages a `compact()`
+ * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
  * retains VERBATIM (folding only the older ones); it defaults to
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
  * folds the WHOLE current live tail into one section). `sections` is an optional cap on the
@@ -1561,7 +1558,7 @@ export type ConversationEventMap = {
 export interface ConversationOptions {
 	readonly id?: string
 	readonly on?: EmitterHooks<ConversationEventMap>
-	/** Holds the emitter's listener-error handler (AGENTS §13) — a listener throw routes here, not to a domain event. */
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
 	/** Supplies the summarizer compaction needs; ABSENT ⇒ `compact()` throws a `ConversationError`. */
 	readonly summarize?: ConversationSummaryHandler
@@ -1601,11 +1598,11 @@ export interface CompactOptions {
  * The rendered block is a cross-conversation reference a SMALL model must read as foreign
  * material, NOT as part of the live thread — so every member keeps it CONCISE and unmistakably
  * attributed:
- * - `label` — the human PROVENANCE name shown in the block's leading marker (e.g. `'planning'`);
+ * - `label` — the human PROVENANCE name shown in the block's leading marker (for example `'planning'`);
  *   defaults to the conversation's own `id`. It is what the model attributes the content to.
  * - `summary` — whether to include the conversation's rollup `summary` (its summary-of-summaries)
  *   in the block; defaults to `true` (the rollup is included WHEN one exists — `undefined` until
- *   the first compaction simply omits the `Summary:` line). Pass `false` to exclude it.
+ *   the first compaction omits the `Summary:` line). Pass `false` to exclude it.
  * - `messages` — the CHERRY-PICKED excerpts to include (each rendered `role: content`), default
  *   NONE. The intended source is the conversation's OWN `search(query)` / `rehydrate(id)` output
  *   (select the few relevant turns), NOT its whole history — dumping every message defeats the
@@ -1634,11 +1631,12 @@ export interface ConversationReferenceOptions {
  *   (oldest → newest), each a summarized slice that RETAINS its originals. `summary` is the
  *   conversation rollup (a summary-of-summaries over all sections), regenerated on each
  *   compaction (`undefined` until the first compaction).
- * - **Message verbs (the inlined store).** `add` takes one {@link MessageInput} or a batch
- *   (§9.2), MINTS each message's `id` (a random UUID), stores it, and returns the created
+ * - **Message verbs (the inlined store).** `add` takes one {@link MessageInput} or a batch,
+ *   MINTS each message's `id` (a random UUID), stores it, and returns the created
  *   message(s); a stored message is immutable. `message(id)` resolves one (`undefined` when
  *   absent); `messages()` lists the live tail in insertion order; `remove` drops one by id or
- *   a batch (§9.2); `clear` empties the tail; `count` is how many live messages are stored.
+ *   a batch (`true` only when EVERY supplied id was removed); `clear` empties the tail;
+ *   `count` is how many live messages are stored.
  * - **`view()` — the model input.** Each section folds to ONE synthetic summary message,
  *   followed by the live messages verbatim: `[...sections-as-summary-messages, ...live]`. The
  *   rollup `summary` is NOT injected (it is a separately pull-able digest for a
@@ -1659,18 +1657,18 @@ export interface ConversationReferenceOptions {
  *   guarded.
  * - **`rehydrate(id)` / `search(query)` — read the retained originals.** `rehydrate` returns
  *   a section's full original messages (`[]` for an unknown id) and emits `rehydrate` — a
- *   pure READ (the caller decides whether to re-add them; v1 never auto-reinserts).
+ *   pure READ (the caller decides whether to re-add them; `rehydrate` never reinserts).
  *   `search` is a case-insensitive substring scan of `content` across ALL messages (every
  *   section's originals + the live tail).
  * - **`reference(options?)` — pull THIS conversation into ANOTHER with provenance.** A PURE
  *   string render (no model call) of a self-labeled, fenced cross-conversation block — the
  *   rollup `summary` (when included + present) plus cherry-picked excerpts — framed so a small
- *   model reads it as FOREIGN material. Written into the ACTIVE conversation's context via the
- *   active workspace (`context.workspaces.active?.write(path, block)`); the cherry-pick comes
- *   from this conversation's own `search` / `rehydrate`, never its whole history.
- * - **Observable (§13).** The owned `emitter` ({@link ConversationEventMap}) carries
+ *   model reads it as FOREIGN material. Written into the ACTIVE conversation's context through
+ *   the active workspace (`context.workspaces.active?.write(path, block)`); the cherry-pick
+ *   comes from this conversation's own `search` / `rehydrate`, never its whole history.
+ * - **Observable.** The owned `emitter` ({@link ConversationEventMap}) carries
  *   `compact` / `summary` / `rehydrate`; the emitter isolates a listener throw and routes it
- *   to its `error` handler (the `error` option, §13).
+ *   to its `error` handler (the `error` option).
  */
 export interface ConversationInterface {
 	readonly id: string
@@ -1689,7 +1687,7 @@ export interface ConversationInterface {
 	/** Counts the LIVE (uncompacted) messages stored in the tail. */
 	readonly count: number
 	/**
-	 * Appends one message to the live tail (or a batch, §9.2) — MINTS each message's `id`
+	 * Appends one message to the live tail (or a batch) — MINTS each message's `id`
 	 * (a random UUID) and returns the created message(s); a stored message is immutable.
 	 *
 	 * @param input - One {@link MessageInput}, or a batch
@@ -1711,10 +1709,10 @@ export interface ConversationInterface {
 	 */
 	messages(): readonly Message[]
 	/**
-	 * Removes one LIVE message by id (or a batch, §9.2) from the tail.
+	 * Removes one LIVE message by id (or a batch) from the tail.
 	 *
 	 * @param id - One message id, or a batch
-	 * @returns True if any was removed; false otherwise
+	 * @returns True when every supplied id was present and removed; false otherwise
 	 */
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
@@ -1822,8 +1820,8 @@ export interface ConversationInterface {
  * container produces from itself ({@link ConversationInterface.snapshot}); the durable analogue of
  * the {@link ConversationOptions.snapshot} hydration seam. A {@link ConversationManagerInterface}
  * hydrates a conversation from it through that seam (see {@link ConversationManagerInterface.open}). It is narrowed back from an
- * untrusted storage read by {@link import('./validators.js').isConversationSnapshot} (the AGENTS §14
- * boundary narrow).
+ * untrusted storage read by {@link import('./validators.js').isConversationSnapshot} (the total
+ * boundary guard).
  */
 export interface ConversationSnapshot {
 	readonly id: string
@@ -1858,7 +1856,7 @@ export interface ConversationSnapshot {
  * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`). UNLIKE a session store
  * there is NO idle-TTL
  * / eviction — a persisted conversation lives until an explicit `delete`. It is concrete over
- * {@link ConversationSnapshot} — no generic parameter (AGENTS §21 minimal-interface), since the
+ * {@link ConversationSnapshot} — no generic parameter, because the
  * snapshot is the ONE payload a conversation store persists.
  */
 export interface ConversationStoreInterface {
@@ -1897,7 +1895,7 @@ export interface ConversationStoreInterface {
  * row type stays FLAT and the sections/messages snapshot shape never
  * forces the contract to `Infer` it. The column therefore reads back as the broad `unknown`; the
  * store narrows it to a {@link ConversationSnapshot} on `get`
- * ({@link import('./validators.js').isConversationSnapshot}, the AGENTS §14 boundary narrow). `id`
+ * ({@link import('./validators.js').isConversationSnapshot}, the total boundary guard). `id`
  * mirrors {@link ConversationSnapshot.id} (the primary key), so a `set` writes
  * `{ id: snapshot.id, snapshot }`.
  */
@@ -1916,7 +1914,7 @@ export interface ConversationSnapshotRow {
  * `id` is the conversation's identity (minted when omitted). `summarize` OVERRIDES the
  * manager's default {@link ConversationSummaryHandler} for this conversation (omitted ⇒ the
  * manager's default flows in). `keep` overrides the manager's default retained-tail size.
- * `sections` overrides the manager's default `sections` cap. `on` is the §8 reserved key
+ * `sections` overrides the manager's default `sections` cap. `on` is the reserved listener key
  * (initial {@link ConversationEventMap} listeners). `snapshot` is
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are RESTORED into the new conversation (the live `summarize` / `keep` /
@@ -1973,7 +1971,7 @@ export interface ConversationManagerOptions {
 
 /**
  * Registers {@link ConversationInterface}s keyed by their `id`, in insertion order, WITH an
- * active pointer — the §9 store over the conversation layer PLUS the `active` / `switch` seam the
+ * active pointer — the id-keyed store over the conversation layer PLUS the `active` / `switch` seam the
  * {@link AgentContextInterface} renders. Event-free (a registry, like
  * {@link import('@orkestrel/workspace').WorkspaceManagerInterface}); the observability lives on each
  * {@link ConversationInterface}.
@@ -1990,8 +1988,8 @@ export interface ConversationManagerOptions {
  *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown
  *   `id` returns `undefined` and leaves `active` unchanged (the lenient lookup style — never
  *   throws, no new error code).
- * - **Removal.** `remove` drops one by id, or a batch (§9.2, array overload FIRST) — `true`
- *   when any was removed; removing the ACTIVE conversation sets `active` to `undefined`. `clear`
+ * - **Removal.** `remove` drops one by id, or a batch (array overload FIRST) — `true`
+ *   only when EVERY supplied id was removed; removing the ACTIVE conversation sets `active` to `undefined`. `clear`
  *   empties the registry and sets `active` to `undefined`.
  * - **Durable open / save (the optional `store` seam).** When a {@link ConversationStoreInterface}
  *   is supplied (the `store` option), `open(id)` HYDRATES a conversation from the store on a registry

@@ -2,7 +2,7 @@ import { Instruction } from '@src/core'
 import { describe, expect, it } from 'vitest'
 
 // Instruction is the immutable named directive an InstructionManager renders by
-// descending priority (AGENTS §16 — real behavior, no mocks). Covers id minting,
+// descending priority — real behavior, no mocks. Covers id minting,
 // verbatim name/content, the priority default (0) + explicit value, distinct ids, and
 // immutability (a stored instruction reflects its input, not mutated afterwards).
 

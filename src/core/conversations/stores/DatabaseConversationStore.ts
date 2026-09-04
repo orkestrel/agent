@@ -34,12 +34,12 @@ import { isConversationSnapshot } from '../../validators.js'
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
  *   a {@link ConversationSnapshot} ({@link import('../../validators.js').isConversationSnapshot} — the
- *   AGENTS §14 boundary narrow for an untrusted storage read), or `undefined` if none is stored.
+ *   total guard for an untrusted storage read), or `undefined` if none is stored.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
  * UNLIKE a session store there is NO idle-TTL / eviction — a persisted conversation lives until an
  * explicit `delete`. The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the
- * §22 method bijection with {@link ConversationStoreInterface}). Hydration stays a caller concern: a
+ * method bijection with {@link ConversationStoreInterface}). Hydration stays a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
  * the live conversation through the `snapshot` option (its `open` / `save`).
  *
@@ -74,7 +74,7 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 		const row = await this.#table.get(id)
 		if (row === undefined) return undefined
 		// The snapshot crosses back as an untrusted storage read (a structured clone / a JSON row),
-		// so narrow the opaque JSON column with the boundary guard rather than a cast (AGENTS §14);
+		// so narrow the opaque JSON column with the total boundary guard rather than a cast;
 		// a malformed blob resolves `undefined`, never a broken conversation.
 		return isConversationSnapshot(row.snapshot) ? row.snapshot : undefined
 	}

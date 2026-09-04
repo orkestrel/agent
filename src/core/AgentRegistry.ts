@@ -15,6 +15,7 @@ import { createTokenBudget } from '@orkestrel/budget'
 import { ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
+import { AgentError } from './errors.js'
 
 /**
  * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named
@@ -27,11 +28,11 @@ import { ConversationManager } from './conversations/ConversationManager.js'
  *   schedulers carrying functions) cannot serialize. The registry closes that gap:
  *   construct it once with the live pools, then a queue / runner handler calls `build`
  *   on each (possibly restored) job to get a ready agent.
- * - **Accessors throw on a miss (§9.1 + §12).** `provider` / `tool` / `authority` /
- *   `scheduler` resolve a name against their pool and THROW `unknown <category>: <name>`
- *   when it is absent — an unknown name in a rehydrated job is a programmer / config
- *   error that must fail LOUDLY at build time, never silently resolve to `undefined` and
- *   run an agent missing a dependency.
+ * - **Accessors throw on a miss.** `provider` / `tool` / `authority` / `scheduler` resolve a
+ *   name against their pool and THROW an {@link AgentError} carrying `code: 'REGISTRY'` and
+ *   the message `unknown <category>: <name>` when it is absent — an unknown name in a
+ *   rehydrated job is a programmer / config error that must fail LOUDLY at build time, never
+ *   silently resolve to `undefined` and run an agent missing a dependency.
  * - **`build` rehydrates.** Resolve the job's `provider`; assemble a fresh
  *   {@link ToolManager} from the `tools` names; rebuild the token `budget` from its
  *   ceiling (`createTokenBudget({ max })`); resolve the optional `authority` /
@@ -129,11 +130,11 @@ export class AgentRegistry implements AgentRegistryInterface {
 		return max === undefined ? undefined : createTokenBudget({ max })
 	}
 
-	// Resolve a name against a pool, throwing a clear, loud error on a miss (§9.1 accessor
-	// + §12 programmer-error throw) — an unknown name in a rehydrated job must not pass.
+	// Resolve a name against a pool, throwing a coded, loud error on a miss — an unknown name
+	// in a rehydrated job is a programmer error and must not pass.
 	#resolve<T>(pool: ReadonlyMap<string, T>, category: string, name: string): T {
 		const value = pool.get(name)
-		if (value === undefined) throw new Error(`unknown ${category}: ${name}`)
+		if (value === undefined) throw new AgentError('REGISTRY', `unknown ${category}: ${name}`)
 		return value
 	}
 }

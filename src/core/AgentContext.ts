@@ -50,7 +50,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   {@link MessageManagerInterface} structurally — the same reference, no duplication), and
  *   `build()` folds that conversation's `view()` (its per-section summaries + live tail) as the
  *   AUTHORITATIVE message inclusion — the scope does NOT filter the conversation (it owns inclusion
- *   via compaction; scope filters only instructions / tools / workspace files). Because `messages`
+ *   through compaction; scope filters only instructions / tools / workspace files). Because `messages`
  *   is read dynamically, an agent SWITCHES the active
  *   conversation BETWEEN runs (`conversations.switch(id)`) to serve MANY threads (the real
  *   multi-conversation pattern); switch between runs, not during a run, and use separate agents
@@ -60,14 +60,14 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   (each as a block: the section's resolved `open` text, each item's resolved rendering, then
  *   any resolved `close` text) into ONE leading `system` message (prepended only when at least
  *   one part exists), then appends the ACTIVE conversation's `view()` (the conversation owns
- *   message inclusion via compaction — the scope does NOT filter the conversation). Each
+ *   message inclusion through compaction — the scope does NOT filter the conversation). Each
  *   `open` / item / `close`
  *   resolves INDEPENDENTLY, MOST-SPECIFIC-FIRST — `build()`'s optional `format` (a provider's
  *   per-section default) is the PROVIDER level: `open` = manager-options-override > provider >
  *   built-in; per item = item-override > manager-options-override > provider > built-in; `close` =
  *   manager-options-override > provider (NO built-in ⇒ no closing line when unset) (see
  *   {@link AgentContextInterface.build}). Passing NO `format` (and with no overrides / no per-item
- *   format) reproduces the built-in framing byte-for-byte (each section is its built-in header +
+ *   override) reproduces the built-in framing byte-for-byte (each section is its built-in header +
  *   items, no closing line). The active workspace's scoped-in image files' `base64` payload is attached to
  *   the LAST user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
@@ -81,10 +81,10 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   workspace nothing renders for workspaces. `build()` OWNS this render (a `Workspace` /
  *   `WorkspaceManager` stays file-focused).
  * - **Tools are structural, not in the prompt.** The registry is advertised to the provider
- *   via `tools.definitions()` (scope-filtered by the loop), NEVER serialized into the
+ *   through `tools.definitions()` (scope-filtered by the loop), NEVER serialized into the
  *   message array — so `build()`'s output carries no tool content, scoped or not.
  * - **Event-free context; observable managers.** The context itself owns no Emitter; the
- *   context managers each carry their own (the §13 observation surface).
+ *   context managers each carry their own (the push observation surface).
  *
  * @example
  * ```ts
@@ -147,7 +147,7 @@ export class AgentContext implements AgentContextInterface {
 	// points at the CURRENT active conversation (the SAME reference — no duplication) and FOLLOWS a
 	// `conversations.switch(id)`. The active `Conversation` satisfies the message-verb contract
 	// directly, so this stays a `MessageManagerInterface`. The `?? this.#ensure()` fallback re-seats
-	// a default if a caller's supplied manager was somehow emptied (e.g. `clear()`), so the getter is
+	// a default if a caller's supplied manager was emptied (for example `clear()`), so the getter is
 	// total — never undefined.
 	get messages(): MessageManagerInterface {
 		return this.#conversations.active ?? this.#ensure()
@@ -178,7 +178,7 @@ export class AgentContext implements AgentContextInterface {
 		// `resolveItem` / `resolveClose`): open = manager-options-override > provider-default >
 		// built-in; per item = item-override > manager-options-override > provider-default >
 		// built-in; close = manager-options-override > provider-default (NO built-in ⇒ no
-		// closing line). With no `format` arg + no overrides + no per-item format it is
+		// closing line). With no `format` arg + no overrides + no per-item `override` it is
 		// byte-for-byte the built-ins (each section's header + items, no closing line).
 		const parts: string[] = []
 		// Configured by `=== undefined`, NOT falsiness — an explicitly supplied '' (or a
@@ -212,9 +212,9 @@ export class AgentContext implements AgentContextInterface {
 		)
 		const workspaceTexts = files.filter((file) => isText(file.content))
 		// The text files have NO format-cascade level of their own (they are not a manager) — the
-		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders via `renderFencedFile`
-		// off its own text arm (`{ text, language }`), narrowed by `isText` (§14: narrow, never
-		// assert; the pre-filter above means the defensive arm is never reached). An empty set
+		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders through `renderFencedFile`
+		// off its own text arm (`{ text, language }`), narrowed by `isText` (a total guard, never an
+		// assertion; the preceding pre-filter means the defensive arm is never reached). An empty set
 		// contributes nothing (`renderSection` returns `undefined`).
 		const documented = renderSection(
 			WORKSPACE_SECTION_HEADER,
@@ -228,9 +228,9 @@ export class AgentContext implements AgentContextInterface {
 		if (documented !== undefined) parts.push(documented)
 
 		// 4. The conversation. The ACTIVE conversation's `view()` is AUTHORITATIVE (the per-section
-		// summaries + the live tail) — the conversation owns message inclusion via compaction, so the
-		// scope does NOT filter the conversation here (scope filters only instructions / tools /
-		// workspace files, above). The active conversation is ALWAYS present (the constructor ensures
+		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
+		// scope does NOT filter the conversation here (scope filters only the preceding instructions /
+		// tools / workspace files). The active conversation is ALWAYS present (the constructor ensures
 		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
 		const active = this.#conversations.active ?? this.#ensure()
 		const conversation = active.view()
@@ -250,7 +250,7 @@ export class AgentContext implements AgentContextInterface {
 	}
 
 	// The total fallback that keeps `messages` / `build()` defined even if a caller's supplied
-	// conversation registry was emptied after construction (e.g. `conversations.clear()`): `add()` a
+	// conversation registry was emptied after construction (for example `conversations.clear()`): `add()` a
 	// default (auto-activating it when the registry is empty) and return it. Returns the
 	// `ConversationInterface` (which satisfies `MessageManagerInterface` structurally for the
 	// `messages` getter AND carries `view()` for `build()`). Normally never reached — the constructor

@@ -17,7 +17,7 @@ import { Instruction } from './Instruction.js'
  *
  * @remarks
  * - **Registry.** Instructions live in an insertion-ordered `Map` keyed by `name`;
- *   `add` takes one {@link InstructionInput} or a batch (§9.2), MINTS each instruction's
+ *   `add` takes one {@link InstructionInput} or a batch, MINTS each instruction's
  *   `id`, and a re-`add` of the same name OVERWRITES it (last write wins). `count` is the
  *   map size, `instruction(name)` looks one up, and `instructions()` lists them SORTED by
  *   descending `priority` (a stable sort, so equal priorities keep insertion order).
@@ -28,10 +28,10 @@ import { Instruction } from './Instruction.js'
  *   `render`, `open` / `render` return IT, else the built-in — so a richer context
  *   reads one consistent pair and layers the provider default + per-item override on top
  *   (see {@link import('../AgentContext.js').AgentContext}). The per-item
- *   {@link InstructionInput.format} is round-tripped onto the stored instruction.
- * - **Removal.** `remove` drops one by name, or a batch (§9.2) — `true` when any was
- *   removed; `clear` empties the registry.
- * - **Observable (§13).** The owned {@link emitter} ({@link InstructionManagerEventMap})
+ *   {@link InstructionInput.override} is round-tripped onto the stored instruction.
+ * - **Removal.** `remove` drops one by name, or a batch — `true` only when EVERY supplied
+ *   name was removed; `clear` empties the registry.
+ * - **Observable.** The owned {@link emitter} ({@link InstructionManagerEventMap})
  *   carries `add` (the created instruction) / `remove` (the name) / `clear` for
  *   fire-and-forget observers. Every event is emitted directly, strictly AFTER the map
  *   mutation completes; the emitter isolates a listener throw and routes it to its `error`
@@ -49,7 +49,7 @@ import { Instruction } from './Instruction.js'
  */
 export class InstructionManager implements InstructionManagerInterface {
 	readonly #instructions = new Map<string, InstructionInterface>()
-	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
+	// The PUSH observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<InstructionManagerEventMap>
 	// The MANAGER-OPTIONS level of the build cascade — consulted FIRST by `open` /
@@ -112,9 +112,11 @@ export class InstructionManager implements InstructionManagerInterface {
 	remove(names: readonly string[]): boolean
 	remove(names: string | readonly string[]): boolean {
 		if (isArray(names)) {
-			let removed = false
+			// True only when EVERY supplied name was present and removed, so a caller can tell a
+			// fully applied batch from a partly applied one. Each present name still emits.
+			let removed = true
 			for (const name of names) {
-				if (this.#delete(name)) removed = true
+				if (!this.#delete(name)) removed = false
 			}
 			return removed
 		}

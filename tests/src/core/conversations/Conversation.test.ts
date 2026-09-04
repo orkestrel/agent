@@ -19,7 +19,7 @@ const recap = (summary: string): string => `${CONVERSATION_RECAP_PREFIX}${summar
 // Conversation OWNS its live message tail DIRECTLY (the flat store verbs folded in, like a
 // Workspace owns its files) — a live tail plus compacted, summarized sections + a regenerated
 // rollup + the `summarizable` flag, with rehydrate / search over the retained originals, driven by
-// a provider-agnostic summarizer seam (AGENTS §16 — real behavior, a data-stub summarizer, NOT a
+// a provider-agnostic summarizer seam — real behavior, a data-stub summarizer, NOT a
 // behavior-mock; the LIVE model is exercised in tests/src/ollama).
 // `compact()` folds the older live messages into a section (its summary from the seam),
 // regenerates the rollup (a second seam call), and emits `summary` then `compact`; view() =
@@ -59,7 +59,7 @@ describe('Conversation — construction & accessors', () => {
 		expect(conversation.messages()).toEqual([turn])
 	})
 
-	it('add(batch) mints each id + returns the array; remove + clear drop from the live tail (§9.2)', () => {
+	it('add(batch) mints each id + returns the array; remove + clear drop from the live tail', () => {
 		const conversation = new Conversation()
 
 		const messages = conversation.add([
@@ -73,11 +73,14 @@ describe('Conversation — construction & accessors', () => {
 		expect(conversation.count).toBe(3)
 		expect(new Set([a.id, b.id, c.id]).size).toBe(3) // each id distinct
 
-		// remove(id) drops one; remove(ids[]) drops a batch (true when any was removed).
+		// remove(id) drops one; remove(ids[]) drops a batch, true only when EVERY id was removed.
 		expect(conversation.remove(a.id)).toBe(true)
 		expect(conversation.remove('missing')).toBe(false)
-		expect(conversation.remove([b.id, 'missing'])).toBe(true)
+		expect(conversation.remove([b.id, 'missing'])).toBe(false)
 		expect(conversation.messages().map((message) => message.content)).toEqual(['c'])
+		expect(conversation.remove([c.id])).toBe(true)
+		expect(conversation.messages()).toEqual([])
+		conversation.add([{ role: 'user', content: 'c' }])
 
 		// clear empties the live tail.
 		conversation.clear()
@@ -331,7 +334,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 		expect(pulled.map((message) => message.content)).toEqual(['remember me', 'and me'])
 		expect(pulled.map((message) => message.id)).toEqual(originals.map((one) => one.id))
 		expect(events.rehydrate.calls).toEqual([[id]])
-		// v1 is a pure read — it does NOT re-add the originals to the live tail.
+		// `rehydrate` is a pure read — it does NOT re-add the originals to the live tail.
 		expect(conversation.count).toBe(0)
 	})
 
@@ -417,7 +420,7 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
 	})
 })
 
-describe('Conversation — observation is side-effect-free (§13)', () => {
+describe('Conversation — observation is side-effect-free', () => {
 	it('a throwing compact listener is isolated + routed to the error handler; the fold still completes', async () => {
 		const stub = createStubSummarizer()
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
@@ -445,7 +448,7 @@ describe('Conversation — observation is side-effect-free (§13)', () => {
 	})
 })
 
-describe('Conversation — sections snapshot independence (§11)', () => {
+describe('Conversation — sections snapshot independence', () => {
 	it('mutating the sections() array does not corrupt the conversation', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
@@ -673,7 +676,7 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 	})
 })
 
-describe('Conversation — sections cap (F2)', () => {
+describe('Conversation — sections cap', () => {
 	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
 		const zero = (): Conversation => new Conversation({ sections: 0 })
 		const negative = (): Conversation => new Conversation({ sections: -1 })
@@ -800,7 +803,7 @@ describe('Conversation — sections cap (F2)', () => {
 		expect(conversation.sections).toHaveLength(4)
 	})
 
-	// F4 — cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
+	// Cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
 	// (and its splice) is skipped — sections transiently sit at `cap + 1`, no loss — but the
 	// rollup regeneration still runs over the CURRENT (unmerged) sections so it is never left
 	// stale, and the error propagates (a manual `compact()` always surfaces a summarizer

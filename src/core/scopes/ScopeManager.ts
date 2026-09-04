@@ -1,9 +1,10 @@
-import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
+import type { EmitterInterface } from '@orkestrel/emitter'
 import type {
 	ScopeInput,
 	ScopeInterface,
 	ScopeManagerEventMap,
 	ScopeManagerInterface,
+	ScopeManagerOptions,
 } from '../types.js'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
@@ -20,9 +21,9 @@ import { Scope } from './Scope.js'
  *   one up, and `scopes()` lists them in insertion order. (Unlike the name-keyed
  *   instruction registry, a scope's key is its minted `id`, so two scopes may share a
  *   `name`; `create` therefore always adds — it never overwrites.)
- * - **Removal.** `remove` drops one by id, or a batch (§9.2) — `true` when any was
- *   removed; `clear` empties the registry.
- * - **Observable (§13).** The owned {@link emitter} ({@link ScopeManagerEventMap}) carries
+ * - **Removal.** `remove` drops one by id, or a batch — `true` only when EVERY supplied id
+ *   was removed; `clear` empties the registry.
+ * - **Observable.** The owned {@link emitter} ({@link ScopeManagerEventMap}) carries
  *   `create` (the created scope) / `remove` (the id) / `clear`. Every event is emitted
  *   directly, strictly AFTER the map mutation completes; the emitter isolates a listener
  *   throw and routes it to its `error` handler (the `error` option), so a buggy observer can
@@ -38,14 +39,14 @@ import { Scope } from './Scope.js'
  */
 export class ScopeManager implements ScopeManagerInterface {
 	readonly #scopes = new Map<string, ScopeInterface>()
-	// The PUSH observation surface (§13) — owned, never inherited. The emitter isolates a
+	// The PUSH observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<ScopeManagerEventMap>
 
-	constructor(on?: EmitterHooks<ScopeManagerEventMap>, error?: EmitterErrorHandler) {
+	constructor(options?: ScopeManagerOptions) {
 		this.#emitter = new Emitter<ScopeManagerEventMap>({
-			...(on === undefined ? {} : { on }),
-			...(error === undefined ? {} : { error }),
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
 		})
 	}
 
@@ -78,9 +79,11 @@ export class ScopeManager implements ScopeManagerInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			let removed = false
+			// True only when EVERY supplied id was present and removed, so a caller can tell a
+			// fully applied batch from a partly applied one. Each present id still emits.
+			let removed = true
 			for (const id of ids) {
-				if (this.#delete(id)) removed = true
+				if (!this.#delete(id)) removed = false
 			}
 			return removed
 		}
