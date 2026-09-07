@@ -106,7 +106,7 @@ describe('AgentContext — tools are structural, not in the prompt', () => {
 		const built = context.build()
 
 		// Only the system message + the user turn — no message carries the tool name,
-		// description, or definition; tools reach the provider via definitions(), not here.
+		// description, or definition; tools reach the provider through definitions(), not here.
 		expect(built).toHaveLength(2)
 		const serialized = JSON.stringify(built)
 		expect(serialized).not.toContain('search')
@@ -342,7 +342,7 @@ describe('AgentContext — context managers', () => {
 
 		const built = context.build()
 
-		// Identical to the original lean behavior: just [system, user].
+		// Identical to the original lean behavior: [system, user] and nothing else.
 		expect(built).toHaveLength(2)
 		expect(requireValue(built[0])).toMatchObject({ role: 'system', content: 'sys' })
 		expect(requireValue(built[1])).toMatchObject({ role: 'user', content: 'hi' })
@@ -522,7 +522,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 
 	it('renders a TEXT file in the system block AND attaches an IMAGE file from the same active workspace', () => {
 		const context = new AgentContext({ system: 'sys' })
-		// One active workspace holding BOTH a text file (added via write) and an image file (seeded,
+		// One active workspace holding BOTH a text file (added through write) and an image file (seeded,
 		// since write() only ever mints text files).
 		const image = createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') })
 		const workspace = context.workspaces.add({ seed: [image] })
@@ -955,7 +955,7 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 
 		const block = requireValue(context.build()[0]).content
 
-		// 'a' renders via its per-item override; 'b' via the built-in content — same section.
+		// 'a' renders through its per-item override; 'b' through the built-in content — same section.
 		expect(block).toContain('OVERRIDE-A')
 		expect(block).toContain('plain-b')
 		expect(block).not.toContain('plain-a')
@@ -1058,7 +1058,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 // tail). The context ALWAYS has an active conversation (a default is added at construction when the
 // supplied manager has none), so `messages` is always defined. The scope's instructions still filter
 // the system block; the scope's MESSAGES allow-list is NOT applied (the conversation is
-// authoritative). A manager is supplied via AgentContextOptions.conversations; `manager.add()` mints
+// authoritative). A manager is supplied through AgentContextOptions.conversations; `manager.add()` mints
 // + auto-activates a conversation the test holds a reference to. Real behavior, a data-stub
 // summarizer (not a behavior-mock).
 describe('AgentContext — the active conversation as the message source', () => {

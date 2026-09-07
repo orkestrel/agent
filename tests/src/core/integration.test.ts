@@ -190,7 +190,7 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 	})
 
 	it('createScriptedProvider (the shared Ollama-free fixture) is itself a conforming provider that drives the loop', async () => {
-		// The shared scripted provider (used across the agent-job tests) is ALSO just a
+		// The shared scripted provider (used across the agent-job tests) is ALSO a
 		// ProviderInterface — driving the loop with it proves the agnosticism claim holds for the
 		// fixture every other suite relies on, not only the bespoke fakes above.
 		const agent = createAgent(

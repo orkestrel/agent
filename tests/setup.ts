@@ -33,7 +33,7 @@ import { createBinaryContent, createFile, createTextContent } from '@orkestrel/w
 // agent commits a genuine partial.
 
 /**
- * One turn a {@link createScriptedProvider} replays — either a bare {@link ProviderResult}
+ * Replays one turn of a {@link createScriptedProvider} script — either a bare {@link ProviderResult}
  * (chunked by the provider's `deltasOf`) or a `{ result, deltas?, thoughts? }` pair whose per-turn
  * `deltas` override how that one turn's content streams and whose `thoughts` stream live
  * reasoning deltas before the content. A `deltas` of `[]` streams the content as zero deltas
@@ -48,7 +48,7 @@ export type ScriptedTurn =
 	  }
 
 /**
- * One recorded `generate` / `stream` call on a {@link createScriptedProvider} (when `record`).
+ * Describes one recorded `generate` / `stream` call on a {@link createScriptedProvider} (when `record`).
  *
  * @remarks
  * `signal` is the live bound the call was handed — the agent's composed run signal (external
@@ -62,7 +62,7 @@ export interface ScriptedCall {
 	readonly signal: AbortSignal
 }
 
-/** How a {@link createScriptedProvider} chunks a turn's content into stream deltas. */
+/** Chunks a turn's content into the stream deltas a {@link createScriptedProvider} emits. */
 export type DeltasOf = (content: string) => readonly string[]
 
 /**
@@ -70,7 +70,7 @@ export type DeltasOf = (content: string) => readonly string[]
  * original single-delta / repeat-on-exhaust behaviour.
  *
  * @remarks
- * - `delay` — ms paused at the start of each call (lets a test observe concurrency via
+ * - `delay` — ms paused at the start of each call (lets a test observe concurrency through
  *   `maxInFlight`); defaults to `0`.
  * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
  *   providers are distinguishable); defaults to `'scripted'`.
@@ -94,9 +94,9 @@ export interface ScriptedProviderOptions {
 }
 
 /**
- * A scripted {@link ProviderInterface} plus its live recorders — `maxInFlight` is the
+ * Extends a scripted {@link ProviderInterface} with its live recorders — `maxInFlight` is the
  * high-water mark of concurrent calls (so a test can prove a queue / runner bounded the
- * agent jobs, e.g. `concurrency: 2` ⇒ `maxInFlight <= 2`), `started` counts calls, and
+ * agent jobs, for example `concurrency: 2` ⇒ `maxInFlight <= 2`), `started` counts calls, and
  * `calls` records each call's `messages` / `tools` / `signal` (populated only under `record: true`).
  */
 export interface ScriptedProviderInterface extends ProviderInterface {
@@ -109,7 +109,7 @@ export interface ScriptedProviderInterface extends ProviderInterface {
 }
 
 /**
- * Normalize a {@link ScriptedTurn} to its `{ result, deltas, thoughts }` parts — a bare result
+ * Normalizes a {@link ScriptedTurn} to its `{ result, deltas, thoughts }` parts — a bare result
  * carries no per-turn deltas and no thoughts. The `'result' in turn` discriminant narrows the
  * union with a guard, never an assertion.
  *
@@ -127,7 +127,7 @@ export function turnParts(turn: ScriptedTurn): {
 }
 
 /**
- * Chunk a turn's whole content into ONE stream delta — the default {@link DeltasOf} a
+ * Chunks a turn's whole content into ONE stream delta — the default {@link DeltasOf} a
  * {@link ScriptedProvider} applies when neither a per-turn `deltas` nor an options `deltasOf`
  * overrides it.
  *
@@ -139,7 +139,7 @@ export function chunkWholeDelta(content: string): readonly string[] {
 }
 
 /**
- * Create the shared scripted {@link ProviderInterface} for deterministic, Ollama-free agent
+ * Creates the shared scripted {@link ProviderInterface} for deterministic, Ollama-free agent
  * tests — each `generate` / `stream` call consumes the next {@link ScriptedTurn}, streams
  * its content as deltas (per-turn `deltas`, else `deltasOf(content)`, else the whole content
  * as one delta), and RETURNS the turn's result. The call honours its `signal` between every
@@ -160,8 +160,8 @@ export function createScriptedProvider(
 }
 
 /**
- * The scripted {@link ProviderInterface} {@link createScriptedProvider} builds — a REAL provider
- * that replays its turns, honours its signal between every delta, and records its calls.
+ * Replays the turns {@link createScriptedProvider} scripts — a REAL {@link ProviderInterface}
+ * that honours its signal between every delta and records its calls.
  *
  * @remarks
  * Reaches its own turn cursor and its in-flight / started / calls recorders, so it is a class
@@ -297,7 +297,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 // working `ToolInterface`s), NOT mocks of behaviour.
 
 /**
- * Build a {@link ToolCall} for an agent / loop test — the verbose `{ id, name, arguments }`
+ * Builds a {@link ToolCall} for an agent / loop test — the verbose `{ id, name, arguments }`
  * literal folded into a call with a sensible default (`add` with no arguments) plus
  * per-call overrides, so a test names only the fields its scenario cares about.
  *
@@ -309,7 +309,7 @@ export function createToolCall(overrides?: Partial<ToolCall>): ToolCall {
 }
 
 /**
- * Build a {@link TokenUsage} for an agent / budget test — the default `{ prompt: 5,
+ * Builds a {@link TokenUsage} for an agent / budget test — the default `{ prompt: 5,
  * completion: 7, total: 12 }`, with per-call overrides for a budget-triggering variant.
  *
  * @param overrides - Fields to override on the default usage
@@ -320,7 +320,7 @@ export function createTokenUsage(overrides?: Partial<TokenUsage>): TokenUsage {
 }
 
 /**
- * The canonical `add` tool — a REAL {@link ToolInterface} that returns a fixed `5`, the
+ * Builds the canonical `add` tool — a REAL {@link ToolInterface} that returns a fixed `5`, the
  * single most-repeated tool literal across the agent loop / registry tests (where the loop
  * only needs SOME callable tool whose result feeds back, not a real summation). A data
  * builder, not a mock: a test that needs the tool to actually sum its arguments, or to
@@ -333,7 +333,7 @@ export function addTool(): ToolInterface {
 }
 
 /**
- * The canonical `loop` tool — a REAL {@link ToolInterface} that always returns `'again'`,
+ * Builds the canonical `loop` tool — a REAL {@link ToolInterface} that always returns `'again'`,
  * the tool the iteration-cap / budget / always-tool loop tests repeat. A data builder, not
  * a mock.
  *
@@ -344,7 +344,7 @@ export function loopTool(): ToolInterface {
 }
 
 /**
- * Build an {@link AgentJobInput} for an agent-job test — the default `{ provider: 'main',
+ * Builds an {@link AgentJobInput} for an agent-job test — the default `{ provider: 'main',
  * messages: [{ role: 'user', content: 'go' }] }`, with per-call overrides so a test names
  * only the job fields its scenario varies (a different `provider` / `content`, a `tools`
  * list, a `budget`). A specific failure-scenario job (a budget ceiling, a tool list) is
@@ -358,7 +358,7 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
 }
 
 /**
- * Create a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
+ * Creates a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
  * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
  * folded count), so a `compact()` produces a predictable section summary and the rollup is a
  * predictable summary-of-summaries (a data-stub, NOT a behavior-mock — the LIVE
@@ -383,14 +383,14 @@ export function createStubSummarizer(): {
 	}
 }
 
-/** A {@link SchedulerInterface} that records how many turn boundaries its `yield` paced. */
+/** Records how many turn boundaries a {@link SchedulerInterface}'s `yield` paced. */
 export interface RecordingSchedulerInterface extends SchedulerInterface {
 	/** How many times `yield` ran — the turn boundaries the loop paced through this scheduler. */
 	readonly yields: number
 }
 
 /**
- * Create a {@link RecordingSchedulerInterface} — a real `SchedulerInterface` whose
+ * Creates a {@link RecordingSchedulerInterface} — a real `SchedulerInterface` whose
  * `yield` counts each call (the turn boundary it paced) and resolves immediately, so a
  * test can prove pacing ran BETWEEN turns (not after the last). It honours its signal
  * exactly like the real scheduler — an already-aborted signal rejects with the reason —
@@ -424,7 +424,7 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 // plain-JSON `toEqual` (no class-identity `toBe`).
 
 /**
- * Build a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
+ * Builds a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
  * added, then a genuine `compact()` folds the oldest two into one summarized section + regenerates
  * the rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is NON-VACUOUS
  * in BOTH the compacted sections AND the live tail (and carries a rollup summary). The shared
@@ -461,7 +461,7 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 export type MakeConversationStore = () => ConversationStoreInterface
 export type BuildConversationSnapshot = (id?: string) => Promise<ConversationSnapshot>
 
-/** The literal values a {@link conversationStoreRoundTrip} result must carry, shared by every twin. */
+/** Names the literal values a {@link conversationStoreRoundTrip} result must carry, shared by every twin. */
 export interface ConversationStoreRoundTripExpectation {
 	readonly sectionSummary: string
 	readonly sectionMessages: readonly string[]
@@ -470,7 +470,7 @@ export interface ConversationStoreRoundTripExpectation {
 }
 
 /**
- * The literal values `buildConversationSnapshot()`'s round trip must reproduce — the fold's section
+ * Holds the literal values `buildConversationSnapshot()`'s round trip must reproduce — the fold's section
  * summary + retained messages, the live tail, and the rollup summary. Shared so both twin suites (and
  * `setup.test.ts`'s own proof) assert the SAME literals rather than each retyping them.
  */
@@ -482,7 +482,7 @@ export const conversationStoreRoundTripExpectation: ConversationStoreRoundTripEx
 }
 
 /**
- * Run the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
+ * Runs the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
  * {@link buildConversationSnapshot} snapshot, then get it back. Returns what was stored and what came
  * back, sections + live tail + rollup summary intact, so the caller's `it` block asserts the equality
  * (and the literals in {@link conversationStoreRoundTripExpectation}) itself.
@@ -506,7 +506,7 @@ export async function conversationStoreRoundTrip(
 }
 
 /**
- * Run the upsert scenario: `set` keys off the snapshot's OWN id (no separate id param), so
+ * Runs the upsert scenario: `set` keys off the snapshot's OWN id (no separate id param), so
  * re-setting the same id REPLACES — insert-or-replace semantics, not an append (one entry, latest
  * wins). Returns the replacement and what `get` reads back, for the caller to assert equal.
  *
@@ -534,7 +534,7 @@ export async function conversationStoreUpsert(
 }
 
 /**
- * Run the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
+ * Runs the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
  * again — the caller asserts `beforeDelete` is defined and `afterDelete` is `undefined`.
  *
  * @param makeStore - Builds a fresh, empty store (the twin's own factory)
@@ -558,7 +558,7 @@ export async function conversationStoreDeleteThenAbsent(
 }
 
 /**
- * Run the absent-delete scenario: deleting an id that was never stored — the caller asserts the
+ * Runs the absent-delete scenario: deleting an id that was never stored — the caller asserts the
  * settled promise resolves `undefined` rather than rejecting (a no-op).
  *
  * @param makeStore - Builds a fresh, empty store (the twin's own factory)
@@ -569,7 +569,7 @@ export function conversationStoreDeleteAbsent(makeStore: MakeConversationStore):
 }
 
 /**
- * Run the absent-get scenario: getting an id that was never stored — the caller asserts the result
+ * Runs the absent-get scenario: getting an id that was never stored — the caller asserts the result
  * is `undefined`.
  *
  * @param makeStore - Builds a fresh, empty store (the twin's own factory)
@@ -582,7 +582,7 @@ export function conversationStoreGetAbsent(
 }
 
 /**
- * Run the two-ids-coexist scenario: a real durable store holds many conversations, so distinct ids
+ * Runs the two-ids-coexist scenario: a real durable store holds many conversations, so distinct ids
  * must not clobber each other, and dropping one must leave the other intact. Returns every snapshot
  * and every read, before and after the `alpha` delete, for the caller to assert.
  *
@@ -621,7 +621,7 @@ export async function conversationStoreTwoIds(
 // entities throughout — no mocks.
 
 /**
- * Build a {@link ToolManagerInterface} pre-seeded with working tools — the registry the agent
+ * Builds a {@link ToolManagerInterface} pre-seeded with working tools — the registry the agent
  * loop tests hand to an agent so the model has SOMETHING callable.
  *
  * @param tools - The tools to seed; defaults to the canonical {@link addTool}
@@ -634,7 +634,7 @@ export function createSeededToolManager(tools?: readonly ToolInterface[]): ToolM
 }
 
 /**
- * Build an {@link AgentContextInterface} whose ACTIVE workspace holds two TEXT files
+ * Builds an {@link AgentContextInterface} whose ACTIVE workspace holds two TEXT files
  * (`keep.txt` / `drop.txt`) and two IMAGE files (`keep.png` / `drop.png`), plus a system prompt
  * and one seeded user turn — so a `scope.files` allow-list can be shown filtering BOTH the
  * rendered text section and the last-user image attach.
@@ -660,7 +660,7 @@ export function seedWorkspaceContext(): AgentContextInterface {
 }
 
 /**
- * Build an {@link AgentContextInterface} carrying a system prompt, two named instructions
+ * Builds an {@link AgentContextInterface} carrying a system prompt, two named instructions
  * (`keep-i` / `drop-i`), and two user turns — the fixture a `scope.instructions` allow-list
  * filters.
  *
@@ -691,7 +691,7 @@ export interface SectionRenderOptions {
 }
 
 /**
- * Resolve the instructions section's `open` (its header) at whichever cascade levels the
+ * Resolves the instructions section's `open` (its header) at whichever cascade levels the
  * arguments set — the built-in floor, a provider default, and a manager-options override.
  *
  * @remarks
@@ -718,7 +718,7 @@ export function resolveSectionOpen(
 }
 
 /**
- * Resolve ONE instruction item's rendering at whichever cascade levels the arguments set — the
+ * Resolves ONE instruction item's rendering at whichever cascade levels the arguments set — the
  * built-in floor, a provider default, a manager-options override, and the per-item override.
  *
  * @remarks
@@ -755,7 +755,7 @@ export function resolveSectionRender(
 }
 
 /**
- * Register a conversation on a {@link ConversationManagerInterface} and compact it, so the
+ * Registers a conversation on a {@link ConversationManagerInterface} and compacts it, so the
  * registered conversation carries a real compacted section, a live tail, and a rollup summary —
  * a durable `save` / `open` round trip over it is then NON-VACUOUS in every field.
  *

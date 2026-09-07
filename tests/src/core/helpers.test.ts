@@ -402,7 +402,7 @@ describe('estimateMessages', () => {
 describe('settleAgentJob', () => {
 	// The shared partial-as-configurable-failure policy. Each case rehydrates a real agent
 	// through a registry over a scripted provider (no Ollama) and settles it: a NATURAL
-	// finish resolves with the run's result; a PARTIAL (forced via a pre-aborted signal,
+	// finish resolves with the run's result; a PARTIAL (forced through a pre-aborted signal,
 	// which commits an empty partial before the provider runs) THROWS an AgentJobError when
 	// partials are disallowed and RESOLVES the partial when allowed.
 	const USAGE = createTokenUsage()

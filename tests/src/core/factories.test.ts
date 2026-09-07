@@ -199,7 +199,7 @@ function loopTools(): Record<string, ReturnType<typeof createTool>> {
 // is exhausted from the agent's first `start()`, so the bound's budget signal is already
 // aborted before the provider stream is even entered: the agent commits a partial with
 // EMPTY content WITHOUT touching the provider. Proves the partial-as-failure policy keys
-// off `AgentResult.partial` alone, not off the budget-via-loop-tool mechanism in
+// off `AgentResult.partial` alone, not off the loop-tool budget mechanism in
 // `partialJob` (which charges usage on turn 1, then fires before turn 2). Because the
 // provider is never entered here, `provider.started` stays 0 on this route — so it is used
 // for the throw/resolve assertions, never to count attempts (that stays on `partialJob`).
@@ -493,7 +493,7 @@ describe('AgentJobError / isAgentJobError', () => {
 
 // -- createAgentQueue — partial-as-failure policy (the shared `settle`), extended -
 //
-// Beyond the budget-via-loop-tool route already covered above: a SECOND independent
+// Beyond the loop-tool budget route already covered above: a SECOND independent
 // partial route (`budget: 0`, provider untouched) proves the policy keys off
 // `AgentResult.partial` alone; a deeper retry budget proves the throw re-runs the
 // configured number of times; and the policy is contrasted with the two HARD-cancel
@@ -852,7 +852,7 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 
 	it('a parent spawning a child on a concurrency:1 runner does NOT deadlock', async () => {
 		// The single slot is held by the parent's handler while it runs the parent agent; the
-		// handler fans the child out via `void controller.spawn(...)` and RETURNS (never
+		// handler fans the child out through `void controller.spawn(...)` and RETURNS (never
 		// inline-awaiting it), freeing the slot for the child. If the handler inline-awaited
 		// the spawn this would deadlock — so a bounded completion is the proof it fans out.
 		const provider = createScriptedProvider([{ content: 'parent' }, { content: 'child' }])

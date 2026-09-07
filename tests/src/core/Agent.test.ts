@@ -48,7 +48,7 @@ import { collect, createRecorder, createRecorders, waitForDelay } from '@orkestr
 // `createScriptedProvider` returns pre-canned ProviderResults in sequence so the LOOP
 // itself — tool iteration, the chunk stream, generate↔stream parity, the iteration cap,
 // abort / budget bounds, scheduler pacing, status — is pinned without a daemon. Every loop
-// test opts the provider into `record: true` (to assert, via `provider.calls`, the
+// test opts the provider into `record: true` (to assert, through `provider.calls`, the
 // messages / tools the loop sent) and `exhaust: 'throw'` (so a loop that over-ran its
 // script fails loudly rather than silently repeating the last turn). The only providers
 // that stay LOCAL are the genuine per-scenario BEHAVIOUR fixtures — a stream that parks
@@ -58,9 +58,9 @@ import { collect, createRecorder, createRecorders, waitForDelay } from '@orkestr
 const USAGE = createTokenUsage()
 
 // This file's uniform options for the shared scripted provider: every loop test records the
-// messages / tools each call saw (asserted via `provider.calls`) and treats over-running the
+// messages / tools each call saw (asserted through `provider.calls`) and treats over-running the
 // script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
-// repeat — so a loop that should have stopped (a cap / budget / cancel) but didn't is caught.
+// repeat — so a loop that had to stop (a cap / budget / cancel) but didn't is caught.
 const SCRIPT_OPTIONS: ScriptedProviderOptions = { name: 'script', record: true, exhaust: 'throw' }
 
 // The real per-turn deadline every timeout test arms, in milliseconds. Real host timers
@@ -209,7 +209,7 @@ describe('Agent — single turn', () => {
 		const [first] = provider.calls
 		expect(first?.messages[0]).toMatchObject({ role: 'system', content: 'be brief' })
 		expect(first?.messages.at(-1)).toMatchObject({ role: 'user', content: 'hi' })
-		// Tools reach the provider via definitions(), never serialized into messages.
+		// Tools reach the provider through definitions(), never serialized into messages.
 		expect(first?.tools).toEqual([{ name: 'noop' }])
 		expect(first?.messages.some((m) => m.content.includes('noop'))).toBe(false)
 	})
@@ -1111,7 +1111,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		const agent = createAgent(provider, { tools, timeout: 5_000 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
-		// Pull exactly ONE chunk via the iterator protocol, then `return()` the iterator —
+		// Pull exactly ONE chunk through the iterator protocol, then `return()` the iterator —
 		// the early-break a consumer's `break` triggers — without an unused loop binding.
 		const iterator = stream.events[Symbol.asyncIterator]()
 		const first = await iterator.next()
@@ -2295,7 +2295,7 @@ describe('Agent — status transitions and getters', () => {
 // isProviderAbortError narrows a caught `unknown` back to it. The class + guard are a
 // PUBLIC export (the @src/core barrel; documented in guides/agents.md). NOTE: the agent
 // loop itself does NOT consume the guard — it distinguishes a cancel from a genuine
-// error via the bound signal's `aborted` flag (see the loop's `#provide` catch), so the
+// error through the bound signal's `aborted` flag (see the loop's `#provide` catch), so the
 // guard is a CONSUMER-facing recovery helper. These pin the class + guard here (in a
 // behavioral file) since `errors.ts` is structure-exempt from its own test mirror.
 describe('ProviderAbortError + isProviderAbortError', () => {
@@ -2638,7 +2638,7 @@ describe('Agent — emitter (push observation surface)', () => {
 	it('the on? option wires initial listeners at construction', async () => {
 		const finishRec = createRecorder<[result: AgentResult]>()
 		const startRec = createRecorder<[id: string]>()
-		// Pass listeners via the reserved `on` option — they must fire without a later .on().
+		// Pass listeners through the reserved `on` option — they must fire without a later .on().
 		const agent = createAgent(
 			createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS),
 			{
@@ -3135,7 +3135,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 //
 // The real app pattern: ONE Agent over a `ConversationManager` of threads (the agent's own
 // `context.conversations`), switching the ACTIVE conversation per request (NOT an agent per thread).
-// Each "request" makes the thread `id` active (creating via `add({ id })` when absent, then
+// Each "request" makes the thread `id` active (creating through `add({ id })` when absent, then
 // `switch(id)`), appends the user turn, and runs `generate()`. These prove each conversation
 // accumulates its OWN independent history AND compacts INDEPENDENTLY (one conversation's sections
 // never leak into another), all served by the SAME agent. Deterministic: a scripted provider + a stub
@@ -3343,7 +3343,7 @@ describe('Agent — limit exhaustion', () => {
 	it("a cancel firing during the last turn's post-provider work (tool execute) reports abort, not exhaust", async () => {
 		// The tool's own execute() fires the bound external signal mid-authorize/execute, on the
 		// run's ONLY allowed turn (limit: 1). The loop still takes the `pending = true; continue`
-		// path and exits via the `for` condition (never a `break`) -- the same shape as a genuine
+		// path and exits through the `for` condition (never a `break`) -- the same shape as a genuine
 		// exhaustion -- but the signal IS aborted, so this must classify as a cancel: `abort` fires
 		// (carrying the reason), `exhaust` must NOT fire.
 		const controller = new AbortController()

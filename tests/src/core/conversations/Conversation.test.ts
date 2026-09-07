@@ -139,7 +139,7 @@ describe('Conversation — compact() with the default keep (0) folds all', () =>
 		expect(section?.messages.map((message) => message.content)).toEqual(['a', 'b', 'c'])
 		// The live tail is emptied (keep 0 folds everything).
 		expect(conversation.count).toBe(0)
-		// view() is now just the single section's FRAMED recap message (the lean RECAP-label prefix
+		// view() is now the single section's FRAMED recap message (the lean RECAP-label prefix
 		// + the summary), keyed by the section id, role assistant. The raw `summary` / rollup above
 		// stay UNframed — the label is a view()-only presentation concern.
 		const view = conversation.view()
@@ -496,8 +496,8 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 		const sections = conversation.sections
 		expect(sections).toHaveLength(3)
 
-		// The RAW baseline: what view() would estimate with UNFRAMED section summaries (just the
-		// summary text), versus the ACTUAL framed view(). The delta is the framing's whole cost.
+		// The RAW baseline: what view() would estimate with UNFRAMED section summaries (the
+		// summary text alone), versus the ACTUAL framed view(). The delta is the framing's whole cost.
 		const baseline = estimateMessages(
 			sections.map((section) => ({ id: section.id, role: 'assistant', content: section.summary })),
 		)
@@ -772,7 +772,7 @@ describe('Conversation — sections cap', () => {
 		await conversation.compact()
 
 		// The first section (containing 'the needle is here') was merged into a new section —
-		// its original message must still be found via search.
+		// its original message must still be found through search.
 		const hits = conversation.search('needle')
 		expect(hits.map((one) => one.content)).toEqual(['the needle is here'])
 	})

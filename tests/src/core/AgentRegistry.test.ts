@@ -453,7 +453,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 	it('threads a live signal so an abort AFTER build cancels the in-flight run', async () => {
 		// The SAME AbortController whose signal was threaded into build cancels a slow run:
 		// the provider pauses 50ms, the test aborts during that pause, and the agent commits
-		// a partial — proving the threaded signal is the agent's actual cancel, not just a
+		// a partial — proving the threaded signal is the agent's actual cancel, not a
 		// pre-aborted short-circuit.
 		const provider = createScriptedProvider([{ content: 'slow' }], { delay: 50 })
 		const registry = createAgentRegistry({ providers: { main: provider } })
