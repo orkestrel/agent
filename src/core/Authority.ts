@@ -8,8 +8,10 @@ import type {
 import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
 
 /**
- * Gates the agent loop's tool calls — the synchronous policy consulted before each call
- * runs, turning one {@link AuthorityContext} into an {@link AuthorityDecision}.
+ * Gates the agent loop's tool calls — the synchronous policy consulted before each call runs,
+ * turning one {@link AuthorityContext} into an {@link AuthorityDecision} by walking the ordered
+ * rules first-match-wins and falling back to a configurable default, which allows an unmatched
+ * call unless its `fallback` denies.
  *
  * @remarks
  * - **Ordered, first-match-wins.** `evaluate` walks the configured rules in order and

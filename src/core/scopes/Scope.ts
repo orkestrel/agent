@@ -2,9 +2,11 @@ import type { ScopeFilter, ScopeInput, ScopeInterface } from '../types.js'
 import { intersectKeys } from '../helpers.js'
 
 /**
- * Represents a named, immutable filter over a richer context's items — an optional
- * allow-list per category (`instructions` / `tools` / `files`), each keyed by that
- * category's identity (an instruction's `name`, a tool's `name`, a workspace file's `path`).
+ * Represents a named, immutable filter over a richer context's items — an optional allow-list per
+ * category (`instructions` / `tools` / `files`), each keyed by that category's identity (an
+ * instruction's `name`, a tool's `name`, a workspace file's `path`) and read as an allow-list:
+ * `undefined` lets everything pass, `[]` lets nothing pass, and a non-empty list passes the listed
+ * keys alone. `narrow` composes a tighter child by set intersection.
  *
  * @remarks
  * - **A category list is three-way.** `undefined` ⇒ NO constraint on that category (all
@@ -30,6 +32,7 @@ import { intersectKeys } from '../helpers.js'
  * // instructions had no parent constraint (undefined) → the child's list passes through.
  * tighter.narrow({ instructions: ['safety'] }).instructions // ['safety']
  * ```
+ *
  */
 export class Scope implements ScopeInterface {
 	readonly id: string = crypto.randomUUID()

@@ -7,8 +7,8 @@ import type { AgentResult, ProviderResult } from './types.js'
 
 /**
  * Reports a provider stream cancelled mid-flight by its bound signal — thrown by a
- * {@link ProviderInterface}'s `stream`, carrying the {@link ProviderResult} assembled
- * from whatever streamed before the cancel.
+ * {@link ProviderInterface}'s `stream`, carrying the {@link ProviderResult} assembled from
+ * whatever streamed before the cancel and the machine-readable `code` `'ABORT'`.
  *
  * @remarks
  * Lets a caller recover the partial content (and any tool calls / usage seen so far)
@@ -29,7 +29,8 @@ export class ProviderAbortError extends Error {
 }
 
 /**
- * Narrows an unknown caught value to a {@link ProviderAbortError}.
+ * Narrows an unknown caught value to a {@link ProviderAbortError} through `instanceof`, so a
+ * `catch` can recover its `partial` result.
  *
  * @param value - The value to test (typically a `catch` binding)
  * @returns True if `value` is a {@link ProviderAbortError}; false otherwise
@@ -57,8 +58,8 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
 /**
  * Reports an {@link AgentInterface} run that ended {@link AgentResult.partial} under a
  * `partial` policy of `false` (the default) — thrown by an agent-job handler (a
- * `createAgentQueue` / `createAgentRunner` job), carrying the partial
- * {@link AgentResult} so the failure stays inspectable.
+ * `createAgentQueue` / `createAgentRunner` job), carrying the partial {@link AgentResult} so
+ * the failure stays inspectable, and the machine-readable `code` `'PARTIAL'`.
  *
  * @remarks
  * A partial result means the agent was cancelled (an external `signal` abort, a queue /
@@ -85,7 +86,8 @@ export class AgentJobError extends Error {
 }
 
 /**
- * Narrows an unknown caught value to an {@link AgentJobError}.
+ * Narrows an unknown caught value to an {@link AgentJobError} through `instanceof`, so a
+ * `catch` can recover its `partial` result.
  *
  * @param value - The value to test (typically a `catch` binding or a rejected enqueue)
  * @returns True if `value` is an {@link AgentJobError}; false otherwise
@@ -110,9 +112,10 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // caught value with `instanceof`, mirroring the other errors in this file.
 
 /**
- * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages
- * with, or with a structurally invalid `sections` cap — thrown by a
- * {@link ConversationInterface}'s `compact()`, carrying a machine-readable `code`.
+ * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with,
+ * or with a `sections` cap below `1` — thrown by a {@link ConversationInterface}'s `compact()`
+ * or its construction, carrying the machine-readable `code`
+ * `'SUMMARIZER' | 'SECTIONS'`.
  *
  * @remarks
  * Compaction REQUIRES a summarizer (it digests the folded slice into a section summary and
@@ -136,7 +139,8 @@ export class ConversationError extends Error {
 }
 
 /**
- * Narrows an unknown caught value to a {@link ConversationError}.
+ * Narrows an unknown caught value to a {@link ConversationError} through `instanceof`, so a
+ * `catch` can branch on its `code`.
  *
  * @param value - The value to test (typically a `catch` binding)
  * @returns True if `value` is a {@link ConversationError}; false otherwise
@@ -163,10 +167,13 @@ export function isConversationError(value: unknown): value is ConversationError 
 // branches on `error.code`, mirroring `ConversationError` above.
 
 /**
- * Reports a concurrent run that would corrupt SHARED per-agent accounting, or a rehydration
+ * Reports a concurrent run that would corrupt shared per-agent accounting, or a rehydration
  * name absent from its registry pool — thrown synchronously by an {@link AgentInterface}'s
- * `stream()` and by an {@link AgentRegistryInterface}'s accessors, carrying a machine-readable
- * `code`.
+ * `stream()` (and so by `generate()`, which calls it) and by an
+ * {@link AgentRegistryInterface}'s accessors, carrying the machine-readable `code`
+ * `'CONCURRENCY' | 'REGISTRY'`. Synchronous means a fire-and-forget
+ * `agent.generate().catch(…)` never catches it: `await` the call inside `try`/`catch`, or wrap
+ * the call expression itself.
  *
  * @remarks
  * `'CONCURRENCY'` reports a run already in flight on the same agent, PLUS a construction-level
@@ -189,7 +196,8 @@ export class AgentError extends Error {
 }
 
 /**
- * Narrows an unknown caught value to an {@link AgentError}.
+ * Narrows an unknown caught value to an {@link AgentError} through `instanceof`, so a `catch`
+ * can branch on its `code`.
  *
  * @param value - The value to test (typically a `catch` binding)
  * @returns True if `value` is an {@link AgentError}; false otherwise

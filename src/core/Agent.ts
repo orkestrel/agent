@@ -41,8 +41,10 @@ import {
 
 /**
  * Composes a {@link ProviderInterface}, an {@link AgentContext}, and a
- * {@link ToolManagerInterface} into a bounded context → provider → tools → repeat
- * turn, exposed as both a one-shot `generate` and a live `stream`.
+ * {@link ToolManagerInterface} into a bounded context → provider → tools → repeat turn, exposed
+ * as both a one-shot `generate` and a live `stream` that share one private run — bounded by the
+ * run `signal`, the `timeout`, and the `budget` folded through `AbortSignal.any`, paced by
+ * `scheduler`, with tool iteration capped at `limit`.
  *
  * @remarks
  * - **One loop, two faces.** A single private async generator (`#run`) drives the

@@ -1,34 +1,34 @@
 /**
- * Caps an {@link AgentInterface} turn's tool iterations by default — the maximum
- * number of context → provider → tools cycles before the loop stops, so a model that
- * keeps requesting tools can never loop forever. Overridable per agent through
- * `AgentOptions.limit`.
+ * Caps an {@link AgentInterface} turn's tool iterations by default — `10` context → provider →
+ * tools cycles before the loop stops, so a model that keeps requesting tools can never loop
+ * forever. Overridable per agent through `AgentOptions.limit`.
  */
 export const DEFAULT_AGENT_LIMIT = 10
 
 /**
  * Names the zone an {@link AuthorityInterface}'s default fallback {@link AuthorityDecision}
- * carries — the classification for a tool call that matched no rule. Paired with the
- * default `allowed: true` fallback, an unmatched call is allowed under this zone, so a
- * rules list of denials acts as a denylist; a caller wanting deny-by-default supplies
- * an `allowed: false` `fallback` of their own (see `AuthorityOptions`).
+ * carries — `'default'`, the classification for a tool call that matched no rule. Paired with
+ * the default `allowed: true` fallback, an unmatched call is allowed under this zone, so a
+ * rules list of denials acts as a denylist; a caller wanting deny-by-default supplies an
+ * `allowed: false` `fallback` of their own (see `AuthorityOptions`).
  */
 export const DEFAULT_AUTHORITY_ZONE = 'default'
 
 /**
  * Sets the default number of recent live messages a {@link ConversationInterface}'s `compact()`
- * RETAINS verbatim — `0`, so a manual `compact()` folds ALL of the current live messages
- * into one summarized section (no tail kept). A caller retains a recent tail by passing
- * `keep` (on {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold
- * through {@link CompactOptions}), folding only the older `count - keep` messages and leaving
- * the most recent `keep` live for the next turn. Overridable everywhere `keep` is accepted.
+ * retains verbatim — `0`, so a manual `compact()` folds every current live message into one
+ * summarized section and keeps no tail. A caller retains a recent tail by passing `keep` (on
+ * {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold through
+ * {@link CompactOptions}), folding only the older `count - keep` messages and leaving the most
+ * recent `keep` live for the next turn. Overridable everywhere `keep` is accepted.
  */
 export const DEFAULT_CONVERSATION_KEEP = 0
 
 /**
  * Names the framing label a {@link ConversationInterface}'s `view()` prefixes onto each compacted
- * section's summary so a small model reads it as a CONDENSED RECAP of earlier turns — not a
- * literal assistant turn to echo or treat as the live answer.
+ * section's summary so a small model reads it as a condensed recap of earlier turns — the lean
+ * `'[Summary of earlier messages] '` marker, never a literal assistant turn to echo or treat as
+ * the live answer.
  *
  * @remarks
  * Deliberately a FIXED, lean handful of tokens (a short bracketed marker) so the framing adds a
@@ -43,23 +43,24 @@ export const CONVERSATION_RECAP_PREFIX = '[Summary of earlier messages] '
 
 /**
  * Names the opening tag a {@link import('./ThinkSplitter.js').ThinkSplitter} recognizes as the start of
- * an in-content reasoning span — the de-facto wire convention thinking models (qwen3, DeepSeek-R1
- * family) emit their chain-of-thought under when a daemon renders it inline instead of on a
- * separate wire field. Paired with {@link THINK_CLOSE}.
+ * an in-content reasoning span — `'<think>'`, the de-facto wire convention thinking models
+ * (qwen3, DeepSeek-R1 family) emit their chain-of-thought under when a daemon renders it inline
+ * instead of on a separate wire field. Paired with {@link THINK_CLOSE}.
  */
 export const THINK_OPEN = '<think>'
 
 /**
- * Names the closing tag that ends a {@link THINK_OPEN} reasoning span. A span the stream never closes
- * (the model was cut off mid-reasoning) is treated as thinking to its end —
- * {@link import('./types.js').ThinkSplitterInterface.flush} settles it.
+ * Names the closing tag that ends a {@link THINK_OPEN} reasoning span — `'</think>'`. A span the
+ * stream never closes (the model was cut off mid-reasoning) is treated as thinking to its end,
+ * and {@link import('./types.js').ThinkSplitterInterface.flush} settles it.
  */
 export const THINK_CLOSE = '</think>'
 
 /**
  * Names the section header {@link import('./AgentContext.js').AgentContext}'s `build()` renders the
- * ACTIVE workspace's TEXT files under — the leading line of the dedicated workspace block in the
- * system message, the carrier-split counterpart to the documents / images section headers.
+ * active workspace's text files under — `'## Workspace'`, the leading line of the dedicated
+ * workspace block in the system message and the carrier-split counterpart to the documents and
+ * images section headers.
  *
  * @remarks
  * `build()` OWNS the workspace render (a `Workspace` / `WorkspaceManager` stays file-focused — no
@@ -71,16 +72,18 @@ export const THINK_CLOSE = '</think>'
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
 
 /**
- * Estimates the per-message role/framing overhead {@link import('./helpers.js').estimateMessages}
- * adds on top of a message's content estimate — accounts for the fixed wire framing every
- * conversation turn carries (its role tag, delimiters) that {@link import('./helpers.js').estimateTokens}'s
- * content-only heuristic does not otherwise capture.
+ * Estimates the per-message role and framing overhead {@link import('./helpers.js').estimateMessages}
+ * adds on top of a message's content estimate — `4` tokens for the fixed wire framing every
+ * conversation turn carries (its role tag, its delimiters) that
+ * {@link import('./helpers.js').estimateTokens}'s content-only heuristic does not otherwise
+ * capture.
  */
 export const MESSAGE_TOKEN_OVERHEAD = 4
 
 /**
- * Names the coarse, deliberately-approximate per-image token cost {@link import('./helpers.js').estimateMessages}
- * charges for each attached image.
+ * Names the coarse, deliberately approximate per-image token cost
+ * {@link import('./helpers.js').estimateMessages} charges for each attached image — `512`, because
+ * a base64 payload's length is no reliable token proxy.
  *
  * @remarks
  * A base64 image payload's LENGTH is NOT a reliable token proxy (a vision model's actual image

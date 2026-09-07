@@ -8,9 +8,11 @@ import { isConversationSnapshot } from '../../validators.js'
 
 /**
  * Backs a {@link ConversationStoreInterface} with one table of the `databases` layer — a
- * conversation's durable state IS a row, so persistence reduces to keyed point-access (`get` / `set`
- * / `delete`) over a {@link TableInterface}, the driver-pluggable twin of the plain-`Map`
- * {@link import('./MemoryConversationStore.js').MemoryConversationStore}. The EXACT twin of
+ * conversation's durable state is a row holding the snapshot as one opaque JSON column, narrowed
+ * back on `get` by {@link import('../../validators.js').isConversationSnapshot}, so persistence
+ * reduces to keyed point-access (`get` / `set` / `delete`) over a {@link TableInterface}. The
+ * driver-pluggable twin of the plain-`Map`
+ * {@link import('./MemoryConversationStore.js').MemoryConversationStore}, and the exact twin of
  * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}.
  *
  * @remarks

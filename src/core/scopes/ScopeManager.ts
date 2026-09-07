@@ -11,8 +11,9 @@ import { Emitter } from '@orkestrel/emitter'
 import { Scope } from './Scope.js'
 
 /**
- * Registers the named filters a richer context reuses — immutable {@link Scope}s keyed by
- * their minted `id`, in insertion order.
+ * Registers the named filters a richer context reuses — immutable {@link Scope}s keyed by their
+ * minted `id`, in insertion order, where `create` always mints and stores rather than overwriting,
+ * and an observable `emitter` reports each change.
  *
  * @remarks
  * - **Registry.** Scopes live in an insertion-ordered `Map` keyed by their minted `id`;

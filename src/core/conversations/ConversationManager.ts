@@ -11,11 +11,12 @@ import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
 import { Conversation } from './Conversation.js'
 
 /**
- * Registers {@link Conversation}s keyed by `id`, in insertion order, WITH an active pointer
- * — the id-keyed store over the conversation layer PLUS the `active` / `switch` seam the
- * {@link import('../AgentContext.js').AgentContext} renders. Event-free (a registry, like
- * {@link import('@orkestrel/workspace').WorkspaceManager}); the observability lives
- * on each {@link Conversation}.
+ * Registers {@link Conversation}s keyed by `id`, in insertion order, with an active pointer —
+ * the id-keyed store over the conversation layer, the `active` / `switch` seam the
+ * {@link import('../AgentContext.js').AgentContext} renders, and the durable `open` / `save`
+ * store seam. Event-free (a registry, like
+ * {@link import('@orkestrel/workspace').WorkspaceManager}); the observability lives on each
+ * {@link Conversation}.
  *
  * @remarks
  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`

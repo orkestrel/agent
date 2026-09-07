@@ -54,7 +54,7 @@ import { ThinkSplitter } from './ThinkSplitter.js'
 
 /**
  * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
- * message store it OWNS DIRECTLY, with compaction into summarized sections, a regenerated
+ * message store it owns directly, with compaction into summarized sections, a regenerated
  * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
  * provider-agnostic {@link ConversationSummaryHandler} seam.
  *
@@ -71,20 +71,39 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` (see {@link ConversationOptions})
  * @returns A working {@link ConversationInterface}
  *
- * @example
+ * @example Conversations & compaction
  * ```ts
- * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createConversation } from '@orkestrel/agent'
+ * import type { ProviderInterface } from '@orkestrel/agent'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
+ * // The summarizer seam — built from the provider by the runtime; core stays provider-agnostic.
+ * // Append the instruction as the FINAL user turn: a chat model emits nothing when the prompt
+ * // ends on an assistant turn, so a leading-system instruction is unreliable.
  * const conversation = createConversation({
- * 	// Append the instruction as the FINAL user turn — a chat model emits nothing when the
- * 	// prompt ends on an assistant turn, so a leading-system instruction is unreliable.
  * 	summarize: async (messages) =>
- * 		(await provider.generate([...messages, { id: 's', role: 'user', content: 'Summarize the conversation so far concisely.' }], AbortSignal.timeout(30_000))).content,
+ * 		(
+ * 			await provider.generate(
+ * 				[
+ * 					...messages,
+ * 					{ id: 's', role: 'user', content: 'Summarize the conversation so far concisely.' },
+ * 				],
+ * 				AbortSignal.timeout(30_000),
+ * 			)
+ * 		).content,
+ * 	keep: 2, // retain the two most recent turns verbatim on each compaction
  * })
- * conversation.add({ role: 'user', content: 'Hello' })
- * await conversation.compact() // folds the live tail into a summarized section
+ * conversation.add([
+ * 	{ role: 'user', content: 'My name is Ada.' },
+ * 	{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+ * 	{ role: 'user', content: 'What did I say my name was?' },
+ * ])
+ *
+ * const section = await conversation.compact() // folds the older turns → a summarized section
+ * conversation.view() // [<section summary message>, ...the retained recent tail] — the model input
+ * conversation.summary // the regenerated rollup (a summary-of-summaries over all sections)
+ * conversation.search('ada') // case-insensitive across sections' originals + the live tail
+ * section && conversation.rehydrate(section.id) // the section's full original messages (a pure read)
  * ```
  */
 export function createConversation(options?: ConversationOptions): ConversationInterface {
@@ -93,9 +112,10 @@ export function createConversation(options?: ConversationOptions): ConversationI
 
 /**
  * Creates a conversation registry — a {@link ConversationManagerInterface} holding
- * {@link ConversationInterface}s keyed by their `id` (in insertion order) WITH an active pointer:
+ * {@link ConversationInterface}s keyed by their `id`, in insertion order, with an active pointer:
  * the id-keyed store over the conversation layer plus the `active` / `switch` seam the context
- * renders.
+ * renders. `add` auto-activates the first conversation and flows the registry's default
+ * `summarize` / `keep` into every conversation it creates.
  *
  * @remarks
  * Starts empty; `add(input?)` mints a {@link ConversationInterface} (its `id` from the input
@@ -131,7 +151,7 @@ export function createConversationManager(
 /**
  * Creates the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
  * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot}s keyed by conversation
- * id, the DEFAULT backing for the durable {@link ConversationManagerInterface.open} /
+ * id, the default backing for the durable {@link ConversationManagerInterface.open} /
  * {@link ConversationManagerInterface.save} seam. The exact twin of
  * {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
  *
@@ -165,8 +185,9 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
 }
 
 /**
- * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
- * driver-pluggable backing for the conversation persistence seam, the opt-in twin of
+ * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface}, defaulting to
+ * `createMemoryDriver()` — the durable, driver-pluggable backing for the conversation persistence
+ * seam, holding each snapshot as one opaque JSON column and standing as the opt-in twin of
  * {@link createMemoryConversationStore}. The exact twin of
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore}.
  *
@@ -323,9 +344,10 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
 }
 
 /**
- * Creates a richer turn context — an {@link AgentContextInterface} assembling a provider
- * request from the optional system prompt, the instruction registry, the workspace registry,
- * the conversation store, the tool registry, and the active scope.
+ * Creates a richer turn context — an {@link AgentContextInterface} assembling a provider request
+ * from the optional system prompt, the instruction registry, the workspace registry (the only
+ * document channel), the conversation registry that is its `messages` source, the tool registry,
+ * and the active scope, which `build()` folds into the next turn's input.
  *
  * @remarks
  * `system` is the optional system prompt; `tools` / `instructions` / `workspaces` are pre-built
@@ -403,10 +425,11 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
 }
 
 /**
- * Creates a stream-stateful `<think>` separator — a {@link ThinkSplitterInterface} that
- * splits a thinking model's in-content `<think>…</think>` reasoning spans away from
- * the answer, delta by delta, so a provider yields ONLY clean content and surfaces the
- * accumulated reasoning as {@link import('./types.js').ProviderResult.thinking}.
+ * Creates a fresh stream-stateful `<think>` separator — a {@link ThinkSplitterInterface} that
+ * splits a thinking model's in-content `<think>…</think>` reasoning spans away from the answer,
+ * delta by delta, so a provider yields clean content alone and surfaces the accumulated
+ * reasoning as {@link import('./types.js').ProviderResult.thinking}. One splitter serves one
+ * stream.
  *
  * @remarks
  * Feed each raw wire delta through `split(delta)` (it returns the clean content to
@@ -535,7 +558,7 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 
 /**
  * Creates a durable, bounded-concurrency agent-job queue — a {@link QueueInterface} over
- * serializable {@link AgentJobInput}s that COMPOSES `createQueue`: each job is rehydrated
+ * serializable {@link AgentJobInput}s that composes `createQueue`: each job is rehydrated
  * through the `registry` into a live {@link AgentInterface}, run to its {@link AgentResult},
  * and subjected to the partial-as-configurable-failure policy.
  *
@@ -586,9 +609,9 @@ export function createAgentQueue(
 
 /**
  * Creates an agent-job runner — a {@link RunnerInterface} over serializable
- * {@link AgentJobInput}s that COMPOSES `createRunner` (one-shot, ordered, fail-fast), each
- * unit rehydrated through the `registry` and subjected to the partial policy. The runner
- * enables **sub-agent fan-out**: a parent job's handler can `controller.spawn(childJob)`.
+ * {@link AgentJobInput}s that composes `createRunner` (one-shot, ordered, fail-fast), each unit
+ * rehydrated through the `registry` and subjected to the partial policy. The runner also carries
+ * sub-agent fan-out: a parent job's handler can `controller.spawn(childJob)`.
  *
  * @remarks
  * - **Composes the substrate (no new engine).** Bounded `concurrency`, `retries`, the

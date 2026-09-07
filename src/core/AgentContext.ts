@@ -30,9 +30,10 @@ import { InstructionManager } from './instructions/InstructionManager.js'
 /**
  * Assembles a provider request from the richer turn context — the optional system prompt, the
  * observable context managers (instructions / workspaces), the
- * {@link ConversationManagerInterface} message source (whose active conversation IS `messages`),
- * the {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
- * {@link AgentContextInterface.apply}.
+ * {@link ConversationManagerInterface} message source whose active conversation is `messages`, the
+ * {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
+ * {@link AgentContextInterface.apply}. `build()` folds the scoped managers and the active
+ * workspace into one system block, then the conversation, and never reads `tools`.
  *
  * @remarks
  * - **Composition.** `system` is the optional system prompt; `instructions` / `tools` /

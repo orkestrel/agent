@@ -4,8 +4,9 @@ import { isToolCall } from '@orkestrel/tool'
 
 /**
  * Checks whether an `unknown` is structurally a {@link Message} record — the per-message step of
- * the {@link isConversationSnapshot} read-boundary narrow (a total guard over an untrusted storage
- * read, never an assertion). The conversation analogue of
+ * the {@link isConversationSnapshot} and {@link isSection} read-boundary narrows, where a present
+ * `calls` must be an array of valid {@link import('@orkestrel/tool').ToolCall}s. Total, never
+ * throwing, and never an assertion; the conversation analogue of
  * {@link import('@orkestrel/workspace').isFile}.
  *
  * @remarks
@@ -42,9 +43,10 @@ export function isMessage(value: unknown): value is Message {
 }
 
 /**
- * Checks whether an `unknown` is structurally a {@link Section} record — the per-section step of
- * the {@link isConversationSnapshot} read-boundary narrow (a total guard over an untrusted storage
- * read, never an assertion).
+ * Checks whether an `unknown` is structurally a {@link Section} record — a `string` `id` and
+ * `summary` beside a `messages` array of valid {@link Message}s, the per-section step of the
+ * {@link isConversationSnapshot} read-boundary narrow. Total, never throwing, and never an
+ * assertion.
  *
  * @remarks
  * A total guard (it NEVER throws — adversarial input returns `false`). It checks the section's
@@ -69,11 +71,12 @@ export function isSection(value: unknown): value is Section {
 }
 
 /**
- * Narrows an `unknown` to a {@link ConversationSnapshot} — the total boundary guard for an
- * UNTRUSTED snapshot read (a storage row a
+ * Narrows an `unknown` to a {@link ConversationSnapshot} — a `string` `id`, an optional `string`
+ * `summary`, and valid `sections` and `messages` arrays; the total boundary guard for an
+ * untrusted snapshot read (a storage row a
  * {@link import('./conversations/stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * reads back from its opaque JSON column, a snapshot loaded from disk). The EXACT analogue of
- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
+ * reads back from its opaque JSON column, a snapshot loaded from disk), never throwing. The exact
+ * analogue of {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
  *
  * @remarks
  * A total guard (it NEVER throws — adversarial input returns `false`). It checks the snapshot's

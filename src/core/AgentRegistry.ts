@@ -18,9 +18,10 @@ import { ConversationManager } from './conversations/ConversationManager.js'
 import { AgentError } from './errors.js'
 
 /**
- * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named
- * pools of live, non-serializable pieces (providers, tools, authorities, schedulers) and
- * rehydrates a seeded, signal-wired {@link Agent} from a job's names + data.
+ * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named pools of
+ * live, non-serializable pieces (providers, tools, authorities, schedulers), throws on a name
+ * absent from its pool, and `build`s a seeded, signal-wired {@link Agent} from a job's names and
+ * data.
  *
  * @remarks
  * - **Why it exists.** An `AgentJobInput` is serializable so it can survive a crash in a

@@ -32,8 +32,11 @@ import {
 import { AgentJobError } from './errors.js'
 
 /**
- * Projects an unknown value onto the canonical JSON representation of an
- * {@link AgentResult}.
+ * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
+ * {@link AgentResult} — capturing each structural field once through a total boundary,
+ * accepting conforming accessors and inherited properties, preserving finite negative and
+ * fractional usage counts, dropping extras, and resolving `undefined` for a malformed field, a
+ * non-finite usage number, a throwing getter, or a hostile or revoked proxy.
  *
  * @remarks
  * This is a total hostile-boundary projection. Each structural field is captured once
@@ -90,9 +93,10 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 }
 
 /**
- * Filters a list of items by a {@link import('./types.js').ScopeInterface} allow-list of
- * keys — the pure, total set-membership primitive the context's build step and the agent
- * loop's tool-advertise step apply a scope through.
+ * Filters a list of items by a {@link import('./types.js').ScopeInterface} allow-list of keys —
+ * `undefined` passes everything, `[]` passes nothing, and a non-empty list passes the listed keys
+ * alone, order preserved. The pure, total set-membership primitive the context's build step and
+ * the agent loop's tool-advertise step apply a scope through.
  *
  * @remarks
  * Three-way by the allow-list's shape, so a `Scope` category cleanly expresses "all /
@@ -130,9 +134,9 @@ export function filterAllowList<T>(
 }
 
 /**
- * Estimates the context-token footprint of a string — the deterministic char-based heuristic
- * {@link estimateMessages} sums over a conversation's messages (the default context-budget
- * estimator).
+ * Estimates the context-token footprint of a string — the deterministic `ceil(length / 4)`
+ * character heuristic {@link estimateMessages} sums over a conversation's messages (the default
+ * context-budget estimator).
  *
  * @remarks
  * Approximates `ceil(length / 4)` (≈ four characters per token — the rough average for
@@ -156,9 +160,12 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Estimates the context-token footprint of a batch of messages — the default `consumer`
- * estimator for an agent's context `BudgetInterface` (a budgets surface's tracking contract)
- * (the {@link import('./types.js').AgentOptions} `window`).
+ * Estimates the context-token footprint of a batch of messages — each message's content plus
+ * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, and
+ * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The default
+ * `consumer` estimator for an agent's context budget (the
+ * {@link import('./types.js').AgentOptions} `window`), total and never throwing, and a
+ * deliberate provider-agnostic approximation rather than an exact tokenizer count.
  *
  * @remarks
  * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` char
@@ -205,9 +212,11 @@ export function estimateMessages(messages: readonly Message[]): number {
 }
 
 /**
- * Runs one rehydrated agent and applies the partial-as-configurable-failure policy — the
- * shared job-handler step BOTH `createAgentQueue` and `createAgentRunner` settle each job
- * through, so the policy can never diverge between them.
+ * Runs one rehydrated agent and applies the partial-as-configurable-failure policy — a partial
+ * run throws an {@link import('./errors.js').AgentJobError} unless the `partial` policy allows
+ * it, and a natural finish resolves. The shared job-handler step `createAgentQueue` and
+ * `createAgentRunner` both settle each job through, so the policy can never diverge between
+ * them.
  *
  * @remarks
  * A turn that committed PARTIAL (a cancel — abort / budget / timeout) is by default a
@@ -280,9 +289,9 @@ export function handleAgentRunnerJob(
 }
 
 /**
- * Renders a path-addressed text body as a fenced reference block — the framing an
- * {@link import('./AgentContext.js').AgentContext}'s ACTIVE-workspace text-file render emits (the
- * active workspace is the SOLE document/image context).
+ * Renders a path-addressed text body as a fenced reference block — a `File: <path>` label line
+ * over a language-tagged fence, the framing an
+ * {@link import('./AgentContext.js').AgentContext}'s active-workspace text-file render emits.
  *
  * @remarks
  * Produces `` File: <path>\n```<language>\n<content>\n``` `` — the `File:` label line, then a
@@ -309,7 +318,8 @@ export function renderFencedFile(path: string, language: string, content: string
 }
 
 /**
- * Sanitizes one reported token count into a safe non-negative integer.
+ * Sanitizes one reported token count into a safe non-negative integer — a non-finite or
+ * non-positive value becomes `0`, and a positive fractional value floors down.
  *
  * @param value - The token count to sanitize
  * @returns The floored count, or `0` when the value is non-finite or non-positive
@@ -399,7 +409,8 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
 
 /**
  * Assembles the settled {@link AgentResult} from a run's {@link RunOutcome} — `thinking` and
- * `usage` are carried only when the run surfaced them.
+ * `usage` are carried only when the run surfaced them, and the loop-internal `exhausted` flag is
+ * left out.
  *
  * @remarks
  * Pure and total. An absent optional is OMITTED rather than stored as `undefined` (the
@@ -456,7 +467,7 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
 
 /**
  * Renders one context section — the resolved `open`, each item's rendering, and the resolved
- * `close` when one exists, blank-line joined.
+ * `close` when one exists, blank-line joined; `undefined` when the section has no items.
  *
  * @remarks
  * Pure and total. A section with NO items renders nothing (`undefined`), so an empty or fully
@@ -491,7 +502,7 @@ export function renderSection<T>(
 }
 
 /**
- * Resolves one section's OPEN text through the format cascade — manager-options override >
+ * Resolves one section's open text through the format cascade — manager-options override >
  * provider default > built-in header.
  *
  * @remarks
@@ -518,8 +529,8 @@ export function resolveOpen<T>(
 }
 
 /**
- * Resolves one section's CLOSE text through the format cascade — manager-options override >
- * provider default.
+ * Resolves one section's close text through the format cascade — manager-options override >
+ * provider default; `undefined` when neither sets one, because there is no built-in close.
  *
  * @remarks
  * Pure and total. There is NO built-in close, so a section with neither level set returns
@@ -545,8 +556,8 @@ export function resolveClose<T>(
 }
 
 /**
- * Resolves ONE item's rendering through the format cascade — item override >
- * manager-options override > provider default > built-in rendering.
+ * Resolves one item's rendering through the format cascade — item override > manager-options
+ * override > provider default > built-in rendering.
  *
  * @remarks
  * Pure and total. The item's own `override` is the most-specific level (a fully-rendered
@@ -581,8 +592,8 @@ export function resolveItem<T extends { readonly override?: string }>(
 }
 
 /**
- * Copies a message with image data merged onto its `images` — the message's own images
- * first, then the attached data.
+ * Copies a message with image data merged onto its `images` — the message's own images first,
+ * then the attached data, carrying `calls` only when present and never mutating the original.
  *
  * @remarks
  * Pure and total: the original message is NEVER mutated. `calls` is carried only when the
@@ -613,8 +624,9 @@ export function attachImages(message: Message, data: readonly string[]): Message
 }
 
 /**
- * Attaches image data to a conversation's LAST user message — the turn a vision provider
- * reads images off.
+ * Attaches image data to a conversation's last user message — the turn a vision provider reads
+ * images off — as a new array with that one message replaced by its carrying copy, and unchanged
+ * when there is no data or no user turn.
  *
  * @remarks
  * Pure and total: the conversation and its messages are NEVER mutated, and the returned array
@@ -651,8 +663,8 @@ export function attachUserImages(
 }
 
 /**
- * Collects the `base64` payload of the IMAGE files in a workspace file list — the data an
- * agent context attaches to the last user message.
+ * Collects the `base64` payload of the image files in a workspace file list — the data an agent
+ * context attaches to the last user message.
  *
  * @remarks
  * Pure and total. `isBinary` NARROWS the tagless content to its binary arm (a total guard,
@@ -667,6 +679,7 @@ export function attachUserImages(
  * collectImageData([createFile({ path: 'a.png', content: { base64: '<payload>', mime: 'image/png' } })])
  * // ['<payload>']
  * ```
+ *
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {
 	const data: string[] = []
@@ -679,8 +692,8 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
 }
 
 /**
- * Builds the RAW synthetic summary message for one compacted section — role `'assistant'`,
- * the section's stable `id`, its `summary` VERBATIM as content.
+ * Builds the raw synthetic summary message for one compacted section — role `'assistant'`, the
+ * section's stable `id`, and its `summary` verbatim as content.
  *
  * @remarks
  * Pure and total. This is the unframed form the rollup regeneration digests (a
@@ -696,15 +709,16 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
  * buildSummaryMessage({ id: 's1', summary: 'recap', messages: [] })
  * // { id: 's1', role: 'assistant', content: 'recap' }
  * ```
+ *
  */
 export function buildSummaryMessage(section: Section): Message {
 	return { id: section.id, role: 'assistant', content: section.summary }
 }
 
 /**
- * Builds the FRAMED recap message for one compacted section — the same role and stable `id`
- * as {@link buildSummaryMessage}, with the content prefixed by
- * {@link import('./constants.js').CONVERSATION_RECAP_PREFIX}.
+ * Builds the framed recap message for one compacted section — the same role and stable `id` as
+ * {@link buildSummaryMessage}, with the content prefixed by {@link
+ * import('./constants.js').CONVERSATION_RECAP_PREFIX}.
  *
  * @remarks
  * Pure and total. The prefix is what makes a small model read the message as a CONDENSED
@@ -720,6 +734,7 @@ export function buildSummaryMessage(section: Section): Message {
  * buildRecapMessage({ id: 's1', summary: 'recap', messages: [] })
  * // { id: 's1', role: 'assistant', content: `${CONVERSATION_RECAP_PREFIX}recap` }
  * ```
+ *
  */
 export function buildRecapMessage(section: Section): Message {
 	return {
@@ -730,8 +745,8 @@ export function buildRecapMessage(section: Section): Message {
 }
 
 /**
- * Intersects two scope category lists under the "`undefined` is the universal set" rule — the
- * primitive a scope narrows through.
+ * Intersects two scope category lists under the "`undefined` is the universal set" rule — a
+ * fresh copy that can only tighten, and the primitive a scope narrows through.
  *
  * @remarks
  * Pure and total, and it can only TIGHTEN: `undefined` ∩ `undefined` is `undefined` (still no
