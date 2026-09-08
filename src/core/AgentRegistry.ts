@@ -30,9 +30,9 @@ import { AgentError } from './errors.js'
  *   construct it once with the live pools, then a queue / runner handler calls `build`
  *   on each (possibly restored) job to get a ready agent.
  * - **Accessors throw on a miss.** `provider` / `tool` / `authority` / `scheduler` resolve a
- *   name against their pool and THROW an {@link AgentError} carrying `code: 'REGISTRY'` and
+ *   name against their pool and throw an {@link AgentError} carrying `code: 'REGISTRY'` and
  *   the message `unknown <category>: <name>` when it is absent — an unknown name in a
- *   rehydrated job is a programmer / config error that must fail LOUDLY at build time, never
+ *   rehydrated job is a programmer / config error that must fail loudly at build time, never
  *   silently resolve to `undefined` and run an agent missing a dependency.
  * - **`build` rehydrates.** Resolve the job's `provider`; assemble a fresh
  *   {@link ToolManager} from the `tools` names; rebuild the token `budget` from its
@@ -94,10 +94,10 @@ export class AgentRegistry implements AgentRegistryInterface {
 
 	// Assemble the AgentOptions for one job: a fresh ToolManager loaded from the named
 	// tools, the rebuilt token budget, the resolved authority / scheduler, plus the data
-	// fields and the threaded cancel. Optional fields are OMITTED (not set to `undefined`)
+	// fields and the threaded cancel. Optional fields are omitted (not set to `undefined`)
 	// so the Agent's `?? default` fallbacks behave exactly as for a hand-built agent. When
 	// the registry carries a conversation store, thread a fresh store-backed
-	// ConversationManager for THIS build (a fresh conversation id per build ⇒ no
+	// ConversationManager for this build (a fresh conversation id per build ⇒ no
 	// collisions in the shared store) — omitted when no store is set, so the shape stays
 	// byte-identical to a registry with no `store`.
 	#options(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {

@@ -48,9 +48,9 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
 	return value instanceof ProviderAbortError
 }
 
-// A real error type, not a sentinel. An agent JOB treats a partial result
-// (a job committed early from an abort / budget / timeout) as a FAILURE by default — the
-// queue / runner handler THROWS this so the Queue's retries + a Runner's fail-fast
+// A real error type, not a sentinel. An agent job treats a partial result
+// (a job committed early from an abort / budget / timeout) as a failure by default — the
+// queue / runner handler throws this so the Queue's retries + a Runner's fail-fast
 // engage. It carries the partial AgentResult so a caller (or a `retries: 0` enqueue that
 // rejects with it) can still inspect what accumulated. The guard narrows with
 // `instanceof`, mirroring ProviderAbortError / isProviderAbortError above.
@@ -64,7 +64,7 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
  * @remarks
  * A partial result means the agent was cancelled (an external `signal` abort, a queue /
  * runner abort threaded in, a `timeout` deadline, or an exhausted token `budget`) rather
- * than finishing naturally. For a durable JOB that is a failure by default: throwing this
+ * than finishing naturally. For a durable job that is a failure by default: throwing this
  * lets the Queue's retries re-run the job and a Runner's fail-fast abort its siblings.
  * Set `partial: true` (see `AgentQueueOptions` / `AgentRunnerOptions`) to treat a
  * partial as success instead, in which case this is never thrown. Narrow a caught value
@@ -106,8 +106,8 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 }
 
 // A real error type, not a sentinel. A `ConversationInterface.compact()` is a
-// PROGRAMMER error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
-// the messages with — so it THROWS this, carrying a machine-readable `code` ('SUMMARIZER')
+// programmer error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
+// the messages with — so it throws this, carrying a machine-readable `code` ('SUMMARIZER')
 // so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
 // caught value with `instanceof`, mirroring the other errors in this file.
 
@@ -118,7 +118,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `'SUMMARIZER' | 'SECTIONS'`.
  *
  * @remarks
- * Compaction REQUIRES a summarizer (it digests the folded slice into a section summary and
+ * Compaction requires a summarizer (it digests the folded slice into a section summary and
  * regenerates the rollup); a conversation created without one can still store + `view()` its
  * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
@@ -159,9 +159,9 @@ export function isConversationError(value: unknown): value is ConversationError 
 }
 
 // A real error type, not a sentinel. Concurrent runs on one Agent whose
-// construction carries a SHARED accounting instance (a `window` context budget, or a
+// construction carries a shared accounting instance (a `window` context budget, or a
 // construction-level `budget` with no per-run override) would corrupt that shared
-// accounting — so `stream()` throws this SYNCHRONOUSLY, before any state mutation or
+// accounting — so `stream()` throws this synchronously, before any state mutation or
 // emit, rather than letting the runs race. An `AgentRegistry` accessor throws it too, when a
 // rehydration name is absent from its pool. Carries a machine-readable `code` so a `catch`
 // branches on `error.code`, mirroring `ConversationError` above.
@@ -176,7 +176,7 @@ export function isConversationError(value: unknown): value is ConversationError 
  * the call expression itself.
  *
  * @remarks
- * `'CONCURRENCY'` reports a run already in flight on the same agent, PLUS a construction-level
+ * `'CONCURRENCY'` reports a run already in flight on the same agent, plus a construction-level
  * `window` (a shared context budget) or a construction-level `budget` with no per-run override
  * (a shared cost budget) — a second concurrent `stream()` would race its charges against the
  * same shared instance, corrupting the accounting. Use separate agents, or per-run `budget`

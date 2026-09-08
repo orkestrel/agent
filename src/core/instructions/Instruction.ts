@@ -9,7 +9,7 @@ import type { InstructionInput, InstructionInterface } from '../types.js'
  * A thin immutable value object (mirroring {@link import('@orkestrel/tool').Tool}): the
  * constructor mints a fresh `id` (`crypto.randomUUID()`), copies the input's `name` /
  * `content`, resolves `priority` to the input's value or `0`, and carries the input's
- * per-item `override` ONLY when supplied (assigned when present, mirroring a
+ * per-item `override` only when supplied (assigned when present, mirroring a
  * message's `images` / `calls` present-when-given convention — kept absent otherwise).
  * Never mutated after construction. An
  * {@link import('./InstructionManager.js').InstructionManager} keys it by `name` and
@@ -26,7 +26,7 @@ export class Instruction implements InstructionInterface {
 	readonly name: string
 	readonly content: string
 	readonly priority: number
-	// The per-item rendered override — the cascade's most-specific level. Assigned ONLY when
+	// The per-item rendered override — the cascade's most-specific level. Assigned only when
 	// the input supplied one, so it stays absent (not present-but-undefined) otherwise.
 	readonly override?: string
 

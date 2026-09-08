@@ -18,29 +18,29 @@ import { isConversationSnapshot } from '../../validators.js'
  * @remarks
  * The store is driver-agnostic: it holds a single {@link TableInterface} whose backend (memory,
  * JSON, SQLite, IndexedDB) is chosen by whoever builds it (the factories), so a JSON / SQLite /
- * IndexedDB backend swaps in WITHOUT touching the
+ * IndexedDB backend swaps in without touching the
  * {@link import('../ConversationManager.js').ConversationManager} or the
  * {@link import('../Conversation.js').Conversation} — the same seam as
  * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. The
  * driver defaults to memory ({@link import('../../factories.js').createDatabaseConversationStore}
- * passes `createMemoryDriver()`), so it ALSO works in memory out of the box; you opt into the
+ * passes `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.
  *
- * The {@link ConversationSnapshot} is stored as ONE OPAQUE JSON COLUMN — the table is a row of
+ * The {@link ConversationSnapshot} is stored as one opaque JSON column — the table is a row of
  * `{ id; snapshot }` ({@link ConversationSnapshotRow}), the snapshot the whole JSON blob (a
  * `rawShape` column the factory builds) — exactly as `DatabaseWorkspaceStore` stores its snapshot.
- * The snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is
- * lossless AND keeps the row type flat (`snapshot` reads back as `unknown`).
+ * The snapshot is already a complete, self-contained, pure-JSON payload, so storing it whole is
+ * lossless and keeps the row type flat (`snapshot` reads back as `unknown`).
  *
- * - **`set(snapshot)` upserts under the snapshot's OWN `id`** (no separate id param) — it writes
+ * - **`set(snapshot)` upserts under the snapshot's own `id`** (no separate id param) — it writes
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
  *   a {@link ConversationSnapshot} ({@link import('../../validators.js').isConversationSnapshot} — the
  *   total guard for an untrusted storage read), or `undefined` if none is stored.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
- * UNLIKE a session store there is NO idle-TTL / eviction — a persisted conversation lives until an
- * explicit `delete`. The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the
+ * Unlike a session store there is no idle-TTL / eviction — a persisted conversation lives until an
+ * explicit `delete`. The public surface is exactly `get` / `set` / `delete` — no extra members (the
  * method bijection with {@link ConversationStoreInterface}). Hydration stays a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
  * the live conversation through the `snapshot` option (its `open` / `save`).
@@ -81,7 +81,7 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 		return isConversationSnapshot(row.snapshot) ? row.snapshot : undefined
 	}
 
-	/** Inserts or replaces under the snapshot's OWN `id` (no separate id param) — the row is `{ id, snapshot }`. */
+	/** Inserts or replaces under the snapshot's own `id` (no separate id param) — the row is `{ id, snapshot }`. */
 	async set(snapshot: ConversationSnapshot): Promise<void> {
 		await this.#table.set({ id: snapshot.id, snapshot })
 	}

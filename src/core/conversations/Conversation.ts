@@ -25,30 +25,30 @@ import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
  * Observable through its own `emitter`.
  *
  * @remarks
- * - **Live tail + sections.** The conversation OWNS its live tail DIRECTLY — `#messages` is an
+ * - **Live tail + sections.** The conversation owns its live tail directly — `#messages` is an
  *   insertion-ordered `Map` of immutable {@link Message}s keyed by their minted id
- *   (the SAME store mechanics a flat manager had, folded in: `add` / `message` / `messages` /
+ *   (the same store mechanics a flat manager had, folded in: `add` / `message` / `messages` /
  *   `remove` / `clear` / `count`), exactly as a `Workspace` owns its files (no separate
  *   per-value manager). `#sections` are the compacted history (oldest → newest), each a
- *   summarized slice that RETAINS its originals. `#summary` is the rollup (a
+ *   summarized slice that retains its originals. `#summary` is the rollup (a
  *   summary-of-summaries over all sections), regenerated on each compaction (`undefined`
  *   until the first).
- * - **`view()`.** Each section folds to ONE synthetic summary message (role `'assistant'` — a
+ * - **`view()`.** Each section folds to one synthetic summary message (role `'assistant'` — a
  *   prior-context recap — keyed by the section's stable `id`), then the live messages
- *   verbatim. The rollup `summary` is NOT injected (it is separately pull-able); `view()`
- *   carries the per-section summaries, which ARE the compaction benefit.
+ *   verbatim. The rollup `summary` is not injected (it is separately pull-able); `view()`
+ *   carries the per-section summaries, which are the compaction benefit.
  * - **`compact()`.** Folds the oldest `count - keep` live messages into a new section
  *   (its `summary` from `#summarize`), removes them from the live tail by id, regenerates the
- *   rollup (a SECOND `#summarize` over all section summaries), and emits `summary` then
+ *   rollup (a second `#summarize` over all section summaries), and emits `summary` then
  *   `compact`. Returns the section, or `undefined` when nothing folds (`count <= keep`).
- *   THROWS a {@link ConversationError} when no `#summarize` was supplied. Two summarizer calls
- *   per compaction.
+ *   Throws a {@link ConversationError} when no `#summarize` was supplied. A compaction calls
+ *   the summarizer for the section digest and again for the rollup.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns a section's full original
  *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (the caller decides
  *   whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
- *   substring scan of `content` across ALL messages (every section's originals + the live tail).
+ *   substring scan of `content` across all messages (every section's originals + the live tail).
  * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries
- *   `compact` / `summary` / `rehydrate`, emitted directly, strictly AFTER the state change;
+ *   `compact` / `summary` / `rehydrate`, emitted directly, strictly after the state change;
  *   the emitter isolates a listener throw and routes it to its `error` handler (the `error`
  *   option), so a buggy observer can never corrupt a compaction.
  *
@@ -66,7 +66,7 @@ import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
  */
 export class Conversation implements ConversationInterface {
 	readonly #id: string
-	// The PUSH observation surface — owned, never inherited. The emitter isolates a
+	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a compaction.
 	readonly #emitter: Emitter<ConversationEventMap>
 	// The provider-agnostic summarizer seam — `undefined` ⇒ `compact()` throws (a conversation
@@ -75,22 +75,22 @@ export class Conversation implements ConversationInterface {
 	// How many recent live messages a `compact()` retains verbatim (older ones fold).
 	readonly #keep: number
 	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
-	// AFTER pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
+	// after pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
 	readonly #cap: number | undefined
-	// The compacted history, oldest → newest — each summarized slice RETAINS its originals.
+	// The compacted history, oldest → newest — each summarized slice retains its originals.
 	readonly #sections: Section[] = []
 	// The rollup (a summary-of-summaries over all sections), regenerated on each compaction.
 	#summary: string | undefined
-	// The LIVE uncompacted tail the conversation OWNS DIRECTLY — an insertion-ordered Map of
+	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
 	// immutable messages keyed by their minted id (the flat store mechanics folded in).
 	readonly #messages = new Map<string, Message>()
 
 	constructor(options?: ConversationOptions) {
-		// An optional snapshot to HYDRATE FROM — its `id` is the conversation's identity (so it
-		// WINS over `options.id`), and its rollup `summary` / compacted `sections` / live tail are
+		// An optional snapshot to hydrate from — its `id` is the conversation's identity (so it
+		// wins over `options.id`), and its rollup `summary` / compacted `sections` / live tail are
 		// restored, with the live `summarize` / `keep` / `on` supplied through `options` alongside it
-		// (a summarizer is a function, not serialized — re-supplied as config). Restoring is SILENT
-		// (no events — nothing was edited). `ConversationOptions.snapshot` is the ONE declared seam
+		// (a summarizer is a function, not serialized — re-supplied as config). Restoring is silent
+		// (no events — nothing was edited). `ConversationOptions.snapshot` is the one declared seam
 		// every caller reaches it through — `createConversation(options)` hydrates through it, and
 		// `ConversationManager.add` passes a stored snapshot in the same options object.
 		const snapshot = options?.snapshot
@@ -129,7 +129,7 @@ export class Conversation implements ConversationInterface {
 	}
 
 	get summarizable(): boolean {
-		// True exactly when a summarizer was supplied — the clean signal the agent loop's AUTOMATIC
+		// True exactly when a summarizer was supplied — the clean signal the agent loop's automatic
 		// compaction gates on (a non-summarizable conversation is never auto-compacted, so the auto
 		// path never throws the `SUMMARIZER` ConversationError). A manual `compact()` still throws.
 		return this.#summarize !== undefined
@@ -158,7 +158,7 @@ export class Conversation implements ConversationInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			// True only when EVERY supplied id was present and removed, so a caller can tell a
+			// True only when every supplied id was present and removed, so a caller can tell a
 			// fully applied batch from a partly applied one.
 			let removed = true
 			for (const id of ids) {
@@ -174,10 +174,10 @@ export class Conversation implements ConversationInterface {
 	}
 
 	view(): readonly Message[] {
-		// Each section → ONE synthetic RECAP message (the compaction benefit), then the live
-		// tail verbatim. The rollup `summary` is deliberately NOT injected here. The recap is
+		// Each section → one synthetic recap message (the compaction benefit), then the live
+		// tail verbatim. The rollup `summary` is deliberately not injected here. The recap is
 		// framed (a `[Summary of earlier messages]` label prefix) so a small model reads it as a
-		// CONDENSED RECAP of prior turns, not as a literal assistant turn it must echo / treat as
+		// condensed recap of prior turns, not as a literal assistant turn it must echo / treat as
 		// the latest answer — a lean label (a handful of tokens), proven no-bloat by a test guard.
 		return [
 			...this.#sections.map((section) => buildRecapMessage(section)),
@@ -199,11 +199,11 @@ export class Conversation implements ConversationInterface {
 		}
 		const keep = options?.keep ?? this.#keep
 		const live = [...this.#messages.values()]
-		// Fold the OLDEST `count - keep` live messages; nothing to fold ⇒ a no-op.
+		// Fold the oldest `count - keep` live messages; nothing to fold ⇒ a no-op.
 		const fold = keep <= 0 ? live.length : live.length - keep
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
-		// 1. Digest the folded slice into the section summary (the FIRST summarizer call).
+		// 1. Digest the folded slice into the section summary (the first summarizer call).
 		const summary = await summarize(slice)
 		const section: Section = {
 			id: crypto.randomUUID(),
@@ -213,8 +213,8 @@ export class Conversation implements ConversationInterface {
 		// 2. Remove the folded messages from the live tail (by their ids) and push the section.
 		for (const message of slice) this.#messages.delete(message.id)
 		this.#sections.push(section)
-		// 3. Enforce the bounded-`sections` cap: an overflow past `cap` folds the OLDEST
-		// overflow sections into ONE merged section (a THIRD summarizer call over the folded
+		// 3. Enforce the bounded-`sections` cap: an overflow past `cap` folds the oldest
+		// overflow sections into one merged section (a further summarizer call over the folded
 		// section summaries), so `#sections.length === cap` afterward.
 		if (cap !== undefined && this.#sections.length > cap) {
 			const overflow = this.#sections.length - cap + 1
@@ -229,7 +229,7 @@ export class Conversation implements ConversationInterface {
 				this.#emitter.emit('collapse', merged)
 			} catch (error) {
 				// The merge summarizer call threw — the sections stay transiently at `cap + 1`
-				// (no splice, no loss), but the rollup below still regenerates over the CURRENT
+				// (no splice, no loss), but the rollup still regenerates over the current
 				// (unmerged) sections so it is never left stale, then the error propagates
 				// (manual `compact()` always surfaces a summarizer failure to its caller; the
 				// next successful `compact()` self-heals the over-cap count).
@@ -238,8 +238,8 @@ export class Conversation implements ConversationInterface {
 				throw error
 			}
 		}
-		// 4. Regenerate the rollup — a summary-of-summaries over ALL (now-capped) sections
-		// — then observe it, AFTER the mutation, through the guarded path.
+		// 4. Regenerate the rollup — a summary-of-summaries over all (now-capped) sections
+		// — then observe it, after the mutation, through the guarded path.
 		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
 		this.#emitter.emit('summary', this.#summary)
 		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
@@ -249,14 +249,14 @@ export class Conversation implements ConversationInterface {
 
 	rehydrate(id: string): readonly Message[] {
 		const section = this.#sections.find((one) => one.id === id)
-		// A pure read — emit `rehydrate` AFTER resolving (no mutation to perturb); `rehydrate`
+		// A pure read — emit `rehydrate` after resolving (no mutation to perturb); `rehydrate`
 		// never reinserts the originals (the caller decides). Unknown id ⇒ an empty list.
 		this.#emitter.emit('rehydrate', id)
 		return section === undefined ? [] : section.messages
 	}
 
 	search(query: string): readonly Message[] {
-		// Case-insensitive substring over `content` across ALL messages — every section's
+		// Case-insensitive substring over `content` across all messages — every section's
 		// retained originals (oldest → newest) first, then the live tail.
 		const needle = query.toLowerCase()
 		const all = [
@@ -267,20 +267,20 @@ export class Conversation implements ConversationInterface {
 	}
 
 	reference(options?: ConversationReferenceOptions): string {
-		// Render THIS conversation as a self-labeled, fenced PROVENANCE block to pull into ANOTHER
-		// conversation (as a `document`). PURE string — never a model call. The leading marker
-		// names the source (`label`, default the `id`) and states it is NOT part of the live
-		// conversation, so a small model reads the rollup + cherry-picked excerpts as FOREIGN
+		// Render this conversation as a self-labeled, fenced provenance block to pull into another
+		// conversation (as a `document`). A pure string — never a model call. The leading marker
+		// names the source (`label`, default the `id`) and states it is not part of the live
+		// conversation, so a small model reads the rollup + cherry-picked excerpts as foreign
 		// material it attributes to that source, never as its own latest turns.
 		const label = options?.label ?? this.#id
 		const lines = [`[Reference — conversation "${label}" — NOT part of this conversation]`]
-		// The rollup `summary` (a summary-of-summaries) — included WHEN opted in (default true) AND
+		// The rollup `summary` (a summary-of-summaries) — included when opted in (default true) and
 		// one exists (`undefined` until the first compaction drops the line).
 		if (options?.summary !== false && this.#summary !== undefined) {
 			lines.push(`Summary: ${this.#summary}`)
 		}
-		// The CHERRY-PICKED excerpts (each `- role: content`) — the few relevant turns the caller
-		// selected (through this conversation's own `search` / `rehydrate`), NOT the whole history.
+		// The cherry-picked excerpts (each `- role: content`) — the few relevant turns the caller
+		// selected (through this conversation's own `search` / `rehydrate`), not the whole history.
 		const messages = options?.messages ?? []
 		if (messages.length > 0) {
 			lines.push('Relevant messages:')
@@ -290,8 +290,8 @@ export class Conversation implements ConversationInterface {
 	}
 
 	snapshot(): ConversationSnapshot {
-		// The container serializes ITSELF: its id + the rollup summary + the compacted sections +
-		// the live tail. The summarizer / keep are NOT serialized — they are live CONFIG re-supplied
+		// The container serializes itself: its id + the rollup summary + the compacted sections +
+		// the live tail. The summarizer / keep are not serialized — they are live config re-supplied
 		// on hydrate (a ConversationSummaryHandler is a function, not data). The sections + messages are
 		// already plain immutable records, so the snapshot JSON-round-trips losslessly; mutates nothing.
 		return {

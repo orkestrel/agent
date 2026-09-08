@@ -61,9 +61,9 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * @remarks
  * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
  * (each section as a summary message, then the live tail). `compact()` folds the older live
- * messages into a summarized {@link Section} and regenerates the rollup — it REQUIRES
+ * messages into a summarized {@link Section} and regenerates the rollup — it requires
  * a `summarize` (omitted ⇒ `compact()` throws a `ConversationError`); `keep` retains a recent
- * tail (default `DEFAULT_CONVERSATION_KEEP` — fold ALL). `rehydrate(id)` / `search(query)` read
+ * tail (default `DEFAULT_CONVERSATION_KEEP` — fold all). `rehydrate(id)` / `search(query)` read
  * the retained originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
  * through the reserved `on` option; the emitter isolates a listener throw and routes it to
  * its `error` handler (the `error` option), so it can never corrupt a compaction.
@@ -121,13 +121,13 @@ export function createConversation(options?: ConversationOptions): ConversationI
  * Starts empty; `add(input?)` mints a {@link ConversationInterface} (its `id` from the input
  * or a random UUID), flowing the manager's default `summarize` / `keep` in unless the input
  * overrides them, and stores it (an already-present `id` overwrites — last write wins) — and
- * AUTO-ACTIVATES the FIRST one (a registry with conversations always has one `active`); a later
+ * auto-activates the first one (a registry with conversations always has one `active`); a later
  * `add` leaves `active` unchanged. `switch(id)` re-points `active` (an unknown `id` returns
  * `undefined`, leaving `active` unchanged — lenient, never throws); `conversation(id)` /
  * `conversations()` look up; `remove` (one or a batch) reports `true` only when every supplied id
- * was removed AND clears `active` if it was a removed one; `clear` empties it and clears `active`.
+ * was removed and clears `active` if it was a removed one; `clear` empties it and clears `active`.
  * Event-free
- * (each conversation owns its own observable `emitter`). A conversation created with NEITHER a
+ * (each conversation owns its own observable `emitter`). A conversation created with neither a
  * manager default nor a per-`add` `summarize` cannot `compact` (it throws a `ConversationError`).
  *
  * @param options - Optional default `summarize` / `keep` (see {@link ConversationManagerOptions})
@@ -159,10 +159,10 @@ export function createConversationManager(
  * A plain `Map` (the snapshot is already pure JSON, so no encoding is needed for the memory tier),
  * the structural twin of {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
  * `get` / `set` / `delete` are async (the
- * same shape a durable backend fits); UNLIKE a session store there is NO idle-TTL / eviction — a
+ * same shape a durable backend fits); unlike a session store there is no idle-TTL / eviction — a
  * persisted conversation lives until an explicit `delete`. Its driver-pluggable twin is
  * {@link createDatabaseConversationStore} (the snapshot as one opaque JSON column over a `databases`
- * table) — for a DURABLE store pass it a JSON / SQLite / IndexedDB driver, and it swaps in WITHOUT
+ * table) — for a durable store pass it a JSON / SQLite / IndexedDB driver, and it swaps in without
  * touching the manager or the conversation. Hydration stays a manager concern: read a snapshot back
  * and rebuild the live conversation through the `snapshot` option (re-supplying the live
  * `summarize` / `keep`).
@@ -193,16 +193,16 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
  *
  * @remarks
  * Builds a one-table database (`conversations`, keyed by `id`) over the supplied driver, the snapshot
- * held as ONE OPAQUE JSON COLUMN — the column map is `{ id; snapshot }` where `snapshot` is a
+ * held as one opaque JSON column — the column map is `{ id; snapshot }` where `snapshot` is a
  * `rawShape` (a JSON blob), exactly as
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore} stores its snapshot. The
- * snapshot is already a COMPLETE, self-contained, pure-JSON payload, so storing it whole is lossless
- * AND keeps the row type FLAT (the column reads back as `unknown`, narrowed on `get` by
- * {@link import('./validators.js').isConversationSnapshot}). The `driver` DEFAULTS to
- * {@link createMemoryDriver}, so the store ALSO works in memory out of the box; pass a server
+ * snapshot is already a complete, self-contained, pure-JSON payload, so storing it whole is lossless
+ * and keeps the row type flat (the column reads back as `unknown`, narrowed on `get` by
+ * {@link import('./validators.js').isConversationSnapshot}). The `driver` defaults to
+ * {@link createMemoryDriver}, so the store also works in memory out of the box; pass a server
  * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
  * the durability is the driver's job, the store engine is shared. It swaps in behind
- * {@link ConversationStoreInterface} WITHOUT touching the manager or the conversation.
+ * {@link ConversationStoreInterface} without touching the manager or the conversation.
  *
  * @param driver - The storage backend the snapshots persist to (defaults to {@link createMemoryDriver})
  * @returns A {@link ConversationStoreInterface} over the driver
@@ -222,7 +222,7 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
 export function createDatabaseConversationStore(
 	driver: DriverInterface = createMemoryDriver(),
 ): ConversationStoreInterface {
-	// The snapshot is stored as ONE OPAQUE JSON column (`rawShape`), so the row infers FLAT —
+	// The snapshot is stored as one opaque JSON column (`rawShape`), so the row infers flat —
 	// `{ id: string; snapshot: unknown }` = `ConversationSnapshotRow` — and the sections/messages
 	// snapshot shape never forces a contract `Infer`.
 	const columns = { id: stringShape(), snapshot: rawShape({}) }
@@ -260,7 +260,7 @@ export function createInstruction(input: InstructionInput): InstructionInterface
  * immutable instructions keyed by `name`, listed by descending `priority`.
  *
  * @remarks
- * Starts empty; `add` (one or a batch) MINTS each `id` and OVERWRITES a same-name
+ * Starts empty; `add` (one or a batch) mints each `id` and overwrites a same-name
  * instruction (last write wins); `instructions()` lists them sorted by descending
  * `priority` (stable for ties); `open` / `render` are the build contract a richer
  * context renders an instructions block with; `remove` (one or a batch) reports `true` only
@@ -294,9 +294,9 @@ export function createInstructionManager(
  * per-category allow-lists, the `id` minted at construction.
  *
  * @remarks
- * Each list is THREE-WAY: `undefined` ⇒ NO constraint on that category (all pass), `[]` ⇒
- * NONE pass, a non-empty list ⇒ only the listed keys pass. `narrow(config)` composes a
- * tighter child by set-INTERSECTION (an `undefined` side imposing no constraint). Stored
+ * Each list is three-way: `undefined` ⇒ no constraint on that category (all pass), `[]` ⇒
+ * none pass, a non-empty list ⇒ only the listed keys pass. `narrow(config)` composes a
+ * tighter child by set-intersection (an `undefined` side imposing no constraint). Stored
  * immutable — never mutated after creation (`narrow` returns a new scope).
  *
  * @param input - `name` (required) and the optional `instructions` / `tools` / `files`
@@ -351,13 +351,13 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  *
  * @remarks
  * `system` is the optional system prompt; `tools` / `instructions` / `workspaces` are pre-built
- * managers to reuse (empty ones are created when omitted, so `context.workspaces` is ALWAYS
+ * managers to reuse (empty ones are created when omitted, so `context.workspaces` is always
  * present); `scope` is the initial active filter (`undefined` ⇒ no filtering, changeable afterwards
  * through `context.apply(...)`). The `messages` store is always fresh. `build()` folds the scoped
- * instructions — PLUS the ACTIVE workspace's scope-filtered text files (fenced) — into ONE leading
+ * instructions — plus the active workspace's scope-filtered text files (fenced) — into one leading
  * `system` message and appends the scoped conversation (attaching the active workspace's
  * scope-filtered image files' `base64` payload to the last user message), built fresh each call; the active
- * workspace is the SOLE document/image context. Tools are advertised STRUCTURALLY (through
+ * workspace is the sole document/image context. Tools are advertised structurally (through
  * `tools.definitions()`, scope-filtered by the loop), never serialized into the prompt.
  *
  * @param options - Optional `system` / `tools` / `instructions` / `workspaces` / `scope`
@@ -385,10 +385,10 @@ export function createAgentContext(options?: AgentContextOptions): AgentContextI
  * `generate` and a live `stream`.
  *
  * @remarks
- * One private loop drives the turn; `generate` DRAINS the same stream `stream`
+ * One private loop drives the turn; `generate` drains the same stream `stream`
  * exposes, so they can never diverge. Each turn is bounded by one cancel folded from
  * `signal` + `timeout` + `budget` (through `AbortSignal.any`) — any trip (or `abort()`)
- * commits a PARTIAL result (the stream's `result` RESOLVES on a cancel, rejects only
+ * commits a partial result (the stream's `result` resolves on a cancel, rejects only
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
  * iteration is capped at `limit` (default `DEFAULT_AGENT_LIMIT`). Tools are advertised
  * structurally through `context.tools.definitions()`. Two observation surfaces: the
@@ -434,10 +434,10 @@ export function createAgent(provider: ProviderInterface, options?: AgentOptions)
  * @remarks
  * Feed each raw wire delta through `split(delta)` (it returns the clean content to
  * surface — possibly `''` mid-think) and settle the stream end with `flush()` (a held
- * partial open tag that never completed returns as final content; an UNCLOSED think
- * span lands on `thinking`). Tags split ACROSS deltas are held back until
+ * partial open tag that never completed returns as final content; an unclosed think
+ * span lands on `thinking`). Tags split across deltas are held back until
  * disambiguated, multiple spans accumulate in order, and a nested-looking `<think>`
- * inside an open span is thinking text. One splitter serves ONE stream — create
+ * inside an open span is thinking text. One splitter serves one stream — create
  * a fresh one per provider call.
  *
  * @returns A fresh {@link ThinkSplitterInterface} (state empty, outside any span)
@@ -465,7 +465,7 @@ export function createThinkSplitter(): ThinkSplitterInterface {
  * Write and read are decoupled, so the producer never waits for a consumer: an agent's eager
  * pump writes each chunk into one, which is why a run's `result` settles whether or not the
  * live events are drained. A value pushed at an already-parked consumer is delivered, buffered
- * values are yielded before the end is reported, and the FIRST failure wins.
+ * values are yielded before the end is reported, and the first failure wins.
  *
  * @typeParam T - The value type the channel carries
  * @returns A fresh, empty {@link ChannelInterface}
@@ -492,11 +492,11 @@ export function createChannel<T>(): ChannelInterface<T> {
  * to the configured default when none match.
  *
  * @remarks
- * `rules` are evaluated in order — the FIRST whose `match` is true decides (a matched
- * rule ALLOWS unless its `allowed` is explicitly `false`). When no rule matches, the
+ * `rules` are evaluated in order — the first whose `match` is true decides (a matched
+ * rule allows unless its `allowed` is explicitly `false`). When no rule matches, the
  * `fallback` decides; it defaults to `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }`
- * (allow-unmatched — a rules list of denials acts as a DENYLIST). Pass an
- * `allowed: false` `fallback` to flip the gate to deny-by-default (an ALLOWLIST). Wire
+ * (allow-unmatched — a rules list of denials acts as a denylist). Pass an
+ * `allowed: false` `fallback` to flip the gate to deny-by-default (an allowlist). Wire
  * the result into `createAgent` through `AgentOptions.authority`: a denied call is fed back
  * to the model as a denial `ToolResult` (not executed, no budget cost), so the model
  * can react. Synchronous — `evaluate` returns the verdict directly.
@@ -527,7 +527,7 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  *
  * @remarks
  * `providers` is required; `tools` / `authorities` / `schedulers` are optional pools.
- * The accessors (`provider` / `tool` / `authority` / `scheduler`) THROW an
+ * The accessors (`provider` / `tool` / `authority` / `scheduler`) throw an
  * {@link import('./errors.js').AgentError} carrying `code: 'REGISTRY'` and the message
  * `unknown <category>: <name>` on an unregistered name — a misconfigured or crash-restored
  * job fails loudly rather than running with a missing dependency. `build(input, signal)`
@@ -571,9 +571,9 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  *   (for example `createMemoryQueueStore` / `createDatabaseQueueStore`) persists outstanding
  *   jobs; `restore()` re-enqueues them after a restart and the `registry` rehydrates the
  *   live pieces from the names — so a job survives a crash.
- * - **Partial policy.** A partial result THROWS an
+ * - **Partial policy.** A partial result throws an
  *   {@link import('./errors.js').AgentJobError} by default, so a job cancelled by its
- *   attempt deadline / a queue abort RETRIES while attempts remain; `partial: true`
+ *   attempt deadline / a queue abort retries while attempts remain; `partial: true`
  *   resolves the partial as success instead.
  * - **Cancellation threads through.** The handler passes `context.signal` into
  *   `registry.build`, so a queue `abort()` or a per-attempt timeout cancels the in-flight
@@ -618,12 +618,12 @@ export function createAgentQueue(
  *   per-attempt `timeout`, ordered results, and fail-fast are all the backing Runner's;
  *   the handler adds only rehydration + the partial policy.
  * - **Sub-agent fan-out.** Each unit's handler receives a `ControllerInterface` whose
- *   `spawn(childJob)` launches a CHILD agent job through the same bounded queue (the
+ *   `spawn(childJob)` launches a child agent job through the same bounded queue (the
  *   child's result joins the run after the declared units, in spawn order). On a bounded
- *   runner, FAN OUT and return — do NOT inline-`await` a spawn from within the handler (a
+ *   runner, fan out and return — do not inline-`await` a spawn from within the handler (a
  *   slot-holding handler awaiting its own spawn can deadlock; see `ControllerInterface`).
  * - **Partial policy + cancellation.** Same as `createAgentQueue`: a partial result
- *   THROWS by default (the run's fail-fast engages), `partial: true` resolves it; the
+ *   throws by default (the run's fail-fast engages), `partial: true` resolves it; the
  *   handler threads `controller.signal` into `registry.build`, so a runner abort / a
  *   per-attempt timeout cancels the agent.
  *

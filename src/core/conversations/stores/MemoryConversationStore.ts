@@ -11,18 +11,18 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
  * A plain `Map<string, ConversationSnapshot>` — the snapshot is already pure,
  * self-contained JSON, so no encoding is needed for the memory tier. Like the
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore} it twins,
- * there is NO idle-TTL and NO eviction: a persisted conversation lives until an explicit `delete`. A
- * durable backend (JSON / SQLite / IndexedDB) swaps in through the SAME interface without touching
+ * there is no idle-TTL and no eviction: a persisted conversation lives until an explicit `delete`. A
+ * durable backend (JSON / SQLite / IndexedDB) swaps in through the same interface without touching
  * the {@link import('../ConversationManager.js').ConversationManager} or the
  * {@link import('../Conversation.js').Conversation} — its driver-pluggable twin is
  * {@link import('./DatabaseConversationStore.js').DatabaseConversationStore} (the snapshot as one
  * opaque JSON column).
  *
  * - **`get` resolves the persisted snapshot for an id**, or `undefined` if none is stored.
- * - **`set` inserts / replaces under the snapshot's OWN `id`** (no separate id param).
+ * - **`set` inserts / replaces under the snapshot's own `id`** (no separate id param).
  * - **`delete` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
- * The public surface is EXACTLY `get` / `set` / `delete` — no extra members (the method
+ * The public surface is exactly `get` / `set` / `delete` — no extra members (the method
  * bijection with {@link ConversationStoreInterface}). Hydration is a caller concern: a
  * {@link import('../ConversationManager.js').ConversationManager} reads a snapshot back and rebuilds
  * the live conversation through the `snapshot` option (its `open` / `save`).
@@ -47,7 +47,7 @@ export class MemoryConversationStore implements ConversationStoreInterface {
 	}
 
 	set(snapshot: ConversationSnapshot): Promise<void> {
-		// Insert / replace under the snapshot's OWN id (no separate id param).
+		// Insert / replace under the snapshot's own id (no separate id param).
 		this.#snapshots.set(snapshot.id, snapshot)
 		return Promise.resolve()
 	}

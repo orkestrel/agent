@@ -61,15 +61,15 @@ import {
  *   assistant message and stop.
  * - **Bounded.** Each run arms one cancel through `createAbort({ signal: AbortSignal.any([
  *   …]) })` folding the external `signal`, the `timeout` deadline, and the `budget`
- *   signal; `abort()` fires it. Any trip stops the loop and commits a PARTIAL result
- *   (the `result` promise RESOLVES, never rejects, on a cancel) — only a genuine
+ *   signal; `abort()` fires it. Any trip stops the loop and commits a partial result
+ *   (the `result` promise resolves, never rejects, on a cancel) — only a genuine
  *   provider / tool error rejects.
  * - **Paced + capped.** The `scheduler` (when given) `yield`s between turns; tool
  *   iteration is capped at `limit`.
- * - **Two observation surfaces.** The PULL {@link AgentChunk} stream carries per-token
- *   deltas (+ usage/tool chunks); the PUSH {@link emitter} ({@link AgentEventMap}) carries
+ * - **Two observation surfaces.** The pull {@link AgentChunk} stream carries per-token
+ *   deltas (+ usage/tool chunks); the push {@link emitter} ({@link AgentEventMap}) carries
  *   lifecycle + usage/tool/deny moments for fire-and-forget observers. Every event is
- *   emitted directly, AFTER the relevant state transition / settle; the emitter isolates a
+ *   emitted directly, after the relevant state transition / settle; the emitter isolates a
  *   listener throw and routes it to its `error` handler (the `error` option), so a buggy
  *   observer can never escape into / reorder / corrupt the settle-once loop — observation is
  *   purely a side-channel.
@@ -91,28 +91,28 @@ export class Agent implements AgentInterface {
 	readonly #scheduler: SchedulerInterface | undefined
 	readonly #signal: AbortSignal | undefined
 	readonly #authority: AuthorityInterface | undefined
-	// The CONTEXT budget for AUTOMATIC conversation compaction — its `consumer`
-	// is a token estimator, its `max` the context window. `#trim` re-measures the ABSOLUTE current
-	// prompt against it (clear() + consume(messages)) BEFORE the first provider request AND between
+	// The context budget for automatic conversation compaction — its `consumer`
+	// is a token estimator, its `max` the context window. `#trim` re-measures the absolute current
+	// prompt against it (clear() + consume(messages)) before the first provider request and between
 	// turns; `undefined` ⇒ disabled: `#trim` is a no-op and the loop is byte-for-byte the prior
 	// behavior. Reset (`clear()`) at run entry so no stale `consumed` carries across runs / a
-	// conversation switch. NOT the hard cost `budget` ceiling — when the prompt reaches its `max`
-	// this COMPACTS + continues (non-fatal on a summarizer throw, futile-guarded), never aborts.
+	// conversation switch. Not the hard cost `budget` ceiling — when the prompt reaches its `max`
+	// this compacts + continues (non-fatal on a summarizer throw, futile-guarded), never aborts.
 	readonly #window: BudgetInterface<readonly Message[]> | undefined
-	// When true, a summarizer failure during AUTOMATIC compaction rethrows (after the
+	// When true, a summarizer failure during automatic compaction rethrows (after the
 	// `fault` event) instead of skipping compaction and continuing over-window.
 	readonly #strict: boolean
-	// The PUSH observation surface — owned, never inherited. The emitter isolates a
+	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
 	// `destroy()`: the Agent holds no other teardownable resources, and an `Emitter` owns
 	// only listener `Set`s (no timers / handles), so it is reclaimed with the agent — there
 	// is no leak to clear, and adding lifecycle the entity does not otherwise need is avoided.
 	readonly #emitter: Emitter<AgentEventMap>
-	// The label the LAST run settled on. `status` derives the live answer from `#runs`, so an
+	// The label the last run settled on. `status` derives the live answer from `#runs`, so an
 	// overlapping run can never report `done` while another is still in flight.
 	#settled: AgentStatus = 'idle'
 	// Every in-flight run's abort handle — a run adds its handle on `stream()` and the
-	// pump removes it when it settles, so `abort()` fires EVERY live run, not only the
+	// pump removes it when it settles, so `abort()` fires every live run, not only the
 	// most recent. Per-run, never a single shared slot a later `stream()` could clobber:
 	// `generate`/`stream` are reusable and may overlap, and each run must cancel
 	// independently (its own `stream.abort()` fires its own handle; `agent.abort()` fires
@@ -171,10 +171,10 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
-		// Concurrency guard: a run already in flight PLUS a shared construction-level
+		// Concurrency guard: a run already in flight plus a shared construction-level
 		// accounting instance (a `window` context budget, or a construction `budget` with no
 		// per-run override) would race its charges against that shared instance — corrupting
-		// the accounting. Thrown SYNCHRONOUSLY, before any state mutation or emit, so a
+		// the accounting. Thrown synchronously, before any state mutation or emit, so a
 		// sequential/awaited caller is never affected and a concurrent run with no `window` and
 		// a per-run `budget` override is still allowed.
 		if (
@@ -188,14 +188,14 @@ export class Agent implements AgentInterface {
 		}
 		// Resolve effective per-run bounds — a per-run override wins, else the
 		// construction default. `limit` and `budget` also thread into `#run` (the loop bound
-		// + the mid-stream charging); `budget` here is the SAME instance folded into `#parents`
-		// below, so its trip both aborts the run and is the budget `#run` charges against.
+		// + the mid-stream charging); `budget` here is the same instance folded into `#parents`,
+		// so its trip both aborts the run and is the budget `#run` charges against.
 		const timeoutMs = options?.timeout ?? this.#timeoutMs
 		const timeout = timeoutMs === undefined ? undefined : createTimeout({ ms: timeoutMs })
 		timeout?.start()
 		const budget = options?.budget ?? this.#budget
 		// A construction-level budget (`this.#budget`, not a per-run `options?.budget` override) is
-		// a SHARED cumulative tally across every sequential run on this agent — concurrent streams
+		// a shared cumulative tally across every sequential run on this agent — concurrent streams
 		// on one agent race their charges against the same instance. Use separate agents (or a
 		// per-run `options.budget`) for concurrent streams that must not share a budget.
 		budget?.start()
@@ -205,13 +205,13 @@ export class Agent implements AgentInterface {
 		const signal = this.#parents(timeout, budget, options?.signal)
 		const abort = createAbort(signal === undefined ? {} : { signal })
 		this.#runs.add(abort)
-		// Observe the run begin — AFTER the run joins `#runs` (which is what `status` derives
+		// Observe the run begin — after the run joins `#runs` (which is what `status` derives
 		// `running` from), so a swallowed listener throw can't perturb the state the pump is
 		// about to drive.
 		this.#emitter.emit('start', this.id)
 		const channel = new Channel<AgentChunk>()
 		const settled = Promise.withResolvers<AgentResult>()
-		// Kick off the eager pump SYNCHRONOUSLY (not lazily on first `events` pull): it
+		// Kick off the eager pump synchronously (not lazily on first `events` pull): it
 		// drives `#run` into the channel and settles `settled` regardless of whether anyone
 		// drains `events`. The per-run `think` / `schema` preferences ride through to
 		// `provider.stream`; `limit` / `budget` ride through as the effective run bounds.
@@ -226,7 +226,7 @@ export class Agent implements AgentInterface {
 			budget,
 		)
 		// An abandoned handle (neither `events` drained nor `result` awaited) must not surface an
-		// unhandledRejection on a genuine error — guard the PUBLIC result, where the rejection lives
+		// unhandledRejection on a genuine error — guard the public result, where the rejection lives
 		// (#pump's finally rejects `settled` without re-throwing, so the pump promise itself resolves).
 		// A caller who awaits `result` still gets the rejection: `.catch` returns a derived promise, it
 		// does not consume the original's rejection.
@@ -234,7 +234,7 @@ export class Agent implements AgentInterface {
 		return {
 			events: this.#events(channel, abort),
 			result: settled.promise,
-			// Fire THIS run's own handle (the closed-over `abort`), never a shared field a
+			// Fire this run's own handle (the closed-over `abort`), never a shared field a
 			// later `stream()` could have replaced — so a handle's `abort()` always cancels
 			// the run it belongs to, even when runs overlap.
 			abort: abort.abort.bind(abort),
@@ -242,23 +242,23 @@ export class Agent implements AgentInterface {
 	}
 
 	abort(reason?: unknown): void {
-		// Cancel EVERY in-flight run — iterate a snapshot so a settle-driven `#runs.delete`
+		// Cancel every in-flight run — iterate a snapshot so a settle-driven `#runs.delete`
 		// (a cancelled run unwinding) can't disturb the walk. Aborting is idempotent, so an
 		// already-finished or already-cancelled handle is a harmless no-op.
 		for (const abort of [...this.#runs]) abort.abort(reason)
 	}
 
-	// The eager pump — the DRIVE behind both faces. Kicked off synchronously in `stream`
-	// (NOT lazily on an `events` pull), it drives `#run` and `push`es each chunk into the
-	// channel as it arrives, then settles `result` from the outcome the generator RETURNS: a
-	// normal / cancelled finish `close`s the channel and RESOLVES the assembled result (status
-	// `done`); a genuine provider / tool error (the bound signal NOT aborted) `fail`s the
-	// channel and REJECTS (status `error`). The generator is driven by hand rather than with
-	// `for await`, which discards a generator's return value — the settled `RunOutcome` IS that
+	// The eager pump — the drive behind both faces. Kicked off synchronously in `stream`
+	// (not lazily on an `events` pull), it drives `#run` and `push`es each chunk into the
+	// channel as it arrives, then settles `result` from the outcome the generator returns: a
+	// normal / cancelled finish `close`s the channel and resolves the assembled result (status
+	// `done`); a genuine provider / tool error (the bound signal not aborted) `fail`s the
+	// channel and rejects (status `error`). The generator is driven by hand rather than with
+	// `for await`, which discards a generator's return value — the settled `RunOutcome` is that
 	// return value, so the run owns its state and nothing is threaded through a caller-held box.
-	// Because the pump runs regardless of whether anyone drains `events`, `result` ALWAYS
+	// Because the pump runs regardless of whether anyone drains `events`, `result` always
 	// settles — that is the fix for the no-drain hang. The deadline `clear()` lives in the
-	// `finally` so it ALWAYS fires (drained or not), and `result` settles EXACTLY ONCE through
+	// `finally` so it always fires (drained or not), and `result` settles exactly once through
 	// the shared resolvers (the underlying promise obeys native settle-once — the first resolve
 	// / reject wins).
 	async #pump(
@@ -301,13 +301,13 @@ export class Agent implements AgentInterface {
 				channel.close()
 				const result = assembleResult(outcome)
 				settled.resolve(result)
-				// Observe the settle — AFTER `settled.resolve(...)` (the result is already
-				// settled; emit only OBSERVES it). A cancel still RESOLVES a partial, so a
-				// cancelled run emits `abort` (the cancel reason) THEN `finish` (the settled
+				// Observe the settle — after `settled.resolve(...)` (the result is already
+				// settled; emit only observes it). A cancel still resolves a partial, so a
+				// cancelled run emits `abort` (the cancel reason) then `finish` (the settled
 				// partial) — observers see both "it was cancelled" and the partial outcome; a
-				// natural / cap finish (`partial: false`) emits `finish` only. LIMIT EXHAUSTION
-				// (unresolved tool intent at the turn cap) is NOT a cancel — it emits `exhaust`
-				// (the turn count) INSTEAD of `abort`, still followed by `finish`. Both emits are
+				// natural / cap finish (`partial: false`) emits `finish` only. Limit exhaustion
+				// (unresolved tool intent at the turn cap) is not a cancel — it emits `exhaust`
+				// (the turn count) instead of `abort`, still followed by `finish`. Both emits are
 				// post-settle, so an isolated listener throw can't reorder the latch.
 				if (outcome.exhausted) this.#emitter.emit('exhaust', limit)
 				else if (outcome.partial) this.#emitter.emit('abort', abort.signal.reason)
@@ -316,7 +316,7 @@ export class Agent implements AgentInterface {
 				this.#settled = 'error'
 				channel.fail(failure.error)
 				settled.reject(failure.error)
-				// Observe the genuine (non-cancel) failure — AFTER `settled.reject(...)`.
+				// Observe the genuine (non-cancel) failure — after `settled.reject(...)`.
 				this.#emitter.emit('error', failure.error)
 			}
 		}
@@ -324,7 +324,7 @@ export class Agent implements AgentInterface {
 
 	// The live event stream: drain the channel the pump writes into, yielding each
 	// `AgentChunk` as it is pushed (and throwing if the pump `fail`ed the channel). Its
-	// `return()` — fired when a consumer `break`s out early — fires the turn ABORT, so the
+	// `return()` — fired when a consumer `break`s out early — fires the turn abort, so the
 	// run stops promptly: the pump then completes the loop with `partial: true`, `clear`s
 	// the deadline, and settles `result` to a non-misleading `{ partial: true }` (never the
 	// old `{ content: '', partial: false }`), leaving `status` no longer `running`.
@@ -346,9 +346,9 @@ export class Agent implements AgentInterface {
 	// iterates up to `limit`: stream the provider (yielding token chunks), fold usage,
 	// dispatch any tool calls (yielding tool chunks) and continue, else finish. A cancel
 	// (the bound abort) stops the loop and marks the outcome partial — it never throws;
-	// only a genuine provider / tool error propagates. The run OWNS its state: every mutable
+	// only a genuine provider / tool error propagates. The run owns its state: every mutable
 	// field lives in these locals for the length of one call (so concurrent runs share
-	// nothing), and the settled `RunOutcome` is what the generator RETURNS to `#pump`.
+	// nothing), and the settled `RunOutcome` is what the generator returns to `#pump`.
 	async *#run(
 		abort: AbortInterface,
 		think: boolean | undefined,
@@ -357,7 +357,7 @@ export class Agent implements AgentInterface {
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, RunOutcome> {
 		// Pass the provider's optional context-framing default into `build()` — the
-		// PROVIDER level of the format cascade. An agnostic provider supplies no `format`,
+		// provider level of the format cascade. An agnostic provider supplies no `format`,
 		// so `build(undefined)` reproduces the managers' built-in framing exactly.
 		const messages: Message[] = [...this.#context.build(this.#provider.format)]
 		const tools = this.#context.tools
@@ -374,30 +374,30 @@ export class Agent implements AgentInterface {
 		let broke = false
 		let partial = false
 		let exhausted = false
-		// PER-RUN auto-compaction state — a local, so it starts FRESH each run (never carried
+		// Per-run auto-compaction state — a local, so it starts fresh each run (never carried
 		// across runs or a conversation switch). `futile` is the futile-compaction guard:
 		// once a `compact()` returns `undefined` while still over the window, the prompt can't
-		// shrink further, so auto-compaction STOPS for the rest of THIS run (no per-turn churn).
+		// shrink further, so auto-compaction stops for the rest of this run (no per-turn churn).
 		let futile = false
-		// AUTO-COMPACTION is enabled only when BOTH a `#window` budget is set AND the active
-		// conversation CAN summarize (`summarizable` — it has a summarizer). There is ALWAYS an
-		// active conversation, but the DEFAULT one has no summarizer, so this gate preserves the shipped
-		// behavior: a non-summarizable conversation is NEVER auto-compacted (and the loop never throws
-		// the `compact()` SUMMARIZER error from the auto path). Gating the whole auto-compaction PATH
+		// Auto-compaction is enabled only when both a `#window` budget is set and the active
+		// conversation can summarize (`summarizable` — it has a summarizer). There is always an
+		// active conversation, but the default one has no summarizer, so this gate preserves the shipped
+		// behavior: a non-summarizable conversation is never auto-compacted (and the loop never throws
+		// the `compact()` SUMMARIZER error from the auto path). Gating the whole auto-compaction path
 		// (the run-entry `clear()` reset + the pre-first-turn `await this.#trim`) behind this flag keeps
-		// the loop PURELY ADDITIVE: with no window OR a non-summarizable conversation, NO extra `await`
+		// the loop purely additive: with no window or a non-summarizable conversation, no extra `await`
 		// is introduced before the first provider request, so the eager-pump / abort timing is
 		// byte-for-byte the prior behavior (a synchronously-fired abort still lands exactly as before).
 		// When enabled: reset `#window` at run entry so no stale `consumed` carries across runs / a
-		// conversation switch, then run a PRE-FIRST-TURN `#trim` so a resumed / long conversation whose
-		// INITIAL prompt already exceeds the window compacts at once (not only after a tool turn) —
+		// conversation switch, then run a pre-first-turn `#trim` so a resumed / long conversation whose
+		// initial prompt already exceeds the window compacts at once (not only after a tool turn) —
 		// skipped when already aborted (a pre-aborted run commits its empty partial without compaction).
 		const compacting =
 			this.#window !== undefined && this.#context.conversations.active?.summarizable === true
 		if (compacting) {
 			this.#window?.clear()
-			// PRE-FIRST-TURN: `latch: false` — an `undefined` fold here means the tail is too short
-			// YET (this run's turns haven't accumulated), NOT permanently futile, so it must not disable
+			// Pre-first-turn: `latch: false` — an `undefined` fold here means the tail is too short
+			// yet (this run's turns haven't accumulated), not permanently futile, so it must not disable
 			// auto-compaction for the run; the growing tail can still fold on the between-turns checks.
 			if (!abort.signal.aborted) futile = await this.#trim(messages, false)
 		}
@@ -406,10 +406,10 @@ export class Agent implements AgentInterface {
 			// throw, so it can't perturb the loop that immediately follows.
 			this.#emitter.emit('turn', turn)
 			// Pace between expensive turns — never after the last (the loop body decides). A
-			// scheduler honours the signal by REJECTING a pending yield on abort (the standard
+			// scheduler honours the signal by rejecting a pending yield on abort (the standard
 			// AbortSignal convention), so a cancel landing at the turn boundary surfaces here as
-			// a throw, NOT as the `aborted` check below. Treat that exactly like a mid-stream
-			// cancel: stop and commit a PARTIAL (resolve), never reject — a cancel is not an
+			// a throw, not as the `aborted` check that follows. Treat that exactly like a mid-stream
+			// cancel: stop and commit a partial (resolve), never reject — a cancel is not an
 			// error. A non-abort yield rejection (a genuine scheduler fault) still propagates.
 			if (turn > 0) {
 				try {
@@ -437,16 +437,16 @@ export class Agent implements AgentInterface {
 				(definition) => definition.name,
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
-			// Bounded mid-stream budget enforcement — a PER-TURN local accumulator (`turnContent`,
+			// Bounded mid-stream budget enforcement — a per-turn local accumulator (`turnContent`,
 			// distinct from the run-spanning `content`) so `charged` (the amount already consumed
-			// against `budget` THIS turn) never mixes with prior turns' content. As each content delta
-			// arrives, re-estimate the turn's token footprint so far and consume only the INCREMENT
+			// against `budget` this turn) never mixes with prior turns' content. As each content delta
+			// arrives, re-estimate the turn's token footprint so far and consume only the increment
 			// over what was already charged — the running `budget.consume` therefore mirrors the live
-			// stream instead of waiting for the turn's final usage report. Thinking deltas are NOT
+			// stream instead of waiting for the turn's final usage report. Thinking deltas are not
 			// metered here: `#provide` never routes a `'thinking'` delta through `onDelta` (only
 			// `'content'` deltas are), so there is no live thinking text to estimate mid-stream — the
 			// honest choice given the loop's existing delta wiring; thinking is metered, like content,
-			// only through the post-turn usage reconcile that follows (which charges the FULL reported usage).
+			// only through the post-turn usage reconcile that follows (which charges the full reported usage).
 			let charged = 0
 			let turnContent = ''
 			let result: ProviderResult
@@ -472,7 +472,7 @@ export class Agent implements AgentInterface {
 				// deltas streamed before the cancel were already accumulated into `content`
 				// through `onDelta`, and a ProviderAbortError's `partial.content` is exactly those
 				// same yielded deltas (the contract) — so `content` already holds the partial;
-				// do NOT re-add it (that double-counts). The separated REASONING has no delta
+				// do not re-add it (that double-counts). The separated reasoning has no delta
 				// channel, though — the abort partial is its only carrier, so harvest it. A
 				// non-abort error (the signal is not aborted) propagates so the run rejects.
 				if (abort.signal.aborted) {
@@ -481,8 +481,8 @@ export class Agent implements AgentInterface {
 							thinking = joinThinking(thinking, error.partial.thinking)
 						}
 						// The abort's partial usage — when the provider observed it mid-stream — is
-						// folded and reconciled exactly like the normal post-turn path below: the
-						// FULL reported usage sums into `usage`, and only the RESIDUAL over the
+						// folded and reconciled exactly like the normal post-turn path that follows: the
+						// full reported usage sums into `usage`, and only the residual over the
 						// mid-stream `charged` estimate is consumed against `budget` (never
 						// double-counted). A provider that can't observe usage mid-stream (its
 						// final counts never arrive) reports none, and none is fabricated here.
@@ -515,12 +515,12 @@ export class Agent implements AgentInterface {
 				// NaN/negative usage would poison `budget.consumed` and `sumUsage`, and never trip
 				// exhaustion (`Math.max(0, NaN - charged)` is `NaN`).
 				const resultUsage = sanitizeUsage(result.usage)
-				// RESIDUAL reconcile — the mid-stream charges above already consumed `charged` worth
-				// of budget against this turn's completion; charge only what remains of the FULL
+				// Residual reconcile — the earlier mid-stream charges already consumed `charged` worth
+				// of budget against this turn's completion; charge only what remains of the full
 				// reported usage so the turn's total budget draw matches `resultUsage` exactly (never
 				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
 				// exists), so it is charged here in full. `sumUsage` / the emitted `usage` chunk below
-				// still carry the FULL sanitized `resultUsage` — reconciliation affects only the
+				// still carry the full sanitized `resultUsage` — reconciliation affects only the
 				// budget charge, never the reported usage.
 				budget?.consume({
 					prompt: resultUsage.prompt,
@@ -556,12 +556,12 @@ export class Agent implements AgentInterface {
 					})
 					messages.push(toolMessage)
 				}
-				// AUTOMATIC compaction — BETWEEN turns (this `continue` path: another
+				// Automatic compaction — between turns (this `continue` path: another
 				// turn follows; never after the final assistant turn that ends the loop, where it
-				// would be wasted). The same `#trim` the run also ran BEFORE the first provider request
+				// would be wasted). The same `#trim` the run also ran before the first provider request
 				// (so a resumed / long conversation whose initial prompt already exceeds the window
 				// compacts at once). Gated behind `compacting` (window + conversation both present), so
-				// with auto-compaction OFF this introduces NO extra `await` — the loop is byte-for-byte
+				// with auto-compaction off this introduces no extra `await` — the loop is byte-for-byte
 				// the prior behavior. `latch: true` — by now the tail has accumulated this turn's
 				// appends, so an `undefined` fold here is genuinely futile, and the run stops
 				// calling `#trim` for the rest of its turns.
@@ -577,8 +577,8 @@ export class Agent implements AgentInterface {
 			break
 		}
 		// The loop exhausted `limit` (the `for` condition failed, never a `break`) while the
-		// most recent turn still held unresolved tool intent: commit the outcome PARTIAL. Flag it
-		// `exhausted` ONLY when the signal did NOT abort — a cancel that lands during the LAST turn's
+		// most recent turn still held unresolved tool intent: commit the outcome partial. Flag it
+		// `exhausted` only when the signal did not abort — a cancel that lands during the last turn's
 		// post-provider work (tool authorize/execute, the residual budget reconcile, between-turns
 		// compaction) also takes this `pending=true; continue` path and exits through the `for` condition
 		// (never a `break`), so `broke` stays `false` even though it was a genuine cancel, not a limit
@@ -592,41 +592,41 @@ export class Agent implements AgentInterface {
 		return { content, thinking, usage, partial, exhausted }
 	}
 
-	// AUTOMATIC compaction — the production-hardened context-budget check. Called
-	// BOTH before the first provider request (a resumed / long conversation compacts at once) AND
-	// between turns. PURELY ADDITIVE: with no `#window` budget OR a NON-SUMMARIZABLE active conversation
+	// Automatic compaction — the production-hardened context-budget check. Called
+	// both before the first provider request (a resumed / long conversation compacts at once) and
+	// between turns. Purely additive: with no `#window` budget or a non-summarizable active conversation
 	// it is a no-op, so the loop is byte-for-byte the prior behavior — and a conversation that cannot
-	// summarize (the default one has no summarizer) is NEVER auto-compacted, so the auto path never
-	// throws the `compact()` SUMMARIZER error. The trigger is the CONTEXT `#window` budget —
+	// summarize (the default one has no summarizer) is never auto-compacted, so the auto path never
+	// throws the `compact()` SUMMARIZER error. The trigger is the context `#window` budget —
 	// its `consumer` a token estimator (for example `estimateMessages`), its `max` the context window — the
-	// SAME consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action is COMPACT, not
-	// abort. It measures the ABSOLUTE current prompt: `clear()` then `consume(messages)` makes
-	// `#window.consumed` the estimated footprint of the EXACT next prompt (the working `messages` array
+	// same consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action is compaction, not
+	// abort. It measures the absolute current prompt: `clear()` then `consume(messages)` makes
+	// `#window.consumed` the estimated footprint of the exact next prompt (the working `messages` array
 	// = the system block + the conversation's `view()` + this turn's appended messages — the real input
-	// the next `provider.stream` will receive), and `exhausted` means that prompt has REACHED `max`.
-	// PRODUCTION HARDENING:
-	//  • NON-FATAL summarizer failure — `conversation.compact()` is wrapped: a thrown summarizer error
-	//    does NOT crash the run; it is surfaced as a `fault` event (observable, never lost) and
-	//    compaction is skipped THIS turn, then the loop continues (the over-window prompt proceeds to
-	//    the provider). (A MANUAL `conversation.compact()` still propagates — only the AUTO path here is
+	// the next `provider.stream` will receive), and `exhausted` means that prompt has reached `max`.
+	// Production hardening:
+	//  • Non-fatal summarizer failure — `conversation.compact()` is wrapped: a thrown summarizer error
+	//    does not crash the run; it is surfaced as a `fault` event (observable, never lost) and
+	//    compaction is skipped this turn, then the loop continues (the over-window prompt proceeds to
+	//    the provider). (A manual `conversation.compact()` still propagates — only the auto path here is
 	//    resilient.)
-	//  • FUTILE-COMPACTION guard (the single-level limit) — when a BETWEEN-TURNS `compact()` resolves
+	//  • Futile-compaction guard (the single-level limit) — when a between-turns `compact()` resolves
 	//    `undefined` (nothing left to fold) while the prompt is still over the window — that is, the live tail
 	//    is at/below `keep` and the over-window is structural (the uncompactable system block + the
 	//    section summaries) so compaction can't reduce further — set the per-run `futile` flag so
-	//    auto-compaction STOPS for the rest of this run (no per-turn churn). The over-window prompt then
+	//    auto-compaction stops for the rest of this run (no per-turn churn). The over-window prompt then
 	//    proceeds to the provider, which surfaces a genuine context-length error if it truly can't fit
-	//    (the real limit). The loop does NOT churn futilely. The RETURNED flag carries that latch back to
+	//    (the real limit). The loop does not churn futilely. The returned flag carries that latch back to
 	//    `#run`, which owns the per-run state and stops calling `#trim` after it is set. `latch`
-	//    gates it: the BETWEEN-TURNS check passes `true`; the PRE-FIRST-TURN check passes `false` —
-	//    there an `undefined` fold means "nothing to fold YET" (the live tail hasn't
-	//    accumulated this run's turns), NOT permanently futile, so it reports `false` and the run's
-	//    growing tail can still fold later. (A `compact()` that DOES fold a section is never futile
-	//    — the tail shrank; if the rebuilt prompt is still over window the NEXT between-turns
+	//    gates it: the between-turns check passes `true`; the pre-first-turn check passes `false` —
+	//    there an `undefined` fold means "nothing to fold yet" (the live tail hasn't
+	//    accumulated this run's turns), not permanently futile, so it reports `false` and the run's
+	//    growing tail can still fold later. (A `compact()` that does fold a section is never futile
+	//    — the tail shrank; if the rebuilt prompt is still over window the next between-turns
 	//    `undefined` fold latches.)
-	// No post-compact `clear()` is needed: the NEXT check's `clear()` + `consume` re-measures the
+	// No post-compact `clear()` is needed: the next check's `clear()` + `consume` re-measures the
 	// now-shrunken prompt from scratch. The summarizer call is the conversation's configured
-	// (best-effort) one, NOT separately bound to this run's abort signal.
+	// (best-effort) one, not separately bound to this run's abort signal.
 	async #trim(messages: Message[], latch: boolean): Promise<boolean> {
 		const conversation = this.#context.conversations.active
 		// No window or a non-summarizable active conversation (the default one can't fold) ⇒ the
@@ -641,18 +641,18 @@ export class Agent implements AgentInterface {
 			section = await conversation.compact()
 		} catch (error) {
 			// Surface the summarizer failure observably first (always). Lenient (default): skip
-			// compaction this turn and continue over-window. STRICT: rethrow after the event so
+			// compaction this turn and continue over-window. Strict: rethrow after the event so
 			// the caught error propagates through `#run` and the run settles `error` instead.
 			this.#emitter.emit('fault', error)
 			if (this.#strict) throw error
 			return false
 		}
-		// Nothing folded. On a BETWEEN-TURNS check (`latch`) the tail had its chance to grow yet
-		// still won't fold ⇒ genuinely FUTILE: report the latch so the run stops churning and the
-		// over-window prompt reaches the provider. On the PRE-FIRST-TURN check the tail is
-		// too short YET ⇒ report no latch, leaving later turns free to fold as the tail grows.
+		// Nothing folded. On a between-turns check (`latch`) the tail had its chance to grow yet
+		// still won't fold ⇒ genuinely futile: report the latch so the run stops churning and the
+		// over-window prompt reaches the provider. On the pre-first-turn check the tail is
+		// too short yet ⇒ report no latch, leaving later turns free to fold as the tail grows.
 		if (section === undefined) return latch
-		// REBUILD the working array from the (now smaller) compacted view through the SAME projection the
+		// Rebuild the working array from the (now smaller) compacted view through the same projection the
 		// loop opened with — so the run continues on the system block + compacted `view()`.
 		messages.splice(0, messages.length, ...this.#context.build(this.#provider.format))
 		return false
@@ -660,9 +660,9 @@ export class Agent implements AgentInterface {
 
 	// The tool-dispatch gate. With no authority this is byte-identical to the no-authority path —
 	// `tools.execute(calls)` straight through. With one set, each call is `evaluate`d:
-	// ALLOWED calls run as a batch (skipped entirely when none are allowed, so a denial
-	// costs no tool run / no budget); DENIED calls become a synthesized denial ToolResult
-	// (never executed). The two are then MERGED back into the ORIGINAL `calls` order
+	// allowed calls run as a batch (skipped entirely when none are allowed, so a denial
+	// costs no tool run / no budget); denied calls become a synthesized denial ToolResult
+	// (never executed). Executed results and denials then merge back into the original `calls` order
 	// (correlated by `id` through a Map), so the loop's per-call `tool` chunks + tool messages
 	// stay in call order — a denied call still yields a `tool` chunk + a tool message
 	// (carrying the denial error), so the model sees it and can react.
@@ -675,7 +675,7 @@ export class Agent implements AgentInterface {
 		const allowed: ToolCall[] = []
 		const denials = new Map<string, ToolResult>()
 		for (const call of calls) {
-			// A security gate must FAIL CLOSED: if a policy `evaluate` throws, the call is NOT
+			// A security gate must fail closed: if a policy `evaluate` throws, the call is not
 			// cleared, so it must not run. Synthesize a denial (carrying the error's message)
 			// instead of letting the throw reject the whole run — the tool stays unexecuted and
 			// the model still sees a denial it can react to, exactly like an explicit `deny`.
@@ -684,7 +684,7 @@ export class Agent implements AgentInterface {
 				decision = authority.evaluate({ call })
 			} catch (error) {
 				// The declared `@orkestrel/workflow` normalizer, so a fail-closed denial carries a
-				// NON-EMPTY explanation the model can read: an `Error` with an empty `message`
+				// non-empty explanation the model can read: an `Error` with an empty `message`
 				// normalizes to real text, and a throw whose stringification itself fails is caught
 				// rather than escaping the gate and rejecting the run.
 				const reason = errorToMessage(error)
@@ -710,9 +710,9 @@ export class Agent implements AgentInterface {
 	// Drive one provider stream turn: read each {@link ProviderDelta}'s `channel` — a
 	// `'content'` delta is the answer (fed back through `onDelta`, surfaced as a
 	// `token` chunk); a `'thinking'` delta is live reasoning (surfaced as a `think` chunk,
-	// NEVER fed into `onDelta` — reasoning is not answer content) — returning the provider's
+	// never fed into `onDelta` — reasoning is not answer content) — returning the provider's
 	// assembled result. The per-run `think` / `schema` preferences ride into `provider.stream`
-	// as {@link ProviderStreamOptions}, composed together — keys are OMITTED when undefined, so
+	// as {@link ProviderStreamOptions}, composed together — keys are omitted when undefined, so
 	// the provider receives no options object at all when both are absent (preserving the prior
 	// think-only behavior exactly). Kept separate so the loop reads as one straight line.
 	async *#provide(
@@ -748,7 +748,7 @@ export class Agent implements AgentInterface {
 
 	// The parent signal for a run's abort: the external signal, an optional per-run signal
 	// (composed with, never replacing, the construction `signal`), the deadline, and the
-	// EFFECTIVE budget (a per-run override, else the construction `budget`) folded through
+	// effective budget (a per-run override, else the construction `budget`) folded through
 	// `AbortSignal.any` — or a lone present one, or `undefined` when none.
 	#parents(
 		timeout: TimeoutInterface | undefined,

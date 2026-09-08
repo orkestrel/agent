@@ -9,18 +9,18 @@ import { intersectKeys } from '../helpers.js'
  * keys alone. `narrow` composes a tighter child by set intersection.
  *
  * @remarks
- * - **A category list is three-way.** `undefined` ⇒ NO constraint on that category (all
- *   pass); `[]` ⇒ NONE pass; a non-empty list ⇒ only the listed keys pass. The build
+ * - **A category list is three-way.** `undefined` ⇒ no constraint on that category (all
+ *   pass); `[]` ⇒ none pass; a non-empty list ⇒ only the listed keys pass. The build
  *   step / loop apply this through `filterAllowList`.
- * - **Immutable.** The `id` is minted at construction; every supplied list is COPIED in
+ * - **Immutable.** The `id` is minted at construction; every supplied list is copied in
  *   (so a later mutation of the caller's array can't leak in), and the lists are
- *   `readonly`. A `Scope` is never mutated after construction — `narrow` returns a NEW
+ *   `readonly`. A `Scope` is never mutated after construction — `narrow` returns a new
  *   one rather than altering this one.
- * - **`narrow` is set-INTERSECTION (immutable composition).** A child scope's visible set
- *   per category is the intersection of THIS scope's list and the config's list — but
+ * - **`narrow` is set-intersection (immutable composition).** A child scope's visible set
+ *   per category is the intersection of this scope's list and the config's list — but
  *   `undefined` means "no constraint", so it acts as the universal set: intersecting
  *   `undefined` with a list yields the list, and `undefined` with `undefined` stays
- *   `undefined`. Narrowing can only TIGHTEN, never widen — a key excluded by a parent
+ *   `undefined`. Narrowing can only tighten, never widen — a key excluded by a parent
  *   can never be re-admitted by a child.
  *
  * @example
@@ -32,7 +32,6 @@ import { intersectKeys } from '../helpers.js'
  * // instructions had no parent constraint (undefined) → the child's list passes through.
  * tighter.narrow({ instructions: ['safety'] }).instructions // ['safety']
  * ```
- *
  */
 export class Scope implements ScopeInterface {
 	readonly id: string = crypto.randomUUID()
@@ -52,7 +51,7 @@ export class Scope implements ScopeInterface {
 
 	narrow(config: ScopeFilter): ScopeInterface {
 		// A child = the per-category set-intersection of this scope and the config, keeping
-		// THIS scope's name. Immutable: a brand-new Scope, this one untouched.
+		// this scope's name. Immutable: a brand-new Scope, this one untouched.
 		const instructions = intersectKeys(this.instructions, config.instructions)
 		const tools = intersectKeys(this.tools, config.tools)
 		const files = intersectKeys(this.files, config.files)

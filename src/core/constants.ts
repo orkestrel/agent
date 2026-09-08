@@ -31,8 +31,8 @@ export const DEFAULT_CONVERSATION_KEEP = 0
  * the live answer.
  *
  * @remarks
- * Deliberately a FIXED, lean handful of tokens (a short bracketed marker) so the framing adds a
- * bounded `prefix × sections` overhead and NEVER an open-ended blow-up — the
+ * Deliberately a fixed, lean handful of tokens (a short bracketed marker) so the framing adds a
+ * bounded `prefix × sections` overhead and never an open-ended blow-up — the
  * {@link ConversationInterface} no-bloat test guard pins exactly that. Kept here (beside
  * {@link DEFAULT_CONVERSATION_KEEP}) as the conversation layer's one tunable framing constant, so
  * the wording has a single source of truth as it is optimized against real small-model behavior
@@ -63,10 +63,10 @@ export const THINK_CLOSE = '</think>'
  * images section headers.
  *
  * @remarks
- * `build()` OWNS the workspace render (a `Workspace` / `WorkspaceManager` stays file-focused — no
+ * `build()` owns the workspace render (a `Workspace` / `WorkspaceManager` stays file-focused — no
  * `open` / `format` getters), so this header lives here as the agents module's one
  * workspace-section framing constant rather than on a manager. Each workspace text file renders
- * beneath it as a fenced `` File: <path>\n```<language>\n<text>\n``` `` block — the SAME framing
+ * beneath it as a fenced `` File: <path>\n```<language>\n<text>\n``` `` block — the same framing
  * the documents section uses — placed immediately after the documents section in the system block.
  */
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
@@ -86,7 +86,7 @@ export const MESSAGE_TOKEN_OVERHEAD = 4
  * a base64 payload's length is no reliable token proxy.
  *
  * @remarks
- * A base64 image payload's LENGTH is NOT a reliable token proxy (a vision model's actual image
+ * A base64 image payload's length is not a reliable token proxy (a vision model's actual image
  * token cost depends on resolution / tiling, not byte size), so this is a fixed, coarse
  * per-image estimate rather than a derivation from `image.length` — a planning heuristic, not an
  * exact count.

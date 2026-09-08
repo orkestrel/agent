@@ -15,13 +15,13 @@ import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
  *
  * @remarks
  * - **Ordered, first-match-wins.** `evaluate` walks the configured rules in order and
- *   returns the FIRST whose `match(context)` is true as
- *   `{ zone, allowed: rule.allowed ?? true, reason }` — a matched rule ALLOWS by
- *   default and DENIES only when its `allowed` is explicitly `false`.
+ *   returns the first whose `match(context)` is true as
+ *   `{ zone, allowed: rule.allowed ?? true, reason }` — a matched rule allows by
+ *   default and denies only when its `allowed` is explicitly `false`.
  * - **Fallback.** When no rule matches, `evaluate` returns the configured `fallback`.
  *   It defaults to `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }` (allow-unmatched),
- *   so a rules list of denials behaves as a DENYLIST. To make the gate deny-by-default
- *   (an ALLOWLIST — only matched rules that allow get through), pass an `allowed: false`
+ *   so a rules list of denials behaves as a denylist. To make the gate deny-by-default
+ *   (an allowlist — only matched rules that allow get through), pass an `allowed: false`
  *   `fallback`.
  * - **Consulted before each tool call.** The agent loop calls `evaluate({ call })` for
  *   every {@link import('@orkestrel/tool').ToolCall} the model emits; a denied call is fed

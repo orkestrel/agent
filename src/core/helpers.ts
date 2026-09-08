@@ -101,8 +101,8 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
  * @remarks
  * Three-way by the allow-list's shape, so a `Scope` category cleanly expresses "all /
  * none / only these":
- * - `undefined` ⇒ NO constraint — every item passes (returned unchanged).
- * - `[]` (empty) ⇒ NONE pass (no key is in an empty set).
+ * - `undefined` ⇒ no constraint — every item passes (returned unchanged).
+ * - `[]` (empty) ⇒ none pass (no key is in an empty set).
  * - a non-empty list ⇒ only items whose `key(item)` is in the list pass.
  *
  * Order-preserving (it filters `items` in place order, never reorders) and total — never
@@ -142,7 +142,7 @@ export function filterAllowList<T>(
  * Approximates `ceil(length / 4)` (≈ four characters per token — the rough average for
  * English text), so the same input always yields the same estimate (no model round-trip).
  * Empty text is `0`. This is a planning heuristic for reasoning about how much a turn's
- * messages cost the next request, NOT an exact tokenizer count — it never calls a provider,
+ * messages cost the next request, not an exact tokenizer count — it never calls a provider,
  * so the agent layer stays provider-agnostic and synchronous where it can be.
  *
  * @param text - The text to estimate (a section summary, a message's content)
@@ -169,10 +169,10 @@ export function estimateTokens(text: string): number {
  *
  * @remarks
  * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` char
- * heuristic) PLUS {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (a fixed per-message
- * role/framing overhead) PLUS, when present, {@link estimateTokens} over its JSON-stringified
- * `calls` PLUS `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
- * deliberately-approximate per-image cost — a base64 length is NOT a token proxy). Deterministic
+ * heuristic) plus {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (a fixed per-message
+ * role/framing overhead) plus, when present, {@link estimateTokens} over its JSON-stringified
+ * `calls` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
+ * deliberately-approximate per-image cost — a base64 length is not a token proxy). Deterministic
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
  * turn's new messages through; a caller wanting a sharper count supplies its own `consumer` to
@@ -219,10 +219,10 @@ export function estimateMessages(messages: readonly Message[]): number {
  * them.
  *
  * @remarks
- * A turn that committed PARTIAL (a cancel — abort / budget / timeout) is by default a
- * FAILURE, so it THROWS an {@link import('./errors.js').AgentJobError} carrying the partial
- * (the Queue's retries + a Runner's fail-fast then engage); the `partial` policy RESOLVES
- * it as success instead. A natural finish ALWAYS resolves with its result.
+ * A turn that committed partial (a cancel — abort / budget / timeout) is by default a
+ * failure, so it throws an {@link import('./errors.js').AgentJobError} carrying the partial
+ * (the Queue's retries + a Runner's fail-fast then engage); the `partial` policy resolves
+ * it as success instead. A natural finish always resolves with its result.
  *
  * @param agent - The rehydrated {@link AgentInterface} to run to its {@link AgentResult}
  * @param partial - The partial policy. If `true`, a partial result resolves as success; if
@@ -413,7 +413,7 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
  * left out.
  *
  * @remarks
- * Pure and total. An absent optional is OMITTED rather than stored as `undefined` (the
+ * Pure and total. An absent optional is omitted rather than stored as `undefined` (the
  * present-when-given convention the message store follows), so a settled result JSON
  * round-trips without an explicit `undefined` field. `exhausted` is loop bookkeeping and does
  * not reach the public result — the `exhaust` event carries it instead.
@@ -470,7 +470,7 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
  * `close` when one exists, blank-line joined; `undefined` when the section has no items.
  *
  * @remarks
- * Pure and total. A section with NO items renders nothing (`undefined`), so an empty or fully
+ * Pure and total. A section with no items renders nothing (`undefined`), so an empty or fully
  * scoped-out manager stays silent — its `open` / `close` never appear without items. `close`
  * is the only optional slot: an unset one (there is no built-in close) drops the
  * trailing line.
@@ -506,9 +506,9 @@ export function renderSection<T>(
  * provider default > built-in header.
  *
  * @remarks
- * Pure and total. The leading text has NO per-item level. A manager's `open` already
+ * Pure and total. The leading text has no per-item level. A manager's `open` already
  * encapsulates `[options-override → built-in]`, so it is reached only when neither the
- * override's `open` nor the provider's `open` applies — and there it IS the built-in header.
+ * override's `open` nor the provider's `open` applies — and there it is the built-in header.
  *
  * @typeParam T - The section item the manager renders
  * @param manager - The section source (its `format` override + its built-in `open`)
@@ -533,9 +533,9 @@ export function resolveOpen<T>(
  * provider default; `undefined` when neither sets one, because there is no built-in close.
  *
  * @remarks
- * Pure and total. There is NO built-in close, so a section with neither level set returns
+ * Pure and total. There is no built-in close, so a section with neither level set returns
  * `undefined` and {@link renderSection} appends no closing line. Paired with
- * {@link resolveOpen}, one level can WRAP the whole group.
+ * {@link resolveOpen}, one level can wrap the whole group.
  *
  * @typeParam T - The section item the manager renders
  * @param manager - The section source (its `format` override)
@@ -563,7 +563,7 @@ export function resolveClose<T>(
  * Pure and total. The item's own `override` is the most-specific level (a fully-rendered
  * string for that item alone). A manager's `render(item)` already encapsulates
  * `[options-override → built-in]`, so it is reached only when no higher level applies — and
- * there it IS the built-in rendering.
+ * there it is the built-in rendering.
  *
  * @typeParam T - The section item being rendered (it may carry its own `override`)
  * @param manager - The section source (its `format` override + its built-in `render`)
@@ -596,7 +596,7 @@ export function resolveItem<T extends { readonly override?: string }>(
  * then the attached data, carrying `calls` only when present and never mutating the original.
  *
  * @remarks
- * Pure and total: the original message is NEVER mutated. `calls` is carried only when the
+ * Pure and total: the original message is never mutated. `calls` is carried only when the
  * source message has one (kept omitted otherwise, mirroring the store's present-when-given
  * convention).
  *
@@ -629,9 +629,9 @@ export function attachImages(message: Message, data: readonly string[]): Message
  * when there is no data or no user turn.
  *
  * @remarks
- * Pure and total: the conversation and its messages are NEVER mutated, and the returned array
+ * Pure and total: the conversation and its messages are never mutated, and the returned array
  * replaces exactly the one target message with the copy {@link attachImages} builds. Empty
- * data returns the conversation unchanged; a conversation with NO user message returns it
+ * data returns the conversation unchanged; a conversation with no user message returns it
  * unchanged too (there is nowhere to attach, and the images already rode the system block).
  *
  * @param conversation - The messages to attach into (left unchanged)
@@ -667,7 +667,7 @@ export function attachUserImages(
  * context attaches to the last user message.
  *
  * @remarks
- * Pure and total. `isBinary` NARROWS the tagless content to its binary arm (a total guard,
+ * Pure and total. `isBinary` narrows the tagless content to its binary arm (a total guard,
  * never an assertion), then the MIME prefix gates it to an image, so a text file and a non-image
  * binary (a PDF) are both skipped. Order follows the file list.
  *
@@ -679,7 +679,6 @@ export function attachUserImages(
  * collectImageData([createFile({ path: 'a.png', content: { base64: '<payload>', mime: 'image/png' } })])
  * // ['<payload>']
  * ```
- *
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {
 	const data: string[] = []
@@ -697,7 +696,7 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
  *
  * @remarks
  * Pure and total. This is the unframed form the rollup regeneration digests (a
- * summary-of-summaries over the section summaries); the recap LABEL is a `view()`
+ * summary-of-summaries over the section summaries); the recap label is a `view()`
  * presentation concern kept out of what the summarizer re-reads — see
  * {@link buildRecapMessage}.
  *
@@ -709,7 +708,6 @@ export function collectImageData(files: readonly FileInterface[]): readonly stri
  * buildSummaryMessage({ id: 's1', summary: 'recap', messages: [] })
  * // { id: 's1', role: 'assistant', content: 'recap' }
  * ```
- *
  */
 export function buildSummaryMessage(section: Section): Message {
 	return { id: section.id, role: 'assistant', content: section.summary }
@@ -721,8 +719,8 @@ export function buildSummaryMessage(section: Section): Message {
  * import('./constants.js').CONVERSATION_RECAP_PREFIX}.
  *
  * @remarks
- * Pure and total. The prefix is what makes a small model read the message as a CONDENSED
- * RECAP of earlier turns rather than a literal assistant turn to echo or answer from. It is a
+ * Pure and total. The prefix is what makes a small model read the message as a condensed
+ * recap of earlier turns rather than a literal assistant turn to echo or answer from. It is a
  * fixed handful of tokens, so a conversation's `view()` stays lean however many sections it
  * carries.
  *
@@ -734,7 +732,6 @@ export function buildSummaryMessage(section: Section): Message {
  * buildRecapMessage({ id: 's1', summary: 'recap', messages: [] })
  * // { id: 's1', role: 'assistant', content: `${CONVERSATION_RECAP_PREFIX}recap` }
  * ```
- *
  */
 export function buildRecapMessage(section: Section): Message {
 	return {
@@ -749,8 +746,8 @@ export function buildRecapMessage(section: Section): Message {
  * fresh copy that can only tighten, and the primitive a scope narrows through.
  *
  * @remarks
- * Pure and total, and it can only TIGHTEN: `undefined` ∩ `undefined` is `undefined` (still no
- * constraint); `undefined` ∩ a list is a COPY of that list (the `undefined` side imposes
+ * Pure and total, and it can only tighten: `undefined` ∩ `undefined` is `undefined` (still no
+ * constraint); `undefined` ∩ a list is a copy of that list (the `undefined` side imposes
  * nothing); a list ∩ a list keeps the child keys the parent also allows, so a parent-excluded
  * key can never be re-admitted. Every returned list is a fresh copy, so a later mutation of
  * either input cannot leak into the result.

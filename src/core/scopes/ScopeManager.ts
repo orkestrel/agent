@@ -22,11 +22,11 @@ import { Scope } from './Scope.js'
  *   one up, and `scopes()` lists them in insertion order. (Unlike the name-keyed
  *   instruction registry, a scope's key is its minted `id`, so two scopes may share a
  *   `name`; `create` therefore always adds — it never overwrites.)
- * - **Removal.** `remove` drops one by id, or a batch — `true` only when EVERY supplied id
+ * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id
  *   was removed; `clear` empties the registry.
  * - **Observable.** The owned {@link emitter} ({@link ScopeManagerEventMap}) carries
  *   `create` (the created scope) / `remove` (the id) / `clear`. Every event is emitted
- *   directly, strictly AFTER the map mutation completes; the emitter isolates a listener
+ *   directly, strictly after the map mutation completes; the emitter isolates a listener
  *   throw and routes it to its `error` handler (the `error` option), so a buggy observer can
  *   never corrupt a mutation.
  *
@@ -40,7 +40,7 @@ import { Scope } from './Scope.js'
  */
 export class ScopeManager implements ScopeManagerInterface {
 	readonly #scopes = new Map<string, ScopeInterface>()
-	// The PUSH observation surface — owned, never inherited. The emitter isolates a
+	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<ScopeManagerEventMap>
 
@@ -62,7 +62,7 @@ export class ScopeManager implements ScopeManagerInterface {
 	create(input: ScopeInput): ScopeInterface {
 		const scope = new Scope(input)
 		this.#scopes.set(scope.id, scope)
-		// Observe the created scope — AFTER the map set, so a swallowed listener throw can't
+		// Observe the created scope — after the map set, so a swallowed listener throw can't
 		// perturb the store the caller is about to use.
 		this.#emitter.emit('create', scope)
 		return scope
@@ -80,7 +80,7 @@ export class ScopeManager implements ScopeManagerInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			// True only when EVERY supplied id was present and removed, so a caller can tell a
+			// True only when every supplied id was present and removed, so a caller can tell a
 			// fully applied batch from a partly applied one. Each present id still emits.
 			let removed = true
 			for (const id of ids) {
@@ -93,13 +93,13 @@ export class ScopeManager implements ScopeManagerInterface {
 
 	clear(): void {
 		this.#scopes.clear()
-		// Observe the cleared registry — AFTER the map emptied, so a swallowed listener
+		// Observe the cleared registry — after the map emptied, so a swallowed listener
 		// throw can never alter the clear (no payload — `clear` is a pure signal).
 		this.#emitter.emit('clear')
 	}
 
 	// Delete one scope, emitting `remove` only when one was actually removed (a delete of
-	// an absent id returns `false` and emits nothing) — AFTER the deletion.
+	// an absent id returns `false` and emits nothing) — after the deletion.
 	#delete(id: string): boolean {
 		const removed = this.#scopes.delete(id)
 		if (removed) this.#emitter.emit('remove', id)

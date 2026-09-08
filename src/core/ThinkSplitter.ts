@@ -10,17 +10,17 @@ import { THINK_CLOSE, THINK_OPEN } from './constants.js'
  *
  * @remarks
  * - **Cross-chunk tags.** A tag may arrive split across wire deltas (`'<thi'` then
- *   `'nk>'`): any suffix of the pending text that is a strict PREFIX of a tag being
- *   scanned for is HELD BACK (neither surfaced nor routed) until the next delta — or
+ *   `'nk>'`): any suffix of the pending text that is a strict prefix of a tag being
+ *   scanned for is held back (neither surfaced nor routed) until the next delta — or
  *   `flush()` — disambiguates it. A held tag prefix that never completes is real
  *   content; a held close-tag prefix inside a span is thinking.
- * - **The IMPLICIT leading open (the qwen3-template shape).** Some chat templates
- *   PRE-SEED `<think>` into the prompt scaffold, so the wire stream begins
- *   MID-REASONING and only a bare `</think>` appears. Before any tag event, a bare
- *   close therefore RECLASSIFIES everything surfaced so far (plus the pre-close
+ * - **The implicit leading open (the qwen3-template shape).** Some chat templates
+ *   pre-seed `<think>` into the prompt scaffold, so the wire stream begins
+ *   mid-reasoning and only a bare `</think>` appears. Before any tag event, a bare
+ *   close therefore reclassifies everything surfaced so far (plus the pre-close
  *   pending) as thinking — `content` is corrected retroactively (the already-returned
  *   prefix cannot be recalled, so `content` is the authoritative accumulation). The
- *   rule is ONE-SHOT: after any tag event a bare `</think>` is plain text.
+ *   rule is one-shot: after any tag event a bare `</think>` is plain text.
  * - **Multiple spans** accumulate onto `thinking` in stream order. A nested-looking
  *   `<think>` inside an open span is thinking text (no nesting is tracked — the
  *   first `</think>` closes the span), matching how the models emit it.
@@ -46,8 +46,8 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	// Whether the scanner is inside an open `<think>` span.
 	#inside = false
 	// Whether a tag event has occurred (an explicit open, or the one-shot implicit-open
-	// close) — BEFORE it, a bare `</think>` closes the implicit span a chat template
-	// pre-seeded; AFTER it, a bare close is plain text.
+	// close) — before it, a bare `</think>` closes the implicit span a chat template
+	// pre-seeded; after it, a bare close is plain text.
 	#opened = false
 	#content = ''
 	#thinking = ''
@@ -103,8 +103,8 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 			}
 			const open = this.#pending.indexOf(THINK_OPEN)
 			if (!this.#opened) {
-				// The IMPLICIT leading open: before any tag event, a bare close (arriving
-				// ahead of any explicit open) means the stream BEGAN inside a pre-seeded
+				// The implicit leading open: before any tag event, a bare close (arriving
+				// ahead of any explicit open) means the stream began inside a pre-seeded
 				// span — everything surfaced so far was reasoning. Reclassify it.
 				const close = this.#pending.indexOf(THINK_CLOSE)
 				if (close !== -1 && (open === -1 || close < open)) {
@@ -118,7 +118,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 			}
 			if (open === -1) {
 				// No open tag — surface all but a possible partial tag suffix as content
-				// (before any tag event a split LEADING close must not leak either, so the
+				// (before any tag event a split leading close must not leak either, so the
 				// close tag's prefixes are held back too).
 				const tags = this.#opened ? [THINK_OPEN] : [THINK_OPEN, THINK_CLOSE]
 				content += this.#hold(tags)
@@ -132,7 +132,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	}
 
 	// Settle the pending text against the given tags' possible partial suffixes: the
-	// LONGEST ambiguous suffix stays pending for the next delta; everything before it
+	// longest ambiguous suffix stays pending for the next delta; everything before it
 	// is returned for routing.
 	#hold(tags: readonly string[]): string {
 		const keep = Math.max(...tags.map((tag) => this.#overlap(tag)))
@@ -142,7 +142,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 		return settled
 	}
 
-	// The length of the LONGEST strict prefix of `tag` that suffixes the pending text —
+	// The length of the longest strict prefix of `tag` that suffixes the pending text —
 	// how many trailing characters are an ambiguous partial tag and must be held back.
 	#overlap(tag: string): number {
 		const max = Math.min(this.#pending.length, tag.length - 1)
