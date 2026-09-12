@@ -42,16 +42,35 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../../typ
 export class MemoryConversationStore implements ConversationStoreInterface {
 	readonly #snapshots = new Map<string, ConversationSnapshot>()
 
+	/**
+	 * Resolves the persisted snapshot for `id`, or `undefined` if none is stored.
+	 *
+	 * @param id - The conversation id to resolve (a {@link ConversationSnapshot.id})
+	 * @returns The persisted snapshot, or `undefined` if absent
+	 */
 	get(id: string): Promise<ConversationSnapshot | undefined> {
 		return Promise.resolve(this.#snapshots.get(id))
 	}
 
+	/**
+	 * Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param —
+	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
+	 *
+	 * @param snapshot - The snapshot to store (keyed by its `id`)
+	 * @returns A promise that resolves after the snapshot is stored
+	 */
 	set(snapshot: ConversationSnapshot): Promise<void> {
 		// Insert / replace under the snapshot's own id (no separate id param).
 		this.#snapshots.set(snapshot.id, snapshot)
 		return Promise.resolve()
 	}
 
+	/**
+	 * Drops a snapshot by id; an absent id is a no-op (no throw).
+	 *
+	 * @param id - The conversation id to drop
+	 * @returns A promise that resolves after the snapshot is dropped
+	 */
 	delete(id: string): Promise<void> {
 		// Drop by id; `Map.delete` of an absent id is already a no-op (no throw).
 		this.#snapshots.delete(id)

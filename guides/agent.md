@@ -587,7 +587,7 @@ Agent-owned readonly data members stay in the preceding Surface tables; their ca
 
 ## Methods
 
-The tables list every public call-signature member of `ProviderInterface`, `ThinkSplitterInterface`, `MessageManagerInterface`, `InstructionManagerInterface`, `ContextSectionSourceInterface`, `ScopeInterface`, `ScopeManagerInterface`, `AgentContextInterface`, `AgentInterface`, `ChannelInterface`, `AuthorityInterface`, `AgentRegistryInterface`, `ConversationInterface`, and `ConversationManagerInterface`. Their readonly data members remain Surface rows. `ThinkSplitter`, `InstructionManager`, `Scope`, `ScopeManager`, `AgentContext`, `Agent`, `Authority`, `AgentRegistry`, `Conversation`, and `ConversationManager` implement their interfaces exactly, so the tables also describe those classes' instance methods. `MessageManagerInterface` has no separate concrete class here: the active `Conversation` satisfies it structurally. A host application supplies the concrete `ProviderInterface`. Tool and workspace methods live in their dependency guides. `StreamInterface<T, R>` is the generic live handle (`events`, `result`, and `abort(reason?)`); `AgentStreamInterface` specializes it for `AgentChunk` and `AgentResult`.
+The tables list every public call-signature member of `ProviderInterface`, `ThinkSplitterInterface`, `MessageManagerInterface`, `InstructionManagerInterface`, `ContextSectionSourceInterface`, `ScopeInterface`, `ScopeManagerInterface`, `AgentContextInterface`, `AgentInterface`, `StreamInterface`, `ChannelInterface`, `AuthorityInterface`, `AgentRegistryInterface`, `ConversationInterface`, `ConversationManagerInterface`, `ConversationStoreInterface`, `MemoryConversationStore`, and `DatabaseConversationStore`. Their readonly data members remain Surface rows. `ThinkSplitter`, `InstructionManager`, `Scope`, `ScopeManager`, `AgentContext`, `Agent`, `Authority`, `AgentRegistry`, `Conversation`, and `ConversationManager` implement their interfaces exactly, so the tables also describe those classes' instance methods. The store classes implement `ConversationStoreInterface` and keep explicit tables because their class names have no same-name interface contracts. `MessageManagerInterface` has no separate concrete class here: the active `Conversation` satisfies it structurally. A host application supplies the concrete `ProviderInterface`. Tool and workspace methods live in their dependency guides.
 
 #### `ProviderInterface`
 
@@ -679,6 +679,14 @@ The bounded agent loop. `generate` and `stream` share one private run (`generate
 | `stream`   | `AgentStreamInterface` | Runs the turn as a live stream — iterate `events` for `AgentChunk`s and `await result` for the settled outcome; `result` resolves partial on a cancel and rejects on a genuine error. |
 | `abort`    | `void`                 | Cancels the in-flight turn — fires the turn's signal; the `result` settles `partial: true` with whatever content accumulated.                                                         |
 
+#### `StreamInterface`
+
+The generic live handle pairs its `events` and `result` data members with a cancellation method. `AgentStreamInterface` specializes it for `AgentChunk` and `AgentResult`.
+
+| Method  | Returns | Summary                                                   |
+| ------- | ------- | --------------------------------------------------------- |
+| `abort` | `void`  | Cancels the in-flight operation — fires its bound signal. |
+
 #### `ChannelInterface`
 
 The unbounded async channel. A producer writes with `push` and ends it with `close` or `fail`; a consumer reads it back live with `drain`. Write and read are decoupled, so the producer never waits for a consumer — an agent's eager pump writes each chunk into one, which is why the run's `result` settles whether or not `events` is ever drained. It carries no data members.
@@ -759,6 +767,36 @@ The id-keyed registry of `Conversation`s with an active pointer. `add(input?)` m
 | `save`          | `Promise<boolean>`                            | Persists a registered conversation's `ConversationInterface.snapshot` to the optional `ConversationStoreInterface` (`store`) — `true` when persisted, `false` when there is no store or the id is unknown, and never throwing.                      |
 | `remove`        | `boolean`                                     | Removes one conversation by id, or a batch — `true` only when every supplied id was removed; clears `active` when a removed conversation was the active one.                                                                                        |
 | `clear`         | `void`                                        | Removes every conversation and clears `active`.                                                                                                                                                                                                     |
+
+#### `ConversationStoreInterface`
+
+The persistence contract stores a `ConversationSnapshot` under its own identity.
+
+| Method   | Returns                                      | Summary                                                                                                                          |
+| -------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `get`    | `Promise<ConversationSnapshot \| undefined>` | Resolves the persisted snapshot for `id`, or `undefined` if none is stored.                                                      |
+| `set`    | `Promise<void>`                              | Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param — mirroring `WorkspaceStoreInterface`'s `set`). |
+| `delete` | `Promise<void>`                              | Drops a snapshot by id; an absent id is a no-op (no throw).                                                                      |
+
+#### `MemoryConversationStore`
+
+The in-memory implementation keeps an explicit table because its class name has no same-name interface contract.
+
+| Method   | Returns                                      | Summary                                                                                                                          |
+| -------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `get`    | `Promise<ConversationSnapshot \| undefined>` | Resolves the persisted snapshot for `id`, or `undefined` if none is stored.                                                      |
+| `set`    | `Promise<void>`                              | Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param — mirroring `WorkspaceStoreInterface`'s `set`). |
+| `delete` | `Promise<void>`                              | Drops a snapshot by id; an absent id is a no-op (no throw).                                                                      |
+
+#### `DatabaseConversationStore`
+
+The driver-backed implementation keeps an explicit table because its class name has no same-name interface contract.
+
+| Method   | Returns                                      | Summary                                                                                                      |
+| -------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `get`    | `Promise<ConversationSnapshot \| undefined>` | Resolves the persisted snapshot for `id`, narrowing the opaque JSON column back to a `ConversationSnapshot`. |
+| `set`    | `Promise<void>`                              | Inserts or replaces under the snapshot's own `id` (no separate id param) — the row is `{ id, snapshot }`.    |
+| `delete` | `Promise<void>`                              | Drops a snapshot by id; an absent id is a no-op (no throw).                                                  |
 
 ## Contract
 
@@ -944,6 +982,35 @@ agent.context.workspaces.add().write(`conversation:${b.id}.md`, block)
 Why this shape: `reference()` leads with `[Reference — conversation "<label>" — NOT part of this conversation]`, so the model treats the rollup + excerpts as a quoted foreign source (it answers "decided in the planning conversation", not "we decided here"). Keep the excerpts cherry-picked — this content enters another context window a small model must read, and a full dump re-bloats it. `reference()` is event-free and never calls a model; provenance lives in the `label` (default the conversation's `id`).
 
 **Within a conversation, the same provenance instinct applies to recaps.** `view()` folds each compacted section into a synthetic `assistant` recap — and prefixes it with `CONVERSATION_RECAP_PREFIX` (`[Summary of earlier messages] …`) so a small model reads it as a condensed recap of earlier turns rather than a literal turn to echo or treat as the live answer. The label is deliberately lean (a fixed handful of tokens — no per-section blow-up) and is a `view()`-only presentation concern (the rollup regeneration re-reads the unframed summaries). Empirically, on a 2B model this tightening is the difference between the model correctly attributing a recapped fact and mis-attributing it — at temperature 0 the recap label reliably steers correct attribution where the bare assistant turn does not.
+
+### Persisting a conversation through either store
+
+A conversation snapshot carries its generated identity, so the same `set` / `get` / `delete` workflow works through the in-memory store and the driver-backed store without hard-coding an id:
+
+```ts
+import {
+	createConversation,
+	createDatabaseConversationStore,
+	createMemoryConversationStore,
+} from '@orkestrel/agent'
+import { createMemoryDriver } from '@orkestrel/database'
+
+const conversation = createConversation()
+conversation.add({ role: 'user', content: 'hello' })
+const snapshot = conversation.snapshot()
+const stores = [
+	createMemoryConversationStore(),
+	createDatabaseConversationStore(createMemoryDriver()),
+]
+
+for (const store of stores) {
+	await store.set(snapshot)
+	const stored = await store.get(conversation.id)
+	JSON.stringify(stored) === JSON.stringify(snapshot) // true
+	await store.delete(conversation.id)
+	await store.get(conversation.id) // undefined
+}
+```
 
 ### Running many durable agents as jobs
 
