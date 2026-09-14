@@ -432,7 +432,7 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 // battery is IDENTICAL across each pair. Each pair's snapshot builder + shared battery are
 // promoted here so the contract lives in ONE place; every twin invokes the battery ONCE with its
 // own store factory and KEEPS its twin-specific blocks local. Real data only — NO mocks. All
-// plain `@src/core` (no `node:*` / DOM), so they load in every project. The assertions are
+// plain `@src/core` without Node or DOM imports, so they load in every project. The assertions are
 // plain-JSON `toEqual` (no class-identity `toBe`).
 
 /**
@@ -862,6 +862,7 @@ export class ScriptedWire extends AgentProvider<string> {
 	readonly #records: ReadonlyMap<string, ProviderIncrement | Error>
 	readonly #buffered: boolean
 	readonly #parsers: ScriptedFrame[] = []
+	readonly #decoded: string[] = []
 	readonly name = 'scripted'
 	constructor(options: ScriptedWireOptions) {
 		super(options)
@@ -870,6 +871,9 @@ export class ScriptedWire extends AgentProvider<string> {
 	}
 	get parsers(): readonly ScriptedFrame[] {
 		return this.#parsers
+	}
+	get decoded(): readonly string[] {
+		return this.#decoded
 	}
 	frame(): ScriptedFrame {
 		const parser = new ScriptedFrame(this.#buffered)
@@ -880,6 +884,7 @@ export class ScriptedWire extends AgentProvider<string> {
 		return request
 	}
 	read(record: string): ProviderIncrement {
+		this.#decoded.push(record)
 		const increment = this.#records.get(record)
 		if (increment instanceof Error) throw increment
 		return (
@@ -900,21 +905,34 @@ export class RecordedBody {
 	readonly #chunks: readonly Uint8Array[]
 	readonly #close: boolean
 	readonly #failure: Error | undefined
+	readonly #cancellation: Error | undefined
 	readonly stream: ReadableStream<Uint8Array>
+	readonly #pending = Promise.withResolvers<void>()
 	#index = 0
 	#bytes = 0
 	#cancelled = false
-	constructor(chunks: readonly Uint8Array[], close = true, failure?: Error) {
+	#reason: unknown
+	constructor(chunks: readonly Uint8Array[], close = true, failure?: Error, cancellation?: Error) {
 		this.#chunks = chunks
 		this.#close = close
 		this.#failure = failure
+		this.#cancellation = cancellation
 		this.stream = new ReadableStream(this, { highWaterMark: 0 })
 	}
 	get bytes(): number {
 		return this.#bytes
 	}
+	get count(): number {
+		return this.#index
+	}
 	get cancelled(): boolean {
 		return this.#cancelled
+	}
+	get pending(): Promise<void> {
+		return this.#pending.promise
+	}
+	get reason(): unknown {
+		return this.#reason
 	}
 	pull(controller: ReadableStreamDefaultController<Uint8Array>): void {
 		const chunk = this.#chunks[this.#index]
@@ -924,16 +942,75 @@ export class RecordedBody {
 			controller.enqueue(chunk)
 		} else if (this.#failure !== undefined) controller.error(this.#failure)
 		else if (this.#close) controller.close()
+		else this.#pending.resolve()
 	}
-	cancel(): void {
+	cancel(reason?: unknown): void | Promise<void> {
 		this.#cancelled = true
+		this.#reason = reason
+		if (this.#cancellation !== undefined) return Promise.reject(this.#cancellation)
 	}
+}
+
+/** Records the call signal received by a request-header hook. */
+export class RecordedHeaders {
+	readonly #signals: AbortSignal[] = []
+	readonly #entered = Promise.withResolvers<AbortSignal>()
+	readonly #result:
+		| Readonly<Record<string, string>>
+		| Promise<Readonly<Record<string, string>>>
+		| Error
+	constructor(
+		result:
+			| Readonly<Record<string, string>>
+			| Promise<Readonly<Record<string, string>>>
+			| Error = {},
+	) {
+		this.#result = result
+	}
+	get signals(): readonly AbortSignal[] {
+		return this.#signals
+	}
+	get entered(): Promise<AbortSignal> {
+		return this.#entered.promise
+	}
+	headers(
+		signal: AbortSignal,
+	): Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>> {
+		this.#signals.push(signal)
+		this.#entered.resolve(signal)
+		if (this.#result instanceof Error) throw this.#result
+		return this.#result
+	}
+}
+
+/** Rejects a transport with its own abort exception when the supplied signal expires. */
+export function rejectTransportOnAbort(
+	_input: RequestInfo | URL,
+	init?: RequestInit,
+): Promise<Response> {
+	const signal = requireValue(init?.signal)
+	return new Promise((_resolve, reject) => {
+		signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')), {
+			once: true,
+		})
+	})
+}
+
+/** Returns true to expose validators that trust an input array's own methods. */
+export function acceptHostileArray(): boolean {
+	return true
+}
+
+/** Throws when a hostile proxy field is read. */
+export function throwProxyRead(): never {
+	throw new Error('unreadable field')
 }
 
 /** Records requests and returns responses supplied by a fixture. */
 export class RecordedTransport {
 	readonly #respond: () => Response | Promise<Response>
 	readonly #requests: Request[] = []
+	readonly #signals: AbortSignal[] = []
 
 	readonly fetch: typeof globalThis.fetch
 	constructor(respond: () => Response | Promise<Response>) {
@@ -943,9 +1020,15 @@ export class RecordedTransport {
 	get requests(): readonly Request[] {
 		return this.#requests
 	}
+	get signals(): readonly AbortSignal[] {
+		return this.#signals
+	}
 
 	async #request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-		this.#requests.push(new Request(input, init))
+		const { signal, ...options } = init ?? {}
+		if (signal !== undefined && signal !== null) this.#signals.push(signal)
+		// Record headers and body without adding a Request-owned listener to the observed signal.
+		this.#requests.push(new Request(input, options))
 		return this.#respond()
 	}
 }

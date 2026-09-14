@@ -2171,15 +2171,17 @@ export interface ProviderIncrement {
  * @remarks
  * `timeout` is an integer duration in milliseconds. Default: 120_000.
  * `fetch` defaults to the global transport bound to its global receiver.
- * `headers` runs for each request inside its deadline and overrides the JSON content type
- * only when it returns that header. `format` is exposed to context assembly.
+ * `headers` runs for each request inside its deadline and receives the combined caller
+ * and deadline signal so token requests can share that bound. It overrides the JSON
+ * content type only when it returns that header. `format` is exposed to context assembly.
  */
 export interface ProviderOptions {
 	readonly timeout?: number
 	readonly fetch?: typeof globalThis.fetch
-	readonly headers?: () =>
-		| Readonly<Record<string, string>>
-		| Promise<Readonly<Record<string, string>>>
+	/** Resolves request headers using the call's combined cancellation signal. */
+	readonly headers?: (
+		signal: AbortSignal,
+	) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>
 	readonly format?: ContextFormat
 }
 
@@ -2214,7 +2216,13 @@ export interface AgentProviderInterface<
 }
 
 /** Names the machine-readable provider failure conditions. */
-export type ProviderErrorCode = 'HTTP' | 'PROTOCOL' | 'LIMIT' | 'PROVIDER'
+export type ProviderErrorCode =
+	/** Reports a non-OK HTTP response, including a relay request rejected with status 413. */
+	| 'HTTP'
+	/** Reports a missing body, malformed wire record, or missing required settled result. */
+	| 'PROTOCOL'
+	/** Reports an upstream provider failure carried by a relay error record. */
+	| 'PROVIDER'
 
 /** Carries a provider failure's HTTP status and underlying cause. */
 export interface ProviderErrorOptions {
@@ -2236,6 +2244,7 @@ export type RelayHandler = (request: Request) => Promise<Response>
 export interface RelayOptions {
 	readonly provider: ProviderInterface
 	readonly authorize: (request: Request) => boolean | Promise<boolean>
+	/** Bounds the request body in bytes; the handler answers 413 when the limit is exceeded. */
 	readonly limit?: number
 }
 
@@ -2249,5 +2258,6 @@ export interface RelayStreamOptions {
 /** Configures a relay destination and its fresh structural parser factory. */
 export interface RelayProviderOptions extends ProviderOptions {
 	readonly url: string
-	readonly frame: () => ProviderParserInterface
+	/** Creates a fresh parser for each relay response stream. */
+	readonly parser: () => ProviderParserInterface
 }

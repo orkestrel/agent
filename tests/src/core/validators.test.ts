@@ -1,7 +1,7 @@
 import { isConversationSnapshot, isMessage, isSection } from '@src/core'
 import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { buildConversationSnapshot } from '../../setup.js'
+import { acceptHostileArray, buildConversationSnapshot, throwProxyRead } from '../../setup.js'
 
 // The core read-boundary guards — `isMessage`, `isSection`, and `isConversationSnapshot`. Each is
 // TOTAL: adversarial input returns `false` and never throws, so an untrusted storage read narrows
@@ -17,6 +17,32 @@ const withCalls = (calls: unknown): unknown => ({
 })
 
 describe('isMessage — the per-message shape guard (total + defensive)', () => {
+	it('rejects images with a hostile own every method', () => {
+		const images = Object.assign([1], { every: acceptHostileArray })
+		expect(isMessage({ id: '1', role: 'user', content: '', images })).toBe(false)
+	})
+
+	it('rejects calls with a hostile own every method', () => {
+		const calls = Object.assign([null], { every: acceptHostileArray })
+		expect(isMessage({ id: '1', role: 'assistant', content: '', calls })).toBe(false)
+	})
+
+	it('rejects a throwing proxy and a revoked proxy', () => {
+		expect(isMessage(new Proxy({}, { get: throwProxyRead }))).toBe(false)
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		expect(isMessage(revoked.proxy)).toBe(false)
+		expect(isMessage({ id: '1', role: 'user', content: '', images: revoked.proxy })).toBe(false)
+		expect(
+			isMessage({
+				id: '1',
+				role: 'assistant',
+				content: '',
+				calls: new Proxy([], { get: throwProxyRead }),
+			}),
+		).toBe(false)
+	})
+
 	it('rejects an arbitrary role outside the domain union', () => {
 		expect(isMessage({ id: '1', role: 'other', content: '' })).toBe(false)
 	})

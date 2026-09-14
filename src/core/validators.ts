@@ -1,5 +1,5 @@
 import type { ConversationSnapshot, Message, Section } from './types.js'
-import { attempt, isArray, isRecord, isString } from '@orkestrel/contract'
+import { arrayOf, attempt, isArray, isRecord, isString } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 
 /**
@@ -26,8 +26,8 @@ export function isMessage(value: unknown): value is Message {
 		if (!isString(id) || !isString(content)) return false
 		if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool')
 			return false
-		if (calls !== undefined && !(isArray(calls) && calls.every(isToolCall))) return false
-		return images === undefined || (isArray(images) && images.every(isString))
+		if (calls !== undefined && !arrayOf(isToolCall)(calls)) return false
+		return images === undefined || arrayOf(isString)(images)
 	})
 	return checked.success && checked.value
 }

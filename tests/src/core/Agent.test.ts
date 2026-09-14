@@ -877,6 +877,28 @@ describe('Agent — iteration cap', () => {
 })
 
 describe('Agent — abort', () => {
+	it('omits empty thinking from an abort partial', async () => {
+		const abort = new AbortController()
+		const failure = new ProviderAbortError({ content: 'x', thinking: '' })
+		const provider: ProviderInterface = {
+			id: 'empty-thinking',
+			name: 'empty-thinking',
+			async *stream() {
+				yield { channel: 'content', text: 'x' }
+				abort.abort()
+				throw failure
+			},
+			async generate() {
+				throw failure
+			},
+		}
+		const agent = createAgent(provider, { signal: abort.signal })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await agent.generate()
+		expect(result).toEqual({ content: 'x', partial: true })
+		expect('thinking' in result).toBe(false)
+	})
+
 	it('a pre-aborted external signal commits a partial without calling the provider', async () => {
 		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
 		const controller = new AbortController()

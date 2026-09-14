@@ -477,7 +477,7 @@ export class Agent implements AgentInterface {
 				// non-abort error (the signal is not aborted) propagates so the run rejects.
 				if (abort.signal.aborted) {
 					if (isProviderAbortError(error)) {
-						if (error.partial.thinking !== undefined) {
+						if (error.partial.thinking !== undefined && error.partial.thinking.length > 0) {
 							thinking = joinThinking(thinking, error.partial.thinking)
 						}
 						// The abort's partial usage — when the provider observed it mid-stream — is

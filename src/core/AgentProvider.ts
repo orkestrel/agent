@@ -25,11 +25,40 @@ import { buildProviderResult, joinThinking, readChunks, readText } from './helpe
  * @remarks
  * Every call owns its parser, splitter, deadline, and accumulation. Success bodies
  * have no size limit. A qwen3 implicit-open reclassification corrects the final
- * content while content deltas already yielded cannot be recalled.
+ * content while content deltas already yielded cannot be recalled. A subclass fills
+ * `name`, `frame`, `body`, `read`, and `finish`; the constructor takes the `split`
+ * and `strict` switches to control reasoning separation and settled-result requirements.
  *
  * @example
  * ```ts
- * const result = await provider.generate(messages, signal)
+ * import type { ProviderIncrement, ProviderParserInterface, ProviderRequest } from '@orkestrel/agent'
+ * import { AgentProvider } from '@orkestrel/agent'
+ *
+ * class TextFrame implements ProviderParserInterface<string> {
+ * 	parse(chunk: string): readonly string[] {
+ * 		return [chunk]
+ * 	}
+ * 	clear(): void {} // Raw text retains no framing state.
+ * }
+ *
+ * class TextProvider extends AgentProvider<string> {
+ * 	readonly name = 'text'
+ * 	constructor(url: string) {
+ * 		super({ url, path: '/generate' })
+ * 	}
+ * 	frame(): ProviderParserInterface<string> {
+ * 		return new TextFrame()
+ * 	}
+ * 	body(request: ProviderRequest): object {
+ * 		return { messages: request.messages }
+ * 	}
+ * 	read(record: string): ProviderIncrement {
+ * 		return { content: record, thinking: '', tools: [] }
+ * 	}
+ * 	finish(_parser: ProviderParserInterface<string>): readonly string[] {
+ * 		return [] // Raw text retains no records at end of input.
+ * 	}
+ * }
  * ```
  */
 export abstract class AgentProvider<
@@ -138,11 +167,7 @@ export abstract class AgentProvider<
 			if (response.body === null) {
 				throw new ProviderError('PROTOCOL', 'provider error: no response body')
 			}
-			// The native pipe propagates cancellation even while a reader is awaiting bytes.
-			const body = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>(), {
-				signal: combined,
-			})
-			for await (const chunk of readChunks(body)) {
+			for await (const chunk of readChunks(response.body, combined)) {
 				combined.throwIfAborted()
 				for (const record of parser.parse(chunk)) {
 					yield* this.#fold(record, state, splitter, combined, (increment) => {
@@ -152,6 +177,7 @@ export abstract class AgentProvider<
 					if (state.result !== undefined) return state.result
 				}
 			}
+			combined.throwIfAborted()
 			for (const record of this.finish(parser)) {
 				yield* this.#fold(record, state, splitter, combined, (increment) => {
 					state = increment
@@ -171,7 +197,7 @@ export abstract class AgentProvider<
 				state.usage,
 			)
 		} catch (error) {
-			if (combined.aborted && error === combined.reason && !(error instanceof ProviderAbortError)) {
+			if (combined.aborted) {
 				splitter?.flush()
 				throw new ProviderAbortError(
 					buildProviderResult(
@@ -232,7 +258,8 @@ export abstract class AgentProvider<
 		if (!response.ok) {
 			let detail: string
 			try {
-				detail = response.body === null ? '' : await readText(response.body, MAX_ERROR_BODY_LENGTH)
+				detail =
+					response.body === null ? '' : await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)
 			} catch (cause) {
 				throw new ProviderError(
 					'HTTP',
@@ -240,6 +267,7 @@ export abstract class AgentProvider<
 					{ status: response.status, cause },
 				)
 			}
+			signal.throwIfAborted()
 			throw new ProviderError('HTTP', `provider error: ${response.status} - ${detail}`, {
 				status: response.status,
 			})
@@ -259,7 +287,11 @@ export abstract class AgentProvider<
 		})
 		try {
 			signal.throwIfAborted()
-			const entries = await Promise.race([Promise.resolve().then(this.#headers), aborted.promise])
+			const hook = this.#headers
+			const entries = await Promise.race([
+				Promise.resolve().then(() => hook(signal)),
+				aborted.promise,
+			])
 			for (const [key, value] of Object.entries(entries)) headers.set(key, value)
 			return headers
 		} finally {

@@ -813,6 +813,7 @@ export function buildProviderResult(
  *
  * @param body - The readable byte stream
  * @param limit - The maximum byte prefix, or undefined for the complete stream
+ * @param signal - The optional cancellation bound; abort returns the decoded prefix
  * @returns The decoded prefix
  * @example
  * ```ts
@@ -820,21 +821,41 @@ export function buildProviderResult(
  * if (body !== null) await readText(body, 3) // 'ans'
  * ```
  */
-export async function readText(body: ReadableStream<Uint8Array>, limit?: number): Promise<string> {
+export async function readText(
+	body: ReadableStream<Uint8Array>,
+	limit?: number,
+	signal?: AbortSignal,
+): Promise<string> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
+	const cleanup = new AbortController()
 	let remaining = limit ?? Infinity
 	let text = ''
 	try {
+		signal?.addEventListener(
+			'abort',
+			() => {
+				void reader.cancel(signal.reason).catch(() => {
+					// Preserve the decoded prefix when source cancellation rejects.
+				})
+			},
+			{ once: true, signal: cleanup.signal },
+		)
+		if (signal?.aborted) {
+			await reader.cancel(signal.reason).catch(() => {
+				// An already-aborted read still returns its empty prefix.
+			})
+		}
 		while (remaining > 0) {
 			const step = await reader.read()
-			if (step.done) break
+			if (step.done || signal?.aborted) break
 			const bytes = step.value.subarray(0, remaining)
 			text += decoder.decode(bytes, { stream: true })
 			remaining -= bytes.byteLength
 		}
 		return text + decoder.decode()
 	} finally {
+		cleanup.abort()
 		try {
 			await reader.cancel()
 		} catch {
@@ -849,6 +870,7 @@ export async function readText(body: ReadableStream<Uint8Array>, limit?: number)
  * Decodes UTF-8 chunks with a final flush and releases the stream on every exit.
  *
  * @param body - The readable byte stream
+ * @param signal - The optional cancellation bound; abort ends iteration without further chunks
  * @returns Decoded text chunks, including a held decoder tail
  * @example
  * ```ts
@@ -856,12 +878,32 @@ export async function readText(body: ReadableStream<Uint8Array>, limit?: number)
  * if (body !== null) for await (const chunk of readChunks(body)) render(chunk)
  * ```
  */
-export async function* readChunks(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+export async function* readChunks(
+	body: ReadableStream<Uint8Array>,
+	signal?: AbortSignal,
+): AsyncGenerator<string> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
+	const cleanup = new AbortController()
 	try {
+		signal?.addEventListener(
+			'abort',
+			() => {
+				void reader.cancel(signal.reason).catch(() => {
+					// Preserve the iteration outcome when source cancellation rejects.
+				})
+			},
+			{ once: true, signal: cleanup.signal },
+		)
+		if (signal?.aborted) {
+			await reader.cancel(signal.reason).catch(() => {
+				// An already-aborted iterator still ends without yielding.
+			})
+			return
+		}
 		for (;;) {
 			const step = await reader.read()
+			if (signal?.aborted) return
 			if (step.done) break
 			const chunk = decoder.decode(step.value, { stream: true })
 			if (chunk.length > 0) yield chunk
@@ -869,6 +911,7 @@ export async function* readChunks(body: ReadableStream<Uint8Array>): AsyncGenera
 		const tail = decoder.decode()
 		if (tail.length > 0) yield tail
 	} finally {
+		cleanup.abort()
 		try {
 			await reader.cancel()
 		} catch {

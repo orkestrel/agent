@@ -1,4 +1,5 @@
 import type { AgentResult, ContextSectionSourceInterface, Message } from '@src/core'
+import { getEventListeners } from 'node:events'
 import {
 	agentResultToJSON,
 	buildProviderResult,
@@ -567,6 +568,11 @@ describe('joinThinking — the separated reasoning across a run', () => {
 	it('treats an empty accumulated string as absent', () => {
 		expect(joinThinking('', 'next')).toBe('next')
 	})
+
+	it('omits the separator when the next carrier is empty', () => {
+		expect(joinThinking('x', '')).toBe('x')
+		expect(joinThinking('', '')).toBe('')
+	})
 })
 
 describe('sumUsage — the running token total across a turn', () => {
@@ -872,15 +878,7 @@ describe('intersectKeys — the scope narrow primitive', () => {
 	})
 })
 
-describe('joinThinking empty carriers', () => {
-	it('omits the separator when either carrier is empty', () => {
-		expect(joinThinking('', 'x')).toBe('x')
-		expect(joinThinking('x', '')).toBe('x')
-		expect(joinThinking('', '')).toBe('')
-	})
-})
-
-describe('provider stream helpers', () => {
+describe('buildProviderResult — the assembled provider turn', () => {
 	it('omits empty result optionals and retains populated calls and usage', () => {
 		expect(buildProviderResult('answer', '', [], undefined)).toEqual({ content: 'answer' })
 		const tools = [{ id: '1', name: 'lookup', arguments: {} }]
@@ -892,17 +890,60 @@ describe('provider stream helpers', () => {
 			usage,
 		})
 	})
-	it('reads a bounded byte prefix even when a chunk exceeds the limit', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 3)).toBe('abc')
+})
+
+describe('readText — bounded decoded text', () => {
+	it('cancels a pending text read on abort and returns the decoded prefix', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('prefix')], false)
+		const abort = new AbortController()
+		const result = readText(body.stream, undefined, abort.signal)
+		await body.pending
+		abort.abort(new Error('text cancelled'))
+		expect(body.cancelled).toBe(true)
+		expect(await result).toBe('prefix')
+		expect(body.reason).toBe(abort.signal.reason)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	}, 400)
+	it('cancels an already-aborted text read before pulling', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('unread')], false)
+		const abort = new AbortController()
+		abort.abort()
+		expect(await readText(body.stream, 3, abort.signal)).toBe('')
+		expect(body.count).toBe(0)
+		expect(body.cancelled).toBe(true)
+		expect(body.reason).toBe(abort.signal.reason)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	})
+	it('preserves a successful prefix when source cancellation rejects', async () => {
+		const signal = new AbortController().signal
+		const body = new RecordedBody(
+			[new TextEncoder().encode('abcdef')],
+			false,
+			undefined,
+			new Error('cancel failed'),
+		)
+		expect(await readText(body.stream, 3, signal)).toBe('abc')
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
+	})
+	it('reads a bounded byte prefix even when a chunk exceeds the limit', async () => {
+		const signal = new AbortController().signal
+		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
+		expect(await readText(body.stream, 3, signal)).toBe('abc')
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('cancels without pulling for a zero-byte limit', async () => {
+		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 0)).toBe('')
+		expect(await readText(body.stream, 0, signal)).toBe('')
 		expect(body.bytes).toBe(0)
 		expect(body.cancelled).toBe(true)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('decodes a multibyte prefix and flushes an incomplete final character', async () => {
 		const bytes = new TextEncoder().encode('🌍')
@@ -911,12 +952,89 @@ describe('provider stream helpers', () => {
 		const partial = new RecordedBody([bytes])
 		expect(await readText(partial.stream, 2)).toBe('�')
 	})
+	it('preserves read failures and releases the text reader lock', async () => {
+		const signal = new AbortController().signal
+		const error = new Error('read failed')
+		const text = new RecordedBody([], true, error)
+		await expect(readText(text.stream, undefined, signal)).rejects.toBe(error)
+		expect(text.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
+	})
+	it('reads an empty body as empty text', async () => {
+		expect(await readText(new RecordedBody([]).stream)).toBe('')
+	})
+})
+
+describe('readChunks — streamed decoded text', () => {
+	it('cancels a pending chunk read on abort and yields nothing further', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('prefix')], false)
+		const abort = new AbortController()
+		const chunks = readChunks(body.stream, abort.signal)
+		expect(await chunks.next()).toEqual({ done: false, value: 'prefix' })
+		const pending = chunks.next()
+		await body.pending
+		abort.abort(new Error('chunks cancelled'))
+		expect(body.cancelled).toBe(true)
+		expect(await pending).toEqual({ done: true, value: undefined })
+		expect(body.reason).toBe(abort.signal.reason)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	}, 400)
+	it('cancels already-aborted chunk iteration before pulling', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('unread')], false)
+		const abort = new AbortController()
+		abort.abort()
+		expect(await readChunks(body.stream, abort.signal).next()).toEqual({
+			done: true,
+			value: undefined,
+		})
+		expect(body.count).toBe(0)
+		expect(body.cancelled).toBe(true)
+		expect(body.reason).toBe(abort.signal.reason)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	})
+	it('discards a held decoder tail on abort even when source cancellation rejects', async () => {
+		const body = new RecordedBody(
+			[new Uint8Array([0xe2])],
+			false,
+			undefined,
+			new Error('cancel failed'),
+		)
+		const abort = new AbortController()
+		const chunks = readChunks(body.stream, abort.signal)
+		const pending = chunks.next()
+		await body.pending
+		abort.abort()
+		expect(await pending).toEqual({ done: true, value: undefined })
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	})
+	it('preserves a yielded chunk and consumer failure when source cancellation rejects', async () => {
+		const signal = new AbortController().signal
+		const body = new RecordedBody(
+			[new TextEncoder().encode('answer')],
+			false,
+			undefined,
+			new Error('cancel failed'),
+		)
+		const chunks = readChunks(body.stream, signal)
+		expect(await chunks.next()).toEqual({ done: false, value: 'answer' })
+		const failure = new Error('consumer failed')
+		await expect(chunks.throw(failure)).rejects.toBe(failure)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
+	})
 	it('flushes decoder state at the end of chunk iteration', async () => {
+		const signal = new AbortController().signal
 		const body = new RecordedBody([new Uint8Array([0xe2])])
 		const chunks: string[] = []
-		for await (const chunk of readChunks(body.stream)) chunks.push(chunk)
+		for await (const chunk of readChunks(body.stream, signal)) chunks.push(chunk)
 		expect(chunks).toEqual(['�'])
 		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('decodes split UTF-8 through chunk iteration', async () => {
 		const bytes = new TextEncoder().encode('🌍')
@@ -926,24 +1044,24 @@ describe('provider stream helpers', () => {
 		expect(chunks).toEqual(['🌍'])
 	})
 	it('releases a byte reader after early return', async () => {
+		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('answer')], false)
-		const chunks = readChunks(body.stream)
+		const chunks = readChunks(body.stream, signal)
 		expect(await chunks.next()).toEqual({ done: false, value: 'answer' })
 		await chunks.return(undefined)
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('preserves read failures and releases the lock', async () => {
+		const signal = new AbortController().signal
 		const error = new Error('read failed')
-		const text = new RecordedBody([], true, error)
-		await expect(readText(text.stream)).rejects.toBe(error)
-		expect(text.stream.locked).toBe(false)
 		const chunks = new RecordedBody([], true, error)
-		await expect(readChunks(chunks.stream).next()).rejects.toBe(error)
+		await expect(readChunks(chunks.stream, signal).next()).rejects.toBe(error)
 		expect(chunks.stream.locked).toBe(false)
+		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
-	it('reads empty bodies as empty text and empty iteration', async () => {
-		expect(await readText(new RecordedBody([]).stream)).toBe('')
+	it('reads an empty body as empty iteration', async () => {
 		expect(await readChunks(new RecordedBody([]).stream).next()).toEqual({
 			done: true,
 			value: undefined,

@@ -220,9 +220,19 @@ export function isAgentError(value: unknown): value is AgentError {
 	return value instanceof AgentError
 }
 
-/** Reports a coded provider failure with its HTTP status and underlying cause when available. */
+/**
+ * Reports a coded provider failure with its HTTP status and underlying cause when available.
+ *
+ * @remarks
+ * The provider base throws this error for a non-OK HTTP response, a missing response
+ * body, or a missing settled result when strict assembly is enabled. Concrete wire
+ * decoders also use it for malformed records and relayed provider failures.
+ * `status` is present only for an `HTTP` failure; other codes leave it undefined.
+ */
 export class ProviderError extends Error {
+	/** Identifies the HTTP, protocol, or upstream provider failure condition. */
 	readonly code: ProviderErrorCode
+	/** Holds the response status for an HTTP failure, or undefined for other codes. */
 	readonly status: number | undefined
 
 	constructor(code: ProviderErrorCode, message: string, options?: ProviderErrorOptions) {
