@@ -77,33 +77,25 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  *
  * @param options - The upstream provider, authorization decision, and optional byte budget
  * @returns A fetch-standard handler suitable for a router
- * @example Relaying a browser provider through your own server
+ * @example Mounting the relay on your server
  * ```ts
  * import type { ProviderInterface } from '@orkestrel/agent'
- * import { createRelay, createRelayProvider } from '@orkestrel/agent'
- * // The browser application supplies this parser dependency.
- * import { createNDJSONParser } from '@orkestrel/ndjson'
- * import type { DispatcherInterface } from '@orkestrel/router'
+ * import { createRelay } from '@orkestrel/agent'
  * import { createDispatcher } from '@orkestrel/router'
  *
- * export function connectRelay(
- * 	upstream: ProviderInterface,
- * 	bearer: string,
- * ): { readonly browser: ProviderInterface; readonly dispatcher: DispatcherInterface } {
- * 	const handler = createRelay({
- * 		provider: upstream,
- * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
- * 	})
- * 	const dispatcher = createDispatcher({
- * 		routes: [{ method: 'POST', path: '/relay', handler }],
- * 	})
- * 	const browser = createRelayProvider({
- * 		url: 'https://relay.example/relay',
- * 		parser: createNDJSONParser,
- * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
- * 		fetch: (input, init) => dispatcher.handle(new Request(input, init), undefined),
- * 	})
- * 	return { browser, dispatcher }
+ * declare const upstream: ProviderInterface // the server-side provider holding the credential
+ * declare const bearer: string
+ *
+ * const handler = createRelay({
+ * 	provider: upstream,
+ * 	authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
+ * })
+ * const dispatcher = createDispatcher({
+ * 	routes: [{ method: 'POST', path: '/relay', handler }],
+ * })
+ *
+ * export function serve(request: Request): Promise<Response> {
+ * 	return dispatcher.handle(request, undefined)
  * }
  * ```
  */
@@ -142,25 +134,28 @@ export function createRelay(options: RelayOptions): RelayHandler {
  *
  * @remarks
  * This is the browser end alone. {@link createRelay} mounts the server end, and its example
- * composes the two.
+ * is the server half this one pairs with.
  *
  * @param options - The endpoint, parser factory, and HTTP call configuration
  * @returns The concrete relay provider
- * @example
+ * @example Reaching the relay from the browser
  * ```ts
- * import type { ProviderResult } from '@orkestrel/agent'
+ * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createRelayProvider } from '@orkestrel/agent'
+ * import { createAbort } from '@orkestrel/abort'
  * // The browser application supplies this parser dependency.
  * import { createNDJSONParser } from '@orkestrel/ndjson'
  *
- * export function ask(bearer: string, signal: AbortSignal): Promise<ProviderResult> {
- * 	const browser = createRelayProvider({
- * 		url: 'https://relay.example/relay',
- * 		parser: createNDJSONParser,
- * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
- * 	})
- * 	return browser.generate([{ id: 'ask', role: 'user', content: 'ping' }], signal)
- * }
+ * declare const bearer: string
+ * const abort = createAbort()
+ * const messages = [{ id: '1', role: 'user', content: 'Say hello.' }] as const
+ *
+ * const browser: ProviderInterface = createRelayProvider({
+ * 	url: 'https://app.example/relay',
+ * 	parser: createNDJSONParser,
+ * 	headers: () => ({ authorization: `Bearer ${bearer}` }),
+ * })
+ * const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's
  * ```
  */
 export function createRelayProvider(options: RelayProviderOptions): RelayProvider {

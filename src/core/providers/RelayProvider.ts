@@ -21,8 +21,8 @@ import { ProviderAbortError, ProviderError } from '../errors.js'
  * signal is aborted.
  * Content is preserved verbatim, including literal thinking tags.
  * A refusal reaches the browser as a `ProviderError` instance with the `HTTP` code and status.
- * This is the browser end alone; {@link createRelay} mounts the server end and its example
- * composes the two.
+ * This is the browser end alone; {@link createRelay} mounts the server end, and
+ * {@link createRelayProvider}'s example is the browser half of that pair.
  *
  * @example
  * ```ts

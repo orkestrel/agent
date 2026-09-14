@@ -57,6 +57,8 @@ await new GuideCommand({
 		createRelay,
 		createRelayProvider,
 		ProviderError,
+		providerRequestContract,
+		RELAY_CONTENT_TYPE,
 		relayFrameContract,
 		sanitizeToken,
 	} = barrel
@@ -94,6 +96,25 @@ await new GuideCommand({
 			return [] // Raw text retains no records at end of input.
 		}
 	}
+	// The engine-configuration fence declares `createTextProvider` rather than defining it, so the
+	// transcription supplies the concrete subclass that factory would return and hands it the
+	// fence's option object unchanged. Its wire is raw text, so it reuses the subclass fence's frame.
+	class ConfiguredProvider extends AgentProvider<string> {
+		readonly name = 'configured'
+		frame(): ProviderParserInterface<string> {
+			return new TextFrame()
+		}
+		body(request: ProviderRequest): object {
+			return { messages: request.messages }
+		}
+		read(record: string): ProviderIncrement {
+			return { content: record, thinking: '', tools: [] }
+		}
+		finish(_parser: ProviderParserInterface<string>): readonly string[] {
+			return []
+		}
+	}
+
 	const manifest = parseJSON(requireValue(files['package.json'], 'Missing inventory: package.json'))
 	if (!isRecord(manifest)) throw new Error('Invalid package manifest: package.json')
 
@@ -361,7 +382,67 @@ await new GuideCommand({
 			expect(guideText).toContain("return { content: record, thinking: '', tools: [] }")
 		})
 
-		it('round trips the relay fence’s composition in process', async () => {
+		it('answers the engine-configuration fence’s declared switches', async () => {
+			const urls: string[] = []
+			const sent: Array<string | null> = []
+			const hooks: AbortSignal[] = []
+			const bounds: Array<AbortSignal | null | undefined> = []
+			const caller = new AbortController()
+			const provider = new ConfiguredProvider({
+				url: 'https://api.example',
+				path: '/generate',
+				timeout: 30_000,
+				headers: async (signal) => {
+					hooks.push(signal)
+					return { authorization: await Promise.resolve('Bearer fixture') }
+				},
+				split: true,
+				strict: false,
+				// The fence omits `fetch` and takes the global transport; the transcription supplies
+				// one so the call stays in process.
+				fetch: (input, init) => {
+					const request = new Request(input, init)
+					urls.push(request.url)
+					sent.push(request.headers.get('authorization'))
+					bounds.push(init?.signal)
+					return Promise.resolve(new Response('<think>considering</think>the answer'))
+				},
+			})
+			const result = await provider.generate([], caller.signal)
+
+			// `path: '/generate'` appends to `url` on every call.
+			expect(urls).toEqual(['https://api.example/generate'])
+			// The `headers` hook is awaited and its value reaches the request.
+			expect(sent).toEqual(['Bearer fixture'])
+			// "awaited inside that deadline": the hook receives the same bound the transport does,
+			// and that bound is the call's own fold rather than the caller's signal.
+			expect(hooks[0]).toBe(bounds[0])
+			expect(hooks[0]).not.toBe(caller.signal)
+			expect(requireValue(bounds[0], 'Missing bound').aborted).toBe(false)
+			// `split: true` routes the <think> span to `thinking` and yields the clean answer, and
+			// `strict: false` assembles that result from a wire that carried no settled record.
+			expect(result).toEqual({ content: 'the answer', thinking: 'considering' })
+			expect(result.content).toBe('the answer')
+		})
+
+		it('carries the engine-configuration fence lines the transcription copies', () => {
+			expect(guideText).toContain("path: '/generate', // appended to `url` on every call")
+			expect(guideText).toContain(
+				"timeout: 30_000, // the base's own deadline; DEFAULT_PROVIDER_TIMEOUT when omitted",
+			)
+			expect(guideText).toContain(
+				'headers: async (signal) => ({ authorization: await token(signal) }), // awaited inside that deadline',
+			)
+			expect(guideText).toContain(
+				'split: true, // route <think> spans to `thinking`, yield the clean answer',
+			)
+			expect(guideText).toContain(
+				'strict: false, // assemble at end of input instead of requiring a settled record',
+			)
+			expect(guideText).toContain('declare function token(signal: AbortSignal): Promise<string>')
+		})
+
+		it('round trips both relay fence halves and carries the route the server half declares', async () => {
 			const upstream = createScriptedProvider([
 				{ result: { content: 'relayed answer' }, deltas: ['relayed', ' answer'] },
 			])
@@ -370,11 +451,16 @@ await new GuideCommand({
 				provider: upstream,
 				authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
 			})
+			const received: Request[] = []
 			const browser = createRelayProvider({
-				url: 'https://relay.example/relay',
+				url: 'https://app.example/relay',
 				parser: createParser,
 				headers: () => ({ authorization: `Bearer ${bearer}` }),
-				fetch: (input, init) => handler(new Request(input, init)),
+				fetch: (input, init) => {
+					const request = new Request(input, init)
+					received.push(request)
+					return handler(request)
+				},
 			})
 
 			// The browser end drives `ProviderInterface` exactly like a local provider, and the
@@ -383,6 +469,51 @@ await new GuideCommand({
 				content: 'relayed answer',
 			})
 			expect(browser.name).toBe('relay')
+
+			// The server half declares `{ method: 'POST', path: '/relay', handler }`. The dispatcher
+			// itself is not executed here, so the route is asserted against what the browser half
+			// actually sends: the request the handler receives carries that method and that path.
+			const request = requireValue(received[0], 'Missing relay request')
+			expect(request.method).toBe('POST')
+			expect(new URL(request.url).pathname).toBe('/relay')
+		})
+
+		it('decodes a scripted relay body through the fence’s browser half alone', async () => {
+			const body = [
+				JSON.stringify({ channel: 'thinking', text: 'considering ' }),
+				JSON.stringify({ channel: 'content', text: 'relayed answer' }),
+				JSON.stringify({
+					channel: 'result',
+					result: { content: 'relayed answer', thinking: 'considering ' },
+				}),
+				'',
+			].join('\n')
+			const bearer = 'fixture'
+			const sent: Array<string | null> = []
+			const browser = createRelayProvider({
+				url: 'https://app.example/relay',
+				parser: createParser,
+				headers: () => ({ authorization: `Bearer ${bearer}` }),
+				fetch: (input, init) => {
+					sent.push(new Request(input, init).headers.get('authorization'))
+					return Promise.resolve(
+						new Response(body, { headers: { 'content-type': RELAY_CONTENT_TYPE } }),
+					)
+				},
+			})
+			const deltas: string[] = []
+			const stream = browser.stream([], new AbortController().signal)
+			let step = await stream.next()
+			while (!step.done) {
+				deltas.push(`${step.value.channel}:${step.value.text}`)
+				step = await stream.next()
+			}
+
+			// The browser half constructs on `split: false` and `strict: true`, so each frame's text
+			// survives verbatim and the settled result is the one the `result` frame carried.
+			expect(sent).toEqual(['Bearer fixture'])
+			expect(deltas).toEqual(['thinking:considering ', 'content:relayed answer'])
+			expect(step.value).toEqual({ content: 'relayed answer', thinking: 'considering ' })
 		})
 
 		it('refuses the relay fence’s hop when the bearer does not match', async () => {
@@ -392,15 +523,15 @@ await new GuideCommand({
 				authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
 			})
 			const browser = createRelayProvider({
-				url: 'https://relay.example/relay',
+				url: 'https://app.example/relay',
 				parser: createParser,
 				headers: () => ({ authorization: 'Bearer wrong' }),
 				fetch: (input, init) => handler(new Request(input, init)),
 			})
 			const refused = browser.generate([], new AbortController().signal)
 
-			// A refusal reaches the browser as a ProviderError with the HTTP code and that status,
-			// and the upstream provider is never entered.
+			// An authorization refusal reaches the browser as a ProviderError with the HTTP code and
+			// that status, and it leaves the upstream provider unentered.
 			await expect(refused).rejects.toBeInstanceOf(ProviderError)
 			await expect(refused).rejects.toMatchObject({
 				code: 'HTTP',
@@ -442,15 +573,47 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,",
 			)
-			expect(guideText).toContain('const browser = createRelayProvider({')
+			expect(guideText).toContain("routes: [{ method: 'POST', path: '/relay', handler }],")
+			expect(guideText).toContain('return dispatcher.handle(request, undefined)')
+			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
+			expect(guideText).toContain("url: 'https://app.example/relay',")
 			expect(guideText).toContain('parser: createNDJSONParser,')
 		})
 
-		it('answers the wire-contract fence’s guard readings', () => {
+		it('answers the wire-contract fence’s guard and projection readings', () => {
 			expect(relayFrameContract.is({ channel: 'error', message: 'relay provider failed' })).toBe(
 				true,
 			)
 			expect(relayFrameContract.is({ channel: 'error', message: 'oops', code: 'X' })).toBe(false)
+			// `parse` answers the same record stripped to the wire shape: the extra member is
+			// projected away rather than carried through.
+			expect(relayFrameContract.parse({ channel: 'error', message: 'oops', code: 'X' })).toEqual({
+				channel: 'error',
+				message: 'oops',
+			})
+		})
+
+		it('projects a settled turn into the frame the wire-contract fence writes back', async () => {
+			const upstream = createScriptedProvider([{ content: 'projected answer' }])
+			const written: string[] = []
+			const body: unknown = { messages: [{ id: '1', role: 'user', content: 'ping' }] }
+			const signal = new AbortController().signal
+
+			// The fence guards the inbound body with `is`, runs the turn, and projects the settled
+			// result into one newline-delimited frame.
+			expect(providerRequestContract.is(body)).toBe(true)
+			if (providerRequestContract.is(body)) {
+				const result = await upstream.generate(body.messages, signal, body.tools, body.options)
+				const frame = relayFrameContract.parse({ channel: 'result', result })
+				written.push(`${JSON.stringify(frame)}\n`)
+			}
+
+			expect(written).toEqual([
+				`${JSON.stringify({
+					channel: 'result',
+					result: { content: 'projected answer' },
+				})}\n`,
+			])
 		})
 
 		it('carries the wire-contract fence lines the transcription copies', () => {
@@ -459,6 +622,12 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"relayFrameContract.is({ channel: 'error', message: 'oops', code: 'X' }) // false — an extra member is refused",
+			)
+			expect(guideText).toContain(
+				"relayFrameContract.parse({ channel: 'error', message: 'oops', code: 'X' }) // { channel: 'error', message: 'oops' } — parse projects the extra member away",
+			)
+			expect(guideText).toContain(
+				"const frame = relayFrameContract.parse({ channel: 'result', result })",
 			)
 		})
 	})

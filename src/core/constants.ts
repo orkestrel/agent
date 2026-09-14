@@ -93,29 +93,61 @@ export const MESSAGE_TOKEN_OVERHEAD = 4
  */
 export const IMAGE_TOKEN_ESTIMATE = 512
 
-/** Holds the default provider deadline in milliseconds. */
+/**
+ * Holds the default provider deadline in milliseconds — `120_000`, the wall-clock bound a call
+ * runs under when `AgentProviderInput.timeout` is omitted, folded with the caller's signal so
+ * whichever trips first cancels the call.
+ */
 export const DEFAULT_PROVIDER_TIMEOUT = 120_000
 
-/** Bounds the decoded error excerpt's input in bytes. */
+/**
+ * Bounds the decoded error excerpt's input in bytes — `2048`, the leading bytes of a non-OK
+ * response body handed to the decoder before the read cancels the remainder, so a `ProviderError`
+ * message never carries a longer excerpt.
+ */
 export const MAX_ERROR_BODY_LENGTH = 2048
 
-/** Holds the default relay request limit in bytes. */
+/**
+ * Holds the default relay request limit in bytes — `1_048_576`, the byte budget a relay applies
+ * to an inbound body when `RelayOptions.limit` is omitted, refusing a body that reaches it.
+ */
 export const DEFAULT_RELAY_LIMIT = 1_048_576
 
-/** Names the relay's newline-delimited JSON content type. */
+/**
+ * Names the relay's newline-delimited JSON content type — `'application/x-ndjson; charset=utf-8'`,
+ * the header a relay response carries beside `cache-control: no-store`.
+ */
 export const RELAY_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8'
 
-/** Names the public message for an unexpected upstream relay failure. */
+/**
+ * Names the public message for an unexpected upstream relay failure — `'relay provider failed'`,
+ * the fixed text every `error` frame carries, so an upstream failure's own message never reaches
+ * the browser.
+ */
 export const RELAY_PROVIDER_MESSAGE = 'relay provider failed'
 
-/** Rejects a relay request whose authorization does not succeed. */
+/**
+ * Names the status a relay answers when `authorize` returns anything but `true` or throws —
+ * `401`, carried with no body and reaching the browser as a `ProviderError` with the `HTTP` code.
+ */
 export const UNAUTHORIZED_RELAY_STATUS = 401
 
-/** Identifies a relay provider call that could not be constructed. */
+/**
+ * Names the status a relay answers when the upstream provider call cannot be constructed — `502`,
+ * carried with no body after `provider.stream` was entered and threw before returning its
+ * iterator.
+ */
 export const UPSTREAM_RELAY_STATUS = 502
 
-/** Rejects a relay request whose body fails validation. */
+/**
+ * Names the status a relay answers for a body that is missing, unreadable, or rejected by
+ * `providerRequestContract` — `400`, carried with no body and reaching the browser as a
+ * `ProviderError` with the `HTTP` code.
+ */
 export const INVALID_RELAY_STATUS = 400
 
-/** Rejects a relay request that exceeds its byte budget. */
+/**
+ * Names the status a relay answers for a request body at or above its byte budget — `413`,
+ * carried with no body and answered for an aborted inbound read as well.
+ */
 export const OVERSIZED_RELAY_STATUS = 413

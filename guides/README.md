@@ -4,14 +4,14 @@ A dual-axis index into this repository's guides — by concept, and by directory
 
 ## By concept
 
-| Concept                                          | Spec                   | Source                    | Tests                                 |
-| ------------------------------------------------ | ---------------------- | ------------------------- | ------------------------------------- |
-| Agent, AgentProvider, RelayProvider, RelayStream | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
+| Concept                                                  | Spec                   | Source                    | Tests                                 |
+| -------------------------------------------------------- | ---------------------- | ------------------------- | ------------------------------------- |
+| `Agent`, `AgentProvider`, `RelayProvider`, `RelayStream` | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
 
-`Agent` is the conversation loop, `AgentProvider` the host-independent HTTP engine a concrete
-provider extends, and `RelayProvider` and `RelayStream` the browser end and the server end of the
-relay hop `createRelay` mounts. One guide covers them because they share one module directory and
-one contract.
+The `Agent` class is the conversation loop, the `AgentProvider` class the host-independent HTTP
+engine a concrete provider extends, and the `RelayProvider` and `RelayStream` classes the browser
+end and the server end of the relay hop the `createRelay` function mounts. The `agent.md` guide
+covers them together because they sit in the same module directory under the same contract.
 
 ## By directory
 

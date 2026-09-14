@@ -9,9 +9,9 @@
 Build an agent with the `createAgent` function over a `ProviderInterface` implementation,
 seed the conversation through `agent.context.messages`, then run the turn as a one-shot
 `generate` or a live `stream`. Extend the `AgentProvider` class to reach a new wire, or
-`createRelayProvider` and `createRelay` to reach a model through your own server. Callable
-tools come from `@orkestrel/tool` and documents from `@orkestrel/workspace`. Part of the
-`@orkestrel` line.
+compose the `createRelayProvider` and `createRelay` functions to reach a model through your
+own server. Callable tools come from `@orkestrel/tool` and documents from
+`@orkestrel/workspace`. Part of the `@orkestrel` line.
 
 ## Install
 
