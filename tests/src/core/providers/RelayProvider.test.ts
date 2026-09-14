@@ -1,5 +1,5 @@
 import type { ProviderRequest, RelayFrame } from '@src/core'
-import { parseJSONAs } from '@orkestrel/contract'
+import { ContractError, parseJSONAs } from '@orkestrel/contract'
 import { requireValue, roundTripJSON } from '@orkestrel/test'
 import {
 	createRelayProvider,
@@ -17,36 +17,105 @@ import {
 	createStreamingTransport,
 	createToolCall,
 	drainProvider,
+	RecordedTransport,
 } from '../../../setup.js'
 
+// One settled NDJSON turn, enough for a call that must reach the transport and return.
+const RELAY_RESULT_FRAME = '{"channel":"result","result":{"content":"answer"}}\n'
+
 describe('RelayProvider', () => {
-	it('rejects a synthetic parameters serializer before fetching', async () => {
-		const transport = createRefusingTransport()
+	it('sends the snapshot of hostile parameters and never consults their serializer', async () => {
+		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
 			parser: createParser,
 			fetch: transport.fetch,
 		})
-		const result = provider.generate([], new AbortController().signal, [
-			{ name: 'hostile', parameters: createHostileSerializer() },
-		])
-		await expect(result).rejects.toBeInstanceOf(ProviderError)
-		await expect(result).rejects.toMatchObject({ code: 'PROTOCOL' })
-		expect(transport.signals).toEqual([])
+		const request: ProviderRequest = {
+			messages: [],
+			tools: [{ name: 'hostile', parameters: createHostileSerializer() }],
+		}
+		expect(
+			await provider.generate(request.messages, new AbortController().signal, request.tools),
+		).toEqual({ content: 'answer' })
+		const sent = await requireValue(transport.requests[0]).text()
+		expect(sent).toBe(JSON.stringify(provider.body(request)))
+		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
+			messages: [],
+			tools: [{ name: 'hostile', parameters: { x: 1 } }],
+		})
 	})
-	it('rejects a synthetic schema serializer before fetching', async () => {
-		const transport = createRefusingTransport()
+	it('sends the snapshot of a hostile schema and never consults its serializer', async () => {
+		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
 			parser: createParser,
 			fetch: transport.fetch,
 		})
-		await expect(
-			provider.generate([], new AbortController().signal, undefined, {
-				schema: createHostileSerializer(),
-			}),
-		).rejects.toMatchObject({ name: 'ProviderError', code: 'PROTOCOL' })
-		expect(transport.signals).toEqual([])
+		const request: ProviderRequest = {
+			messages: [],
+			options: { schema: createHostileSerializer() },
+		}
+		expect(
+			await provider.generate(
+				request.messages,
+				new AbortController().signal,
+				undefined,
+				request.options,
+			),
+		).toEqual({ content: 'answer' })
+		const sent = await requireValue(transport.requests[0]).text()
+		expect(sent).toBe(JSON.stringify(provider.body(request)))
+		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
+			messages: [],
+			options: { schema: { x: 1 } },
+		})
+	})
+	it('sends the snapshot of hostile call arguments and never consults their serializer', async () => {
+		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
+		const provider = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: transport.fetch,
+		})
+		const request: ProviderRequest = {
+			messages: [
+				{
+					id: 'message',
+					role: 'assistant',
+					content: '',
+					calls: [createToolCall({ arguments: createHostileSerializer() })],
+				},
+			],
+		}
+		expect(await provider.generate(request.messages, new AbortController().signal)).toEqual({
+			content: 'answer',
+		})
+		const sent = await requireValue(transport.requests[0]).text()
+		expect(sent).toBe(JSON.stringify(provider.body(request)))
+		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
+			messages: [
+				{
+					id: 'message',
+					role: 'assistant',
+					content: '',
+					calls: [createToolCall({ arguments: { x: 1 } })],
+				},
+			],
+		})
+	})
+	it('carries the projection failure as the refusal cause', () => {
+		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		let refusal: unknown
+		try {
+			provider.body({ messages: [], tools: [{ name: 'invalid', parameters: { value: Infinity } }] })
+		} catch (error) {
+			refusal = error
+		}
+		if (!(refusal instanceof ProviderError)) throw new Error('the projection was not refused')
+		expect(refusal.code).toBe('PROTOCOL')
+		expect(refusal.message).toBe('relay request is not JSON')
+		expect(refusal.cause).toBeInstanceOf(ContractError)
 	})
 	it('owns a valid request snapshot without changing its JSON values', () => {
 		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })

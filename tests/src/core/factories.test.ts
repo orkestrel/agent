@@ -166,6 +166,7 @@ describe('createRelay', () => {
 	it('refuses valid JSON at exactly the default limit', async () => {
 		const provider = new RecordedProvider()
 		const body = '{"messages":[]}'.padEnd(DEFAULT_RELAY_LIMIT)
+		expect(new TextEncoder().encode(body).byteLength).toBe(DEFAULT_RELAY_LIMIT)
 		const response = await createRelay({ provider, authorize: () => true })(
 			createRelayRequest(body),
 		)

@@ -9,6 +9,9 @@ import { ProviderAbortError, ProviderError } from './errors.js'
  * @remarks
  * Cancellation aborts upstream before returning its iterator. Request listeners are
  * released on settlement. Unexpected provider failures carry a fixed public message.
+ * An inbound abort leaves the response body neither closed nor errored — a server runtime
+ * cancels that body when the client disconnects — so a consumer that aborts the inbound
+ * signal itself must cancel the body rather than keep reading it.
  *
  * @example
  * ```ts
@@ -25,13 +28,13 @@ export class RelayStream {
 	readonly #encoder = new TextEncoder()
 	readonly #iterator: AsyncGenerator<ProviderDelta, ProviderResult>
 	readonly #signal: AbortSignal
-	readonly #abort: () => void
+	readonly #listener: () => void
 	readonly #response: Response
 	#settled = false
 
 	constructor(options: RelayStreamOptions) {
 		this.#signal = options.signal
-		this.#abort = this.#cancel.bind(this)
+		this.#listener = this.#cancel.bind(this)
 		if (this.#signal.aborted) this.#abortProvider()
 		this.#iterator = options.provider.stream(
 			options.request.messages,
@@ -39,8 +42,7 @@ export class RelayStream {
 			options.request.tools,
 			options.request.options,
 		)
-		this.#signal.addEventListener('abort', this.#abort, { once: true })
-		if (this.#signal.aborted) this.#abortProvider()
+		this.#signal.addEventListener('abort', this.#listener, { once: true })
 		this.#response = new Response(
 			new ReadableStream<Uint8Array>({
 				pull: this.#pull.bind(this),
@@ -115,6 +117,6 @@ export class RelayStream {
 	}
 
 	#release(): void {
-		this.#signal.removeEventListener('abort', this.#abort)
+		this.#signal.removeEventListener('abort', this.#listener)
 	}
 }

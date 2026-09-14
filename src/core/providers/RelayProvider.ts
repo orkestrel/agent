@@ -13,36 +13,31 @@ import { ProviderAbortError, ProviderError } from '../errors.js'
  * Carries provider calls over an authenticated NDJSON relay endpoint.
  *
  * @remarks
- * The `ToolCall.caller` member never crosses the hop. Non-JSON arguments, parameters,
- * and schemas are refused before fetching. A remote abort reconstructs a
- * `ProviderAbortError` instance without aborting the local signal; the `Agent` runtime
- * treats that instance as an error unless its own bound signal is aborted.
+ * The `ToolCall.caller` member never crosses the hop. The wire body is an owned snapshot of
+ * the projection, so a custom serializer on an argument, a parameter schema, or a response
+ * schema is ignored rather than consulted, and a value outside JSON is refused before
+ * fetching. A remote abort reconstructs a `ProviderAbortError` instance without aborting the
+ * local signal; the `Agent` runtime treats that instance as an error unless its own bound
+ * signal is aborted.
  * Content is preserved verbatim, including literal thinking tags.
  * A refusal reaches the browser as a `ProviderError` instance with the `HTTP` code and status.
+ * This is the browser end alone; {@link createRelay} mounts the server end and its example
+ * composes the two.
  *
  * @example
  * ```ts
- * import type { ProviderInterface } from '@orkestrel/agent'
- * import { createRelay, RelayProvider } from '@orkestrel/agent'
+ * import type { ProviderResult } from '@orkestrel/agent'
+ * import { RelayProvider } from '@orkestrel/agent'
  * // The browser application supplies this parser dependency.
  * import { createNDJSONParser } from '@orkestrel/ndjson'
- * import { createDispatcher } from '@orkestrel/router'
  *
- * export function connectRelay(upstream: ProviderInterface, bearer: string) {
- * 	const handler = createRelay({
- * 		provider: upstream,
- * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
- * 	})
- * 	const dispatcher = createDispatcher({
- * 		routes: [{ method: 'POST', path: '/relay', handler }],
- * 	})
+ * export function ask(bearer: string, signal: AbortSignal): Promise<ProviderResult> {
  * 	const browser = new RelayProvider({
  * 		url: 'https://relay.example/relay',
  * 		parser: createNDJSONParser,
  * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
- * 		fetch: (input, init) => dispatcher.handle(new Request(input, init), undefined),
  * 	})
- * 	return { browser, dispatcher }
+ * 	return browser.generate([{ id: 'ask', role: 'user', content: 'ping' }], signal)
  * }
  * ```
  */
@@ -74,11 +69,18 @@ export class RelayProvider extends AgentProvider {
 	/**
 	 * Projects declared request fields and refuses values the JSON wire cannot carry.
 	 *
+	 * @remarks
+	 * The snapshot is taken from property descriptors, so a custom serializer a projected
+	 * value carries is ignored rather than consulted and cannot reach the wire.
+	 *
 	 * @param request - The domain conversation and call configuration
 	 * @returns The validated wire request with caller context omitted
-	 * @throws {ProviderError} Thrown when the projected request is not JSON
+	 * @throws {ProviderError} Thrown when the snapshot cannot be taken — a hostile read or a
+	 * value outside JSON — carrying that failure as its `cause`, and when the snapshot the
+	 * projection produced is not a valid wire request
 	 */
 	body(request: ProviderRequest): object {
+		let snapshot: unknown
 		try {
 			const projected = {
 				messages: request.messages.map((message) => ({
@@ -114,20 +116,14 @@ export class RelayProvider extends AgentProvider {
 							},
 						}),
 			}
-			if (
-				projected.tools?.some((tool) => typeof tool.parameters?.toJSON === 'function') ||
-				typeof projected.options?.schema?.toJSON === 'function'
-			) {
-				throw new ProviderError('PROTOCOL', 'relay request is not JSON')
-			}
-			const snapshot = cloneJSONValue(projected)
-			if (!providerRequestContract.is(snapshot)) {
-				throw new ProviderError('PROTOCOL', 'relay request is not JSON')
-			}
-			return snapshot
-		} catch {
+			snapshot = cloneJSONValue(projected)
+		} catch (cause) {
+			throw new ProviderError('PROTOCOL', 'relay request is not JSON', { cause })
+		}
+		if (!providerRequestContract.is(snapshot)) {
 			throw new ProviderError('PROTOCOL', 'relay request is not JSON')
 		}
+		return snapshot
 	}
 
 	/**

@@ -83,9 +83,13 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * import { createRelay, createRelayProvider } from '@orkestrel/agent'
  * // The browser application supplies this parser dependency.
  * import { createNDJSONParser } from '@orkestrel/ndjson'
+ * import type { DispatcherInterface } from '@orkestrel/router'
  * import { createDispatcher } from '@orkestrel/router'
  *
- * export function connectRelay(upstream: ProviderInterface, bearer: string) {
+ * export function connectRelay(
+ * 	upstream: ProviderInterface,
+ * 	bearer: string,
+ * ): { readonly browser: ProviderInterface; readonly dispatcher: DispatcherInterface } {
  * 	const handler = createRelay({
  * 		provider: upstream,
  * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
@@ -136,31 +140,26 @@ export function createRelay(options: RelayOptions): RelayHandler {
 /**
  * Creates a provider that carries calls through a relay endpoint.
  *
+ * @remarks
+ * This is the browser end alone. {@link createRelay} mounts the server end, and its example
+ * composes the two.
+ *
  * @param options - The endpoint, parser factory, and HTTP call configuration
  * @returns The concrete relay provider
  * @example
  * ```ts
- * import type { ProviderInterface } from '@orkestrel/agent'
- * import { createRelay, createRelayProvider } from '@orkestrel/agent'
+ * import type { ProviderResult } from '@orkestrel/agent'
+ * import { createRelayProvider } from '@orkestrel/agent'
  * // The browser application supplies this parser dependency.
  * import { createNDJSONParser } from '@orkestrel/ndjson'
- * import { createDispatcher } from '@orkestrel/router'
  *
- * export function connectRelay(upstream: ProviderInterface, bearer: string) {
- * 	const handler = createRelay({
- * 		provider: upstream,
- * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
- * 	})
- * 	const dispatcher = createDispatcher({
- * 		routes: [{ method: 'POST', path: '/relay', handler }],
- * 	})
+ * export function ask(bearer: string, signal: AbortSignal): Promise<ProviderResult> {
  * 	const browser = createRelayProvider({
  * 		url: 'https://relay.example/relay',
  * 		parser: createNDJSONParser,
  * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
- * 		fetch: (input, init) => dispatcher.handle(new Request(input, init), undefined),
  * 	})
- * 	return { browser, dispatcher }
+ * 	return browser.generate([{ id: 'ask', role: 'user', content: 'ping' }], signal)
  * }
  * ```
  */

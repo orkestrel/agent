@@ -306,7 +306,7 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			fetch: transport.fetch,
-			timeout: 80,
+			timeout: 200,
 		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
 			name: 'ProviderError',

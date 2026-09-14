@@ -98,8 +98,5 @@ export const relayFrameShape = unionShape(
 	objectShape({ channel: literalShape(['content', 'thinking']), text: stringShape() }),
 	objectShape({ channel: literalShape(['result']), result: providerResultShape }),
 	objectShape({ channel: literalShape(['abort']), partial: providerResultShape }),
-	objectShape({
-		channel: literalShape(['error']),
-		message: stringShape(),
-	}),
+	objectShape({ channel: literalShape(['error']), message: stringShape() }),
 ) satisfies ContractShape
