@@ -17,6 +17,8 @@ import {
 	createChannel,
 	createInstructionManager,
 	createScope,
+	createRelay,
+	DEFAULT_RELAY_LIMIT,
 	isAgentJobError,
 	ProviderAbortError,
 } from '@src/core'
@@ -30,8 +32,89 @@ import {
 } from '@orkestrel/contract'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
-import { createAgentJob, createScriptedProvider, createTokenUsage, loopTool } from '../../setup.js'
+import {
+	createAgentJob,
+	createRelayRequest,
+	createScriptedProvider,
+	createTokenUsage,
+	loopTool,
+} from '../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
+
+describe('createRelay', () => {
+	it('refuses false authorization before reading the body or calling the provider', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const request = createRelayRequest('invalid')
+		const response = await createRelay({ provider, authorize: () => false })(request)
+		expect(response.status).toBe(401)
+		expect(request.bodyUsed).toBe(false)
+		expect(provider.started).toBe(0)
+		expect(provider.calls).toEqual([])
+	})
+	it('fails closed when authorization throws', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const handler = createRelay({
+			provider,
+			authorize: () => {
+				throw new Error('secret')
+			},
+		})
+		const response = await handler(createRelayRequest())
+		expect(response.status).toBe(401)
+		expect(await response.text()).toBe('')
+		expect(provider.started).toBe(0)
+	})
+	it('fails closed when asynchronous authorization rejects', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const handler = createRelay({ provider, authorize: () => Promise.reject(new Error('secret')) })
+		expect((await handler(createRelayRequest())).status).toBe(401)
+		expect(provider.started).toBe(0)
+	})
+	it('rejects missing malformed and contract-invalid bodies before calling the provider', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const handler = createRelay({ provider, authorize: () => true })
+		expect((await handler(new Request('http://relay.test/'))).status).toBe(400)
+		expect((await handler(createRelayRequest('not json'))).status).toBe(400)
+		expect(
+			(await handler(createRelayRequest('{"messages":[{"id":"m","role":"invalid","content":""}]}')))
+				.status,
+		).toBe(400)
+		expect((await handler(createRelayRequest('{"messages":[],"extra":true}'))).status).toBe(400)
+		expect(provider.started).toBe(0)
+	})
+	it('rejects default limit plus one before calling the provider', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const body = '{"messages":[]}'.padEnd(DEFAULT_RELAY_LIMIT + 1)
+		expect(new TextEncoder().encode(body).byteLength).toBe(DEFAULT_RELAY_LIMIT + 1)
+		const response = await createRelay({ provider, authorize: () => true })(
+			createRelayRequest(body),
+		)
+		expect(response.status).toBe(413)
+		expect(provider.started).toBe(0)
+		expect(provider.calls).toEqual([])
+	})
+	it('accepts valid JSON at exactly the default limit', async () => {
+		const provider = createScriptedProvider([{ content: 'answer' }], { record: true })
+		const body = '{"messages":[]}'.padEnd(DEFAULT_RELAY_LIMIT)
+		expect(new TextEncoder().encode(body).byteLength).toBe(DEFAULT_RELAY_LIMIT)
+		const response = await createRelay({ provider, authorize: () => Promise.resolve(true) })(
+			createRelayRequest(body),
+		)
+		expect(response.status).toBe(200)
+		expect(await response.text()).toContain('"channel":"result"')
+		expect(provider.started).toBe(1)
+	})
+	it('uses completion rather than decoded length for a custom limit with a BOM', async () => {
+		const provider = createScriptedProvider([], { record: true })
+		const handler = createRelay({ provider, authorize: () => true, limit: 18 })
+		expect((await handler(createRelayRequest('\uFEFF{"messages":[]} '))).status).toBe(413)
+		expect(provider.started).toBe(0)
+		const response = await handler(createRelayRequest('\uFEFF{"messages":[]}'))
+		expect(response.status).toBe(200)
+		await response.text()
+		expect(provider.started).toBe(1)
+	})
+})
 
 // The Ollama-free agent factories — plain registry / store / context builders plus
 // createAgent, all needing no daemon. `createOllama` (the live-Ollama

@@ -23,6 +23,9 @@ import type {
 	InstructionManagerInterface,
 	InstructionManagerOptions,
 	ProviderInterface,
+	RelayHandler,
+	RelayOptions,
+	RelayProviderOptions,
 	ScopeInput,
 	ScopeInterface,
 	ScopeManagerInterface,
@@ -32,7 +35,7 @@ import type {
 import type { DriverInterface, TableInterface } from '@orkestrel/database'
 import type { QueueInterface } from '@orkestrel/queue'
 import type { RunnerInterface } from '@orkestrel/workflow'
-import { rawShape, stringShape } from '@orkestrel/contract'
+import { parseJSONAs, rawShape, stringShape } from '@orkestrel/contract'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { createQueue } from '@orkestrel/queue'
 import { createRunner } from '@orkestrel/workflow'
@@ -41,16 +44,69 @@ import { AgentContext } from './AgentContext.js'
 import { AgentRegistry } from './AgentRegistry.js'
 import { Authority } from './Authority.js'
 import { Channel } from './Channel.js'
+import {
+	DEFAULT_RELAY_LIMIT,
+	INVALID_RELAY_STATUS,
+	OVERSIZED_RELAY_STATUS,
+	UNAUTHORIZED_RELAY_STATUS,
+} from './constants.js'
+import { providerRequestContract } from './contracts.js'
 import { Conversation } from './conversations/Conversation.js'
 import { ConversationManager } from './conversations/ConversationManager.js'
 import { DatabaseConversationStore } from './conversations/stores/DatabaseConversationStore.js'
 import { MemoryConversationStore } from './conversations/stores/MemoryConversationStore.js'
-import { handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
+import { handleAgentQueueJob, handleAgentRunnerJob, readText } from './helpers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
+import { RelayProvider } from './providers/RelayProvider.js'
+import { RelayStream } from './RelayStream.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
+
+/**
+ * Creates an authorized relay handler that validates a bounded JSON request before streaming.
+ *
+ * @param options - The upstream provider, authorization decision, and optional byte budget
+ * @returns A fetch-standard handler suitable for a router
+ * @example
+ * ```ts
+ * const handler = createRelay({ provider, authorize: (request) => verify(request) })
+ * const response = await handler(request)
+ * ```
+ */
+export function createRelay(options: RelayOptions): RelayHandler {
+	const { provider, authorize, limit } = options
+	return async (request) => {
+		try {
+			if ((await authorize(request)) !== true) {
+				return new Response(undefined, { status: UNAUTHORIZED_RELAY_STATUS })
+			}
+		} catch {
+			return new Response(undefined, { status: UNAUTHORIZED_RELAY_STATUS })
+		}
+		if (request.body === null) return new Response(undefined, { status: INVALID_RELAY_STATUS })
+		const read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal)
+		if (!read.complete) return new Response(undefined, { status: OVERSIZED_RELAY_STATUS })
+		const parsed = parseJSONAs(read.text, providerRequestContract.is)
+		if (parsed === undefined) return new Response(undefined, { status: INVALID_RELAY_STATUS })
+		return new RelayStream({ provider, request: parsed, signal: request.signal }).response
+	}
+}
+
+/**
+ * Creates a provider that carries calls through a relay endpoint.
+ *
+ * @param options - The endpoint, parser factory, and HTTP call configuration
+ * @returns The concrete relay provider
+ * @example
+ * ```ts
+ * const provider = createRelayProvider({ url: 'https://relay.example/', parser: createParser })
+ * ```
+ */
+export function createRelayProvider(options: RelayProviderOptions): RelayProvider {
+	return new RelayProvider(options)
+}
 
 /**
  * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat

@@ -123,7 +123,7 @@ describe('AgentProvider', () => {
 			status: 503,
 			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
 		})
-		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH)
+		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH + 512)
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 	})

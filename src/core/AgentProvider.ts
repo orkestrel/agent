@@ -259,7 +259,9 @@ export abstract class AgentProvider<
 			let detail: string
 			try {
 				detail =
-					response.body === null ? '' : await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)
+					response.body === null
+						? ''
+						: (await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)).text
 			} catch (cause) {
 				throw new ProviderError(
 					'HTTP',

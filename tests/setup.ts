@@ -27,7 +27,9 @@ import {
 	createConversation,
 	InstructionManager,
 	ProviderAbortError,
+	ProviderError,
 } from '@src/core'
+import { isRecord, parseJSONAs } from '@orkestrel/contract'
 import { requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
@@ -171,6 +173,41 @@ export function createScriptedProvider(
 	return new ScriptedProvider(turns, options)
 }
 
+/** Frames newline-delimited JSON records without replacing relay behavior. */
+export class RelayParser implements ProviderParserInterface {
+	#pending = ''
+	parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
+		this.#pending += chunk
+		const lines = this.#pending.split('\n')
+		this.#pending = lines.pop() ?? ''
+		const records: Array<Readonly<Record<string, unknown>>> = []
+		for (const line of lines) {
+			if (line.trim().length === 0) continue
+			const record = parseJSONAs(line, isRecord)
+			if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+			records.push(record)
+		}
+		return records
+	}
+	clear(): void {
+		this.#pending = ''
+	}
+}
+
+/** Creates fresh NDJSON framing for a relay response. */
+export function createParser(): ProviderParserInterface {
+	return new RelayParser()
+}
+
+/** Creates a real POST request carrying the supplied relay body. */
+export function createRelayRequest(body = '{"messages":[]}', signal?: AbortSignal): Request {
+	return new Request('http://relay.test/', {
+		method: 'POST',
+		body,
+		...(signal === undefined ? {} : { signal }),
+	})
+}
+
 /**
  * Replays the turns {@link createScriptedProvider} scripts — a REAL {@link ProviderInterface}
  * that honours its signal between every delta and records its calls.
@@ -297,6 +334,92 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		const turn = this.#turns[Math.min(this.#index, this.#turns.length - 1)] ?? { content: '' }
 		this.#index += 1
 		return turn
+	}
+}
+
+/** Replays a provider turn and then raises the supplied boundary failure. */
+export class FailingProvider extends ScriptedProvider {
+	readonly #failure: Error
+	constructor(result: ProviderResult, failure: Error) {
+		super([result], { record: true })
+		this.#failure = failure
+	}
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		yield* super.stream(messages, signal, tools, options)
+		throw this.#failure
+	}
+}
+
+/** Records iterator entry and return while forwarding a real scripted generator. */
+export class RecordedProvider extends ScriptedProvider {
+	readonly #gate: Promise<void>
+	#active = 0
+	#maximum = 0
+	#steps = 0
+	#returns = 0
+	#cancelled = false
+	constructor(turns: readonly ScriptedTurn[], gate = Promise.resolve()) {
+		super(turns, { record: true })
+		this.#gate = gate
+	}
+	get active(): number {
+		return this.#active
+	}
+	get maximum(): number {
+		return this.#maximum
+	}
+	get steps(): number {
+		return this.#steps
+	}
+	get returns(): number {
+		return this.#returns
+	}
+	get cancelled(): boolean {
+		return this.#cancelled
+	}
+	override stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const iterator = super.stream(messages, signal, tools, options)
+		return {
+			next: this.#next.bind(this, iterator),
+			return: this.#return.bind(this, iterator, signal),
+			throw: iterator.throw.bind(iterator),
+			[Symbol.asyncIterator]() {
+				return this
+			},
+			[Symbol.asyncDispose]: iterator[Symbol.asyncDispose].bind(iterator),
+		}
+	}
+	async #next(
+		iterator: AsyncGenerator<ProviderDelta, ProviderResult>,
+	): Promise<IteratorResult<ProviderDelta, ProviderResult>> {
+		this.#steps += 1
+		this.#active += 1
+		this.#maximum = Math.max(this.#maximum, this.#active)
+		try {
+			await this.#gate
+			return await iterator.next()
+		} finally {
+			this.#active -= 1
+		}
+	}
+	async #return(
+		iterator: AsyncGenerator<ProviderDelta, ProviderResult>,
+		signal: AbortSignal,
+		result: ProviderResult | PromiseLike<ProviderResult>,
+	): Promise<IteratorResult<ProviderDelta, ProviderResult>> {
+		this.#returns += 1
+		this.#cancelled = signal.aborted
+		return iterator.return(result)
 	}
 }
 

@@ -2261,3 +2261,9 @@ export interface RelayProviderOptions extends ProviderOptions {
 	/** Creates a fresh parser for each relay response stream. */
 	readonly parser: () => ProviderParserInterface
 }
+
+/** Carries a decoded stream prefix and whether the stream ended within its byte budget. */
+export interface TextRead {
+	readonly text: string
+	readonly complete: boolean
+}

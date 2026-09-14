@@ -893,6 +893,46 @@ describe('buildProviderResult — the assembled provider turn', () => {
 })
 
 describe('readText — bounded decoded text', () => {
+	it('reports completion for exactly the byte limit followed by EOF', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('abc')])
+		expect(await readText(body.stream, 3)).toEqual({ text: 'abc', complete: true })
+		expect(body.stream.locked).toBe(false)
+	})
+	it('leaves completion false when an exact-limit lookahead is aborted', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('abc')], false)
+		const abort = new AbortController()
+		const result = readText(body.stream, 3, abort.signal)
+		await body.pending
+		abort.abort()
+		expect(await result).toEqual({ text: 'abc', complete: false })
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	}, 400)
+	it('reports completion for an empty body with a zero-byte limit', async () => {
+		const body = new RecordedBody([])
+		expect(await readText(body.stream, 0)).toEqual({ text: '', complete: true })
+	})
+	it('reports incompletion for limit plus one with one overshoot chunk', async () => {
+		const body = new RecordedBody([
+			new TextEncoder().encode('abc'),
+			new TextEncoder().encode('d'),
+			new TextEncoder().encode('unread'),
+		])
+		expect(await readText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
+		expect(body.count).toBe(2)
+		expect(body.bytes).toBe(4)
+		expect(body.cancelled).toBe(true)
+	})
+	it('measures BOM-prefixed completion from bytes despite identical decoded text', async () => {
+		const complete = new RecordedBody([new TextEncoder().encode('{"messages":[]}')])
+		const overflow = new RecordedBody([new TextEncoder().encode('\uFEFF{"messages":[]}  ')])
+		expect(await readText(complete.stream, 18)).toEqual({ text: '{"messages":[]}', complete: true })
+		expect(await readText(overflow.stream, 18)).toEqual({
+			text: '{"messages":[]}',
+			complete: false,
+		})
+	})
 	it('cancels a pending text read on abort and returns the decoded prefix', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('prefix')], false)
 		const abort = new AbortController()
@@ -900,7 +940,7 @@ describe('readText — bounded decoded text', () => {
 		await body.pending
 		abort.abort(new Error('text cancelled'))
 		expect(body.cancelled).toBe(true)
-		expect(await result).toBe('prefix')
+		expect(await result).toEqual({ text: 'prefix', complete: false })
 		expect(body.reason).toBe(abort.signal.reason)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
@@ -909,7 +949,7 @@ describe('readText — bounded decoded text', () => {
 		const body = new RecordedBody([new TextEncoder().encode('unread')], false)
 		const abort = new AbortController()
 		abort.abort()
-		expect(await readText(body.stream, 3, abort.signal)).toBe('')
+		expect(await readText(body.stream, 3, abort.signal)).toEqual({ text: '', complete: false })
 		expect(body.count).toBe(0)
 		expect(body.cancelled).toBe(true)
 		expect(body.reason).toBe(abort.signal.reason)
@@ -924,7 +964,7 @@ describe('readText — bounded decoded text', () => {
 			undefined,
 			new Error('cancel failed'),
 		)
-		expect(await readText(body.stream, 3, signal)).toBe('abc')
+		expect(await readText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
@@ -932,25 +972,25 @@ describe('readText — bounded decoded text', () => {
 	it('reads a bounded byte prefix even when a chunk exceeds the limit', async () => {
 		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 3, signal)).toBe('abc')
+		expect(await readText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
-	it('cancels without pulling for a zero-byte limit', async () => {
+	it('checks completion without decoding for a zero-byte limit', async () => {
 		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 0, signal)).toBe('')
-		expect(body.bytes).toBe(0)
+		expect(await readText(body.stream, 0, signal)).toEqual({ text: '', complete: false })
+		expect(body.bytes).toBe(6)
 		expect(body.cancelled).toBe(true)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('decodes a multibyte prefix and flushes an incomplete final character', async () => {
 		const bytes = new TextEncoder().encode('🌍')
 		const complete = new RecordedBody([bytes.subarray(0, 2), bytes.subarray(2)])
-		expect(await readText(complete.stream)).toBe('🌍')
+		expect(await readText(complete.stream)).toEqual({ text: '🌍', complete: true })
 		const partial = new RecordedBody([bytes])
-		expect(await readText(partial.stream, 2)).toBe('�')
+		expect(await readText(partial.stream, 2)).toEqual({ text: '�', complete: false })
 	})
 	it('preserves read failures and releases the text reader lock', async () => {
 		const signal = new AbortController().signal
@@ -961,7 +1001,7 @@ describe('readText — bounded decoded text', () => {
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('reads an empty body as empty text', async () => {
-		expect(await readText(new RecordedBody([]).stream)).toBe('')
+		expect(await readText(new RecordedBody([]).stream)).toEqual({ text: '', complete: true })
 	})
 })
 

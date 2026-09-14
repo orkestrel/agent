@@ -1,9 +1,173 @@
+import type { ContextFormat, ProviderInterface, ProviderRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import type { ContextFormat, ProviderInterface } from '@src/core'
-import { createAgent } from '@src/core'
+import {
+	createAgent,
+	createRelay,
+	createRelayProvider,
+	ProviderAbortError,
+	providerRequestContract,
+	RELAY_PROVIDER_MESSAGE,
+	relayFrameContract,
+} from '@src/core'
+import { parseJSONAs } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import { createScriptedProvider, createTokenUsage, type DeltasOf } from '../../setup.js'
+import {
+	createParser,
+	createScriptedProvider,
+	createTokenUsage,
+	createToolCall,
+	drainProvider,
+	FailingProvider,
+	type DeltasOf,
+} from '../../setup.js'
 import { collect, requireValue } from '@orkestrel/test'
+
+describe('in-process relay hop', () => {
+	it('round trips identified messages tools options deltas and the authoritative result', async () => {
+		const result = {
+			content: '<think>literal</think> answer',
+			thinking: 'reason',
+			tools: [createToolCall()],
+			usage: createTokenUsage(),
+		}
+		const provider = createScriptedProvider(
+			[{ result, deltas: ['<think>literal</think>', ' answer'], thoughts: ['rea', 'son'] }],
+			{ record: true },
+		)
+		const handler = createRelay({
+			provider,
+			authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
+		})
+		const requests: Request[] = []
+		const bodies: unknown[] = []
+		const frames: unknown[] = []
+		const browser = createRelayProvider({
+			url: 'http://relay.test/exact?route=turn',
+			parser: createParser,
+			headers: () => ({ authorization: 'Bearer fixture' }),
+			fetch: async (input, init) => {
+				const request = new Request(input, init)
+				requests.push(request)
+				bodies.push(parseJSONAs(await request.clone().text(), providerRequestContract.is))
+				const response = await handler(request)
+				frames.push(
+					...(await response.clone().text())
+						.split('\n')
+						.filter((line) => line.length > 0)
+						.map((line) => parseJSONAs(line, relayFrameContract.is)),
+				)
+				return response
+			},
+		})
+		const request: ProviderRequest = {
+			messages: [
+				{
+					id: 'identified',
+					role: 'assistant',
+					content: 'before',
+					calls: [createToolCall({ caller: 'local-only' })],
+					images: ['image'],
+				},
+			],
+			tools: [{ name: 'add', description: 'Adds numbers', parameters: { type: 'object' } }],
+			options: { think: true, schema: { type: 'object' } },
+		}
+		const signal = new AbortController().signal
+		const direct = await drainProvider(
+			provider.stream(request.messages, signal, request.tools, request.options),
+		)
+		const hop = await drainProvider(
+			browser.stream(request.messages, signal, request.tools, request.options),
+		)
+		expect(hop).toEqual(direct)
+		expect(hop.result).toEqual(result)
+		expect(
+			await browser.generate(request.messages, signal, request.tools, request.options),
+		).toEqual(hop.result)
+		expect(requests.map((entry) => entry.url)).toEqual([
+			'http://relay.test/exact?route=turn',
+			'http://relay.test/exact?route=turn',
+		])
+		expect(requests.map((entry) => entry.method)).toEqual(['POST', 'POST'])
+		expect(bodies).toEqual([browser.body(request), browser.body(request)])
+		expect(frames).toEqual([
+			...direct.deltas,
+			{ channel: 'result', result },
+			...direct.deltas,
+			{ channel: 'result', result },
+		])
+		const relayed = requireValue(provider.calls[1])
+		expect({ messages: relayed.messages, tools: relayed.tools, options: relayed.options }).toEqual(
+			browser.body(request),
+		)
+		expect(relayed.messages[0]?.id).toBe('identified')
+	})
+	it('propagates browser cancellation through the request and upstream signals', async () => {
+		const provider = createScriptedProvider(
+			[{ result: { content: 'first second third' }, deltas: ['first', ' second', ' third'] }],
+			{ record: true },
+		)
+		const handler = createRelay({ provider, authorize: () => true })
+		const requests: Request[] = []
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: (input, init) => {
+				const request = new Request(input, init)
+				requests.push(request)
+				return handler(request)
+			},
+		})
+		const abort = new AbortController()
+		const stream = browser.stream([], abort.signal)
+		const first = await stream.next()
+		expect(first).toEqual({ done: false, value: { channel: 'content', text: 'first' } })
+		abort.abort()
+		await expect(stream.next()).rejects.toMatchObject({
+			code: 'ABORT',
+			partial: { content: 'first' },
+		})
+		expect(requireValue(requests[0]).signal.aborted).toBe(true)
+		expect(requireValue(provider.calls[0]).signal.aborted).toBe(true)
+	})
+	it('reconstructs a server abort while the browser signal remains unaborted', async () => {
+		const partial = {
+			content: 'partial',
+			thinking: 'reason',
+			tools: [createToolCall()],
+			usage: createTokenUsage(),
+		}
+		const provider = new FailingProvider({ content: 'partial' }, new ProviderAbortError(partial))
+		const handler = createRelay({ provider, authorize: () => true })
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: (input, init) => handler(new Request(input, init)),
+		})
+		const signal = new AbortController().signal
+		const stream = browser.stream([], signal)
+		expect(await stream.next()).toEqual({
+			done: false,
+			value: { channel: 'content', text: 'partial' },
+		})
+		await expect(stream.next()).rejects.toEqual(new ProviderAbortError(partial))
+		expect(signal.aborted).toBe(false)
+	})
+	it('translates a secret upstream failure to the fixed public provider error', async () => {
+		const provider = new FailingProvider({ content: '' }, new Error('sk-secret'))
+		const handler = createRelay({ provider, authorize: () => true })
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: (input, init) => handler(new Request(input, init)),
+		})
+		await expect(browser.generate([], new AbortController().signal)).rejects.toMatchObject({
+			name: 'ProviderError',
+			code: 'PROVIDER',
+			message: RELAY_PROVIDER_MESSAGE,
+		})
+	})
+})
 
 // PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
 // on Ollama (or any concrete backend). This is the `src/core` scope proof — `integration.test.ts`

@@ -104,3 +104,15 @@ export const DEFAULT_RELAY_LIMIT = 1_048_576
 
 /** Names the relay's newline-delimited JSON content type. */
 export const RELAY_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8'
+
+/** Names the public message for an unexpected upstream relay failure. */
+export const RELAY_PROVIDER_MESSAGE = 'relay provider failed'
+
+/** Rejects a relay request whose authorization does not succeed. */
+export const UNAUTHORIZED_RELAY_STATUS = 401
+
+/** Rejects a relay request whose body fails validation. */
+export const INVALID_RELAY_STATUS = 400
+
+/** Rejects a relay request that exceeds its byte budget. */
+export const OVERSIZED_RELAY_STATUS = 413

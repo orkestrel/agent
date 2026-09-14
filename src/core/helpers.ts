@@ -9,6 +9,7 @@ import type {
 	ProviderResult,
 	RunOutcome,
 	Section,
+	TextRead,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
@@ -809,28 +810,31 @@ export function buildProviderResult(
  * @remarks
  * `limit` bounds bytes passed to the decoder, including a partial final character.
  * An omitted limit reads to completion. A source may deliver a chunk larger than
- * the remaining limit; its unused bytes are discarded without decoding.
+ * the remaining limit; its unused bytes are discarded without decoding. After an
+ * exact budget match, reads one further chunk to distinguish EOF from overflow.
+ * The read can overshoot by one source chunk. An abort leaves completion false.
  *
  * @param body - The readable byte stream
  * @param limit - The maximum byte prefix, or undefined for the complete stream
  * @param signal - The optional cancellation bound; abort returns the decoded prefix
- * @returns The decoded prefix
+ * @returns The decoded prefix and whether EOF occurred within the byte budget
  * @example
  * ```ts
  * const body = new Response('answer').body
- * if (body !== null) await readText(body, 3) // 'ans'
+ * if (body !== null) await readText(body, 3) // { text: 'ans', complete: false }
  * ```
  */
 export async function readText(
 	body: ReadableStream<Uint8Array>,
 	limit?: number,
 	signal?: AbortSignal,
-): Promise<string> {
+): Promise<TextRead> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
 	const cleanup = new AbortController()
 	let remaining = limit ?? Infinity
 	let text = ''
+	let complete = false
 	try {
 		signal?.addEventListener(
 			'abort',
@@ -846,14 +850,21 @@ export async function readText(
 				// An already-aborted read still returns its empty prefix.
 			})
 		}
-		while (remaining > 0) {
+		for (;;) {
+			if (signal?.aborted) break
 			const step = await reader.read()
-			if (step.done || signal?.aborted) break
+			if (signal?.aborted) break
+			if (step.done) {
+				complete = true
+				break
+			}
+			if (remaining <= 0) break
 			const bytes = step.value.subarray(0, remaining)
 			text += decoder.decode(bytes, { stream: true })
 			remaining -= bytes.byteLength
+			if (step.value.byteLength > bytes.byteLength) break
 		}
-		return text + decoder.decode()
+		return { text: text + decoder.decode(), complete }
 	} finally {
 		cleanup.abort()
 		try {
