@@ -1,6 +1,9 @@
 import type { AgentResult, ContextSectionSourceInterface, Message } from '@src/core'
 import {
 	agentResultToJSON,
+	buildProviderResult,
+	readText,
+	readChunks,
 	assembleResult,
 	attachImages,
 	attachUserImages,
@@ -30,7 +33,12 @@ import {
 } from '@src/core'
 import { createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
-import { createScriptedProvider, createToolCall, createTokenUsage } from '../../setup.js'
+import {
+	createScriptedProvider,
+	createToolCall,
+	createTokenUsage,
+	RecordedBody,
+} from '../../setup.js'
 
 // Agent-owned pure helpers: filterAllowList applies the three-way set-membership primitive
 // a scope uses (undefined ⇒ all, [] ⇒ none, list ⇒ only-listed), while estimateMessages is
@@ -556,8 +564,8 @@ describe('joinThinking — the separated reasoning across a run', () => {
 		expect(joinThinking('first', 'second')).toBe('first\n\nsecond')
 	})
 
-	it('keeps an empty accumulated string as the running value', () => {
-		expect(joinThinking('', 'next')).toBe('\n\nnext')
+	it('treats an empty accumulated string as absent', () => {
+		expect(joinThinking('', 'next')).toBe('next')
 	})
 })
 
@@ -861,5 +869,84 @@ describe('intersectKeys — the scope narrow primitive', () => {
 
 	it('yields an empty list when nothing is shared', () => {
 		expect(intersectKeys(['read'], ['write'])).toEqual([])
+	})
+})
+
+describe('joinThinking empty carriers', () => {
+	it('omits the separator when either carrier is empty', () => {
+		expect(joinThinking('', 'x')).toBe('x')
+		expect(joinThinking('x', '')).toBe('x')
+		expect(joinThinking('', '')).toBe('')
+	})
+})
+
+describe('provider stream helpers', () => {
+	it('omits empty result optionals and retains populated calls and usage', () => {
+		expect(buildProviderResult('answer', '', [], undefined)).toEqual({ content: 'answer' })
+		const tools = [{ id: '1', name: 'lookup', arguments: {} }]
+		const usage = { prompt: 1, completion: 2, total: 3 }
+		expect(buildProviderResult('answer', 'reason', tools, usage)).toEqual({
+			content: 'answer',
+			thinking: 'reason',
+			tools,
+			usage,
+		})
+	})
+	it('reads a bounded byte prefix even when a chunk exceeds the limit', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
+		expect(await readText(body.stream, 3)).toBe('abc')
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+	it('cancels without pulling for a zero-byte limit', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
+		expect(await readText(body.stream, 0)).toBe('')
+		expect(body.bytes).toBe(0)
+		expect(body.cancelled).toBe(true)
+	})
+	it('decodes a multibyte prefix and flushes an incomplete final character', async () => {
+		const bytes = new TextEncoder().encode('🌍')
+		const complete = new RecordedBody([bytes.subarray(0, 2), bytes.subarray(2)])
+		expect(await readText(complete.stream)).toBe('🌍')
+		const partial = new RecordedBody([bytes])
+		expect(await readText(partial.stream, 2)).toBe('�')
+	})
+	it('flushes decoder state at the end of chunk iteration', async () => {
+		const body = new RecordedBody([new Uint8Array([0xe2])])
+		const chunks: string[] = []
+		for await (const chunk of readChunks(body.stream)) chunks.push(chunk)
+		expect(chunks).toEqual(['�'])
+		expect(body.stream.locked).toBe(false)
+	})
+	it('decodes split UTF-8 through chunk iteration', async () => {
+		const bytes = new TextEncoder().encode('🌍')
+		const body = new RecordedBody([bytes.subarray(0, 2), bytes.subarray(2)])
+		const chunks: string[] = []
+		for await (const chunk of readChunks(body.stream)) chunks.push(chunk)
+		expect(chunks).toEqual(['🌍'])
+	})
+	it('releases a byte reader after early return', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('answer')], false)
+		const chunks = readChunks(body.stream)
+		expect(await chunks.next()).toEqual({ done: false, value: 'answer' })
+		await chunks.return(undefined)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+	it('preserves read failures and releases the lock', async () => {
+		const error = new Error('read failed')
+		const text = new RecordedBody([], true, error)
+		await expect(readText(text.stream)).rejects.toBe(error)
+		expect(text.stream.locked).toBe(false)
+		const chunks = new RecordedBody([], true, error)
+		await expect(readChunks(chunks.stream).next()).rejects.toBe(error)
+		expect(chunks.stream.locked).toBe(false)
+	})
+	it('reads empty bodies as empty text and empty iteration', async () => {
+		expect(await readText(new RecordedBody([]).stream)).toBe('')
+		expect(await readChunks(new RecordedBody([]).stream).next()).toEqual({
+			done: true,
+			value: undefined,
+		})
 	})
 })

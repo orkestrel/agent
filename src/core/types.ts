@@ -2140,3 +2140,114 @@ export interface ConversationManagerInterface {
 	/** Removes every conversation and clears `active`. */
 	clear(): void
 }
+
+/** Defines the structural framing seam supplied by a concrete provider. */
+export interface ProviderParserInterface<TRecord = Readonly<Record<string, unknown>>> {
+	/** Parses a decoded chunk into complete records. */
+	parse(chunk: string): readonly TRecord[]
+	/** Clears retained framing state. */
+	clear(): void
+}
+
+/** Carries the conversation and per-call configuration sent to a provider. */
+export interface ProviderRequest {
+	readonly messages: readonly Message[]
+	readonly tools?: readonly ToolDefinition[]
+	readonly options?: ProviderStreamOptions
+}
+
+/** Holds the decoded contribution of a wire record to a provider turn. */
+export interface ProviderIncrement {
+	readonly content: string
+	readonly thinking: string
+	readonly tools: readonly ToolCall[]
+	readonly usage?: TokenUsage
+	readonly result?: ProviderResult
+}
+
+/**
+ * Configures a provider's deadline, transport, headers, and context framing.
+ *
+ * @remarks
+ * `timeout` is an integer duration in milliseconds. Default: 120_000.
+ * `fetch` defaults to the global transport bound to its global receiver.
+ * `headers` runs for each request inside its deadline and overrides the JSON content type
+ * only when it returns that header. `format` is exposed to context assembly.
+ */
+export interface ProviderOptions {
+	readonly timeout?: number
+	readonly fetch?: typeof globalThis.fetch
+	readonly headers?: () =>
+		| Readonly<Record<string, string>>
+		| Promise<Readonly<Record<string, string>>>
+	readonly format?: ContextFormat
+}
+
+/**
+ * Configures the HTTP destination and stream assembly of a provider base.
+ *
+ * @remarks
+ * `path` appends to `url`. If `split` is true, separates in-content reasoning;
+ * if false, preserves content verbatim. Default: true.
+ * If `strict` is true, requires a settled result record; if false, assembles at end of input.
+ * Default: false.
+ */
+export interface AgentProviderInput extends ProviderOptions {
+	readonly url: string
+	readonly path?: string
+	readonly split?: boolean
+	readonly strict?: boolean
+}
+
+/** Defines the wire-specific seams of the shared HTTP provider engine. */
+export interface AgentProviderInterface<
+	TRecord = Readonly<Record<string, unknown>>,
+> extends ProviderInterface {
+	/** Creates fresh framing state for a call. */
+	frame(): ProviderParserInterface<TRecord>
+	/** Projects a request to the concrete protocol's serializable body. */
+	body(request: ProviderRequest): object
+	/** Decodes a framed record into its contribution to the turn. */
+	read(record: TRecord): ProviderIncrement
+	/** Returns records retained at end of input before the parser is cleared. */
+	finish(parser: ProviderParserInterface<TRecord>): readonly TRecord[]
+}
+
+/** Names the machine-readable provider failure conditions. */
+export type ProviderErrorCode = 'HTTP' | 'PROTOCOL' | 'LIMIT' | 'PROVIDER'
+
+/** Carries a provider failure's HTTP status and underlying cause. */
+export interface ProviderErrorOptions {
+	readonly status?: number
+	readonly cause?: unknown
+}
+
+/** Carries a relay delta, settled result, remote abort, or remote failure. */
+export type RelayFrame =
+	| ProviderDelta
+	| { readonly channel: 'result'; readonly result: ProviderResult }
+	| { readonly channel: 'abort'; readonly partial: ProviderResult }
+	| { readonly channel: 'error'; readonly code: 'PROVIDER'; readonly message: string }
+
+/** Defines a host-independent relay request handler. */
+export type RelayHandler = (request: Request) => Promise<Response>
+
+/** Configures the upstream provider, mandatory authorization, and request byte limit. */
+export interface RelayOptions {
+	readonly provider: ProviderInterface
+	readonly authorize: (request: Request) => boolean | Promise<boolean>
+	readonly limit?: number
+}
+
+/** Carries the upstream call and cancellation bound of a relay response stream. */
+export interface RelayStreamOptions {
+	readonly provider: ProviderInterface
+	readonly request: ProviderRequest
+	readonly signal: AbortSignal
+}
+
+/** Configures a relay destination and its fresh structural parser factory. */
+export interface RelayProviderOptions extends ProviderOptions {
+	readonly url: string
+	readonly frame: () => ProviderParserInterface
+}

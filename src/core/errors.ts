@@ -1,4 +1,9 @@
-import type { AgentResult, ProviderResult } from './types.js'
+import type {
+	AgentResult,
+	ProviderErrorCode,
+	ProviderErrorOptions,
+	ProviderResult,
+} from './types.js'
 
 // A real error type, not a sentinel. `stream` throws a
 // ProviderAbortError when its bound signal aborts mid-flight, carrying the partial
@@ -213,4 +218,31 @@ export class AgentError extends Error {
  */
 export function isAgentError(value: unknown): value is AgentError {
 	return value instanceof AgentError
+}
+
+/** Reports a coded provider failure with its HTTP status and underlying cause when available. */
+export class ProviderError extends Error {
+	readonly code: ProviderErrorCode
+	readonly status: number | undefined
+
+	constructor(code: ProviderErrorCode, message: string, options?: ProviderErrorOptions) {
+		super(message, options)
+		this.name = 'ProviderError'
+		this.code = code
+		this.status = options?.status
+	}
+}
+
+/**
+ * Narrows a caught value to the provider failure class through instanceof.
+ *
+ * @param value - The caught value
+ * @returns True if the value is a provider failure; false otherwise
+ * @example
+ * ```ts
+ * isProviderError(new ProviderError('HTTP', 'unavailable', { status: 503 })) // true
+ * ```
+ */
+export function isProviderError(value: unknown): value is ProviderError {
+	return value instanceof ProviderError
 }

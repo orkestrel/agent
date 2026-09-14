@@ -6,6 +6,7 @@ import type {
 	ContextSectionFormat,
 	ContextSectionSourceInterface,
 	Message,
+	ProviderResult,
 	RunOutcome,
 	Section,
 } from './types.js'
@@ -371,11 +372,13 @@ export function sanitizeUsage(usage: TokenUsage): TokenUsage {
  * @example
  * ```ts
  * joinThinking(undefined, 'first') // 'first'
+ * joinThinking('', 'x') // 'x'
  * joinThinking('first', 'second') // 'first\n\nsecond'
  * ```
  */
 export function joinThinking(running: string | undefined, next: string): string {
-	return running === undefined ? next : `${running}\n\n${next}`
+	if (running === undefined || running.length === 0) return next
+	return next.length === 0 ? running : `${running}\n\n${next}`
 }
 
 /**
@@ -771,4 +774,107 @@ export function intersectKeys(
 	if (child === undefined) return [...parent]
 	const allowed = new Set(parent)
 	return child.filter((key) => allowed.has(key))
+}
+
+/**
+ * Assembles a provider result with only populated optional fields.
+ *
+ * @param content - The authoritative answer
+ * @param thinking - The joined reasoning
+ * @param tools - The accumulated calls
+ * @param usage - The reported token usage
+ * @returns The assembled result
+ * @example
+ * ```ts
+ * buildProviderResult('ok', '', [], undefined) // { content: 'ok' }
+ * ```
+ */
+export function buildProviderResult(
+	content: string,
+	thinking: string,
+	tools: readonly ToolCall[],
+	usage: TokenUsage | undefined,
+): ProviderResult {
+	return {
+		content,
+		...(thinking.length === 0 ? {} : { thinking }),
+		...(tools.length === 0 ? {} : { tools }),
+		...(usage === undefined ? {} : { usage }),
+	}
+}
+
+/**
+ * Reads a UTF-8 prefix of a byte stream and cancels its remainder.
+ *
+ * @remarks
+ * `limit` bounds bytes passed to the decoder, including a partial final character.
+ * An omitted limit reads to completion. A source may deliver a chunk larger than
+ * the remaining limit; its unused bytes are discarded without decoding.
+ *
+ * @param body - The readable byte stream
+ * @param limit - The maximum byte prefix, or undefined for the complete stream
+ * @returns The decoded prefix
+ * @example
+ * ```ts
+ * const body = new Response('answer').body
+ * if (body !== null) await readText(body, 3) // 'ans'
+ * ```
+ */
+export async function readText(body: ReadableStream<Uint8Array>, limit?: number): Promise<string> {
+	const reader = body.getReader()
+	const decoder = new TextDecoder()
+	let remaining = limit ?? Infinity
+	let text = ''
+	try {
+		while (remaining > 0) {
+			const step = await reader.read()
+			if (step.done) break
+			const bytes = step.value.subarray(0, remaining)
+			text += decoder.decode(bytes, { stream: true })
+			remaining -= bytes.byteLength
+		}
+		return text + decoder.decode()
+	} finally {
+		try {
+			await reader.cancel()
+		} catch {
+			// Preserve the read outcome when cancellation fails.
+		} finally {
+			reader.releaseLock()
+		}
+	}
+}
+
+/**
+ * Decodes UTF-8 chunks with a final flush and releases the stream on every exit.
+ *
+ * @param body - The readable byte stream
+ * @returns Decoded text chunks, including a held decoder tail
+ * @example
+ * ```ts
+ * const body = new Response('answer').body
+ * if (body !== null) for await (const chunk of readChunks(body)) render(chunk)
+ * ```
+ */
+export async function* readChunks(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+	const reader = body.getReader()
+	const decoder = new TextDecoder()
+	try {
+		for (;;) {
+			const step = await reader.read()
+			if (step.done) break
+			const chunk = decoder.decode(step.value, { stream: true })
+			if (chunk.length > 0) yield chunk
+		}
+		const tail = decoder.decode()
+		if (tail.length > 0) yield tail
+	} finally {
+		try {
+			await reader.cancel()
+		} catch {
+			// Preserve the primary outcome when the source refuses cancellation.
+		} finally {
+			reader.releaseLock()
+		}
+	}
 }

@@ -92,3 +92,15 @@ export const MESSAGE_TOKEN_OVERHEAD = 4
  * exact count.
  */
 export const IMAGE_TOKEN_ESTIMATE = 512
+
+/** Holds the default provider deadline in milliseconds. */
+export const DEFAULT_PROVIDER_TIMEOUT = 120_000
+
+/** Bounds the decoded error excerpt's input in bytes. */
+export const MAX_ERROR_BODY_LENGTH = 2048
+
+/** Holds the default relay request limit in bytes. */
+export const DEFAULT_RELAY_LIMIT = 1_048_576
+
+/** Names the relay's newline-delimited JSON content type. */
+export const RELAY_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8'

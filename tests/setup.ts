@@ -1,5 +1,9 @@
 import type {
 	AgentContextInterface,
+	AgentProviderInput,
+	ProviderIncrement,
+	ProviderParserInterface,
+	ProviderRequest,
 	AgentJobInput,
 	ContextFormat,
 	ConversationManagerInterface,
@@ -7,6 +11,8 @@ import type {
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
 	Message,
+	MessageRole,
+	RelayFrame,
 	ProviderDelta,
 	ProviderInterface,
 	ProviderResult,
@@ -15,7 +21,13 @@ import type {
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
-import { AgentContext, createConversation, InstructionManager, ProviderAbortError } from '@src/core'
+import {
+	AgentContext,
+	AgentProvider,
+	createConversation,
+	InstructionManager,
+	ProviderAbortError,
+} from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
@@ -774,3 +786,217 @@ export async function seedConversation(
 	])
 	await conversation.compact()
 }
+
+/** Holds signals recorded by a transport that rejects every request. */
+export interface RefusingTransportInterface {
+	readonly signals: readonly AbortSignal[]
+	readonly fetch: typeof globalThis.fetch
+}
+
+/** Builds a transport that records the request signal and rejects without network access. */
+export function createRefusingTransport(): RefusingTransportInterface {
+	const signals: AbortSignal[] = []
+	return {
+		get signals() {
+			return signals
+		},
+		fetch(_input, init) {
+			const signal = init?.signal
+			if (signal !== null && signal !== undefined) signals.push(signal)
+			return Promise.reject(new Error('fetch failed'))
+		},
+	}
+}
+
+/** Builds a transport that enqueues each supplied UTF-8 chunk verbatim and closes. */
+export function createStreamingTransport(chunks: readonly string[]): typeof globalThis.fetch {
+	return () =>
+		Promise.resolve(
+			new Response(
+				new ReadableStream<Uint8Array>({
+					start(controller) {
+						const encoder = new TextEncoder()
+						for (const chunk of chunks) controller.enqueue(encoder.encode(chunk))
+						controller.close()
+					},
+				}),
+				{ headers: { 'Content-Type': 'application/x-ndjson' } },
+			),
+		)
+}
+
+/** Frames chunks directly or retains them for an explicit end-of-input fixture. */
+export class ScriptedFrame implements ProviderParserInterface<string> {
+	readonly #buffered: boolean
+	#pending = ''
+	#cleared = false
+
+	constructor(buffered = false) {
+		this.#buffered = buffered
+	}
+	get cleared(): boolean {
+		return this.#cleared
+	}
+	parse(chunk: string): readonly string[] {
+		if (!this.#buffered) return [chunk]
+		this.#pending += chunk
+		return []
+	}
+	flush(): readonly string[] {
+		return this.#pending.length > 0 ? [this.#pending] : []
+	}
+	clear(): void {
+		this.#pending = ''
+		this.#cleared = true
+	}
+}
+
+/** Holds scripted wire records and optional end-of-input buffering. */
+export interface ScriptedWireOptions extends AgentProviderInput {
+	readonly records?: ReadonlyMap<string, ProviderIncrement | Error>
+	readonly buffered?: boolean
+}
+
+/** Drives the real provider engine with direct content/thinking records and scripted increments. */
+export class ScriptedWire extends AgentProvider<string> {
+	readonly #records: ReadonlyMap<string, ProviderIncrement | Error>
+	readonly #buffered: boolean
+	readonly #parsers: ScriptedFrame[] = []
+	readonly name = 'scripted'
+	constructor(options: ScriptedWireOptions) {
+		super(options)
+		this.#records = options.records ?? new Map()
+		this.#buffered = options.buffered ?? false
+	}
+	get parsers(): readonly ScriptedFrame[] {
+		return this.#parsers
+	}
+	frame(): ScriptedFrame {
+		const parser = new ScriptedFrame(this.#buffered)
+		this.#parsers.push(parser)
+		return parser
+	}
+	body(request: ProviderRequest): object {
+		return request
+	}
+	read(record: string): ProviderIncrement {
+		const increment = this.#records.get(record)
+		if (increment instanceof Error) throw increment
+		return (
+			increment ?? {
+				content: record.startsWith('c:') ? record.slice(2) : '',
+				thinking: record.startsWith('t:') ? record.slice(2) : '',
+				tools: [],
+			}
+		)
+	}
+	finish(parser: ProviderParserInterface<string>): readonly string[] {
+		return parser instanceof ScriptedFrame ? parser.flush() : []
+	}
+}
+
+/** Records byte delivery and cancellation on a real readable stream. */
+export class RecordedBody {
+	readonly #chunks: readonly Uint8Array[]
+	readonly #close: boolean
+	readonly #failure: Error | undefined
+	readonly stream: ReadableStream<Uint8Array>
+	#index = 0
+	#bytes = 0
+	#cancelled = false
+	constructor(chunks: readonly Uint8Array[], close = true, failure?: Error) {
+		this.#chunks = chunks
+		this.#close = close
+		this.#failure = failure
+		this.stream = new ReadableStream(this, { highWaterMark: 0 })
+	}
+	get bytes(): number {
+		return this.#bytes
+	}
+	get cancelled(): boolean {
+		return this.#cancelled
+	}
+	pull(controller: ReadableStreamDefaultController<Uint8Array>): void {
+		const chunk = this.#chunks[this.#index]
+		if (chunk !== undefined) {
+			this.#index += 1
+			this.#bytes += chunk.byteLength
+			controller.enqueue(chunk)
+		} else if (this.#failure !== undefined) controller.error(this.#failure)
+		else if (this.#close) controller.close()
+	}
+	cancel(): void {
+		this.#cancelled = true
+	}
+}
+
+/** Records requests and returns responses supplied by a fixture. */
+export class RecordedTransport {
+	readonly #respond: () => Response | Promise<Response>
+	readonly #requests: Request[] = []
+
+	readonly fetch: typeof globalThis.fetch
+	constructor(respond: () => Response | Promise<Response>) {
+		this.#respond = respond
+		this.fetch = this.#request.bind(this)
+	}
+	get requests(): readonly Request[] {
+		return this.#requests
+	}
+
+	async #request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+		this.#requests.push(new Request(input, init))
+		return this.#respond()
+	}
+}
+
+/** Drains a provider generator and retains its yielded deltas and terminal value. */
+export async function drainProvider(
+	stream: AsyncGenerator<ProviderDelta, ProviderResult>,
+): Promise<{
+	readonly deltas: readonly ProviderDelta[]
+	readonly result: ProviderResult
+}> {
+	const deltas: ProviderDelta[] = []
+	let step = await stream.next()
+	while (!step.done) {
+		deltas.push(step.value)
+		step = await stream.next()
+	}
+	return { deltas, result: step.value }
+}
+
+/** Records the global fetch receiver while returning a real response without network access. */
+export function recordGlobalTransport(
+	this: unknown,
+	input: RequestInfo | URL,
+	init?: RequestInit,
+): Promise<Response> {
+	return Promise.resolve(
+		new Response('c:' + (this === globalThis ? 'global' : 'unbound'), {
+			headers: { 'X-Request': new Request(input, init).method },
+		}),
+	)
+}
+
+/** Supplies a callable value for non-JSON domain argument fixtures. */
+export function domainArgument(): string {
+	return 'domain'
+}
+
+/** Lists the domain roles used to compare message wire and domain guards. */
+export const MESSAGE_WIRE_ROLES: readonly MessageRole[] = Object.freeze([
+	'system',
+	'user',
+	'assistant',
+	'tool',
+])
+
+/** Covers the relay channels with inert JSON wire values. */
+export const RELAY_WIRE_FRAMES: readonly RelayFrame[] = Object.freeze([
+	{ channel: 'content', text: 'answer' },
+	{ channel: 'thinking', text: 'reason' },
+	{ channel: 'result', result: { content: 'answer' } },
+	{ channel: 'abort', partial: { content: 'partial' } },
+	{ channel: 'error', code: 'PROVIDER', message: 'unavailable' },
+])

@@ -17,6 +17,14 @@ const withCalls = (calls: unknown): unknown => ({
 })
 
 describe('isMessage — the per-message shape guard (total + defensive)', () => {
+	it('rejects an arbitrary role outside the domain union', () => {
+		expect(isMessage({ id: '1', role: 'other', content: '' })).toBe(false)
+	})
+
+	it('rejects a non-string image element', () => {
+		expect(isMessage({ id: '1', role: 'user', content: '', images: [1] })).toBe(false)
+	})
+
 	it('accepts the real Message shape, with and without its optionals', () => {
 		expect(isMessage({ id: 'm1', role: 'user', content: 'hi' })).toBe(true)
 		expect(isMessage({ id: 'm1', role: 'assistant', content: '', calls: [] })).toBe(true)
@@ -29,8 +37,7 @@ describe('isMessage — the per-message shape guard (total + defensive)', () => 
 			}),
 		).toBe(true)
 		expect(isMessage({ id: 'm1', role: 'user', content: 'see', images: ['DATA'] })).toBe(true)
-		// The role stays a broad string, so a storage-read role outside the current literal set passes.
-		expect(isMessage({ id: 'm1', role: 'developer', content: 'hi' })).toBe(true)
+		expect(isMessage({ id: 'm1', role: 'developer', content: 'hi' })).toBe(false)
 	})
 
 	it('rejects a non-record, a nullish, and a primitive without throwing', () => {

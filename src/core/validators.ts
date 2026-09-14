@@ -1,45 +1,35 @@
 import type { ConversationSnapshot, Message, Section } from './types.js'
-import { isArray, isRecord, isString } from '@orkestrel/contract'
+import { attempt, isArray, isRecord, isString } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 
 /**
- * Checks whether an `unknown` is structurally a {@link Message} record — the per-message step of
- * the {@link isConversationSnapshot} and {@link isSection} read-boundary narrows, where a present
- * `calls` must be an array of valid {@link import('@orkestrel/tool').ToolCall}s. Total, never
- * throwing, and never an assertion; the conversation analogue of
- * {@link import('@orkestrel/workspace').isFile}.
+ * Checks whether a value satisfies the domain conversation-message contract.
  *
  * @remarks
- * A total guard (it never throws — adversarial input returns `false`). It checks the message's
- * shape: a record with a `string` `id`, a `string` `role`, a `string` `content`, and — when present
- * — a `calls` array every element of which is a valid
- * {@link import('@orkestrel/tool').ToolCall} ({@link isToolCall} — the
- * fail-closed deepening: a tampered `calls` element rejects the message, so the snapshot
- * reads back as absent rather than replaying a malformed call) and an `images` that is an array
- * (an absent optional passes). The `role` is left as a broad `string` here (an open
- * {@link import('./types.js').MessageRole}, so any storage-read role string is accepted
- * defensively rather than rejected against the current literal set). Enough to safely impose the
- * {@link Message} type at
- * a storage boundary without a cast.
+ * Roles belong to MessageRole and image elements are strings. Tool arguments may
+ * carry non-JSON values, as the domain type permits; the message wire contract is
+ * narrower. Unreadable fields and hostile inputs return false.
  *
- * @param value - The value to test (one element of a snapshot's `messages` / a section's `messages`)
- * @returns True if `value` has the structural shape of a {@link Message}; false otherwise
- *
+ * @param value - The unknown message candidate
+ * @returns True if the domain message fields are valid; false otherwise
  * @example
  * ```ts
  * isMessage({ id: '1', role: 'user', content: 'hi' }) // true
- * isMessage({ id: '1', role: 'assistant', content: '', calls: [] }) // true
- * isMessage({ id: '1', role: 'user' }) // false (missing content)
- * isMessage({ id: '1', role: 'assistant', content: '', calls: [null] }) // false (malformed call)
+ * isMessage({ id: '1', role: 'other', content: '' }) // false
+ * isMessage({ id: '1', role: 'user', content: '', images: [1] }) // false
  * ```
  */
 export function isMessage(value: unknown): value is Message {
-	if (!isRecord(value)) return false
-	if (!isString(value.id) || !isString(value.role) || !isString(value.content)) return false
-	if (value.calls !== undefined && !(isArray(value.calls) && value.calls.every(isToolCall))) {
-		return false
-	}
-	return value.images === undefined || isArray(value.images)
+	const checked = attempt(() => {
+		if (!isRecord(value)) return false
+		const { id, role, content, calls, images } = value
+		if (!isString(id) || !isString(content)) return false
+		if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool')
+			return false
+		if (calls !== undefined && !(isArray(calls) && calls.every(isToolCall))) return false
+		return images === undefined || (isArray(images) && images.every(isString))
+	})
+	return checked.success && checked.value
 }
 
 /**

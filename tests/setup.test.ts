@@ -3,7 +3,6 @@ import type {
 	ConversationStoreInterface,
 	ContextFormat,
 	Message,
-	ProviderDelta,
 	ProviderResult,
 } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
@@ -22,6 +21,15 @@ import {
 	conversationStoreTwoIds,
 	conversationStoreUpsert,
 	createAgentJob,
+	createRefusingTransport,
+	createStreamingTransport,
+	domainArgument,
+	drainProvider,
+	RecordedBody,
+	RecordedTransport,
+	recordGlobalTransport,
+	ScriptedFrame,
+	ScriptedWire,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createSeededToolManager,
@@ -54,22 +62,6 @@ import {
 // The messages every scripted call is handed. A provider is framing-agnostic, so one seed turn
 // is enough for every case that does not assert on what was passed through.
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
-
-// Proof-local, and deliberately not promoted to `tests/setup.ts`: nothing but this proof drives a
-// provider generator directly for BOTH halves at once (the yielded deltas AND the generator's
-// return value). Every suite drives the provider through the agent, which surfaces the two halves
-// separately.
-async function drainProvider(
-	generator: AsyncGenerator<ProviderDelta, ProviderResult>,
-): Promise<{ readonly deltas: readonly ProviderDelta[]; readonly result: ProviderResult }> {
-	const deltas: ProviderDelta[] = []
-	let step = await generator.next()
-	while (!step.done) {
-		deltas.push(step.value)
-		step = await generator.next()
-	}
-	return { deltas, result: step.value }
-}
 
 // Proof-local conforming `ConversationStoreInterface` — the minimal real boundary the exported
 // battery is run against. The battery's subject is the CONTRACT it registers, so running it
@@ -609,5 +601,101 @@ describe('seedConversation', () => {
 		])
 		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
 		expect(conversation.summary).toBeDefined()
+	})
+})
+
+describe('provider wire fixtures', () => {
+	it('records rejecting transport signals and preserves its rejection message', async () => {
+		const transport = createRefusingTransport()
+		const signal = new AbortController().signal
+		await expect(transport.fetch('https://provider.test', { signal })).rejects.toThrow(
+			'fetch failed',
+		)
+		expect(transport.signals).toEqual([signal])
+		await expect(transport.fetch('https://provider.test')).rejects.toThrow('fetch failed')
+		expect(transport.signals).toEqual([signal])
+	})
+	it('enqueues streaming transport chunks verbatim with its content type', async () => {
+		const response = await createStreamingTransport(['c:one', 'c:two'])('https://provider.test')
+		expect(response.headers.get('content-type')).toBe('application/x-ndjson')
+		const reader = requireValue(response.body).getReader()
+		expect(new TextDecoder().decode((await reader.read()).value)).toBe('c:one')
+		expect(new TextDecoder().decode((await reader.read()).value)).toBe('c:two')
+		expect((await reader.read()).done).toBe(true)
+		reader.releaseLock()
+	})
+	it('frames direct chunks and flushes buffered chunks before clear', () => {
+		const direct = new ScriptedFrame()
+		expect(direct.parse('record')).toEqual(['record'])
+		expect(direct.flush()).toEqual([])
+		const buffered = new ScriptedFrame(true)
+		expect(buffered.parse('rec')).toEqual([])
+		expect(buffered.parse('ord')).toEqual([])
+		expect(buffered.flush()).toEqual(['record'])
+		buffered.clear()
+		expect(buffered.cleared).toBe(true)
+		expect(buffered.flush()).toEqual([])
+	})
+	it('decodes direct content, thinking, and scripted increments', () => {
+		const increment = { content: 'answer', thinking: '', tools: [] }
+		const error = new Error('script failure')
+		const records = new Map<string, typeof increment | Error>([
+			['result', increment],
+			['error', error],
+		])
+		const wire = new ScriptedWire({ url: 'https://provider.test', records })
+		expect(wire.read('c:content')).toEqual({ content: 'content', thinking: '', tools: [] })
+		expect(wire.read('t:reason')).toEqual({ content: '', thinking: 'reason', tools: [] })
+		expect(wire.read('result')).toBe(increment)
+		expect(() => wire.read('error')).toThrow(error)
+		const request = { messages: [] }
+		expect(wire.body(request)).toBe(request)
+		const frame = wire.frame()
+		expect(wire.parsers).toEqual([frame])
+		expect(wire.finish(frame)).toEqual([])
+	})
+	it('records delivered bytes and cancellation without prefetching', async () => {
+		const body = new RecordedBody([new Uint8Array([1, 2])], false)
+		expect(body.bytes).toBe(0)
+		const reader = body.stream.getReader()
+		expect((await reader.read()).value).toEqual(new Uint8Array([1, 2]))
+		expect(body.bytes).toBe(2)
+		await reader.cancel()
+		reader.releaseLock()
+		expect(body.cancelled).toBe(true)
+	})
+	it('closes or errors a recorded body after its supplied chunks', async () => {
+		expect((await new RecordedBody([]).stream.getReader().read()).done).toBe(true)
+		const error = new Error('body failure')
+		await expect(new RecordedBody([], true, error).stream.getReader().read()).rejects.toBe(error)
+	})
+	it('records real requests and returns the supplied response', async () => {
+		const response = new Response('answer')
+		const transport = new RecordedTransport(() => response)
+		expect(await transport.fetch('https://provider.test', { method: 'POST', body: 'query' })).toBe(
+			response,
+		)
+		const request = requireValue(transport.requests[0])
+		expect(request.url).toBe('https://provider.test/')
+		expect(request.method).toBe('POST')
+		expect(await request.text()).toBe('query')
+	})
+	it('retains generator deltas and terminal result in the draining helper', async () => {
+		const provider = createScriptedProvider([{ content: 'answer' }])
+		expect(await drainProvider(provider.stream([], new AbortController().signal))).toEqual({
+			deltas: [{ channel: 'content', text: 'answer' }],
+			result: { content: 'answer' },
+		})
+	})
+	it('distinguishes global and foreign transport receivers', async () => {
+		expect(
+			await (await recordGlobalTransport.call(globalThis, 'https://provider.test')).text(),
+		).toBe('c:global')
+		expect(await (await recordGlobalTransport.call({}, 'https://provider.test')).text()).toBe(
+			'c:unbound',
+		)
+	})
+	it('supplies a callable non-JSON domain value', () => {
+		expect(domainArgument()).toBe('domain')
 	})
 })
