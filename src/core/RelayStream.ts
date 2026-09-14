@@ -12,7 +12,12 @@ import { ProviderAbortError, ProviderError } from './errors.js'
  *
  * @example
  * ```ts
- * const response = new RelayStream({ provider, request: { messages: [] }, signal }).response
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { RelayStream } from '@orkestrel/agent'
+ *
+ * export function respond(provider: ProviderInterface, signal: AbortSignal): Response {
+ * 	return new RelayStream({ provider, request: { messages: [] }, signal }).response
+ * }
  * ```
  */
 export class RelayStream {
@@ -26,8 +31,7 @@ export class RelayStream {
 
 	constructor(options: RelayStreamOptions) {
 		this.#signal = options.signal
-		this.#abort = this.#abortProvider.bind(this)
-		this.#signal.addEventListener('abort', this.#abort, { once: true })
+		this.#abort = this.#cancel.bind(this)
 		if (this.#signal.aborted) this.#abortProvider()
 		this.#iterator = options.provider.stream(
 			options.request.messages,
@@ -35,6 +39,8 @@ export class RelayStream {
 			options.request.tools,
 			options.request.options,
 		)
+		this.#signal.addEventListener('abort', this.#abort, { once: true })
+		if (this.#signal.aborted) this.#abortProvider()
 		this.#response = new Response(
 			new ReadableStream<Uint8Array>({
 				pull: this.#pull.bind(this),
@@ -61,12 +67,12 @@ export class RelayStream {
 			const frame: RelayFrame =
 				error instanceof ProviderAbortError
 					? { channel: 'abort', partial: error.partial }
-					: { channel: 'error', code: 'PROVIDER', message: RELAY_PROVIDER_MESSAGE }
+					: { channel: 'error', message: RELAY_PROVIDER_MESSAGE }
 			this.#write(
 				controller,
 				relayFrameContract.is(frame)
 					? frame
-					: { channel: 'error', code: 'PROVIDER', message: RELAY_PROVIDER_MESSAGE },
+					: { channel: 'error', message: RELAY_PROVIDER_MESSAGE },
 			)
 			this.#finish(controller)
 			this.#abortProvider()

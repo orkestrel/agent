@@ -277,7 +277,7 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 			status: 503,
 			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
 		})
-		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH + 512)
+		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH)
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 	})
@@ -295,6 +295,40 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 		expect(body.count).toBe(1)
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
+	})
+
+	it('rejects an exact-bound stalled error body before the deadline', async () => {
+		const body = new RecordedBody(
+			[new TextEncoder().encode('x'.repeat(MAX_ERROR_BODY_LENGTH))],
+			false,
+		)
+		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			timeout: 80,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			name: 'ProviderError',
+			code: 'HTTP',
+			status: 503,
+			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
+		})
+		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+	}, 400)
+
+	it('omits the separator for an empty error excerpt', async () => {
+		const transport = new RecordedTransport(() => new Response(undefined, { status: 401 }))
+		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			name: 'ProviderError',
+			code: 'HTTP',
+			status: 401,
+			message: 'provider error: 401',
+		})
 	})
 
 	it('retains HTTP status and cause when the error body cannot be read', async () => {

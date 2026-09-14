@@ -2234,7 +2234,7 @@ export type RelayFrame =
 	| ProviderDelta
 	| { readonly channel: 'result'; readonly result: ProviderResult }
 	| { readonly channel: 'abort'; readonly partial: ProviderResult }
-	| { readonly channel: 'error'; readonly code: 'PROVIDER'; readonly message: string }
+	| { readonly channel: 'error'; readonly message: string }
 
 /** Defines a host-independent relay request handler. */
 export type RelayHandler = (request: Request) => Promise<Response>
@@ -2242,8 +2242,20 @@ export type RelayHandler = (request: Request) => Promise<Response>
 /** Configures the upstream provider, mandatory authorization, and request byte limit. */
 export interface RelayOptions {
 	readonly provider: ProviderInterface
+	/**
+	 * Authorizes the request before its body is read.
+	 *
+	 * @remarks
+	 * The hook must not consume the request body; a body-reading hook locks the stream
+	 * and the handler answers with the `400` status. The relay performs no origin or
+	 * method check. An application trusting an ambient credential such as a cookie
+	 * must compose origin and CSRF middleware before the handler to prevent cross-site calls.
+	 */
 	readonly authorize: (request: Request) => boolean | Promise<boolean>
-	/** Bounds the request body in bytes; the handler answers 413 when the limit is exceeded. */
+	/**
+	 * Bounds the request body in bytes; the handler answers with the `413` status
+	 * for a body at or above the limit.
+	 */
 	readonly limit?: number
 }
 
@@ -2264,5 +2276,9 @@ export interface RelayProviderOptions extends ProviderOptions {
 /** Carries a decoded stream prefix and whether the stream ended within its byte budget. */
 export interface TextRead {
 	readonly text: string
+	/**
+	 * Reports true only when a read observes the `done` flag before exhausting the
+	 * byte budget; an abort reports false.
+	 */
 	readonly complete: boolean
 }

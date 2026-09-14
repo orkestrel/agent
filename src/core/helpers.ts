@@ -808,10 +808,9 @@ export function buildProviderResult(
  * Reads a UTF-8 prefix of a byte stream and cancels its remainder.
  *
  * @remarks
- * `limit` bounds bytes passed to the decoder, including a partial final character.
- * An omitted limit reads to completion. A source may deliver a chunk larger than
- * the remaining limit; its unused bytes are discarded without decoding. After an
- * exact budget match, reads one further chunk to distinguish EOF from overflow.
+ * The `limit` parameter bounds bytes passed to the decoder, including a partial final
+ * character. An omitted limit reads to completion. A source may deliver a chunk larger
+ * than the remaining limit; its unused bytes are discarded without decoding.
  * The read can overshoot by one source chunk. An abort leaves completion false.
  *
  * @param body - The readable byte stream
@@ -820,6 +819,8 @@ export function buildProviderResult(
  * @returns The decoded prefix and whether EOF occurred within the byte budget
  * @example
  * ```ts
+ * import { readText } from '@orkestrel/agent'
+ *
  * const body = new Response('answer').body
  * if (body !== null) await readText(body, 3) // { text: 'ans', complete: false }
  * ```
@@ -850,7 +851,7 @@ export async function readText(
 				// An already-aborted read still returns its empty prefix.
 			})
 		}
-		for (;;) {
+		while (remaining > 0) {
 			if (signal?.aborted) break
 			const step = await reader.read()
 			if (signal?.aborted) break
@@ -858,11 +859,9 @@ export async function readText(
 				complete = true
 				break
 			}
-			if (remaining <= 0) break
 			const bytes = step.value.subarray(0, remaining)
 			text += decoder.decode(bytes, { stream: true })
 			remaining -= bytes.byteLength
-			if (step.value.byteLength > bytes.byteLength) break
 		}
 		return { text: text + decoder.decode(), complete }
 	} finally {

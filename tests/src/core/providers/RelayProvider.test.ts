@@ -1,4 +1,4 @@
-import type { ProviderRequest } from '@src/core'
+import type { ProviderRequest, RelayFrame } from '@src/core'
 import { parseJSONAs } from '@orkestrel/contract'
 import { requireValue, roundTripJSON } from '@orkestrel/test'
 import {
@@ -6,11 +6,13 @@ import {
 	providerRequestContract,
 	relayFrameContract,
 	ProviderAbortError,
+	ProviderError,
 	RelayProvider,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	createParser,
+	createHostileSerializer,
 	createRefusingTransport,
 	createStreamingTransport,
 	createToolCall,
@@ -18,6 +20,65 @@ import {
 } from '../../../setup.js'
 
 describe('RelayProvider', () => {
+	it('rejects a synthetic parameters serializer before fetching', async () => {
+		const transport = createRefusingTransport()
+		const provider = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: transport.fetch,
+		})
+		const result = provider.generate([], new AbortController().signal, [
+			{ name: 'hostile', parameters: createHostileSerializer() },
+		])
+		await expect(result).rejects.toBeInstanceOf(ProviderError)
+		await expect(result).rejects.toMatchObject({ code: 'PROTOCOL' })
+		expect(transport.signals).toEqual([])
+	})
+	it('rejects a synthetic schema serializer before fetching', async () => {
+		const transport = createRefusingTransport()
+		const provider = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: transport.fetch,
+		})
+		await expect(
+			provider.generate([], new AbortController().signal, undefined, {
+				schema: createHostileSerializer(),
+			}),
+		).rejects.toMatchObject({ name: 'ProviderError', code: 'PROTOCOL' })
+		expect(transport.signals).toEqual([])
+	})
+	it('owns a valid request snapshot without changing its JSON values', () => {
+		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const parameters = { x: 1 }
+		const schema = { type: 'object' }
+		const request: ProviderRequest = {
+			messages: [],
+			tools: [{ name: 'valid', parameters }],
+			options: { schema },
+		}
+		const snapshot = provider.body(request)
+		if (!providerRequestContract.is(snapshot)) throw new Error('invalid request snapshot')
+		expect(parseJSONAs(JSON.stringify(snapshot), providerRequestContract.is)).toEqual(request)
+		parameters.x = 2
+		schema.type = 'string'
+		expect(parseJSONAs(JSON.stringify(snapshot), providerRequestContract.is)).toEqual({
+			messages: [],
+			tools: [{ name: 'valid', parameters: { x: 1 } }],
+			options: { schema: { type: 'object' } },
+		})
+	})
+	it('refuses an error frame carrying a decorative code member', () => {
+		expectTypeOf<Extract<RelayFrame, { channel: 'error' }>>().toEqualTypeOf<{
+			readonly channel: 'error'
+			readonly message: string
+		}>()
+		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const frame = { channel: 'error', code: 'PROVIDER', message: 'unavailable' }
+		expect(relayFrameContract.is(frame)).toBe(false)
+		expect(() => provider.read(frame)).toThrow('invalid relay frame')
+		expect(relayFrameContract.is({ channel: 'error', message: 'unavailable' })).toBe(true)
+	})
 	it('projects declared request fields and omits caller context before a JSON round trip', () => {
 		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
 		const request: ProviderRequest = {

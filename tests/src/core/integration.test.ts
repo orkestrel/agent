@@ -5,6 +5,7 @@ import {
 	createRelay,
 	createRelayProvider,
 	ProviderAbortError,
+	ProviderError,
 	providerRequestContract,
 	RELAY_PROVIDER_MESSAGE,
 	relayFrameContract,
@@ -18,11 +19,67 @@ import {
 	createToolCall,
 	drainProvider,
 	FailingProvider,
+	RecordedProvider,
 	type DeltasOf,
 } from '../../setup.js'
 import { collect, requireValue } from '@orkestrel/test'
 
 describe('in-process relay hop', () => {
+	it('carries a 401 refusal through the browser without entering stream', async () => {
+		const provider = new RecordedProvider()
+		const handler = createRelay({
+			provider,
+			authorize: (request) => request.headers.get('authorization') === 'Bearer accepted',
+		})
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			headers: () => ({ authorization: 'Bearer refused' }),
+			fetch: (input, init) => handler(new Request(input, init)),
+		})
+		const result = browser.generate([], new AbortController().signal)
+		await expect(result).rejects.toBeInstanceOf(ProviderError)
+		await expect(result).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 401,
+			message: 'provider error: 401',
+		})
+		expect(provider.entries).toBe(0)
+	})
+	it('carries a 413 refusal through the browser without entering stream', async () => {
+		const provider = new RecordedProvider()
+		const handler = createRelay({ provider, authorize: () => true, limit: 1 })
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: (input, init) => handler(new Request(input, init)),
+		})
+		const result = browser.generate([], new AbortController().signal)
+		await expect(result).rejects.toBeInstanceOf(ProviderError)
+		await expect(result).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 413,
+			message: 'provider error: 413',
+		})
+		expect(provider.entries).toBe(0)
+	})
+	it('carries a 400 refusal through the browser without entering stream', async () => {
+		const provider = new RecordedProvider()
+		const handler = createRelay({ provider, authorize: () => true })
+		const browser = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: (input, init) => handler(new Request(input, { ...init, body: '{"messages":null}' })),
+		})
+		const result = browser.generate([], new AbortController().signal)
+		await expect(result).rejects.toBeInstanceOf(ProviderError)
+		await expect(result).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 400,
+			message: 'provider error: 400',
+		})
+		expect(provider.entries).toBe(0)
+	})
 	it('round trips identified messages tools options deltas and the authoritative result', async () => {
 		const result = {
 			content: '<think>literal</think> answer',

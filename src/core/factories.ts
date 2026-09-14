@@ -31,6 +31,7 @@ import type {
 	ScopeManagerInterface,
 	ScopeManagerOptions,
 	ThinkSplitterInterface,
+	TextRead,
 } from './types.js'
 import type { DriverInterface, TableInterface } from '@orkestrel/database'
 import type { QueueInterface } from '@orkestrel/queue'
@@ -49,6 +50,7 @@ import {
 	INVALID_RELAY_STATUS,
 	OVERSIZED_RELAY_STATUS,
 	UNAUTHORIZED_RELAY_STATUS,
+	UPSTREAM_RELAY_STATUS,
 } from './constants.js'
 import { providerRequestContract } from './contracts.js'
 import { Conversation } from './conversations/Conversation.js'
@@ -67,12 +69,38 @@ import { ThinkSplitter } from './ThinkSplitter.js'
 /**
  * Creates an authorized relay handler that validates a bounded JSON request before streaming.
  *
+ * @remarks
+ * Answers with the `401` status when authorization refuses or throws, the `400`
+ * status when the body is missing, unreadable, or invalid, the `413` status when
+ * the body fills its byte budget or the inbound read is aborted, and the `502`
+ * status when the upstream provider call cannot be constructed. Refusals carry no body.
+ *
  * @param options - The upstream provider, authorization decision, and optional byte budget
  * @returns A fetch-standard handler suitable for a router
  * @example
  * ```ts
- * const handler = createRelay({ provider, authorize: (request) => verify(request) })
- * const response = await handler(request)
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createRelay, createRelayProvider } from '@orkestrel/agent'
+ * // The browser application supplies this parser dependency.
+ * import { createNDJSONParser } from '@orkestrel/ndjson'
+ * import { createDispatcher } from '@orkestrel/router'
+ *
+ * export function connectRelay(upstream: ProviderInterface, bearer: string) {
+ * 	const handler = createRelay({
+ * 		provider: upstream,
+ * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
+ * 	})
+ * 	const dispatcher = createDispatcher({
+ * 		routes: [{ method: 'POST', path: '/relay', handler }],
+ * 	})
+ * 	const browser = createRelayProvider({
+ * 		url: 'https://relay.example/relay',
+ * 		parser: createNDJSONParser,
+ * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
+ * 		fetch: (input, init) => dispatcher.handle(new Request(input, init), undefined),
+ * 	})
+ * 	return { browser, dispatcher }
+ * }
  * ```
  */
 export function createRelay(options: RelayOptions): RelayHandler {
@@ -86,11 +114,22 @@ export function createRelay(options: RelayOptions): RelayHandler {
 			return new Response(undefined, { status: UNAUTHORIZED_RELAY_STATUS })
 		}
 		if (request.body === null) return new Response(undefined, { status: INVALID_RELAY_STATUS })
-		const read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal)
+		let read: TextRead
+		try {
+			read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal)
+		} catch {
+			return new Response(undefined, {
+				status: request.signal.aborted ? OVERSIZED_RELAY_STATUS : INVALID_RELAY_STATUS,
+			})
+		}
 		if (!read.complete) return new Response(undefined, { status: OVERSIZED_RELAY_STATUS })
 		const parsed = parseJSONAs(read.text, providerRequestContract.is)
 		if (parsed === undefined) return new Response(undefined, { status: INVALID_RELAY_STATUS })
-		return new RelayStream({ provider, request: parsed, signal: request.signal }).response
+		try {
+			return new RelayStream({ provider, request: parsed, signal: request.signal }).response
+		} catch {
+			return new Response(undefined, { status: UPSTREAM_RELAY_STATUS })
+		}
 	}
 }
 
@@ -101,7 +140,28 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * @returns The concrete relay provider
  * @example
  * ```ts
- * const provider = createRelayProvider({ url: 'https://relay.example/', parser: createParser })
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createRelay, createRelayProvider } from '@orkestrel/agent'
+ * // The browser application supplies this parser dependency.
+ * import { createNDJSONParser } from '@orkestrel/ndjson'
+ * import { createDispatcher } from '@orkestrel/router'
+ *
+ * export function connectRelay(upstream: ProviderInterface, bearer: string) {
+ * 	const handler = createRelay({
+ * 		provider: upstream,
+ * 		authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
+ * 	})
+ * 	const dispatcher = createDispatcher({
+ * 		routes: [{ method: 'POST', path: '/relay', handler }],
+ * 	})
+ * 	const browser = createRelayProvider({
+ * 		url: 'https://relay.example/relay',
+ * 		parser: createNDJSONParser,
+ * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
+ * 		fetch: (input, init) => dispatcher.handle(new Request(input, init), undefined),
+ * 	})
+ * 	return { browser, dispatcher }
+ * }
  * ```
  */
 export function createRelayProvider(options: RelayProviderOptions): RelayProvider {

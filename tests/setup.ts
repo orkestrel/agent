@@ -208,6 +208,32 @@ export function createRelayRequest(body = '{"messages":[]}', signal?: AbortSigna
 	})
 }
 
+/** Creates a streamed POST request for body-read failure and cancellation proofs. */
+export function createStreamingRelayRequest(
+	body: ReadableStream<Uint8Array>,
+	signal?: AbortSignal,
+): Request {
+	const options = {
+		method: 'POST',
+		body,
+		duplex: 'half',
+		...(signal === undefined ? {} : { signal }),
+	}
+	return new Request('http://relay.test/', options)
+}
+
+/** Creates a JSON-shaped proxy with a synthetic serializer that returns a bigint. */
+export function createHostileSerializer(): Readonly<Record<string, unknown>> {
+	return new Proxy(
+		{ x: 1 },
+		{
+			get(target, key) {
+				return key === 'toJSON' ? () => 1n : Reflect.get(target, key)
+			},
+		},
+	)
+}
+
 /**
  * Replays the turns {@link createScriptedProvider} scripts — a REAL {@link ProviderInterface}
  * that honours its signal between every delta and records its calls.
@@ -358,14 +384,36 @@ export class FailingProvider extends ScriptedProvider {
 /** Records iterator entry and return while forwarding a real scripted generator. */
 export class RecordedProvider extends ScriptedProvider {
 	readonly #gate: Promise<void>
+	readonly #failure: Error | undefined
+	readonly #ready = Promise.withResolvers<void>()
+	readonly #closed = Promise.withResolvers<void>()
+	#entries = 0
+	#finished = false
 	#active = 0
 	#maximum = 0
 	#steps = 0
 	#returns = 0
 	#cancelled = false
-	constructor(turns: readonly ScriptedTurn[], gate = Promise.resolve()) {
+	constructor(
+		turns: readonly ScriptedTurn[] = [{ content: 'queued' }],
+		gate = Promise.resolve(),
+		failure?: Error,
+	) {
 		super(turns, { record: true })
 		this.#gate = gate
+		this.#failure = failure
+	}
+	get entries(): number {
+		return this.#entries
+	}
+	get finished(): boolean {
+		return this.#finished
+	}
+	get ready(): Promise<void> {
+		return this.#ready.promise
+	}
+	get closed(): Promise<void> {
+		return this.#closed.promise
 	}
 	get active(): number {
 		return this.#active
@@ -388,7 +436,9 @@ export class RecordedProvider extends ScriptedProvider {
 		tools?: readonly ToolDefinition[],
 		options?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
-		const iterator = super.stream(messages, signal, tools, options)
+		this.#entries += 1
+		if (this.#failure !== undefined) throw this.#failure
+		const iterator = this.#iterate(messages, signal, tools, options)
 		return {
 			next: this.#next.bind(this, iterator),
 			return: this.#return.bind(this, iterator, signal),
@@ -399,6 +449,19 @@ export class RecordedProvider extends ScriptedProvider {
 			[Symbol.asyncDispose]: iterator[Symbol.asyncDispose].bind(iterator),
 		}
 	}
+	async *#iterate(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		try {
+			return yield* super.stream(messages, signal, tools, options)
+		} finally {
+			this.#finished = true
+			this.#closed.resolve()
+		}
+	}
 	async #next(
 		iterator: AsyncGenerator<ProviderDelta, ProviderResult>,
 	): Promise<IteratorResult<ProviderDelta, ProviderResult>> {
@@ -407,7 +470,9 @@ export class RecordedProvider extends ScriptedProvider {
 		this.#maximum = Math.max(this.#maximum, this.#active)
 		try {
 			await this.#gate
-			return await iterator.next()
+			const step = await iterator.next()
+			this.#ready.resolve()
+			return step
 		} finally {
 			this.#active -= 1
 		}
@@ -1213,5 +1278,5 @@ export const RELAY_WIRE_FRAMES: readonly RelayFrame[] = Object.freeze([
 	{ channel: 'thinking', text: 'reason' },
 	{ channel: 'result', result: { content: 'answer' } },
 	{ channel: 'abort', partial: { content: 'partial' } },
-	{ channel: 'error', code: 'PROVIDER', message: 'unavailable' },
+	{ channel: 'error', message: 'unavailable' },
 ])

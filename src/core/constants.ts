@@ -111,6 +111,9 @@ export const RELAY_PROVIDER_MESSAGE = 'relay provider failed'
 /** Rejects a relay request whose authorization does not succeed. */
 export const UNAUTHORIZED_RELAY_STATUS = 401
 
+/** Identifies a relay provider call that could not be constructed. */
+export const UPSTREAM_RELAY_STATUS = 502
+
 /** Rejects a relay request whose body fails validation. */
 export const INVALID_RELAY_STATUS = 400
 

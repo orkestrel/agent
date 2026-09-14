@@ -282,9 +282,11 @@ export abstract class AgentProvider<
 				)
 			}
 			signal.throwIfAborted()
-			throw new ProviderError('HTTP', `provider error: ${response.status} - ${detail}`, {
-				status: response.status,
-			})
+			throw new ProviderError(
+				'HTTP',
+				`provider error: ${response.status}${detail === '' ? '' : ` - ${detail}`}`,
+				{ status: response.status },
+			)
 		}
 		return response
 	}

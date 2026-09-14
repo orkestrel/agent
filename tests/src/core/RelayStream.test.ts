@@ -17,6 +17,26 @@ import {
 } from '../../setup.js'
 
 describe('RelayStream', () => {
+	it('returns and finalizes the generator on inbound abort with a queued unread frame', async () => {
+		const provider = new RecordedProvider()
+		const abort = new AbortController()
+		const response = new RelayStream({ provider, request: { messages: [] }, signal: abort.signal })
+			.response
+		try {
+			await provider.ready
+			await waitForDelay()
+			expect(response.bodyUsed).toBe(false)
+			expect(provider.finished).toBe(false)
+			abort.abort()
+			await Promise.race([provider.closed, waitForDelay(80)])
+			expect(provider.returns).toBe(1)
+			expect(provider.finished).toBe(true)
+			expect(provider.cancelled).toBe(true)
+			expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+		} finally {
+			await response.body?.cancel()
+		}
+	}, 400)
 	it('writes validated deltas and the authoritative result with response headers', async () => {
 		const result = {
 			content: 'answer',
@@ -60,7 +80,6 @@ describe('RelayStream', () => {
 		expect(text).not.toContain('stack')
 		expect(parseJSONAs(text, relayFrameContract.is)).toEqual({
 			channel: 'error',
-			code: 'PROVIDER',
 			message: RELAY_PROVIDER_MESSAGE,
 		})
 		expect(getEventListeners(signal, 'abort')).toEqual([])
@@ -88,7 +107,6 @@ describe('RelayStream', () => {
 		}).response
 		expect(parseJSONAs(await response.text(), relayFrameContract.is)).toEqual({
 			channel: 'error',
-			code: 'PROVIDER',
 			message: RELAY_PROVIDER_MESSAGE,
 		})
 	})
