@@ -2,6 +2,12 @@
 // repository's own `guides/README.md` manifest. The constants that follow are this
 // package's own, as is the executed section that closes the file.
 
+import type {
+	ProviderIncrement,
+	ProviderOptions,
+	ProviderParserInterface,
+	ProviderRequest,
+} from '@src/core'
 import { GuideCommand } from '@orkestrel/guide/server'
 import { readInventory } from '@orkestrel/test/server'
 import { createVitest } from 'vitest/node'
@@ -42,14 +48,52 @@ await new GuideCommand({
 	const { createMemoryDriver } = await import('@orkestrel/database')
 	const barrel = await import('@src/core')
 	const {
+		AgentProvider,
 		createConversation,
 		createConversationManager,
 		createDatabaseConversationStore,
 		createInstructionManager,
 		createMemoryConversationStore,
+		createRelay,
+		createRelayProvider,
+		ProviderError,
+		relayFrameContract,
 		sanitizeToken,
 	} = barrel
+	const { createParser, createScriptedProvider } = await import('./setup.js')
 	const { describe, expect, it } = await import('vitest')
+
+	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
+	// an `it` body because `AgentProvider` is only in scope after the dynamic barrel import.
+	class TextFrame implements ProviderParserInterface<string> {
+		parse(chunk: string): readonly string[] {
+			return [chunk]
+		}
+		clear(): void {} // Raw text retains no framing state.
+	}
+
+	interface TextOptions extends ProviderOptions {
+		readonly url: string
+	}
+
+	class TextProvider extends AgentProvider<string> {
+		readonly name = 'text'
+		constructor(options: TextOptions) {
+			super({ ...options, path: '/generate' })
+		}
+		frame(): ProviderParserInterface<string> {
+			return new TextFrame()
+		}
+		body(request: ProviderRequest): object {
+			return { messages: request.messages }
+		}
+		read(record: string): ProviderIncrement {
+			return { content: record, thinking: '', tools: [] }
+		}
+		finish(_parser: ProviderParserInterface<string>): readonly string[] {
+			return [] // Raw text retains no records at end of input.
+		}
+	}
 	const manifest = parseJSON(requireValue(files['package.json'], 'Missing inventory: package.json'))
 	if (!isRecord(manifest)) throw new Error('Invalid package manifest: package.json')
 
@@ -262,6 +306,159 @@ await new GuideCommand({
 		it('carries the snapshot fence line the transcription copies', () => {
 			expect(guideText).toContain(
 				'thread.snapshot() // { id, summary?, sections, messages } — the durable payload',
+			)
+		})
+
+		it('streams and settles a turn through the provider-subclass fence', async () => {
+			const bodies: unknown[] = []
+			const provider = new TextProvider({
+				url: 'https://text.test',
+				fetch: async (input, init) => {
+					const request = new Request(input, init)
+					bodies.push(JSON.parse(await request.text()))
+					return new Response('one two')
+				},
+			})
+			const deltas: string[] = []
+			const stream = provider.stream(
+				[{ id: '1', role: 'user', content: 'Say something.' }],
+				new AbortController().signal,
+			)
+			let step = await stream.next()
+			while (!step.done) {
+				deltas.push(step.value.text)
+				step = await stream.next()
+			}
+
+			// The fence's `read` hands every chunk back as content, so the assembled answer is the
+			// body verbatim and `finish` contributes nothing.
+			expect(deltas).toEqual(['one two'])
+			expect(step.value).toEqual({ content: 'one two' })
+			expect(bodies).toEqual([{ messages: [{ id: '1', role: 'user', content: 'Say something.' }] }])
+			expect(provider.name).toBe('text')
+		})
+
+		it('posts the subclass fence’s path onto its url', async () => {
+			const urls: string[] = []
+			const provider = new TextProvider({
+				url: 'https://text.test',
+				fetch: (input, init) => {
+					urls.push(new Request(input, init).url)
+					return Promise.resolve(new Response('ok'))
+				},
+			})
+			await provider.generate([], new AbortController().signal)
+
+			// `super({ ...options, path: '/generate' })` — the fence's path appends to its url.
+			expect(urls).toEqual(['https://text.test/generate'])
+		})
+
+		it('carries the provider-subclass fence lines the transcription copies', () => {
+			expect(guideText).toContain('class TextProvider extends AgentProvider<string> {')
+			expect(guideText).toContain("readonly name = 'text'")
+			expect(guideText).toContain("super({ ...options, path: '/generate' })")
+			expect(guideText).toContain('read(record: string): ProviderIncrement {')
+			expect(guideText).toContain("return { content: record, thinking: '', tools: [] }")
+		})
+
+		it('round trips the relay fence’s composition in process', async () => {
+			const upstream = createScriptedProvider([
+				{ result: { content: 'relayed answer' }, deltas: ['relayed', ' answer'] },
+			])
+			const bearer = 'fixture'
+			const handler = createRelay({
+				provider: upstream,
+				authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
+			})
+			const browser = createRelayProvider({
+				url: 'https://relay.example/relay',
+				parser: createParser,
+				headers: () => ({ authorization: `Bearer ${bearer}` }),
+				fetch: (input, init) => handler(new Request(input, init)),
+			})
+
+			// The browser end drives `ProviderInterface` exactly like a local provider, and the
+			// credential never leaves the handler's side of the hop.
+			expect(await browser.generate([], new AbortController().signal)).toEqual({
+				content: 'relayed answer',
+			})
+			expect(browser.name).toBe('relay')
+		})
+
+		it('refuses the relay fence’s hop when the bearer does not match', async () => {
+			const upstream = createScriptedProvider([{ content: 'never reached' }], { record: true })
+			const handler = createRelay({
+				provider: upstream,
+				authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
+			})
+			const browser = createRelayProvider({
+				url: 'https://relay.example/relay',
+				parser: createParser,
+				headers: () => ({ authorization: 'Bearer wrong' }),
+				fetch: (input, init) => handler(new Request(input, init)),
+			})
+			const refused = browser.generate([], new AbortController().signal)
+
+			// A refusal reaches the browser as a ProviderError with the HTTP code and that status,
+			// and the upstream provider is never entered.
+			await expect(refused).rejects.toBeInstanceOf(ProviderError)
+			await expect(refused).rejects.toMatchObject({
+				code: 'HTTP',
+				status: 401,
+				message: 'provider error: 401',
+			})
+			expect(upstream.started).toBe(0)
+		})
+
+		it('refuses a relay body at its byte limit and admits one below it', async () => {
+			const upstream = createScriptedProvider([{ content: 'admitted' }], { record: true })
+			const browserOf = (limit: number) =>
+				createRelayProvider({
+					url: 'https://app.example/relay',
+					parser: createParser,
+					fetch: (input, init) =>
+						createRelay({ provider: upstream, authorize: () => true, limit })(
+							new Request(input, init),
+						),
+				})
+			const exact = new TextEncoder().encode(
+				JSON.stringify(browserOf(1).body({ messages: [] })),
+			).byteLength
+			const refused = browserOf(exact).generate([], new AbortController().signal)
+
+			// `limit` refuses a body AT the limit, not merely above it: a body that fills the budget
+			// without reporting end of input is indistinguishable from one that exceeds it.
+			await expect(refused).rejects.toMatchObject({ code: 'HTTP', status: 413 })
+			expect(upstream.started).toBe(0)
+			expect(await browserOf(exact + 1).generate([], new AbortController().signal)).toEqual({
+				content: 'admitted',
+			})
+			expect(upstream.started).toBe(1)
+		})
+
+		it('carries the relay fence lines the transcription copies', () => {
+			expect(guideText).toContain('limit: 65_536, // a body at or above this answers 413')
+			expect(guideText).toContain('const handler = createRelay({')
+			expect(guideText).toContain(
+				"authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,",
+			)
+			expect(guideText).toContain('const browser = createRelayProvider({')
+			expect(guideText).toContain('parser: createNDJSONParser,')
+		})
+
+		it('answers the wire-contract fence’s guard readings', () => {
+			expect(relayFrameContract.is({ channel: 'error', message: 'relay provider failed' })).toBe(
+				true,
+			)
+			expect(relayFrameContract.is({ channel: 'error', message: 'oops', code: 'X' })).toBe(false)
+		})
+
+		it('carries the wire-contract fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"relayFrameContract.is({ channel: 'error', message: 'relay provider failed' }) // true",
+			)
+			expect(guideText).toContain(
+				"relayFrameContract.is({ channel: 'error', message: 'oops', code: 'X' }) // false — an extra member is refused",
 			)
 		})
 	})

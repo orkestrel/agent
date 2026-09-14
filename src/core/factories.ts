@@ -77,7 +77,7 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  *
  * @param options - The upstream provider, authorization decision, and optional byte budget
  * @returns A fetch-standard handler suitable for a router
- * @example
+ * @example Relaying a browser provider through your own server
  * ```ts
  * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createRelay, createRelayProvider } from '@orkestrel/agent'

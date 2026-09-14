@@ -29,7 +29,7 @@ import { buildProviderResult, joinThinking, readChunks, readText } from './helpe
  * `name`, `frame`, `body`, `read`, and `finish`; the constructor takes the `split`
  * and `strict` switches to control reasoning separation and settled-result requirements.
  *
- * @example
+ * @example Writing a provider for a new wire
  * ```ts
  * import type {
  * 	ProviderIncrement,
