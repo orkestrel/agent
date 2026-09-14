@@ -5,6 +5,7 @@ import {
 	MAX_ERROR_BODY_LENGTH,
 	ProviderAbortError,
 	ProviderError,
+	isProviderAbortError,
 	isProviderError,
 } from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
@@ -21,7 +22,7 @@ import {
 	ScriptedWire,
 } from '../../setup.js'
 
-describe('AgentProvider', () => {
+describe('AgentProvider — identity, transport, and request composition', () => {
 	it('mints an instance UUID and exposes exact optional context framing', () => {
 		const format: ContextFormat = { instructions: { open: 'instructions' } }
 		const provider = new ScriptedWire({ url: 'https://provider.test', format })
@@ -82,108 +83,9 @@ describe('AgentProvider', () => {
 		}).generate([], new AbortController().signal)
 		expect(requireValue(transport.requests[0]).headers.get('content-type')).toBe('application/json')
 	})
+})
 
-	it('clears the deadline after successful completion', async () => {
-		const transport = new RecordedTransport(() => new Response('c:ok'))
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			timeout: 20,
-		})
-		await provider.generate([], new AbortController().signal)
-		await waitForDelay(40)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	})
-
-	it('clears the deadline after a transport rejection', async () => {
-		const transport = createRefusingTransport()
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			timeout: 20,
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toThrow(
-			'fetch failed',
-		)
-		await waitForDelay(40)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	})
-
-	it('bounds the error-body read and cancels its remainder', async () => {
-		const body = new RecordedBody(
-			Array.from({ length: 16 }, () => new TextEncoder().encode('x'.repeat(512))),
-		)
-		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
-		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-			name: 'ProviderError',
-			code: 'HTTP',
-			status: 503,
-			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
-		})
-		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH + 512)
-		expect(body.cancelled).toBe(true)
-		expect(body.stream.locked).toBe(false)
-	})
-
-	it('races a never-resolving header hook against the deadline', async () => {
-		const transport = createRefusingTransport()
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			timeout: 10,
-			headers: () => new Promise(() => {}),
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toBeInstanceOf(
-			ProviderAbortError,
-		)
-		expect(transport.signals).toEqual([])
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	}, 250)
-
-	it('preserves a rejected header hook and issues no request', async () => {
-		const error = new Error('header rejected')
-		const transport = createRefusingTransport()
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			headers: () => Promise.reject(error),
-			timeout: 10,
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(error)
-		expect(transport.signals).toEqual([])
-	})
-
-	it('retains HTTP status and cause when the error body cannot be read', async () => {
-		const cause = new Error('broken body')
-		const body = new RecordedBody([], true, cause)
-		const transport = new RecordedTransport(() => new Response(body.stream, { status: 502 }))
-		await expect(
-			new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch }).generate(
-				[],
-				new AbortController().signal,
-			),
-		).rejects.toMatchObject({
-			code: 'HTTP',
-			status: 502,
-			cause,
-			message: 'provider error: 502 - (error body unavailable)',
-		})
-		expect(body.stream.locked).toBe(false)
-	})
-
-	it('rejects a successful response with no body as a protocol failure', async () => {
-		const transport = new RecordedTransport(() => new Response(null, { status: 204 }))
-		await expect(
-			new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch }).generate(
-				[],
-				new AbortController().signal,
-			),
-		).rejects.toMatchObject({ code: 'PROTOCOL' })
-	})
-
+describe('AgentProvider — stream assembly and settled results', () => {
 	it('assembles content, native reasoning, tool calls, and replacement usage', async () => {
 		const records = new Map<string, ProviderIncrement>([
 			[
@@ -272,34 +174,6 @@ describe('AgentProvider', () => {
 		})
 	})
 
-	it('returns a settled result unchanged without folding its duplicate fields', async () => {
-		const result = { content: 'authoritative', usage: { prompt: 1, completion: 1, total: 2 } }
-		const records = new Map<string, ProviderIncrement>([
-			['r:done', { content: 'duplicate', thinking: '', tools: [], result }],
-		])
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			records,
-			strict: true,
-			fetch: createStreamingTransport(['c:prior', 'r:done']),
-		})
-		const actual = await drainProvider(provider.stream([], new AbortController().signal))
-		expect(actual.result).toBe(result)
-		expect(actual.deltas).toEqual([{ channel: 'content', text: 'prior' }])
-	})
-
-	it('rejects strict end of input without a settled result', async () => {
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			strict: true,
-			fetch: createStreamingTransport(['c:partial']),
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-			code: 'PROTOCOL',
-			message: 'provider error: missing settled result',
-		})
-	})
-
 	it('feeds a buffered record through finish and clears the parser', async () => {
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
@@ -322,65 +196,150 @@ describe('AgentProvider', () => {
 		expect(await provider.generate([], new AbortController().signal)).toEqual({ content: '🌍' })
 	})
 
-	it('rejects an already-aborted call before framing or issuing a request', async () => {
-		const transport = createRefusingTransport()
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
-		await expect(provider.generate([], AbortSignal.abort())).rejects.toMatchObject({
-			partial: { content: '' },
-		})
-		expect(transport.signals).toEqual([])
-		expect(provider.parsers).toEqual([])
-	})
-
-	it('flushes held content into the partial when cancelled between deltas', async () => {
-		const abort = new AbortController()
+	it('returns a settled result unchanged without folding its duplicate fields', async () => {
+		const result = { content: 'authoritative', usage: { prompt: 1, completion: 1, total: 2 } }
+		const records = new Map<string, ProviderIncrement>([
+			['r:done', { content: 'duplicate', thinking: '', tools: [], result }],
+		])
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
-			fetch: createStreamingTransport(['c:answer<thi']),
+			records,
+			strict: true,
+			fetch: createStreamingTransport(['c:prior', 'r:done']),
 		})
-		const stream = provider.stream([], abort.signal)
-		expect(await stream.next()).toEqual({
-			done: false,
-			value: { channel: 'content', text: 'answer' },
+		const actual = await drainProvider(provider.stream([], new AbortController().signal))
+		expect(actual.result).toBe(result)
+		expect(actual.deltas).toEqual([{ channel: 'content', text: 'prior' }])
+	})
+
+	it('accepts a settled result retained by finish', async () => {
+		const result = { content: 'terminal', thinking: 'reason' }
+		const records = new Map<string, ProviderIncrement>([
+			['r:done', { content: '', thinking: '', tools: [], result }],
+		])
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records,
+			buffered: true,
+			strict: true,
+			fetch: createStreamingTransport(['r:', 'done']),
 		})
-		abort.abort()
-		await expect(stream.next()).rejects.toMatchObject({ partial: { content: 'answer<thi' } })
+		expect(await provider.generate([], new AbortController().signal)).toBe(result)
 		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
 	})
 
-	it('cancels a stalled readable body on the deadline', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('c:partial')], false)
-		const transport = new RecordedTransport(() => new Response(body.stream))
+	it('rejects strict end of input without a settled result', async () => {
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
-			timeout: 15,
-			fetch: transport.fetch,
+			strict: true,
+			fetch: createStreamingTransport(['c:partial']),
 		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-			partial: { content: 'partial' },
+			code: 'PROTOCOL',
+			message: 'provider error: missing settled result',
 		})
-		expect(body.cancelled).toBe(true)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
 	})
 
-	it('releases the reader and deadline after an early generator return', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
+	it('leaves a poison record undecoded after a result and cancels the body', async () => {
+		const result = { content: 'authoritative' }
+		const body = new RecordedBody(
+			['c:first', 'result', 'poison'].map((chunk) => new TextEncoder().encode(chunk)),
+			false,
+		)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
-			timeout: 20,
 			fetch: transport.fetch,
+			records: new Map<string, ProviderIncrement | Error>([
+				['result', { content: '', thinking: '', tools: [], result }],
+				['poison', new Error('decoded poison')],
+			]),
 		})
-		const stream = provider.stream([], new AbortController().signal)
-		await stream.next()
-		await stream.return({ content: 'stopped' })
-		await waitForDelay(40)
+		const actual = await drainProvider(provider.stream([], new AbortController().signal))
+		expect(actual.result).toBe(result)
+		expect(actual.deltas).toEqual([{ channel: 'content', text: 'first' }])
+		expect(provider.decoded).toEqual(['c:first', 'result'])
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+})
+
+describe('AgentProvider — HTTP failures and the bounded error body', () => {
+	it('bounds the error-body read and cancels its remainder', async () => {
+		const body = new RecordedBody(
+			Array.from({ length: 16 }, () => new TextEncoder().encode('x'.repeat(512))),
+		)
+		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
+		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			name: 'ProviderError',
+			code: 'HTTP',
+			status: 503,
+			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
+		})
+		expect(body.bytes).toBe(MAX_ERROR_BODY_LENGTH + 512)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
 	})
 
+	it('bounds decoded error bytes with the documented single-chunk overshoot', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('x'.repeat(8192))], false)
+		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
+		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 503,
+			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
+		})
+		expect(body.bytes).toBe(8192)
+		expect(body.count).toBe(1)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+
+	it('retains HTTP status and cause when the error body cannot be read', async () => {
+		const cause = new Error('broken body')
+		const body = new RecordedBody([], true, cause)
+		const transport = new RecordedTransport(() => new Response(body.stream, { status: 502 }))
+		await expect(
+			new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch }).generate(
+				[],
+				new AbortController().signal,
+			),
+		).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 502,
+			cause,
+			message: 'provider error: 502 - (error body unavailable)',
+		})
+		expect(body.stream.locked).toBe(false)
+	})
+
+	it('rejects a successful response with no body as a protocol failure', async () => {
+		const transport = new RecordedTransport(() => new Response(null, { status: 204 }))
+		await expect(
+			new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch }).generate(
+				[],
+				new AbortController().signal,
+			),
+		).rejects.toMatchObject({ code: 'PROTOCOL' })
+	})
+
+	it('preserves provider failure codes, status, cause, and instanceof narrowing', () => {
+		const cause = new Error('network')
+		const error = new ProviderError('HTTP', 'unavailable', { status: 503, cause })
+		expect(error).toBeInstanceOf(Error)
+		expect(error.name).toBe('ProviderError')
+		expect(error.code).toBe('HTTP')
+		expect(error.status).toBe(503)
+		expect(error.cause).toBe(cause)
+		expect(isProviderError(error)).toBe(true)
+		expect(isProviderError(new Error('plain'))).toBe(false)
+		expect(new ProviderError('PROTOCOL', 'missing').status).toBeUndefined()
+	})
+})
+
+describe('AgentProvider — failures that reach the caller unchanged', () => {
 	it('propagates a hostile record decoder error unchanged', async () => {
 		const error = new Error('hostile decoder')
 		const provider = new ScriptedWire({
@@ -402,86 +361,6 @@ describe('AgentProvider', () => {
 		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(error)
 	})
 
-	it('keeps concurrent calls isolated and generate equal to a drained stream', async () => {
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: createStreamingTransport(['c:<thi', 'c:nk>reason</think>answer']),
-		})
-		const [generated, streamed] = await Promise.all([
-			provider.generate([], new AbortController().signal),
-			drainProvider(provider.stream([], new AbortController().signal)),
-		])
-		expect(generated).toEqual({ content: 'answer', thinking: 'reason' })
-		expect(streamed.result).toEqual(generated)
-		expect(provider.parsers).toHaveLength(2)
-		expect(provider.parsers[0]).not.toBe(provider.parsers[1])
-		expect(provider.parsers.every((parser) => parser.cleared)).toBe(true)
-	})
-
-	it('preserves provider failure codes, status, cause, and instanceof narrowing', () => {
-		const cause = new Error('network')
-		const error = new ProviderError('HTTP', 'unavailable', { status: 503, cause })
-		expect(error).toBeInstanceOf(Error)
-		expect(error.name).toBe('ProviderError')
-		expect(error.code).toBe('HTTP')
-		expect(error.status).toBe(503)
-		expect(error.cause).toBe(cause)
-		expect(isProviderError(error)).toBe(true)
-		expect(isProviderError(new Error('plain'))).toBe(false)
-		expect(new ProviderError('PROTOCOL', 'missing').status).toBeUndefined()
-	})
-})
-
-describe('AgentProvider — cancellation and partial results', () => {
-	it('refuses buffered finish records after cancellation ends a pending read', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('c:unfolded')], false)
-		const transport = new RecordedTransport(() => new Response(body.stream))
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			buffered: true,
-		})
-		const abort = new AbortController()
-		const result = provider.generate([], abort.signal)
-		await body.pending
-		abort.abort()
-		await expect(result).rejects.toMatchObject({ partial: { content: '' } })
-		expect(provider.decoded).toEqual([])
-		expect(body.cancelled).toBe(true)
-		expect(body.stream.locked).toBe(false)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	})
-	it('normalizes a transport AbortError after the local deadline', async () => {
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: rejectTransportOnAbort,
-			timeout: 40,
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toBeInstanceOf(
-			ProviderAbortError,
-		)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	})
-
-	it('replaces a caller ProviderAbortError reason with the locally accumulated partial', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
-		const transport = new RecordedTransport(() => new Response(body.stream))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
-		const abort = new AbortController()
-		const stream = provider.stream([], abort.signal)
-		expect(await stream.next()).toEqual({
-			done: false,
-			value: { channel: 'content', text: 'answer' },
-		})
-		abort.abort(new ProviderAbortError({ content: 'foreign' }))
-		await expect(stream.next()).rejects.toMatchObject({
-			name: 'ProviderAbortError',
-			partial: { content: 'answer' },
-		})
-		expect(body.cancelled).toBe(true)
-		expect(body.stream.locked).toBe(false)
-	})
-
 	it('preserves a remote abort identity and cancels its open body with the local signal unaborted', async () => {
 		const failure = new ProviderAbortError({ content: 'remote partial' })
 		const body = new RecordedBody([new TextEncoder().encode('abort')], false)
@@ -499,95 +378,56 @@ describe('AgentProvider — cancellation and partial results', () => {
 		await waitForDelay(60)
 		expect(requireValue(transport.signals[0]).aborted).toBe(false)
 	})
+})
 
-	it('cancels a stalled 503 body within the deadline budget', async () => {
-		const body = new RecordedBody([], false)
-		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
-		const abort = new AbortController()
-		try {
-			const provider = new ScriptedWire({
-				url: 'https://provider.test',
-				fetch: transport.fetch,
-				timeout: 40,
-			})
-			const result = provider.generate([], abort.signal)
-			await expect(result).rejects.toMatchObject({
-				name: 'ProviderAbortError',
-				partial: { content: '' },
-			})
-			expect(body.cancelled).toBe(true)
-			expect(body.stream.locked).toBe(false)
-			expect(requireValue(transport.signals[0]).aborted).toBe(true)
-			expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-		} finally {
-			abort.abort()
-		}
-	}, 400)
-
-	it('stops between channels while retaining the complete decoded increment', async () => {
-		const abort = new AbortController()
-		const records = new Map<string, ProviderIncrement>([
-			[
-				'mixed',
-				{
-					content: 'answer',
-					thinking: 'reason',
-					tools: [{ id: 'call', name: 'lookup', arguments: {} }],
-					usage: { prompt: 1, completion: 2, total: 3 },
-				},
-			],
-		])
+describe('AgentProvider — the header hook inside the cancellation bound', () => {
+	it('races a never-resolving header hook against the deadline', async () => {
+		const transport = createRefusingTransport()
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
-			records,
-			fetch: createStreamingTransport(['mixed']),
+			fetch: transport.fetch,
+			timeout: 10,
+			headers: () => new Promise(() => {}),
 		})
-		const stream = provider.stream([], abort.signal)
-		await stream.next()
-		abort.abort()
-		await expect(stream.next()).rejects.toMatchObject({
-			partial: {
-				content: 'answer',
-				thinking: 'reason',
-				tools: [{ id: 'call', name: 'lookup', arguments: {} }],
-				usage: { prompt: 1, completion: 2, total: 3 },
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBeInstanceOf(
+			ProviderAbortError,
+		)
+		expect(transport.signals).toEqual([])
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	}, 250)
+
+	it('preserves a rejected header hook and issues no request', async () => {
+		const error = new Error('header rejected')
+		const transport = createRefusingTransport()
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			headers: () => Promise.reject(error),
+			timeout: 10,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(error)
+		expect(transport.signals).toEqual([])
+	})
+
+	it('cancels an unresolved header hook through the caller signal', async () => {
+		const abort = new AbortController()
+		const entered = Promise.withResolvers<void>()
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			headers: () => {
+				entered.resolve()
+				return new Promise(() => {})
 			},
 		})
+		const result = provider.generate([], abort.signal)
+		await entered.promise
+		abort.abort()
+		await expect(result).rejects.toMatchObject({ partial: { content: '' } })
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
 	})
 })
 
-describe('AgentProvider — call completion and isolation', () => {
-	it('clears the deadline after a non-OK response', async () => {
-		const transport = new RecordedTransport(() => new Response('unavailable', { status: 503 }))
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			timeout: 40,
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-			code: 'HTTP',
-		})
-		await waitForDelay(60)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-	})
-
-	it('clears the deadline after a decoder failure', async () => {
-		const failure = new Error('decoder failed')
-		const body = new RecordedBody([new TextEncoder().encode('poison')], false)
-		const transport = new RecordedTransport(() => new Response(body.stream))
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			fetch: transport.fetch,
-			timeout: 40,
-			records: new Map([['poison', failure]]),
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
-		await waitForDelay(60)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-		expect(body.cancelled).toBe(true)
-		expect(body.stream.locked).toBe(false)
-	})
-
+describe('AgentProvider — abort listener removal after the header hook', () => {
 	it('removes abort listeners after hook success and clears the deadline', async () => {
 		const pending = Promise.withResolvers<Readonly<Record<string, string>>>()
 		const hook = new RecordedHeaders(pending.promise)
@@ -678,28 +518,298 @@ describe('AgentProvider — call completion and isolation', () => {
 			pending.resolve({})
 		}
 	})
+})
 
-	it('leaves a poison record undecoded after a result and cancels the body', async () => {
-		const result = { content: 'authoritative' }
-		const body = new RecordedBody(
-			['c:first', 'result', 'poison'].map((chunk) => new TextEncoder().encode(chunk)),
-			false,
-		)
+describe('AgentProvider — cancellation and partial results', () => {
+	it('rejects an already-aborted call before framing or issuing a request', async () => {
+		const transport = createRefusingTransport()
+		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		await expect(provider.generate([], AbortSignal.abort())).rejects.toMatchObject({
+			partial: { content: '' },
+		})
+		expect(transport.signals).toEqual([])
+		expect(provider.parsers).toEqual([])
+	})
+
+	it('flushes held content into the partial when cancelled between deltas', async () => {
+		const abort = new AbortController()
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['c:answer<thi']),
+		})
+		const stream = provider.stream([], abort.signal)
+		expect(await stream.next()).toEqual({
+			done: false,
+			value: { channel: 'content', text: 'answer' },
+		})
+		abort.abort()
+		await expect(stream.next()).rejects.toMatchObject({ partial: { content: 'answer<thi' } })
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('stops between channels while retaining the complete decoded increment', async () => {
+		const abort = new AbortController()
+		const records = new Map<string, ProviderIncrement>([
+			[
+				'mixed',
+				{
+					content: 'answer',
+					thinking: 'reason',
+					tools: [{ id: 'call', name: 'lookup', arguments: {} }],
+					usage: { prompt: 1, completion: 2, total: 3 },
+				},
+			],
+		])
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records,
+			fetch: createStreamingTransport(['mixed']),
+		})
+		const stream = provider.stream([], abort.signal)
+		await stream.next()
+		abort.abort()
+		await expect(stream.next()).rejects.toMatchObject({
+			partial: {
+				content: 'answer',
+				thinking: 'reason',
+				tools: [{ id: 'call', name: 'lookup', arguments: {} }],
+				usage: { prompt: 1, completion: 2, total: 3 },
+			},
+		})
+	})
+
+	it('cancels a stalled readable body on the deadline', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('c:partial')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			timeout: 15,
+			fetch: transport.fetch,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			partial: { content: 'partial' },
+		})
+		expect(body.cancelled).toBe(true)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('cancels a stalled 503 body within the deadline budget', async () => {
+		const body = new RecordedBody([], false)
+		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
+		const abort = new AbortController()
+		try {
+			const provider = new ScriptedWire({
+				url: 'https://provider.test',
+				fetch: transport.fetch,
+				timeout: 40,
+			})
+			const result = provider.generate([], abort.signal)
+			await expect(result).rejects.toMatchObject({
+				name: 'ProviderAbortError',
+				partial: { content: '' },
+			})
+			expect(body.cancelled).toBe(true)
+			expect(body.stream.locked).toBe(false)
+			expect(requireValue(transport.signals[0]).aborted).toBe(true)
+			expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+		} finally {
+			abort.abort()
+		}
+	}, 400)
+
+	it('refuses buffered finish records after cancellation ends a pending read', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('c:unfolded')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			fetch: transport.fetch,
-			records: new Map<string, ProviderIncrement | Error>([
-				['result', { content: '', thinking: '', tools: [], result }],
-				['poison', new Error('decoded poison')],
-			]),
+			buffered: true,
 		})
-		const actual = await drainProvider(provider.stream([], new AbortController().signal))
-		expect(actual.result).toBe(result)
-		expect(actual.deltas).toEqual([{ channel: 'content', text: 'first' }])
-		expect(provider.decoded).toEqual(['c:first', 'result'])
+		const abort = new AbortController()
+		const result = provider.generate([], abort.signal)
+		await body.pending
+		abort.abort()
+		await expect(result).rejects.toMatchObject({ partial: { content: '' } })
+		expect(provider.decoded).toEqual([])
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('normalizes a transport AbortError after the local deadline', async () => {
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: rejectTransportOnAbort,
+			timeout: 40,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBeInstanceOf(
+			ProviderAbortError,
+		)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('replaces a caller ProviderAbortError reason with the locally accumulated partial', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const abort = new AbortController()
+		const stream = provider.stream([], abort.signal)
+		expect(await stream.next()).toEqual({
+			done: false,
+			value: { channel: 'content', text: 'answer' },
+		})
+		abort.abort(new ProviderAbortError({ content: 'foreign' }))
+		await expect(stream.next()).rejects.toMatchObject({
+			name: 'ProviderAbortError',
+			partial: { content: 'answer' },
+		})
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+
+	it('carries a decoder failure that raced the cancel as the abort error cause', async () => {
+		const abort = new AbortController()
+		const failure = new ProviderError('PROTOCOL', 'provider error: malformed record')
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			abort,
+			records: new Map([['poison', failure]]),
+			fetch: createStreamingTransport(['poison']),
+		})
+		const caught = await provider.generate([], abort.signal).then(
+			() => undefined,
+			(error: unknown) => (isProviderAbortError(error) ? error : undefined),
+		)
+		expect(provider.decoded).toEqual(['poison'])
+		expect(requireValue(caught).partial).toEqual({ content: '' })
+		expect(requireValue(caught).cause).toBe(failure)
+	})
+
+	it('leaves the cause undefined when the cancel is the only failure', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('c:partial')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			timeout: 15,
+			fetch: transport.fetch,
+		})
+		const caught = await provider.generate([], new AbortController().signal).then(
+			() => undefined,
+			(error: unknown) => (isProviderAbortError(error) ? error : undefined),
+		)
+		expect(requireValue(caught).partial).toEqual({ content: 'partial' })
+		expect(requireValue(caught).cause).toBeUndefined()
+	})
+})
+
+describe('AgentProvider — deadline clearing and reader release on every exit', () => {
+	it('clears the deadline after successful completion', async () => {
+		const transport = new RecordedTransport(() => new Response('c:ok'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			timeout: 20,
+		})
+		await provider.generate([], new AbortController().signal)
+		await waitForDelay(40)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('clears the deadline after a transport rejection', async () => {
+		const transport = createRefusingTransport()
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			timeout: 20,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toThrow(
+			'fetch failed',
+		)
+		await waitForDelay(40)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('releases the reader and deadline after an early generator return', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			timeout: 20,
+			fetch: transport.fetch,
+		})
+		const stream = provider.stream([], new AbortController().signal)
+		await stream.next()
+		await stream.return({ content: 'stopped' })
+		await waitForDelay(40)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('clears the deadline after a non-OK response', async () => {
+		const transport = new RecordedTransport(() => new Response('unavailable', { status: 503 }))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			timeout: 40,
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'HTTP',
+		})
+		await waitForDelay(60)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+	})
+
+	it('clears the deadline after a decoder failure', async () => {
+		const failure = new Error('decoder failed')
+		const body = new RecordedBody([new TextEncoder().encode('poison')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			timeout: 40,
+			records: new Map([['poison', failure]]),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+		await waitForDelay(60)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+
+	it('clears the local deadline after a remotely reported abort', async () => {
+		const failure = new ProviderAbortError({ content: 'remote' })
+		const transport = new RecordedTransport(() => new Response('abort'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			timeout: 20,
+			fetch: transport.fetch,
+			records: new Map([['abort', failure]]),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+		await waitForDelay(40)
+		expect(requireValue(transport.signals[0]).aborted).toBe(false)
+	})
+})
+
+describe('AgentProvider — isolation between concurrent calls on one instance', () => {
+	it('keeps concurrent calls isolated and generate equal to a drained stream', async () => {
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['c:<thi', 'c:nk>reason</think>answer']),
+		})
+		const [generated, streamed] = await Promise.all([
+			provider.generate([], new AbortController().signal),
+			drainProvider(provider.stream([], new AbortController().signal)),
+		])
+		expect(generated).toEqual({ content: 'answer', thinking: 'reason' })
+		expect(streamed.result).toEqual(generated)
+		expect(provider.parsers).toHaveLength(2)
+		expect(provider.parsers[0]).not.toBe(provider.parsers[1])
+		expect(provider.parsers.every((parser) => parser.cleared)).toBe(true)
 	})
 
 	it('isolates distinct interleaved bodies while one splitter holds a cancelled prefix', async () => {
@@ -786,36 +896,6 @@ describe('AgentProvider — call completion and isolation', () => {
 		}
 	})
 
-	it('bounds decoded error bytes with the documented single-chunk overshoot', async () => {
-		const body = new RecordedBody([new TextEncoder().encode('x'.repeat(8192))], false)
-		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
-		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-			code: 'HTTP',
-			status: 503,
-			message: 'provider error: 503 - ' + 'x'.repeat(MAX_ERROR_BODY_LENGTH),
-		})
-		expect(body.bytes).toBe(8192)
-		expect(body.count).toBe(1)
-		expect(body.cancelled).toBe(true)
-		expect(body.stream.locked).toBe(false)
-	})
-
-	it('accepts a settled result retained by finish', async () => {
-		const result = { content: 'terminal', thinking: 'reason' }
-		const records = new Map<string, ProviderIncrement>([
-			['r:done', { content: '', thinking: '', tools: [], result }],
-		])
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			records,
-			buffered: true,
-			strict: true,
-			fetch: createStreamingTransport(['r:', 'done']),
-		})
-		expect(await provider.generate([], new AbortController().signal)).toBe(result)
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
-	})
 	it('isolates cancellation from a concurrent call on the same instance', async () => {
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
@@ -829,34 +909,5 @@ describe('AgentProvider — call completion and isolation', () => {
 		await expect(cancelled.next()).rejects.toMatchObject({ partial: { content: 'answer' } })
 		expect((await drainProvider(running)).result).toEqual({ content: 'answertail' })
 		expect(provider.parsers.every((parser) => parser.cleared)).toBe(true)
-	})
-	it('clears the local deadline after a remotely reported abort', async () => {
-		const failure = new ProviderAbortError({ content: 'remote' })
-		const transport = new RecordedTransport(() => new Response('abort'))
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			timeout: 20,
-			fetch: transport.fetch,
-			records: new Map([['abort', failure]]),
-		})
-		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
-		await waitForDelay(40)
-		expect(requireValue(transport.signals[0]).aborted).toBe(false)
-	})
-	it('cancels an unresolved header hook through the caller signal', async () => {
-		const abort = new AbortController()
-		const entered = Promise.withResolvers<void>()
-		const provider = new ScriptedWire({
-			url: 'https://provider.test',
-			headers: () => {
-				entered.resolve()
-				return new Promise(() => {})
-			},
-		})
-		const result = provider.generate([], abort.signal)
-		await entered.promise
-		abort.abort()
-		await expect(result).rejects.toMatchObject({ partial: { content: '' } })
-		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
 	})
 })

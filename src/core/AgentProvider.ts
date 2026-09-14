@@ -31,7 +31,12 @@ import { buildProviderResult, joinThinking, readChunks, readText } from './helpe
  *
  * @example
  * ```ts
- * import type { ProviderIncrement, ProviderParserInterface, ProviderRequest } from '@orkestrel/agent'
+ * import type {
+ * 	ProviderIncrement,
+ * 	ProviderOptions,
+ * 	ProviderParserInterface,
+ * 	ProviderRequest,
+ * } from '@orkestrel/agent'
  * import { AgentProvider } from '@orkestrel/agent'
  *
  * class TextFrame implements ProviderParserInterface<string> {
@@ -41,10 +46,14 @@ import { buildProviderResult, joinThinking, readChunks, readText } from './helpe
  * 	clear(): void {} // Raw text retains no framing state.
  * }
  *
+ * interface TextOptions extends ProviderOptions {
+ * 	readonly url: string
+ * }
+ *
  * class TextProvider extends AgentProvider<string> {
  * 	readonly name = 'text'
- * 	constructor(url: string) {
- * 		super({ url, path: '/generate' })
+ * 	constructor(options: TextOptions) {
+ * 		super({ ...options, path: '/generate' })
  * 	}
  * 	frame(): ProviderParserInterface<string> {
  * 		return new TextFrame()
@@ -199,13 +208,16 @@ export abstract class AgentProvider<
 		} catch (error) {
 			if (combined.aborted) {
 				splitter?.flush()
+				const partial = buildProviderResult(
+					splitter?.content ?? state.content,
+					joinThinking(splitter?.thinking, state.thinking),
+					state.tools,
+					state.usage,
+				)
+				// A throw that raced the cancel is the call's real failure, so it rides as the cause.
 				throw new ProviderAbortError(
-					buildProviderResult(
-						splitter?.content ?? state.content,
-						joinThinking(splitter?.thinking, state.thinking),
-						state.tools,
-						state.usage,
-					),
+					partial,
+					error === combined.reason ? undefined : { cause: error },
 				)
 			}
 			throw error

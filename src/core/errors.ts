@@ -19,15 +19,17 @@ import type {
  * Lets a caller recover the partial content (and any tool calls / usage seen so far)
  * on cancellation: `catch` the throw, narrow with {@link isProviderAbortError}, and
  * read `partial`. `code` is the machine-readable condition (`'ABORT'` — the only one this
- * error reports), so a `catch` branches on it rather than on the message string.
+ * error reports), so a `catch` branches on it rather than on the message string. `cause`
+ * holds the failure the cancel superseded when a throw raced the abort — the wire decoder's
+ * {@link ProviderError}, say — and is undefined when the cancel was the only failure.
  */
 export class ProviderAbortError extends Error {
 	/** Names the machine-readable condition — `'ABORT'`: a stream cancelled mid-flight. */
 	readonly code = 'ABORT' as const
 	readonly partial: ProviderResult
 
-	constructor(partial: ProviderResult) {
-		super('provider stream aborted')
+	constructor(partial: ProviderResult, options?: ErrorOptions) {
+		super('provider stream aborted', options)
 		this.name = 'ProviderAbortError'
 		this.partial = partial
 	}
@@ -230,7 +232,7 @@ export function isAgentError(value: unknown): value is AgentError {
  * `status` is present only for an `HTTP` failure; other codes leave it undefined.
  */
 export class ProviderError extends Error {
-	/** Identifies the HTTP, protocol, or upstream provider failure condition. */
+	/** Names the machine-readable condition — `'HTTP'`: a non-OK response, including a relay refusing an oversized request with 413; `'PROTOCOL'`: a missing response body, a malformed wire record, or a strict stream with no settled result; `'PROVIDER'`: an upstream failure carried by a relay error record. */
 	readonly code: ProviderErrorCode
 	/** Holds the response status for an HTTP failure, or undefined for other codes. */
 	readonly status: number | undefined

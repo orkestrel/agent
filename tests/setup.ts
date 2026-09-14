@@ -974,16 +974,21 @@ export class ScriptedFrame implements ProviderParserInterface<string> {
 	}
 }
 
-/** Holds scripted wire records and optional end-of-input buffering. */
+/**
+ * Holds scripted wire records, optional end-of-input buffering, and the controller a scripted
+ * failure aborts in the turn it throws, so a decoder throw races the cancel.
+ */
 export interface ScriptedWireOptions extends AgentProviderInput {
 	readonly records?: ReadonlyMap<string, ProviderIncrement | Error>
 	readonly buffered?: boolean
+	readonly abort?: AbortController
 }
 
 /** Drives the real provider engine with direct content/thinking records and scripted increments. */
 export class ScriptedWire extends AgentProvider<string> {
 	readonly #records: ReadonlyMap<string, ProviderIncrement | Error>
 	readonly #buffered: boolean
+	readonly #abort: AbortController | undefined
 	readonly #parsers: ScriptedFrame[] = []
 	readonly #decoded: string[] = []
 	readonly name = 'scripted'
@@ -991,6 +996,7 @@ export class ScriptedWire extends AgentProvider<string> {
 		super(options)
 		this.#records = options.records ?? new Map()
 		this.#buffered = options.buffered ?? false
+		this.#abort = options.abort
 	}
 	get parsers(): readonly ScriptedFrame[] {
 		return this.#parsers
@@ -1009,7 +1015,10 @@ export class ScriptedWire extends AgentProvider<string> {
 	read(record: string): ProviderIncrement {
 		this.#decoded.push(record)
 		const increment = this.#records.get(record)
-		if (increment instanceof Error) throw increment
+		if (increment instanceof Error) {
+			this.#abort?.abort()
+			throw increment
+		}
 		return (
 			increment ?? {
 				content: record.startsWith('c:') ? record.slice(2) : '',
@@ -1119,8 +1128,8 @@ export function rejectTransportOnAbort(
 	})
 }
 
-/** Returns true to expose validators that trust an input array's own methods. */
-export function acceptHostileArray(): boolean {
+/** Returns true as an array's own hostile `every`, exposing a guard that trusts the method. */
+export function approveEvery(): boolean {
 	return true
 }
 

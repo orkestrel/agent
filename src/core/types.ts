@@ -2178,7 +2178,6 @@ export interface ProviderIncrement {
 export interface ProviderOptions {
 	readonly timeout?: number
 	readonly fetch?: typeof globalThis.fetch
-	/** Resolves request headers using the call's combined cancellation signal. */
 	readonly headers?: (
 		signal: AbortSignal,
 	) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>
