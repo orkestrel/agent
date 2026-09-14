@@ -18,10 +18,8 @@ import {
 	createToolCall,
 	drainProvider,
 	RecordedTransport,
+	RELAY_RESULT_FRAME,
 } from '../../../setup.js'
-
-// One settled NDJSON turn, enough for a call that must reach the transport and return.
-const RELAY_RESULT_FRAME = '{"channel":"result","result":{"content":"answer"}}\n'
 
 describe('RelayProvider', () => {
 	it('sends the snapshot of hostile parameters and never consults their serializer', async () => {

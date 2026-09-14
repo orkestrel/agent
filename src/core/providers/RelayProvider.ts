@@ -14,9 +14,11 @@ import { ProviderAbortError, ProviderError } from '../errors.js'
  *
  * @remarks
  * The `ToolCall.caller` member never crosses the hop. The wire body is an owned snapshot of
- * the projection, so a custom serializer on an argument, a parameter schema, or a response
- * schema is ignored rather than consulted, and a value outside JSON is refused before
- * fetching. A remote abort reconstructs a `ProviderAbortError` instance without aborting the
+ * the projection read through property descriptors, so a serializer reachable only through a
+ * `get` trap or a prototype is never consulted; an own function-valued property such as a
+ * `toJSON` method is a value outside JSON and is refused before fetching, with the clone's
+ * failure as the refusal's `cause`. A remote abort reconstructs a `ProviderAbortError` instance
+ * without aborting the
  * local signal; the `Agent` runtime treats that instance as an error unless its own bound
  * signal is aborted.
  * Content is preserved verbatim, including literal thinking tags.

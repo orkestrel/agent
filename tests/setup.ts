@@ -1280,3 +1280,6 @@ export const RELAY_WIRE_FRAMES: readonly RelayFrame[] = Object.freeze([
 	{ channel: 'abort', partial: { content: 'partial' } },
 	{ channel: 'error', message: 'unavailable' },
 ])
+
+/** Supplies one settled NDJSON turn, enough for a call that must reach the transport and return. */
+export const RELAY_RESULT_FRAME = '{"channel":"result","result":{"content":"answer"}}\n'
