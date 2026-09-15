@@ -463,8 +463,8 @@ await new GuideCommand({
 			})
 			// The server half's composition runs as written apart from the `host` option a test
 			// listener needs. The fence's `serve` export is the alternative entry this listener stands
-			// in for, and `await server.stop()` after the case replaces the `SIGTERM` listener a test
-			// process outlives.
+			// in for, and the `await server.stop()` call in the case's `finally` block replaces the
+			// `SIGTERM` listener a test process outlives.
 			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
 			const port = await server.start()
 			try {
@@ -568,10 +568,10 @@ await new GuideCommand({
 				drained = performance.now() - closing
 			}
 
-			// A cancel leaves the client's socket aborted rather than idle, so `closeIdleConnections`
-			// does not reach it and `server.close()` waits on the socket itself — seconds, on a server
-			// that also served a completed call over that reused keep-alive socket. One server per
-			// case keeps the stop immediate.
+			// A cancel leaves the client's socket aborted rather than idle, so the
+			// `closeIdleConnections` step does not reach it and the `server.close()` call waits on the
+			// socket itself — seconds, on a server that also served a completed call over that reused
+			// keep-alive socket. One server per case keeps the stop immediate.
 			expect(drained).toBeLessThan(1000)
 			expect(server.status).toBe('stopped')
 		})
