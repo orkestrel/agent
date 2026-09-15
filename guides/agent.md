@@ -21,8 +21,8 @@ The agent-owned surface: the inference boundary and the HTTP engine behind it, t
 A provider turns a conversation (plus optional tools) into a turn: `generate` resolves the assembled `ProviderResult` (content + any tool calls + any usage); `stream` yields channel-tagged `ProviderDelta`s as they arrive (`content` for answer text, `thinking` for live reasoning) and returns the same assembled result when the stream completes, so a caller can render tokens / reasoning live and still get the full outcome. Both bound the call with an `AbortSignal`:
 
 ```ts
-import { createAbort } from '@orkestrel/abort'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAbort } from '@orkestrel/abort'
 
 declare const provider: ProviderInterface // any concrete implementation supplied by the host app
 const abort = createAbort()
@@ -72,8 +72,8 @@ Contained failure is the registry's contract, not a limitation of it: in-process
 Collect a turn's conversation in an `AgentContext`. Add turns through `context.messages` — the active conversation's live tail, always present, satisfying `MessageManagerInterface` by minting each `id` on `add` and keeping stored messages immutable and in insertion order — then `build()` the provider input: `[systemMessage?, ...messages]`. `context.tools` sits beside them, but it is a different kind of thing: the other managers assemble prompt text, while the tool registry exists so the loop can advertise definitions and dispatch calls. Its contents reach the model as the `tools` argument, never as a message:
 
 ```ts
-import { createAgentContext } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgentContext } from '@orkestrel/agent'
 import { createAbort } from '@orkestrel/abort'
 import { createToolManager } from '@orkestrel/tool'
 
@@ -95,8 +95,8 @@ const result = await provider.generate(input, abort.signal, definitions)
 Drive the whole turn with an `Agent` (`createAgent`) — it composes the provider, its `AgentContext`, and the tool registry into the bounded context → provider → tools → repeat loop. Seed the conversation through `agent.context.messages`, then either `generate()` for a one-shot `AgentResult` or `stream()` for a live `AgentChunk` stream (`token` answer deltas, `think` reasoning deltas, `tool` dispatches, `usage`) whose `result` resolves the same `AgentResult`. `generate` drains that same stream, so they can't diverge:
 
 ```ts
-import { createAgent } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent } from '@orkestrel/agent'
 import { createTokenBudget } from '@orkestrel/budget'
 import { createTool, createToolManager } from '@orkestrel/tool'
 
@@ -216,8 +216,8 @@ const input = context.build()
 Above the flat `MessageManagerInterface` sits the `Conversation` (`createConversation` / a `ConversationManager`) — it owns its messages directly and compacts older ones into summarized `sections` so a long history fits a turn's context window without discarding the originals. Append turns through the conversation's own `add` (the live uncompacted tail; `message` / `messages` / `remove` / `clear` / `count` round it out); `compact()` folds the older live messages into a summarized `Section` (retaining their originals), regenerates the conversation rollup `summary`, and shrinks `view()` — the model input, where each section becomes one summary message followed by the live tail. Compaction is driven by a provider-agnostic `ConversationSummaryHandler` seam (`(messages) => Promise<string>`) the agent runtime supplies, so a `compact()` without one throws a `ConversationError`. `keep` retains a recent tail (default `DEFAULT_CONVERSATION_KEEP` = `0`, fold all); `rehydrate(id)` / `search(query)` read the retained originals:
 
 ```ts
-import { createConversation } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createConversation } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface // any concrete implementation supplied by the host app
 // The summarizer seam — built from the provider by the runtime; core stays provider-agnostic.
@@ -531,8 +531,8 @@ The JSON wire projections the relay validates against, and the contracts compile
 A contract's `is` narrows an unknown record to its wire shape, and its `parse` projects one — returning the value stripped to that shape, or `undefined` when the value is invalid — so the same declaration guards an inbound body and shapes a frame written back out:
 
 ```ts
-import { providerRequestContract, relayFrameContract } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { providerRequestContract, relayFrameContract } from '@orkestrel/agent'
 
 declare const upstream: ProviderInterface
 declare const body: unknown
@@ -584,8 +584,8 @@ relayFrameContract.parse({ channel: 'error', message: 'oops', code: 'X' }) // { 
 Project an agent result at its originating package before carrying it through a JSON boundary:
 
 ```ts
-import { agentResultToJSON } from '@orkestrel/agent'
 import type { AgentResult } from '@orkestrel/agent'
+import { agentResultToJSON } from '@orkestrel/agent'
 
 declare const result: AgentResult
 const portable = agentResultToJSON(result)
@@ -596,8 +596,8 @@ JSON.stringify(portable)
 The queue and runner factories bind their named handlers to a registry and partial policy; callers composing the lower-level substrates can do the same:
 
 ```ts
-import { handleAgentQueueJob, handleAgentRunnerJob, sanitizeToken } from '@orkestrel/agent'
 import type { AgentRegistryInterface } from '@orkestrel/agent'
+import { handleAgentQueueJob, handleAgentRunnerJob, sanitizeToken } from '@orkestrel/agent'
 
 declare const registry: AgentRegistryInterface
 
@@ -1167,8 +1167,8 @@ if (turn.tools) {
 The preceding patterns are what an `Agent` does for you turn after turn — bounding the call, dispatching the model's tools, feeding the results back, and repeating until the model stops (or `limit` is hit). Reach for `createAgent` rather than hand-rolling the loop; bound and pace it through `AgentOptions`, and recover a cancel's partial from `result` (which resolves, never rejects, on a cancel).
 
 ```ts
-import { createAgent } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const agent = createAgent(provider, { timeout: 30_000, limit: 6 })
@@ -1205,8 +1205,8 @@ const result = await agent.generate() // partial: true if the story ran the budg
 An `Agent` exposes a pull and a push observation surface. Pull — the `AgentChunk` stream (`stream().events`) — is for a live consumer rendering per-token answer deltas and per-think reasoning deltas as they arrive. Push — the `emitter` (`AgentEventMap`) — is for fire-and-forget observers (logging, metrics, tracing) that want the loop's lifecycle moments without draining the stream: `start` (a run begins), `turn` (each iteration), `tool` (a dispatched call + its result), `usage` (a turn's token usage), `deny` (an authority denial — which never reaches the chunk stream), `finish` (the settled result), `error` (a genuine failure), `abort` (a cancel), and `exhaust` (the limit was reached while the model still held unresolved tool intent — fires instead of `abort`, still followed by `finish`). Per-token / per-thinking deltas stay the stream's job exclusively — there is deliberately no `token` or `think` event on the emitter; reach for the stream when you need live output, the emitter when you need lifecycle.
 
 ```ts
-import { createAgent } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 // Wire fire-and-forget observers at construction through the reserved `on` option …
@@ -1233,8 +1233,8 @@ One agent serves many conversations by switching the active conversation between
 The flow is **summary → search / rehydrate → reference → write-to-workspace** — and cherry-pick, never dump:
 
 ```ts
-import { createAgent, createConversationManager } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent, createConversationManager } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const conversations = createConversationManager({
@@ -1295,8 +1295,8 @@ for (const store of stores) {
 When you need many agents — bounded, retried, surviving a crash — describe each as a serializable `AgentJobInput` (names for the live pieces, data for the rest), register the live pieces once, and run them through a `createAgentQueue` (durable, bounded) or a `createAgentRunner` (one-shot, ordered, fail-fast, with sub-agent fan-out). The layer composes the `@orkestrel/queue` `Queue` and the `@orkestrel/workflow` `Runner` — it adds only rehydration and the partial policy, no new engine.
 
 ```ts
-import { createAgentQueue, createAgentRegistry } from '@orkestrel/agent'
 import type { AgentJobInput } from '@orkestrel/agent'
+import { createAgentQueue, createAgentRegistry } from '@orkestrel/agent'
 import { createMemoryQueueStore } from '@orkestrel/queue'
 
 declare const store: ReturnType<typeof createMemoryQueueStore> // or a server JSON / SQLite store
@@ -1334,8 +1334,8 @@ const results = await runner.execute([parent]) // [parent result, …then spawne
 A workspace reaches the model through `context.workspaces`, and this is the only channel documents have. `build()` renders the active workspace by carrier on every turn — active-only and scope-filtered — so the workspace the agent is working in is always what the prompt reflects, with nothing to re-mount after an edit. Register one (the first `add` auto-activates it) and its text files fold into the `## Workspace` system section as fenced reference blocks, while its image files' base64 rides the last user message.
 
 ```ts
-import { createAgent } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent } from '@orkestrel/agent'
 import { createToolManager } from '@orkestrel/tool'
 
 declare const provider: ProviderInterface
@@ -1354,8 +1354,8 @@ Reading is one half. To let the model edit what it reads, register the `createWo
 Only the active workspace renders; the other registered workspaces never reach the model at all. `switch` changes which one the model sees between runs:
 
 ```ts
-import { createAgent, createScope } from '@orkestrel/agent'
 import type { ProviderInterface } from '@orkestrel/agent'
+import { createAgent, createScope } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 const agent = createAgent(provider)
@@ -1381,6 +1381,7 @@ Because the editing tool drives the same registry, a switch moves both surfaces 
 Agent-owned registries expose their less-common removal, clearing, persistence, and lookup methods here. Tool and workspace registry operations are documented in their dependency guides.
 
 ```ts
+import type { ProviderInterface } from '@orkestrel/agent'
 import {
 	createAgent,
 	createAgentContext,
@@ -1391,7 +1392,6 @@ import {
 	createScopeManager,
 	createThinkSplitter,
 } from '@orkestrel/agent'
-import type { ProviderInterface } from '@orkestrel/agent'
 
 declare const provider: ProviderInterface
 

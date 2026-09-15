@@ -183,8 +183,8 @@ export function createRelayProvider(options: RelayProviderOptions): RelayProvide
  *
  * @example Conversations & compaction
  * ```ts
- * import { createConversation } from '@orkestrel/agent'
  * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createConversation } from '@orkestrel/agent'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * // The summarizer seam — built from the provider by the runtime; core stays provider-agnostic.
