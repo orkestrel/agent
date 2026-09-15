@@ -77,7 +77,7 @@
 		"@orkestrel/emitter": "^0.0.10",
 		"@orkestrel/queue": "^0.0.13",
 		"@orkestrel/timeout": "^0.0.10",
-		"@orkestrel/tool": "^0.0.14",
+		"@orkestrel/tool": "^0.0.15",
 		"@orkestrel/workflow": "^0.0.18",
 		"@orkestrel/workspace": "^0.0.8"
 	},
