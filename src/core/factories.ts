@@ -82,6 +82,7 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createRelay } from '@orkestrel/agent'
  * import { createDispatcher } from '@orkestrel/router'
+ * import { createServer } from '@orkestrel/server'
  *
  * declare const upstream: ProviderInterface // the server-side provider holding the credential
  * declare const bearer: string
@@ -97,6 +98,10 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  * export function serve(request: Request): Promise<Response> {
  * 	return dispatcher.handle(request, undefined)
  * }
+ *
+ * const server = createServer({ dispatcher, state: () => undefined })
+ * await server.start()
+ * process.on('SIGTERM', () => server.stop()) // stop draining new requests on shutdown
  * ```
  */
 export function createRelay(options: RelayOptions): RelayHandler {

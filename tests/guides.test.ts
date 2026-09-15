@@ -470,9 +470,10 @@ await new GuideCommand({
 			})
 			expect(browser.name).toBe('relay')
 
-			// The server half declares `{ method: 'POST', path: '/relay', handler }`. The dispatcher
-			// itself is not executed here, so the route is asserted against what the browser half
-			// actually sends: the request the handler receives carries that method and that path.
+			// The server half declares `{ method: 'POST', path: '/relay', handler }`. Neither the
+			// dispatcher nor the `createServer` start-up that follows it is executed here, so the
+			// route is asserted against what the browser half actually sends: the request the
+			// handler receives carries that method and that path.
 			const request = requireValue(received[0], 'Missing relay request')
 			expect(request.method).toBe('POST')
 			expect(new URL(request.url).pathname).toBe('/relay')

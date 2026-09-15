@@ -127,7 +127,7 @@ export const RELAY_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8'
 export const RELAY_PROVIDER_MESSAGE = 'relay provider failed'
 
 /**
- * Names the status a relay answers when `authorize` returns anything but `true` or throws —
+ * Names the status a relay answers when the `authorize` callback returns anything but `true` or throws —
  * `401`, carried with no body and reaching the browser as a `ProviderError` with the `HTTP` code.
  */
 export const UNAUTHORIZED_RELAY_STATUS = 401
