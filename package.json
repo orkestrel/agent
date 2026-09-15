@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/agent",
-	"version": "0.0.21",
+	"version": "0.0.22",
 	"description": "A typed conversation runtime for the @orkestrel line — providers, conversations, prompt assembly, authority, and the bounded agent loop. Part of the @orkestrel line.",
 	"keywords": [
 		"agent",
@@ -83,7 +83,7 @@
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.59.1",
-		"@orkestrel/guide": "^0.0.18",
+		"@orkestrel/guide": "^0.0.19",
 		"@orkestrel/probe": "^0.0.14",
 		"@orkestrel/router": "^0.0.14",
 		"@orkestrel/scaffold": "^0.0.67",
