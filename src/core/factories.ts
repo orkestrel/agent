@@ -101,7 +101,7 @@ import { ThinkSplitter } from './ThinkSplitter.js'
  *
  * const server = createServer({ dispatcher, state: () => undefined })
  * await server.start()
- * process.on('SIGTERM', () => server.stop()) // refuse new connections, drain, then close
+ * process.on('SIGTERM', () => server.stop()) // signal cancellation, drain, then close the listener
  * ```
  */
 export function createRelay(options: RelayOptions): RelayHandler {

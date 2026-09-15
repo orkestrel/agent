@@ -45,6 +45,7 @@ await new GuideCommand({
 	const { isRecord, parseJSON } = await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
 	const { requireValue, waitForCondition } = await import('@orkestrel/test')
+	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
 	// The relay fence's server half: its router and its adapter are the server application's
@@ -453,8 +454,6 @@ await new GuideCommand({
 			const upstream = createScriptedProvider(turns)
 			const bearer = 'fixture'
 			const messages: readonly Message[] = [{ id: '1', role: 'user', content: 'Say hello.' }]
-			// The server half runs as written, apart from the `host` a test listener needs: the
-			// fence omits it because a deployed server binds every interface.
 			const handler = createRelay({
 				provider: upstream,
 				authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
@@ -462,12 +461,16 @@ await new GuideCommand({
 			const dispatcher = createDispatcher({
 				routes: [{ method: 'POST', path: '/relay', handler }],
 			})
+			// The server half's composition runs as written apart from the `host` option a test
+			// listener needs. The fence's `serve` export is the alternative entry this listener stands
+			// in for, and `await server.stop()` after the case replaces the `SIGTERM` listener a test
+			// process outlives.
 			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
 			const port = await server.start()
 			try {
-				// The route the server half declares is the dispatcher's own contract: it answers
-				// every call that misses the declared method or the declared path itself, so neither
-				// the relay nor the upstream provider is entered.
+				// The route the server half declares is the dispatcher's own contract: the dispatcher itself
+				// answers every call that misses the declared method or the declared path, so neither the
+				// relay nor the upstream provider is entered.
 				const declined = await fetch(`http://127.0.0.1:${port}/relay`, {
 					headers: { authorization: `Bearer ${bearer}` },
 				})
@@ -483,13 +486,13 @@ await new GuideCommand({
 				await unrouted.text()
 				expect(upstream.started).toBe(0)
 
-				// An authorization refusal crosses the hop as a ProviderError carrying the HTTP code
+				// An authorization refusal crosses the hop as a `ProviderError` instance carrying the HTTP code
 				// and that status, and it leaves the upstream provider unentered.
 				const refused = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
 					parser: createParser,
 					headers: () => ({ authorization: 'Bearer wrong' }),
-				}).generate(messages, new AbortController().signal)
+				}).generate(messages, createAbort().signal)
 				await expect(refused).rejects.toBeInstanceOf(ProviderError)
 				await expect(refused).rejects.toMatchObject({
 					code: 'HTTP',
@@ -498,29 +501,28 @@ await new GuideCommand({
 				})
 				expect(upstream.started).toBe(0)
 
-				// The browser end drives `ProviderInterface` exactly like a local provider, and the
-				// credential never leaves the listener's side of the hop: the same script driven
-				// directly in this process answers what the relayed call answers.
+				// The browser end drives the `ProviderInterface` contract exactly like a local provider:
+				// the same script driven directly in this process answers what the relayed call answers.
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
 					parser: createParser,
 					headers: () => ({ authorization: `Bearer ${bearer}` }),
 				})
-				const relayed = await browser.generate(messages, new AbortController().signal)
+				const relayed = await browser.generate(messages, createAbort().signal)
 				expect(relayed).toEqual({ content: 'relayed answer' })
 				expect(relayed).toEqual(
-					await createScriptedProvider(turns).generate(messages, new AbortController().signal),
+					await createScriptedProvider(turns).generate(messages, createAbort().signal),
 				)
 				expect(browser.name).toBe('relay')
 				expect(upstream.started).toBe(1)
 			} finally {
 				await server.stop()
-				expect(server.status).toBe('stopped')
-				expect(server.address).toBeUndefined()
 			}
+			expect(server.status).toBe('stopped')
+			expect(server.address).toBeUndefined()
 		})
 
-		it('cancels the upstream turn when the relay reader goes away mid-stream', async () => {
+		it('cancels the upstream turn when the relay reader goes away with the first pull pending', async () => {
 			// The gate parks the upstream pull, so the turn cannot finish on its own and the only
 			// thing that ends it is the cancel travelling back over the hop.
 			const gate = Promise.withResolvers<void>()
@@ -536,8 +538,9 @@ await new GuideCommand({
 			})
 			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
 			const port = await server.start()
+			let drained: number | undefined
 			try {
-				const abort = new AbortController()
+				const abort = createAbort()
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
 					parser: createParser,
@@ -562,14 +565,15 @@ await new GuideCommand({
 				gate.resolve()
 				const closing = performance.now()
 				await server.stop()
-				const drained = performance.now() - closing
-
-				// A cancel leaves the client's socket aborted rather than idle, so a server that also
-				// served a completed call on a reused keep-alive socket waits out its whole `drain`
-				// budget here. One server per case keeps the stop immediate.
-				expect(drained).toBeLessThan(1000)
-				expect(server.status).toBe('stopped')
+				drained = performance.now() - closing
 			}
+
+			// A cancel leaves the client's socket aborted rather than idle, so `closeIdleConnections`
+			// does not reach it and `server.close()` waits on the socket itself — seconds, on a server
+			// that also served a completed call over that reused keep-alive socket. One server per
+			// case keeps the stop immediate.
+			expect(drained).toBeLessThan(1000)
+			expect(server.status).toBe('stopped')
 		})
 
 		it('decodes a scripted relay body through the fence’s browser half alone', async () => {
@@ -650,7 +654,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain('await server.start()')
 			expect(guideText).toContain(
-				"process.on('SIGTERM', () => server.stop()) // refuse new connections, drain, then close",
+				"process.on('SIGTERM', () => server.stop()) // signal cancellation, drain, then close the listener",
 			)
 			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
 			expect(guideText).toContain("url: 'https://app.example/relay',")
