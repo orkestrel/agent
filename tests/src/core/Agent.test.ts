@@ -42,7 +42,14 @@ import {
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 } from '../../setup.js'
-import { collect, createRecorder, createRecorders, waitForDelay } from '@orkestrel/test'
+import {
+	collect,
+	createRecorder,
+	createRecorders,
+	waitForAbort,
+	waitForCondition,
+	waitForDelay,
+} from '@orkestrel/test'
 
 // Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
 // src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted
@@ -1642,23 +1649,16 @@ describe('Agent — cancellation timing matrix', () => {
 
 	it('delivers agent abort inside the tool handler without authority', async () => {
 		const entered = Promise.withResolvers<void>()
-		const completion = Promise.withResolvers<string>()
 		const observed = createRecorder<[unknown]>()
 		const tools = createToolManager()
 		tools.add(
 			createTool({
 				name: 'wait',
-				execute: (_args, context) => {
-					context.signal.addEventListener(
-						'abort',
-						() => {
-							observed.handler(context.signal.reason)
-							completion.resolve('stopped')
-						},
-						{ once: true },
-					)
+				execute: async (_args, context) => {
 					entered.resolve()
-					return completion.promise
+					await waitForAbort(context.signal)
+					observed.handler(context.signal.reason)
+					return 'stopped'
 				},
 			}),
 		)
@@ -1671,35 +1671,27 @@ describe('Agent — cancellation timing matrix', () => {
 		try {
 			await entered.promise
 			agent.abort('request ended')
-			expect(observed.calls).toEqual([['request ended']])
 			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			expect(observed.calls).toEqual([['request ended']])
 			expect(provider.calls).toHaveLength(1)
 			expect(agent.status).toBe('done')
 		} finally {
-			completion.resolve('cleanup')
 			await stream.result
 		}
 	})
 
 	it('delivers the run deadline inside an authorized tool handler', async () => {
-		const completion = Promise.withResolvers<string>()
 		const observed = createRecorder<[boolean]>()
 		const signals = createRecorder<[AbortSignal]>()
 		const tools = createToolManager()
 		tools.add(
 			createTool({
 				name: 'wait',
-				execute: (_args, context) => {
+				execute: async (_args, context) => {
 					signals.handler(context.signal)
-					context.signal.addEventListener(
-						'abort',
-						() => {
-							observed.handler(context.signal.aborted)
-							completion.resolve('deadline observed')
-						},
-						{ once: true },
-					)
-					return completion.promise
+					await waitForAbort(context.signal)
+					observed.handler(context.signal.aborted)
+					return 'deadline observed'
 				},
 			}),
 		)
@@ -1710,7 +1702,13 @@ describe('Agent — cancellation timing matrix', () => {
 		const agent = createAgent(provider, { tools, authority: createAuthority(), timeout: DEADLINE })
 		const stream = agent.stream()
 		try {
-			await Promise.race([completion.promise, waitForDelay(DEADLINE * 6)])
+			await waitForCondition(
+				'the deadline observer records the aborted tool handler',
+				() => observed.count === 1,
+				{
+					budget: DEADLINE * 6,
+				},
+			)
 			expect(observed.calls).toEqual([[true]])
 			expect(signals.count).toBe(1)
 			expect(signals.calls[0]?.[0]).toBe(provider.calls[0]?.signal)
@@ -1718,7 +1716,6 @@ describe('Agent — cancellation timing matrix', () => {
 			expect(provider.calls).toHaveLength(1)
 			expect(agent.status).toBe('done')
 		} finally {
-			completion.resolve('cleanup')
 			await stream.result
 		}
 	})
