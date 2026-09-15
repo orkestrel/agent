@@ -31,6 +31,7 @@ import {
 } from '@src/core'
 import {
 	addTool,
+	AUTHORITY_STATES,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createSeededToolManager,
@@ -1502,6 +1503,270 @@ describe('Agent — re-entrancy / reuse', () => {
 // arrives after the run already finished (a harmless no-op).
 
 describe('Agent — cancellation timing matrix', () => {
+	it.each(AUTHORITY_STATES)(
+		'supplies no caller identity to a tool handler (authority: %s)',
+		async (authorized) => {
+			const tools = createToolManager()
+			tools.add(
+				createTool({
+					name: 'identity',
+					execute: (_args, context) => {
+						expect(context.caller).toBeUndefined()
+						return 'entered'
+					},
+				}),
+			)
+			const call = createToolCall({ name: 'identity' })
+			const provider = createScriptedProvider(
+				[{ result: { content: '', tools: [call] } }, { result: { content: 'done' } }],
+				SCRIPT_OPTIONS,
+			)
+			const agent = createAgent(provider, {
+				tools,
+				...(authorized ? { authority: createAuthority() } : {}),
+			})
+			const stream = agent.stream()
+			expect(await collect(stream.events)).toContainEqual({
+				category: 'tool',
+				call,
+				result: { id: call.id, name: call.name, success: true, value: 'entered' },
+			})
+			expect(await stream.result).toMatchObject({ content: 'done', partial: false })
+		},
+	)
+
+	it.each(AUTHORITY_STATES)(
+		'budget exhaustion before dispatch preserves only the prior conversation (authority: %s)',
+		async (authorized) => {
+			const executed = createRecorder<[]>()
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'wait', execute: executed.handler }))
+			const budget = createTokenBudget({ max: USAGE.total, scope: 'total' })
+			const provider = createScriptedProvider(
+				[
+					{
+						result: { content: 'working', tools: [createToolCall({ name: 'wait' })], usage: USAGE },
+					},
+				],
+				SCRIPT_OPTIONS,
+			)
+			const agent = createAgent(provider, {
+				tools,
+				budget,
+				...(authorized ? { authority: createAuthority() } : {}),
+			})
+			const seed = agent.context.messages.add({ role: 'user', content: 'go' })
+			const stream = agent.stream()
+			const chunks = await collect(stream.events)
+			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			expect(budget.signal.aborted).toBe(true)
+			expect(provider.calls).toHaveLength(1)
+			expect(executed.count).toBe(0)
+			expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
+			expect(agent.context.messages.messages()).toEqual([seed])
+		},
+	)
+
+	it.each(AUTHORITY_STATES)(
+		'external abort in a usage listener preserves only the prior conversation (authority: %s)',
+		async (authorized) => {
+			const external = new AbortController()
+			const executed = createRecorder<[]>()
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'wait', execute: executed.handler }))
+			const provider = createScriptedProvider(
+				[
+					{
+						result: { content: 'working', tools: [createToolCall({ name: 'wait' })], usage: USAGE },
+					},
+				],
+				SCRIPT_OPTIONS,
+			)
+			const agent = createAgent(provider, {
+				tools,
+				signal: external.signal,
+				on: { usage: () => external.abort('usage listener ended the run') },
+				...(authorized ? { authority: createAuthority() } : {}),
+			})
+			const seed = agent.context.messages.add({ role: 'user', content: 'go' })
+			const stream = agent.stream()
+			const chunks = await collect(stream.events)
+			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			expect(external.signal.aborted).toBe(true)
+			expect(provider.calls).toHaveLength(1)
+			expect(executed.count).toBe(0)
+			expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
+			expect(agent.context.messages.messages()).toEqual([seed])
+		},
+	)
+
+	it('abort in a deny listener preserves only the prior conversation', async () => {
+		const executed = createRecorder<[]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add([
+			createTool({ name: 'blocked', execute: executed.handler }),
+			createTool({ name: 'allowed', execute: executed.handler }),
+		])
+		const denial = createToolCall({ id: 'denied', name: 'blocked' })
+		const allowed = createToolCall({ id: 'allowed', name: 'allowed' })
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [denial, allowed] } }],
+			SCRIPT_OPTIONS,
+		)
+		const authority = createAuthority({
+			rules: [
+				{
+					match: (context) => context.call.name === 'blocked',
+					zone: 'r',
+					allowed: false,
+					reason: 'blocked',
+				},
+			],
+		})
+		const agent = createAgent(provider, { tools, authority })
+		agent.emitter.on('deny', (call, reason) => {
+			denied.handler(call, reason)
+			agent.abort('deny listener ended the run')
+		})
+		const seed = agent.context.messages.add({ role: 'user', content: 'go' })
+		const stream = agent.stream()
+		const chunks = await collect(stream.events)
+		expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+		expect(denied.calls).toEqual([[denial, 'blocked']])
+		expect(provider.calls).toHaveLength(1)
+		expect(executed.count).toBe(0)
+		expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
+		expect(agent.context.messages.messages()).toEqual([seed])
+	})
+
+	it('delivers agent abort inside the tool handler without authority', async () => {
+		const entered = Promise.withResolvers<void>()
+		const completion = Promise.withResolvers<string>()
+		const observed = createRecorder<[unknown]>()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'wait',
+				execute: (_args, context) => {
+					context.signal.addEventListener(
+						'abort',
+						() => {
+							observed.handler(context.signal.reason)
+							completion.resolve('stopped')
+						},
+						{ once: true },
+					)
+					entered.resolve()
+					return completion.promise
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		const stream = agent.stream()
+		try {
+			await entered.promise
+			agent.abort('request ended')
+			expect(observed.calls).toEqual([['request ended']])
+			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			expect(provider.calls).toHaveLength(1)
+			expect(agent.status).toBe('done')
+		} finally {
+			completion.resolve('cleanup')
+			await stream.result
+		}
+	})
+
+	it('delivers the run deadline inside an authorized tool handler', async () => {
+		const completion = Promise.withResolvers<string>()
+		const observed = createRecorder<[boolean]>()
+		const signals = createRecorder<[AbortSignal]>()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'wait',
+				execute: (_args, context) => {
+					signals.handler(context.signal)
+					context.signal.addEventListener(
+						'abort',
+						() => {
+							observed.handler(context.signal.aborted)
+							completion.resolve('deadline observed')
+						},
+						{ once: true },
+					)
+					return completion.promise
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, authority: createAuthority(), timeout: DEADLINE })
+		const stream = agent.stream()
+		try {
+			await Promise.race([completion.promise, waitForDelay(DEADLINE * 6)])
+			expect(observed.calls).toEqual([[true]])
+			expect(signals.count).toBe(1)
+			expect(signals.calls[0]?.[0]).toBe(provider.calls[0]?.signal)
+			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			expect(provider.calls).toHaveLength(1)
+			expect(agent.status).toBe('done')
+		} finally {
+			completion.resolve('cleanup')
+			await stream.result
+		}
+	})
+
+	it('waits for a tool that ignores its signal before settling a cancelled run', async () => {
+		const entered = Promise.withResolvers<AbortSignal>()
+		const completion = Promise.withResolvers<string>()
+		const finished = createRecorder<[AgentResult]>()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'wait',
+				execute: (_args, context) => {
+					entered.resolve(context.signal)
+					return completion.promise
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, on: { finish: finished.handler } })
+		const stream = agent.stream()
+		try {
+			const signal = await entered.promise
+			stream.abort('request ended')
+			await waitForDelay()
+			expect(signal.aborted).toBe(true)
+			expect(agent.status).toBe('running')
+			expect(finished.count).toBe(0)
+			completion.resolve('finished work')
+			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
+			const chunks = await collect(stream.events)
+			expect(chunks).toContainEqual({
+				category: 'tool',
+				call: createToolCall({ name: 'wait' }),
+				result: { id: 'c1', name: 'wait', success: true, value: 'finished work' },
+			})
+			expect(provider.calls).toHaveLength(1)
+			expect(finished.count).toBe(1)
+			expect(agent.status).toBe('done')
+		} finally {
+			completion.resolve('cleanup')
+			await stream.result
+		}
+	})
+
 	it('abort DURING tool execution commits a partial (the tool turn already streamed)', async () => {
 		// Turn 1 streams a delta + requests a tool whose handler parks on a gate; aborting
 		// while the handler is in flight must stop the loop and commit partial. The first

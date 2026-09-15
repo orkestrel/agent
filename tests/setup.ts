@@ -34,6 +34,9 @@ import { requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
+/** Exercises tool dispatch with authority configured and omitted. */
+export const AUTHORITY_STATES = Object.freeze([true, false])
+
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
 // The ONE general scripted `ProviderInterface` every Ollama-free agent

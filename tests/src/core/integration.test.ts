@@ -122,7 +122,7 @@ describe('in-process relay hop', () => {
 					id: 'identified',
 					role: 'assistant',
 					content: 'before',
-					calls: [createToolCall({ caller: 'local-only' })],
+					calls: [createToolCall()],
 					images: ['image'],
 				},
 			],
@@ -282,7 +282,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		expect(chunks.some((chunk) => chunk.category === 'usage')).toBe(true)
 	})
 
-	it('drives a full tool ROUND-TRIP — the fake returns a tool call, the loop dispatches it and feeds the result back, the fake then uses it', async () => {
+	it('runs the agent tool loop in Node and feeds the result into the next provider turn', async () => {
 		// Turn 1: the fake requests `add(2,3)`. The loop dispatches the REAL tool, appends the
 		// tool result message, and re-drives the provider. Turn 2: the fake returns the final
 		// answer. This proves the loop's tool plumbing works through the abstract contract alone
@@ -303,7 +303,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 				{ content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] },
 				{ content: 'the sum is 5', usage: USAGE },
 			],
-			{ name: 'alpha' },
+			{ name: 'alpha', record: true },
 		)
 		const agent = createAgent(provider, { tools, limit: 4 })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
@@ -320,6 +320,10 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 				: [],
 		)
 		expect(dispatched).toEqual([{ name: 'add', value: 5 }])
+		expect(provider.calls).toHaveLength(2)
+		expect(provider.calls[1]?.messages).toContainEqual(
+			expect.objectContaining({ role: 'tool', content: '5' }),
+		)
 		// The loop fed the result back and the fake's SECOND turn produced the final answer.
 		expect(result.content).toBe('the sum is 5')
 		expect(result.partial).toBe(false)

@@ -1205,6 +1205,14 @@ export interface AgentRunOptions {
  * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
  *   `timeout` deadline, and the `budget` signal (through `AbortSignal.any`); any of them —
  *   or `abort()` — stops the loop and settles the result `partial: true`.
+ *   Tool handlers receive that run's signal through their `ToolContext`. An agent abort,
+ *   stream abort, external signal, or deadline can reach a running handler. The budget is
+ *   charged during provider streaming and between turns, before tool dispatch; exhaustion
+ *   ends the run without dispatching, never inside a handler. An abort before dispatch
+ *   appends neither the assistant call turn nor tool messages and emits no tool chunk;
+ *   streamed content remains in the partial result. Cancellation after entry is cooperative:
+ *   the loop awaits a running handler even when it ignores the signal.
+ *   The agent supplies no caller identity.
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.
  * - **Two observation surfaces.** Pull: the {@link AgentChunk} stream (`stream().events`)

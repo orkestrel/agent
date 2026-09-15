@@ -333,13 +333,13 @@ describe('canonical tools', () => {
 		const tool = addTool()
 		expect(tool.name).toBe('add')
 		// A real `ToolInterface`, not a stub: the loop calls `execute` and feeds the result back.
-		expect(await tool.execute({})).toBe(5)
+		expect(await tool.execute({}, { signal: new AbortController().signal })).toBe(5)
 	})
 
 	it('returns a real callable loop tool that resolves again', async () => {
 		const tool = loopTool()
 		expect(tool.name).toBe('loop')
-		expect(await tool.execute({})).toBe('again')
+		expect(await tool.execute({}, { signal: new AbortController().signal })).toBe('again')
 	})
 
 	it('mints an independent tool on every call', () => {

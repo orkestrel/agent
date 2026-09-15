@@ -533,13 +533,19 @@ export class Agent implements AgentInterface {
 				yield { category: 'usage', usage: resultUsage }
 			}
 			if (result.tools !== undefined && result.tools.length > 0) {
+				const authorization = this.#authorize(result.tools)
+				if (abort.signal.aborted) {
+					partial = true
+					broke = true
+					break
+				}
 				const assistant = this.#context.messages.add({
 					role: 'assistant',
 					content: result.content,
 					calls: result.tools,
 				})
 				messages.push(assistant)
-				const results = await this.#authorize(tools, result.tools)
+				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
 				for (let index = 0; index < result.tools.length; index += 1) {
 					const call = result.tools[index]
 					const outcomeResult = results[index]
@@ -658,19 +664,10 @@ export class Agent implements AgentInterface {
 		return false
 	}
 
-	// The tool-dispatch gate. With no authority this is byte-identical to the no-authority path —
-	// `tools.execute(calls)` straight through. With one set, each call is `evaluate`d:
-	// allowed calls run as a batch (skipped entirely when none are allowed, so a denial
-	// costs no tool run / no budget); denied calls become a synthesized denial ToolResult
-	// (never executed). Executed results and denials then merge back into the original `calls` order
-	// (correlated by `id` through a Map), so the loop's per-call `tool` chunks + tool messages
-	// stay in call order — a denied call still yields a `tool` chunk + a tool message
-	// (carrying the denial error), so the model sees it and can react.
-	async #authorize(
-		tools: ToolManagerInterface,
-		calls: readonly ToolCall[],
-	): Promise<readonly ToolResult[]> {
-		if (this.#authority === undefined) return tools.execute(calls)
+	// Evaluate policy and emit denials before the run's final pre-dispatch abort guard:
+	// policy callbacks and denial listeners can cancel the run synchronously.
+	#authorize(calls: readonly ToolCall[]) {
+		if (this.#authority === undefined) return undefined
 		const authority = this.#authority
 		const allowed: ToolCall[] = []
 		const denials = new Map<string, ToolResult>()
@@ -689,8 +686,7 @@ export class Agent implements AgentInterface {
 				// rather than escaping the gate and rejecting the run.
 				const reason = errorToMessage(error)
 				denials.set(call.id, denyCall(call, reason))
-				// Observe the fail-closed denial (the call + the thrown reason) — the denial is
-				// already synthesized; the guarded emit can't perturb the dispatch that follows.
+				// Observe the fail-closed denial with the thrown reason.
 				this.#emitter.emit('deny', call, reason)
 				continue
 			}
@@ -701,7 +697,25 @@ export class Agent implements AgentInterface {
 				this.#emitter.emit('deny', call, decision.reason)
 			}
 		}
-		const executed = allowed.length > 0 ? await tools.execute(allowed) : []
+		return { allowed, denials }
+	}
+
+	// Carry cancellation into entered handlers, then merge executed results and denials
+	// in call order. An all-denied turn costs no tool run.
+	async #dispatch(
+		tools: ToolManagerInterface,
+		calls: readonly ToolCall[],
+		signal: AbortSignal,
+		authorization:
+			| {
+					readonly allowed: readonly ToolCall[]
+					readonly denials: ReadonlyMap<string, ToolResult>
+			  }
+			| undefined,
+	): Promise<readonly ToolResult[]> {
+		if (authorization === undefined) return tools.execute(calls, { signal })
+		const { allowed, denials } = authorization
+		const executed = allowed.length > 0 ? await tools.execute(allowed, { signal }) : []
 		const byId = new Map<string, ToolResult>(denials)
 		for (const result of executed) byId.set(result.id, result)
 		return calls.map((call) => byId.get(call.id) ?? denyCall(call, undefined))

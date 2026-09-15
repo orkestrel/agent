@@ -13,7 +13,8 @@ import { ProviderAbortError, ProviderError } from '../errors.js'
  * Carries provider calls over an authenticated NDJSON relay endpoint.
  *
  * @remarks
- * The `ToolCall.caller` member never crosses the hop. The wire body is an owned snapshot of
+ * Tool execution context stays local; calls carry only `id`, `name`, and `arguments`.
+ * The wire body is an owned snapshot of
  * the projection read through property descriptors, so a serializer reachable only through a
  * `get` trap or a prototype is never consulted; an own function-valued property such as a
  * `toJSON` method is a value outside JSON and is refused before fetching, with the clone's
@@ -76,7 +77,7 @@ export class RelayProvider extends AgentProvider {
 	 * value carries is ignored rather than consulted and cannot reach the wire.
 	 *
 	 * @param request - The domain conversation and call configuration
-	 * @returns The validated wire request with caller context omitted
+	 * @returns The validated wire request
 	 * @throws {ProviderError} Thrown when the snapshot cannot be taken — a hostile read or a
 	 * value outside JSON — carrying that failure as its `cause`, and when the snapshot the
 	 * projection produced is not a valid wire request

@@ -146,8 +146,12 @@ describe('RelayProvider', () => {
 		expect(() => provider.read(frame)).toThrow('invalid relay frame')
 		expect(relayFrameContract.is({ channel: 'error', message: 'unavailable' })).toBe(true)
 	})
-	it('projects declared request fields and omits caller context before a JSON round trip', () => {
+	it('projects declared request fields and omits extra execution context before a JSON round trip', () => {
 		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const call = {
+			...createToolCall({ arguments: { x: 1 } }),
+			context: { signal: new AbortController().signal, caller: { subject: 'local-only' } },
+		}
 		const request: ProviderRequest = {
 			messages: [
 				{
@@ -155,7 +159,7 @@ describe('RelayProvider', () => {
 					role: 'assistant',
 					content: 'answer',
 					images: ['image'],
-					calls: [createToolCall({ caller: { credential: 'local-only' }, arguments: { x: 1 } })],
+					calls: [call],
 				},
 			],
 			tools: [{ name: 'add', description: 'Adds values', parameters: { x: { type: 'number' } } }],
@@ -168,7 +172,8 @@ describe('RelayProvider', () => {
 			...request,
 			messages: [{ ...request.messages[0], calls: [createToolCall({ arguments: { x: 1 } })] }],
 		})
-		expect(request.messages[0]?.calls?.[0]?.caller).toEqual({ credential: 'local-only' })
+		expect(request.messages[0]?.calls?.[0]).toBe(call)
+		expect(call.context.caller).toEqual({ subject: 'local-only' })
 	})
 	it('rejects non-JSON arguments before fetching', async () => {
 		const transport = createRefusingTransport()

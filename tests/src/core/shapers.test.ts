@@ -1,4 +1,5 @@
 import type { Infer } from '@orkestrel/contract'
+import type { ToolCall, ToolContext } from '@orkestrel/tool'
 import type { Message, ProviderRequest, ProviderResult, RelayFrame } from '@src/core'
 import {
 	messageShape,
@@ -27,9 +28,11 @@ describe('wire shapes', () => {
 		expectTypeOf<Infer<typeof relayFrameShape>>().toExtend<RelayFrame>()
 		expect(createContract(relayFrameShape).is({ channel: 'content', text: '' })).toBe(true)
 	})
-	it('excludes opaque caller context from the tool wire shape', () => {
+	it('keeps execution context separate from the tool call and wire shape', () => {
+		expectTypeOf<keyof ToolCall>().toEqualTypeOf<'id' | 'name' | 'arguments'>()
+		expectTypeOf<ToolContext['signal']>().toEqualTypeOf<AbortSignal>()
 		const contract = createContract(toolCallShape)
-		const call = { id: '1', name: 'lookup', arguments: {}, caller: 'private context' }
+		const call = { id: '1', name: 'lookup', arguments: {}, context: { caller: 'private context' } }
 		expect(contract.is(call)).toBe(false)
 		expect(contract.parse(call)).toEqual({ id: '1', name: 'lookup', arguments: {} })
 	})

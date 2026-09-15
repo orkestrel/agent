@@ -99,7 +99,13 @@ describe('AgentContext — tools are structural, not in the prompt', () => {
 
 	it('never includes tools in the built message array', () => {
 		const tools = new ToolManager()
-		tools.add(new Tool({ name: 'search', description: 'Search the web', execute: () => 'ok' }))
+		tools.add(
+			new Tool({
+				name: 'search',
+				description: 'Search the web',
+				execute: () => 'ok',
+			}),
+		)
 		const context = new AgentContext({ system: 'sys', tools })
 		context.messages.add({ role: 'user', content: 'find cats' })
 

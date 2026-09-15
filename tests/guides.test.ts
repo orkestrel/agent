@@ -55,6 +55,7 @@ await new GuideCommand({
 	const barrel = await import('@src/core')
 	const {
 		AgentProvider,
+		createAgent,
 		createConversation,
 		createConversationManager,
 		createDatabaseConversationStore,
@@ -281,6 +282,68 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"{ id: '2', name: 'ghost', arguments: {} }, // → { success: false, id: '2', name: 'ghost', error: 'tool not found: ghost' }",
 			)
+		})
+
+		it('observes cancellation inside the handler as the tool cancellation fence claims', async () => {
+			const provider = createScriptedProvider(
+				[{ content: 'working', tools: [{ id: 'wait-1', name: 'wait', arguments: {} }] }],
+				{ record: true, exhaust: 'throw' },
+			)
+			const entered = Promise.withResolvers<void>()
+			const cancelled = Promise.withResolvers<boolean>()
+			const tools = createToolManager()
+			tools.add(
+				createTool({
+					name: 'wait',
+					execute: (_args, context) => {
+						context.signal.addEventListener(
+							'abort',
+							() => {
+								cancelled.resolve(context.signal.aborted)
+							},
+							{ once: true },
+						)
+						entered.resolve()
+						return cancelled.promise
+					},
+				}),
+			)
+			const agent = createAgent(provider, { tools })
+			const stream = agent.stream()
+			try {
+				await entered.promise
+				agent.abort('request ended')
+				expect(await cancelled.promise).toBe(true)
+				const result = await stream.result
+				expect(result.partial).toBe(true)
+				expect(provider.calls).toHaveLength(1)
+			} finally {
+				cancelled.resolve(false)
+				await stream.result
+			}
+		})
+
+		it('names placement proof locations and carries the cancellation fence lines', () => {
+			const integration = requireValue(
+				files['tests/src/core/integration.test.ts'],
+				'Missing file: tests/src/core/integration.test.ts',
+			)
+			expect(integration).toContain(
+				"it('runs the agent tool loop in Node and feeds the result into the next provider turn',",
+			)
+			expect(guideText).toContain(
+				'runs the agent tool loop in Node and feeds the result into the next provider turn',
+			)
+			expect(guideText).toContain('`src:core` project')
+			expect(guideText).toContain("`@orkestrel/mcp` checkout's `tests/distribution.test.ts`")
+			expect(guideText).toContain(
+				'planned proof “executes a page tool through an agent without network requests”',
+			)
+			expect(guideText).toContain(
+				'planned proof “executes a page tool through an agent over a Node relay”',
+			)
+			expect(guideText).toContain('await cancelled.promise // true — observed inside the handler')
+			expect(guideText).toContain('result.partial // true')
 		})
 
 		it('answers the helper fence’s sanitized token count', () => {

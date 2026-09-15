@@ -17,8 +17,8 @@ import {
  *
  * @remarks
  * The wire is strictly narrower than the domain: non-JSON arguments are refused.
- * ToolCall.caller is not in this shape and never crosses a wire. The guard refuses
- * that extra member; the contract parser drops it.
+ * Calls carry only id, name, and arguments; execution context stays local.
+ * The guard refuses every extra member; the contract parser drops extra members.
  */
 export const toolCallShape = objectShape({
 	id: stringShape(),
@@ -31,7 +31,7 @@ export const toolCallShape = objectShape({
  *
  * @remarks
  * The wire is strictly narrower than Message: non-JSON call arguments are refused,
- * and caller context is refused by the guard or dropped by the parser.
+ * and execution context stays local. The guard refuses extra members; the parser drops them.
  */
 export const messageShape = objectShape({
 	id: stringShape(),
@@ -46,7 +46,8 @@ export const messageShape = objectShape({
  *
  * @remarks
  * The wire is strictly narrower than ProviderRequest: non-JSON arguments, parameters,
- * or schema members are refused, and caller context is refused or dropped.
+ * or schema members are refused. Execution context stays local; the guard refuses
+ * extra members, and the parser drops them.
  */
 export const providerRequestShape = objectShape({
 	messages: arrayShape(messageShape),
@@ -72,7 +73,7 @@ export const providerRequestShape = objectShape({
  *
  * @remarks
  * The wire is strictly narrower than ProviderResult: non-JSON call arguments are
- * refused, and caller context is refused or dropped.
+ * refused. Execution context stays local; the guard refuses extra members, and the parser drops them.
  */
 export const providerResultShape = objectShape({
 	content: stringShape(),
@@ -92,7 +93,8 @@ export const providerResultShape = objectShape({
  *
  * @remarks
  * The wire is strictly narrower than RelayFrame through its result and partial
- * fields: non-JSON arguments are refused, and caller context is refused or dropped.
+ * fields: non-JSON arguments are refused. Execution context stays local; the guard
+ * refuses extra members, and the parser drops them.
  */
 export const relayFrameShape = unionShape(
 	objectShape({ channel: literalShape(['content', 'thinking']), text: stringShape() }),
