@@ -3,6 +3,7 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
+	Message,
 	ProviderIncrement,
 	ProviderOptions,
 	ProviderParserInterface,
@@ -43,9 +44,13 @@ await new GuideCommand({
 }).execute(async ({ files, report, rows }) => {
 	const { isRecord, parseJSON } = await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
-	const { requireValue } = await import('@orkestrel/test')
+	const { requireValue, waitForCondition } = await import('@orkestrel/test')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
+	// The relay fence's server half: its router and its adapter are the server application's
+	// dependencies, declared here for development so the transcription can run the real hop.
+	const { createDispatcher } = await import('@orkestrel/router')
+	const { createServer } = await import('@orkestrel/server')
 	const barrel = await import('@src/core')
 	const {
 		AgentProvider,
@@ -56,13 +61,14 @@ await new GuideCommand({
 		createMemoryConversationStore,
 		createRelay,
 		createRelayProvider,
+		ProviderAbortError,
 		ProviderError,
 		providerRequestContract,
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
 		sanitizeToken,
 	} = barrel
-	const { createParser, createScriptedProvider } = await import('./setup.js')
+	const { createParser, createScriptedProvider, RecordedProvider } = await import('./setup.js')
 	const { describe, expect, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
@@ -442,41 +448,128 @@ await new GuideCommand({
 			expect(guideText).toContain('declare function token(signal: AbortSignal): Promise<string>')
 		})
 
-		it('round trips both relay fence halves and carries the route the server half declares', async () => {
-			const upstream = createScriptedProvider([
-				{ result: { content: 'relayed answer' }, deltas: ['relayed', ' answer'] },
-			])
+		it('round trips both relay fence halves over a started listener and refuses what the route declines', async () => {
+			const turns = [{ result: { content: 'relayed answer' }, deltas: ['relayed', ' answer'] }]
+			const upstream = createScriptedProvider(turns)
 			const bearer = 'fixture'
+			const messages: readonly Message[] = [{ id: '1', role: 'user', content: 'Say hello.' }]
+			// The server half runs as written, apart from the `host` a test listener needs: the
+			// fence omits it because a deployed server binds every interface.
 			const handler = createRelay({
 				provider: upstream,
 				authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
 			})
-			const received: Request[] = []
-			const browser = createRelayProvider({
-				url: 'https://app.example/relay',
-				parser: createParser,
-				headers: () => ({ authorization: `Bearer ${bearer}` }),
-				fetch: (input, init) => {
-					const request = new Request(input, init)
-					received.push(request)
-					return handler(request)
-				},
+			const dispatcher = createDispatcher({
+				routes: [{ method: 'POST', path: '/relay', handler }],
 			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				// The route the server half declares is the dispatcher's own contract: it answers
+				// every call that misses the declared method or the declared path itself, so neither
+				// the relay nor the upstream provider is entered.
+				const declined = await fetch(`http://127.0.0.1:${port}/relay`, {
+					headers: { authorization: `Bearer ${bearer}` },
+				})
+				expect(declined.status).toBe(405)
+				expect(declined.headers.get('allow')).toBe('POST')
+				await declined.text()
+				const unrouted = await fetch(`http://127.0.0.1:${port}/other`, {
+					method: 'POST',
+					headers: { authorization: `Bearer ${bearer}` },
+					body: '{"messages":[]}',
+				})
+				expect(unrouted.status).toBe(404)
+				await unrouted.text()
+				expect(upstream.started).toBe(0)
 
-			// The browser end drives `ProviderInterface` exactly like a local provider, and the
-			// credential never leaves the handler's side of the hop.
-			expect(await browser.generate([], new AbortController().signal)).toEqual({
-				content: 'relayed answer',
+				// An authorization refusal crosses the hop as a ProviderError carrying the HTTP code
+				// and that status, and it leaves the upstream provider unentered.
+				const refused = createRelayProvider({
+					url: `http://127.0.0.1:${port}/relay`,
+					parser: createParser,
+					headers: () => ({ authorization: 'Bearer wrong' }),
+				}).generate(messages, new AbortController().signal)
+				await expect(refused).rejects.toBeInstanceOf(ProviderError)
+				await expect(refused).rejects.toMatchObject({
+					code: 'HTTP',
+					status: 401,
+					message: 'provider error: 401',
+				})
+				expect(upstream.started).toBe(0)
+
+				// The browser end drives `ProviderInterface` exactly like a local provider, and the
+				// credential never leaves the listener's side of the hop: the same script driven
+				// directly in this process answers what the relayed call answers.
+				const browser = createRelayProvider({
+					url: `http://127.0.0.1:${port}/relay`,
+					parser: createParser,
+					headers: () => ({ authorization: `Bearer ${bearer}` }),
+				})
+				const relayed = await browser.generate(messages, new AbortController().signal)
+				expect(relayed).toEqual({ content: 'relayed answer' })
+				expect(relayed).toEqual(
+					await createScriptedProvider(turns).generate(messages, new AbortController().signal),
+				)
+				expect(browser.name).toBe('relay')
+				expect(upstream.started).toBe(1)
+			} finally {
+				await server.stop()
+				expect(server.status).toBe('stopped')
+				expect(server.address).toBeUndefined()
+			}
+		})
+
+		it('cancels the upstream turn when the relay reader goes away mid-stream', async () => {
+			// The gate parks the upstream pull, so the turn cannot finish on its own and the only
+			// thing that ends it is the cancel travelling back over the hop.
+			const gate = Promise.withResolvers<void>()
+			const upstream = new RecordedProvider([{ content: 'relayed answer' }], gate.promise)
+			const bearer = 'fixture'
+			const messages: readonly Message[] = [{ id: '1', role: 'user', content: 'Say hello.' }]
+			const handler = createRelay({
+				provider: upstream,
+				authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,
 			})
-			expect(browser.name).toBe('relay')
+			const dispatcher = createDispatcher({
+				routes: [{ method: 'POST', path: '/relay', handler }],
+			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				const abort = new AbortController()
+				const browser = createRelayProvider({
+					url: `http://127.0.0.1:${port}/relay`,
+					parser: createParser,
+					headers: () => ({ authorization: `Bearer ${bearer}` }),
+				})
+				const stream = browser.stream(messages, abort.signal)
+				const step = stream.next()
+				await waitForCondition('the relay entered the upstream turn', () => upstream.steps === 1)
+				abort.abort()
 
-			// The server half declares `{ method: 'POST', path: '/relay', handler }`. Neither the
-			// dispatcher nor the `createServer` start-up that follows it is executed here, so the
-			// route is asserted against what the browser half actually sends: the request the
-			// handler receives carries that method and that path.
-			const request = requireValue(received[0], 'Missing relay request')
-			expect(request.method).toBe('POST')
-			expect(new URL(request.url).pathname).toBe('/relay')
+				// This is the obligation the guide puts on the adapter: aborting the request's signal
+				// when the client disconnects, so a reader that goes away cancels the upstream turn
+				// instead of leaving it running. `@orkestrel/server` is the adapter that meets it.
+				await expect(step).rejects.toBeInstanceOf(ProviderAbortError)
+				await expect(step).rejects.toMatchObject({ code: 'ABORT' })
+				await waitForCondition(
+					'the relay returned the upstream iterator',
+					() => upstream.returns === 1,
+				)
+				expect(upstream.cancelled).toBe(true)
+			} finally {
+				gate.resolve()
+				const closing = performance.now()
+				await server.stop()
+				const drained = performance.now() - closing
+
+				// A cancel leaves the client's socket aborted rather than idle, so a server that also
+				// served a completed call on a reused keep-alive socket waits out its whole `drain`
+				// budget here. One server per case keeps the stop immediate.
+				expect(drained).toBeLessThan(1000)
+				expect(server.status).toBe('stopped')
+			}
 		})
 
 		it('decodes a scripted relay body through the fence’s browser half alone', async () => {
@@ -517,31 +610,6 @@ await new GuideCommand({
 			expect(step.value).toEqual({ content: 'relayed answer', thinking: 'considering ' })
 		})
 
-		it('refuses the relay fence’s hop when the bearer does not match', async () => {
-			const upstream = createScriptedProvider([{ content: 'never reached' }], { record: true })
-			const handler = createRelay({
-				provider: upstream,
-				authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
-			})
-			const browser = createRelayProvider({
-				url: 'https://app.example/relay',
-				parser: createParser,
-				headers: () => ({ authorization: 'Bearer wrong' }),
-				fetch: (input, init) => handler(new Request(input, init)),
-			})
-			const refused = browser.generate([], new AbortController().signal)
-
-			// An authorization refusal reaches the browser as a ProviderError with the HTTP code and
-			// that status, and it leaves the upstream provider unentered.
-			await expect(refused).rejects.toBeInstanceOf(ProviderError)
-			await expect(refused).rejects.toMatchObject({
-				code: 'HTTP',
-				status: 401,
-				message: 'provider error: 401',
-			})
-			expect(upstream.started).toBe(0)
-		})
-
 		it('refuses a relay body at its byte limit and admits one below it', async () => {
 			const upstream = createScriptedProvider([{ content: 'admitted' }], { record: true })
 			const browserOf = (limit: number) =>
@@ -574,8 +642,16 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"authorize: (request) => request.headers.get('authorization') === `Bearer ${bearer}`,",
 			)
+			expect(guideText).toContain('const dispatcher = createDispatcher({')
 			expect(guideText).toContain("routes: [{ method: 'POST', path: '/relay', handler }],")
 			expect(guideText).toContain('return dispatcher.handle(request, undefined)')
+			expect(guideText).toContain(
+				'const server = createServer({ dispatcher, state: () => undefined })',
+			)
+			expect(guideText).toContain('await server.start()')
+			expect(guideText).toContain(
+				"process.on('SIGTERM', () => server.stop()) // refuse new connections, drain, then close",
+			)
 			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
 			expect(guideText).toContain("url: 'https://app.example/relay',")
 			expect(guideText).toContain('parser: createNDJSONParser,')
