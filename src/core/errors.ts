@@ -4,6 +4,7 @@ import type {
 	ProviderErrorOptions,
 	ProviderResult,
 } from './types.js'
+import { isInstance } from '@orkestrel/contract'
 
 // A real error type, not a sentinel. `stream` throws a
 // ProviderAbortError when its bound signal aborts mid-flight, carrying the partial
@@ -52,7 +53,7 @@ export class ProviderAbortError extends Error {
  * ```
  */
 export function isProviderAbortError(value: unknown): value is ProviderAbortError {
-	return value instanceof ProviderAbortError
+	return isInstance(value, ProviderAbortError)
 }
 
 // A real error type, not a sentinel. An agent job treats a partial result
@@ -109,7 +110,7 @@ export class AgentJobError extends Error {
  * ```
  */
 export function isAgentJobError(value: unknown): value is AgentJobError {
-	return value instanceof AgentJobError
+	return isInstance(value, AgentJobError)
 }
 
 // A real error type, not a sentinel. A `ConversationInterface.compact()` is a
@@ -162,7 +163,7 @@ export class ConversationError extends Error {
  * ```
  */
 export function isConversationError(value: unknown): value is ConversationError {
-	return value instanceof ConversationError
+	return isInstance(value, ConversationError)
 }
 
 // A real error type, not a sentinel. Concurrent runs on one Agent whose
@@ -219,7 +220,7 @@ export class AgentError extends Error {
  * ```
  */
 export function isAgentError(value: unknown): value is AgentError {
-	return value instanceof AgentError
+	return isInstance(value, AgentError)
 }
 
 /**
@@ -256,5 +257,5 @@ export class ProviderError extends Error {
  * ```
  */
 export function isProviderError(value: unknown): value is ProviderError {
-	return value instanceof ProviderError
+	return isInstance(value, ProviderError)
 }

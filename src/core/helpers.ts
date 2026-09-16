@@ -327,7 +327,7 @@ export function renderFencedFile(path: string, language: string, content: string
  * @returns The floored count, or `0` when the value is non-finite or non-positive
  */
 export function sanitizeToken(value: number): number {
-	return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+	return isFiniteNumber(value) && value > 0 ? Math.floor(value) : 0
 }
 
 /**

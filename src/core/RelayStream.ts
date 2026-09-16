@@ -1,7 +1,7 @@
 import type { ProviderDelta, ProviderResult, RelayFrame, RelayStreamOptions } from './types.js'
 import { RELAY_CONTENT_TYPE, RELAY_PROVIDER_MESSAGE } from './constants.js'
 import { relayFrameContract } from './contracts.js'
-import { ProviderAbortError, ProviderError } from './errors.js'
+import { ProviderError, isProviderAbortError } from './errors.js'
 
 /**
  * Streams a provider call as validated NDJSON frames under response backpressure.
@@ -66,10 +66,9 @@ export class RelayStream {
 			if (step.done) this.#finish(controller)
 		} catch (error) {
 			if (this.#settled) return
-			const frame: RelayFrame =
-				error instanceof ProviderAbortError
-					? { channel: 'abort', partial: error.partial }
-					: { channel: 'error', message: RELAY_PROVIDER_MESSAGE }
+			const frame: RelayFrame = isProviderAbortError(error)
+				? { channel: 'abort', partial: error.partial }
+				: { channel: 'error', message: RELAY_PROVIDER_MESSAGE }
 			this.#write(
 				controller,
 				relayFrameContract.is(frame)
