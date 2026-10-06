@@ -372,6 +372,55 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 })
 
 describe('Agent — tool iteration', () => {
+	it('passes multiline string tool content with quotes, backslashes, and Unicode unchanged', async () => {
+		const content = 'First line\n"quoted" C:\\workspace\\notes\r\nCafé 日本語 🌿\n'
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'read', execute: () => content }))
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'read the notes' })
+		await agent.generate()
+		expect(provider.calls).toHaveLength(2)
+		const message = provider.calls[1]?.messages.at(-1)
+		expect(message?.role).toBe('tool')
+		expect(message?.content).toBe(content)
+	})
+
+	it('passes empty string tool content unchanged', async () => {
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'read', execute: () => '' }))
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'read the empty file' })
+		await agent.generate()
+		expect(provider.calls).toHaveLength(2)
+		const message = provider.calls[1]?.messages.at(-1)
+		expect(message?.role).toBe('tool')
+		expect(message?.content).toBe('')
+	})
+
+	it('JSON-encodes object tool content', async () => {
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'read', execute: () => ({ text: 'first\n"second"', count: 2 }) }))
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'read the record' })
+		await agent.generate()
+		expect(provider.calls).toHaveLength(2)
+		const message = provider.calls[1]?.messages.at(-1)
+		expect(message?.role).toBe('tool')
+		expect(message?.content).toBe('{"text":"first\\n\\"second\\"","count":2}')
+	})
+
 	it('dispatches a tool call then finishes with the follow-up turn', async () => {
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
@@ -393,7 +442,7 @@ describe('Agent — tool iteration', () => {
 		expect(roles).toContain('assistant')
 		expect(roles?.at(-1)).toBe('tool')
 		const toolMessage = second?.messages.at(-1)
-		expect(toolMessage?.content).toBe(JSON.stringify(5))
+		expect(toolMessage?.content).toBe('5')
 	})
 
 	it('feeds a tool error back as the tool message (loop never throws)', async () => {

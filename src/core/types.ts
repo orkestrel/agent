@@ -23,6 +23,8 @@ export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
  * `tool_calls` a prior generation produced, replayed back into the next request so
  * the model sees its own decision. A `tool` turn carries the tool's result in
  * `content` (the textual outcome), keyed back to the call by the conversation order.
+ * For a successful tool result, a string is the content as is; any other value is
+ * JSON-encoded. A failed tool result carries its error text unchanged.
  */
 export interface Message {
 	readonly id: string

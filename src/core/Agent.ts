@@ -557,7 +557,9 @@ export class Agent implements AgentInterface {
 					const toolMessage = this.#context.messages.add({
 						role: 'tool',
 						content: outcomeResult.success
-							? JSON.stringify(outcomeResult.value)
+							? typeof outcomeResult.value === 'string'
+								? outcomeResult.value
+								: JSON.stringify(outcomeResult.value)
 							: outcomeResult.error,
 					})
 					messages.push(toolMessage)
