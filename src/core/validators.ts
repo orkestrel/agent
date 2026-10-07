@@ -1,9 +1,19 @@
-import type { ConversationSnapshot, JudgeEntry, JudgeQuestion, Message, Section } from './types.js'
+import type {
+	ConversationSnapshot,
+	JudgeEntry,
+	JudgeQuestion,
+	Message,
+	Section,
+	SystemOneAnswer,
+	SystemOneResponse,
+} from './types.js'
 import {
 	arrayOf,
 	attempt,
+	boundsOf,
 	isArray,
 	isJSONValue,
+	isNumber,
 	isRecord,
 	isString,
 	nullableOf,
@@ -169,6 +179,82 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 		if (criteria === undefined) return true
 		if (!isRecord(criteria)) return false
 		return optionalOf(isJudgeEntry)(criteria.true) && optionalOf(isJudgeEntry)(criteria.false)
+	})
+	return checked.success && checked.value
+}
+
+/**
+ * Checks whether a value is a System One response envelope with optional model and usage.
+ *
+ * @remarks
+ * Answers remain unknown until checked against their questions. Missing and null usage counts
+ * are accepted. Extra members are ignored, and unreadable fields return false.
+ *
+ * @param value - The unknown response candidate
+ * @returns True if the envelope fields have their wire types; false otherwise
+ * @example
+ * ```ts
+ * isSystemOneResponse({ answers: {}, usage: { input_tokens: null } }) // true
+ * ```
+ */
+export function isSystemOneResponse(value: unknown): value is SystemOneResponse {
+	const checked = attempt(() => {
+		if (!isRecord(value)) return false
+		const { model, answers, usage } = value
+		if (!optionalOf(isString)(model) || !isRecord(answers)) return false
+		if (usage === undefined) return true
+		if (!isRecord(usage)) return false
+		return (
+			optionalOf(nullableOf(isNumber))(usage.input_tokens) &&
+			optionalOf(nullableOf(isNumber))(usage.output_tokens)
+		)
+	})
+	return checked.success && checked.value
+}
+
+/**
+ * Checks whether a value is a System One answer with bounded probabilities and typed metadata.
+ *
+ * @remarks
+ * Score probabilities and legends accept maps or dense arrays. Legend entries follow the wire
+ * entry contract without imposing question length or key equality. Distribution sums are not
+ * constrained; values are never normalized. Extra members are ignored, and hostile reads return false.
+ *
+ * @param value - The unknown answer candidate
+ * @returns True if the answer fields satisfy the wire contract; false otherwise
+ * @example
+ * ```ts
+ * isSystemOneAnswer({ type: 'noul', noul: 0.9 }) // true
+ * isSystemOneAnswer({ type: 'score', probabilities: [0.2, 0.8] }) // true
+ * ```
+ */
+export function isSystemOneAnswer(value: unknown): value is SystemOneAnswer {
+	const checked = attempt(() => {
+		if (!isRecord(value)) return false
+		const { type, confidence } = value
+		if (!optionalOf(isNumber)(confidence)) return false
+		if (type === 'noul') {
+			const { noul } = value
+			return boundsOf(0, 1)(noul)
+		}
+		if (type !== 'choice' && type !== 'score') return false
+		const { probabilities } = value
+		if (type === 'choice' && !optionalOf(isString)(value.choice)) return false
+		if (type === 'score') {
+			const { score, legend } = value
+			if (!optionalOf(isNumber)(score)) return false
+			if (legend !== undefined) {
+				if (isArray(legend)) {
+					if (!arrayOf(nullableOf(isJudgeEntry))(legend)) return false
+				} else if (!isRecord(legend) || !Object.values(legend).every(nullableOf(isJudgeEntry))) {
+					return false
+				}
+			}
+		}
+		if (type === 'score' && isArray(probabilities)) {
+			return arrayOf(boundsOf(0, 1))(probabilities)
+		}
+		return isRecord(probabilities) && Object.values(probabilities).every(boundsOf(0, 1))
 	})
 	return checked.success && checked.value
 }

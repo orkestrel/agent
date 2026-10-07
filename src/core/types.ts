@@ -2430,3 +2430,70 @@ export type JudgeErrorCode =
 	| 'PROTOCOL'
 	/** Reports a request refused before inference: an empty question map, a malformed question or state, or a wire limit. */
 	| 'QUESTION'
+
+/** Configures the System One server, model, transport, authentication, and deadline. */
+export interface SystemOneJudgeOptions extends Pick<
+	ProviderOptions,
+	'timeout' | 'fetch' | 'headers'
+> {
+	/** Holds the server origin without a path. */
+	readonly url: string
+	readonly model: string
+}
+
+/** Carries a TypeSafe System One entry, including the wire's explicit null. */
+export type SystemOneEntry = JudgeEntry | null
+
+/** Transliterates a TypeSafe System One question with its protocol discriminant and criteria. */
+export interface SystemOneQuestion {
+	readonly type: 'choice' | 'score' | 'noul'
+	readonly instructions?: SystemOneEntry
+	readonly criteria?: ChoiceCriteria | ScoreCriteria | NoulCriteria | null
+}
+
+/** Transliterates the TypeSafe System One request body. */
+export interface SystemOneRequest {
+	readonly state: SystemOneEntry
+	readonly model: string
+	readonly questions: Readonly<Record<string, SystemOneQuestion>>
+}
+
+/** Transliterates TypeSafe System One token counts with missing or null counts permitted. */
+export interface SystemOneUsage {
+	readonly input_tokens?: number | null
+	readonly output_tokens?: number | null
+}
+
+/** Transliterates a TypeSafe System One choice distribution and optional server measures. */
+export interface SystemOneChoiceAnswer {
+	readonly type: 'choice'
+	readonly probabilities: Readonly<Record<string, number>>
+	readonly choice?: string
+	readonly confidence?: number
+}
+
+/** Accepts System One score probabilities and legends as maps or llama.cpp arrays. */
+export interface SystemOneScoreAnswer {
+	readonly type: 'score'
+	readonly probabilities: Readonly<Record<string, number>> | readonly number[]
+	readonly score?: number
+	readonly legend?: Readonly<Record<string, SystemOneEntry>> | readonly SystemOneEntry[]
+	readonly confidence?: number
+}
+
+/** Transliterates a TypeSafe System One yes probability and optional server confidence. */
+export interface SystemOneNoulAnswer {
+	readonly type: 'noul'
+	readonly noul: number
+	readonly confidence?: number
+}
+
+/** Unites the TypeSafe System One answer forms. */
+export type SystemOneAnswer = SystemOneChoiceAnswer | SystemOneScoreAnswer | SystemOneNoulAnswer
+
+/** Transliterates the System One response envelope before question-specific answer validation. */
+export interface SystemOneResponse {
+	readonly model?: string
+	readonly answers: Readonly<Record<string, unknown>>
+	readonly usage?: SystemOneUsage
+}

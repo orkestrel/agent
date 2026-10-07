@@ -22,6 +22,7 @@ import type {
 	InstructionInterface,
 	InstructionManagerInterface,
 	InstructionManagerOptions,
+	JudgeInterface,
 	ProviderInterface,
 	RelayHandler,
 	RelayOptions,
@@ -32,6 +33,7 @@ import type {
 	ScopeManagerOptions,
 	ThinkSplitterInterface,
 	TextRead,
+	SystemOneJudgeOptions,
 } from './types.js'
 import type { DriverInterface, TableInterface } from '@orkestrel/database'
 import type { QueueInterface } from '@orkestrel/queue'
@@ -61,6 +63,7 @@ import { handleAgentQueueJob, handleAgentRunnerJob, readText } from './helpers.j
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { RelayProvider } from './providers/RelayProvider.js'
+import { SystemOneJudge } from './providers/SystemOneJudge.js'
 import { RelayStream } from './RelayStream.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
@@ -768,4 +771,17 @@ export function createAgentRunner(
 		...(timeout === undefined ? {} : { timeout }),
 		handler: handleAgentRunnerJob.bind(undefined, registry, partial),
 	})
+}
+/**
+ * Creates a judge that sends every question through the configured System One server.
+ *
+ * @param options - The server origin, model, and optional transport, headers, and timeout
+ * @returns The configured judge behind its shared interface
+ * @example
+ * ```ts
+ * const judge = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
+ * ```
+ */
+export function createSystemOneJudge(options: SystemOneJudgeOptions): JudgeInterface {
+	return new SystemOneJudge(options)
 }

@@ -1419,3 +1419,201 @@ export class ScriptedJudge extends AgentJudge {
 		}
 	}
 }
+/** Holds the exact Ollama 0.40.0 request recorded in systemone-tev1-request.json on 2026-10-07. */
+export const SYSTEM_ONE_TEV1_REQUEST = Object.freeze({
+	model: 'tev1:0.8b',
+	state: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
+	questions: {
+		label: {
+			type: 'choice',
+			instructions: 'Which label fits this ticket?',
+			criteria: { billing: 'Payments and refunds', bug: 'Software errors', account: null },
+		},
+		refund: {
+			type: 'noul',
+			instructions: 'Does the customer ask for money back?',
+			criteria: {
+				true: 'The customer asks for a refund or for money back.',
+				false: 'The customer does not ask for money back.',
+			},
+		},
+		severity: {
+			type: 'score',
+			instructions: 'How severe is the reported issue?',
+			criteria: ['Cosmetic; no impact', 'Degraded, workaround exists', 'Blocking; no workaround'],
+		},
+	},
+})
+
+/** Holds the HTTP 200 body recorded in systemone-tev1.json on 2026-10-07. */
+export const SYSTEM_ONE_TEV1 = Object.freeze({
+	model: 'tev1:0.8b',
+	answers: {
+		label: {
+			type: 'choice',
+			choice: 'bug',
+			probabilities: {
+				billing: 0.030333089940396418,
+				bug: 0.9690833479435905,
+				account: 0.0005835621160130767,
+			},
+			confidence: 0.8718301731972261,
+		},
+		refund: { type: 'noul', noul: 0.9978973674111222 },
+		severity: {
+			type: 'score',
+			score: 0.9919248376139791,
+			legend: {
+				'0': 'Cosmetic; no impact',
+				'1': 'Degraded, workaround exists',
+				'2': 'Blocking; no workaround',
+			},
+			probabilities: {
+				'0': 0.029332143644132135,
+				'1': 0.9494108750977565,
+				'2': 0.021256981258111343,
+			},
+			confidence: 0.7863989838603391,
+		},
+	},
+	usage: { input_tokens: 975, output_tokens: 4 },
+})
+
+/** Holds the exact request recorded in systemone-tev1-object-request.json on 2026-10-07. */
+export const SYSTEM_ONE_OBJECT_REQUEST = Object.freeze({
+	model: 'tev1:0.8b',
+	state: { message: 'Hi, I was charged twice', plan: 'pro' },
+	questions: {
+		intent: {
+			type: 'choice',
+			instructions: { question: 'What does the customer want?', field: 'message' },
+			criteria: { refund: 'wants money back', other: 'anything else' },
+		},
+	},
+})
+
+/** Holds the HTTP 200 body recorded in systemone-tev1-object.json on 2026-10-07. */
+export const SYSTEM_ONE_OBJECT = Object.freeze({
+	model: 'tev1:0.8b',
+	answers: {
+		intent: {
+			type: 'choice',
+			choice: 'refund',
+			probabilities: { refund: 0.672163600162288, other: 0.32783639983771207 },
+			confidence: 0.0872994563506665,
+		},
+	},
+	usage: { input_tokens: 148, output_tokens: 1 },
+})
+
+/** Transliterates the recorded distribution into llama.cpp's array probabilities and legend; no live llama.cpp body was recorded. */
+export const SYSTEM_ONE_LLAMA = Object.freeze({
+	...SYSTEM_ONE_TEV1,
+	answers: {
+		...SYSTEM_ONE_TEV1.answers,
+		severity: {
+			type: 'score',
+			score: 0.9919248376139791,
+			legend: ['Cosmetic; no impact', 'Degraded, workaround exists', 'Blocking; no workaround'],
+			probabilities: [0.029332143644132135, 0.9494108750977565, 0.021256981258111343],
+		},
+	},
+})
+
+/** Transliterates the recorded distribution into Mica server fields; no live Mica server body was recorded. */
+export const SYSTEM_ONE_MICA = Object.freeze({
+	...SYSTEM_ONE_TEV1,
+	model: 'mica-v0.1-4b',
+	latency_ms: 414,
+	answers: {
+		label: { ...SYSTEM_ONE_TEV1.answers.label, answer: 'bug', confidence: 0.9690833479435905 },
+		refund: { ...SYSTEM_ONE_TEV1.answers.refund, answer: true, confidence: 0.9978973674111222 },
+		severity: {
+			type: 'score',
+			score: 1,
+			answer: 1,
+			probabilities: SYSTEM_ONE_TEV1.answers.severity.probabilities,
+			confidence: 0.9494108750977565,
+		},
+	},
+	usage: { input_tokens: 975, output_tokens: 0 },
+})
+
+/** Holds the HTTP 400 responses recorded in systemone-errors.json and systemone-mica-refusal.json. */
+export const SYSTEM_ONE_ERRORS = Object.freeze([
+	{ status: 400, body: { error: 'questions must contain 1–64 fields' } },
+	{ status: 400, body: { error: 'question "q": type must be choice, noul, or score' } },
+	{ status: 400, body: { error: 'model is required' } },
+	{ status: 400, body: { error: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M does not support decision' } },
+])
+
+/** Lists values outside the probability domain for guard and decoder boundary tests. */
+export const SYSTEM_ONE_INVALID_PROBABILITIES = Object.freeze([
+	NaN,
+	Infinity,
+	-Infinity,
+	-0.01,
+	1.01,
+	'0.5',
+	null,
+	undefined,
+])
+
+/** Carries the recorded tev1 request under the domain's form discriminant. */
+export const SYSTEM_ONE_JUDGE_REQUEST: JudgeRequest = Object.freeze<JudgeRequest>({
+	state: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
+	questions: {
+		label: {
+			form: 'choice',
+			instructions: 'Which label fits this ticket?',
+			criteria: { billing: 'Payments and refunds', bug: 'Software errors', account: null },
+		},
+		refund: {
+			form: 'noul',
+			instructions: 'Does the customer ask for money back?',
+			criteria: {
+				true: 'The customer asks for a refund or for money back.',
+				false: 'The customer does not ask for money back.',
+			},
+		},
+		severity: {
+			form: 'score',
+			instructions: 'How severe is the reported issue?',
+			criteria: ['Cosmetic; no impact', 'Degraded, workaround exists', 'Blocking; no workaround'],
+		},
+	},
+})
+
+/** Carries the recorded structured request under the domain's form discriminant. */
+export const SYSTEM_ONE_JUDGE_OBJECT: JudgeRequest = Object.freeze<JudgeRequest>({
+	state: { message: 'Hi, I was charged twice', plan: 'pro' },
+	questions: {
+		intent: {
+			form: 'choice',
+			instructions: { question: 'What does the customer want?', field: 'message' },
+			criteria: { refund: 'wants money back', other: 'anything else' },
+		},
+	},
+})
+
+/** Holds the TypeSafe quickstart sentence from introduction/quickstart.md as recorded on 2026-10-07. */
+export const SYSTEM_ONE_QUICKSTART_STATE =
+	"Hi, I've been trying to connect my Stripe account for 3 days and the integration keeps failing. I'm losing sales. Please help ASAP."
+
+/** Lists incomplete and mismatched response bodies with the question each must name. */
+export const SYSTEM_ONE_PROTOCOL_CASES = Object.freeze([
+	{ id: 'label', answers: {} },
+	{ id: 'label', answers: { ...SYSTEM_ONE_TEV1.answers, label: { type: 'noul', noul: 0.5 } } },
+	{
+		id: 'label',
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			label: { type: 'choice', probabilities: { billing: 0.1, bug: 0.9 } },
+		},
+	},
+	{
+		id: 'severity',
+		answers: { ...SYSTEM_ONE_TEV1.answers, severity: { type: 'score', probabilities: [0.1, 0.9] } },
+	},
+	{ id: 'refund', answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } } },
+])

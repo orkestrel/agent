@@ -151,3 +151,5 @@ export const INVALID_RELAY_STATUS = 400
  * carried with no body and answered for an aborted inbound read as well.
  */
 export const OVERSIZED_RELAY_STATUS = 413
+/** Names the System One decision endpoint shared by compatible servers. */
+export const SYSTEM_ONE_PATH = '/v1/systemone'

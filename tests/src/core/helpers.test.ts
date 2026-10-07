@@ -1,10 +1,20 @@
-import type { AgentResult, ContextSectionSourceInterface, JudgeAnswer, Message } from '@src/core'
+import type {
+	AgentResult,
+	ContextSectionSourceInterface,
+	JudgeAnswer,
+	JudgeQuestion,
+	Message,
+} from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
 	agentResultToJSON,
 	buildJudgeResult,
 	buildProviderResult,
 	computeReading,
+	extractSystemOneAnswer,
+	extractSystemOneUsage,
+	isSystemOneAnswer,
+	questionToSystemOne,
 	isJudgeError,
 	readHeaders,
 	readText,
@@ -36,7 +46,7 @@ import {
 	settleAgentJob,
 	sumUsage,
 } from '@src/core'
-import { captureError } from '@orkestrel/test'
+import { captureError, requireValue } from '@orkestrel/test'
 import { createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import {
@@ -48,6 +58,12 @@ import {
 	TEV1_CHOICE,
 	TEV1_NOUL,
 	TEV1_SCORE,
+	TEV1_REQUEST,
+	TEV1_ANSWERS,
+	SYSTEM_ONE_TEV1,
+	SYSTEM_ONE_OBJECT,
+	SYSTEM_ONE_LLAMA,
+	SYSTEM_ONE_MICA,
 } from '../../setup.js'
 
 // Agent-owned pure helpers: filterAllowList applies the three-way set-membership primitive
@@ -1296,5 +1312,159 @@ describe('readHeaders — request headers inside the cancellation bound', () => 
 		await expect(readHeaders(hook.headers.bind(hook), new AbortController().signal)).rejects.toBe(
 			error,
 		)
+	})
+})
+describe('System One helpers', () => {
+	it('preserves omission, null descriptions, and structured instructions in the question projection', () => {
+		expect(questionToSystemOne({ form: 'noul' })).toEqual({ type: 'noul' })
+		expect(
+			questionToSystemOne({ form: 'choice', criteria: { billing: null, bug: 'Defect' } }),
+		).toEqual({ type: 'choice', criteria: { billing: null, bug: 'Defect' } })
+		expect(
+			questionToSystemOne({
+				form: 'score',
+				instructions: { question: ['Severity?'] },
+				criteria: [null, 'Blocking'],
+			}),
+		).toEqual({
+			type: 'score',
+			instructions: { question: ['Severity?'] },
+			criteria: [null, 'Blocking'],
+		})
+		expect(
+			questionToSystemOne({
+				form: 'noul',
+				criteria: { true: 'Requested', false: 'Not requested' },
+			}),
+		).toEqual({ type: 'noul', criteria: { true: 'Requested', false: 'Not requested' } })
+	})
+
+	it('decodes the recorded tev1 and transliterated llama.cpp and Mica answers into the same distributions', () => {
+		for (const body of [SYSTEM_ONE_TEV1, SYSTEM_ONE_LLAMA, SYSTEM_ONE_MICA]) {
+			for (const [id, answer] of Object.entries(body.answers)) {
+				expect(isSystemOneAnswer(answer)).toBe(true)
+				if (!isSystemOneAnswer(answer)) throw new Error('invalid fixture answer')
+				expect(extractSystemOneAnswer(answer, requireValue(TEV1_REQUEST.questions[id]))).toEqual(
+					TEV1_ANSWERS[id],
+				)
+			}
+		}
+		const answer = SYSTEM_ONE_OBJECT.answers.intent
+		if (!isSystemOneAnswer(answer)) throw new Error('invalid object fixture answer')
+		expect(
+			extractSystemOneAnswer(answer, { form: 'choice', criteria: { refund: null, other: null } }),
+		).toEqual({
+			form: 'choice',
+			probabilities: { refund: 0.672163600162288, other: 0.32783639983771207 },
+		})
+		expect(extractSystemOneUsage(SYSTEM_ONE_TEV1.usage)).toEqual({
+			prompt: 975,
+			completion: 4,
+			total: 979,
+		})
+		expect(extractSystemOneUsage(SYSTEM_ONE_OBJECT.usage)).toEqual({
+			prompt: 148,
+			completion: 1,
+			total: 149,
+		})
+		expect(extractSystemOneUsage(SYSTEM_ONE_MICA.usage)).toEqual({
+			prompt: 975,
+			completion: 0,
+			total: 975,
+		})
+	})
+
+	it('orders choice probabilities by criteria, keeps prototype-like labels, and preserves values without normalization', () => {
+		const question: JudgeQuestion = {
+			form: 'choice',
+			criteria: { bug: null, billing: null, ['__proto__']: null },
+		}
+		const answer = requireValue(
+			extractSystemOneAnswer(
+				{
+					type: 'choice',
+					probabilities: { ['__proto__']: 0, billing: 0.3, bug: 0.6, extra: 0.05 },
+				},
+				question,
+			),
+		)
+		expect(answer).toEqual({
+			form: 'choice',
+			probabilities: { bug: 0.6, billing: 0.3, ['__proto__']: 0 },
+		})
+		if (answer.form !== 'choice') throw new Error('expected choice')
+		expect(Object.keys(answer.probabilities)).toEqual(['bug', 'billing', '__proto__'])
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: [0.2, 0.7, 0.05] },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toEqual({ form: 'score', probabilities: [0.2, 0.7] })
+	})
+
+	it('refuses missing labels, missing levels, mismatched forms, and non-finite or unbounded values', () => {
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'choice', probabilities: { bug: 1 } },
+				{ form: 'choice', criteria: { bug: null, billing: null } },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'choice', probabilities: {} },
+				{ form: 'choice', criteria: { ['__proto__']: null, bug: null } },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: { '0': 0.5 } },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: [1] },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'noul', noul: 0.5 },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer({ type: 'choice', probabilities: { bug: 1 } }, { form: 'noul' }),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer({ type: 'noul', noul: Infinity }, { form: 'noul' }),
+		).toBeUndefined()
+		expect(extractSystemOneAnswer({ type: 'noul', noul: -0.1 }, { form: 'noul' })).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'choice', probabilities: { bug: 1.1, billing: 0 } },
+				{ form: 'choice', criteria: { bug: null, billing: null } },
+			),
+		).toBeUndefined()
+	})
+
+	it('omits incomplete or invalid usage and accepts finite fractional counts and zero', () => {
+		expect(extractSystemOneUsage(undefined)).toBeUndefined()
+		expect(extractSystemOneUsage({})).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: 2 })).toBeUndefined()
+		expect(extractSystemOneUsage({ output_tokens: 2 })).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: null, output_tokens: 2 })).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: 2, output_tokens: null })).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: -1, output_tokens: 2 })).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: NaN, output_tokens: 2 })).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: 2, output_tokens: Infinity })).toBeUndefined()
+		expect(
+			extractSystemOneUsage({ input_tokens: Number.MAX_VALUE, output_tokens: Number.MAX_VALUE }),
+		).toBeUndefined()
+		expect(extractSystemOneUsage({ input_tokens: 0.5, output_tokens: 0 })).toEqual({
+			prompt: 0.5,
+			completion: 0,
+			total: 0.5,
+		})
 	})
 })

@@ -6,6 +6,7 @@ import type {
 	ContextSectionFormat,
 	ContextSectionSourceInterface,
 	JudgeAnswer,
+	JudgeQuestion,
 	JudgeResult,
 	Message,
 	ProviderOptions,
@@ -15,6 +16,9 @@ import type {
 	RunOutcome,
 	Section,
 	TextRead,
+	SystemOneAnswer,
+	SystemOneQuestion,
+	SystemOneUsage,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
@@ -22,10 +26,13 @@ import type { QueueContext } from '@orkestrel/queue'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import type { ControllerInterface } from '@orkestrel/workflow'
 import type { FileInterface } from '@orkestrel/workspace'
+import { isTokenUsage } from '@orkestrel/budget'
 import {
 	attempt,
+	isArray,
 	isBoolean,
 	isFiniteNumber,
+	isNumber,
 	isObject,
 	isString,
 	parseJSONValue,
@@ -37,6 +44,7 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 } from './constants.js'
 import { AgentJobError, JudgeError } from './errors.js'
+import { isSystemOneAnswer } from './validators.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
@@ -1091,4 +1099,93 @@ export async function readHeaders(
 	} finally {
 		cleanup.abort()
 	}
+}
+/**
+ * Projects a judge question onto the System One wire while preserving omitted members.
+ *
+ * @param question - The domain question to send
+ * @returns The wire question with `type` replacing `form`
+ * @example
+ * ```ts
+ * questionToSystemOne({ form: 'noul' }) // { type: 'noul' }
+ * ```
+ */
+export function questionToSystemOne(question: JudgeQuestion): SystemOneQuestion {
+	return {
+		type: question.form,
+		...(question.instructions === undefined ? {} : { instructions: question.instructions }),
+		...(question.criteria === undefined ? {} : { criteria: question.criteria }),
+	}
+}
+
+/**
+ * Extracts a System One distribution in question criteria order and drops server measures.
+ *
+ * @remarks
+ * Every requested candidate must have a finite probability in [0, 1]. Score maps and arrays
+ * project onto the requested levels. Additional candidates are ignored, sums are unconstrained,
+ * and probabilities are preserved without normalization.
+ *
+ * @param answer - The wire answer to decode
+ * @param question - The question defining the form and candidate order
+ * @returns The domain answer, or undefined for a mismatched form or invalid distribution
+ * @example
+ * ```ts
+ * extractSystemOneAnswer({ type: 'noul', noul: 0.9 }, { form: 'noul' })
+ * // { form: 'noul', noul: 0.9 }
+ * ```
+ */
+export function extractSystemOneAnswer(
+	answer: SystemOneAnswer,
+	question: JudgeQuestion,
+): JudgeAnswer | undefined {
+	const extracted = attempt((): JudgeAnswer | undefined => {
+		if (!isSystemOneAnswer(answer)) return undefined
+		if (answer.type === 'noul' && question.form === 'noul')
+			return { form: 'noul', noul: answer.noul }
+		if (answer.type === 'choice' && question.form === 'choice') {
+			const entries: Array<readonly [string, number]> = []
+			for (const label of Object.keys(question.criteria)) {
+				if (!Object.hasOwn(answer.probabilities, label)) return undefined
+				const probability = answer.probabilities[label]
+				if (!isFiniteNumber(probability)) return undefined
+				entries.push([label, probability])
+			}
+			return { form: 'choice', probabilities: Object.fromEntries(entries) }
+		}
+		if (answer.type !== 'score' || question.form !== 'score') return undefined
+		const probabilities: number[] = []
+		for (let level = 0; level < question.criteria.length; level++) {
+			if (!Object.hasOwn(answer.probabilities, level)) return undefined
+			const probability = isArray(answer.probabilities)
+				? answer.probabilities[level]
+				: answer.probabilities[String(level)]
+			if (!isFiniteNumber(probability)) return undefined
+			probabilities.push(probability)
+		}
+		return { form: 'score', probabilities }
+	})
+	return extracted.success ? extracted.value : undefined
+}
+
+/**
+ * Maps complete System One token counts onto validated token usage.
+ *
+ * @param usage - The optional wire token counts
+ * @returns Token usage, or undefined for missing, null, negative, or non-finite counts
+ * @example
+ * ```ts
+ * extractSystemOneUsage({ input_tokens: 975, output_tokens: 4 })
+ * // { prompt: 975, completion: 4, total: 979 }
+ * ```
+ */
+export function extractSystemOneUsage(usage: SystemOneUsage | undefined): TokenUsage | undefined {
+	const extracted = attempt(() => {
+		if (usage === undefined) return undefined
+		const { input_tokens: prompt, output_tokens: completion } = usage
+		if (!isNumber(prompt) || !isNumber(completion)) return undefined
+		const result = { prompt, completion, total: prompt + completion }
+		return isTokenUsage(result) ? result : undefined
+	})
+	return extracted.success ? extracted.value : undefined
 }
