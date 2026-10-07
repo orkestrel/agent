@@ -449,7 +449,7 @@ export class RecordedProvider extends ScriptedProvider {
 			[Symbol.asyncIterator]() {
 				return this
 			},
-			[Symbol.asyncDispose]: iterator[Symbol.asyncDispose].bind(iterator),
+			[Symbol.asyncDispose]: this.#dispose.bind(this, iterator, signal),
 		}
 	}
 	async *#iterate(
@@ -488,6 +488,14 @@ export class RecordedProvider extends ScriptedProvider {
 		this.#returns += 1
 		this.#cancelled = signal.aborted
 		return iterator.return(result)
+	}
+	// A Node 22 generator carries no `Symbol.asyncDispose`, so disposal is the wrapper's own
+	// `return`, counted like any other return.
+	async #dispose(
+		iterator: AsyncGenerator<ProviderDelta, ProviderResult>,
+		signal: AbortSignal,
+	): Promise<void> {
+		await this.#return(iterator, signal, { content: '' })
 	}
 }
 
