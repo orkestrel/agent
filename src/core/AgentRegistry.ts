@@ -98,8 +98,8 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// so the Agent's `?? default` fallbacks behave exactly as for a hand-built agent. When
 	// the registry carries a conversation store, thread a fresh store-backed
 	// ConversationManager for this build (a fresh conversation id per build ⇒ no
-	// collisions in the shared store) — omitted when no store is set, so the shape stays
-	// byte-identical to a registry with no `store`.
+	// collisions in the shared store) — omitted when no store is set, so the shape matches a
+	// registry with no `store`.
 	#options(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
 		const budget = this.#budget(input.budget)
 		return {

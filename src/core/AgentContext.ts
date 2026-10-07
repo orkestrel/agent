@@ -44,18 +44,17 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   `workspaces` / `conversations` registries are fixed at construction; switch their active
  *   members through their own `switch(id)` methods.
  * - **The message source — the conversation registry's active conversation.** `conversations` is a
- *   {@link ConversationManagerInterface}; the constructor gives it an active conversation
- *   (at construction it `add`s a default when the manager has none), so the dynamic `messages`
- *   getter — `this.#conversations.active` — is always defined. `messages` returns the active
- *   conversation itself (it owns the live tail + the message verbs directly, satisfying
- *   {@link MessageManagerInterface} structurally — the same reference, no duplication), and
- *   `build()` folds that conversation's `view()` (its per-section summaries + live tail) as the
- *   authoritative message inclusion — the scope does not filter the conversation (it owns inclusion
- *   through compaction; scope filters only instructions / tools / workspace files). Because `messages`
- *   is read dynamically, an agent switches the active
+ *   {@link ConversationManagerInterface}. The constructor adds a default conversation when the
+ *   manager has no active one, so the dynamic `messages` getter — `this.#conversations.active` — is
+ *   always defined. `messages` returns the active conversation itself (it owns the live tail + the
+ *   message verbs directly, satisfying {@link MessageManagerInterface} structurally — the same
+ *   reference, no duplication), and `build()` folds that conversation's `view()` (its per-section
+ *   summaries + live tail) as the authoritative message inclusion — the scope does not filter the
+ *   conversation (it owns inclusion through compaction; scope filters only instructions / tools /
+ *   workspace files). Because `messages` is read dynamically, an agent switches the active
  *   conversation between runs (`conversations.switch(id)`) to serve many threads (the real
- *   multi-conversation pattern); switch between runs, not during a run, and use separate agents
- *   for concurrent threads.
+ *   multi-conversation pattern); switch between runs, not during a run, and use separate agents for
+ *   concurrent threads.
  * - **`build(format?)` — the scoped assembly + the format cascade.** It folds, in order,
  *   the system prompt then the scope-filtered instructions → the active workspace's text files
  *   (each as a block: the section's resolved `open` text, each item's resolved rendering, then
@@ -104,9 +103,9 @@ export class AgentContext implements AgentContextInterface {
 	// through `workspaces.switch(id)`. `build()` reads `active` / its `files()` fresh each call.
 	readonly #workspaces: WorkspaceManagerInterface
 	// The conversation registry whose active conversation is the message source: the dynamic
-	// `messages` getter returns `#conversations.active` (always defined — the constructor adds one
-	// when absent) and `build()` folds that conversation's `view()`. Always present. The registry is
-	// structural; switch its active conversation through `conversations.switch(id)`.
+	// `messages` getter returns `#conversations.active`, which the constructor seeds when absent, and
+	// `build()` folds that conversation's `view()`. The registry is structural; switch its active
+	// conversation through `conversations.switch(id)`.
 	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
 	#scope: ScopeInterface | undefined
@@ -119,11 +118,11 @@ export class AgentContext implements AgentContextInterface {
 		// is the sole document/image context.
 		this.#workspaces = options?.workspaces ?? new WorkspaceManager()
 		// The conversation registry the message source flows from — a supplied one is reused, else a
-		// fresh empty one. Ensure an active conversation so `context.messages` (the active conversation's
-		// live tail) is always defined: when the manager has none active, `add()` a default (which
-		// auto-activates it). NB: `messages` is not captured here — it is computed dynamically (the
-		// getter reads `#conversations.active`), so it always tracks the current active conversation's
-		// live tail, no duplication.
+		// fresh empty one. Seed an active conversation so `context.messages` (the active conversation's
+		// live tail) is always defined: when the manager has none active, call `add()` for a default
+		// (which auto-activates it). NB: `messages` is not captured here — it is computed dynamically
+		// (the getter reads `#conversations.active`), so it always tracks the current active
+		// conversation's live tail, no duplication.
 		this.#conversations = options?.conversations ?? new ConversationManager()
 		if (this.#conversations.active === undefined) this.#conversations.add()
 		this.#tools = options?.tools ?? new ToolManager()
@@ -183,8 +182,7 @@ export class AgentContext implements AgentContextInterface {
 		// identical to the built-ins (each section's header + items, no closing line).
 		const parts: string[] = []
 		// Configured by `=== undefined`, not falsiness — an explicitly supplied '' (or a
-		// whitespace-only) system is opted in and prepended verbatim, exactly as the lean
-		// context did (a refactor to a truthiness check would wrongly drop it).
+		// whitespace-only) system is opted in and prepended verbatim; a truthiness check would drop it.
 		if (this.#system !== undefined) parts.push(this.#system)
 		const instructions = filterAllowList(
 			scope?.instructions,

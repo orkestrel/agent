@@ -215,7 +215,7 @@ export function estimateMessages(messages: readonly Message[]): number {
 			// though this function promises never to throw — so the serialization is wrapped; a
 			// throw falls back to a conservative fixed contribution (the same per-message overhead
 			// scale) instead of an unreachable serialized-length estimate. The happy path (no
-			// throw) is byte-identical to the bare estimate below.
+			// throw) equals the bare estimate below.
 			try {
 				calls = estimateTokens(JSON.stringify(message.calls))
 			} catch {

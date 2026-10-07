@@ -113,9 +113,8 @@ export type ProviderDelta =
  * {@link ProviderResult.thinking}); `false` suppresses it. `schema`, when given, asks the
  * backend to constrain its response to the given JSON-Schema shape (the same open
  * JSON-Schema record {@link ToolDefinition.parameters} already carries) — a structured-output
- * request for this call only. Both omitted ⇒ the provider's own defaults apply (the
- * constructor value / no schema constraint), so the contract stays backward-safe — a caller
- * that passes no options behaves unchanged.
+ * request for this call only. Both omitted ⇒ the provider's own defaults apply: its constructed
+ * reasoning preference and no schema constraint.
  */
 export interface ProviderStreamOptions {
 	/** Overrides the provider's reasoning preference for this call; omitted ⇒ the provider default. */
@@ -674,8 +673,8 @@ export interface AgentContextOptions {
 	readonly scope?: ScopeInterface
 	/**
 	 * Reuses a pre-built {@link ConversationManagerInterface} as the message source; a fresh
-	 * empty one is created when omitted. Construction leaves an active conversation
-	 * (it `add`s a default when the manager has none), so `messages` — the manager's active
+	 * empty one is created when omitted. The constructor adds a default conversation when the
+	 * manager has no active one, so `messages` — the manager's active
 	 * conversation's live tail — is always defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail) as its authoritative message inclusion —
 	 * the scope does not filter the conversation (it owns inclusion through compaction; scope filters
@@ -803,15 +802,13 @@ export interface AgentContextInterface {
 	 *   per-item level): unset at both levels ⇒ `undefined` ⇒ no closing line. Paired with
 	 *   `open`, it lets a level wrap the group (`open: '<instructions>'` … `close: '</instructions>'`).
 	 *
-	 * Passing no `format` (the default) leaves the provider-default level empty, so the
-	 * output is identical to the managers' built-in framing — every section is its
-	 * built-in header + items, with no closing line (the regression contract). Scope
-	 * filtering runs before formatting (unchanged); the workspace image-data attachment to the
-	 * last user message is unchanged.
+	 * Passing no `format` leaves the provider-default level empty, so each section renders as its
+	 * built-in header and items with no closing line. Scope filtering runs before formatting, and
+	 * the workspace image data attaches to the last user message.
 	 *
 	 * @param format - The provider's optional {@link ContextFormat} default
-	 *   (typically `provider.format`); omitted ⇒ only the manager-options / item / built-in
-	 *   levels apply, reproducing the prior built-in output exactly
+	 *   (typically `provider.format`); omitted ⇒ only the manager-options, item, and built-in
+	 *   levels apply
 	 * @returns The scoped conversation, prefixed by the assembled `system` message when any
 	 *   of (the prompt, the scoped instructions, the active workspace's text files) is non-empty
 	 */
@@ -1127,7 +1124,7 @@ export interface AgentOptions {
 	readonly timeout?: number
 	/** Bounds the token cost; each provider call's usage is charged and its abort commits a partial. */
 	readonly budget?: BudgetInterface<TokenUsage>
-	/** Paces the loop — `yield`ed between turns so the host regains control. */
+	/** Paces the loop — the loop yields to it between turns so the host regains control. */
 	readonly scheduler?: SchedulerInterface
 	/** Carries an external cancel; its abort commits a partial result. */
 	readonly signal?: AbortSignal
@@ -1186,8 +1183,7 @@ export interface AgentRunOptions {
 	 * Sets the per-run reasoning preference forwarded to the provider's `stream` as
 	 * {@link ProviderStreamOptions.think} — `true` asks the backend to separate reasoning
 	 * (surfaced as `think` {@link AgentChunk}s + the settled `thinking`), `false` suppresses
-	 * it. Omitted ⇒ the provider's own default applies (the loop adds no
-	 * reasoning preference), so a caller that passes no options runs unchanged.
+	 * it. Omitted ⇒ the loop sends no reasoning preference and the provider's own default applies.
 	 */
 	readonly think?: boolean
 	/**
@@ -1208,7 +1204,7 @@ export interface AgentRunOptions {
 	readonly timeout?: number
 	/**
 	 * Overrides {@link AgentOptions.budget} for this run only — a token cost bound whose abort
-	 * commits a partial result; `start()`ed for this run exactly as the constructed budget is.
+	 * commits a partial result; started for this run with `start()`, as the constructed budget is.
 	 * Omitted ⇒ the agent's constructed `budget` applies.
 	 */
 	readonly budget?: BudgetInterface<TokenUsage>
@@ -1508,8 +1504,7 @@ export interface AgentRegistryInterface {
  * build (minted by the seeded `add`), so concurrent builds never collide, and the store
  * accumulates one snapshot per built agent that later calls `save`. Persistence
  * stays caller-triggered (`open` / `save`) — `build` never hydrates, so `build` stays
- * synchronous. Omitted ⇒ every built agent gets a registry-only manager, byte-identical
- * to today.
+ * synchronous. Omitted ⇒ every built agent gets a registry-only manager.
  */
 export interface AgentRegistryOptions {
 	readonly providers: Readonly<Record<string, ProviderInterface>>
@@ -2057,7 +2052,7 @@ export interface ConversationInput {
  * backing `open` / `save`.
  *
  * @remarks
- * `summarize` is the default summarizer flowed into every conversation the manager `add`s
+ * `summarize` is the default summarizer flowed into every conversation the manager creates
  * (a per-`add` {@link ConversationInput.summarize} overrides it); a conversation created
  * with neither cannot `compact` (it throws a `ConversationError`). `keep` is the default
  * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it), defaulting
@@ -2140,7 +2135,7 @@ export interface ConversationManagerInterface {
 	 * it is neither registered nor stored.
 	 *
 	 * @remarks
-	 * - If `id` is already registered, it is activated (`switch`ed to) and returned — no store hit.
+	 * - If `id` is already registered, it is activated through `switch` and returned — no store hit.
 	 * - Else if a `store` is set, `store.get(id)` is awaited; on a hit the snapshot is rehydrated
 	 *   into a fresh {@link ConversationInterface} through the `snapshot` option
 	 *   (`add({ snapshot, ... })`, flowing the manager's default `summarize` / `keep` in), which
