@@ -4,14 +4,16 @@ A dual-axis index into this repository's guides — by concept, and by directory
 
 ## By concept
 
-| Concept                                                  | Spec                   | Source                    | Tests                                 |
-| -------------------------------------------------------- | ---------------------- | ------------------------- | ------------------------------------- |
-| `Agent`, `AgentProvider`, `RelayProvider`, `RelayStream` | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
+| Concept                                                                                  | Spec                   | Source                    | Tests                                 |
+| ---------------------------------------------------------------------------------------- | ---------------------- | ------------------------- | ------------------------------------- |
+| `Agent`, `AgentProvider`, `AgentJudge`, `RelayProvider`, `RelayStream`, `SystemOneJudge` | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
 
 The `Agent` class is the conversation loop, the `AgentProvider` class the host-independent HTTP
-engine a concrete provider extends, and the `RelayProvider` and `RelayStream` classes the browser
-end and the server end of the relay hop the `createRelay` function mounts. The `agent.md` guide
-covers them together because they sit in the same module directory under the same contract.
+engine a concrete provider extends, the `AgentJudge` class the engine a judge wire extends with the
+`SystemOneJudge` class as its System One wire, and the `RelayProvider` and `RelayStream` classes
+the browser end and the server end of the relay hop the `createRelay` function mounts. The
+`agent.md` guide covers them together because they sit in the same module directory under the same
+contract.
 
 ## By directory
 

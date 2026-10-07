@@ -3,12 +3,15 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
+	JudgeRequest,
+	JudgeResult,
 	Message,
 	ProviderIncrement,
 	ProviderOptions,
 	ProviderParserInterface,
 	ProviderRequest,
 } from '@src/core'
+import type { JSONValue } from '@orkestrel/contract'
 import { GuideCommand } from '@orkestrel/guide/server'
 import { readInventory } from '@orkestrel/test/server'
 import { createVitest } from 'vitest/node'
@@ -42,9 +45,9 @@ await new GuideCommand({
 	reader: readInventory,
 	runner: createVitest,
 }).execute(async ({ files, report, rows }) => {
-	const { isRecord, parseJSON } = await import('@orkestrel/contract')
+	const { isFiniteNumber, isRecord, parseJSON } = await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
-	const { requireValue, waitForCondition } = await import('@orkestrel/test')
+	const { captureError, requireValue, waitForCondition } = await import('@orkestrel/test')
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
@@ -54,7 +57,9 @@ await new GuideCommand({
 	const { createServer } = await import('@orkestrel/server')
 	const barrel = await import('@src/core')
 	const {
+		AgentJudge,
 		AgentProvider,
+		computeReading,
 		createAgent,
 		createConversation,
 		createConversationManager,
@@ -63,14 +68,42 @@ await new GuideCommand({
 		createMemoryConversationStore,
 		createRelay,
 		createRelayProvider,
+		createSystemOneJudge,
+		isJudgeAbortError,
+		isJudgeEntry,
+		isJudgeQuestion,
+		JudgeAbortError,
+		JudgeError,
+		MAX_ERROR_BODY_LENGTH,
 		ProviderAbortError,
 		ProviderError,
 		providerRequestContract,
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
 		sanitizeToken,
+		SYSTEM_ONE_PATH,
+		SystemOneJudge,
 	} = barrel
-	const { createParser, createScriptedProvider, RecordedProvider } = await import('./setup.js')
+	const {
+		createParser,
+		createScriptedProvider,
+		JUDGE_ENVELOPE,
+		RecordedHeaders,
+		RecordedProvider,
+		RecordedTransport,
+		rejectTransportOnAbort,
+		ScriptedJudge,
+		SYSTEM_ONE_ERRORS,
+		SYSTEM_ONE_JUDGE_REQUEST,
+		SYSTEM_ONE_LLAMA,
+		SYSTEM_ONE_MICA,
+		SYSTEM_ONE_TEV1,
+		SYSTEM_ONE_TEV1_REQUEST,
+		TEV1_ANSWERS,
+		TEV1_CHOICE,
+		TEV1_REQUEST,
+		TEV1_SCORE,
+	} = await import('./setup.js')
 	const { describe, expect, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
@@ -120,6 +153,22 @@ await new GuideCommand({
 		}
 		finish(_parser: ProviderParserInterface<string>): readonly string[] {
 			return []
+		}
+	}
+	// The judge-wire fence, transcribed and declared here for the same reason: `AgentJudge` is only
+	// in scope after the dynamic barrel import.
+	// A wire whose server answers one yes/no question per call as { "yes": 0.93 }.
+	class YesJudge extends AgentJudge {
+		readonly name = 'yes'
+		body(request: JudgeRequest): object {
+			return { model: this.model, state: request.state, questions: request.questions }
+		}
+		read(value: unknown, request: JudgeRequest): JudgeResult {
+			const [id] = Object.keys(request.questions)
+			if (id === undefined || !isRecord(value) || !isFiniteNumber(value.yes)) {
+				throw new JudgeError('PROTOCOL', 'judge error: unreadable answer')
+			}
+			return { model: this.model, answers: { [id]: { form: 'noul', noul: value.yes } } }
 		}
 	}
 
@@ -772,6 +821,679 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"const frame = relayFrameContract.parse({ channel: 'result', result })",
+			)
+		})
+
+		it('asks the System One fence’s three questions over a started listener and reads the published measures', async () => {
+			const posted: unknown[] = []
+			const dispatcher = createDispatcher({
+				routes: [
+					{
+						method: 'POST',
+						path: SYSTEM_ONE_PATH,
+						handler: async (request) => {
+							posted.push(JSON.parse(await request.text()))
+							return Response.json(SYSTEM_ONE_TEV1)
+						},
+					},
+				],
+			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				// The fence names a local Ollama origin; the transcription names the fixture listener
+				// that replays the response Ollama 0.40.0 returned for this request on 2026-10-07.
+				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
+				const result = await judge.ask(
+					{
+						state: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
+						questions: {
+							label: {
+								form: 'choice',
+								instructions: 'Which label fits this ticket?',
+								criteria: {
+									billing: 'Payments and refunds',
+									bug: 'Software errors',
+									account: null,
+								},
+							},
+							refund: {
+								form: 'noul',
+								instructions: 'Does the customer ask for money back?',
+								criteria: {
+									true: 'The customer asks for a refund or for money back.',
+									false: 'The customer does not ask for money back.',
+								},
+							},
+							severity: {
+								form: 'score',
+								instructions: 'How severe is the reported issue?',
+								criteria: [
+									'Cosmetic; no impact',
+									'Degraded, workaround exists',
+									'Blocking; no workaround',
+								],
+							},
+						},
+					},
+					AbortSignal.timeout(30_000),
+				)
+				const readings = Object.fromEntries(
+					Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),
+				)
+
+				// One POST to the origin plus SYSTEM_ONE_PATH carried every question, and its body is the
+				// exact request Ollama accepted: `form` written as `type`, the undescribed option kept null.
+				expect(posted).toEqual([SYSTEM_ONE_TEV1_REQUEST])
+				expect(result.model).toBe('tev1:0.8b')
+				expect(result.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
+				expect(result).not.toHaveProperty('refusals')
+				const label = requireValue(readings.label, 'Missing reading: label')
+				expect(label.winner).toBe('bug')
+				expect(label.probability).toBeCloseTo(0.9691, 4)
+				expect(label.confidence).toBeCloseTo(0.9536, 4)
+				expect(label).not.toHaveProperty('score')
+				const refund = requireValue(readings.refund, 'Missing reading: refund')
+				expect(refund.winner).toBe('true')
+				expect(refund.probability).toBeCloseTo(0.9979, 4)
+				expect(refund.confidence).toBeCloseTo(0.9958, 4)
+				expect(refund).not.toHaveProperty('score')
+				const severity = requireValue(readings.severity, 'Missing reading: severity')
+				expect(severity.winner).toBe('1')
+				expect(severity.probability).toBeCloseTo(0.9494, 4)
+				expect(severity.confidence).toBeCloseTo(0.9241, 4)
+				expect(severity.score).toBeCloseTo(0.9919, 4)
+
+				// The same response carried the server's own confidence, which the published formulas
+				// contradict; the decoded answers hold the distribution and nothing else.
+				expect(SYSTEM_ONE_TEV1.answers.label.confidence).toBeCloseTo(0.8718, 4)
+				expect(SYSTEM_ONE_TEV1.answers.severity.confidence).toBeCloseTo(0.7864, 4)
+				expect(result.answers).toStrictEqual({
+					label: { form: 'choice', probabilities: SYSTEM_ONE_TEV1.answers.label.probabilities },
+					refund: { form: 'noul', noul: SYSTEM_ONE_TEV1.answers.refund.noul },
+					severity: {
+						form: 'score',
+						probabilities: [0.029332143644132135, 0.9494108750977565, 0.021256981258111343],
+					},
+				})
+			} finally {
+				await server.stop()
+			}
+			expect(server.status).toBe('stopped')
+		})
+
+		it('carries the System One fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"const judge = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })",
+			)
+			expect(guideText).toContain(
+				"criteria: { billing: 'Payments and refunds', bug: 'Software errors', account: null },",
+			)
+			expect(guideText).toContain(
+				'Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),',
+			)
+			expect(guideText).toContain("result.model // 'tev1:0.8b' — the model the server named")
+			expect(guideText).toContain('result.usage // { prompt: 975, completion: 4, total: 979 }')
+			expect(guideText).toContain(
+				"readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to four decimals",
+			)
+			expect(guideText).toContain(
+				"readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to four decimals",
+			)
+			expect(guideText).toContain(
+				"readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to four decimals",
+			)
+		})
+
+		it('authenticates the Jev fence through its header hook on the System One path', async () => {
+			const key = 'fixture-key'
+			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const jev = createSystemOneJudge({
+				url: 'https://api.typesafe.ai',
+				model: 'jev-latest',
+				headers: () => ({ authorization: `Bearer ${key}` }),
+				// The fence omits `fetch` and takes the global transport; the transcription records the
+				// call in process.
+				fetch: transport.fetch,
+			})
+			const result = await jev.ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal)
+			const sent = requireValue(transport.requests[0], 'Missing request')
+
+			expect(transport.requests).toHaveLength(1)
+			expect(sent.method).toBe('POST')
+			expect(sent.url).toBe('https://api.typesafe.ai/v1/systemone')
+			expect(sent.headers.get('authorization')).toBe('Bearer fixture-key')
+			expect(sent.headers.get('content-type')).toBe('application/json')
+			expect(await sent.json()).toMatchObject({ model: 'jev-latest' })
+			// The response named its own model, so the configured alias does not mask it.
+			expect(result.model).toBe('tev1:0.8b')
+		})
+
+		it('carries the Jev fence lines the transcription copies', () => {
+			expect(guideText).toContain("url: 'https://api.typesafe.ai',")
+			expect(guideText).toContain("model: 'jev-latest',")
+			expect(guideText).toContain(
+				"headers: () => ({ authorization: `Bearer ${key}` }), // awaited inside each call's deadline",
+			)
+		})
+
+		it('answers each question in its own call through the judge-wire fence', async () => {
+			const transport = new RecordedTransport(() => Response.json({ yes: 0.93 }))
+			const judge = new YesJudge({
+				url: 'http://localhost:8010',
+				path: '/v1/yes',
+				model: 'yes-1',
+				batch: false,
+				// The fence omits `fetch`; the transcription answers in process.
+				fetch: transport.fetch,
+			})
+			const request: JudgeRequest = {
+				state: 'Ticket 4182: the customer paid twice for one plan.',
+				questions: {
+					refund: { form: 'noul', instructions: 'Is a refund owed?' },
+					urgent: { form: 'noul', instructions: 'Is the ticket urgent?' },
+				},
+			}
+			const result = await judge.ask(request, new AbortController().signal)
+
+			expect(judge.name).toBe('yes')
+			expect(transport.requests.map((sent) => sent.url)).toEqual([
+				'http://localhost:8010/v1/yes',
+				'http://localhost:8010/v1/yes',
+			])
+			expect(await Promise.all(transport.requests.map((sent) => sent.json()))).toEqual([
+				{ model: 'yes-1', state: request.state, questions: { refund: request.questions.refund } },
+				{ model: 'yes-1', state: request.state, questions: { urgent: request.questions.urgent } },
+			])
+			expect(result).toStrictEqual({
+				model: 'yes-1',
+				answers: {
+					refund: { form: 'noul', noul: 0.93 },
+					urgent: { form: 'noul', noul: 0.93 },
+				},
+			})
+
+			// A response the wire cannot read reaches the caller as the wire's own PROTOCOL failure.
+			const unreadable = new YesJudge({
+				url: 'http://localhost:8010',
+				path: '/v1/yes',
+				model: 'yes-1',
+				batch: false,
+				fetch: new RecordedTransport(() => Response.json({ no: 1 })).fetch,
+			})
+			const failure = unreadable.ask(request, new AbortController().signal)
+			await expect(failure).rejects.toBeInstanceOf(JudgeError)
+			await expect(failure).rejects.toMatchObject({
+				code: 'PROTOCOL',
+				message: 'judge error: unreadable answer',
+			})
+		})
+
+		it('carries the judge-wire fence lines the transcription copies', () => {
+			expect(guideText).toContain('class YesJudge extends AgentJudge {')
+			expect(guideText).toContain("readonly name = 'yes'")
+			expect(guideText).toContain(
+				"throw new JudgeError('PROTOCOL', 'judge error: unreadable answer')",
+			)
+			expect(guideText).toContain(
+				"return { model: this.model, answers: { [id]: { form: 'noul', noul: value.yes } } }",
+			)
+			expect(guideText).toContain("path: '/v1/yes',")
+			expect(guideText).toContain('batch: false,')
+		})
+
+		it('answers through a judge boundary that is never a provider (the judge-boundary clause)', () => {
+			const judge = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
+			const other = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
+
+			expect(judge.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+			expect(judge.id).not.toBe(other.id)
+			expect(judge.name).toBe('systemone')
+			expect(judge.model).toBe('tev1:0.8b')
+			expect('generate' in judge).toBe(false)
+			expect('stream' in judge).toBe(false)
+		})
+
+		it('derives each reading from the stored distribution alone (the derived-reading clause)', () => {
+			// A tie names the first candidate in enumeration order, and a noul of exactly 0.5 names false.
+			expect(computeReading({ form: 'choice', probabilities: { billing: 0.5, bug: 0.5 } })).toEqual(
+				{
+					winner: 'billing',
+					probability: 0.5,
+					confidence: 0,
+				},
+			)
+			expect(computeReading({ form: 'noul', noul: 0.5 })).toEqual({
+				winner: 'false',
+				probability: 0.5,
+				confidence: 0,
+			})
+			expect(computeReading({ form: 'noul', noul: 0.25 })).toEqual({
+				winner: 'false',
+				probability: 0.75,
+				confidence: 0.5,
+			})
+			// (0.7 - 1/3) / (1 - 1/3) = 0.55 for a choice over three options.
+			const choice = computeReading({
+				form: 'choice',
+				probabilities: { billing: 0.7, bug: 0.2, account: 0.1 },
+			})
+			expect(choice.winner).toBe('billing')
+			expect(choice.confidence).toBeCloseTo(0.55, 10)
+			expect(choice).not.toHaveProperty('score')
+			// A score whose mass sits far from its winner clamps its confidence at 0; its expected level
+			// is 0 * 0.25 + 1 * 0.25 + 2 * 0.5.
+			expect(computeReading({ form: 'score', probabilities: [0.25, 0.25, 0.5] })).toEqual({
+				winner: '2',
+				probability: 0.5,
+				confidence: 0,
+				score: 1.25,
+			})
+			// Both formulas divide by the candidate count, so a single candidate is a protocol failure.
+			const single = captureError(() =>
+				computeReading({ form: 'choice', probabilities: { bug: 1 } }),
+			)
+			expect(single).toBeInstanceOf(JudgeError)
+			expect(single).toMatchObject({
+				code: 'PROTOCOL',
+				message: 'judge error: an answer needs at least 2 candidates',
+			})
+		})
+
+		it('keeps the protocol’s null for an undescribed candidate and omits it elsewhere (the null clause)', () => {
+			expect(
+				isJudgeQuestion({ form: 'choice', criteria: { billing: null, bug: 'Software errors' } }),
+			).toBe(true)
+			expect(isJudgeQuestion({ form: 'score', criteria: ['Cosmetic; no impact', null] })).toBe(true)
+			expect(isJudgeQuestion({ form: 'noul', instructions: null })).toBe(false)
+			expect(isJudgeQuestion({ form: 'noul', criteria: null })).toBe(false)
+			expect(isJudgeQuestion({ form: 'noul', criteria: { true: null } })).toBe(false)
+			expect(isJudgeEntry(null)).toBe(false)
+
+			const judge = new SystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
+			// The null description travels as null; an omitted member stays omitted.
+			expect(judge.body(SYSTEM_ONE_JUDGE_REQUEST)).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+			expect(
+				judge.body({ state: 'Ticket 4182', questions: { refund: { form: 'noul' } } }),
+			).toStrictEqual({
+				state: 'Ticket 4182',
+				model: 'tev1:0.8b',
+				questions: { refund: { type: 'noul' } },
+			})
+		})
+
+		it('refuses a malformed request before any call and reports a server refusal as HTTP (the validation clause)', async () => {
+			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const judge = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: transport.fetch,
+			})
+			const signal = new AbortController().signal
+			const state: Record<string, JSONValue> = {}
+			state.self = state
+
+			await expect(
+				judge.ask({ state: 'Ticket 4182', questions: {} }, signal),
+			).rejects.toMatchObject({ code: 'QUESTION', message: 'judge error: no questions' })
+			await expect(
+				judge.ask(
+					{
+						state: 'Ticket 4182',
+						questions: { label: { form: 'choice', criteria: { bug: null } } },
+					},
+					signal,
+				),
+			).rejects.toMatchObject({
+				code: 'QUESTION',
+				message: 'judge error: question label is malformed',
+			})
+			await expect(
+				judge.ask({ state, questions: SYSTEM_ONE_JUDGE_REQUEST.questions }, signal),
+			).rejects.toMatchObject({
+				code: 'QUESTION',
+				message: 'judge error: state is not a judge entry',
+			})
+			expect(transport.requests).toHaveLength(0)
+
+			// The server's own limit: the HTTP 400 Ollama returned on 2026-10-07 for a request with no
+			// model, carried with its status and body excerpt.
+			const refusal = requireValue(SYSTEM_ONE_ERRORS[2], 'Missing recorded refusal')
+			const refused = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(() => Response.json(refusal.body, { status: refusal.status }))
+					.fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, signal)
+			await expect(refused).rejects.toBeInstanceOf(JudgeError)
+			await expect(refused).rejects.toMatchObject({
+				code: 'HTTP',
+				status: 400,
+				message: 'judge error: 400 - {"error":"model is required"}',
+			})
+			const flooded = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(
+					() => new Response('x'.repeat(MAX_ERROR_BODY_LENGTH * 2), { status: 529 }),
+				).fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, signal)
+			await expect(flooded).rejects.toMatchObject({
+				code: 'HTTP',
+				status: 529,
+				message: `judge error: 529 - ${'x'.repeat(MAX_ERROR_BODY_LENGTH)}`,
+			})
+
+			// A successful response with no body, or with a body that is not JSON, is a protocol failure.
+			const empty = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(() => new Response(null)).fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, signal)
+			await expect(empty).rejects.toMatchObject({
+				code: 'PROTOCOL',
+				status: undefined,
+				message: 'judge error: no response body',
+			})
+			const garbled = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(() => new Response('not json')).fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, signal)
+			await expect(garbled).rejects.toMatchObject({
+				code: 'PROTOCOL',
+				message: 'judge error: invalid JSON body',
+			})
+		})
+
+		it('bounds each call by its own deadline and keeps the completed calls in the abort partial (the abort-partial clause)', async () => {
+			// An already-aborted signal: an empty partial, and no call.
+			const idle = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const early: unknown = await new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: idle.fetch,
+			})
+				.ask(SYSTEM_ONE_JUDGE_REQUEST, AbortSignal.abort())
+				.catch((failure: unknown) => failure)
+			expect(isJudgeAbortError(early)).toBe(true)
+			expect(early).toMatchObject({ code: 'ABORT', partial: { model: 'tev1:0.8b', answers: {} } })
+			expect(idle.requests).toHaveLength(0)
+
+			// A stalled call: its own deadline fires while the caller's signal stays live.
+			const caller = new AbortController()
+			const stalled: unknown = await new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				timeout: 10,
+				fetch: rejectTransportOnAbort,
+			})
+				.ask(SYSTEM_ONE_JUDGE_REQUEST, caller.signal)
+				.catch((failure: unknown) => failure)
+			expect(stalled).toBeInstanceOf(JudgeAbortError)
+			expect(stalled).toMatchObject({ code: 'ABORT', partial: { model: 'tev1:0.8b', answers: {} } })
+			expect(caller.signal.aborted).toBe(false)
+
+			// A cancel in the second of three calls: the first call's answer and usage survive, and the
+			// third call is never made.
+			const abort = new AbortController()
+			const transport = new RecordedTransport(() => {
+				if (transport.requests.length === 2) abort.abort()
+				return new Response(JUDGE_ENVELOPE)
+			})
+			const split: unknown = await new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'jev-latest',
+				fetch: transport.fetch,
+				batch: false,
+				answers: TEV1_ANSWERS,
+			})
+				.ask(TEV1_REQUEST, abort.signal)
+				.catch((failure: unknown) => failure)
+			if (!isJudgeAbortError(split)) throw new Error('Expected a JudgeAbortError')
+			expect(split.code).toBe('ABORT')
+			expect(split.partial).toStrictEqual({
+				model: 'tev1:0.8b',
+				answers: { label: TEV1_CHOICE },
+				usage: { prompt: 975, completion: 4, total: 979 },
+			})
+			expect(transport.requests).toHaveLength(2)
+
+			// A cancel that lands while `read` decodes: no cause, and the decoded answer is left out.
+			const reading = new AbortController()
+			const decoding = new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(() => new Response(JUDGE_ENVELOPE)).fetch,
+				answers: TEV1_ANSWERS,
+				readAbort: reading,
+			})
+			const late: unknown = await decoding
+				.ask(TEV1_REQUEST, reading.signal)
+				.catch((failure: unknown) => failure)
+			if (!isJudgeAbortError(late)) throw new Error('Expected a JudgeAbortError')
+			expect(late).not.toHaveProperty('cause')
+			expect(late.partial).toStrictEqual({ model: 'tev1:0.8b', answers: {} })
+			expect(decoding.values).toHaveLength(1)
+
+			// A transport failure with neither bound fired reaches the caller unchanged.
+			const offline = new TypeError('fetch failed')
+			const broken = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: () => Promise.reject(offline),
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal)
+			await expect(broken).rejects.toBe(offline)
+		}, 1000)
+
+		it('splits a request by the batch switch and merges the calls (the batch-switch clause)', async () => {
+			const signal = new AbortController().signal
+			const whole = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
+			const batched = new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'configured',
+				fetch: whole.fetch,
+				answers: TEV1_ANSWERS,
+			})
+			await batched.ask(TEV1_REQUEST, signal)
+			expect(whole.requests).toHaveLength(1)
+			expect(batched.bodies.map((part) => Object.keys(part.questions))).toEqual([
+				['label', 'refund', 'severity'],
+			])
+
+			const each = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
+			const split = new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'configured',
+				fetch: each.fetch,
+				batch: false,
+				answers: { label: TEV1_CHOICE, severity: TEV1_SCORE },
+				refusals: { refund: { missing: ['true'] } },
+			})
+			const result = await split.ask(TEV1_REQUEST, signal)
+			expect(each.requests).toHaveLength(3)
+			expect(split.bodies.map((part) => Object.keys(part.questions))).toEqual([
+				['label'],
+				['refund'],
+				['severity'],
+			])
+			expect(split.bodies.every((part) => part.state === TEV1_REQUEST.state)).toBe(true)
+			// The model comes from the first call's response, and the three calls' usage is summed.
+			expect(result).toStrictEqual({
+				model: 'tev1:0.8b',
+				answers: { label: TEV1_CHOICE, severity: TEV1_SCORE },
+				refusals: { refund: { missing: ['true'] } },
+				usage: { prompt: 2925, completion: 12, total: 2937 },
+			})
+
+			// A response naming no model and no usage: the configured model, and no usage or refusals.
+			const bare = await new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'configured',
+				fetch: new RecordedTransport(() => new Response('{}')).fetch,
+				answers: TEV1_ANSWERS,
+			}).ask(TEV1_REQUEST, signal)
+			expect(bare).toStrictEqual({ model: 'configured', answers: TEV1_ANSWERS })
+
+			// Every body is built before the first call, so a refusal from `body` sends nothing.
+			const untouched = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
+			const refusing = new ScriptedJudge({
+				url: 'http://judge.test',
+				model: 'configured',
+				fetch: untouched.fetch,
+				batch: false,
+				answers: TEV1_ANSWERS,
+				refuse: 'severity',
+			})
+			await expect(refusing.ask(TEV1_REQUEST, signal)).rejects.toMatchObject({
+				code: 'QUESTION',
+				message: 'judge error: question severity is refused',
+			})
+			expect(refusing.bodies).toHaveLength(3)
+			expect(untouched.requests).toHaveLength(0)
+		})
+
+		it('decodes every server form to one distribution and refuses an unreadable answer (the System One wire clause)', async () => {
+			// The forms carry server measures that disagree with one another.
+			expect(SYSTEM_ONE_MICA.answers.label.confidence).not.toBe(
+				SYSTEM_ONE_TEV1.answers.label.confidence,
+			)
+			expect(SYSTEM_ONE_MICA.answers.severity.score).not.toBe(
+				SYSTEM_ONE_TEV1.answers.severity.score,
+			)
+			const results = await Promise.all(
+				[SYSTEM_ONE_TEV1, SYSTEM_ONE_LLAMA, SYSTEM_ONE_MICA].map((body) =>
+					new SystemOneJudge({
+						url: 'http://localhost:11434',
+						model: 'tev1:0.8b',
+						fetch: () => Promise.resolve(Response.json(body)),
+					}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal),
+				),
+			)
+			expect(results).toHaveLength(3)
+			for (const result of results) {
+				expect(result.answers).toStrictEqual({
+					label: { form: 'choice', probabilities: SYSTEM_ONE_TEV1.answers.label.probabilities },
+					refund: { form: 'noul', noul: SYSTEM_ONE_TEV1.answers.refund.noul },
+					severity: {
+						form: 'score',
+						probabilities: [0.029332143644132135, 0.9494108750977565, 0.021256981258111343],
+					},
+				})
+				expect(result).not.toHaveProperty('refusals')
+				expect(computeReading(requireValue(result.answers.severity)).score).toBeCloseTo(0.9919, 4)
+			}
+
+			// A System One server answers from the supplied options alone, so an answer it cannot have
+			// given is a protocol failure naming the question, never a refusal.
+			const cases: ReadonlyArray<{ readonly answers: unknown; readonly message: string }> = [
+				{
+					answers: {
+						...SYSTEM_ONE_TEV1.answers,
+						label: { type: 'choice', probabilities: { billing: 0.03, bug: 0.97 } },
+					},
+					message: 'judge error: question label has a mismatched or incomplete System One answer',
+				},
+				{
+					answers: {
+						refund: SYSTEM_ONE_TEV1.answers.refund,
+						severity: SYSTEM_ONE_TEV1.answers.severity,
+					},
+					message: 'judge error: question label has no System One answer',
+				},
+				{
+					answers: {
+						...SYSTEM_ONE_TEV1.answers,
+						refund: { type: 'choice', probabilities: { true: 0.9, false: 0.1 } },
+					},
+					message: 'judge error: question refund has a mismatched or incomplete System One answer',
+				},
+				{
+					answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } },
+					message: 'judge error: question refund has an invalid System One answer',
+				},
+			]
+			for (const { answers, message } of cases) {
+				const failure = new SystemOneJudge({
+					url: 'http://localhost:11434',
+					model: 'tev1:0.8b',
+					fetch: () => Promise.resolve(Response.json({ ...SYSTEM_ONE_TEV1, answers })),
+				}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal)
+				await expect(failure).rejects.toBeInstanceOf(JudgeError)
+				await expect(failure).rejects.toMatchObject({ code: 'PROTOCOL', message })
+			}
+		})
+
+		it('reports the model the response named and complete usage alone (the response-model clause)', async () => {
+			const bodies = [
+				{ ...SYSTEM_ONE_TEV1, model: 'gateway/tev1:0.8b' },
+				{ answers: SYSTEM_ONE_TEV1.answers, usage: SYSTEM_ONE_TEV1.usage },
+				{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: 975, output_tokens: null } },
+				{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: -1, output_tokens: 4 } },
+				{ model: 'tev1:0.8b', answers: SYSTEM_ONE_TEV1.answers },
+			]
+			const results = await Promise.all(
+				bodies.map((body) =>
+					new SystemOneJudge({
+						url: 'http://localhost:11434',
+						model: 'jev-latest',
+						fetch: () => Promise.resolve(Response.json(body)),
+					}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal),
+				),
+			)
+
+			expect(results.map((result) => result.model)).toEqual([
+				'gateway/tev1:0.8b',
+				'jev-latest',
+				'tev1:0.8b',
+				'tev1:0.8b',
+				'tev1:0.8b',
+			])
+			expect(results.slice(0, 2).map((result) => result.usage)).toEqual([
+				{ prompt: 975, completion: 4, total: 979 },
+				{ prompt: 975, completion: 4, total: 979 },
+			])
+			for (const result of results.slice(2)) expect(result).not.toHaveProperty('usage')
+		})
+
+		it('cancels a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
+			const caller = new AbortController()
+			const hook = new RecordedHeaders({ authorization: 'Bearer fixture-key' })
+			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			await new SystemOneJudge({
+				url: 'https://api.typesafe.ai',
+				model: 'jev-latest',
+				headers: hook.headers.bind(hook),
+				fetch: transport.fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, caller.signal)
+			// The hook receives the call's own bound, the one the transport receives, never the caller's.
+			expect(hook.signals).toHaveLength(1)
+			expect(hook.signals[0]).toBe(transport.signals[0])
+			expect(hook.signals[0]).not.toBe(caller.signal)
+
+			const stalled = new RecordedHeaders(new Promise(() => {}))
+			const untouched = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const failure: unknown = await new SystemOneJudge({
+				url: 'https://api.typesafe.ai',
+				model: 'jev-latest',
+				timeout: 10,
+				headers: stalled.headers.bind(stalled),
+				fetch: untouched.fetch,
+			})
+				.ask(SYSTEM_ONE_JUDGE_REQUEST, caller.signal)
+				.catch((error: unknown) => error)
+			expect(failure).toBeInstanceOf(JudgeAbortError)
+			expect(failure).toMatchObject({ partial: { model: 'jev-latest', answers: {} } })
+			expect(untouched.requests).toHaveLength(0)
+			expect(caller.signal.aborted).toBe(false)
+		}, 1000)
+
+		it('carries the judge clause sentences the executed cases back', () => {
+			expect(guideText).toContain("a noul of exactly 0.5 names `'false'`")
+			expect(guideText).toContain('so the wire never reports a refusal')
+			expect(guideText).toContain('a response that names no model reports the configured `model`')
+			expect(guideText).toContain(
+				'A cancel that lands while `read` decodes the answer is reported with no `cause`',
 			)
 		})
 	})
