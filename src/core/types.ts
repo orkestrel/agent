@@ -115,7 +115,7 @@ export type ProviderDelta =
  * JSON-Schema record {@link ToolDefinition.parameters} already carries) — a structured-output
  * request for this call only. Both omitted ⇒ the provider's own defaults apply (the
  * constructor value / no schema constraint), so the contract stays backward-safe — a caller
- * that passes no options behaves exactly as before.
+ * that passes no options behaves unchanged.
  */
 export interface ProviderStreamOptions {
 	/** Overrides the provider's reasoning preference for this call; omitted ⇒ the provider default. */
@@ -674,7 +674,7 @@ export interface AgentContextOptions {
 	readonly scope?: ScopeInterface
 	/**
 	 * Reuses a pre-built {@link ConversationManagerInterface} as the message source; a fresh
-	 * empty one is created when omitted. The context ensures an active conversation at construction
+	 * empty one is created when omitted. Construction leaves an active conversation
 	 * (it `add`s a default when the manager has none), so `messages` — the manager's active
 	 * conversation's live tail — is always defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail) as its authoritative message inclusion —
@@ -804,7 +804,7 @@ export interface AgentContextInterface {
 	 *   `open`, it lets a level wrap the group (`open: '<instructions>'` … `close: '</instructions>'`).
 	 *
 	 * Passing no `format` (the default) leaves the provider-default level empty, so the
-	 * output is byte-for-byte the managers' built-in framing — every section is its
+	 * output is identical to the managers' built-in framing — every section is its
 	 * built-in header + items, with no closing line (the regression contract). Scope
 	 * filtering runs before formatting (unchanged); the workspace image-data attachment to the
 	 * last user message is unchanged.
@@ -1089,7 +1089,7 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
  *   (rethrown after the `fault` event, propagating through `#run` to a genuine `error`
  *   settle) instead of skipping compaction and continuing over-window. Defaults to `false`
- *   (lenient — the prior, byte-for-byte behavior).
+ *   (lenient — the run continues over-window).
  * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
  *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
  * - `workspaces` — an optional pre-built {@link WorkspaceManagerInterface} forwarded to the
@@ -1162,7 +1162,7 @@ export interface AgentOptions {
 	 * If `true`, a summarizer failure during automatic compaction aborts the run — the
 	 * `fault` event still fires, then the caught error is rethrown so the run settles
 	 * `error` instead of continuing over-window. Defaults to `false` (lenient — the run
-	 * continues over-window, byte-for-byte the prior behavior).
+	 * continues over-window).
 	 */
 	readonly strict?: boolean
 }
@@ -1186,14 +1186,14 @@ export interface AgentRunOptions {
 	 * Sets the per-run reasoning preference forwarded to the provider's `stream` as
 	 * {@link ProviderStreamOptions.think} — `true` asks the backend to separate reasoning
 	 * (surfaced as `think` {@link AgentChunk}s + the settled `thinking`), `false` suppresses
-	 * it. Omitted ⇒ the provider's own default applies (the loop is byte-for-byte the prior
-	 * behaviour), so a caller that passes no options runs exactly as before.
+	 * it. Omitted ⇒ the provider's own default applies (the loop adds no
+	 * reasoning preference), so a caller that passes no options runs unchanged.
 	 */
 	readonly think?: boolean
 	/**
 	 * Constrains the response to this JSON-Schema shape, forwarded to the provider's `stream`
 	 * as {@link ProviderStreamOptions.schema} — a per-run structured-output request. Omitted ⇒
-	 * no constraint (the loop is byte-for-byte the prior behaviour).
+	 * no constraint (the loop sends no schema).
 	 */
 	readonly schema?: Readonly<Record<string, unknown>>
 	/**
@@ -1647,7 +1647,7 @@ export type ConversationEventMap = {
  * folds the whole current live tail into one section). `sections` is an optional cap on the
  * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
  * `sections` sections folds the oldest overflow into one merged section so the list never
- * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited (the prior behavior).
+ * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited.
  * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, rollup
  * `summary`, compacted `sections`, and live tail are restored into the new conversation, with
  * the live `summarize` / `keep` / `on` supplied alongside it (a summarizer is a function, not

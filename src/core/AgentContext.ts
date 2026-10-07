@@ -44,7 +44,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   `workspaces` / `conversations` registries are fixed at construction; switch their active
  *   members through their own `switch(id)` methods.
  * - **The message source — the conversation registry's active conversation.** `conversations` is a
- *   {@link ConversationManagerInterface}; the context ensures it always has an active conversation
+ *   {@link ConversationManagerInterface}; the constructor gives it an active conversation
  *   (at construction it `add`s a default when the manager has none), so the dynamic `messages`
  *   getter — `this.#conversations.active` — is always defined. `messages` returns the active
  *   conversation itself (it owns the live tail + the message verbs directly, satisfying
@@ -68,7 +68,7 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   built-in; per item = item-override > manager-options-override > provider > built-in; `close` =
  *   manager-options-override > provider (no built-in ⇒ no closing line when unset) (see
  *   {@link AgentContextInterface.build}). Passing no `format` (and with no overrides / no per-item
- *   override) reproduces the built-in framing byte-for-byte (each section is its built-in header +
+ *   override) reproduces the built-in framing exactly (each section is its built-in header +
  *   items, no closing line). The active workspace's scoped-in image files' `base64` payload is attached to
  *   the last user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
@@ -104,9 +104,9 @@ export class AgentContext implements AgentContextInterface {
 	// through `workspaces.switch(id)`. `build()` reads `active` / its `files()` fresh each call.
 	readonly #workspaces: WorkspaceManagerInterface
 	// The conversation registry whose active conversation is the message source: the dynamic
-	// `messages` getter returns `#conversations.active` (always defined — the constructor ensures one)
-	// and `build()` folds that conversation's `view()`. Always present. The registry is structural;
-	// switch its active conversation through `conversations.switch(id)`.
+	// `messages` getter returns `#conversations.active` (always defined — the constructor adds one
+	// when absent) and `build()` folds that conversation's `view()`. Always present. The registry is
+	// structural; switch its active conversation through `conversations.switch(id)`.
 	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
 	#scope: ScopeInterface | undefined
@@ -143,13 +143,13 @@ export class AgentContext implements AgentContextInterface {
 	}
 
 	// Dynamic — the active conversation itself (it owns its live tail + the message verbs directly,
-	// like a `Workspace` owns its files), always defined: the constructor ensures the registry has an
-	// active conversation. Computed on every read (never captured), so `context.messages` always
-	// points at the current active conversation (the same reference — no duplication) and follows a
-	// `conversations.switch(id)`. The active `Conversation` satisfies the message-verb contract
-	// directly, so this stays a `MessageManagerInterface`. The `?? this.#ensure()` fallback re-seats
-	// a default if a caller's supplied manager was emptied (for example `clear()`), so the getter is
-	// total — never undefined.
+	// like a `Workspace` owns its files), always defined: the constructor adds a default when the
+	// registry has no active conversation. Computed on every read (never captured), so
+	// `context.messages` always points at the current active conversation (the same reference — no
+	// duplication) and follows a `conversations.switch(id)`. The active `Conversation` satisfies the
+	// message-verb contract directly, so this stays a `MessageManagerInterface`. The `??
+	// this.#ensure()` fallback re-seats a default if a caller's supplied manager was emptied (for
+	// example `clear()`), so the getter is total — never undefined.
 	get messages(): MessageManagerInterface {
 		return this.#conversations.active ?? this.#ensure()
 	}
@@ -180,7 +180,7 @@ export class AgentContext implements AgentContextInterface {
 		// built-in; per item = item-override > manager-options-override > provider-default >
 		// built-in; close = manager-options-override > provider-default (no built-in ⇒ no
 		// closing line). With no `format` arg + no overrides + no per-item `override` it is
-		// byte-for-byte the built-ins (each section's header + items, no closing line).
+		// identical to the built-ins (each section's header + items, no closing line).
 		const parts: string[] = []
 		// Configured by `=== undefined`, not falsiness — an explicitly supplied '' (or a
 		// whitespace-only) system is opted in and prepended verbatim, exactly as the lean
@@ -231,7 +231,7 @@ export class AgentContext implements AgentContextInterface {
 		// 4. The conversation. The active conversation's `view()` is authoritative (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
-		// tools / workspace files). The active conversation is always present (the constructor ensures
+		// tools / workspace files). The active conversation is always present (the constructor adds
 		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
 		const active = this.#conversations.active ?? this.#ensure()
 		const conversation = active.view()

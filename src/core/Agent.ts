@@ -94,8 +94,8 @@ export class Agent implements AgentInterface {
 	// The context budget for automatic conversation compaction — its `consumer`
 	// is a token estimator, its `max` the context window. `#trim` re-measures the absolute current
 	// prompt against it (clear() + consume(messages)) before the first provider request and between
-	// turns; `undefined` ⇒ disabled: `#trim` is a no-op and the loop is byte-for-byte the prior
-	// behavior. Reset (`clear()`) at run entry so no stale `consumed` carries across runs / a
+	// turns; `undefined` ⇒ disabled: `#trim` is a no-op and the loop adds no
+	// compaction step. Reset (`clear()`) at run entry so no stale `consumed` carries across runs / a
 	// conversation switch. Not the hard cost `budget` ceiling — when the prompt reaches its `max`
 	// this compacts + continues (non-fatal on a summarizer throw, futile-guarded), never aborts.
 	readonly #window: BudgetInterface<readonly Message[]> | undefined
@@ -386,8 +386,8 @@ export class Agent implements AgentInterface {
 		// the `compact()` SUMMARIZER error from the auto path). Gating the whole auto-compaction path
 		// (the run-entry `clear()` reset + the pre-first-turn `await this.#trim`) behind this flag keeps
 		// the loop purely additive: with no window or a non-summarizable conversation, no extra `await`
-		// is introduced before the first provider request, so the eager-pump / abort timing is
-		// byte-for-byte the prior behavior (a synchronously-fired abort still lands exactly as before).
+		// precedes the first provider request, so the eager-pump / abort timing is unchanged
+		// (a synchronously-fired abort still lands before the first request).
 		// When enabled: reset `#window` at run entry so no stale `consumed` carries across runs / a
 		// conversation switch, then run a pre-first-turn `#trim` so a resumed / long conversation whose
 		// initial prompt already exceeds the window compacts at once (not only after a tool turn) —
@@ -573,10 +573,9 @@ export class Agent implements AgentInterface {
 				// would be wasted). The same `#trim` the run also ran before the first provider request
 				// (so a resumed / long conversation whose initial prompt already exceeds the window
 				// compacts at once). Gated behind `compacting` (window + conversation both present), so
-				// with auto-compaction off this introduces no extra `await` — the loop is byte-for-byte
-				// the prior behavior. `latch: true` — by now the tail has accumulated this turn's
-				// appends, so an `undefined` fold here is genuinely futile, and the run stops
-				// calling `#trim` for the rest of its turns.
+				// with auto-compaction off this adds no `await` to the loop. `latch: true` — by now the
+				// tail has accumulated this turn's appends, so an `undefined` fold here is genuinely futile,
+				// and the run stops calling `#trim` for the rest of its turns.
 				if (compacting && !futile) futile = await this.#trim(messages, true)
 				pending = true
 				continue
@@ -607,7 +606,7 @@ export class Agent implements AgentInterface {
 	// Automatic compaction — the production-hardened context-budget check. Called
 	// both before the first provider request (a resumed / long conversation compacts at once) and
 	// between turns. Purely additive: with no `#window` budget or a non-summarizable active conversation
-	// it is a no-op, so the loop is byte-for-byte the prior behavior — and a conversation that cannot
+	// it is a no-op, so the loop gains no `await` — and a conversation that cannot
 	// summarize (the default one has no summarizer) is never auto-compacted, so the auto path never
 	// throws the `compact()` SUMMARIZER error. The trigger is the context `#window` budget —
 	// its `consumer` a token estimator (for example `estimateMessages`), its `max` the context window — the
