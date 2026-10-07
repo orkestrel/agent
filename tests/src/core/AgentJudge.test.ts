@@ -385,6 +385,25 @@ describe('AgentJudge — cancellation and partial results', () => {
 		expect(judge.values).toHaveLength(1)
 	})
 
+	it('reports a cancel that lands while the answer is decoded as an abort with no cause', async () => {
+		const abort = new AbortController()
+		const transport = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'm',
+			fetch: transport.fetch,
+			answers: TEV1_ANSWERS,
+			readAbort: abort,
+		})
+		const error: unknown = await judge
+			.ask(TEV1_REQUEST, abort.signal)
+			.catch((failure: unknown) => failure)
+		expect(error).toBeInstanceOf(JudgeAbortError)
+		expect(error).not.toHaveProperty('cause')
+		expect(error).toMatchObject({ partial: { model: 'm', answers: {} } })
+		expect(judge.values).toHaveLength(1)
+	})
+
 	it('aborts a stalled call at its deadline and carries the transport failure as the cause', async () => {
 		const judge = new ScriptedJudge({
 			url: 'http://judge.test',

@@ -127,7 +127,6 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 		return buildJudgeResult(this.#model, results)
 	}
 
-	// Run one call under its own deadline; a cancel carries the calls completed before it.
 	async #call(
 		request: JudgeRequest,
 		body: string,
@@ -174,7 +173,9 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 			combined.throwIfAborted()
 			const value = parseJSON(text.text)
 			if (value === undefined) throw new JudgeError('PROTOCOL', 'judge error: invalid JSON body')
-			return this.read(value, request)
+			const result = this.read(value, request)
+			combined.throwIfAborted()
+			return result
 		} catch (error) {
 			if (combined.aborted) {
 				// A throw that raced the cancel is the call's real failure, so it rides as the cause.

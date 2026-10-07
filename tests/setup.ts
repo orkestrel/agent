@@ -1367,6 +1367,8 @@ export interface ScriptedJudgeOptions extends AgentJudgeInput {
 	readonly answers?: Readonly<Record<string, JudgeAnswer>>
 	readonly refusals?: Readonly<Record<string, Refusal>>
 	readonly refuse?: string
+	/** Holds the controller `read` aborts before it returns, so a cancel lands during decoding. */
+	readonly readAbort?: AbortController
 }
 
 /**
@@ -1377,6 +1379,7 @@ export class ScriptedJudge extends AgentJudge {
 	readonly #answers: Readonly<Record<string, JudgeAnswer>>
 	readonly #refusals: Readonly<Record<string, Refusal>>
 	readonly #refuse: string | undefined
+	readonly #readAbort: AbortController | undefined
 	readonly #bodies: JudgeRequest[] = []
 	readonly #values: unknown[] = []
 	readonly name = 'scripted'
@@ -1385,6 +1388,7 @@ export class ScriptedJudge extends AgentJudge {
 		this.#answers = options.answers ?? {}
 		this.#refusals = options.refusals ?? {}
 		this.#refuse = options.refuse
+		this.#readAbort = options.readAbort
 	}
 	get bodies(): readonly JudgeRequest[] {
 		return this.#bodies
@@ -1401,6 +1405,7 @@ export class ScriptedJudge extends AgentJudge {
 	}
 	read(value: unknown, request: JudgeRequest): JudgeResult {
 		this.#values.push(value)
+		this.#readAbort?.abort()
 		if (!isRecord(value)) throw new JudgeError('PROTOCOL', 'judge error: invalid envelope')
 		let answers: Readonly<Record<string, JudgeAnswer>> = {}
 		let refusals: Readonly<Record<string, Refusal>> = {}
