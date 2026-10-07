@@ -1,8 +1,12 @@
-import type { AgentResult, ContextSectionSourceInterface, Message } from '@src/core'
+import type { AgentResult, ContextSectionSourceInterface, JudgeAnswer, Message } from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
 	agentResultToJSON,
+	buildJudgeResult,
 	buildProviderResult,
+	computeReading,
+	isJudgeError,
+	readHeaders,
 	readText,
 	readChunks,
 	assembleResult,
@@ -32,6 +36,7 @@ import {
 	settleAgentJob,
 	sumUsage,
 } from '@src/core'
+import { captureError } from '@orkestrel/test'
 import { createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import {
@@ -39,6 +44,10 @@ import {
 	createToolCall,
 	createTokenUsage,
 	RecordedBody,
+	RecordedHeaders,
+	TEV1_CHOICE,
+	TEV1_NOUL,
+	TEV1_SCORE,
 } from '../../setup.js'
 
 // Agent-owned pure helpers: filterAllowList applies the three-way set-membership primitive
@@ -1111,5 +1120,181 @@ describe('readChunks — streamed decoded text', () => {
 			done: true,
 			value: undefined,
 		})
+	})
+})
+
+describe('computeReading — the measures derived from a judge answer', () => {
+	it('reads the recorded tev1 choice with the published choice confidence', () => {
+		const reading = computeReading(TEV1_CHOICE)
+		expect(reading.winner).toBe('bug')
+		expect(reading.probability).toBeCloseTo(0.969, 3)
+		expect(reading.confidence).toBeCloseTo(0.9536, 4)
+		expect(reading.score).toBeUndefined()
+	})
+
+	it('reads the recorded tev1 score as its expected level and spread confidence', () => {
+		const reading = computeReading(TEV1_SCORE)
+		expect(reading.winner).toBe('1')
+		expect(reading.probability).toBe(0.9494108750977565)
+		expect(reading.score).toBeCloseTo(0.99192, 5)
+		// spread 0.0505891 over the even spread 2/3 of three levels.
+		expect(reading.confidence).toBeCloseTo(0.924116, 6)
+	})
+
+	it('reproduces the TypeSafe documented choice and score examples', () => {
+		const choice = computeReading({
+			form: 'choice',
+			probabilities: { billing: 0.88, technical: 0.12, sales: 0 },
+		})
+		expect(choice).toMatchObject({ winner: 'billing', probability: 0.88 })
+		expect(choice.confidence).toBeCloseTo(0.82, 2)
+		const score = computeReading({ form: 'score', probabilities: [0, 0.95, 0.05] })
+		expect(score.winner).toBe('1')
+		expect(score.score).toBeCloseTo(1.05, 10)
+		// The documented 0.92 is the formula's 0.925 shown at two decimals, half a unit away.
+		expect(score.confidence).toBeCloseTo(0.925, 10)
+		expect(Math.abs(score.confidence - 0.92)).toBeLessThanOrEqual(0.005 + Number.EPSILON)
+		const spread = computeReading({ form: 'score', probabilities: [0, 0.57, 0.43] })
+		expect(spread.confidence).toBeCloseTo(0.355, 3)
+		expect(spread.score).toBeCloseTo(1.43, 10)
+	})
+
+	it('clamps a score confidence at zero when the spread passes the even spread', () => {
+		const reading = computeReading({ form: 'score', probabilities: [0.34, 0, 0.33, 0.33] })
+		expect(reading.winner).toBe('0')
+		expect(reading.confidence).toBe(0)
+	})
+
+	it('reads a noul over false then true with the confidence |2p - 1|', () => {
+		expect(computeReading(TEV1_NOUL)).toEqual({
+			winner: 'true',
+			probability: 0.9978973674111222,
+			confidence: expect.closeTo(0.995794734822244, 12),
+		})
+		expect(computeReading({ form: 'noul', noul: 0.5 })).toEqual({
+			winner: 'false',
+			probability: 0.5,
+			confidence: 0,
+		})
+		const no = computeReading({ form: 'noul', noul: 0.25 })
+		expect(no).toEqual({ winner: 'false', probability: 0.75, confidence: 0.5 })
+	})
+
+	it('names the first of two equal candidates in enumeration order', () => {
+		const choice = computeReading({
+			form: 'choice',
+			probabilities: { refund: 0.4, replace: 0.4, other: 0.2 },
+		})
+		expect(choice.winner).toBe('refund')
+		const reversed = computeReading({
+			form: 'choice',
+			probabilities: { replace: 0.4, refund: 0.4, other: 0.2 },
+		})
+		expect(reversed.winner).toBe('replace')
+		expect(computeReading({ form: 'score', probabilities: [0.2, 0.4, 0.4] }).winner).toBe('1')
+	})
+
+	it('refuses a choice or score answer with fewer than two candidates', () => {
+		for (const answer of [
+			{ form: 'choice', probabilities: { billing: 1 } },
+			{ form: 'choice', probabilities: {} },
+			{ form: 'score', probabilities: [1] },
+		] satisfies readonly JudgeAnswer[]) {
+			const error = captureError(() => computeReading(answer))
+			expect(isJudgeError(error)).toBe(true)
+			expect(error).toMatchObject({ code: 'PROTOCOL', status: undefined })
+		}
+	})
+})
+
+describe('buildJudgeResult — the merge of a judge request’s calls', () => {
+	it('returns the given model and no answers for an empty list', () => {
+		expect(buildJudgeResult('tev1:0.8b', [])).toEqual({ model: 'tev1:0.8b', answers: {} })
+	})
+
+	it('joins answers and refusals, sums usage, and reports the first call’s model', () => {
+		const result = buildJudgeResult('jev-latest', [
+			{
+				model: 'jev-1.13.0',
+				answers: { label: TEV1_CHOICE },
+				usage: { prompt: 975, completion: 4, total: 979 },
+			},
+			{ model: 'jev-1.13.1', answers: {}, refusals: { team: { missing: ['sales'] } } },
+			{
+				model: 'jev-1.13.0',
+				answers: { refund: TEV1_NOUL },
+				usage: { prompt: 10, completion: 1, total: 11 },
+			},
+		])
+		expect(result).toEqual({
+			model: 'jev-1.13.0',
+			answers: { label: TEV1_CHOICE, refund: TEV1_NOUL },
+			refusals: { team: { missing: ['sales'] } },
+			usage: { prompt: 985, completion: 5, total: 990 },
+		})
+	})
+
+	it('omits empty refusals and absent usage, and sanitizes reported usage', () => {
+		const result = buildJudgeResult('tev1:0.8b', [
+			{ model: 'tev1:0.8b', answers: { refund: TEV1_NOUL }, refusals: {} },
+			{
+				model: 'tev1:0.8b',
+				answers: { severity: TEV1_SCORE },
+				usage: { prompt: -5, completion: Number.NaN, total: 12.7 },
+			},
+		])
+		expect(result).toEqual({
+			model: 'tev1:0.8b',
+			answers: { refund: TEV1_NOUL, severity: TEV1_SCORE },
+			usage: { prompt: 0, completion: 0, total: 12 },
+		})
+		expect(Object.hasOwn(result, 'refusals')).toBe(false)
+		expect(Object.hasOwn(buildJudgeResult('m', [{ model: 'm', answers: {} }]), 'usage')).toBe(false)
+	})
+})
+
+describe('readHeaders — request headers inside the cancellation bound', () => {
+	it('returns the JSON content type alone without a hook', async () => {
+		const headers = await readHeaders(undefined, new AbortController().signal)
+		expect([...headers]).toEqual([['content-type', 'application/json']])
+	})
+
+	it('passes the signal to the hook and sets its entries over the content type', async () => {
+		const hook = new RecordedHeaders({ authorization: 'Bearer KEY', 'Content-Type': 'text/plain' })
+		const signal = new AbortController().signal
+		const headers = await readHeaders(hook.headers.bind(hook), signal)
+		expect(hook.signals).toEqual([signal])
+		expect(headers.get('authorization')).toBe('Bearer KEY')
+		expect(headers.get('content-type')).toBe('text/plain')
+		expect(getEventListeners(signal, 'abort')).toHaveLength(0)
+	})
+
+	it('refuses an aborted signal without calling the hook', async () => {
+		const hook = new RecordedHeaders()
+		const abort = new AbortController()
+		const reason = new Error('cancelled')
+		abort.abort(reason)
+		await expect(readHeaders(hook.headers.bind(hook), abort.signal)).rejects.toBe(reason)
+		expect(hook.signals).toEqual([])
+	})
+
+	it('rejects a pending hook with the abort reason and removes its listener', async () => {
+		const hook = new RecordedHeaders(new Promise(() => {}))
+		const abort = new AbortController()
+		const reason = new Error('cancelled')
+		const headers = readHeaders(hook.headers.bind(hook), abort.signal)
+		await hook.entered
+		expect(getEventListeners(abort.signal, 'abort')).toHaveLength(1)
+		abort.abort(reason)
+		await expect(headers).rejects.toBe(reason)
+		expect(getEventListeners(abort.signal, 'abort')).toHaveLength(0)
+	})
+
+	it('rethrows a throwing hook unchanged', async () => {
+		const error = new Error('token unavailable')
+		const hook = new RecordedHeaders(error)
+		await expect(readHeaders(hook.headers.bind(hook), new AbortController().signal)).rejects.toBe(
+			error,
+		)
 	})
 })

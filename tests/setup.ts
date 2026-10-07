@@ -1,6 +1,14 @@
 import type {
 	AgentContextInterface,
+	AgentJudgeInput,
 	AgentProviderInput,
+	ChoiceAnswer,
+	JudgeAnswer,
+	JudgeRequest,
+	JudgeResult,
+	NoulAnswer,
+	Refusal,
+	ScoreAnswer,
 	ProviderIncrement,
 	ProviderParserInterface,
 	ProviderRequest,
@@ -23,13 +31,16 @@ import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } fr
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
 import {
 	AgentContext,
+	AgentJudge,
 	AgentProvider,
 	createConversation,
 	InstructionManager,
+	JudgeError,
 	ProviderAbortError,
 	ProviderError,
 } from '@src/core'
-import { isRecord, parseJSONAs } from '@orkestrel/contract'
+import { isTokenUsage } from '@orkestrel/budget'
+import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
 import { requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
@@ -1294,3 +1305,117 @@ export const RELAY_WIRE_FRAMES: readonly RelayFrame[] = Object.freeze([
 
 /** Supplies one settled NDJSON turn, enough for a call that must reach the transport and return. */
 export const RELAY_RESULT_FRAME = '{"channel":"result","result":{"content":"answer"}}\n'
+
+/** Holds the recorded `tev1:0.8b` choice distribution over a ticket's billing, bug, and account labels. */
+export const TEV1_CHOICE: ChoiceAnswer = Object.freeze({
+	form: 'choice',
+	probabilities: Object.freeze({
+		billing: 0.030333089940396418,
+		bug: 0.9690833479435905,
+		account: 0.0005835621160130767,
+	}),
+})
+
+/** Holds the recorded `tev1:0.8b` severity distribution over three levels. */
+export const TEV1_SCORE: ScoreAnswer = Object.freeze({
+	form: 'score',
+	probabilities: Object.freeze([0.029332143644132135, 0.9494108750977565, 0.021256981258111343]),
+})
+
+/** Holds the recorded `tev1:0.8b` probability that a refund is owed. */
+export const TEV1_NOUL: NoulAnswer = Object.freeze({ form: 'noul', noul: 0.9978973674111222 })
+
+/** Keys the recorded `tev1:0.8b` answers by the question ids of {@link TEV1_REQUEST}. */
+export const TEV1_ANSWERS: Readonly<Record<string, JudgeAnswer>> = Object.freeze({
+	label: TEV1_CHOICE,
+	refund: TEV1_NOUL,
+	severity: TEV1_SCORE,
+})
+
+/** Asks the recorded `tev1:0.8b` request's choice, noul, and score questions about one ticket. */
+export const TEV1_REQUEST: JudgeRequest = Object.freeze<JudgeRequest>({
+	state:
+		'Ticket 4182: the export button crashes the app after the 2.4 update; the customer paid twice.',
+	questions: {
+		label: {
+			form: 'choice',
+			instructions: 'Which team owns this ticket?',
+			criteria: { billing: 'Payments and invoices', bug: null, account: 'Login and profile' },
+		},
+		refund: {
+			form: 'noul',
+			instructions: 'Is a refund owed?',
+			criteria: { true: 'The customer was charged in error', false: 'Every charge was valid' },
+		},
+		severity: {
+			form: 'score',
+			instructions: 'How severe is the defect?',
+			criteria: ['Cosmetic; no impact', 'Degraded, workaround exists', 'Blocking; no workaround'],
+		},
+	},
+})
+
+/** Carries the response envelope a {@link ScriptedJudge} reads: the answering model and one call's usage. */
+export const JUDGE_ENVELOPE =
+	'{"model":"tev1:0.8b","usage":{"prompt":975,"completion":4,"total":979}}'
+
+/**
+ * Holds the scripted answers and refusals a {@link ScriptedJudge} reads per question id, and the
+ * question id whose body projection it refuses.
+ */
+export interface ScriptedJudgeOptions extends AgentJudgeInput {
+	readonly answers?: Readonly<Record<string, JudgeAnswer>>
+	readonly refusals?: Readonly<Record<string, Refusal>>
+	readonly refuse?: string
+}
+
+/**
+ * Drives the real judge engine: it posts each call's request as JSON, reads the model and usage
+ * from the response envelope, and answers each requested id from its script.
+ */
+export class ScriptedJudge extends AgentJudge {
+	readonly #answers: Readonly<Record<string, JudgeAnswer>>
+	readonly #refusals: Readonly<Record<string, Refusal>>
+	readonly #refuse: string | undefined
+	readonly #bodies: JudgeRequest[] = []
+	readonly #values: unknown[] = []
+	readonly name = 'scripted'
+	constructor(options: ScriptedJudgeOptions) {
+		super(options)
+		this.#answers = options.answers ?? {}
+		this.#refusals = options.refusals ?? {}
+		this.#refuse = options.refuse
+	}
+	get bodies(): readonly JudgeRequest[] {
+		return this.#bodies
+	}
+	get values(): readonly unknown[] {
+		return this.#values
+	}
+	body(request: JudgeRequest): object {
+		this.#bodies.push(request)
+		if (this.#refuse !== undefined && Object.hasOwn(request.questions, this.#refuse)) {
+			throw new JudgeError('QUESTION', `judge error: question ${this.#refuse} is refused`)
+		}
+		return { model: this.model, state: request.state, questions: request.questions }
+	}
+	read(value: unknown, request: JudgeRequest): JudgeResult {
+		this.#values.push(value)
+		if (!isRecord(value)) throw new JudgeError('PROTOCOL', 'judge error: invalid envelope')
+		let answers: Readonly<Record<string, JudgeAnswer>> = {}
+		let refusals: Readonly<Record<string, Refusal>> = {}
+		for (const id of Object.keys(request.questions)) {
+			const answer = this.#answers[id]
+			const refusal = this.#refusals[id]
+			if (answer !== undefined) answers = { ...answers, [id]: answer }
+			else if (refusal !== undefined) refusals = { ...refusals, [id]: refusal }
+			else throw new JudgeError('PROTOCOL', `judge error: answer ${id} is missing`)
+		}
+		return {
+			model: isString(value.model) ? value.model : this.model,
+			answers,
+			...(Object.keys(refusals).length === 0 ? {} : { refusals }),
+			...(isTokenUsage(value.usage) ? { usage: value.usage } : {}),
+		}
+	}
+}

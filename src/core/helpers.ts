@@ -5,8 +5,13 @@ import type {
 	AgentResult,
 	ContextSectionFormat,
 	ContextSectionSourceInterface,
+	JudgeAnswer,
+	JudgeResult,
 	Message,
+	ProviderOptions,
 	ProviderResult,
+	Reading,
+	Refusal,
 	RunOutcome,
 	Section,
 	TextRead,
@@ -31,7 +36,7 @@ import {
 	IMAGE_TOKEN_ESTIMATE,
 	MESSAGE_TOKEN_OVERHEAD,
 } from './constants.js'
-import { AgentJobError } from './errors.js'
+import { AgentJobError, JudgeError } from './errors.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
@@ -929,5 +934,161 @@ export async function* readChunks(
 		} finally {
 			reader.releaseLock()
 		}
+	}
+}
+
+/**
+ * Derives the winner, its probability, the published confidence, and a score answer's expected
+ * level from a judge answer's distribution.
+ *
+ * @remarks
+ * The winner is the first strictly greatest candidate in enumeration order: an option name in
+ * criteria order, a level index, or `'false'` then `'true'` for a noul, so a noul of exactly 0.5
+ * names `'false'`. Confidence follows the TypeSafe formulas, whatever confidence a server sent: a
+ * choice reads `(max(p) - 1/n) / (1 - 1/n)`, a noul reads `|2p - 1|` (the choice formula at
+ * n = 2), and a score reads `max(0, 1 - spread / even_spread)`, where `spread` sums each level's
+ * probability times its distance from the winning level and `even_spread` is the mean distance
+ * from the middle level. `score` is the expected level `sum(i * p_i)` and is set only for a score
+ * answer.
+ *
+ * @param answer - The answer whose distribution is read
+ * @returns The derived measures
+ * @throws JudgeError Thrown with code `PROTOCOL` when a choice or score answer has fewer than 2
+ * candidates, because the confidence formulas divide by the candidate count
+ * @example
+ * ```ts
+ * computeReading({ form: 'choice', probabilities: { billing: 0.88, technical: 0.12, sales: 0 } })
+ * // { winner: 'billing', probability: 0.88, confidence: 0.82 } to two decimals
+ * computeReading({ form: 'score', probabilities: [0, 0.57, 0.43] })
+ * // { winner: '1', probability: 0.57, confidence: 0.355, score: 1.43 } to three decimals
+ * computeReading({ form: 'noul', noul: 0.5 }) // { winner: 'false', probability: 0.5, confidence: 0 }
+ * ```
+ */
+export function computeReading(answer: JudgeAnswer): Reading {
+	if (answer.form === 'noul') {
+		const yes = answer.noul > 0.5
+		return {
+			winner: yes ? 'true' : 'false',
+			probability: yes ? answer.noul : 1 - answer.noul,
+			confidence: Math.abs(2 * answer.noul - 1),
+		}
+	}
+	const candidates: ReadonlyArray<readonly [string, number]> =
+		answer.form === 'choice'
+			? Object.entries(answer.probabilities)
+			: answer.probabilities.map((probability, level) => [String(level), probability])
+	const count = candidates.length
+	if (count < 2) {
+		throw new JudgeError('PROTOCOL', 'judge error: an answer needs at least 2 candidates')
+	}
+	let winner = ''
+	let index = 0
+	let probability = -Infinity
+	for (const [position, [name, candidate]] of candidates.entries()) {
+		if (candidate > probability) {
+			winner = name
+			index = position
+			probability = candidate
+		}
+	}
+	if (answer.form === 'choice') {
+		return { winner, probability, confidence: (probability - 1 / count) / (1 - 1 / count) }
+	}
+	let spread = 0
+	let even = 0
+	let score = 0
+	for (const [level, candidate] of answer.probabilities.entries()) {
+		spread += candidate * Math.abs(level - index)
+		even += Math.abs(level - (count - 1) / 2)
+		score += level * candidate
+	}
+	return { winner, probability, confidence: Math.max(0, 1 - spread / (even / count)), score }
+}
+
+/**
+ * Merges the results of a judge request's calls into one result.
+ *
+ * @remarks
+ * Pure and total. Answers and refusals are joined by question id; `refusals` is omitted when no
+ * call refused a question. Each call's usage passes through {@link sanitizeUsage} and the totals
+ * add through {@link sumUsage}; `usage` is omitted when no call reported one. The model is the
+ * first call's, or the given model when the list is empty, as the empty partial of a cancel
+ * before the first call requires.
+ *
+ * @param model - The judge's configured model, reported when no call completed
+ * @param results - The completed calls' results in call order
+ * @returns The merged result
+ * @example
+ * ```ts
+ * buildJudgeResult('tev1:0.8b', []) // { model: 'tev1:0.8b', answers: {} }
+ * buildJudgeResult('jev-latest', [
+ * 	{ model: 'jev-1.13.0', answers: { urgent: { form: 'noul', noul: 0.95 } } },
+ * 	{ model: 'jev-1.13.0', answers: {}, refusals: { team: { missing: ['sales'] } } },
+ * ])
+ * // { model: 'jev-1.13.0', answers: { urgent: ... }, refusals: { team: { missing: ['sales'] } } }
+ * ```
+ */
+export function buildJudgeResult(model: string, results: readonly JudgeResult[]): JudgeResult {
+	let answers: Readonly<Record<string, JudgeAnswer>> = {}
+	let refusals: Readonly<Record<string, Refusal>> = {}
+	let usage: TokenUsage | undefined
+	for (const result of results) {
+		answers = { ...answers, ...result.answers }
+		refusals = { ...refusals, ...result.refusals }
+		if (result.usage !== undefined) usage = sumUsage(usage, sanitizeUsage(result.usage))
+	}
+	return {
+		model: results[0]?.model ?? model,
+		answers,
+		...(Object.keys(refusals).length === 0 ? {} : { refusals }),
+		...(usage === undefined ? {} : { usage }),
+	}
+}
+
+/**
+ * Builds a request's JSON headers, awaiting the caller's header hook inside the call's
+ * cancellation bound.
+ *
+ * @remarks
+ * The headers start with `Content-Type: application/json`; each entry the hook returns is set
+ * over them, so the hook overrides the content type only when it returns that header. The hook
+ * receives `signal` and races its abort, and the abort listener is removed on every exit. Both
+ * HTTP engines, the provider and the judge, read their headers here.
+ *
+ * @param hook - The caller's header hook, or undefined for the JSON content type alone
+ * @param signal - The call's combined caller and deadline signal
+ * @returns The request headers
+ * @throws Thrown when the signal aborts before the hook settles, with the signal's reason, and
+ * when the hook throws or rejects, with the hook's own failure
+ * @example
+ * ```ts
+ * const signal = new AbortController().signal
+ * const headers = await readHeaders(() => ({ authorization: 'Bearer KEY' }), signal)
+ * headers.get('authorization') // 'Bearer KEY'
+ * headers.get('content-type') // 'application/json'
+ * ```
+ */
+export async function readHeaders(
+	hook: ProviderOptions['headers'],
+	signal: AbortSignal,
+): Promise<Headers> {
+	const headers = new Headers({ 'Content-Type': 'application/json' })
+	if (hook === undefined) return headers
+	const cleanup = new AbortController()
+	const aborted = Promise.withResolvers<never>()
+	signal.addEventListener('abort', () => aborted.reject(signal.reason), {
+		once: true,
+		signal: cleanup.signal,
+	})
+	try {
+		signal.throwIfAborted()
+		const entries = await Promise.race([
+			Promise.resolve().then(() => hook(signal)),
+			aborted.promise,
+		])
+		for (const [key, value] of Object.entries(entries)) headers.set(key, value)
+		return headers
+	} finally {
+		cleanup.abort()
 	}
 }

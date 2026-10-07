@@ -1,5 +1,7 @@
 import type {
 	AgentResult,
+	JudgeErrorCode,
+	JudgeResult,
 	ProviderErrorCode,
 	ProviderErrorOptions,
 	ProviderResult,
@@ -258,4 +260,79 @@ export class ProviderError extends Error {
  */
 export function isProviderError(value: unknown): value is ProviderError {
 	return isInstance(value, ProviderError)
+}
+
+/**
+ * Reports a judge call cancelled by the caller's signal or its deadline, carrying the
+ * {@link JudgeResult} merged from the calls that completed before the cancel and the
+ * machine-readable `code` `'ABORT'`.
+ *
+ * @remarks
+ * `partial` keeps the answers and the usage of every completed call, so spent usage is never
+ * lost; a cancel before the first call carries an empty partial. `cause` holds the failure the
+ * cancel superseded when a throw raced the abort, and is undefined when the cancel was the only
+ * failure.
+ */
+export class JudgeAbortError extends Error {
+	/** Names the machine-readable condition — `'ABORT'`: a judge call cancelled mid-flight. */
+	readonly code = 'ABORT' as const
+	readonly partial: JudgeResult
+
+	constructor(partial: JudgeResult, options?: ErrorOptions) {
+		super('judge call aborted', options)
+		this.name = 'JudgeAbortError'
+		this.partial = partial
+	}
+}
+
+/**
+ * Narrows a caught value to a {@link JudgeAbortError} through `instanceof`, so a `catch` can
+ * recover its `partial` result.
+ *
+ * @param value - The caught value
+ * @returns True if the value is a {@link JudgeAbortError}; false otherwise
+ * @example
+ * ```ts
+ * isJudgeAbortError(new JudgeAbortError({ model: 'tev1:0.8b', answers: {} })) // true
+ * ```
+ */
+export function isJudgeAbortError(value: unknown): value is JudgeAbortError {
+	return isInstance(value, JudgeAbortError)
+}
+
+/**
+ * Reports a coded judge failure with its HTTP status and underlying cause when available.
+ *
+ * @remarks
+ * The judge engine throws this error for a non-OK HTTP response, a missing or unparsable
+ * response body, and a request refused before inference. Concrete wire decoders also use it for
+ * a response they cannot read and for a wire limit. `status` is present only for an `HTTP`
+ * failure; other codes leave it undefined.
+ */
+export class JudgeError extends Error {
+	/** Names the machine-readable condition — `'HTTP'`: a non-OK response; `'PROTOCOL'`: a missing, unparsable, or unreadable response body; `'QUESTION'`: a request refused before inference. */
+	readonly code: JudgeErrorCode
+	/** Holds the response status for an HTTP failure, or undefined for other codes. */
+	readonly status: number | undefined
+
+	constructor(code: JudgeErrorCode, message: string, options?: ProviderErrorOptions) {
+		super(message, options)
+		this.name = 'JudgeError'
+		this.code = code
+		this.status = options?.status
+	}
+}
+
+/**
+ * Narrows a caught value to the judge failure class through `instanceof`.
+ *
+ * @param value - The caught value
+ * @returns True if the value is a {@link JudgeError}; false otherwise
+ * @example
+ * ```ts
+ * isJudgeError(new JudgeError('HTTP', 'judge error: 429', { status: 429 })) // true
+ * ```
+ */
+export function isJudgeError(value: unknown): value is JudgeError {
+	return isInstance(value, JudgeError)
 }

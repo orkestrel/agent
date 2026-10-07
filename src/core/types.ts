@@ -1,4 +1,5 @@
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { JSONRecord, JSONValue } from '@orkestrel/contract'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { QueueStoreInterface } from '@orkestrel/queue'
 import type {
@@ -2292,3 +2293,140 @@ export interface TextRead {
 	 */
 	readonly complete: boolean
 }
+
+/** Carries text or structured JSON the model reads; mirrors the TypeSafe `EntryType` without its null arm. */
+export type JudgeEntry = string | JSONRecord | readonly JSONValue[]
+
+/** Maps each option name the model sees to its description; null keeps an undescribed option in the map. */
+export type ChoiceCriteria = Readonly<Record<string, JudgeEntry | null>>
+
+/** Lists at least two score levels from level 0 upward; null leaves a level undescribed. */
+export type ScoreCriteria = readonly [
+	JudgeEntry | null,
+	JudgeEntry | null,
+	...Array<JudgeEntry | null>,
+]
+
+/** Carries what makes a noul answer true and what makes it false; an omitted side is undescribed. */
+export interface NoulCriteria {
+	readonly true?: JudgeEntry
+	readonly false?: JudgeEntry
+}
+
+/** Asks the model to pick one named option from its criteria. */
+export interface ChoiceQuestion {
+	readonly form: 'choice'
+	readonly instructions?: JudgeEntry
+	readonly criteria: ChoiceCriteria
+}
+
+/** Asks the model to place the state on an ordered scale of levels. */
+export interface ScoreQuestion {
+	readonly form: 'score'
+	readonly instructions?: JudgeEntry
+	readonly criteria: ScoreCriteria
+}
+
+/** Asks the model whether a statement about the state holds. */
+export interface NoulQuestion {
+	readonly form: 'noul'
+	readonly instructions?: JudgeEntry
+	readonly criteria?: NoulCriteria
+}
+
+/** Names one question by its form, the protocol's type field under the fleet's named discriminant. */
+export type JudgeQuestion = ChoiceQuestion | ScoreQuestion | NoulQuestion
+
+/** Carries one state and the questions asked about it, keyed by caller ids the model never sees; each question is evaluated on its own. */
+export interface JudgeRequest {
+	readonly state: JudgeEntry
+	readonly questions: Readonly<Record<string, JudgeQuestion>>
+}
+
+/** Carries a choice distribution keyed by option name, in criteria order. */
+export interface ChoiceAnswer {
+	readonly form: 'choice'
+	readonly probabilities: Readonly<Record<string, number>>
+}
+
+/** Carries a score distribution indexed by level. */
+export interface ScoreAnswer {
+	readonly form: 'score'
+	readonly probabilities: readonly number[]
+}
+
+/** Carries the probability that the answer is yes; the protocol's noul field. */
+export interface NoulAnswer {
+	readonly form: 'noul'
+	readonly noul: number
+}
+
+/** Names one answer by its form; it stores only the distribution a server returned. */
+export type JudgeAnswer = ChoiceAnswer | ScoreAnswer | NoulAnswer
+
+/** Reports a question a wire could not read a candidate for; it lists the caller's keys and invents no probability. */
+export interface Refusal {
+	readonly missing: readonly string[]
+}
+
+/** Carries the answering model, the answers keyed by question id, the refusals, and the usage the request's calls spent. */
+export interface JudgeResult {
+	readonly model: string
+	readonly answers: Readonly<Record<string, JudgeAnswer>>
+	/** Holds each refused question by id; absent when none was refused. An id appears in answers or refusals, never both. */
+	readonly refusals?: Readonly<Record<string, Refusal>>
+	readonly usage?: TokenUsage
+}
+
+/** Answers typed questions about one state with probabilities; the sibling of `ProviderInterface`, never a provider. */
+export interface JudgeInterface {
+	readonly id: string
+	readonly name: string
+	/** Holds the configured model identity; the wire composes it from everything that changes an answer under one state. */
+	readonly model: string
+	/** Asks every question of the request about its state and returns the merged answers. */
+	ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult>
+}
+
+/** Carries the measures `computeReading` derives from an answer; nothing stores them. */
+export interface Reading {
+	/** Holds the first strictly greatest candidate in enumeration order: an option name, a level index, or true or false. */
+	readonly winner: string
+	readonly probability: number
+	readonly confidence: number
+	/** Holds the expected level of a score answer; the protocol's score field. */
+	readonly score?: number
+}
+
+/**
+ * Configures the judge engine's destination, identity, and call split.
+ *
+ * @remarks
+ * `path` appends to `url`. `model` is the identity the judge reports when a response names none.
+ * `timeout`, `fetch`, and `headers` bound, carry, and authenticate each call as they do for a
+ * provider; the deadline applies to each call on its own.
+ */
+export interface AgentJudgeInput extends Pick<ProviderOptions, 'timeout' | 'fetch' | 'headers'> {
+	readonly url: string
+	readonly path?: string
+	readonly model: string
+	/** If true, one call carries every question; if false, the engine issues one call per question. Default: true. */
+	readonly batch?: boolean
+}
+
+/** Defines the wire seams of the shared judge engine. */
+export interface AgentJudgeInterface extends JudgeInterface {
+	/** Projects one call's request onto the concrete protocol's serializable body. */
+	body(request: JudgeRequest): object
+	/** Decodes one call's parsed response body into the answers for that call's questions. */
+	read(value: unknown, request: JudgeRequest): JudgeResult
+}
+
+/** Names the machine-readable judge failure conditions. */
+export type JudgeErrorCode =
+	/** Reports a non-OK HTTP response. */
+	| 'HTTP'
+	/** Reports a missing or unparsable response body, or a response a wire cannot read. */
+	| 'PROTOCOL'
+	/** Reports a request refused before inference: an empty question map, a malformed question or state, or a wire limit. */
+	| 'QUESTION'

@@ -17,7 +17,7 @@ import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
 import { createThinkSplitter } from './factories.js'
-import { buildProviderResult, joinThinking, readChunks, readText } from './helpers.js'
+import { buildProviderResult, joinThinking, readChunks, readHeaders, readText } from './helpers.js'
 
 /**
  * Implements bounded HTTP streaming and result assembly behind concrete wire seams.
@@ -259,7 +259,7 @@ export abstract class AgentProvider<
 
 	// Send one request and translate its HTTP failure into the shared provider taxonomy.
 	async #request(request: ProviderRequest, signal: AbortSignal): Promise<Response> {
-		const headers = await this.#requestHeaders(signal)
+		const headers = await readHeaders(this.#headers, signal)
 		signal.throwIfAborted()
 		const response = await this.#transport(this.#url + this.#path, {
 			method: 'POST',
@@ -289,29 +289,5 @@ export abstract class AgentProvider<
 			)
 		}
 		return response
-	}
-
-	// Await the hook inside the call's cancellation bound and release its listener on exit.
-	async #requestHeaders(signal: AbortSignal): Promise<Headers> {
-		const headers = new Headers({ 'Content-Type': 'application/json' })
-		if (this.#headers === undefined) return headers
-		const cleanup = new AbortController()
-		const aborted = Promise.withResolvers<never>()
-		signal.addEventListener('abort', () => aborted.reject(signal.reason), {
-			once: true,
-			signal: cleanup.signal,
-		})
-		try {
-			signal.throwIfAborted()
-			const hook = this.#headers
-			const entries = await Promise.race([
-				Promise.resolve().then(() => hook(signal)),
-				aborted.promise,
-			])
-			for (const [key, value] of Object.entries(entries)) headers.set(key, value)
-			return headers
-		} finally {
-			cleanup.abort()
-		}
 	}
 }
