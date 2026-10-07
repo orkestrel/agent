@@ -23,7 +23,10 @@ export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
  * `calls` is present only on an `assistant` turn that requested tool calls — the
  * `tool_calls` a prior generation produced, replayed back into the next request so
  * the model sees its own decision. A `tool` turn carries the tool's result in
- * `content` (the textual outcome), keyed back to the call by the conversation order.
+ * `content` (the textual outcome) and the `id` of the call it answers in `call`.
+ * Position stays the join the loop uses: the `tool` turns that follow an `assistant`
+ * turn answer its `calls` in order. `call` is the record's reference, and it identifies
+ * one call only where the ids within one assistant turn are unique.
  * For a successful tool result, a string is the content as is; any other value is
  * JSON-encoded. A failed tool result carries its error text unchanged.
  */
@@ -33,6 +36,8 @@ export interface Message {
 	readonly content: string
 	/** Holds an assistant turn's requested tools — its `tool_calls`, replayed. */
 	readonly calls?: readonly ToolCall[]
+	/** Holds the `id` of the {@link ToolCall} a `tool` turn answers. */
+	readonly call?: string
 	/**
 	 * Holds multimodal image data attached to this turn — base64-encoded image strings,
 	 * forwarded to a vision-capable provider (the provider maps them onto the wire's
@@ -44,12 +49,14 @@ export interface Message {
 /**
  * Carries the minimal data needed to author a {@link Message} — the `id` is
  * assigned by the layer that stores it, so a caller supplies only role / content
- * (and, for a replayed assistant turn, its `calls`).
+ * (and, for a replayed assistant turn, its `calls`; for a tool turn, the `call` it answers).
  */
 export interface MessageInput {
 	readonly role: MessageRole
 	readonly content: string
 	readonly calls?: readonly ToolCall[]
+	/** Holds the `id` of the {@link ToolCall} a `tool` turn answers. */
+	readonly call?: string
 	/**
 	 * Holds multimodal image data for this turn — base64-encoded image strings forwarded to a
 	 * vision-capable provider (carried verbatim onto the stored {@link Message}).

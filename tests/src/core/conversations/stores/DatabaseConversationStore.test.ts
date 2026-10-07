@@ -12,6 +12,7 @@ import {
 	conversationStoreRoundTripExpectation,
 	conversationStoreTwoIds,
 	conversationStoreUpsert,
+	TOOL_SNAPSHOT,
 } from '../../../../setup.js'
 
 const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
@@ -134,6 +135,34 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 				id: 'poisoned',
 				sections: [],
 				messages: [{ id: 'a1', role: 'assistant', content: '', calls: [null, 'x'] }],
+			},
+		})
+		await database.close()
+		const store = createDatabaseConversationStore(driver)
+		expect(await store.get('poisoned')).toBeUndefined()
+	})
+
+	it('reads back a tool message naming its call beside one saved without call', async () => {
+		const store = makeStore()
+		await store.set(TOOL_SNAPSHOT)
+		const got = await store.get(TOOL_SNAPSHOT.id)
+		expect(got).toEqual(TOOL_SNAPSHOT)
+		expect(got?.messages.at(-1)?.call).toBe('call-oslo')
+		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
+	})
+
+	it('a TAMPERED row (a non-string call) resolves UNDEFINED from get (fail-closed)', async () => {
+		const driver = createMemoryDriver()
+		const database = createDatabase({
+			driver,
+			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+		})
+		await database.table('conversations').set({
+			id: 'poisoned',
+			snapshot: {
+				id: 'poisoned',
+				sections: [],
+				messages: [{ id: 't1', role: 'tool', content: 'sunny', call: 7 }],
 			},
 		})
 		await database.close()

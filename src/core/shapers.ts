@@ -38,6 +38,7 @@ export const messageShape = objectShape({
 	role: literalShape(['system', 'user', 'assistant', 'tool']),
 	content: stringShape(),
 	calls: optionalShape(arrayShape(toolCallShape)),
+	call: optionalShape(stringShape()),
 	images: optionalShape(arrayShape(stringShape())),
 }) satisfies ContractShape
 

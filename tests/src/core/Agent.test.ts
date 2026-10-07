@@ -361,6 +361,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual(['denied: secret is not in the active scope', 'ok'])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.call),
+		).toEqual(calls.map((call) => call.id))
 	})
 
 	it.each([
@@ -476,6 +481,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual(['alpha result', 'beta result'])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.call),
+		).toEqual(['c1', 'c1'])
 	})
 
 	it.each([
@@ -595,10 +605,44 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual(['denied: secret is not in the active scope', 'denied: policy refusal'])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.call),
+		).toEqual(['secret', 'safe'])
 	})
 })
 
 describe('Agent — tool iteration', () => {
+	it('names each answered call on its tool message when one reply calls one tool twice', async () => {
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'weather', execute: (args) => `sunny in ${String(args.city)}` }))
+		const calls = [
+			createToolCall({ id: 'call-paris', name: 'weather', arguments: { city: 'Paris' } }),
+			createToolCall({ id: 'call-oslo', name: 'weather', arguments: { city: 'Oslo' } }),
+		]
+		const provider = createScriptedProvider(
+			[{ content: '', tools: calls }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'weather in Paris and Oslo' })
+		await agent.generate()
+		const answers = requireValue(provider.calls[1]).messages.filter(
+			(message) => message.role === 'tool',
+		)
+		expect(answers.map(({ call, content }) => ({ call, content }))).toEqual([
+			{ call: 'call-paris', content: 'sunny in Paris' },
+			{ call: 'call-oslo', content: 'sunny in Oslo' },
+		])
+		expect(
+			agent.context.messages
+				.messages()
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.call),
+		).toEqual(['call-paris', 'call-oslo'])
+	})
+
 	it('passes multiline string tool content with quotes, backslashes, and Unicode unchanged', async () => {
 		const content = 'First line\n"quoted" C:\\workspace\\notes\r\nCafé 日本語 🌿\n'
 		const tools = createToolManager()
@@ -923,6 +967,11 @@ describe('Agent — authority gate', () => {
 			.filter((m) => m.role === 'tool')
 			.map((m) => m.content)
 		expect(toolContents).toEqual([JSON.stringify(5), 'denied: no deletes', JSON.stringify(5)])
+		expect((second?.messages ?? []).filter((m) => m.role === 'tool').map((m) => m.call)).toEqual([
+			'a1',
+			'd1',
+			'a2',
+		])
 	})
 
 	it('an all-denied turn feeds every call back as a denial and the loop stays bounded', async () => {

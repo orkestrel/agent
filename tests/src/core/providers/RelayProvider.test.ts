@@ -161,6 +161,8 @@ describe('RelayProvider', () => {
 					images: ['image'],
 					calls: [call],
 				},
+				{ id: 'answer', role: 'tool', content: '2', call: 'c1' },
+				{ id: 'unnamed', role: 'tool', content: '3' },
 			],
 			tools: [{ name: 'add', description: 'Adds values', parameters: { x: { type: 'number' } } }],
 			options: { think: false, schema: { type: 'object' } },
@@ -170,8 +172,14 @@ describe('RelayProvider', () => {
 		expect(parseJSONAs(JSON.stringify(wire), providerRequestContract.is)).toEqual(wire)
 		expect(wire).toEqual({
 			...request,
-			messages: [{ ...request.messages[0], calls: [createToolCall({ arguments: { x: 1 } })] }],
+			messages: [
+				{ ...request.messages[0], calls: [createToolCall({ arguments: { x: 1 } })] },
+				...request.messages.slice(1),
+			],
 		})
+		expect(JSON.stringify(wire)).toContain(
+			'{"id":"answer","role":"tool","content":"2","call":"c1"},{"id":"unnamed","role":"tool","content":"3"}',
+		)
 		expect(request.messages[0]?.calls?.[0]).toBe(call)
 		expect(call.context.caller).toEqual({ subject: 'local-only' })
 	})

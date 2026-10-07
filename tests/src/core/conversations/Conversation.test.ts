@@ -99,6 +99,22 @@ describe('Conversation — construction & accessors', () => {
 		expect(rich.images).toEqual(['B64'])
 		expect('calls' in rich).toBe(false)
 	})
+
+	it('stores the call a tool message answers, and omits call when absent', () => {
+		const conversation = new Conversation()
+
+		const answer = conversation.add({ role: 'tool', content: 'sunny', call: 'call-weather' })
+		expect(answer.call).toBe('call-weather')
+		expect(conversation.message(answer.id)).toEqual({
+			id: answer.id,
+			role: 'tool',
+			content: 'sunny',
+			call: 'call-weather',
+		})
+
+		const unnamed = conversation.add({ role: 'tool', content: 'cloudy' })
+		expect('call' in unnamed).toBe(false)
+	})
 })
 
 describe('Conversation — view() before any compaction', () => {

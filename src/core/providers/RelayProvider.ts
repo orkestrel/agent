@@ -98,6 +98,7 @@ export class RelayProvider extends AgentProvider {
 									arguments: call.arguments,
 								})),
 							}),
+					...(message.call === undefined ? {} : { call: message.call }),
 					...(message.images === undefined ? {} : { images: message.images }),
 				})),
 				...(request.tools === undefined

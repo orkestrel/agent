@@ -25,9 +25,10 @@ import { isToolCall } from '@orkestrel/tool'
  * Checks whether a value satisfies the domain conversation-message contract.
  *
  * @remarks
- * Roles belong to MessageRole and image elements are strings. Tool arguments may
- * carry non-JSON values, as the domain type permits; the message wire contract is
- * narrower. Unreadable fields and hostile inputs return false.
+ * Roles belong to MessageRole, image elements are strings, and `call` is a string on any
+ * role, as the flat Message type admits. Tool arguments may carry non-JSON values, as the
+ * domain type permits; the message wire contract is narrower. Unreadable fields and hostile
+ * inputs return false.
  *
  * @param value - The unknown message candidate
  * @returns True if the domain message fields are valid; false otherwise
@@ -41,11 +42,12 @@ import { isToolCall } from '@orkestrel/tool'
 export function isMessage(value: unknown): value is Message {
 	const checked = attempt(() => {
 		if (!isRecord(value)) return false
-		const { id, role, content, calls, images } = value
+		const { id, role, content, calls, call, images } = value
 		if (!isString(id) || !isString(content)) return false
 		if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool')
 			return false
 		if (calls !== undefined && !arrayOf(isToolCall)(calls)) return false
+		if (call !== undefined && !isString(call)) return false
 		return images === undefined || arrayOf(isString)(images)
 	})
 	return checked.success && checked.value

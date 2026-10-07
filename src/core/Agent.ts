@@ -550,6 +550,8 @@ export class Agent implements AgentInterface {
 					// (the result already exists). Carries the same pair the chunk carries.
 					this.#emitter.emit('tool', call, outcomeResult)
 					yield { category: 'tool', call, result: outcomeResult }
+					// `call` comes from the paired call rather than the result's `id`, so tool message
+					// `index` names `calls[index]` even when a supplied tool manager returns another id.
 					const toolMessage = this.#context.messages.add({
 						role: 'tool',
 						content: outcomeResult.success
@@ -557,6 +559,7 @@ export class Agent implements AgentInterface {
 								? outcomeResult.value
 								: JSON.stringify(outcomeResult.value)
 							: outcomeResult.error,
+						call: call.id,
 					})
 					messages.push(toolMessage)
 				}

@@ -16,6 +16,15 @@ describe('wire shapes', () => {
 		expectTypeOf<Infer<typeof messageShape>>().toExtend<Message>()
 		expect(createContract(messageShape).is({ id: '1', role: 'user', content: '' })).toBe(true)
 	})
+	it('declares the optional string call on the message wire projection', () => {
+		expectTypeOf<Infer<typeof messageShape>['call']>().toEqualTypeOf<string | undefined>()
+		const contract = createContract(messageShape)
+		const answer = { id: 't1', role: 'tool', content: 'sunny', call: 'call-weather' }
+		expect(contract.is(answer)).toBe(true)
+		expect(contract.parse(answer)).toEqual(answer)
+		expect(contract.is({ id: 't1', role: 'tool', content: 'sunny' })).toBe(true)
+		expect(contract.is({ id: 't1', role: 'tool', content: 'sunny', call: 7 })).toBe(false)
+	})
 	it('infers a request wire projection assignable to its domain', () => {
 		expectTypeOf<Infer<typeof providerRequestShape>>().toExtend<ProviderRequest>()
 		expect(createContract(providerRequestShape).is({ messages: [] })).toBe(true)

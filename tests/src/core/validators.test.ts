@@ -19,6 +19,7 @@ import {
 	SYSTEM_ONE_LLAMA,
 	SYSTEM_ONE_MICA,
 	SYSTEM_ONE_INVALID_PROBABILITIES,
+	TOOL_SNAPSHOT,
 } from '../../setup.js'
 
 // The core read-boundary guards — `isMessage`, `isSection`, and `isConversationSnapshot`. Each is
@@ -109,6 +110,28 @@ describe('isMessage — the per-message shape guard (total + defensive)', () => 
 		).toBe(false)
 		expect(isMessage({ id: 'm1', role: 'user', content: 'see', images: 'DATA' })).toBe(false)
 	})
+
+	it('accepts a string call on a tool message and on every other role the flat type admits', () => {
+		expect(isMessage({ id: 't1', role: 'tool', content: 'sunny', call: 'call-weather' })).toBe(true)
+		expect(isMessage({ id: 't1', role: 'tool', content: 'sunny' })).toBe(true)
+		expect(isMessage({ id: 'u1', role: 'user', content: 'hi', call: 'call-weather' })).toBe(true)
+	})
+
+	it('rejects a non-string call', () => {
+		expect(isMessage({ id: 't1', role: 'tool', content: 'sunny', call: 7 })).toBe(false)
+		expect(isMessage({ id: 't1', role: 'tool', content: 'sunny', call: null })).toBe(false)
+		expect(isMessage({ id: 't1', role: 'tool', content: 'sunny', call: ['call-weather'] })).toBe(
+			false,
+		)
+		expect(
+			isMessage({
+				id: 't1',
+				role: 'tool',
+				content: 'sunny',
+				call: { id: 'call-weather', name: 'weather', arguments: {} },
+			}),
+		).toBe(false)
+	})
 })
 
 describe('isSection — the per-section shape guard (total + defensive)', () => {
@@ -146,6 +169,7 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
 		// An empty-sections + empty-tail snapshot is still valid (a fresh conversation, no summary).
 		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(true)
+		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
 		// An optional rollup `summary` (present) is accepted.
 		expect(isConversationSnapshot({ id: 'c', summary: 'rollup', sections: [], messages: [] })).toBe(
 			true,

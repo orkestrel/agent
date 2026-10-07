@@ -1,5 +1,5 @@
 import { createMemoryConversationStore } from '@src/core'
-import { roundTripJSON } from '@orkestrel/test'
+import { requireValue, roundTripJSON } from '@orkestrel/test'
 import { isToolCall } from '@orkestrel/tool'
 import { describe, expect, it } from 'vitest'
 import {
@@ -11,6 +11,7 @@ import {
 	conversationStoreRoundTripExpectation,
 	conversationStoreTwoIds,
 	conversationStoreUpsert,
+	TOOL_SNAPSHOT,
 } from '../../../../setup.js'
 
 const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
@@ -103,6 +104,18 @@ describe('MemoryConversationStore — JSON driver-swap parity', () => {
 		expect(got).toBeDefined()
 		if (got === undefined) return
 		expect(roundTripJSON(got)).toEqual(got)
+	})
+})
+
+describe('MemoryConversationStore — tool messages with and without call', () => {
+	it('round-trips a tool message naming its call beside one saved without call', async () => {
+		const store = createMemoryConversationStore()
+		await store.set(TOOL_SNAPSHOT)
+		const got = requireValue(await store.get(TOOL_SNAPSHOT.id))
+		expect(got).toEqual(TOOL_SNAPSHOT)
+		expect(roundTripJSON(got)).toEqual(TOOL_SNAPSHOT)
+		expect(got.messages.at(-1)?.call).toBe('call-oslo')
+		expect(got.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
 	})
 })
 

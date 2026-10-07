@@ -670,6 +670,41 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 	return conversation.snapshot()
 }
 
+/**
+ * Holds a stored tool-turn snapshot in both written forms: the section's tool message lacks
+ * `call`, as a snapshot saved before tool messages named their call, and the live tail's tool
+ * message names the call it answers.
+ */
+export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
+	id: 'weather',
+	summary: 'Paris is sunny',
+	sections: [
+		{
+			id: 'section-paris',
+			summary: 'Paris is sunny',
+			messages: [
+				{ id: 'user-paris', role: 'user', content: 'weather in Paris' },
+				{
+					id: 'assistant-paris',
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'call-paris', name: 'weather', arguments: { city: 'Paris' } }],
+				},
+				{ id: 'tool-paris', role: 'tool', content: 'sunny in Paris' },
+			],
+		},
+	],
+	messages: [
+		{
+			id: 'assistant-oslo',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'call-oslo', name: 'weather', arguments: { city: 'Oslo' } }],
+		},
+		{ id: 'tool-oslo', role: 'tool', content: 'sunny in Oslo', call: 'call-oslo' },
+	],
+})
+
 // A `makeStore` builds a fresh, empty store for one scenario; `build` is
 // {@link buildConversationSnapshot}. Every scenario below RUNS the store operations and RETURNS
 // their plain results — it asserts nothing, since NO `describe` / `it` / `expect` may enter this
