@@ -671,9 +671,8 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 }
 
 /**
- * Holds a stored tool-turn snapshot in both written forms: the section's tool message lacks
- * `call`, as a snapshot saved before tool messages named their call, and the live tail's tool
- * message names the call it answers.
+ * Holds tool messages with and without `call` so storage tests cover the member's
+ * optionality and preservation.
  */
 export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
 	id: 'weather',
