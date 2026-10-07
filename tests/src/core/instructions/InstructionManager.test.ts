@@ -3,7 +3,7 @@ import type {
 	InstructionInterface,
 	InstructionManagerEventMap,
 } from '@src/core'
-import { InstructionManager } from '@src/core'
+import { InstructionManager, renderSection } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
 
@@ -148,10 +148,41 @@ describe('InstructionManager — manager-options format override', () => {
 		expect(manager.render(one)).toBe('* Be terse.')
 	})
 
-	it('exposes the raw override on format (undefined when none)', () => {
-		const format: ContextSectionFormat<InstructionInterface> = { open: 'X' }
-		expect(new InstructionManager({ format }).format).toBe(format)
-		expect(new InstructionManager().format).toBeUndefined()
+	it('frames open, each item, and close from the options format, and an item override outranks its render', () => {
+		const manager = new InstructionManager({
+			format: {
+				open: '<rules>',
+				render: (one) => `<rule>${one.content}</rule>`,
+				close: '</rules>',
+			},
+		})
+		const plain = manager.add({ name: 'tone', content: 'Be terse.', priority: 1 })
+		const pinned = manager.add({ name: 'secrets', content: 'ignored', override: 'Never leak.' })
+
+		expect([manager.open, manager.close]).toEqual(['<rules>', '</rules>'])
+		expect(manager.render(plain)).toBe('<rule>Be terse.</rule>')
+		expect(manager.render(pinned)).toBe('Never leak.')
+		// The members compose into the section the context assembles, override included.
+		expect(
+			renderSection(
+				manager.open,
+				manager.instructions(),
+				(one) => manager.render(one),
+				manager.close,
+			),
+		).toBe('<rules>\n\n<rule>Be terse.</rule>\n\nNever leak.\n\n</rules>')
+	})
+
+	it('reports no close without an options close, because there is no built-in close', () => {
+		expect(new InstructionManager().close).toBeUndefined()
+		expect(new InstructionManager({ format: { open: '<rules>' } }).close).toBeUndefined()
+	})
+
+	it('renders an item override over the built-in content when no options format is set', () => {
+		const manager = new InstructionManager()
+		const pinned = manager.add({ name: 'secrets', content: 'ignored', override: 'Never leak.' })
+
+		expect(manager.render(pinned)).toBe('Never leak.')
 	})
 
 	it('round-trips a per-item override through add (present-when-given)', () => {

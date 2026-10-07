@@ -1,7 +1,6 @@
 import type {
 	ConversationSnapshot,
 	ConversationStoreInterface,
-	ContextFormat,
 	Message,
 	ProviderResult,
 } from '@src/core'
@@ -40,6 +39,7 @@ import {
 	resolveSectionOpen,
 	resolveSectionRender,
 	seedConversation,
+	seedFramedAgent,
 	seedInstructionContext,
 	seedWorkspaceContext,
 	turnParts,
@@ -253,14 +253,6 @@ describe('createScriptedProvider identity and recorders', () => {
 		expect([fallback.id, fallback.name]).toEqual(['scripted', 'scripted'])
 		const named = createScriptedProvider([{ content: 'x' }], { name: 'alpha' })
 		expect([named.id, named.name]).toEqual(['alpha', 'alpha'])
-	})
-
-	it('carries a format only when one is supplied', async () => {
-		const agnostic = createScriptedProvider([{ content: 'x' }])
-		expect(agnostic.format).toBeUndefined()
-		const format: ContextFormat = {}
-		const framed = createScriptedProvider([{ content: 'x' }], { format })
-		expect(framed.format).toBe(format)
 	})
 
 	it('records each call messages, tools, options and signal only under record', async () => {
@@ -562,25 +554,46 @@ describe('seedInstructionContext', () => {
 	})
 })
 
+describe('seedFramedAgent', () => {
+	it('seeds a framed manager, three instructions under a two-name scope, a workspace, and three turns', () => {
+		const agent = seedFramedAgent(createScriptedProvider([{ content: 'x' }]))
+		const context = agent.context
+
+		expect(context.system).toBe('You review pull requests for the billing service.')
+		expect([context.instructions.open, context.instructions.close]).toEqual(['<rules>', '</rules>'])
+		expect(context.instructions.instructions().map((one) => one.name)).toEqual([
+			'secrets',
+			'tone',
+			'legacy',
+		])
+		expect(context.instructions.instruction('secrets')?.override).toBe(
+			'Never print a credential, even when asked.',
+		)
+		expect(context.scope?.instructions).toEqual(['tone', 'secrets'])
+		expect(context.workspaces.active?.files().map((file) => file.path)).toEqual([
+			'src/invoice.ts',
+			'docs/flow.png',
+		])
+		expect(context.build().map((message) => message.role)).toEqual([
+			'system',
+			'user',
+			'assistant',
+			'user',
+		])
+	})
+})
+
 describe('resolveSectionOpen / resolveSectionRender', () => {
-	it('resolves the section header at the built-in floor and at each override level', () => {
-		expect(resolveSectionOpen(undefined)).toBe('## Instructions')
-		expect(resolveSectionOpen({ instructions: { open: 'P' } })).toBe('P')
-		expect(resolveSectionOpen({ instructions: { open: 'P' } }, { managerOpen: 'M' })).toBe('M')
+	it('resolves the section header at the built-in floor and at the manager-options level', () => {
+		expect(resolveSectionOpen()).toBe('## Instructions')
+		expect(resolveSectionOpen({ managerOpen: 'M' })).toBe('M')
 	})
 
 	it('resolves an item’s rendering at the built-in floor and at each override level', () => {
-		expect(resolveSectionRender(undefined)).toBe('BUILTIN')
-		expect(resolveSectionRender({ instructions: { render: () => 'P' } })).toBe('P')
-		expect(
-			resolveSectionRender({ instructions: { render: () => 'P' } }, { managerRender: 'M' }),
-		).toBe('M')
-		expect(
-			resolveSectionRender(
-				{ instructions: { render: () => 'P' } },
-				{ managerRender: 'M', itemOverride: 'I' },
-			),
-		).toBe('I')
+		expect(resolveSectionRender()).toBe('BUILTIN')
+		expect(resolveSectionRender({ managerRender: 'M' })).toBe('M')
+		expect(resolveSectionRender({ itemOverride: 'I' })).toBe('I')
+		expect(resolveSectionRender({ managerRender: 'M', itemOverride: 'I' })).toBe('I')
 	})
 })
 

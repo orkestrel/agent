@@ -1,7 +1,8 @@
-import type { ContextFormat, ProviderInterface, ProviderRequest } from '@src/core'
+import type { ProviderInterface, ProviderRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
 	createAgent,
+	createInstructionManager,
 	createRelay,
 	createRelayProvider,
 	ProviderAbortError,
@@ -234,12 +235,13 @@ describe('in-process relay hop', () => {
 //  • a minimal provider's generate()/stream() drive content + a tool round-trip + summed
 //    usage, and an abort commits a partial;
 //  • two DIFFERENTLY-NAMED providers are drop-in swappable behind identical agent code;
-//  • the loop passes each provider's `format` (or none) into build() correctly.
+//  • a manager-options framing reaches the request the provider receives, and an unframed
+//    manager sends the built-ins.
 // The scripted provider is a REAL provider (a real async generator honouring
 // the signal), never a mock of the agent. The deterministic loop mechanics also live in
 // Agent.test.ts; here the framing is the agnosticism CLAIM (a generic provider, not Ollama,
 // satisfies the contract). A `name` distinguishes the two swap providers; `deltasOf` chunks
-// the streamed content; `format` (when given) carries a provider-default framing.
+// the streamed content.
 
 const USAGE = createTokenUsage()
 
@@ -380,38 +382,36 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		expect(await run(second)).toBe('I am beta')
 	})
 
-	it('the loop passes each provider FORMAT (or none) into build() — a formatted provider frames the system block; an agnostic one falls to the built-ins', async () => {
-		// One provider declares an XML instructions framing (its provider-default), the other
-		// declares no `format` at all. The SAME agent code drives both; the built system block
-		// reflects each provider's framing — the runtime threads `provider.format` into build().
-		const formatXml: ContextFormat = {
-			instructions: {
-				open: '<INSTRUCTIONS>',
-				render: (one) => `<i>${one.content}</i>`,
-			},
-		}
-		const framed = createScriptedProvider([{ content: 'ok' }], {
-			name: 'framed',
-			format: formatXml,
+	it('a manager-options format frames the system block the provider receives; an unframed manager sends the built-ins', async () => {
+		// A model's framing preference reaches the request through the instructions manager the
+		// agent receives, so one provider type sends XML framing from one agent and the built-in
+		// Markdown header from the other, through the real loop.
+		const framed = createScriptedProvider([{ content: 'ok' }], { name: 'framed', record: true })
+		const framedAgent = createAgent(framed, {
+			instructions: createInstructionManager({
+				format: {
+					open: '<INSTRUCTIONS>',
+					render: (one) => `<i>${one.content}</i>`,
+					close: '</INSTRUCTIONS>',
+				},
+			}),
 		})
-		const agnostic = createScriptedProvider([{ content: 'ok' }], { name: 'agnostic' })
+		framedAgent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		framedAgent.context.messages.add({ role: 'user', content: 'hi' })
+		await framedAgent.generate()
 
-		// A recorder-free way to observe the built block: read it off the context with the SAME
-		// `provider.format` the loop would pass (the loop calls `context.build(provider.format)`).
-		const buildWith = (provider: ProviderInterface): string => {
-			const agent = createAgent(provider)
-			agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
-			return requireValue(agent.context.build(provider.format)[0]).content
-		}
+		const plain = createScriptedProvider([{ content: 'ok' }], { name: 'plain', record: true })
+		const plainAgent = createAgent(plain)
+		plainAgent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		plainAgent.context.messages.add({ role: 'user', content: 'hi' })
+		await plainAgent.generate()
 
-		// The framed provider's default reframes the instructions section (XML, not Markdown).
-		const framedBlock = buildWith(framed)
-		expect(framedBlock).toContain('<INSTRUCTIONS>')
-		expect(framedBlock).toContain('<i>Be terse.</i>')
-		expect(framedBlock).not.toContain('## Instructions')
-		// The agnostic provider (no format) leaves the section on the managers' built-in.
-		const agnosticBlock = buildWith(agnostic)
-		expect(agnosticBlock).toBe('## Instructions\n\nBe terse.')
+		expect(requireValue(requireValue(framed.calls[0]).messages[0]).content).toBe(
+			'<INSTRUCTIONS>\n\n<i>Be terse.</i>\n\n</INSTRUCTIONS>',
+		)
+		expect(requireValue(requireValue(plain.calls[0]).messages[0]).content).toBe(
+			'## Instructions\n\nBe terse.',
+		)
 	})
 
 	it('createScriptedProvider (the shared Ollama-free fixture) is itself a conforming provider that drives the loop', async () => {

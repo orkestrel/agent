@@ -14,7 +14,7 @@ import { Instruction } from './Instruction.js'
 /**
  * Registers the immutable {@link Instruction}s a richer context assembles a directives block
  * from — keyed by `name` so a re-`add` overwrites, last write wins, and listed by descending
- * `priority`, carrying the `open` / `render` build contract and an observable `emitter`.
+ * `priority`, carrying the `open` / `render` / `close` build contract and an observable `emitter`.
  *
  * @remarks
  * - **Registry.** Instructions live in an insertion-ordered `Map` keyed by `name`;
@@ -22,14 +22,14 @@ import { Instruction } from './Instruction.js'
  *   `id`, and a re-`add` of the same name overwrites it (last write wins). `count` is the
  *   map size, `instruction(name)` looks one up, and `instructions()` lists them sorted by
  *   descending `priority` (a stable sort, so equal priorities keep insertion order).
- * - **Build contract (with the manager-options override).** `open` is the section
- *   header a context renders the instructions under; `render(instruction)` renders one
- *   instruction (its `content`). Each encapsulates the cascade's `[options-override →
- *   built-in]` half: when `InstructionManagerOptions.format` supplies an `open` /
- *   `render`, `open` / `render` return it, else the built-in — so a richer context
- *   reads one consistent pair and layers the provider default + per-item override on top
- *   (see {@link import('../AgentContext.js').AgentContext}). The per-item
- *   {@link InstructionInput.override} is round-tripped onto the stored instruction.
+ * - **Build contract (the whole format cascade).** `open` is the section header a context
+ *   renders the instructions under, `render(instruction)` renders one instruction, and
+ *   `close` is the line after them. Each resolves the cascade most-specific-first: `render`
+ *   returns the instruction's {@link InstructionInput.override}, else the
+ *   `InstructionManagerOptions.format` `render`, else its `content`; `open` returns the
+ *   options `open`, else the built-in header; `close` returns the options `close`, else
+ *   `undefined`. A context reads the three and frames the section from them (see
+ *   {@link import('../AgentContext.js').AgentContext}).
  * - **Removal.** `remove` drops one by name, or a batch — `true` only when every supplied
  *   name was removed; `clear` empties the registry.
  * - **Observable.** The owned {@link emitter} ({@link InstructionManagerEventMap})
@@ -53,9 +53,7 @@ export class InstructionManager implements InstructionManagerInterface {
 	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<InstructionManagerEventMap>
-	// The manager-options level of the build cascade — consulted first by `open` /
-	// `render` (falling back to the built-in), so this manager encapsulates the
-	// `[options-override → built-in]` half and a context layers the rest on top.
+	// The manager-options level of the build cascade, read by `open`, `render`, and `close`.
 	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
 
 	constructor(options?: InstructionManagerOptions) {
@@ -75,14 +73,11 @@ export class InstructionManager implements InstructionManagerInterface {
 	}
 
 	get open(): string {
-		// Manager-options override first, else the built-in header.
 		return this.#format?.open ?? '## Instructions'
 	}
 
-	get format(): ContextSectionFormat<InstructionInterface> | undefined {
-		// The raw override — so a context's `build()` can interleave the provider default
-		// beneath it (this getter / `open` / `render` encapsulate override→built-in).
-		return this.#format
+	get close(): string | undefined {
+		return this.#format?.close
 	}
 
 	add(input: InstructionInput): InstructionInterface
@@ -105,8 +100,7 @@ export class InstructionManager implements InstructionManagerInterface {
 	}
 
 	render(instruction: InstructionInterface): string {
-		// Manager-options override first, else the built-in (its `content`).
-		return this.#format?.render?.(instruction) ?? instruction.content
+		return instruction.override ?? this.#format?.render?.(instruction) ?? instruction.content
 	}
 
 	remove(name: string): boolean

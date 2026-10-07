@@ -6,7 +6,6 @@ import type {
 	AgentEventMap,
 	AgentResult,
 	AgentStreamInterface,
-	ContextFormat,
 	ConversationEventMap,
 	Message,
 	ProviderDelta,
@@ -39,13 +38,16 @@ import {
 	createToolCall,
 	createTokenUsage,
 	loopTool,
+	RECORDED_REQUEST,
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
+	seedFramedAgent,
 } from '../../setup.js'
 import {
 	collect,
 	createRecorder,
 	createRecorders,
+	requireValue,
 	waitForAbort,
 	waitForCondition,
 	waitForDelay,
@@ -223,46 +225,19 @@ describe('Agent — single turn', () => {
 	})
 })
 
-describe('Agent — passes the provider format into build()', () => {
-	it('a scripted provider WITH a format frames the built context (PROVIDER level)', async () => {
-		// The loop's ONE build()-level change: it passes `provider.format` into
-		// context.build(). A provider declaring a framing default ⇒ the built system block
-		// reflects it (the provider beats the managers' built-in framing).
-		const format: ContextFormat = {
-			instructions: {
-				open: '<INSTRUCTIONS>',
-				render: (one) => `<i>${one.content}</i>`,
-			},
-		}
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], {
-			...SCRIPT_OPTIONS,
-			format,
-		})
-		const agent = createAgent(provider)
-		agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-
-		await agent.generate()
-
-		const system = provider.calls[0]?.messages[0]
-		expect(system?.role).toBe('system')
-		// The provider's framing replaced BOTH the built-in '## Instructions' header and the
-		// built-in content rendering.
-		expect(system?.content).toBe('<INSTRUCTIONS>\n\n<i>Be terse.</i>')
-	})
-
-	it('a scripted provider WITHOUT a format reflects the managers built-ins (agnostic)', async () => {
-		// An agnostic provider supplies NO format (like OllamaProvider) ⇒ build(undefined) ⇒
-		// the managers' built-in framing, byte-for-byte.
+describe('Agent — the provider request matches the recorded request', () => {
+	it('sends the recorded messages for a framed, scoped, workspace-backed conversation', async () => {
+		// RECORDED_REQUEST is a recorded value, never derived from the source under test, so a change
+		// to context assembly that moves one prompt byte fails here. The minted message ids differ on
+		// every run, so they are checked for presence and compared no further.
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
-		expect(provider.format).toBeUndefined()
-		const agent = createAgent(provider)
-		agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
-		agent.context.messages.add({ role: 'user', content: 'hi' })
+		await seedFramedAgent(provider).generate()
 
-		await agent.generate()
-
-		expect(provider.calls[0]?.messages[0]?.content).toBe('## Instructions\n\nBe terse.')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.every((message) => message.id.length > 0)).toBe(true)
+		const bodies = sent.map(({ id, ...body }) => body)
+		expect(bodies).toStrictEqual(RECORDED_REQUEST)
+		expect(JSON.stringify(bodies)).toBe(JSON.stringify(RECORDED_REQUEST))
 	})
 })
 

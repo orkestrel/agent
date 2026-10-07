@@ -380,14 +380,14 @@ export function createInstruction(input: InstructionInput): InstructionInterface
  * @remarks
  * Starts empty; `add` (one or a batch) mints each `id` and overwrites a same-name
  * instruction (last write wins); `instructions()` lists them sorted by descending
- * `priority` (stable for ties); `open` / `render` are the build contract a richer
+ * `priority` (stable for ties); `open` / `render` / `close` are the build contract a richer
  * context renders an instructions block with; `remove` (one or a batch) reports `true` only
  * when every supplied name was removed; `clear` empties it. Carries an observable `emitter`
  * ({@link import('./types.js').InstructionManagerEventMap}) wired through the reserved `on`
  * option; the emitter isolates a listener throw and routes it to its `error` handler
  * (the `error` option), so it can never corrupt a mutation. An optional `format`
  * override is the manager-options level of the `AgentContext` build cascade (consulted by
- * `open` / `render`, beating the provider default + built-in; a per-item
+ * `open` / `render` / `close`, beating the built-in; a per-item
  * `InstructionInput.override` still beats it).
  *
  * @param options - Optional `on` hooks + a `format` override (see {@link InstructionManagerOptions})

@@ -1,4 +1,4 @@
-import type { ContextFormat, Message, ProviderIncrement } from '@src/core'
+import type { Message, ProviderIncrement } from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
@@ -23,14 +23,11 @@ import {
 } from '../../setup.js'
 
 describe('AgentProvider — identity, transport, and request composition', () => {
-	it('mints an instance UUID and exposes exact optional context framing', () => {
-		const format: ContextFormat = { instructions: { open: 'instructions' } }
-		const provider = new ScriptedWire({ url: 'https://provider.test', format })
+	it('mints a distinct instance UUID per provider beside the exported transport limits', () => {
+		const provider = new ScriptedWire({ url: 'https://provider.test' })
 		const other = new ScriptedWire({ url: 'https://provider.test' })
 		expect(provider.id).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/)
 		expect(provider.id).not.toBe(other.id)
-		expect(provider.format).toBe(format)
-		expect(other.format).toBeUndefined()
 		expect(DEFAULT_PROVIDER_TIMEOUT).toBe(120_000)
 		expect(MAX_ERROR_BODY_LENGTH).toBe(2048)
 	})

@@ -2,7 +2,6 @@ import type { ToolDefinition } from '@orkestrel/tool'
 import type {
 	AgentProviderInput,
 	AgentProviderInterface,
-	ContextFormat,
 	Message,
 	ProviderDelta,
 	ProviderIncrement,
@@ -79,7 +78,6 @@ export abstract class AgentProvider<
 	readonly #timeout: number
 	readonly #transport: typeof globalThis.fetch
 	readonly #headers: ProviderOptions['headers']
-	readonly #format: ContextFormat | undefined
 	readonly #split: boolean
 	readonly #strict: boolean
 
@@ -90,7 +88,6 @@ export abstract class AgentProvider<
 		this.#timeout = input.timeout ?? DEFAULT_PROVIDER_TIMEOUT
 		this.#transport = input.fetch ?? globalThis.fetch.bind(globalThis)
 		this.#headers = input.headers
-		this.#format = input.format
 		this.#split = input.split ?? true
 		this.#strict = input.strict ?? false
 	}
@@ -101,11 +98,6 @@ export abstract class AgentProvider<
 	/** Exposes the instance's minted UUID. */
 	get id(): string {
 		return this.#id
-	}
-
-	/** Exposes the context framing exactly as supplied. */
-	get format(): ContextFormat | undefined {
-		return this.#format
 	}
 
 	/** Creates fresh framing state for the call. */

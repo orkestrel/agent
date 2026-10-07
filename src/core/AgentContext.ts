@@ -1,7 +1,6 @@
 import type {
 	AgentContextInterface,
 	AgentContextOptions,
-	ContextFormat,
 	ConversationInterface,
 	ConversationManagerInterface,
 	InstructionManagerInterface,
@@ -21,9 +20,6 @@ import {
 	filterAllowList,
 	renderFencedFile,
 	renderSection,
-	resolveClose,
-	resolveItem,
-	resolveOpen,
 } from './helpers.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 
@@ -55,20 +51,17 @@ import { InstructionManager } from './instructions/InstructionManager.js'
  *   conversation between runs (`conversations.switch(id)`) to serve many threads (the real
  *   multi-conversation pattern); switch between runs, not during a run, and use separate agents for
  *   concurrent threads.
- * - **`build(format?)` — the scoped assembly + the format cascade.** It folds, in order,
+ * - **`build()` — the scoped assembly + the format cascade.** It folds, in order,
  *   the system prompt then the scope-filtered instructions → the active workspace's text files
- *   (each as a block: the section's resolved `open` text, each item's resolved rendering, then
- *   any resolved `close` text) into one leading `system` message (prepended only when at least
- *   one part exists), then appends the active conversation's `view()` (the conversation owns
- *   message inclusion through compaction — the scope does not filter the conversation). Each
- *   `open` / item / `close`
- *   resolves independently, most-specific-first — `build()`'s optional `format` (a provider's
- *   per-section default) is the provider level: `open` = manager-options-override > provider >
- *   built-in; per item = item-override > manager-options-override > provider > built-in; `close` =
- *   manager-options-override > provider (no built-in ⇒ no closing line when unset) (see
- *   {@link AgentContextInterface.build}). Passing no `format` (and with no overrides / no per-item
- *   override) reproduces the built-in framing exactly (each section is its built-in header +
- *   items, no closing line). The active workspace's scoped-in image files' `base64` payload is attached to
+ *   (each as a block: the section's `open` text, each item's rendering, then any `close` text)
+ *   into one leading `system` message (prepended only when at least one part exists), then
+ *   appends the active conversation's `view()` (the conversation owns message inclusion through
+ *   compaction — the scope does not filter the conversation). The instruction manager resolves
+ *   each `open` / item / `close` most-specific-first: `open` = manager-options-override >
+ *   built-in; per item = item-override > manager-options-override > built-in; `close` =
+ *   manager-options-override (no built-in ⇒ no closing line when unset) (see
+ *   {@link AgentContextInterface.build}). With no override set, each section is its built-in
+ *   header + items, no closing line. The active workspace's scoped-in image files' `base64` payload is attached to
  *   the last user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
  *   always reflects the current managers / messages / scope / active workspace; it never mutates a
@@ -169,17 +162,13 @@ export class AgentContext implements AgentContextInterface {
 		this.#scope = scope
 	}
 
-	build(format?: ContextFormat): readonly Message[] {
+	build(): readonly Message[] {
 		const scope = this.#scope
 		// 1–2. Assemble the system block parts: the prompt, then each scoped manager's
-		// section (its resolved `open` + each item's resolved rendering + any resolved
-		// `close`) when it has any scoped-in items. Tools are not folded in — they reach the
-		// provider structurally. Each slot resolves through the format cascade (`resolveOpen` /
-		// `resolveItem` / `resolveClose`): open = manager-options-override > provider-default >
-		// built-in; per item = item-override > manager-options-override > provider-default >
-		// built-in; close = manager-options-override > provider-default (no built-in ⇒ no
-		// closing line). With no `format` arg + no overrides + no per-item `override` it is
-		// identical to the built-ins (each section's header + items, no closing line).
+		// section (its `open` + each item's rendering + any `close`) when it has any scoped-in
+		// items. Tools are not folded in — they reach the provider structurally. The manager
+		// resolves every slot of the format cascade, so this reads its `open`, `render`, and
+		// `close` as given.
 		const parts: string[] = []
 		// Configured by `=== undefined`, not falsiness — an explicitly supplied '' (or a
 		// whitespace-only) system is opted in and prepended verbatim; a truthiness check would drop it.
@@ -190,10 +179,10 @@ export class AgentContext implements AgentContextInterface {
 			(one) => one.name,
 		)
 		const instructed = renderSection(
-			resolveOpen(this.#instructions, format?.instructions),
+			this.#instructions.open,
 			instructions,
-			(one) => resolveItem(this.#instructions, format?.instructions, one),
-			resolveClose(this.#instructions, format?.instructions),
+			(one) => this.#instructions.render(one),
+			this.#instructions.close,
 		)
 		if (instructed !== undefined) parts.push(instructed)
 		// The active workspace's files, rendered by carrier — the sole document/image context.

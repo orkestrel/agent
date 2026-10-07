@@ -143,14 +143,6 @@ export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
 	/**
-	 * Holds the model's preferred context framing, by section kind — an optional
-	 * {@link ContextFormat} an {@link import('./AgentContext.js').AgentContext}
-	 * applies as the provider-default level of its build cascade (beating the managers'
-	 * built-in framing, beaten by a manager-options or per-item override). Omitted ⇒ the
-	 * provider is framing-agnostic and the managers' built-in defaults apply unchanged.
-	 */
-	readonly format?: ContextFormat | undefined
-	/**
 	 * Generates one complete turn — resolves the assembled {@link ProviderResult}.
 	 *
 	 * @param messages - The conversation so far
@@ -316,8 +308,8 @@ export interface InstructionInput {
 	readonly priority?: number
 	/**
 	 * Holds a fully-rendered override of this instruction's prompt text — the most-specific
-	 * level of the {@link import('./AgentContext.js').AgentContext} build cascade (beats a
-	 * manager-options / provider / built-in format for this item). Round-tripped onto the
+	 * level of the {@link import('./AgentContext.js').AgentContext} build cascade (beats the
+	 * manager-options format and the built-in rendering for this item). Round-tripped onto the
 	 * stored {@link InstructionInterface} when given (present-when-supplied, like `images`).
 	 */
 	readonly override?: string
@@ -352,16 +344,16 @@ export type InstructionManagerEventMap = {
  * `on` is the reserved listener key: initial listeners for the manager's
  * {@link InstructionManagerEventMap}, wired at construction. `format` is the
  * manager-options level of the {@link import('./AgentContext.js').AgentContext} build
- * cascade — a {@link ContextSectionFormat} the manager consults first in its own
- * `open` / `render` (falling back to the built-in when a member is omitted), so it
- * beats the provider default and the built-in, while a per-item
- * {@link InstructionInput.override} still beats it. Omitted ⇒ the built-in framing applies.
+ * cascade — a {@link ContextSectionFormat} the manager consults in its own `open` /
+ * `render` / `close` (falling back to the built-in when a member is omitted), so it beats
+ * the built-in, while a per-item {@link InstructionInput.override} still beats it.
+ * Omitted ⇒ the built-in framing applies.
  */
 export interface InstructionManagerOptions {
 	readonly on?: EmitterHooks<InstructionManagerEventMap>
 	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
-	/** Holds a manager-level format override (beats the provider default + built-in); see {@link AgentContextInterface.build}. */
+	/** Holds a manager-level format override that beats the built-in; see {@link AgentContextInterface.build}. */
 	readonly format?: ContextSectionFormat<InstructionInterface>
 }
 
@@ -372,9 +364,10 @@ export interface InstructionManagerOptions {
  *
  * @remarks
  * - **Build contract.** `open` is the section header a richer context renders
- *   the instructions under; `render(instruction)` renders one instruction (its
- *   `content`). Together they let an {@link import('./AgentContext.js').AgentContext}
- *   assemble an instructions block.
+ *   the instructions under, `render(instruction)` renders one instruction, and `close` is
+ *   the trailing line after them, each resolved through the item override, the
+ *   manager-options `format`, and the built-in. Together they let an
+ *   {@link import('./AgentContext.js').AgentContext} assemble an instructions block.
  * - **Observable.** The owned `emitter` ({@link InstructionManagerEventMap})
  *   carries `add` / `remove` / `clear` for fire-and-forget observers; the emitter
  *   isolates a listener throw and routes it to its `error` handler (the `error` option).
@@ -382,17 +375,16 @@ export interface InstructionManagerOptions {
 export interface InstructionManagerInterface {
 	readonly emitter: EmitterInterface<InstructionManagerEventMap>
 	readonly count: number
-	/** Names the section header a context renders the instructions under. */
+	/**
+	 * Names the section header a context renders the instructions under — the manager-options
+	 * `open`, else the built-in `'## Instructions'`.
+	 */
 	readonly open: string
 	/**
-	 * Holds the manager-options format override (the {@link InstructionManagerOptions.format}
-	 * supplied at construction), or `undefined` when none — the manager-options level of the
-	 * {@link import('./AgentContext.js').AgentContext} build cascade, exposed so `build()`
-	 * can interleave the provider default beneath it (`open` / `render` already
-	 * encapsulate the `[override → built-in]` half for standalone use). A `readonly` data
-	 * member, not a method.
+	 * Holds the line a context renders after the instructions — the manager-options `close`, or
+	 * `undefined` when none, because there is no built-in close and so no closing line.
 	 */
-	readonly format: ContextSectionFormat<InstructionInterface> | undefined
+	readonly close: string | undefined
 	/**
 	 * Adds one {@link InstructionInput}, or a batch — mints each `id`; a re-`add` of the same
 	 * name overwrites it, last write wins.
@@ -403,7 +395,10 @@ export interface InstructionManagerInterface {
 	instruction(name: string): InstructionInterface | undefined
 	/** Lists every instruction, sorted by descending `priority` (stable for equal priorities). */
 	instructions(): readonly InstructionInterface[]
-	/** Renders one instruction for the prompt — its `content`. */
+	/**
+	 * Renders one instruction for the prompt — its `override`, else the manager-options
+	 * `render`, else its `content`.
+	 */
 	render(instruction: InstructionInterface): string
 	/**
 	 * Removes one instruction by name, or a batch — `true` only when every supplied name was
@@ -432,8 +427,7 @@ export interface InstructionManagerInterface {
  * `open` and `render` cascade through the
  * built-in floor (`open` ⇒ the manager's built-in header, `render` ⇒ the manager's built-in
  * rendering); `close` has no built-in, so an unset `close` yields no closing line.
- * It is the unit both a provider's {@link ContextFormat} (a per-section-kind
- * default) and a manager's `Options` carry — see {@link AgentContextInterface.build} for
+ * It is the unit a manager's `Options` carry — see {@link AgentContextInterface.build} for
  * the full precedence.
  *
  * @typeParam T - The section item the `render` override formats
@@ -452,56 +446,6 @@ export interface ContextSectionFormat<T> {
 	 * example `'</instructions>'`; omitted ⇒ no closing line (there is no built-in close).
 	 */
 	readonly close?: string
-}
-
-/**
- * Exposes the manager surface one context section's format cascade reads — its built-in `open` /
- * `render`, plus the raw options override the cascade layers a provider default beneath; {@link
- * InstructionManagerInterface} satisfies it structurally.
- *
- * @remarks
- * The narrow contract the cascade resolvers
- * ({@link import('./helpers.js').resolveOpen} / {@link import('./helpers.js').resolveClose} /
- * {@link import('./helpers.js').resolveItem}) take, so they stay independent of which manager
- * supplies the section: an {@link InstructionManagerInterface} satisfies it structurally.
- * `open` and `render` already encapsulate `[options-override → built-in]` (so a manager
- * used standalone renders correctly), and `format` exposes the raw override so `build()` can
- * interleave the provider default beneath it.
- *
- * @typeParam T - The section item this source renders
- */
-export interface ContextSectionSourceInterface<T> {
-	/** Names the built-in section header (already resolved against the manager-options override). */
-	readonly open: string
-	/** Holds the raw manager-options override, or `undefined` when none was supplied. */
-	readonly format: ContextSectionFormat<T> | undefined
-	/**
-	 * Renders one section item, already resolved against the manager-options override and
-	 * otherwise on the built-in rendering.
-	 */
-	render(item: T): string
-}
-
-/**
- * Holds a provider's optional context-framing default, keyed by section kind — the framing a model
- * prefers (for example XML tags against Markdown headers), declared by a {@link ProviderInterface}
- * that opts in.
- *
- * @remarks
- * Each key is a {@link ContextSectionFormat} for one of the observable context sections
- * (the `instructions` section), so a provider can frame each section independently — and any
- * it omits falls through to that manager's built-in default. It is the provider-default
- * level of the {@link import('./AgentContext.js').AgentContext} build cascade: it beats a
- * manager's built-in default but is beaten by a manager-options override and by a per-item
- * override (see {@link AgentContextInterface.build}). It references the abstract core
- * item interface ({@link InstructionInterface}), so a provider opting in imports it from
- * `@orkestrel/agent` — the type is provider-agnostic, with no backend coupling. Omitting it
- * entirely (the default for an agnostic provider) leaves every section on its manager's
- * built-in framing.
- */
-export interface ContextFormat {
-	/** Frames the instructions section; omitted ⇒ that manager's built-in. */
-	readonly instructions?: ContextSectionFormat<InstructionInterface>
 }
 
 /**
@@ -760,12 +704,10 @@ export interface AgentContextInterface {
 	 * resolved through the format cascade), and the active workspace's scope-filtered
 	 * (`scope.files`) text files as fenced reference blocks in a `## Workspace` section, then
 	 * the active conversation's `view()`, with the active workspace's image files' `base64`
-	 * payload attached to the last user message. Takes an optional `format` — typically
-	 * `provider.format`, the provider level of the cascade — and omitting it with no overrides
-	 * set renders each section on its manager's built-in framing. The `system` message is
-	 * prepended only when some part of it exists, the workspace render covers the active
-	 * workspace alone, tools are advertised structurally rather than in the prompt, and the
-	 * input is built fresh on each call.
+	 * payload attached to the last user message. With no override set, each section renders on
+	 * its manager's built-in framing. The `system` message is prepended only when some part of
+	 * it exists, the workspace render covers the active workspace alone, tools are advertised
+	 * structurally rather than in the prompt, and the input is built fresh on each call.
 	 *
 	 * @remarks
 	 * **The active workspace (rendered by carrier) — the sole document/image context.** When
@@ -781,39 +723,26 @@ export interface AgentContextInterface {
 	 * rendered for workspaces.
 	 *
 	 * **The format cascade.** Each manager section frames as `[open, ...items.map(render), close]`
-	 * (empty / absent slots dropped, the survivors `\n\n`-joined). The `open` (the section's
-	 * leading text), each item's `render`, and the `close` (the section's trailing text)
-	 * resolve independently, most-specific-first, from a {@link ContextSectionFormat} at each
-	 * level — an item override, a manager-options override, the provider `format` default,
-	 * and the manager's built-in. For the `instructions` section kind `K`, manager
-	 * `M`, and the supplied `format` `F`:
-	 * - **open** = `M.format?.open ?? F?.[K]?.open ?? M.open` — that is,
-	 *   **manager-options override > provider default > built-in** (the leading text has no
-	 *   per-item level). The manager encapsulates the `[options-override → built-in]` half:
-	 *   `M.open` already returns the options override's `open` when one is set, else
-	 *   the built-in header — so `build()` only layers the provider default between them.
-	 * - **item** `I` = `I.override ?? M.format?.render?.(I) ?? F?.[K]?.render?.(I) ?? M.render(I)`
-	 *   — that is, **item override > manager-options override > provider default > built-in**.
-	 *   Again `M.render(I)` already returns the options override when set, else the
-	 *   built-in, so `build()` layers the per-item `I.override` on top and the provider
-	 *   default between.
-	 * - **close** = `M.format?.close ?? F?.[K]?.close` — that is, **manager-options
-	 *   override > provider default**, with no built-in floor (the trailing text has no
-	 *   per-item level): unset at both levels ⇒ `undefined` ⇒ no closing line. Paired with
-	 *   `open`, it lets a level wrap the group (`open: '<instructions>'` … `close: '</instructions>'`).
+	 * (empty / absent slots dropped, the survivors `\n\n`-joined), reading the manager's `open`,
+	 * `render`, and `close`. Each slot resolves independently, most-specific-first, across three
+	 * levels — an item override, the manager-options {@link ContextSectionFormat}, and the
+	 * manager's built-in. For the instructions manager's options format `O`:
+	 * - **open** = `O.open ?? '## Instructions'` — **manager-options override > built-in** (the
+	 *   leading text has no per-item level).
+	 * - **item** `I` = `I.override ?? O.render?.(I) ?? I.content` — **item override >
+	 *   manager-options override > built-in**.
+	 * - **close** = `O.close` — **manager-options override** alone, with no built-in floor:
+	 *   unset ⇒ `undefined` ⇒ no closing line. Paired with `open`, it wraps the group
+	 *   (`open: '<instructions>'` … `close: '</instructions>'`).
 	 *
-	 * Passing no `format` leaves the provider-default level empty, so a section with no
-	 * manager-options or item override renders as its built-in header and items with no closing
-	 * line. Scope filtering runs before formatting, and the workspace image data attaches to the
-	 * last user message.
+	 * To apply a provider's framing preference, pass it as the manager-options `format` of the
+	 * instructions manager the agent receives. Scope filtering runs before formatting, and the
+	 * workspace image data attaches to the last user message.
 	 *
-	 * @param format - The provider's optional {@link ContextFormat} default
-	 *   (typically `provider.format`); omitted ⇒ only the manager-options, item, and built-in
-	 *   levels apply
 	 * @returns The scoped conversation, prefixed by the assembled `system` message when any
 	 *   of (the prompt, the scoped instructions, the active workspace's text files) is non-empty
 	 */
-	build(format?: ContextFormat): readonly Message[]
+	build(): readonly Message[]
 }
 
 /**
@@ -2196,14 +2125,14 @@ export interface ProviderIncrement {
 }
 
 /**
- * Configures a provider's deadline, transport, headers, and context framing.
+ * Configures a provider's deadline, transport, and headers.
  *
  * @remarks
  * `timeout` is an integer duration in milliseconds. Default: 120_000.
  * `fetch` defaults to the global transport bound to its global receiver.
  * `headers` runs for each request inside its deadline and receives the combined caller
  * and deadline signal so token requests can share that bound. It overrides the JSON
- * content type only when it returns that header. `format` is exposed to context assembly.
+ * content type only when it returns that header.
  */
 export interface ProviderOptions {
 	readonly timeout?: number
@@ -2211,7 +2140,6 @@ export interface ProviderOptions {
 	readonly headers?: (
 		signal: AbortSignal,
 	) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>
-	readonly format?: ContextFormat
 }
 
 /**

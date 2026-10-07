@@ -354,10 +354,7 @@ export class Agent implements AgentInterface {
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, RunOutcome> {
-		// Pass the provider's optional context-framing default into `build()` — the
-		// provider level of the format cascade. An agnostic provider supplies no `format`,
-		// so `build(undefined)` reproduces the managers' built-in framing exactly.
-		const messages: Message[] = [...this.#context.build(this.#provider.format)]
+		const messages: Message[] = [...this.#context.build()]
 		const tools = this.#context.tools
 		let content = ''
 		let thinking: string | undefined
@@ -654,7 +651,7 @@ export class Agent implements AgentInterface {
 		if (section === undefined) return latch
 		// Rebuild the working array from the (now smaller) compacted view through the same projection the
 		// loop opened with — so the run continues on the system block + compacted `view()`.
-		messages.splice(0, messages.length, ...this.#context.build(this.#provider.format))
+		messages.splice(0, messages.length, ...this.#context.build())
 		return false
 	}
 

@@ -48,7 +48,7 @@ export class RelayProvider extends AgentProvider {
 	readonly #parser: () => ProviderParserInterface
 
 	constructor(options: RelayProviderOptions) {
-		const { url, timeout, fetch, headers, format } = options
+		const { url, timeout, fetch, headers } = options
 		super({
 			url,
 			split: false,
@@ -56,7 +56,6 @@ export class RelayProvider extends AgentProvider {
 			...(timeout === undefined ? {} : { timeout }),
 			...(fetch === undefined ? {} : { fetch }),
 			...(headers === undefined ? {} : { headers }),
-			...(format === undefined ? {} : { format }),
 		})
 		this.#parser = options.parser
 	}

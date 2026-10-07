@@ -3,8 +3,6 @@ import type {
 	AgentJobInput,
 	AgentRegistryInterface,
 	AgentResult,
-	ContextSectionFormat,
-	ContextSectionSourceInterface,
 	JudgeAnswer,
 	JudgeQuestion,
 	JudgeResult,
@@ -516,96 +514,6 @@ export function renderSection<T>(
 	const lines = [open, ...items.map(render)]
 	if (close !== undefined) lines.push(close)
 	return lines.join('\n\n')
-}
-
-/**
- * Resolves one section's open text through the format cascade — manager-options override >
- * provider default > built-in header.
- *
- * @remarks
- * Pure and total. The leading text has no per-item level. A manager's `open` already
- * encapsulates `[options-override → built-in]`, so it is reached only when neither the
- * override's `open` nor the provider's `open` applies — and there it is the built-in header.
- *
- * @typeParam T - The section item the manager renders
- * @param manager - The section source (its `format` override + its built-in `open`)
- * @param provider - The provider-default framing for this section, or `undefined`
- * @returns The section's leading text
- *
- * @example
- * ```ts
- * resolveOpen(instructions, undefined) // '## Instructions' (the built-in header)
- * resolveOpen(instructions, { open: '<rules>' }) // '<rules>' (the provider default)
- * ```
- */
-export function resolveOpen<T>(
-	manager: ContextSectionSourceInterface<T>,
-	provider: ContextSectionFormat<T> | undefined,
-): string {
-	return manager.format?.open ?? provider?.open ?? manager.open
-}
-
-/**
- * Resolves one section's close text through the format cascade — manager-options override >
- * provider default; `undefined` when neither sets one, because there is no built-in close.
- *
- * @remarks
- * Pure and total. There is no built-in close, so a section with neither level set returns
- * `undefined` and {@link renderSection} appends no closing line. Paired with
- * {@link resolveOpen}, one level can wrap the whole group.
- *
- * @typeParam T - The section item the manager renders
- * @param manager - The section source (its `format` override)
- * @param provider - The provider-default framing for this section, or `undefined`
- * @returns The section's trailing text, or `undefined` when no level sets one
- *
- * @example
- * ```ts
- * resolveClose(instructions, undefined) // undefined (no built-in close)
- * resolveClose(instructions, { close: '</rules>' }) // '</rules>'
- * ```
- */
-export function resolveClose<T>(
-	manager: ContextSectionSourceInterface<T>,
-	provider: ContextSectionFormat<T> | undefined,
-): string | undefined {
-	return manager.format?.close ?? provider?.close
-}
-
-/**
- * Resolves one item's rendering through the format cascade — item override > manager-options
- * override > provider default > built-in rendering.
- *
- * @remarks
- * Pure and total. The item's own `override` is the most-specific level (a fully-rendered
- * string for that item alone). A manager's `render(item)` already encapsulates
- * `[options-override → built-in]`, so it is reached only when no higher level applies — and
- * there it is the built-in rendering.
- *
- * @typeParam T - The section item being rendered (it may carry its own `override`)
- * @param manager - The section source (its `format` override + its built-in `render`)
- * @param provider - The provider-default framing for this section, or `undefined`
- * @param item - The item to render
- * @returns The item's prompt text
- *
- * @example
- * ```ts
- * resolveItem(instructions, undefined, terse) // 'Be terse.' (the built-in rendering)
- * resolveItem(instructions, { render: (one) => `<rule>${one.content}</rule>` }, terse)
- * // '<rule>Be terse.</rule>'
- * ```
- */
-export function resolveItem<T extends { readonly override?: string }>(
-	manager: ContextSectionSourceInterface<T>,
-	provider: ContextSectionFormat<T> | undefined,
-	item: T,
-): string {
-	return (
-		item.override ??
-		manager.format?.render?.(item) ??
-		provider?.render?.(item) ??
-		manager.render(item)
-	)
 }
 
 /**

@@ -784,65 +784,45 @@ describe('AgentContext — scope filtering in build()', () => {
 	})
 })
 
-// The FORMAT CASCADE — build(format?) frames each section as [open, ...render, close] and
-// resolves each slot MOST-SPECIFIC-FIRST: open = manager-options override > provider default
-// > built-in; render = item override > manager-options > provider > built-in; close =
-// manager-options > provider (NO built-in ⇒ no closing line). These pin the precedence at
-// EACH slot/level over the instructions section + the no-arg regression guard + the per-item
-// round-trip reaching build + the close coverage — real behavior, no mocks.
+// The FORMAT CASCADE — build() frames each section as [open, ...render, close], and the
+// instruction manager resolves each slot MOST-SPECIFIC-FIRST: open = manager-options override >
+// built-in; render = item override > manager-options > built-in; close = manager-options (NO
+// built-in ⇒ no closing line). These pin the precedence at EACH slot/level over the
+// instructions section + the built-in regression guard + the per-item round-trip reaching
+// build + the close coverage — real behavior, no mocks.
 describe('AgentContext — format cascade: the instructions open (header)', () => {
-	it('(a) built-in floor — no provider format, no manager override', () => {
-		expect(resolveSectionOpen(undefined)).toBe('## Instructions')
+	it('(a) built-in floor — no manager override', () => {
+		expect(resolveSectionOpen()).toBe('## Instructions')
 	})
 
-	it('(b) provider default BEATS the built-in', () => {
-		expect(resolveSectionOpen({ instructions: { open: 'P-HEADER' } })).toBe('P-HEADER')
-	})
-
-	it('(c) manager-options override BEATS the provider default', () => {
-		const header = resolveSectionOpen(
-			{ instructions: { open: 'P-HEADER' } },
-			{ managerOpen: 'M-HEADER' },
-		)
-		expect(header).toBe('M-HEADER')
+	it('(b) manager-options override BEATS the built-in', () => {
+		expect(resolveSectionOpen({ managerOpen: 'M-HEADER' })).toBe('M-HEADER')
 	})
 })
 
 describe('AgentContext — format cascade: an instruction item (render)', () => {
 	it('(a) built-in floor — the instruction content', () => {
-		expect(resolveSectionRender(undefined)).toBe('BUILTIN')
+		expect(resolveSectionRender()).toBe('BUILTIN')
 	})
 
-	it('(b) provider default BEATS the built-in', () => {
-		expect(resolveSectionRender({ instructions: { render: () => 'P-RENDER' } })).toBe('P-RENDER')
+	it('(b) manager-options override BEATS the built-in', () => {
+		expect(resolveSectionRender({ managerRender: 'M-RENDER' })).toBe('M-RENDER')
 	})
 
-	it('(c) manager-options override BEATS the provider default', () => {
-		const render = resolveSectionRender(
-			{ instructions: { render: () => 'P-RENDER' } },
-			{ managerRender: 'M-RENDER' },
-		)
-		expect(render).toBe('M-RENDER')
+	it('(c) item override BEATS the manager-options override (and everything below)', () => {
+		expect(resolveSectionRender({ managerRender: 'M-RENDER', itemOverride: 'ITEM' })).toBe('ITEM')
 	})
 
-	it('(d) item override BEATS the manager-options override (and everything below)', () => {
-		const render = resolveSectionRender(
-			{ instructions: { render: () => 'P-RENDER' } },
-			{ managerRender: 'M-RENDER', itemOverride: 'ITEM' },
-		)
-		expect(render).toBe('ITEM')
-	})
-
-	it('an item override alone beats the built-in (no provider, no manager override)', () => {
-		expect(resolveSectionRender(undefined, { itemOverride: 'ITEM' })).toBe('ITEM')
+	it('an item override alone beats the built-in (no manager override)', () => {
+		expect(resolveSectionRender({ itemOverride: 'ITEM' })).toBe('ITEM')
 	})
 })
 
 // The CLOSE slot — the bottom line a section renders ONCE after its items, so `open` + `close`
 // WRAP the whole group (`<instructions>` … `</instructions>`). It has NO built-in floor (unlike
-// open / render), so an unset close yields no closing line; it cascades manager-options > provider.
+// open / render), so an unset close yields no closing line; only the manager options set it.
 // These pin the group-wrap assembly, close-without-open, the items-empty guard winning over a
-// set close, and the close cascade — real behavior, no mocks.
+// set close, and the absent close — real behavior, no mocks.
 describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 	it('open + close WRAP the group — [open, ...items, close] in order, blank-line joined', () => {
 		// A two-instruction section framed by a manager-options open/render/close. The whole section
@@ -891,30 +871,8 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 		expect(requireValue(context.build()[0]).content).toBe('sys')
 	})
 
-	it('the close cascade — manager-options close BEATS the provider close', () => {
-		// close = manager-options > provider (no built-in). A manager-options close overrides the
-		// provider's close for that section; a section with neither has no closing line.
-		const instructions = new InstructionManager({ format: { close: '</M>' } })
-		const context = new AgentContext({ instructions })
-		context.instructions.add({ name: 'a', content: 'X' })
-
-		const block = requireValue(context.build({ instructions: { close: '</P>' } })[0]).content
-		expect(block.endsWith('</M>')).toBe(true)
-		expect(block).not.toContain('</P>')
-	})
-
-	it('a provider close alone applies when the manager sets none', () => {
-		// With no manager-options close, the provider's close is used (the next cascade level).
-		const context = new AgentContext()
-		context.instructions.add({ name: 'a', content: 'X' })
-
-		const block = requireValue(context.build({ instructions: { close: '</P>' } })[0]).content
-		expect(block.endsWith('</P>')).toBe(true)
-	})
-
 	it('no close anywhere ⇒ NO closing line (the built-in floor has no close)', () => {
-		// The regression invariant for the slot: absent at every level ⇒ the section ends at its
-		// last item, exactly as before this slot existed (byte-for-byte the prior output).
+		// The invariant for the slot: no manager-options close ⇒ the section ends at its last item.
 		const context = new AgentContext()
 		context.instructions.add({ name: 'a', content: 'X' })
 
@@ -922,11 +880,11 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 	})
 })
 
-describe('AgentContext — format cascade: the no-arg regression guard', () => {
-	it('build() with NO format arg reproduces the built-in framing byte-for-byte', () => {
-		// The load-bearing regression: no provider format + no manager overrides + no
-		// per-item override ⇒ today's exact output. Compare build(undefined) to the assembled
-		// built-in strings (the snapshot the prior tests pin).
+describe('AgentContext — format cascade: the built-in regression guard', () => {
+	it('build() with no override reproduces the built-in framing byte-for-byte', () => {
+		// The load-bearing regression: no manager overrides + no per-item override ⇒ the built-in
+		// header and the instruction content. Compare build() to the manager's own `open` /
+		// `render` and to the hardcoded built-in strings.
 		const context = new AgentContext({ system: 'You are concise.' })
 		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.messages.add({ role: 'user', content: 'hi' })
@@ -940,15 +898,6 @@ describe('AgentContext — format cascade: the no-arg regression guard', () => {
 		// And explicitly: it equals the hardcoded built-in strings (no override anywhere).
 		expect(requireValue(context.build()[0]).content).toBe(
 			'You are concise.\n\n## Instructions\n\nBe terse.',
-		)
-	})
-
-	it('passing an EMPTY provider format ({}) is identical to passing none', () => {
-		const context = new AgentContext({ system: 'sys' })
-		context.instructions.add({ name: 'a', content: 'do this' })
-
-		expect(requireValue(context.build({})[0]).content).toBe(
-			requireValue(context.build()[0]).content,
 		)
 	})
 

@@ -1,10 +1,4 @@
-import type {
-	AgentResult,
-	ContextSectionSourceInterface,
-	JudgeAnswer,
-	JudgeQuestion,
-	Message,
-} from '@src/core'
+import type { AgentResult, JudgeAnswer, JudgeQuestion, Message } from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
 	agentResultToJSON,
@@ -38,9 +32,6 @@ import {
 	joinThinking,
 	MESSAGE_TOKEN_OVERHEAD,
 	renderSection,
-	resolveClose,
-	resolveItem,
-	resolveOpen,
 	sanitizeToken,
 	sanitizeUsage,
 	settleAgentJob,
@@ -713,75 +704,6 @@ describe('renderSection — one assembled context section', () => {
 
 	it('renders nothing for an empty item list, so open and close never appear alone', () => {
 		expect(renderSection('<rules>', [], (one: string) => one, '</rules>')).toBeUndefined()
-	})
-})
-
-describe('resolveOpen / resolveClose / resolveItem — the format cascade', () => {
-	// A section item is anything carrying the per-item `override` — an instruction here,
-	// declared locally so the cascade is exercised on its own contract, not an entity's.
-	interface CascadeItem {
-		readonly content: string
-		readonly override?: string
-	}
-	const manager: ContextSectionSourceInterface<CascadeItem> = {
-		open: '## Instructions',
-		format: undefined,
-		render: (one) => one.content,
-	}
-	const overridden: ContextSectionSourceInterface<CascadeItem> = {
-		open: '<rules>',
-		format: {
-			open: '<rules>',
-			render: (one) => `<rule>${one.content}</rule>`,
-			close: '</rules>',
-		},
-		render: (one) => one.content,
-	}
-	const item: CascadeItem = { content: 'Be terse.' }
-
-	it('falls through to the built-in header with no override and no provider default', () => {
-		expect(resolveOpen(manager, undefined)).toBe('## Instructions')
-	})
-
-	it('prefers the provider default over the built-in header', () => {
-		expect(resolveOpen(manager, { open: '<docs>' })).toBe('<docs>')
-	})
-
-	it('prefers the manager-options override over the provider default', () => {
-		expect(resolveOpen(overridden, { open: '<docs>' })).toBe('<rules>')
-	})
-
-	it('resolves no close when neither level sets one', () => {
-		expect(resolveClose(manager, undefined)).toBeUndefined()
-	})
-
-	it('takes the provider close, then the manager-options close', () => {
-		expect(resolveClose(manager, { close: '</docs>' })).toBe('</docs>')
-		expect(resolveClose(overridden, { close: '</docs>' })).toBe('</rules>')
-	})
-
-	it('renders an item through the built-in when no level applies', () => {
-		expect(resolveItem(manager, undefined, item)).toBe('Be terse.')
-	})
-
-	it('prefers the provider render, then the manager-options render', () => {
-		expect(resolveItem(manager, { render: (one) => `- ${one.content}` }, item)).toBe('- Be terse.')
-		expect(resolveItem(overridden, { render: (one) => `- ${one.content}` }, item)).toBe(
-			'<rule>Be terse.</rule>',
-		)
-	})
-
-	it("prefers the item's own override over every other level", () => {
-		expect(
-			resolveItem(
-				overridden,
-				{ render: (one) => `- ${one.content}` },
-				{
-					content: 'ignored',
-					override: '<rule priority="high">Escalate.</rule>',
-				},
-			),
-		).toBe('<rule priority="high">Escalate.</rule>')
 	})
 })
 

@@ -1,5 +1,6 @@
 import type {
 	AgentContextInterface,
+	AgentInterface,
 	AgentJudgeInput,
 	AgentProviderInput,
 	ChoiceAnswer,
@@ -13,12 +14,12 @@ import type {
 	ProviderParserInterface,
 	ProviderRequest,
 	AgentJobInput,
-	ContextFormat,
 	ConversationManagerInterface,
 	ConversationSnapshot,
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
 	Message,
+	MessageInput,
 	MessageRole,
 	RelayFrame,
 	ProviderDelta,
@@ -33,11 +34,13 @@ import {
 	AgentContext,
 	AgentJudge,
 	AgentProvider,
+	createAgent,
 	createConversation,
 	InstructionManager,
 	JudgeError,
 	ProviderAbortError,
 	ProviderError,
+	Scope,
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
 import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
@@ -102,8 +105,6 @@ export type DeltasOf = (content: string) => readonly string[]
  *   `maxInFlight`); defaults to `0`.
  * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
  *   providers are distinguishable); defaults to `'scripted'`.
- * - `format` — a provider-default {@link ContextFormat}; `undefined` when unset, so an
- *   agnostic provider reports no framing.
  * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
  *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
  *   form) overrides this for that turn.
@@ -115,7 +116,6 @@ export type DeltasOf = (content: string) => readonly string[]
 export interface ScriptedProviderOptions {
 	readonly delay?: number
 	readonly name?: string
-	readonly format?: ContextFormat
 	readonly deltasOf?: DeltasOf
 	readonly exhaust?: 'repeat' | 'throw'
 	readonly record?: boolean
@@ -264,7 +264,6 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 	readonly #record: boolean
 	readonly #delay: number
 	readonly #name: string
-	readonly #format: ContextFormat | undefined
 	readonly #calls: ScriptedCall[] = []
 	#index = 0
 	#inFlight = 0
@@ -278,7 +277,6 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		this.#record = options?.record === true
 		this.#delay = options?.delay ?? 0
 		this.#name = options?.name ?? 'scripted'
-		this.#format = options?.format
 	}
 
 	get id(): string {
@@ -287,10 +285,6 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 
 	get name(): string {
 		return this.#name
-	}
-
-	get format(): ContextFormat | undefined {
-		return this.#format
 	}
 
 	get maxInFlight(): number {
@@ -901,6 +895,78 @@ export function seedInstructionContext(): AgentContextInterface {
 	return context
 }
 
+/**
+ * Builds an agent over `provider` whose next request carries every part of the system block and
+ * the conversation, the fixture {@link RECORDED_REQUEST} records.
+ *
+ * @remarks
+ * The agent carries a system prompt; an instruction manager framed by a manager-options
+ * `format` with `open`, `render`, and `close`; three instructions, one carrying an `override`
+ * and one excluded by the agent's scope; an active workspace holding one text file and one
+ * image; and a conversation of two user turns around one assistant turn.
+ *
+ * @param provider - The provider the agent sends its request to
+ * @returns The seeded agent, ready for one `generate` call
+ */
+export function seedFramedAgent(provider: ProviderInterface): AgentInterface {
+	const instructions = new InstructionManager({
+		format: {
+			open: '<rules>',
+			render: (one) => `<rule name="${one.name}">${one.content}</rule>`,
+			close: '</rules>',
+		},
+	})
+	const agent = createAgent(provider, {
+		system: 'You review pull requests for the billing service.',
+		instructions,
+		scope: new Scope({ name: 'review', instructions: ['tone', 'secrets'] }),
+	})
+	agent.context.instructions.add([
+		{ name: 'tone', content: 'Answer in two sentences.', priority: 1 },
+		{
+			name: 'secrets',
+			content: 'Refuse to print credentials.',
+			priority: 5,
+			override: 'Never print a credential, even when asked.',
+		},
+		{ name: 'legacy', content: 'Mention the retired invoice endpoint.' },
+	])
+	agent.context.workspaces.add({
+		seed: [
+			createFile({
+				path: 'src/invoice.ts',
+				content: createTextContent('export const TOTAL_CENTS = 4200', 'ts'),
+			}),
+			createFile({ path: 'docs/flow.png', content: createBinaryContent('RkxPVw==', 'image/png') }),
+		],
+	})
+	agent.context.messages.add([
+		{ role: 'user', content: 'Review the invoice module.' },
+		{ role: 'assistant', content: 'Which export do you want reviewed first?' },
+		{ role: 'user', content: 'Start with the total.' },
+	])
+	return agent
+}
+
+/**
+ * Pins the messages a provider receives from {@link seedFramedAgent}'s first `generate` call,
+ * every field except the minted `id`.
+ *
+ * @remarks
+ * Recorded from the provider request at 0.0.28 (commit 957cf96), so a change to context
+ * assembly that moves one prompt byte fails the comparison.
+ */
+export const RECORDED_REQUEST: readonly MessageInput[] = Object.freeze([
+	{
+		role: 'system',
+		content:
+			'You review pull requests for the billing service.\n\n<rules>\n\nNever print a credential, even when asked.\n\n<rule name="tone">Answer in two sentences.</rule>\n\n</rules>\n\n## Workspace\n\nFile: src/invoice.ts\n```ts\nexport const TOTAL_CENTS = 4200\n```',
+	},
+	{ role: 'user', content: 'Review the invoice module.' },
+	{ role: 'assistant', content: 'Which export do you want reviewed first?' },
+	{ role: 'user', content: 'Start with the total.', images: ['RkxPVw=='] },
+])
+
 /** Options for {@link resolveSectionOpen} — the manager-options `open` override, when one applies. */
 export interface SectionOpenOptions {
 	readonly managerOpen?: string
@@ -913,21 +979,17 @@ export interface SectionRenderOptions {
 }
 
 /**
- * Resolves the instructions section's `open` (its header) at whichever cascade levels the
- * arguments set — the built-in floor, a provider default, and a manager-options override.
+ * Resolves the instructions section's `open` (its header) at whichever cascade level the
+ * options set — the built-in floor or a manager-options override.
  *
  * @remarks
  * Builds a context holding ONE instruction, so the rendered block is `<open>\n\n<render>`; the
  * returned string is the part before the render.
  *
- * @param format - The provider-default {@link ContextFormat}, or `undefined` for none
  * @param options - The manager-options `open` override, when one applies
  * @returns The resolved section header
  */
-export function resolveSectionOpen(
-	format: ContextFormat | undefined,
-	options?: SectionOpenOptions,
-): string {
+export function resolveSectionOpen(options?: SectionOpenOptions): string {
 	const managerOpen = options?.managerOpen
 	const instructions =
 		managerOpen === undefined
@@ -935,26 +997,22 @@ export function resolveSectionOpen(
 			: new InstructionManager({ format: { open: managerOpen } })
 	const context = new AgentContext({ instructions })
 	context.instructions.add({ name: 'a', content: 'X' })
-	const block = requireValue(context.build(format)[0]).content
+	const block = requireValue(context.build()[0]).content
 	return requireValue(block.split('\n\n')[0])
 }
 
 /**
- * Resolves ONE instruction item's rendering at whichever cascade levels the arguments set — the
- * built-in floor, a provider default, a manager-options override, and the per-item override.
+ * Resolves ONE instruction item's rendering at whichever cascade levels the options set — the
+ * built-in floor, a manager-options override, and the per-item override.
  *
  * @remarks
  * Builds a context holding ONE instruction whose built-in content is `'BUILTIN'`; the returned
  * string is the part after the header.
  *
- * @param format - The provider-default {@link ContextFormat}, or `undefined` for none
  * @param options - The manager-options `render` override and the per-item `override`
  * @returns The resolved item rendering
  */
-export function resolveSectionRender(
-	format: ContextFormat | undefined,
-	options?: SectionRenderOptions,
-): string {
+export function resolveSectionRender(options?: SectionRenderOptions): string {
 	const managerRender = options?.managerRender
 	const instructions =
 		managerRender === undefined
@@ -972,7 +1030,7 @@ export function resolveSectionRender(
 		content: 'BUILTIN',
 		...(options?.itemOverride === undefined ? {} : { override: options.itemOverride }),
 	})
-	const block = requireValue(context.build(format)[0]).content
+	const block = requireValue(context.build()[0]).content
 	return requireValue(block.split('\n\n')[1])
 }
 
