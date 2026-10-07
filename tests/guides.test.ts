@@ -351,6 +351,31 @@ await new GuideCommand({
 			expect(instructions.render(safety)).toBe('Refuse unsafe requests.')
 		})
 
+		it('answers the custom framing fence', () => {
+			const instructions = createInstructionManager({
+				format: {
+					open: '<rules>',
+					render: (one) => `<rule>${one.content}</rule>`,
+					close: '</rules>',
+				},
+			})
+			const context = barrel.createAgentContext({ instructions })
+			context.instructions.add({ name: 'tone', content: 'Be terse.' })
+			context.instructions.add({
+				name: 'raw',
+				content: 'ignored',
+				override: '<rule priority="high">Escalate.</rule>',
+			})
+
+			expect(context.build().map(({ role, content }) => ({ role, content }))).toStrictEqual([
+				{
+					role: 'system',
+					content:
+						'<rules>\n\n<rule>Be terse.</rule>\n\n<rule priority="high">Escalate.</rule>\n\n</rules>',
+				},
+			])
+		})
+
 		it('carries the instructions fence lines the transcription copies', () => {
 			expect(guideText).toContain("instructions.open // '## Instructions'")
 			expect(guideText).toContain("instructions.render(safety) // 'Refuse unsafe requests.'")

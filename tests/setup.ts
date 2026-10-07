@@ -988,8 +988,9 @@ export function seedFramedAgent(provider: ProviderInterface): AgentInterface {
  * every field except the minted `id`.
  *
  * @remarks
- * Recorded from the provider request at 0.0.28 (commit 957cf96), so a change to context
- * assembly that moves one prompt byte fails the comparison.
+ * A recorded value, never derived from the assembly under test, so a change that moves one
+ * prompt byte fails the comparison; regenerate it only from a run of code the change has not
+ * touched.
  */
 export const RECORDED_REQUEST: readonly MessageInput[] = Object.freeze([
 	{

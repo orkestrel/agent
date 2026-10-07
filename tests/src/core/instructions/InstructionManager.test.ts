@@ -162,7 +162,6 @@ describe('InstructionManager — manager-options format override', () => {
 		expect([manager.open, manager.close]).toEqual(['<rules>', '</rules>'])
 		expect(manager.render(plain)).toBe('<rule>Be terse.</rule>')
 		expect(manager.render(pinned)).toBe('Never leak.')
-		// The members compose into the section the context assembles, override included.
 		expect(
 			renderSection(
 				manager.open,

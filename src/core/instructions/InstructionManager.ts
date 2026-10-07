@@ -53,7 +53,6 @@ export class InstructionManager implements InstructionManagerInterface {
 	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
 	readonly #emitter: Emitter<InstructionManagerEventMap>
-	// The manager-options level of the build cascade, read by `open`, `render`, and `close`.
 	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
 
 	constructor(options?: InstructionManagerOptions) {
