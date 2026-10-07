@@ -1446,6 +1446,40 @@ describe('System One helpers', () => {
 				{ form: 'choice', criteria: { bug: null, billing: null } },
 			),
 		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'choice', probabilities: { bug: NaN, billing: 0 } },
+				{ form: 'choice', criteria: { bug: null, billing: null } },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: [0.5, -0.01] },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toBeUndefined()
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: { '0': 0.5, '1': 1.01 } },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toBeUndefined()
+		expect(extractSystemOneAnswer({ type: 'noul', noul: NaN }, { form: 'noul' })).toBeUndefined()
+	})
+
+	it('ignores an unrequested candidate outside [0, 1]', () => {
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'choice', probabilities: { bug: 0.6, billing: 0.4, extra: 7 } },
+				{ form: 'choice', criteria: { bug: null, billing: null } },
+			),
+		).toEqual({ form: 'choice', probabilities: { bug: 0.6, billing: 0.4 } })
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: [0.2, 0.8, -3] },
+				{ form: 'score', criteria: [null, null] },
+			),
+		).toEqual({ form: 'score', probabilities: [0.2, 0.8] })
 	})
 
 	it('omits incomplete or invalid usage and accepts finite fractional counts and zero', () => {

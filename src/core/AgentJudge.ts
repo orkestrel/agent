@@ -1,6 +1,7 @@
 import type {
 	AgentJudgeInput,
 	AgentJudgeInterface,
+	JudgeQuestion,
 	JudgeRequest,
 	JudgeResult,
 	ProviderOptions,
@@ -9,7 +10,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'
 import { JudgeAbortError, JudgeError } from './errors.js'
-import { buildJudgeResult, readHeaders, readText } from './helpers.js'
+import { buildJudgeResult, copyJSON, readHeaders, readText } from './helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from './validators.js'
 
 /**
@@ -106,19 +107,27 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 	 */
 	async ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
 		if (signal.aborted) throw new JudgeAbortError(buildJudgeResult(this.#model, []))
-		if (!isJudgeEntry(request.state)) {
+		// The request is owned through JSON before validation, so a caller mutating it while a call
+		// is pending cannot make `read` decode against criteria that were never sent, and a proxied
+		// request (a reactive view) is owned where a structured clone would refuse it.
+		const state = copyJSON(request.state)
+		if (!isJudgeEntry(state)) {
 			throw new JudgeError('QUESTION', 'judge error: state is not a judge entry')
 		}
 		const questions = isRecord(request.questions) ? Object.entries(request.questions) : []
 		if (questions.length === 0) throw new JudgeError('QUESTION', 'judge error: no questions')
+		const entries: Array<readonly [string, JudgeQuestion]> = []
 		for (const [id, question] of questions) {
-			if (!isJudgeQuestion(question)) {
+			const copy = copyJSON(question)
+			if (!isJudgeQuestion(copy)) {
 				throw new JudgeError('QUESTION', `judge error: question ${id} is malformed`)
 			}
+			entries.push([id, copy])
 		}
+		const owned: JudgeRequest = { state, questions: Object.fromEntries(entries) }
 		const parts: readonly JudgeRequest[] = this.#batch
-			? [request]
-			: questions.map(([id, question]) => ({ state: request.state, questions: { [id]: question } }))
+			? [owned]
+			: entries.map(([id, question]) => ({ state, questions: { [id]: question } }))
 		const calls = parts.map((part) => ({ request: part, body: JSON.stringify(this.body(part)) }))
 		const results: JudgeResult[] = []
 		for (const call of calls) {

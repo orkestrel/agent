@@ -99,6 +99,7 @@ await new GuideCommand({
 		SYSTEM_ONE_MICA,
 		SYSTEM_ONE_TEV1,
 		SYSTEM_ONE_TEV1_REQUEST,
+		SYSTEM_ONE_UNREADABLE_ANSWERS,
 		TEV1_ANSWERS,
 		TEV1_CHOICE,
 		TEV1_REQUEST,
@@ -1111,7 +1112,6 @@ await new GuideCommand({
 			expect(isJudgeEntry(null)).toBe(false)
 
 			const judge = new SystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
-			// The null description travels as null; an omitted member stays omitted.
 			expect(judge.body(SYSTEM_ONE_JUDGE_REQUEST)).toEqual(SYSTEM_ONE_TEV1_REQUEST)
 			expect(
 				judge.body({ state: 'Ticket 4182', questions: { refund: { form: 'noul' } } }),
@@ -1182,6 +1182,16 @@ await new GuideCommand({
 				code: 'HTTP',
 				status: 529,
 				message: `judge error: 529 - ${'x'.repeat(MAX_ERROR_BODY_LENGTH)}`,
+			})
+			const silent = new SystemOneJudge({
+				url: 'http://localhost:11434',
+				model: 'tev1:0.8b',
+				fetch: new RecordedTransport(() => new Response(null, { status: 400 })).fetch,
+			}).ask(SYSTEM_ONE_JUDGE_REQUEST, signal)
+			await expect(silent).rejects.toMatchObject({
+				code: 'HTTP',
+				status: 400,
+				message: 'judge error: 400',
 			})
 
 			// A successful response with no body, or with a body that is not JSON, is a protocol failure.
@@ -1386,34 +1396,7 @@ await new GuideCommand({
 
 			// A System One server answers from the supplied options alone, so an answer it cannot have
 			// given is a protocol failure naming the question, never a refusal.
-			const cases: ReadonlyArray<{ readonly answers: unknown; readonly message: string }> = [
-				{
-					answers: {
-						...SYSTEM_ONE_TEV1.answers,
-						label: { type: 'choice', probabilities: { billing: 0.03, bug: 0.97 } },
-					},
-					message: 'judge error: question label has a mismatched or incomplete System One answer',
-				},
-				{
-					answers: {
-						refund: SYSTEM_ONE_TEV1.answers.refund,
-						severity: SYSTEM_ONE_TEV1.answers.severity,
-					},
-					message: 'judge error: question label has no System One answer',
-				},
-				{
-					answers: {
-						...SYSTEM_ONE_TEV1.answers,
-						refund: { type: 'choice', probabilities: { true: 0.9, false: 0.1 } },
-					},
-					message: 'judge error: question refund has a mismatched or incomplete System One answer',
-				},
-				{
-					answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } },
-					message: 'judge error: question refund has an invalid System One answer',
-				},
-			]
-			for (const { answers, message } of cases) {
+			for (const { answers, message } of SYSTEM_ONE_UNREADABLE_ANSWERS) {
 				const failure = new SystemOneJudge({
 					url: 'http://localhost:11434',
 					model: 'tev1:0.8b',
@@ -1424,7 +1407,7 @@ await new GuideCommand({
 			}
 		})
 
-		it('reports the model the response named and complete usage alone (the response-model clause)', async () => {
+		it('reports the model a System One response named and complete usage alone (the response-model clause)', async () => {
 			const bodies = [
 				{ ...SYSTEM_ONE_TEV1, model: 'gateway/tev1:0.8b' },
 				{ answers: SYSTEM_ONE_TEV1.answers, usage: SYSTEM_ONE_TEV1.usage },

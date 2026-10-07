@@ -16,16 +16,48 @@ import { isSystemOneAnswer, isSystemOneResponse } from '../validators.js'
  *
  * @remarks
  * The caller supplies the server origin and model. Every question travels in one request.
- * Server measures are validated by type and discarded; the response model is preserved.
+ * Server measures are ignored; the response model is preserved.
  * `headers` supplies authentication through the shared judge engine.
  *
- * @example
+ * @example Asking a System One server a choice, a noul, and a score
  * ```ts
- * const judge = new SystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
- * const result = await judge.ask({
- * 	state: 'Please refund the duplicate charge.',
- * 	questions: { refund: { form: 'noul', instructions: 'Is a refund requested?' } },
- * }, new AbortController().signal)
+ * import { computeReading, createSystemOneJudge } from '@orkestrel/agent'
+ *
+ * const judge = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
+ * const result = await judge.ask(
+ * 	{
+ * 		state: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
+ * 		questions: {
+ * 			label: {
+ * 				form: 'choice',
+ * 				instructions: 'Which label fits this ticket?',
+ * 				criteria: { billing: 'Payments and refunds', bug: 'Software errors', account: null },
+ * 			},
+ * 			refund: {
+ * 				form: 'noul',
+ * 				instructions: 'Does the customer ask for money back?',
+ * 				criteria: {
+ * 					true: 'The customer asks for a refund or for money back.',
+ * 					false: 'The customer does not ask for money back.',
+ * 				},
+ * 			},
+ * 			severity: {
+ * 				form: 'score',
+ * 				instructions: 'How severe is the reported issue?',
+ * 				criteria: ['Cosmetic; no impact', 'Degraded, workaround exists', 'Blocking; no workaround'],
+ * 			},
+ * 		},
+ * 	},
+ * 	AbortSignal.timeout(30_000),
+ * )
+ * const readings = Object.fromEntries(
+ * 	Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),
+ * )
+ * result.model // 'tev1:0.8b' — the model the server named
+ * result.usage // { prompt: 975, completion: 4, total: 979 }
+ * readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to four decimals
+ * readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to four decimals
+ * readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to four decimals
  * ```
  */
 export class SystemOneJudge extends AgentJudge {

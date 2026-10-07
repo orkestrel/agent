@@ -268,8 +268,8 @@ export function isProviderError(value: unknown): value is ProviderError {
  * machine-readable `code` `'ABORT'`.
  *
  * @remarks
- * `partial` keeps the answers and the usage of every completed call, so spent usage is never
- * lost; a cancel before the first call carries an empty partial. `cause` holds the failure the
+ * `partial` keeps the answers and the usage of every completed call, so usage reported by
+ * completed calls is retained; a cancel before the first call carries an empty partial. `cause` holds the failure the
  * cancel superseded when a throw raced the abort, and is undefined when the cancel was the only
  * failure.
  */

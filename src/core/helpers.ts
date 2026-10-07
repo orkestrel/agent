@@ -29,12 +29,14 @@ import type { FileInterface } from '@orkestrel/workspace'
 import { isTokenUsage } from '@orkestrel/budget'
 import {
 	attempt,
+	boundsOf,
 	isArray,
 	isBoolean,
 	isFiniteNumber,
 	isNumber,
 	isObject,
 	isString,
+	parseJSON,
 	parseJSONValue,
 } from '@orkestrel/contract'
 import { isBinary } from '@orkestrel/workspace'
@@ -44,7 +46,6 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 } from './constants.js'
 import { AgentJobError, JudgeError } from './errors.js'
-import { isSystemOneAnswer } from './validators.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
@@ -1101,6 +1102,28 @@ export async function readHeaders(
 	}
 }
 /**
+ * Owns a value by serializing it to JSON and parsing the text, so the copy shares nothing with its source.
+ *
+ * @remarks
+ * A value that JSON cannot carry, such as a cycle or a bigint, and a value that serializes to
+ * nothing, such as a function, both return undefined, so a guard over the result refuses them.
+ * A proxied value serializes through its traps, where a structured clone refuses it.
+ *
+ * @param value - The value to own
+ * @returns The owned JSON copy, or undefined when the value is not JSON
+ * @example
+ * ```ts
+ * copyJSON({ state: 'A ticket.' }) // { state: 'A ticket.' }
+ * copyJSON(() => 1) // undefined
+ * ```
+ */
+export function copyJSON(value: unknown): unknown {
+	const text = attempt(() => JSON.stringify(value))
+	if (!text.success || typeof text.value !== 'string') return undefined
+	return parseJSON(text.value)
+}
+
+/**
  * Projects a judge question onto the System One wire while preserving omitted members.
  *
  * @param question - The domain question to send
@@ -1122,13 +1145,15 @@ export function questionToSystemOne(question: JudgeQuestion): SystemOneQuestion 
  * Extracts a System One distribution in question criteria order and drops server measures.
  *
  * @remarks
- * Every requested candidate must have a finite probability in [0, 1]. Score maps and arrays
- * project onto the requested levels. Additional candidates are ignored, sums are unconstrained,
- * and probabilities are preserved without normalization.
+ * Every requested candidate must have a finite probability in [0, 1]; the helper checks each
+ * requested candidate itself and reads no other member. Score maps and arrays project onto the
+ * requested levels. Additional candidates are ignored, sums are unconstrained, and probabilities
+ * are preserved without normalization.
  *
  * @param answer - The wire answer to decode
  * @param question - The question defining the form and candidate order
- * @returns The domain answer, or undefined for a mismatched form or invalid distribution
+ * @returns The domain answer, or undefined for a mismatched form or a requested candidate whose
+ * probability is missing, not finite, or outside [0, 1]
  * @example
  * ```ts
  * extractSystemOneAnswer({ type: 'noul', noul: 0.9 }, { form: 'noul' })
@@ -1139,33 +1164,31 @@ export function extractSystemOneAnswer(
 	answer: SystemOneAnswer,
 	question: JudgeQuestion,
 ): JudgeAnswer | undefined {
-	const extracted = attempt((): JudgeAnswer | undefined => {
-		if (!isSystemOneAnswer(answer)) return undefined
-		if (answer.type === 'noul' && question.form === 'noul')
-			return { form: 'noul', noul: answer.noul }
-		if (answer.type === 'choice' && question.form === 'choice') {
-			const entries: Array<readonly [string, number]> = []
-			for (const label of Object.keys(question.criteria)) {
-				if (!Object.hasOwn(answer.probabilities, label)) return undefined
-				const probability = answer.probabilities[label]
-				if (!isFiniteNumber(probability)) return undefined
-				entries.push([label, probability])
-			}
-			return { form: 'choice', probabilities: Object.fromEntries(entries) }
+	const bounded = boundsOf(0, 1)
+	if (answer.type === 'noul' && question.form === 'noul') {
+		return bounded(answer.noul) ? { form: 'noul', noul: answer.noul } : undefined
+	}
+	if (answer.type === 'choice' && question.form === 'choice') {
+		const entries: Array<readonly [string, number]> = []
+		for (const label of Object.keys(question.criteria)) {
+			if (!Object.hasOwn(answer.probabilities, label)) return undefined
+			const probability = answer.probabilities[label]
+			if (!bounded(probability)) return undefined
+			entries.push([label, probability])
 		}
-		if (answer.type !== 'score' || question.form !== 'score') return undefined
-		const probabilities: number[] = []
-		for (let level = 0; level < question.criteria.length; level++) {
-			if (!Object.hasOwn(answer.probabilities, level)) return undefined
-			const probability = isArray(answer.probabilities)
-				? answer.probabilities[level]
-				: answer.probabilities[String(level)]
-			if (!isFiniteNumber(probability)) return undefined
-			probabilities.push(probability)
-		}
-		return { form: 'score', probabilities }
-	})
-	return extracted.success ? extracted.value : undefined
+		return { form: 'choice', probabilities: Object.fromEntries(entries) }
+	}
+	if (answer.type !== 'score' || question.form !== 'score') return undefined
+	const probabilities: number[] = []
+	for (let level = 0; level < question.criteria.length; level++) {
+		if (!Object.hasOwn(answer.probabilities, level)) return undefined
+		const probability = isArray(answer.probabilities)
+			? answer.probabilities[level]
+			: answer.probabilities[String(level)]
+		if (!bounded(probability)) return undefined
+		probabilities.push(probability)
+	}
+	return { form: 'score', probabilities }
 }
 
 /**

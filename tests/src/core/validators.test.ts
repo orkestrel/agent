@@ -323,27 +323,27 @@ describe('System One guards', () => {
 		},
 	)
 
-	it('checks metadata types and dense array entries while leaving sums and legend keys unconstrained', () => {
-		expect(isSystemOneAnswer({ type: 'choice', probabilities: [0.5, 0.5] })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'rank', probabilities: {} })).toBe(false)
-		expect(isSystemOneAnswer(null)).toBe(false)
-		expect(isSystemOneAnswer({ type: 'choice', probabilities: {}, choice: 1 })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'noul', noul: 0, confidence: 'high' })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], score: 'one' })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], legend: null })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], legend: [false] })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], legend: { '0': 1 } })).toBe(
-			false,
-		)
+	it('carries the members the wire never reads unchecked', () => {
+		expect(isSystemOneAnswer({ type: 'noul', noul: 0.9, confidence: null })).toBe(true)
+		expect(isSystemOneAnswer({ type: 'score', probabilities: [0.2, 0.8], legend: 7 })).toBe(true)
+		expect(isSystemOneAnswer({ type: 'choice', probabilities: { bug: 1 }, choice: 1 })).toBe(true)
+		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], score: 'one' })).toBe(true)
 		expect(
-			isSystemOneAnswer({ type: 'score', probabilities: [0, 0], legend: { custom: null } }),
+			isSystemOneAnswer({ type: 'score', probabilities: [0, 1], legend: Array(2), confidence: {} }),
 		).toBe(true)
 		expect(isSystemOneAnswer({ type: 'noul', noul: -0, confidence: NaN })).toBe(true)
 		expect(isSystemOneAnswer({ type: 'noul', noul: 1 })).toBe(true)
+		expect(isSystemOneAnswer({ type: 'score', probabilities: { '0': 0, '1': 0 } })).toBe(true)
+	})
+
+	it('refuses an unknown type, a missing distribution, a choice array, and a sparse score array', () => {
+		expect(isSystemOneAnswer({ type: 'choice', probabilities: [0.5, 0.5] })).toBe(false)
+		expect(isSystemOneAnswer({ type: 'rank', probabilities: {} })).toBe(false)
+		expect(isSystemOneAnswer({ type: 'noul' })).toBe(false)
+		expect(isSystemOneAnswer({ type: 'choice' })).toBe(false)
+		expect(isSystemOneAnswer({ type: 'score', probabilities: null })).toBe(false)
+		expect(isSystemOneAnswer(null)).toBe(false)
 		expect(isSystemOneAnswer({ type: 'score', probabilities: Array(2) })).toBe(false)
-		expect(isSystemOneAnswer({ type: 'score', probabilities: [0, 1], legend: Array(2) })).toBe(
-			false,
-		)
 	})
 
 	it('contains hostile reads and refuses arrays with a misleading every method', () => {
@@ -361,9 +361,8 @@ describe('System One guards', () => {
 		).toBe(false)
 		expect(
 			isSystemOneAnswer({
-				type: 'score',
-				probabilities: [0, 1],
-				legend: Object.assign([false], { every: approveEvery }),
+				type: 'choice',
+				probabilities: new Proxy({ bug: 0.5 }, { ownKeys: throwProxyRead }),
 			}),
 		).toBe(false)
 	})

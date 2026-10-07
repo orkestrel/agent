@@ -2428,7 +2428,7 @@ export type JudgeErrorCode =
 	| 'HTTP'
 	/** Reports a missing or unparsable response body, or a response a wire cannot read. */
 	| 'PROTOCOL'
-	/** Reports a request refused before inference: an empty question map, a malformed question or state, or a wire limit. */
+	/** Reports a request refused before inference: an empty question map, a malformed question or state, a wire limit, or a judge configuration that would refuse every request. */
 	| 'QUESTION'
 
 /** Configures the System One server, model, transport, authentication, and deadline. */

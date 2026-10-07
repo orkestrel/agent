@@ -213,44 +213,32 @@ export function isSystemOneResponse(value: unknown): value is SystemOneResponse 
 }
 
 /**
- * Checks whether a value is a System One answer with bounded probabilities and typed metadata.
+ * Checks whether a value is a System One answer whose type and distribution the wire can read.
  *
  * @remarks
- * Score probabilities and legends accept maps or dense arrays. Legend entries follow the wire
- * entry contract without imposing question length or key equality. Distribution sums are not
- * constrained; values are never normalized. Extra members are ignored, and hostile reads return false.
+ * The guard checks `type` and the distribution the wire dereferences: the `noul` number for a
+ * noul, the `probabilities` map for a choice, and the `probabilities` map or dense array for a
+ * score, each probability a finite number in [0, 1]. The `choice`, `score`, `confidence`, and
+ * `legend` members are carried unchecked, because the wire never reads them, so a value this
+ * guard accepts can hold any value in those members. Distribution sums are not constrained;
+ * values are never normalized. Hostile reads return false.
  *
  * @param value - The unknown answer candidate
- * @returns True if the answer fields satisfy the wire contract; false otherwise
+ * @returns True if the type and the distribution satisfy the wire contract; false otherwise
  * @example
  * ```ts
  * isSystemOneAnswer({ type: 'noul', noul: 0.9 }) // true
  * isSystemOneAnswer({ type: 'score', probabilities: [0.2, 0.8] }) // true
+ * isSystemOneAnswer({ type: 'noul', noul: 1.1 }) // false
  * ```
  */
 export function isSystemOneAnswer(value: unknown): value is SystemOneAnswer {
 	const checked = attempt(() => {
 		if (!isRecord(value)) return false
-		const { type, confidence } = value
-		if (!optionalOf(isNumber)(confidence)) return false
-		if (type === 'noul') {
-			const { noul } = value
-			return boundsOf(0, 1)(noul)
-		}
+		const { type } = value
+		if (type === 'noul') return boundsOf(0, 1)(value.noul)
 		if (type !== 'choice' && type !== 'score') return false
 		const { probabilities } = value
-		if (type === 'choice' && !optionalOf(isString)(value.choice)) return false
-		if (type === 'score') {
-			const { score, legend } = value
-			if (!optionalOf(isNumber)(score)) return false
-			if (legend !== undefined) {
-				if (isArray(legend)) {
-					if (!arrayOf(nullableOf(isJudgeEntry))(legend)) return false
-				} else if (!isRecord(legend) || !Object.values(legend).every(nullableOf(isJudgeEntry))) {
-					return false
-				}
-			}
-		}
 		if (type === 'score' && isArray(probabilities)) {
 			return arrayOf(boundsOf(0, 1))(probabilities)
 		}

@@ -1,4 +1,4 @@
-import type { JudgeRequest } from '@src/core'
+import type { JudgeEntry, JudgeRequest } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
@@ -7,6 +7,7 @@ import {
 	JudgeAbortError,
 	JudgeError,
 	MAX_ERROR_BODY_LENGTH,
+	SystemOneJudge,
 } from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
@@ -18,6 +19,9 @@ import {
 	RecordedTransport,
 	rejectTransportOnAbort,
 	ScriptedJudge,
+	SYSTEM_ONE_JUDGE_REQUEST,
+	SYSTEM_ONE_TEV1,
+	SYSTEM_ONE_TEV1_REQUEST,
 	TEV1_ANSWERS,
 	TEV1_CHOICE,
 	TEV1_NOUL,
@@ -125,9 +129,63 @@ describe('AgentJudge — identity and request composition', () => {
 		}
 		expect(transport.requests).toHaveLength(1)
 	})
+
+	it('decodes against the request it sent when the caller mutates its criteria during the call', async () => {
+		const criteria: Record<string, JudgeEntry | null> = {
+			billing: 'Payments and refunds',
+			bug: 'Software errors',
+			account: null,
+		}
+		const request: JudgeRequest = {
+			state: SYSTEM_ONE_JUDGE_REQUEST.state,
+			questions: {
+				...SYSTEM_ONE_JUDGE_REQUEST.questions,
+				label: { form: 'choice', instructions: 'Which label fits this ticket?', criteria },
+			},
+		}
+		const { label } = SYSTEM_ONE_TEV1.answers
+		const transport = new RecordedTransport(() => {
+			criteria.escalation = 'Needs a manager'
+			return Response.json({
+				...SYSTEM_ONE_TEV1,
+				answers: {
+					...SYSTEM_ONE_TEV1.answers,
+					label: { ...label, probabilities: { ...label.probabilities, escalation: 0 } },
+				},
+			})
+		})
+		const judge = new SystemOneJudge({
+			url: 'http://judge.test',
+			model: 'tev1:0.8b',
+			fetch: transport.fetch,
+		})
+		const result = await judge.ask(request, new AbortController().signal)
+		expect(Object.keys(criteria)).toEqual(['billing', 'bug', 'account', 'escalation'])
+		expect(result.answers.label).toStrictEqual(TEV1_CHOICE)
+		expect(await requireValue(transport.requests[0]).json()).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+	})
 })
 
 describe('AgentJudge — requests refused before inference', () => {
+	it('owns a proxied request through JSON where a structured clone would refuse it', async () => {
+		const transport = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'tev1:0.8b',
+			fetch: transport.fetch,
+			answers: TEV1_ANSWERS,
+		})
+		const proxied: JudgeRequest = new Proxy(
+			{ state: TEV1_REQUEST.state, questions: new Proxy(TEV1_REQUEST.questions, {}) },
+			{},
+		)
+		expect(() => structuredClone(proxied)).toThrow(DOMException)
+		const result = await judge.ask(proxied, new AbortController().signal)
+		expect(result.answers).toEqual(TEV1_ANSWERS)
+		expect(judge.bodies[0]).toEqual(TEV1_REQUEST)
+		expect(judge.bodies[0]).not.toBe(proxied)
+	})
+
 	it('refuses an empty question map with no transport call', async () => {
 		const transport = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
 		const judge = new ScriptedJudge({

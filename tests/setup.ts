@@ -1332,7 +1332,11 @@ export const TEV1_ANSWERS: Readonly<Record<string, JudgeAnswer>> = Object.freeze
 	severity: TEV1_SCORE,
 })
 
-/** Asks the recorded `tev1:0.8b` request's choice, noul, and score questions about one ticket. */
+/**
+ * Holds a synthetic engine fixture that asks a choice, a noul, and a score question about one
+ * ticket. Its ticket and questions are not the recorded request's; {@link SYSTEM_ONE_JUDGE_REQUEST}
+ * carries the recorded projection.
+ */
 export const TEV1_REQUEST: JudgeRequest = Object.freeze<JudgeRequest>({
 	state:
 		'Ticket 4182: the export button crashes the app after the 2.4 update; the customer paid twice.',
@@ -1621,4 +1625,33 @@ export const SYSTEM_ONE_PROTOCOL_CASES = Object.freeze([
 		answers: { ...SYSTEM_ONE_TEV1.answers, severity: { type: 'score', probabilities: [0.1, 0.9] } },
 	},
 	{ id: 'refund', answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } } },
+])
+
+/** Lists unreadable answer maps for {@link SYSTEM_ONE_JUDGE_REQUEST} with the `PROTOCOL` message each must produce. */
+export const SYSTEM_ONE_UNREADABLE_ANSWERS = Object.freeze([
+	{
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			label: { type: 'choice', probabilities: { billing: 0.03, bug: 0.97 } },
+		},
+		message: 'judge error: question label has a mismatched or incomplete System One answer',
+	},
+	{
+		answers: {
+			refund: SYSTEM_ONE_TEV1.answers.refund,
+			severity: SYSTEM_ONE_TEV1.answers.severity,
+		},
+		message: 'judge error: question label has no System One answer',
+	},
+	{
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			refund: { type: 'choice', probabilities: { true: 0.9, false: 0.1 } },
+		},
+		message: 'judge error: question refund has a mismatched or incomplete System One answer',
+	},
+	{
+		answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } },
+		message: 'judge error: question refund has an invalid System One answer',
+	},
 ])
