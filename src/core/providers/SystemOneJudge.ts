@@ -1,15 +1,10 @@
-import type {
-	JudgeAnswer,
-	JudgeRequest,
-	JudgeResult,
-	SystemOneJudgeOptions,
-	SystemOneRequest,
-} from '../types.js'
-import { AgentJudge } from '../AgentJudge.js'
-import { SYSTEM_ONE_PATH } from '../constants.js'
-import { JudgeError } from '../errors.js'
-import { extractSystemOneAnswer, extractSystemOneUsage, questionToSystemOne } from '../helpers.js'
-import { isSystemOneAnswer, isSystemOneResponse } from '../validators.js'
+import type { SystemOneJudgeOptions, SystemOneRequest } from './types.js'
+import type { JudgeAnswer, JudgeRequest, JudgeResult } from '../types.js'
+import { AgentJudge } from './AgentJudge.js'
+import { SYSTEM_ONE_PATH } from './constants.js'
+import { extractSystemOneAnswer, extractSystemOneUsage, questionToSystemOne } from './helpers.js'
+import { isSystemOneAnswer, isSystemOneResponse } from './validators.js'
+import { JudgeError } from './errors.js'
 
 /**
  * Carries judge questions over the System One protocol and derives answers from server distributions.

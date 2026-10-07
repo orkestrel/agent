@@ -1,9 +1,9 @@
-import type { ConversationSnapshot, ConversationStoreInterface } from '../../types.js'
+import type { ConversationSnapshot, ConversationStoreInterface } from '../types.js'
 
 /**
  * Implements the {@link ConversationStoreInterface} in memory — a process-lifetime `Map` of
  * {@link ConversationSnapshot}s keyed by conversation id, the default store
- * {@link import('../../factories.js').createMemoryConversationStore} builds and the default
+ * {@link import('../factories.js').createMemoryConversationStore} builds and the default
  * backing for `open` / `save`. The exact twin of
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.
  *

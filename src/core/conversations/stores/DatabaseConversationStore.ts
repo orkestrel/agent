@@ -2,14 +2,14 @@ import type {
 	ConversationSnapshot,
 	ConversationSnapshotRow,
 	ConversationStoreInterface,
-} from '../../types.js'
+} from '../types.js'
 import type { TableInterface } from '@orkestrel/database'
-import { isConversationSnapshot } from '../../validators.js'
+import { isConversationSnapshot } from '../validators.js'
 
 /**
  * Backs a {@link ConversationStoreInterface} with one table of the `databases` layer — a
  * conversation's durable state is a row holding the snapshot as one opaque JSON column, narrowed
- * back on `get` by {@link import('../../validators.js').isConversationSnapshot}, so persistence
+ * back on `get` by {@link import('../validators.js').isConversationSnapshot}, so persistence
  * reduces to keyed point-access (`get` / `set` / `delete`) over a {@link TableInterface}. The
  * driver-pluggable twin of the plain-`Map`
  * {@link import('./MemoryConversationStore.js').MemoryConversationStore}, and the exact twin of
@@ -22,7 +22,7 @@ import { isConversationSnapshot } from '../../validators.js'
  * {@link import('../ConversationManager.js').ConversationManager} or the
  * {@link import('../Conversation.js').Conversation} — the same seam as
  * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. The
- * driver defaults to memory ({@link import('../../factories.js').createDatabaseConversationStore}
+ * driver defaults to memory ({@link import('../factories.js').createDatabaseConversationStore}
  * passes `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.
  *
@@ -35,7 +35,7 @@ import { isConversationSnapshot } from '../../validators.js'
  * - **`set(snapshot)` upserts under the snapshot's own `id`** (no separate id param) — it writes
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
- *   a {@link ConversationSnapshot} ({@link import('../../validators.js').isConversationSnapshot} — the
+ *   a {@link ConversationSnapshot} ({@link import('../validators.js').isConversationSnapshot} — the
  *   total guard for an untrusted storage read), or `undefined` if none is stored.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *

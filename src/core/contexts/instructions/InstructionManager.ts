@@ -1,0 +1,143 @@
+import type {
+	ContextSectionFormat,
+	InstructionInput,
+	InstructionInterface,
+	InstructionManagerEventMap,
+	InstructionManagerInterface,
+	InstructionManagerOptions,
+} from '../types.js'
+import type { EmitterInterface } from '@orkestrel/emitter'
+import { isArray } from '@orkestrel/contract'
+import { Emitter } from '@orkestrel/emitter'
+import { Instruction } from './Instruction.js'
+
+/**
+ * Registers the immutable {@link Instruction}s a richer context assembles a directives block
+ * from — keyed by `name` so a re-`add` overwrites, last write wins, and listed by descending
+ * `priority`, carrying the `open` / `render` / `close` build contract and an observable `emitter`.
+ *
+ * @remarks
+ * - **Registry.** Instructions live in an insertion-ordered `Map` keyed by `name`;
+ *   `add` takes one {@link InstructionInput} or a batch, mints each instruction's
+ *   `id`, and a re-`add` of the same name overwrites it (last write wins). `count` is the
+ *   map size, `instruction(name)` looks one up, and `instructions()` lists them sorted by
+ *   descending `priority` (a stable sort, so equal priorities keep insertion order).
+ * - **Build contract (the whole format cascade).** `open` is the section header a context
+ *   renders the instructions under, `render(instruction)` renders one instruction, and
+ *   `close` is the line after them. Each resolves the cascade most-specific-first: `render`
+ *   returns the instruction's {@link InstructionInput.override}, else the
+ *   `InstructionManagerOptions.format` `render`, else its `content`; `open` returns the
+ *   options `open`, else the built-in header; `close` returns the options `close`, else
+ *   `undefined`. A context reads the three and frames the section from them (see
+ *   {@link import('../AgentContext.js').AgentContext}).
+ * - **Removal.** `remove` drops one by name, or a batch — `true` only when every supplied
+ *   name was removed; `clear` empties the registry.
+ * - **Observable.** The owned {@link emitter} ({@link InstructionManagerEventMap})
+ *   carries `add` (the created instruction) / `remove` (the name) / `clear` for
+ *   fire-and-forget observers. Every event is emitted directly, strictly after the map
+ *   mutation completes; the emitter isolates a listener throw and routes it to its `error`
+ *   handler (the `error` option), so a buggy observer can never corrupt a mutation.
+ *
+ * @example
+ * ```ts
+ * const manager = new InstructionManager()
+ * manager.add([
+ * 	{ name: 'tone', content: 'Be concise.', priority: 1 },
+ * 	{ name: 'safety', content: 'Refuse unsafe requests.', priority: 10 },
+ * ])
+ * manager.instructions().map((one) => one.name) // ['safety', 'tone'] — highest priority first
+ * ```
+ */
+export class InstructionManager implements InstructionManagerInterface {
+	readonly #instructions = new Map<string, InstructionInterface>()
+	// The push observation surface — owned, never inherited. The emitter isolates a
+	// listener throw (routing it to the `error` handler), so it can never escape into a mutation.
+	readonly #emitter: Emitter<InstructionManagerEventMap>
+	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
+
+	constructor(options?: InstructionManagerOptions) {
+		this.#emitter = new Emitter<InstructionManagerEventMap>({
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
+		})
+		this.#format = options?.format
+	}
+
+	get emitter(): EmitterInterface<InstructionManagerEventMap> {
+		return this.#emitter
+	}
+
+	get count(): number {
+		return this.#instructions.size
+	}
+
+	get open(): string {
+		return this.#format?.open ?? '## Instructions'
+	}
+
+	get close(): string | undefined {
+		return this.#format?.close
+	}
+
+	add(input: InstructionInput): InstructionInterface
+	add(inputs: readonly InstructionInput[]): readonly InstructionInterface[]
+	add(
+		input: InstructionInput | readonly InstructionInput[],
+	): InstructionInterface | readonly InstructionInterface[] {
+		if (isArray(input)) return input.map((one) => this.#create(one))
+		return this.#create(input)
+	}
+
+	instruction(name: string): InstructionInterface | undefined {
+		return this.#instructions.get(name)
+	}
+
+	instructions(): readonly InstructionInterface[] {
+		// A stable descending-priority sort — Array.prototype.sort is stable, so equal
+		// priorities keep their insertion order (the map's iteration order).
+		return [...this.#instructions.values()].sort((a, b) => b.priority - a.priority)
+	}
+
+	render(instruction: InstructionInterface): string {
+		return instruction.override ?? this.#format?.render?.(instruction) ?? instruction.content
+	}
+
+	remove(name: string): boolean
+	remove(names: readonly string[]): boolean
+	remove(names: string | readonly string[]): boolean {
+		if (isArray(names)) {
+			// True only when every supplied name was present and removed, so a caller can tell a
+			// fully applied batch from a partly applied one. Each present name still emits.
+			let removed = true
+			for (const name of names) {
+				if (!this.#delete(name)) removed = false
+			}
+			return removed
+		}
+		return this.#delete(names)
+	}
+
+	clear(): void {
+		this.#instructions.clear()
+		// Observe the cleared registry — after the map emptied, so a swallowed listener
+		// throw can never alter the clear (no payload — `clear` is a pure signal).
+		this.#emitter.emit('clear')
+	}
+
+	// Mint an immutable instruction, store it by name (overwriting a same-name one), and
+	// emit `add` after the map mutation — so a swallowed listener throw can't perturb it.
+	#create(input: InstructionInput): InstructionInterface {
+		const instruction = new Instruction(input)
+		this.#instructions.set(instruction.name, instruction)
+		this.#emitter.emit('add', instruction)
+		return instruction
+	}
+
+	// Delete one instruction, emitting `remove` only when one was actually removed (a
+	// delete of an absent name returns `false` and emits nothing) — after the deletion.
+	#delete(name: string): boolean {
+		const removed = this.#instructions.delete(name)
+		if (removed) this.#emitter.emit('remove', name)
+		return removed
+	}
+}

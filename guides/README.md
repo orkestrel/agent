@@ -11,16 +11,24 @@ A dual-axis index into this repository's guides — by concept, and by directory
 The `Agent` class is the conversation loop, the `AgentProvider` class the host-independent HTTP
 engine a concrete provider extends, the `AgentJudge` class the engine a judge wire extends with the
 `SystemOneJudge` class as its System One wire, and the `RelayProvider` and `RelayStream` classes
-the browser end and the server end of the relay hop the `createRelay` function mounts. The
-`agent.md` guide covers them together because they sit in the same module directory under the same
-contract.
+the browser end and the server end of the relay hop the `createRelay` function mounts.
+
+The `providers`, `conversations`, `contexts`, and `agents` modules under `src/core` are one layer
+concept, the conversation runtime, so `agent.md` is the one guide over all four. The root files of
+`src/core` hold the message shape and the judge value types the four modules share. The guide
+covers them together because one barrel, `src/core/index.ts`, publishes them with an export set the
+module split leaves unchanged; the scaffold guide set maps several directories to one guide the
+same way for `scaffold.md`.
 
 ## By directory
 
-| Directory            | Guide                  |
-| -------------------- | ---------------------- |
-| `src/core`           | [`agent.md`](agent.md) |
-| `src/core/providers` | [`agent.md`](agent.md) |
+| Directory                | Guide                  |
+| ------------------------ | ---------------------- |
+| `src/core`               | [`agent.md`](agent.md) |
+| `src/core/providers`     | [`agent.md`](agent.md) |
+| `src/core/conversations` | [`agent.md`](agent.md) |
+| `src/core/contexts`      | [`agent.md`](agent.md) |
+| `src/core/agents`        | [`agent.md`](agent.md) |
 
 ## Dependency reference
 

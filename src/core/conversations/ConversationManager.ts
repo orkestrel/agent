@@ -5,15 +5,15 @@ import type {
 	ConversationManagerOptions,
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
-} from '../types.js'
+} from './types.js'
 import { isArray } from '@orkestrel/contract'
-import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
+import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { Conversation } from './Conversation.js'
 
 /**
  * Registers {@link Conversation}s keyed by `id`, in insertion order, with an active pointer —
  * the id-keyed store over the conversation layer, the `active` / `switch` seam the
- * {@link import('../AgentContext.js').AgentContext} renders, and the durable `open` / `save`
+ * {@link import('../contexts/index.js').AgentContext} renders, and the durable `open` / `save`
  * store seam. Event-free (a registry, like
  * {@link import('@orkestrel/workspace').WorkspaceManager}); the observability lives on each
  * {@link Conversation}.

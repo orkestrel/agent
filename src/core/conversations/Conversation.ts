@@ -1,4 +1,3 @@
-import type { EmitterInterface } from '@orkestrel/emitter'
 import type {
 	CompactOptions,
 	ConversationEventMap,
@@ -7,15 +6,15 @@ import type {
 	ConversationReferenceOptions,
 	ConversationSnapshot,
 	ConversationSummaryHandler,
-	MessageInput,
-	Message,
 	Section,
-} from '../types.js'
+} from './types.js'
+import type { Message, MessageInput } from '../types.js'
+import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
-import { DEFAULT_CONVERSATION_KEEP } from '../constants.js'
 import { Emitter } from '@orkestrel/emitter'
-import { ConversationError } from '../errors.js'
-import { buildRecapMessage, buildSummaryMessage } from '../helpers.js'
+import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
+import { ConversationError } from './errors.js'
+import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
 
 /**
  * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat

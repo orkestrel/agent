@@ -3,11 +3,11 @@ import type {
 	ProviderParserInterface,
 	ProviderRequest,
 	RelayProviderOptions,
-} from '../types.js'
+} from './types.js'
 import { cloneJSONValue } from '@orkestrel/contract'
-import { AgentProvider } from '../AgentProvider.js'
-import { providerRequestContract, relayFrameContract } from '../contracts.js'
-import { ProviderAbortError, ProviderError } from '../errors.js'
+import { AgentProvider } from './AgentProvider.js'
+import { ProviderAbortError, ProviderError } from './errors.js'
+import { providerRequestContract, relayFrameContract } from './contracts.js'
 
 /**
  * Carries provider calls over an authenticated NDJSON relay endpoint.

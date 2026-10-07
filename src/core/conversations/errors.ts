@@ -1,0 +1,54 @@
+import { isInstance } from '@orkestrel/contract'
+
+// A real error type, not a sentinel. A `ConversationInterface.compact()` is a
+// programmer error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
+// the messages with — so it throws this, carrying a machine-readable `code` ('SUMMARIZER')
+// so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
+// caught value with `instanceof`, mirroring the other errors in this file.
+
+/**
+ * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with,
+ * or with a `sections` cap below `1` — thrown by a {@link ConversationInterface}'s `compact()`
+ * or its construction, carrying the machine-readable `code`
+ * `'SUMMARIZER' | 'SECTIONS'`.
+ *
+ * @remarks
+ * Compaction requires a summarizer (it digests the folded slice into a section summary and
+ * regenerates the rollup); a conversation created without one can still store + `view()` its
+ * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
+ * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
+ * {@link import('./types.js').ConversationManagerOptions} /
+ * {@link import('./types.js').CompactOptions}) must be `>= 1` — a sub-1 cap is a programmer
+ * error and throws this with `'SECTIONS'`. Narrow a caught value with
+ * {@link isConversationError} and branch on `error.code`.
+ */
+export class ConversationError extends Error {
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap. */
+	readonly code: 'SUMMARIZER' | 'SECTIONS'
+
+	constructor(code: 'SUMMARIZER' | 'SECTIONS', message: string) {
+		super(message)
+		this.name = 'ConversationError'
+		this.code = code
+	}
+}
+
+/**
+ * Narrows an unknown caught value to a {@link ConversationError} through `instanceof`, so a
+ * `catch` can branch on its `code`.
+ *
+ * @param value - The value to test (typically a `catch` binding)
+ * @returns True if `value` is a {@link ConversationError}; false otherwise
+ *
+ * @example
+ * ```ts
+ * try {
+ * 	await conversation.compact()
+ * } catch (error) {
+ * 	if (isConversationError(error) && error.code === 'SUMMARIZER') addSummarizer()
+ * }
+ * ```
+ */
+export function isConversationError(value: unknown): value is ConversationError {
+	return isInstance(value, ConversationError)
+}
