@@ -315,6 +315,18 @@ describe('agentResultToJSON', () => {
 })
 
 describe('filterAllowList', () => {
+	it('keeps admitted tool calls by name with their identity and reply order', () => {
+		const hidden = createToolCall({ id: 'hidden', name: 'secret' })
+		const first = createToolCall({ id: 'first', name: 'safe' })
+		const second = createToolCall({ id: 'second', name: 'safe' })
+		const calls = [hidden, first, second]
+		const admitted = filterAllowList(['safe'], calls, (call) => call.name)
+		expect(admitted).toEqual([first, second])
+		expect(admitted[0]).toBe(first)
+		expect(admitted[1]).toBe(second)
+		expect(calls).toEqual([hidden, first, second])
+	})
+
 	const items = [{ name: 'a' }, { name: 'b' }, { name: 'c' }] as const
 	const byName = (item: { readonly name: string }): string => item.name
 

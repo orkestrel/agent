@@ -428,11 +428,10 @@ export class Agent implements AgentInterface {
 				broke = true
 				break
 			}
-			// Advertise only the tools the active scope admits — a scoped-out tool is filtered
-			// from the definitions handed to the provider, so the model never sees it and thus
-			// can't call it (neither described nor callable). `undefined` scope ⇒ all pass.
+			// Snapshot the allow-list before listeners can change the active scope this turn.
+			const names = this.#context.scope?.tools?.slice()
 			const advertised = filterAllowList(
-				this.#context.scope?.tools,
+				names,
 				tools.definitions(),
 				(definition) => definition.name,
 			)
@@ -532,8 +531,13 @@ export class Agent implements AgentInterface {
 				this.#emitter.emit('usage', resultUsage)
 				yield { category: 'usage', usage: resultUsage }
 			}
-			if (result.tools !== undefined && result.tools.length > 0) {
-				const authorization = this.#authorize(result.tools)
+			if (definitions === undefined) {
+				for (const call of result.tools ?? []) {
+					this.#emitter.emit('deny', call, 'no tool is advertised in the active scope')
+				}
+			} else if (result.tools !== undefined && result.tools.length > 0) {
+				const admitted = filterAllowList(names, result.tools, (call) => call.name)
+				const authorization = this.#authorize(result.tools, admitted)
 				if (abort.signal.aborted) {
 					partial = true
 					broke = true
@@ -668,12 +672,21 @@ export class Agent implements AgentInterface {
 
 	// Evaluate policy and emit denials before the run's final pre-dispatch abort guard:
 	// policy callbacks and denial listeners can cancel the run synchronously.
-	#authorize(calls: readonly ToolCall[]) {
-		if (this.#authority === undefined) return undefined
+	#authorize(calls: readonly ToolCall[], admitted: readonly ToolCall[]) {
 		const authority = this.#authority
-		const allowed: ToolCall[] = []
-		const denials = new Map<string, ToolResult>()
-		for (const call of calls) {
+		const allowed = new Map<number, ToolCall>()
+		const denials = new Map<number, ToolResult>()
+		for (const [index, call] of calls.entries()) {
+			if (!admitted.includes(call)) {
+				const reason = `${call.name} is not in the active scope`
+				denials.set(index, denyCall(call, reason))
+				this.#emitter.emit('deny', call, reason)
+				continue
+			}
+			if (authority === undefined) {
+				allowed.set(index, call)
+				continue
+			}
 			// A security gate must fail closed: if a policy `evaluate` throws, the call is not
 			// cleared, so it must not run. Synthesize a denial (carrying the error's message)
 			// instead of letting the throw reject the whole run — the tool stays unexecuted and
@@ -687,14 +700,14 @@ export class Agent implements AgentInterface {
 				// normalizes to real text, and a throw whose stringification itself fails is caught
 				// rather than escaping the gate and rejecting the run.
 				const reason = errorToMessage(error)
-				denials.set(call.id, denyCall(call, reason))
+				denials.set(index, denyCall(call, reason))
 				// Observe the fail-closed denial with the thrown reason.
 				this.#emitter.emit('deny', call, reason)
 				continue
 			}
-			if (decision.allowed) allowed.push(call)
+			if (decision.allowed) allowed.set(index, call)
 			else {
-				denials.set(call.id, denyCall(call, decision.reason))
+				denials.set(index, denyCall(call, decision.reason))
 				// Observe the explicit denial (the call + the rule's reason).
 				this.#emitter.emit('deny', call, decision.reason)
 			}
@@ -708,19 +721,21 @@ export class Agent implements AgentInterface {
 		tools: ToolManagerInterface,
 		calls: readonly ToolCall[],
 		signal: AbortSignal,
-		authorization:
-			| {
-					readonly allowed: readonly ToolCall[]
-					readonly denials: ReadonlyMap<string, ToolResult>
-			  }
-			| undefined,
+		authorization: {
+			readonly allowed: ReadonlyMap<number, ToolCall>
+			readonly denials: ReadonlyMap<number, ToolResult>
+		},
 	): Promise<readonly ToolResult[]> {
-		if (authorization === undefined) return tools.execute(calls, { signal })
 		const { allowed, denials } = authorization
-		const executed = allowed.length > 0 ? await tools.execute(allowed, { signal }) : []
-		const byId = new Map<string, ToolResult>(denials)
-		for (const result of executed) byId.set(result.id, result)
-		return calls.map((call) => byId.get(call.id) ?? denyCall(call, undefined))
+		const executed = allowed.size > 0 ? await tools.execute([...allowed.values()], { signal }) : []
+		const results = new Map<number, ToolResult>(denials)
+		let offset = 0
+		for (const index of allowed.keys()) {
+			const result = executed[offset]
+			if (result !== undefined) results.set(index, result)
+			offset += 1
+		}
+		return calls.map((call, index) => results.get(index) ?? denyCall(call, undefined))
 	}
 
 	// Drive one provider stream turn: read each {@link ProviderDelta}'s `channel` — a

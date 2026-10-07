@@ -523,7 +523,11 @@ export interface ContextFormat {
 export interface ScopeFilter {
 	/** Lists the allowed instruction `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly instructions?: readonly string[]
-	/** Lists the allowed tool `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	/**
+	 * Lists the allowed tool `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
+	 * The loop advertises and dispatches only admitted tools, checking scope before authority.
+	 * If no definition is advertised, the reply ends the run without dispatching its calls.
+	 */
 	readonly tools?: readonly string[]
 	/**
 	 * Lists the allowed active-workspace file `path`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
@@ -873,6 +877,11 @@ export interface AgentResult {
 	readonly thinking?: string
 	/** Holds the summed {@link TokenUsage} across the turn's provider calls (present when any reported it). */
 	readonly usage?: TokenUsage
+	/**
+	 * Reports cancellation or a turn limit reached with unresolved tool intent.
+	 * A reply to a turn advertising no tools is a complete answer (`false`), even if it
+	 * contains calls: those calls are dropped and observed through the `deny` event.
+	 */
 	readonly partial: boolean
 }
 
@@ -937,7 +946,12 @@ export type AgentEventMap = {
 	readonly tool: readonly [call: ToolCall, result: ToolResult]
 	/** Reports a turn's {@link TokenUsage} — emitted after a usage-bearing provider call. */
 	readonly usage: readonly [usage: TokenUsage]
-	/** Reports a call the authority denied — the call + the optional reason (not in the chunk stream). */
+	/**
+	 * Reports a call denied by scope or authority, before dispatch.
+	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
+	 * Otherwise a call excluded by the tool allow-list carries `<tool name> is not in the active scope` and
+	 * produces a denial tool result and message. Authority evaluates only admitted calls.
+	 */
 	readonly deny: readonly [call: ToolCall, reason: string | undefined]
 	/** Reports the run settled successfully (a natural finish or a cancel's partial) — the {@link AgentResult}. */
 	readonly finish: readonly [result: AgentResult]
@@ -1081,7 +1095,7 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `workspaces` — an optional pre-built {@link WorkspaceManagerInterface} forwarded to the
  *   agent's context; a fresh empty one is created when omitted (mirrors {@link AgentContextOptions.workspaces}).
  * - `scope` — an optional initial active {@link ScopeInterface} forwarded to the agent's context
- *   (the build-time filter); `undefined` ⇒ no filtering (mirrors {@link AgentContextOptions.scope}).
+ *   (the context and tool-dispatch filter); `undefined` ⇒ every registered tool is admitted.
  * - `on` — the reserved {@link EmitterHooks} key: initial listeners for the agent's
  *   {@link AgentEventMap}, wired at construction (for example `{ finish: (r) => log(r) }`).
  */
@@ -1096,7 +1110,16 @@ export interface AgentOptions {
 	readonly instructions?: InstructionManagerInterface
 	/** Reuses a pre-built workspace registry forwarded to the agent's context; a fresh empty one is created when omitted. */
 	readonly workspaces?: WorkspaceManagerInterface
-	/** Sets the initial active scope forwarded to the agent's context (the build-time filter); `undefined` ⇒ no filtering. */
+	/**
+	 * Sets the initial active scope; `undefined` admits every registered tool.
+	 * Each turn snapshots the scope's tool allow-list before advertising and checks calls
+	 * against that list before applying authority. An absent list also admits unknown names
+	 * to authority and the registry, which returns its tool-not-found failure.
+	 * A reply to a turn advertising no tools ends the run as its answer, records an assistant
+	 * message without calls, and emits a `deny` event for every dropped call without marking it partial.
+	 * Other scoped-out calls produce denial tool results and messages, and the loop continues.
+	 * Changing the context scope through the `apply` method takes effect on the next turn.
+	 */
 	readonly scope?: ScopeInterface
 	/** Caps the tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
 	readonly limit?: number
@@ -1109,11 +1132,11 @@ export interface AgentOptions {
 	/** Carries an external cancel; its abort commits a partial result. */
 	readonly signal?: AbortSignal
 	/**
-	 * Holds an optional policy gate consulted before each tool call runs — a denied call is
+	 * Holds an optional policy gate consulted after scope admits a tool call — a denied call is
 	 * fed back to the model as a denial {@link ToolResult} (a `tool` chunk + a tool
 	 * message) rather than executed (no tool run, no budget cost), so the model sees the
-	 * denial and can react; an allowed call dispatches normally. Omitted ⇒ every call
-	 * dispatches as before.
+	 * denial and can react; an allowed call dispatches normally. Omitted ⇒ every admitted call
+	 * dispatches through the registry.
 	 */
 	readonly authority?: AuthorityInterface
 	/**

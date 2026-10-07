@@ -68,6 +68,7 @@ await new GuideCommand({
 		createMemoryConversationStore,
 		createRelay,
 		createRelayProvider,
+		createScope,
 		createSystemOneJudge,
 		isJudgeAbortError,
 		isJudgeEntry,
@@ -280,6 +281,63 @@ await new GuideCommand({
 	// comments claim. Change a fence, change the transcription beside it.
 	describe('flagship fences', () => {
 		const guideText = requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`)
+
+		it('enforces the scope dispatch and answer-only behavior the guide states', async () => {
+			expect(guideText).toContain('A scoped-out tool is neither described nor callable.')
+			expect(guideText).toContain('no tool is advertised in the active scope')
+			expect(guideText).toContain('denied: TOOL is not in the active scope')
+			expect(guideText).toContain(
+				'A scope change through the `context.apply` method takes effect on the next turn.',
+			)
+			const executed: string[] = []
+			const denials: Array<string | undefined> = []
+			const tools = createToolManager()
+			tools.add(
+				['search', 'delete'].map((name) =>
+					createTool({
+						name,
+						execute: () => {
+							executed.push(name)
+							return name
+						},
+					}),
+				),
+			)
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{ id: 'delete', name: 'delete', arguments: {} },
+							{ id: 'search', name: 'search', arguments: {} },
+						],
+					},
+					{ content: 'answer', tools: [{ id: 'dropped', name: 'search', arguments: {} }] },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const agent = createAgent(provider, {
+				tools,
+				limit: 2,
+				scope: createScope({ name: 'read', tools: ['search'] }),
+			})
+			agent.emitter.on('deny', (_call, reason) => denials.push(reason))
+			agent.emitter.on('tool', () =>
+				agent.context.apply(createScope({ name: 'answer', tools: [] })),
+			)
+			expect(await agent.generate()).toEqual({ content: 'answer', partial: false })
+			expect(executed).toEqual(['search'])
+			expect(denials).toEqual([
+				'delete is not in the active scope',
+				'no tool is advertised in the active scope',
+			])
+			expect(
+				provider.calls[1]?.messages
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual(['denied: delete is not in the active scope', 'search'])
+			expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
+		})
 
 		it('answers the instructions fence’s open and per-item rendering', () => {
 			const instructions = createInstructionManager()

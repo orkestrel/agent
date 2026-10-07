@@ -322,12 +322,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		expect(provider.calls[0]?.tools).toBeUndefined()
 	})
 
-	it('a scoped-out tool is NOT callable — its handler never runs when the model requests it', async () => {
-		// The model (turn 1) requests `secret`; but `secret` is scoped out, so it was never
-		// advertised. The loop still dispatches the call through the manager — proving the
-		// scope did not merely hide the description: a scoped-out tool must not be callable.
-		// Here we assert the model could only ever have seen `safe`, so a well-behaved model
-		// can't call `secret`; and even if it does, the advertised set excludes it.
+	it('dispatches the admitted call and denies a scoped-out call in the same reply', async () => {
 		const ran: string[] = []
 		const tools = createToolManager()
 		tools.add([
@@ -346,28 +341,285 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				},
 			}),
 		])
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const calls = [createToolCall({ name: 'secret' }), createToolCall({ name: 'safe' })]
 		const provider = createScriptedProvider(
-			[
-				{ result: { content: '', tools: [{ id: 'c1', name: 'safe', arguments: {} }] } },
-				{ result: { content: 'final' } },
-			],
+			[{ result: { content: '', tools: calls } }, { result: { content: 'final' } }],
 			SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
 			scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
+			on: { deny: denied.handler },
 		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
-		await agent.generate()
+		const run = agent.stream()
+		const chunks = await collect(run.events)
+		expect(await run.result).toEqual({ content: 'final', partial: false })
 
 		// The model was only ever told about `safe` on every turn.
 		for (const call of provider.calls) {
 			expect(call.tools?.map((definition) => definition.name)).toEqual(['safe'])
 		}
-		// `secret`'s handler never ran (it was never advertised, so the model can't reach it).
-		expect(ran).not.toContain('secret')
-		expect(ran).toContain('safe')
+		expect(ran).toEqual(['safe'])
+		expect(denied.calls).toEqual([[calls[0], 'secret is not in the active scope']])
+		expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([
+			{
+				category: 'tool',
+				call: calls[0],
+				result: {
+					success: false,
+					id: 'c1',
+					name: 'secret',
+					error: 'denied: secret is not in the active scope',
+				},
+			},
+			{
+				category: 'tool',
+				call: calls[1],
+				result: { success: true, id: 'c1', name: 'safe', value: 'ok' },
+			},
+		])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual(['denied: secret is not in the active scope', 'ok'])
+	})
+
+	it.each([
+		new Scope({ name: 'empty', tools: [] }),
+		new Scope({ name: 'missing', tools: ['missing'] }),
+		undefined,
+	])('ends a reply without calls when no tool is advertised (%j)', async (scope) => {
+		const executed = createRecorder<[]>()
+		const evaluated = createRecorder<[call: ToolCall]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const exhausted = createRecorder<AgentEventMap['exhaust']>()
+		const tools = createToolManager()
+		if (scope !== undefined) tools.add(createTool({ name: 'save', execute: executed.handler }))
+		const calls = [
+			createToolCall({ id: 'save-1', name: 'save' }),
+			createToolCall({ id: 'save-2', name: 'save' }),
+		]
+		const provider = createScriptedProvider([{ content: 'answer', tools: calls }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			tools,
+			limit: 1,
+			...(scope === undefined ? {} : { scope }),
+			authority: {
+				evaluate: ({ call }) => {
+					evaluated.handler(call)
+					return { allowed: true, zone: 'test' }
+				},
+			},
+			on: { deny: denied.handler, exhaust: exhausted.handler },
+		})
+		const run = agent.stream()
+		const chunks = await collect(run.events)
+		expect(await run.result).toEqual({ content: 'answer', partial: false })
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.tools).toBeUndefined()
+		expect(executed.count).toBe(0)
+		expect(evaluated.count).toBe(0)
+		expect(exhausted.count).toBe(0)
+		expect(denied.calls).toEqual(
+			calls.map((call) => [call, 'no tool is advertised in the active scope']),
+		)
+		expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
+		expect(agent.context.messages.messages()).toEqual([
+			expect.objectContaining({ role: 'assistant', content: 'answer' }),
+		])
+		expect(agent.context.messages.messages()[0]).not.toHaveProperty('calls')
+	})
+
+	it('dispatches every registered requested tool with an undefined scope', async () => {
+		const executed = createRecorder<[name: string]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add(
+			['alpha', 'beta'].map((name) =>
+				createTool({
+					name,
+					execute: () => {
+						executed.handler(name)
+						return name
+					},
+				}),
+			),
+		)
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						createToolCall({ name: 'alpha', id: 'a' }),
+						createToolCall({ name: 'beta', id: 'b' }),
+					],
+				},
+				{ content: 'done' },
+			],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, on: { deny: denied.handler } })
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(executed.calls).toEqual([['alpha'], ['beta']])
+		expect(denied.count).toBe(0)
+	})
+
+	it('keeps duplicate-id results, tool events, and tool messages in call order without scope or authority', async () => {
+		const tools = createToolManager()
+		tools.add([
+			createTool({ name: 'alpha', execute: () => 'alpha result' }),
+			createTool({ name: 'beta', execute: () => 'beta result' }),
+		])
+		const calls = [createToolCall({ name: 'alpha' }), createToolCall({ name: 'beta' })]
+		const provider = createScriptedProvider(
+			[{ content: '', tools: calls }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const events = createRecorder<AgentEventMap['tool']>()
+		const agent = createAgent(provider, { tools, on: { tool: events.handler } })
+		const run = agent.stream()
+		const chunks = await collect(run.events)
+		expect(await run.result).toEqual({ content: 'done', partial: false })
+		expect(calls[0]?.id).toBe(calls[1]?.id)
+		const results = [
+			{ success: true, id: 'c1', name: 'alpha', value: 'alpha result' },
+			{ success: true, id: 'c1', name: 'beta', value: 'beta result' },
+		]
+		expect(
+			chunks.filter((chunk) => chunk.category === 'tool').map((chunk) => chunk.result),
+		).toEqual(results)
+		expect(events.calls).toEqual([
+			[calls[0], results[0]],
+			[calls[1], results[1]],
+		])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual(['alpha result', 'beta result'])
+	})
+
+	it.each([
+		undefined,
+		new Scope({ name: 'unrestricted' }),
+		new Scope({ name: 'listed', tools: ['alpha', 'missing'] }),
+	])('sends an admitted unknown name through authority to the registry (%#)', async (scope) => {
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'alpha', execute: () => 'alpha' }))
+		const call = createToolCall({ name: 'missing' })
+		const evaluated = createRecorder<[call: ToolCall]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [call] }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			...(scope === undefined ? {} : { scope }),
+			authority: createAuthority({
+				rules: [
+					{
+						zone: 'test',
+						match: ({ call: requested }) => {
+							evaluated.handler(requested)
+							return true
+						},
+					},
+				],
+			}),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(evaluated.calls).toEqual([[call]])
+		expect(denied.count).toBe(0)
+		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['alpha'])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual(['tool not found: missing'])
+	})
+
+	it('snapshots the scope before a usage listener narrows it for the next turn', async () => {
+		const executed = createRecorder<[]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		const calls = [createToolCall({ id: 'save', name: 'save' })]
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: calls, usage: USAGE },
+				{ content: 'answer', tools: [createToolCall({ id: 'dropped', name: 'save' })] },
+			],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			limit: 2,
+			scope: new Scope({ name: 'save', tools: ['save'] }),
+			on: { deny: denied.handler },
+		})
+		agent.emitter.on('usage', () => agent.context.apply(new Scope({ name: 'answer', tools: [] })))
+		tools.add([
+			createTool({
+				name: 'save',
+				execute: () => {
+					expect(agent.context.scope?.tools).toEqual([])
+					executed.handler()
+					return 'saved'
+				},
+			}),
+		])
+		expect(await agent.generate()).toEqual({ content: 'answer', partial: false, usage: USAGE })
+		expect(executed.count).toBe(1)
+		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['save'])
+		expect(provider.calls[1]?.tools).toBeUndefined()
+		expect(denied.calls).toEqual([
+			[expect.objectContaining({ id: 'dropped' }), 'no tool is advertised in the active scope'],
+		])
+		expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
+	})
+
+	it('checks scope before authority and keeps authority denials for admitted calls', async () => {
+		const evaluated = createRecorder<[name: string]>()
+		const executed = createRecorder<[]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add(['safe', 'secret'].map((name) => createTool({ name, execute: executed.handler })))
+		const calls = [
+			createToolCall({ id: 'secret', name: 'secret' }),
+			createToolCall({ id: 'safe', name: 'safe' }),
+		]
+		const provider = createScriptedProvider(
+			[{ content: '', tools: calls }, { content: 'done' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
+			authority: {
+				evaluate: ({ call }) => {
+					evaluated.handler(call.name)
+					return { allowed: false, zone: 'test', reason: 'policy refusal' }
+				},
+			},
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(evaluated.calls).toEqual([['safe']])
+		expect(executed.count).toBe(0)
+		expect(denied.calls).toEqual([
+			[calls[0], 'secret is not in the active scope'],
+			[calls[1], 'policy refusal'],
+		])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual(['denied: secret is not in the active scope', 'denied: policy refusal'])
 	})
 })
 
