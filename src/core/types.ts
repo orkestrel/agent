@@ -802,9 +802,10 @@ export interface AgentContextInterface {
 	 *   per-item level): unset at both levels ⇒ `undefined` ⇒ no closing line. Paired with
 	 *   `open`, it lets a level wrap the group (`open: '<instructions>'` … `close: '</instructions>'`).
 	 *
-	 * Passing no `format` leaves the provider-default level empty, so each section renders as its
-	 * built-in header and items with no closing line. Scope filtering runs before formatting, and
-	 * the workspace image data attaches to the last user message.
+	 * Passing no `format` leaves the provider-default level empty, so a section with no
+	 * manager-options or item override renders as its built-in header and items with no closing
+	 * line. Scope filtering runs before formatting, and the workspace image data attaches to the
+	 * last user message.
 	 *
 	 * @param format - The provider's optional {@link ContextFormat} default
 	 *   (typically `provider.format`); omitted ⇒ only the manager-options, item, and built-in

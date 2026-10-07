@@ -381,7 +381,8 @@ export class Agent implements AgentInterface {
 		// summarizable; the default conversation has no summarizer, so the auto path never throws the
 		// `compact()` SUMMARIZER error. Gating the run-entry `clear()` and the pre-first-turn `#trim`
 		// behind this flag leaves no `await` before the first provider request when compaction is off,
-		// so an abort fired synchronously after `stream()` lands before that request.
+		// so `stream()` calls `provider.stream` before it returns and a later abort reaches the provider
+		// through the run signal.
 		// When enabled: reset `#window` at run entry so no stale `consumed` carries across runs / a
 		// conversation switch, then run a pre-first-turn `#trim` so a resumed / long conversation whose
 		// initial prompt already exceeds the window compacts at once (not only after a tool turn) —

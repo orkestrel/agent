@@ -214,8 +214,7 @@ export function estimateMessages(messages: readonly Message[]): number {
 			// `JSON.stringify` over `ToolCall.arguments` can throw (a circular reference) even
 			// though this function promises never to throw — so the serialization is wrapped; a
 			// throw falls back to a conservative fixed contribution (the same per-message overhead
-			// scale) instead of an unreachable serialized-length estimate. The happy path (no
-			// throw) equals the bare estimate below.
+			// scale) instead of an unreachable serialized-length estimate.
 			try {
 				calls = estimateTokens(JSON.stringify(message.calls))
 			} catch {
