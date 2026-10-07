@@ -1,4 +1,5 @@
 import type { ContractShape } from '@orkestrel/contract'
+import { MESSAGE_ROLES } from './constants.js'
 import {
 	arrayShape,
 	jsonShape,
@@ -32,7 +33,7 @@ export const toolCallShape = objectShape({
  */
 export const messageShape = objectShape({
 	id: stringShape(),
-	role: literalShape(['system', 'user', 'assistant', 'tool']),
+	role: literalShape(MESSAGE_ROLES),
 	content: stringShape(),
 	calls: optionalShape(arrayShape(toolCallShape)),
 	call: optionalShape(stringShape()),

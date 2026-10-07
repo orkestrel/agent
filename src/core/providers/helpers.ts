@@ -42,6 +42,31 @@ export function buildProviderResult(
 }
 
 /**
+ * Cancels a stream reader and releases its lock, swallowing a cancellation failure so the
+ * caller's own outcome stands.
+ *
+ * @param reader - The reader to cancel and release
+ * @returns A promise that settles after the lock is released
+ *
+ * @example
+ * ```ts
+ * const reader = new Response('answer').body!.getReader()
+ * await releaseReader(reader)
+ * ```
+ */
+export async function releaseReader(
+	reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<void> {
+	try {
+		await reader.cancel()
+	} catch {
+		// Preserve the caller's outcome when the source refuses cancellation.
+	} finally {
+		reader.releaseLock()
+	}
+}
+
+/**
  * Reads a UTF-8 prefix of a byte stream and cancels its remainder.
  *
  * @remarks
@@ -103,13 +128,7 @@ export async function readText(
 		return { text: text + decoder.decode(), complete }
 	} finally {
 		cleanup.abort()
-		try {
-			await reader.cancel()
-		} catch {
-			// Preserve the read outcome when cancellation fails.
-		} finally {
-			reader.releaseLock()
-		}
+		await releaseReader(reader)
 	}
 }
 
@@ -159,13 +178,7 @@ export async function* readChunks(
 		if (tail.length > 0) yield tail
 	} finally {
 		cleanup.abort()
-		try {
-			await reader.cancel()
-		} catch {
-			// Preserve the primary outcome when the source refuses cancellation.
-		} finally {
-			reader.releaseLock()
-		}
+		await releaseReader(reader)
 	}
 }
 

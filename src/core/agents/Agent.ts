@@ -28,7 +28,7 @@ import { AgentContext } from '../contexts/index.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError } from './errors.js'
 import { Channel } from './Channel.js'
-import { assembleResult, denyCall, estimateTokens } from './helpers.js'
+import { assembleResult, chargeUsage, denyCall, estimateTokens } from './helpers.js'
 import { filterAllowList, joinThinking, sanitizeUsage, sumUsage } from '../helpers.js'
 import { isProviderAbortError } from '../providers/index.js'
 
@@ -475,11 +475,7 @@ export class Agent implements AgentInterface {
 							// non-finite or negative field floors to `0`, a fractional field floors to its
 							// integer part. The normal post-turn usage path is untouched.
 							const abortUsage = sanitizeUsage(error.partial.usage)
-							budget?.consume({
-								prompt: abortUsage.prompt,
-								completion: Math.max(0, abortUsage.completion - charged),
-								total: Math.max(0, abortUsage.total - charged),
-							})
+							chargeUsage(budget, abortUsage, charged)
 							usage = sumUsage(usage, abortUsage)
 						}
 					}
@@ -506,11 +502,7 @@ export class Agent implements AgentInterface {
 				// exists), so it is charged here in full. `sumUsage` / the emitted `usage` chunk below
 				// still carry the full sanitized `resultUsage` — reconciliation affects only the
 				// budget charge, never the reported usage.
-				budget?.consume({
-					prompt: resultUsage.prompt,
-					completion: Math.max(0, resultUsage.completion - charged),
-					total: Math.max(0, resultUsage.total - charged),
-				})
+				chargeUsage(budget, resultUsage, charged)
 				usage = sumUsage(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
 				this.#emitter.emit('usage', resultUsage)

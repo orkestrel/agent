@@ -8,6 +8,7 @@ import type {
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { removeEntries } from '../../helpers.js'
 import { Scope } from './Scope.js'
 
 /**
@@ -80,13 +81,8 @@ export class ScopeManager implements ScopeManagerInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			// True only when every supplied id was present and removed, so a caller can tell a
-			// fully applied batch from a partly applied one. Each present id still emits.
-			let removed = true
-			for (const id of ids) {
-				if (!this.#delete(id)) removed = false
-			}
-			return removed
+			// Each present id still emits.
+			return removeEntries(ids, (id) => this.#delete(id))
 		}
 		return this.#delete(ids)
 	}

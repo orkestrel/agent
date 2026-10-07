@@ -192,21 +192,11 @@ export abstract class AgentProvider<
 			combined.throwIfAborted()
 			if (this.#strict)
 				throw new ProviderError('PROTOCOL', 'provider error: missing settled result')
-			return buildProviderResult(
-				splitter?.content ?? state.content,
-				joinThinking(splitter?.thinking, state.thinking),
-				state.tools,
-				state.usage,
-			)
+			return this.#assemble(splitter, state)
 		} catch (error) {
 			if (combined.aborted) {
 				splitter?.flush()
-				const partial = buildProviderResult(
-					splitter?.content ?? state.content,
-					joinThinking(splitter?.thinking, state.thinking),
-					state.tools,
-					state.usage,
-				)
+				const partial = this.#assemble(splitter, state)
 				// A throw that raced the cancel is the call's real failure, so it rides as the cause.
 				throw new ProviderAbortError(
 					partial,
@@ -221,6 +211,19 @@ export abstract class AgentProvider<
 				timeout.clear()
 			}
 		}
+	}
+
+	// Assemble the result from the splitter's separated text when present, else the folded state.
+	#assemble(
+		splitter: ThinkSplitterInterface | undefined,
+		state: ProviderIncrement,
+	): ProviderResult {
+		return buildProviderResult(
+			splitter?.content ?? state.content,
+			joinThinking(splitter?.thinking, state.thinking),
+			state.tools,
+			state.usage,
+		)
 	}
 
 	// Fold every record before exposing deltas, so resumed cancellation retains its contribution.

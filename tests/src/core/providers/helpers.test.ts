@@ -10,6 +10,7 @@ import {
 	questionToSystemOne,
 	isJudgeError,
 	readHeaders,
+	releaseReader,
 	readText,
 	readChunks,
 } from '@src/core'
@@ -627,5 +628,29 @@ describe('System One helpers', () => {
 			completion: 0,
 			total: 0.5,
 		})
+	})
+})
+
+describe('releaseReader — the cancel-and-release sequence', () => {
+	it('cancels the source and frees the lock', async () => {
+		let cancelled = false
+		const stream = new ReadableStream<Uint8Array>({
+			cancel: () => {
+				cancelled = true
+			},
+		})
+		await releaseReader(stream.getReader())
+		expect(cancelled).toBe(true)
+		expect(stream.locked).toBe(false)
+	})
+
+	it('frees the lock and resolves when the source refuses cancellation', async () => {
+		const stream = new ReadableStream<Uint8Array>({
+			cancel: () => {
+				throw new Error('refused')
+			},
+		})
+		await releaseReader(stream.getReader())
+		expect(stream.locked).toBe(false)
 	})
 })

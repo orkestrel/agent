@@ -15,6 +15,7 @@ import { Emitter } from '@orkestrel/emitter'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
 import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
+import { removeEntries } from '../helpers.js'
 
 /**
  * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat
@@ -157,13 +158,7 @@ export class Conversation implements ConversationInterface {
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			// True only when every supplied id was present and removed, so a caller can tell a
-			// fully applied batch from a partly applied one.
-			let removed = true
-			for (const id of ids) {
-				if (!this.#messages.delete(id)) removed = false
-			}
-			return removed
+			return removeEntries(ids, (id) => this.#messages.delete(id))
 		}
 		return this.#messages.delete(ids)
 	}
@@ -232,15 +227,13 @@ export class Conversation implements ConversationInterface {
 				// (unmerged) sections so it is never left stale, then the error propagates
 				// (manual `compact()` always surfaces a summarizer failure to its caller; the
 				// next successful `compact()` self-heals the over-cap count).
-				this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
-				this.#emitter.emit('summary', this.#summary)
+				await this.#regenerate(summarize)
 				throw error
 			}
 		}
 		// 4. Regenerate the rollup — a summary-of-summaries over all (now-capped) sections
 		// — then observe it, after the mutation, through the guarded path.
-		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
-		this.#emitter.emit('summary', this.#summary)
+		await this.#regenerate(summarize)
 		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
 		this.#emitter.emit('compact', section)
 		return section
@@ -299,6 +292,13 @@ export class Conversation implements ConversationInterface {
 			sections: this.sections,
 			messages: this.messages(),
 		}
+	}
+
+	// Regenerate the rollup over every section summary, then observe it. The summarizer is a
+	// parameter because the caller has already narrowed the optional field.
+	async #regenerate(summarize: ConversationSummaryHandler): Promise<void> {
+		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
+		this.#emitter.emit('summary', this.#summary)
 	}
 
 	// Mint an immutable live-tail message from one input — a fresh UUID id plus the input's

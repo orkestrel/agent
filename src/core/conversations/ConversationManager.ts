@@ -9,6 +9,7 @@ import type {
 import { isArray } from '@orkestrel/contract'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { Conversation } from './Conversation.js'
+import { removeEntries } from '../helpers.js'
 
 /**
  * Registers {@link Conversation}s keyed by `id`, in insertion order, with an active pointer —
@@ -150,14 +151,8 @@ export class ConversationManager implements ConversationManagerInterface {
 	remove(id: string): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
-			// True only when every supplied id was present and removed, so a caller can tell a
-			// fully applied batch from a partly applied one. Each present id still clears `active`
-			// when it was the active conversation.
-			let removed = true
-			for (const id of ids) {
-				if (!this.#drop(id)) removed = false
-			}
-			return removed
+			// Each present id still clears `active` when it was the active conversation.
+			return removeEntries(ids, (id) => this.#drop(id))
 		}
 		return this.#drop(ids)
 	}

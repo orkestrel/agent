@@ -9,6 +9,7 @@ import type {
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { removeEntries } from '../../helpers.js'
 import { Instruction } from './Instruction.js'
 
 /**
@@ -106,13 +107,8 @@ export class InstructionManager implements InstructionManagerInterface {
 	remove(names: readonly string[]): boolean
 	remove(names: string | readonly string[]): boolean {
 		if (isArray(names)) {
-			// True only when every supplied name was present and removed, so a caller can tell a
-			// fully applied batch from a partly applied one. Each present name still emits.
-			let removed = true
-			for (const name of names) {
-				if (!this.#delete(name)) removed = false
-			}
-			return removed
+			// Each present name still emits.
+			return removeEntries(names, (name) => this.#delete(name))
 		}
 		return this.#delete(names)
 	}

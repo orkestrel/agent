@@ -2,6 +2,7 @@ import type { AgentResult, Message } from '@src/core'
 import {
 	agentResultToJSON,
 	assembleResult,
+	chargeUsage,
 	createAgentRegistry,
 	denyCall,
 	estimateMessages,
@@ -11,6 +12,7 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 	settleAgentJob,
 } from '@src/core'
+import { createBudget } from '@orkestrel/budget'
 import { describe, expect, it } from 'vitest'
 import { createScriptedProvider, createToolCall, createTokenUsage } from '../../../setup.js'
 
@@ -454,5 +456,27 @@ describe('denyCall — the synthesized denial result', () => {
 			name: 'drop',
 			error: 'denied by authority',
 		})
+	})
+})
+
+describe('chargeUsage — the residual budget charge', () => {
+	const consumer = (usage: { readonly total: number }): number => usage.total
+
+	it('consumes the full prompt and only the residual over what was charged', () => {
+		const budget = createBudget({ max: 1000, consumer })
+		const charged = chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10)
+		expect(budget.consumed).toBe(40)
+		expect(charged).toBe(30)
+	})
+
+	it('floors the residual at 0 when the estimate already exceeds the report', () => {
+		const budget = createBudget({ max: 1000, consumer })
+		const charged = chargeUsage(budget, { prompt: 5, completion: 3, total: 8 }, 12)
+		expect(budget.consumed).toBe(0)
+		expect(charged).toBe(12)
+	})
+
+	it('returns the charged total without a budget', () => {
+		expect(chargeUsage(undefined, { prompt: 1, completion: 4, total: 5 }, 2)).toBe(4)
 	})
 })

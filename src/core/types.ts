@@ -1,9 +1,10 @@
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONRecord, JSONValue } from '@orkestrel/contract'
 import type { ToolCall } from '@orkestrel/tool'
+import type { MESSAGE_ROLES } from './constants.js'
 
 /** Names the role a {@link Message} plays in a conversation turn. */
-export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
+export type MessageRole = (typeof MESSAGE_ROLES)[number]
 
 /**
  * Represents one conversation turn fed to a {@link ProviderInterface} — a stored, identified

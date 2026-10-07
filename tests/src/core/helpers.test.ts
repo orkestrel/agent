@@ -1,4 +1,12 @@
-import { filterAllowList, joinThinking, sanitizeToken, sanitizeUsage, sumUsage } from '@src/core'
+import {
+	filterAllowList,
+	joinThinking,
+	MESSAGE_ROLES,
+	removeEntries,
+	sanitizeToken,
+	sanitizeUsage,
+	sumUsage,
+} from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createToolCall, createTokenUsage } from '../../setup.js'
 
@@ -161,5 +169,31 @@ describe('sumUsage — the running token total across a turn', () => {
 		sumUsage(running, next)
 		expect(running).toEqual({ prompt: 2, completion: 1, total: 3 })
 		expect(next).toEqual({ prompt: 1, completion: 1, total: 2 })
+	})
+})
+
+describe('removeEntries — the folded batch removal', () => {
+	it('returns true only when every key was present, and visits every key regardless', () => {
+		const stored = new Set(['a', 'b'])
+		const visited: string[] = []
+		const remove = (key: string): boolean => {
+			visited.push(key)
+			return stored.delete(key)
+		}
+		expect(removeEntries(['a', 'missing', 'b'], remove)).toBe(false)
+		expect(visited).toEqual(['a', 'missing', 'b'])
+		expect(stored.size).toBe(0)
+	})
+
+	it('returns true for a fully applied batch and for an empty batch', () => {
+		const stored = new Set(['a', 'b'])
+		expect(removeEntries(['a', 'b'], (key) => stored.delete(key))).toBe(true)
+		expect(removeEntries([], () => false)).toBe(true)
+	})
+})
+
+describe('MESSAGE_ROLES — the one role list', () => {
+	it('lists the four roles in wire order', () => {
+		expect(MESSAGE_ROLES).toEqual(['system', 'user', 'assistant', 'tool'])
 	})
 })

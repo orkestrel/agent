@@ -133,3 +133,31 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
 		total: running.total + next.total,
 	}
 }
+
+/**
+ * Removes each key through a single-key remover and folds the outcomes, so a batch `remove`
+ * reports whether the whole batch applied.
+ *
+ * @remarks
+ * Every key is passed to `remove` even after one is missing, so a present key still takes
+ * effect (and emits) when an earlier key was absent.
+ *
+ * @typeParam K - The key type the remover accepts
+ * @param keys - The keys to remove, in order
+ * @param remove - Removes one key and returns whether it was present
+ * @returns True if every key was present and removed; false otherwise (an empty list returns true)
+ *
+ * @example
+ * ```ts
+ * const stored = new Set(['a', 'b'])
+ * removeEntries(['a', 'b'], (key) => stored.delete(key)) // true
+ * removeEntries(['a', 'c'], (key) => stored.delete(key)) // false
+ * ```
+ */
+export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean): boolean {
+	let removed = true
+	for (const key of keys) {
+		if (!remove(key)) removed = false
+	}
+	return removed
+}

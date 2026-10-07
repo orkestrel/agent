@@ -1,4 +1,5 @@
 import type { JudgeEntry, JudgeQuestion, Message } from './types.js'
+import { MESSAGE_ROLES } from './constants.js'
 import {
 	arrayOf,
 	attempt,
@@ -34,8 +35,7 @@ export function isMessage(value: unknown): value is Message {
 		if (!isRecord(value)) return false
 		const { id, role, content, calls, call, images } = value
 		if (!isString(id) || !isString(content)) return false
-		if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool')
-			return false
+		if (!MESSAGE_ROLES.some((one) => one === role)) return false
 		if (calls !== undefined && !arrayOf(isToolCall)(calls)) return false
 		if (call !== undefined && !isString(call)) return false
 		return images === undefined || arrayOf(isString)(images)
