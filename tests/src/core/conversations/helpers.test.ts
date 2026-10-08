@@ -15,24 +15,11 @@ import {
 } from '../../../setup.js'
 
 describe('judgment helpers', () => {
-	it('matches a question by JSON structure and ignores record time', () => {
+	it('matches the shared record and ignores its time', () => {
 		expect(
 			matchesJudgment(
 				JUDGMENT_RECORD,
 				JUDGMENT_QUESTION,
-				JUDGMENT_INPUT.sources,
-				JUDGMENT_INPUT.state,
-				JUDGMENT_INPUT.model,
-			),
-		).toBe(true)
-		expect(
-			matchesJudgment(
-				JUDGMENT_RECORD,
-				{
-					form: 'noul',
-					criteria: { false: 'Charged once', true: 'Charged twice' },
-					instructions: 'Is a refund owed?',
-				},
 				JUDGMENT_INPUT.sources,
 				JUDGMENT_INPUT.state,
 				JUDGMENT_INPUT.model,
@@ -61,10 +48,11 @@ describe('judgment helpers', () => {
 				},
 				JUDGMENT_INPUT.sources,
 				JUDGMENT_INPUT.state,
+				JUDGMENT_INPUT.model,
 			),
 		).toEqual([{ ...JUDGMENT_INPUT, usage: JUDGMENT_USAGE }])
 	})
-	it('keeps request order, includes refusals, omits unanswered keys and batch usage', () => {
+	it('keeps request order, includes refusals, carries the configured identity, omits unanswered keys and batch usage', () => {
 		expect(
 			buildJudgments(
 				{
@@ -83,14 +71,15 @@ describe('judgment helpers', () => {
 				},
 				JUDGMENT_INPUT.sources,
 				'state',
+				'configured',
 			),
 		).toEqual([
-			{ ...JUDGMENT_INPUT, model: 'reported', state: 'state' },
+			{ ...JUDGMENT_INPUT, model: 'configured', state: 'state' },
 			{
 				id: 'refused',
 				question: JUDGMENT_QUESTION,
 				refusal: { missing: ['true'] },
-				model: 'reported',
+				model: 'configured',
 				sources: JUDGMENT_INPUT.sources,
 				state: 'state',
 			},

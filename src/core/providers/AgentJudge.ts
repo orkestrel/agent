@@ -3,8 +3,10 @@ import type { JudgeQuestion, JudgeRequest, JudgeResult } from '../types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'
-import { JudgeAbortError, JudgeError } from './errors.js'
-import { buildJudgeResult, copyJSON, readHeaders, readText } from './helpers.js'
+import { JudgeError } from './errors.js'
+import { JudgeAbortError } from '../errors.js'
+import { buildJudgeResult, readHeaders, readText } from './helpers.js'
+import { copyJSON } from '../helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**

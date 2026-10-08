@@ -494,9 +494,9 @@ await new GuideCommand({
 			thread.remove(message.id)
 			thread.clear()
 
-			// `summary?` is optional and absent until the first compaction, so an uncompacted
-			// conversation's snapshot carries its messages and judgments and omits the summary.
-			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages', 'judgments'])
+			// `summary?` and `judgments?` are absent until the first compaction and the first judgment, so
+			// an uncompacted, unjudged conversation's snapshot carries `id` / `sections` / `messages` alone.
+			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages'])
 		})
 
 		it('answers the conversation-store fence with real memory and database stores', async () => {
@@ -529,7 +529,7 @@ await new GuideCommand({
 
 		it('carries the snapshot fence line the transcription copies', () => {
 			expect(guideText).toContain(
-				'thread.snapshot() // { id, summary?, sections, messages } — the durable payload',
+				'thread.snapshot() // { id, summary?, sections, messages, judgments? } — the durable payload',
 			)
 		})
 

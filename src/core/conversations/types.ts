@@ -444,7 +444,7 @@ export interface ConversationInterface {
 	 * `summarize` / `keep` are configuration re-supplied on hydrate rather than serialized.
 	 *
 	 * @remarks
-	 * The container serializes itself (`{ id, summary, sections, messages: this.messages() }`) — the
+	 * The container serializes itself (`{ id, summary?, sections, messages, judgments? }`) — the
 	 * {@link ConversationStoreInterface} persistence seam's payload, the exact analogue of
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface}'s `snapshot`. The summarizer /
 	 * `keep` are not serialized — they are live
@@ -454,7 +454,8 @@ export interface ConversationInterface {
 	 * Pure — the sections + messages are already plain immutable records (so the snapshot
 	 * `structuredClone`s / JSON-round-trips losslessly), and snapshotting mutates nothing.
 	 *
-	 * @returns The {@link ConversationSnapshot} (`{ id, summary?, sections, messages }`)
+	 * @returns The {@link ConversationSnapshot} (`{ id, summary?, sections, messages, judgments? }`), the
+	 * judgments present only when the store holds one
 	 */
 	snapshot(): ConversationSnapshot
 }

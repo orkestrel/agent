@@ -5,6 +5,7 @@ import type {
 	AgentProviderInput,
 	ChoiceAnswer,
 	JudgeAnswer,
+	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
 	Judgment,
@@ -120,6 +121,7 @@ export const JUDGMENT_USAGE: TokenUsage = Object.freeze({ prompt: 975, completio
 export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = Object.freeze([
 	['source', { ...JUDGMENT_RECORD, sources: ['message-c', 'message-b'] }],
 	['source order', { ...JUDGMENT_RECORD, sources: ['message-b', 'message-a'] }],
+	['source count', { ...JUDGMENT_RECORD, sources: ['message-a'] }],
 	[
 		'text',
 		{ ...JUDGMENT_RECORD, question: { ...JUDGMENT_QUESTION, instructions: 'Was payment valid?' } },
@@ -136,13 +138,24 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 		},
 	],
 	[
+		'criteria order',
+		{
+			...JUDGMENT_RECORD,
+			question: {
+				form: 'noul',
+				instructions: 'Is a refund owed?',
+				criteria: { false: 'Charged once', true: 'Charged twice' },
+			},
+		},
+	],
+	[
 		'form',
 		{
 			...JUDGMENT_RECORD,
 			question: {
-				form: 'score',
+				form: 'choice',
 				instructions: 'Is a refund owed?',
-				criteria: ['Charged once', 'Charged twice'],
+				criteria: { true: 'Charged twice', false: 'Charged once' },
 			},
 		},
 	],
@@ -155,6 +168,19 @@ export class SequentialSystemOneJudge extends AgentJudge {
 	readonly name = 'systemone'
 	readonly body = SystemOneJudge.prototype.body
 	readonly read = SystemOneJudge.prototype.read
+}
+
+/** Records each request a resolver hands it and answers nothing, so a pre-ask check is observable. */
+export class RecordingJudge implements JudgeInterface {
+	readonly id = 'recording'
+	readonly name = 'recording'
+	readonly model = 'recording-model'
+	readonly requests: JudgeRequest[] = []
+
+	ask(request: JudgeRequest): Promise<JudgeResult> {
+		this.requests.push(request)
+		return Promise.resolve({ model: this.model, answers: {} })
+	}
 }
 
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────

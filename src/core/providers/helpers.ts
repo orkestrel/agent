@@ -10,7 +10,7 @@ import type { JudgeAnswer, JudgeQuestion, JudgeResult, Reading, Refusal } from '
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall } from '@orkestrel/tool'
 import { isTokenUsage } from '@orkestrel/budget'
-import { attempt, boundsOf, isArray, isNumber, parseJSON } from '@orkestrel/contract'
+import { attempt, boundsOf, isArray, isNumber } from '@orkestrel/contract'
 import { JudgeError } from './errors.js'
 import { sanitizeUsage, sumUsage } from '../helpers.js'
 
@@ -336,28 +336,6 @@ export async function readHeaders(
 	} finally {
 		cleanup.abort()
 	}
-}
-
-/**
- * Owns a value by serializing it to JSON and parsing the text, so the copy shares nothing with its source.
- *
- * @remarks
- * A value that JSON cannot carry, such as a cycle or a bigint, and a value that serializes to
- * nothing, such as a function, both return undefined, so a guard over the result refuses them.
- * A proxied value serializes through its traps, where a structured clone refuses it.
- *
- * @param value - The value to own
- * @returns The owned JSON copy, or undefined when the value is not JSON
- * @example
- * ```ts
- * copyJSON({ state: 'A ticket.' }) // { state: 'A ticket.' }
- * copyJSON(() => 1) // undefined
- * ```
- */
-export function copyJSON(value: unknown): unknown {
-	const text = attempt(() => JSON.stringify(value))
-	if (!text.success || typeof text.value !== 'string') return undefined
-	return parseJSON(text.value)
 }
 
 /**

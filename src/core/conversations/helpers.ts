@@ -1,6 +1,5 @@
 import type { Judgment, JudgmentInput, Section } from './types.js'
 import type { JudgeQuestion, JudgeRequest, JudgeResult, Message } from '../types.js'
-import { canonicalStringify } from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 
 /**
@@ -10,10 +9,11 @@ import { CONVERSATION_RECAP_PREFIX } from './constants.js'
  * @param result - The reported answers, refusals, model, and usage
  * @param sources - The ordered source message ids
  * @param state - The rendered state read by the judge
+ * @param model - The configured judge identity the records carry
  * @returns Inputs for completed question keys in request order
  * @example
  * ```ts
- * buildJudgments(request, result, ['message-a'], 'Charged twice')
+ * buildJudgments(request, result, ['message-a'], 'Charged twice', judge.model)
  * ```
  */
 export function buildJudgments(
@@ -21,6 +21,7 @@ export function buildJudgments(
 	result: JudgeResult,
 	sources: readonly string[],
 	state: string,
+	model: string,
 ): readonly JudgmentInput[] {
 	const judgments: JudgmentInput[] = []
 	const single = Object.keys(request.questions).length === 1
@@ -34,7 +35,7 @@ export function buildJudgments(
 		judgments.push({
 			id,
 			question,
-			model: result.model,
+			model,
 			sources,
 			state,
 			...(answer !== undefined ? { answer } : refusal !== undefined ? { refusal } : {}),
@@ -45,7 +46,7 @@ export function buildJudgments(
 }
 
 /**
- * Matches a recorded question, ordered sources, rendered state, and model identity by JSON value.
+ * Matches a recorded question, ordered sources, rendered state, and judge identity by JSON text, so key order counts.
  *
  * @param judgment - The recorded judgment to compare
  * @param question - The question to ask
@@ -71,9 +72,8 @@ export function matchesJudgment(
 		judgment.sources.length === sources.length &&
 		judgment.sources.every((id, index) => id === sources[index]) &&
 		judgment.question.form === question.form &&
-		canonicalStringify(judgment.question.instructions) ===
-			canonicalStringify(question.instructions) &&
-		canonicalStringify(judgment.question.criteria) === canonicalStringify(question.criteria)
+		JSON.stringify(judgment.question.instructions) === JSON.stringify(question.instructions) &&
+		JSON.stringify(judgment.question.criteria) === JSON.stringify(question.criteria)
 	)
 }
 

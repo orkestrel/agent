@@ -1,3 +1,4 @@
+import type { Judgment, JudgeRequest } from '@src/core'
 import {
 	createConversation,
 	createSystemOneJudge,
@@ -12,6 +13,7 @@ import {
 	JUDGMENT_RECORD,
 	JUDGMENT_USAGE,
 	RecordedTransport,
+	RecordingJudge,
 	SequentialSystemOneJudge,
 	SYSTEM_ONE_JUDGE_REQUEST,
 	SYSTEM_ONE_JUDGE_OBJECT,
@@ -195,18 +197,50 @@ describe('JudgmentManager', () => {
 	})
 
 	it('checks cancellation before asking and leaves the store unchanged', async () => {
+		// The recording judge answers an aborted signal like any other, so a request it never
+		// received proves the manager's own check, not the engine's.
+		const judge = new RecordingJudge()
+		const manager = new JudgmentManager()
+		await expect(
+			manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], AbortSignal.abort()),
+		).rejects.toBeInstanceOf(JudgeAbortError)
+		expect(judge.requests).toHaveLength(0)
+		expect(manager.count).toBe(0)
+	})
+
+	it('owns a proxied request through JSON before comparing or asking', async () => {
 		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
 		const judge = createSystemOneJudge({
 			url: 'http://judge.test',
 			model: 'tev1:0.8b',
 			fetch: transport.fetch,
 		})
+		const proxied: JudgeRequest = new Proxy(
+			{
+				state: SYSTEM_ONE_JUDGE_REQUEST.state,
+				questions: new Proxy(SYSTEM_ONE_JUDGE_REQUEST.questions, {}),
+			},
+			{},
+		)
+		expect(() => structuredClone(proxied)).toThrow(DOMException)
 		const manager = new JudgmentManager()
-		await expect(
-			manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], AbortSignal.abort()),
-		).rejects.toBeInstanceOf(JudgeAbortError)
-		expect(transport.requests).toHaveLength(0)
-		expect(manager.count).toBe(0)
+		const records = await manager.resolve(judge, proxied, [], new AbortController().signal)
+		expect(records.map((record) => record.id)).toEqual(['label', 'refund', 'severity'])
+		expect(transport.requests).toHaveLength(1)
+	})
+
+	it('refuses a record or input that JSON cannot carry with the JUDGMENT code', () => {
+		const hostile: Judgment = new Proxy(JUDGMENT_RECORD, {
+			get() {
+				throw new Error('hostile')
+			},
+		})
+		expect(() => new JudgmentManager([hostile])).toThrow(
+			expect.objectContaining({ name: 'ConversationError', code: 'JUDGMENT' }),
+		)
+		expect(() => new JudgmentManager().add(hostile)).toThrow(
+			expect.objectContaining({ name: 'ConversationError', code: 'JUDGMENT' }),
+		)
 	})
 
 	it('creates an independent manager per conversation and restores snapshot records', () => {
@@ -215,6 +249,7 @@ describe('JudgmentManager', () => {
 		})
 		expect(conversation.snapshot().judgments).toEqual([JUDGMENT_RECORD])
 		expect(createConversation().judgments.count).toBe(0)
+		expect(createConversation().snapshot()).not.toHaveProperty('judgments')
 		const restored = createConversation({ snapshot: conversation.snapshot() })
 		expect(restored.judgments.judgments()).toEqual([JUDGMENT_RECORD])
 		conversation.judgments.clear()

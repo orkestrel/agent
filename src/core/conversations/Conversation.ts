@@ -299,7 +299,7 @@ export class Conversation implements ConversationInterface {
 			...(this.#summary === undefined ? {} : { summary: this.#summary }),
 			sections: this.sections,
 			messages: this.messages(),
-			judgments: this.#judgments.judgments(),
+			...(this.#judgments.count === 0 ? {} : { judgments: this.#judgments.judgments() }),
 		}
 	}
 
