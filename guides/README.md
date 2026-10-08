@@ -15,10 +15,11 @@ the browser end and the server end of the relay hop the `createRelay` function m
 
 The `providers`, `conversations`, `contexts`, and `agents` modules under `src/core` are one layer
 concept, the conversation runtime, so `agent.md` is the one guide over all four. The root files of
-`src/core` hold the message shape and the judge value types the four modules share. The guide
-covers them together because one barrel, `src/core/index.ts`, publishes them with an export set the
-module split leaves unchanged; the scaffold guide set maps several directories to one guide the
-same way for `scaffold.md`.
+`src/core` hold the declarations two or more of those modules import — the `Message` and
+`MessageInput` types, `filterAllowList`, `joinThinking`, `sanitizeUsage`, and `sumUsage` — beside
+the message wire shape, `isMessage`, and the judge value types. One barrel, `src/core/index.ts`,
+publishes the root and the four modules. The `@orkestrel/scaffold` guide index maps `src/core`,
+`src/server`, and `src/bin` to one `scaffold.md` the same way.
 
 ## By directory
 

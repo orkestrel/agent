@@ -3,7 +3,7 @@ import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { buildConversationSnapshot, TOOL_SNAPSHOT } from '../../../setup.js'
 
-// The core read-boundary guards — `isMessage`, `isSection`, and `isConversationSnapshot`. Each is
+// The conversation read-boundary guards — `isSection` and `isConversationSnapshot`. Each is
 // TOTAL: adversarial input returns `false` and never throws, so an untrusted storage read narrows
 // through a guard rather than an assertion. Real data throughout — `buildConversationSnapshot`
 // produces a genuine compacted conversation, no mocks.

@@ -1,4 +1,10 @@
-import type { AgentJobInput, ProviderDelta, ProviderInterface, ProviderResult } from '@src/core'
+import type {
+	AgentJobInput,
+	AgentResult,
+	ProviderDelta,
+	ProviderInterface,
+	ProviderResult,
+} from '@src/core'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
@@ -9,6 +15,7 @@ import {
 	createChannel,
 	createInstructionManager,
 	createScope,
+	AgentJobError,
 	isAgentJobError,
 	ProviderAbortError,
 } from '@src/core'
@@ -30,55 +37,11 @@ import {
 } from '../../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
-// -- Agent JOBS: createAgentRegistry / createAgentQueue / createAgentRunner ----
-//
-// The durable, bounded-concurrency agent-job layer COMPOSED over the workers Queue /
-// Runner substrate (no new concurrency engine). A serializable AgentJobInput is
-// rehydrated through the registry into a live Agent; a partial result is a configurable
-// failure (throws by default so retries / fail-fast engage, `partial` opts out);
-// cancellation threads through. All Ollama-free with the scripted provider — the LIVE
-// batch + sub-agent spawn run in the src:ollama project.
-
-// A reusable token-charging usage so a tiny `budget` ceiling can deterministically
-// commit a partial (completion 7 — `createTokenBudget`'s default scope). The completion
-// matches the shared default; the prompt/total differ, so it stays a named local built
-// off `createTokenUsage` with overrides (a specific budget-scenario value, not the shape).
-const JOB_USAGE = createTokenUsage({ prompt: 3, total: 10 })
-
-// A job that loops a tool against a tiny `budget` so the agent commits a PARTIAL after
-// turn 1 — the deterministic way to exercise the partial-as-failure policy. Built off the
-// shared `createAgentJob`, overriding only the scenario fields (the looping tool + the
-// sub-completion budget ceiling).
-function partialJob(provider: string): AgentJobInput {
-	// budget < a turn's completion (7) ? budget fires after turn 1 ? partial
-	return createAgentJob({ provider, tools: ['loop'], budget: 5 })
-}
-
-// The scripted turn a `partialJob` runs: EVERY turn reports usage + a tool call, so the
-// budget always charges on turn 1 and fires before turn 2 — partial regardless of where
-// the (shared, across-attempt) provider's script index sits, so a retry re-runs the SAME
-// partial scenario rather than drifting into a different (finishing) turn.
-const PARTIAL_TURNS = [
-	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
-] as const
-
-// The `loop` tool a `partialJob` references — the shared canonical `loop` tool keyed for
-// the registry's tool pool.
-function loopTools(): Record<string, ReturnType<typeof createTool>> {
-	return { loop: loopTool() }
-}
-
-// A SECOND, independent deterministic route to a partial result — a `budget: 0` ceiling
-// is exhausted from the agent's first `start()`, so the bound's budget signal is already
-// aborted before the provider stream is even entered: the agent commits a partial with
-// EMPTY content WITHOUT touching the provider. Proves the partial-as-failure policy keys
-// off `AgentResult.partial` alone, not off the loop-tool budget mechanism in
-// `partialJob` (which charges usage on turn 1, then fires before turn 2). Because the
-// provider is never entered here, `provider.started` stays 0 on this route — so it is used
-// for the throw/resolve assertions, never to count attempts (that stays on `partialJob`).
-function budgetZeroJob(provider: string): AgentJobInput {
-	return createAgentJob({ provider, budget: 0 })
-}
+// The Ollama-free agent factories — plain registry / store / context builders plus
+// createAgent, all needing no daemon. `createOllama` (the live-Ollama
+// factory) is split out to the dedicated `src:ollama` project. createAgent's loop
+// logic is pinned in Agent.test.ts; here we only assert the factory wires a provider
+// into a working AgentInterface that runs one turn to its result.
 
 describe('createChannel', () => {
 	it('hands back a working channel — pushed values drain in write order, then close ends it', async () => {
@@ -171,6 +134,56 @@ describe('createAgent', () => {
 		expect(agent.context.build()).toEqual([])
 	})
 })
+
+// -- Agent JOBS: createAgentRegistry / createAgentQueue / createAgentRunner ----
+//
+// The durable, bounded-concurrency agent-job layer COMPOSED over the workers Queue /
+// Runner substrate (no new concurrency engine). A serializable AgentJobInput is
+// rehydrated through the registry into a live Agent; a partial result is a configurable
+// failure (throws by default so retries / fail-fast engage, `partial` opts out);
+// cancellation threads through. All Ollama-free with the scripted provider — the LIVE
+// batch + sub-agent spawn run in the src:ollama project.
+
+// A reusable token-charging usage so a tiny `budget` ceiling can deterministically
+// commit a partial (completion 7 — `createTokenBudget`'s default scope). The completion
+// matches the shared default; the prompt/total differ, so it stays a named local built
+// off `createTokenUsage` with overrides (a specific budget-scenario value, not the shape).
+const JOB_USAGE = createTokenUsage({ prompt: 3, total: 10 })
+
+// A job that loops a tool against a tiny `budget` so the agent commits a PARTIAL after
+// turn 1 — the deterministic way to exercise the partial-as-failure policy. Built off the
+// shared `createAgentJob`, overriding only the scenario fields (the looping tool + the
+// sub-completion budget ceiling).
+function partialJob(provider: string): AgentJobInput {
+	// budget < a turn's completion (7) ? budget fires after turn 1 ? partial
+	return createAgentJob({ provider, tools: ['loop'], budget: 5 })
+}
+
+// The scripted turn a `partialJob` runs: EVERY turn reports usage + a tool call, so the
+// budget always charges on turn 1 and fires before turn 2 — partial regardless of where
+// the (shared, across-attempt) provider's script index sits, so a retry re-runs the SAME
+// partial scenario rather than drifting into a different (finishing) turn.
+const PARTIAL_TURNS = [
+	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
+] as const
+
+// The `loop` tool a `partialJob` references — the shared canonical `loop` tool keyed for
+// the registry's tool pool.
+function loopTools(): Record<string, ReturnType<typeof createTool>> {
+	return { loop: loopTool() }
+}
+
+// A SECOND, independent deterministic route to a partial result — a `budget: 0` ceiling
+// is exhausted from the agent's first `start()`, so the bound's budget signal is already
+// aborted before the provider stream is even entered: the agent commits a partial with
+// EMPTY content WITHOUT touching the provider. Proves the partial-as-failure policy keys
+// off `AgentResult.partial` alone, not off the loop-tool budget mechanism in
+// `partialJob` (which charges usage on turn 1, then fires before turn 2). Because the
+// provider is never entered here, `provider.started` stays 0 on this route — so it is used
+// for the throw/resolve assertions, never to count attempts (that stays on `partialJob`).
+function budgetZeroJob(provider: string): AgentJobInput {
+	return createAgentJob({ provider, budget: 0 })
+}
 
 describe('createAgentRegistry', () => {
 	it('round-trips: build an agent from a serializable job and run it to its result', async () => {
@@ -419,6 +432,40 @@ describe('createAgentRunner', () => {
 		// through controller.signal ? build ? agent ? provider.
 		expect(caught).toBeInstanceOf(Error)
 		expect(providerSawAbort).toBe(true)
+	})
+})
+
+// -- AgentJobError / isAgentJobError (the partial-carrying failure) ------------
+//
+// The real error type the shared `settle` throws on a default-partial job (a
+// real Error, not a sentinel) — it CARRIES the partial AgentResult so a caller can
+// still inspect what accumulated. Mirrors ProviderAbortError / isProviderAbortError.
+
+describe('AgentJobError / isAgentJobError', () => {
+	it('constructs with a message and carries the partial AgentResult', () => {
+		const partial: AgentResult = { content: 'half', partial: true }
+		const error = new AgentJobError('agent job ended partial', partial)
+		expect(error).toBeInstanceOf(Error)
+		expect(error.name).toBe('AgentJobError')
+		expect(error.message).toBe('agent job ended partial')
+		// The partial is the EXACT object handed in (carried by reference, not copied).
+		expect(error.partial).toBe(partial)
+		expect(error.partial.content).toBe('half')
+		expect(error.partial.partial).toBe(true)
+	})
+
+	it('the guard narrows a real AgentJobError to true', () => {
+		const error = new AgentJobError('x', { content: '', partial: true })
+		expect(isAgentJobError(error)).toBe(true)
+	})
+
+	it('the guard is false for a plain Error, a non-error, null, and undefined', () => {
+		expect(isAgentJobError(new Error('plain'))).toBe(false)
+		expect(isAgentJobError(new ProviderAbortError({ content: '' }))).toBe(false)
+		expect(isAgentJobError('agent job ended partial')).toBe(false)
+		expect(isAgentJobError({ partial: { content: '', partial: true } })).toBe(false)
+		expect(isAgentJobError(null)).toBe(false)
+		expect(isAgentJobError(undefined)).toBe(false)
 	})
 })
 

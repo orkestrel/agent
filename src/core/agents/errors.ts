@@ -6,7 +6,7 @@ import { isInstance } from '@orkestrel/contract'
 // queue / runner handler throws this so the Queue's retries + a Runner's fail-fast
 // engage. It carries the partial AgentResult so a caller (or a `retries: 0` enqueue that
 // rejects with it) can still inspect what accumulated. The guard narrows with
-// `instanceof`, mirroring ProviderAbortError / isProviderAbortError above.
+// `instanceof`, mirroring `ProviderAbortError` and `isProviderAbortError` in `providers/errors.ts`.
 
 /**
  * Reports an {@link AgentInterface} run that ended {@link AgentResult.partial} under a
@@ -64,7 +64,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // accounting — so `stream()` throws this synchronously, before any state mutation or
 // emit, rather than letting the runs race. An `AgentRegistry` accessor throws it too, when a
 // rehydration name is absent from its pool. Carries a machine-readable `code` so a `catch`
-// branches on `error.code`, mirroring `ConversationError` above.
+// branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
  * Reports a concurrent run that would corrupt shared per-agent accounting, or a rehydration

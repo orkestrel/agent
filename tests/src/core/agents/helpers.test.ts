@@ -16,9 +16,7 @@ import { createBudget } from '@orkestrel/budget'
 import { describe, expect, it } from 'vitest'
 import { createScriptedProvider, createToolCall, createTokenUsage } from '../../../setup.js'
 
-// Agent-owned pure helpers: filterAllowList applies the three-way set-membership primitive
-// a scope uses (undefined ⇒ all, [] ⇒ none, list ⇒ only-listed), while estimateMessages is
-// the default context-budget token estimator
+// Agent-owned pure helpers: estimateMessages is the default context-budget token estimator
 // (the per-message sum of the estimateTokens char heuristic). Plus settleAgentJob —
 // the shared job-handler step both createAgentQueue / createAgentRunner settle each
 // rehydrated agent through: a natural finish resolves with its result, a PARTIAL throws

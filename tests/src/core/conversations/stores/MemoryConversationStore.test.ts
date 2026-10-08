@@ -29,8 +29,9 @@ const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
 // each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
 // THIS file registers the battery against the memory factory and asserts on what each scenario
 // returns, keeping only its TWIN-SPECIFIC blocks: the JSON driver-swap-parity round-trip and the
-// per-call element guard the snapshot's assistant `calls` rests on. The core snapshot / message /
-// section guards live in tests/src/core/validators.test.ts, their module's own mirror.
+// per-call element guard the snapshot's assistant `calls` rests on. The snapshot and section guards
+// live in tests/src/core/conversations/validators.test.ts and the message guard in
+// tests/src/core/validators.test.ts, each beside its module.
 describe('MemoryConversationStore', () => {
 	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
 		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {

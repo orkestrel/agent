@@ -4,7 +4,7 @@ import { isInstance } from '@orkestrel/contract'
 // programmer error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
 // the messages with — so it throws this, carrying a machine-readable `code` ('SUMMARIZER')
 // so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
-// caught value with `instanceof`, mirroring the other errors in this file.
+// caught value with `instanceof`, mirroring the provider and agent errors.
 
 /**
  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with,
