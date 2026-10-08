@@ -1,4 +1,4 @@
-import type { ScopeFilter, ScopeInput, ScopeInterface } from '../types.js'
+import type { ScopeFilter, ScopeInput, ScopeInterface, SelectionHandler } from '../types.js'
 import { intersectKeys } from '../helpers.js'
 
 /**
@@ -21,7 +21,8 @@ import { intersectKeys } from '../helpers.js'
  *   `undefined` means "no constraint", so it acts as the universal set: intersecting
  *   `undefined` with a list yields the list, and `undefined` with `undefined` stays
  *   `undefined`. Narrowing can only tighten, never widen — a key excluded by a parent
- *   can never be re-admitted by a child.
+ *   can never be re-admitted by a child. The child keeps this scope's `name`, `description`,
+ *   and `select` handler.
  *
  * @example
  * ```ts
@@ -39,9 +40,13 @@ export class Scope implements ScopeInterface {
 	readonly instructions?: readonly string[]
 	readonly tools?: readonly string[]
 	readonly files?: readonly string[]
+	readonly select?: SelectionHandler
+	readonly description?: string
 
 	constructor(input: ScopeInput) {
 		this.name = input.name
+		if (input.select !== undefined) this.select = input.select
+		if (input.description !== undefined) this.description = input.description
 		// Copy each supplied list in (a later mutation of the caller's array can't leak in);
 		// an omitted list stays `undefined` — the "no constraint" sentinel.
 		if (input.instructions !== undefined) this.instructions = [...input.instructions]
@@ -51,12 +56,14 @@ export class Scope implements ScopeInterface {
 
 	narrow(config: ScopeFilter): ScopeInterface {
 		// A child = the per-category set-intersection of this scope and the config, keeping
-		// this scope's name. Immutable: a brand-new Scope, this one untouched.
+		// this scope's name, description, and handler. Immutable: a brand-new Scope, this one untouched.
 		const instructions = intersectKeys(this.instructions, config.instructions)
 		const tools = intersectKeys(this.tools, config.tools)
 		const files = intersectKeys(this.files, config.files)
 		return new Scope({
 			name: this.name,
+			...(this.description === undefined ? {} : { description: this.description }),
+			...(this.select === undefined ? {} : { select: this.select }),
 			...(instructions === undefined ? {} : { instructions }),
 			...(tools === undefined ? {} : { tools }),
 			...(files === undefined ? {} : { files }),

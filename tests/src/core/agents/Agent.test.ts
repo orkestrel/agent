@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { ToolCall } from '@orkestrel/tool'
@@ -7,10 +7,12 @@ import type {
 	AgentResult,
 	AgentStreamInterface,
 	ConversationEventMap,
+	ConversationInterface,
 	Message,
 	ProviderDelta,
 	ProviderInterface,
 	ProviderResult,
+	Selection,
 } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
 import { createBudget, createTokenBudget } from '@orkestrel/budget'
@@ -21,6 +23,7 @@ import {
 	createAuthority,
 	type createConversation,
 	createConversationManager,
+	createScope,
 	estimateMessages,
 	estimateTokens,
 	isAgentError,
@@ -29,9 +32,11 @@ import {
 	Scope,
 } from '@src/core'
 import {
+	abandonSelection,
 	addTool,
 	AUTHORITY_STATES,
 	createRecordingScheduler,
+	createRecordingSelection,
 	createScriptedProvider,
 	createSeededToolManager,
 	createStubSummarizer,
@@ -39,9 +44,11 @@ import {
 	createTokenUsage,
 	loopTool,
 	RECORDED_REQUEST,
+	rejectSelection,
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 	seedFramedAgent,
+	SELECTION_USAGE,
 } from '../../../setup.js'
 import {
 	collect,
@@ -4448,5 +4455,623 @@ describe('Agent — normal usage sanitize', () => {
 			{ prompt: 0, completion: 0, total: 12 - midStream },
 		])
 		expect(budget.consumed).toBe(12)
+	})
+})
+
+describe('Agent — a selection handler shapes the prompt and never the tools', () => {
+	it('sends the system block plus the selected subset and hands the handler the request and the run signal', async () => {
+		const selection = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			system: 'You triage billing tickets.',
+			select: selection.handler,
+		})
+		agent.context.messages.add([
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'assistant', content: 'Which invoice?' },
+		])
+		const request = agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await agent.generate()
+
+		const sent = requireValue(provider.calls[0])
+		expect(sent.messages.map(({ id, ...body }) => body)).toEqual([
+			{ role: 'system', content: 'You triage billing tickets.' },
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'user', content: 'Invoice 42.' },
+		])
+		expect(sent.messages.slice(1)).toEqual(selection.selections[0]?.messages)
+		expect(selection.calls).toHaveLength(1)
+		const [conversation, received, signal] = requireValue(selection.calls[0])
+		expect(conversation).toBe(agent.context.conversations.active)
+		expect(received).toBe(request)
+		expect(signal).toBeInstanceOf(AbortSignal)
+		expect(signal).toBe(sent.signal)
+	})
+
+	it('advertises the same definitions on every turn with a subset selection as without a handler', async () => {
+		expectTypeOf<keyof Selection>().toEqualTypeOf<'messages' | 'judgments' | 'usage' | 'fault'>()
+		const subset = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const advertised = await Promise.all(
+			[undefined, subset.handler].map(async (select) => {
+				const tools = createToolManager()
+				tools.add([
+					createTool({ name: 'lookup', execute: () => 'invoice 42: 120 EUR' }),
+					createTool({ name: 'refund', execute: () => 'refunded' }),
+				])
+				const provider = createScriptedProvider(
+					[{ content: '', tools: [createToolCall({ name: 'lookup' })] }, { content: 'done' }],
+					SCRIPT_OPTIONS,
+				)
+				const agent = createAgent(provider, {
+					tools,
+					scope: createScope({ name: 'lookup-only', tools: ['lookup'] }),
+					...(select === undefined ? {} : { select }),
+				})
+				agent.context.messages.add([
+					{ role: 'user', content: 'The invoice total is wrong.' },
+					{ role: 'assistant', content: 'Which invoice?' },
+					{ role: 'user', content: 'Invoice 42.' },
+				])
+				await agent.generate()
+				return provider.calls.map((call) => call.tools)
+			}),
+		)
+
+		expect(subset.selections[0]?.messages).toHaveLength(2)
+		expect(advertised[1]).toEqual(advertised[0])
+		expect(advertised[0]).toEqual([[{ name: 'lookup' }], [{ name: 'lookup' }]])
+	})
+
+	it('keeps the scope-dispatch record when the handler drops every message but the request', async () => {
+		const drop = createRecordingSelection({ keep: (message, request) => message.id === request.id })
+		const records = await Promise.all(
+			[undefined, drop.handler].map(async (select) => {
+				const ran: string[] = []
+				const tools = createToolManager()
+				tools.add([
+					createTool({
+						name: 'safe',
+						execute: () => {
+							ran.push('safe')
+							return 'ok'
+						},
+					}),
+					createTool({
+						name: 'secret',
+						execute: () => {
+							ran.push('secret')
+							return 'leaked'
+						},
+					}),
+				])
+				const denied = createRecorder<AgentEventMap['deny']>()
+				const dispatched = createRecorder<AgentEventMap['tool']>()
+				const calls = [createToolCall({ name: 'secret' }), createToolCall({ name: 'safe' })]
+				const provider = createScriptedProvider(
+					[{ result: { content: '', tools: calls } }, { result: { content: 'final' } }],
+					SCRIPT_OPTIONS,
+				)
+				const agent = createAgent(provider, {
+					tools,
+					scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
+					on: { deny: denied.handler, tool: dispatched.handler },
+					...(select === undefined ? {} : { select }),
+				})
+				agent.context.messages.add([
+					{ role: 'user', content: 'Rotate the key.' },
+					{ role: 'assistant', content: 'Which key?' },
+					{ role: 'user', content: 'go' },
+				])
+				const result = await agent.generate()
+				return {
+					result,
+					ran,
+					advertised: provider.calls.map((call) => call.tools),
+					denied: denied.calls,
+					dispatched: dispatched.calls,
+				}
+			}),
+		)
+
+		expect(drop.selections[0]?.messages.map((message) => message.content)).toEqual(['go'])
+		expect(records[1]).toEqual(records[0])
+		expect(records[0]?.ran).toEqual(['safe'])
+		expect(records[0]?.denied).toEqual([
+			[createToolCall({ name: 'secret' }), 'secret is not in the active scope'],
+		])
+	})
+
+	it('ends turn 0 answer-only when the handler applies a scope with no tools', async () => {
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
+		const calls = [createToolCall({ id: 'refund-1', name: 'refund' })]
+		const provider = createScriptedProvider(
+			[{ content: 'Refunds need a manager.', tools: calls }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			select: async (conversation) => {
+				agent.context.apply(createScope({ name: 'answer', tools: [] }))
+				return { messages: conversation.view(), judgments: [] }
+			},
+			on: { deny: denied.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Refund invoice 42.' })
+
+		const result = await agent.generate()
+
+		expect(result).toEqual({ content: 'Refunds need a manager.', partial: false })
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.tools).toBeUndefined()
+		expect(denied.calls).toEqual([[calls[0], 'no tool is advertised in the active scope']])
+	})
+
+	it('runs the agent default under an answer-only scope and ends the run as the answer', async () => {
+		const selection = createRecordingSelection()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
+		const calls = [createToolCall({ id: 'refund-1', name: 'refund' })]
+		const provider = createScriptedProvider(
+			[{ content: 'Refunds need a manager.', tools: calls }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			scope: createScope({ name: 'answer', tools: [] }),
+			select: selection.handler,
+			on: { deny: denied.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Refund invoice 42.' })
+
+		const result = await agent.generate()
+
+		expect(selection.calls).toHaveLength(1)
+		expect(result).toEqual({ content: 'Refunds need a manager.', partial: false })
+		expect(provider.calls[0]?.tools).toBeUndefined()
+		expect(denied.calls).toEqual([[calls[0], 'no tool is advertised in the active scope']])
+	})
+
+	it('selects nothing when the conversation ends without a user message', async () => {
+		const selection = createRecordingSelection({ keep: () => false })
+		const selected = createRecorder<AgentEventMap['select']>()
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select: selection.handler,
+			on: { select: selected.handler },
+		})
+		agent.context.messages.add([
+			{ role: 'user', content: 'Invoice 42.' },
+			{ role: 'assistant', content: 'It totals 120 EUR.' },
+		])
+
+		await agent.generate()
+
+		expect(selection.calls).toHaveLength(0)
+		expect(selected.count).toBe(0)
+		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
+			'Invoice 42.',
+			'It totals 120 EUR.',
+		])
+	})
+})
+
+describe('Agent — the select event follows each select-site build', () => {
+	it('fires once at entry, before turn 0, with the handler selection', async () => {
+		const selection = createRecordingSelection()
+		const order: string[] = []
+		const selected = createRecorder<AgentEventMap['select']>()
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select: selection.handler,
+			on: {
+				select: (picked) => {
+					order.push('select')
+					selected.handler(picked)
+				},
+				turn: (index) => order.push(`turn ${index}`),
+			},
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await agent.generate()
+
+		expect(order).toEqual(['select', 'turn 0'])
+		expect(selected.calls[0]?.[0]).toBe(selection.selections[0])
+	})
+
+	it('fires again after each compaction rebuild with the request captured at entry', async () => {
+		const selection = createRecordingSelection()
+		const selected = createRecorder<AgentEventMap['select']>()
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		conversations.add()
+		const tools = createToolManager()
+		tools.add(addTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: contextBudget(12),
+			limit: 5,
+			select: selection.handler,
+			on: { select: selected.handler },
+		})
+		const request = agent.context.messages.add({ role: 'user', content: 'go' })
+
+		const result = await agent.generate()
+
+		expect(result.content).toBe('the answer is 42')
+		expect(provider.calls.map((call) => call.messages.length)).toEqual([1, 1, 2])
+		expect(selected.count).toBe(3)
+		expect(selected.calls.map(([picked]) => picked)).toEqual(selection.selections)
+		expect(selection.calls.map(([, received]) => received)).toEqual([request, request, request])
+		expect(selection.calls.every(([, received]) => received === request)).toBe(true)
+		expect(selection.selections[1]?.messages.some((message) => message.id === request.id)).toBe(
+			false,
+		)
+	})
+
+	it('fires twice before turn 0 when the pre-first-turn compaction folds', async () => {
+		const selection = createRecordingSelection()
+		const order: string[] = []
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		conversations.add().add({ role: 'user', content: 'q'.repeat(200) })
+		const provider = createScriptedProvider([{ content: 'final answer' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			window: contextBudget(20),
+			limit: 5,
+			select: selection.handler,
+			on: {
+				select: () => order.push('select'),
+				turn: (index) => order.push(`turn ${index}`),
+			},
+		})
+
+		await agent.generate()
+
+		expect(order).toEqual(['select', 'select', 'turn 0'])
+		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
+			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
+		])
+	})
+
+	it('fires none and calls no provider when the run aborts during selection', async () => {
+		const selected = createRecorder<AgentEventMap['select']>()
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select: async (conversation, _request, signal) => {
+				await waitForAbort(signal)
+				return { messages: conversation.view(), judgments: [], usage: SELECTION_USAGE }
+			},
+			strict: true,
+			on: { select: selected.handler, fault: faults.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const run = agent.stream()
+		run.abort('the operator closed the ticket')
+		const result = await run.result
+
+		expect(result).toEqual({ content: '', usage: SELECTION_USAGE, partial: true })
+		expect(provider.calls).toHaveLength(0)
+		expect(selected.count).toBe(0)
+		expect(faults.count).toBe(0)
+		expect(agent.status).toBe('done')
+	})
+})
+
+describe('Agent — a selection fault follows the compaction fault rules', () => {
+	it('commits partial with no fault when the handler throws after the run aborts', async () => {
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select: async (_conversation, _request, signal) => {
+				await waitForAbort(signal)
+				throw new Error('the judge call was cancelled')
+			},
+			strict: true,
+			on: { fault: faults.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const run = agent.stream()
+		run.abort('the operator closed the ticket')
+
+		expect(await run.result).toEqual({ content: '', partial: true })
+		expect(faults.count).toBe(0)
+		expect(provider.calls).toHaveLength(0)
+	})
+
+	it('emits fault for a thrown handler and sends view() without a select event', async () => {
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const selected = createRecorder<AgentEventMap['select']>()
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			system: 'You triage billing tickets.',
+			select: rejectSelection,
+			on: { fault: faults.handler, select: selected.handler },
+		})
+		agent.context.messages.add([
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'assistant', content: 'Which invoice?' },
+			{ role: 'user', content: 'Invoice 42.' },
+		])
+
+		const result = await agent.generate()
+
+		expect(result).toEqual({ content: 'done', partial: false })
+		expect(faults.calls).toEqual([[new Error('the judge is unreachable')]])
+		expect(selected.count).toBe(0)
+		expect(provider.calls[0]?.messages.map(({ id, ...body }) => body)).toEqual([
+			{ role: 'system', content: 'You triage billing tickets.' },
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'assistant', content: 'Which invoice?' },
+			{ role: 'user', content: 'Invoice 42.' },
+		])
+	})
+
+	it('builds from a returned fault, emits fault then select, and folds its usage into the result', async () => {
+		const order: string[] = []
+		const selected = createRecorder<AgentEventMap['select']>()
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select: abandonSelection,
+			on: {
+				fault: (error) => order.push(`fault ${String(error)}`),
+				select: (picked) => {
+					order.push('select')
+					selected.handler(picked)
+				},
+			},
+		})
+		agent.context.messages.add([
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'user', content: 'Invoice 42.' },
+		])
+
+		const result = await agent.generate()
+
+		expect(order).toEqual(['fault Error: the judge refused the needed question', 'select'])
+		expect(selected.calls[0]?.[0].fault).toEqual(new Error('the judge refused the needed question'))
+		expect(result).toEqual({ content: 'done', usage: SELECTION_USAGE, partial: false })
+		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
+			'The invoice total is wrong.',
+			'Invoice 42.',
+		])
+	})
+
+	it('charges a returned fault usage before fault fires', async () => {
+		const budget = createRecordingBudget(10_000)
+		const consumed = createRecorder<[consumed: number]>()
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			budget,
+			select: abandonSelection,
+			on: { fault: () => consumed.handler(budget.consumed) },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await agent.generate()
+
+		expect(consumed.calls).toEqual([[SELECTION_USAGE.total]])
+		expect(budget.consumes[0]).toEqual(SELECTION_USAGE)
+	})
+
+	it.each([
+		['a thrown handler', rejectSelection, 'the judge is unreachable'],
+		['a returned fault', abandonSelection, 'the judge refused the needed question'],
+		[
+			'a changed tail',
+			async (conversation: ConversationInterface) => {
+				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
+				return { messages: conversation.view(), judgments: [] }
+			},
+			'changed during selection',
+		],
+	])('settles error under strict for %s', async (_label, select, message) => {
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const errors = createRecorder<AgentEventMap['error']>()
+		const finished = createRecorder<AgentEventMap['finish']>()
+		const selected = createRecorder<AgentEventMap['select']>()
+		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			select,
+			strict: true,
+			on: {
+				fault: faults.handler,
+				error: errors.handler,
+				finish: finished.handler,
+				select: selected.handler,
+			},
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await expect(agent.generate()).rejects.toThrow(message)
+
+		expect(agent.status).toBe('error')
+		expect(faults.count).toBe(1)
+		expect(errors.calls).toEqual([[faults.calls[0]?.[0]]])
+		expect(finished.count).toBe(0)
+		expect(selected.count).toBe(0)
+		expect(provider.calls).toHaveLength(0)
+	})
+})
+
+describe('Agent — selection usage reaches the budget and the result, never a usage chunk', () => {
+	it('charges the judge usage in full and sums it with the provider usage', async () => {
+		const budget = createRecordingBudget(10_000)
+		const usages = createRecorder<AgentEventMap['usage']>()
+		const provider = createScriptedProvider(
+			[{ result: { content: 'done', usage: USAGE } }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			budget,
+			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+			on: { usage: usages.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const run = agent.stream()
+		const chunks = await collect(run.events)
+		const result = await run.result
+
+		expect(chunks.filter((chunk) => chunk.category === 'usage')).toEqual([
+			{ category: 'usage', usage: USAGE },
+		])
+		expect(chunks.filter((chunk) => chunk.category === 'usage')).toHaveLength(provider.calls.length)
+		expect(usages.calls).toEqual([[USAGE]])
+		expect(result.usage).toEqual({ prompt: 35, completion: 9, total: 44 })
+		expect(budget.consumes[0]).toEqual(SELECTION_USAGE)
+		expect(budget.consumed).toBe(44)
+	})
+})
+
+describe('Agent — the handler resolves once per select site, scope first', () => {
+	it('applies a scope changed during the handler at the next select site only', async () => {
+		const gate = Promise.withResolvers<void>()
+		const first = createRecordingSelection()
+		const second = createRecordingSelection()
+		const selected = createRecorder<AgentEventMap['select']>()
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		conversations.add()
+		const tools = createToolManager()
+		tools.add(addTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: contextBudget(12),
+			limit: 5,
+			select: async (conversation, request, signal) => {
+				await gate.promise
+				return first.handler(conversation, request, signal)
+			},
+			on: { select: selected.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		const run = agent.stream()
+		agent.context.apply(createScope({ name: 'second', select: second.handler }))
+		gate.resolve()
+		await run.result
+
+		expect(first.calls).toHaveLength(1)
+		expect(second.calls).toHaveLength(2)
+		expect(selected.calls.map(([picked]) => picked)).toEqual([
+			first.selections[0],
+			second.selections[0],
+			second.selections[1],
+		])
+	})
+
+	it('runs the default under a scope without a handler, the scope handler while active, and the default after apply(undefined)', async () => {
+		const fallback = createRecordingSelection()
+		const mode = createRecordingSelection()
+		const provider = createScriptedProvider(
+			[{ content: 'first' }, { content: 'second' }, { content: 'third' }],
+			SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			select: fallback.handler,
+			scope: createScope({ name: 'review', instructions: [] }),
+		})
+		agent.context.messages.add({ role: 'user', content: 'Review invoice 42.' })
+		await agent.generate()
+		agent.context.apply(createScope({ name: 'triage', select: mode.handler }))
+		agent.context.messages.add({ role: 'user', content: 'Triage ticket 7.' })
+		await agent.generate()
+		agent.context.apply(undefined)
+		agent.context.messages.add({ role: 'user', content: 'Close ticket 7.' })
+		await agent.generate()
+
+		expect(fallback.calls.map(([, request]) => request.content)).toEqual([
+			'Review invoice 42.',
+			'Close ticket 7.',
+		])
+		expect(mode.calls.map(([, request]) => request.content)).toEqual(['Triage ticket 7.'])
+	})
+
+	it('sends the no-handler request under a judging default when the mode carries a pass-through', async () => {
+		const judge = createRecordingSelection({
+			keep: (message, request) => message.id === request.id,
+		})
+		const passThrough = createRecordingSelection()
+		const bodies = await Promise.all(
+			[false, true].map(async (selecting) => {
+				const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+				const agent = createAgent(provider, {
+					system: 'You triage billing tickets.',
+					scope: createScope({
+						name: 'verbatim',
+						...(selecting ? { select: passThrough.handler } : {}),
+					}),
+					...(selecting ? { select: judge.handler } : {}),
+				})
+				agent.context.messages.add([
+					{ role: 'user', content: 'The invoice total is wrong.' },
+					{ role: 'assistant', content: 'Which invoice?' },
+					{ role: 'user', content: 'Invoice 42.' },
+				])
+				await agent.generate()
+				return requireValue(provider.calls[0]).messages.map(({ id, ...body }) => body)
+			}),
+		)
+
+		expect(judge.calls).toHaveLength(0)
+		expect(passThrough.calls).toHaveLength(1)
+		expect(bodies[1]).toEqual(bodies[0])
+		expect(bodies[0]).toHaveLength(4)
+	})
+
+	it('sends the recorded request through a pass-through mode handler', async () => {
+		const passThrough = createRecordingSelection()
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const agent = seedFramedAgent(provider)
+		agent.context.apply(
+			createScope({
+				name: 'review',
+				instructions: ['tone', 'secrets'],
+				select: passThrough.handler,
+			}),
+		)
+
+		await agent.generate()
+
+		expect(passThrough.calls).toHaveLength(1)
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.map(({ id, ...body }) => body)).toStrictEqual(RECORDED_REQUEST)
+	})
+})
+
+describe('Agent — with no handler in either home the loop adds no await', () => {
+	it('reaches the provider before stream() returns, and waits for a handler when one is set', async () => {
+		const plain = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(plain, { scope: createScope({ name: 'review', tools: [] }) })
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const selecting = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const selected = createAgent(selecting, { select: createRecordingSelection().handler })
+		selected.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const runs = [agent.stream(), selected.stream()]
+
+		expect(plain.calls).toHaveLength(1)
+		expect(selecting.calls).toHaveLength(0)
+		await Promise.all(runs.map((run) => run.result))
+		expect(selecting.calls).toHaveLength(1)
 	})
 })

@@ -16,11 +16,14 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	createRecordingSelection,
 	createStubSummarizer,
+	rejectSelection,
 	resolveSectionOpen,
 	resolveSectionRender,
 	seedInstructionContext,
 	seedWorkspaceContext,
+	SELECTION_USAGE,
 } from '../../../setup.js'
 import { requireValue } from '@orkestrel/test'
 
@@ -1228,5 +1231,114 @@ describe('AgentContext — switching the active conversation (multi-conversation
 		expect(context.build().map((message) => message.content)).toEqual(['b-live'])
 		// a's compaction did not leak into b.
 		expect(b.sections.length).toBe(0)
+	})
+})
+
+describe('AgentContext — select resolves the active scope handler, else the agent default', () => {
+	it('returns undefined synchronously when neither home holds a handler', () => {
+		const context = new AgentContext({ scope: new Scope({ name: 'review', tools: [] }) })
+		const request = context.messages.add({ role: 'user', content: 'Summarize the ticket.' })
+
+		// `toBeUndefined` refuses a pending promise, so the call settled without one.
+		expect(context.select(request, new AbortController().signal)).toBeUndefined()
+	})
+
+	it('runs the default with the active conversation, the request, and the signal', async () => {
+		const selection = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const context = new AgentContext({ select: selection.handler })
+		context.messages.add([
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'assistant', content: 'Which invoice?' },
+		])
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const signal = new AbortController().signal
+
+		const selected = await context.select(request, signal)
+
+		expect(selected).toBe(selection.selections[0])
+		expect(selected?.messages.map((message) => message.content)).toEqual([
+			'The invoice total is wrong.',
+			'Invoice 42.',
+		])
+		expect(selection.calls).toEqual([[context.conversations.active, request, signal]])
+	})
+
+	it('runs the active scope handler over the default and the default again after `apply(undefined)`', async () => {
+		const fallback = createRecordingSelection()
+		const mode = createRecordingSelection()
+		const context = new AgentContext({ select: fallback.handler })
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const signal = new AbortController().signal
+
+		await context.select(request, signal)
+		context.apply(new Scope({ name: 'answer', tools: [] }))
+		await context.select(request, signal)
+		context.apply(new Scope({ name: 'triage', select: mode.handler }))
+		await context.select(request, signal)
+		context.apply(undefined)
+		await context.select(request, signal)
+
+		expect(fallback.calls).toHaveLength(3)
+		expect(mode.calls).toHaveLength(1)
+	})
+
+	it('turns a selection into a fault over `view()` when the conversation changed under the handler', async () => {
+		const context = new AgentContext({
+			select: async (conversation) => {
+				const view = conversation.view()
+				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
+				return { messages: view, judgments: ['needed:invoice'], usage: SELECTION_USAGE }
+			},
+		})
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const conversation = requireValue(context.conversations.active)
+
+		const selected = requireValue(await context.select(request, new AbortController().signal))
+
+		expect(selected.messages).toEqual(conversation.view())
+		expect(selected.messages).toHaveLength(2)
+		expect(selected.judgments).toEqual(['needed:invoice'])
+		expect(selected.usage).toEqual(SELECTION_USAGE)
+		expect(selected.fault).toBeInstanceOf(Error)
+		expect(selected.fault?.message).toBe(
+			`conversation ${conversation.id} changed during selection: 1 messages before, 2 after`,
+		)
+	})
+
+	it('rejects with the thrown value when the handler throws', async () => {
+		const context = new AgentContext({ select: rejectSelection })
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await expect(context.select(request, new AbortController().signal)).rejects.toThrow(
+			'the judge is unreachable',
+		)
+	})
+})
+
+describe('AgentContext — build(selection) folds the selected messages in place of view()', () => {
+	it('keeps the system block and attaches images to the last user message of the selection', () => {
+		const context = seedWorkspaceContext()
+		const [first] = context.messages.messages()
+		context.messages.add([
+			{ role: 'assistant', content: 'Which file?' },
+			{ role: 'user', content: 'The kept one.' },
+		])
+
+		const built = context.build({ messages: [requireValue(first)], judgments: [] })
+
+		expect(built).toHaveLength(2)
+		expect(built[0]).toEqual({ ...requireValue(context.build()[0]), id: requireValue(built[0]).id })
+		expect(built[1]).toEqual({ ...requireValue(first), images: ['KEEPIMG', 'DROPIMG'] })
+		expect(context.build().at(-1)).toEqual(
+			expect.objectContaining({ content: 'The kept one.', images: ['KEEPIMG', 'DROPIMG'] }),
+		)
+	})
+
+	it('folds an empty selection to the system block alone', () => {
+		const context = seedWorkspaceContext()
+
+		const built = context.build({ messages: [], judgments: [] })
+
+		expect(built.map((message) => message.role)).toEqual(['system'])
 	})
 })

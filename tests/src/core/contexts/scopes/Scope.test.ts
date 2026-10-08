@@ -1,5 +1,7 @@
-import { Scope } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import type { ScopeInterface } from '@src/core'
+import { createScope, Scope } from '@src/core'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import { createRecordingSelection, rejectSelection } from '../../../../setup.js'
 
 // Scope is the named, immutable allow-list filter over a context's items — real
 // behavior, no mocks. Covers construction (a minted id + the per-category
@@ -148,5 +150,58 @@ describe('Scope — narrow (set-intersection)', () => {
 		const narrowed = scope.narrow({ tools: ['a', 'b', 'c'] }).narrow({ tools: ['b', 'c', 'e'] })
 
 		expect(narrowed.tools).toEqual(['b', 'c'])
+	})
+})
+
+describe('Scope — the selection handler and description travel with the scope', () => {
+	it('carries `select` and `description` when supplied and leaves both undefined when omitted', () => {
+		const selection = createRecordingSelection()
+		const scope = createScope({
+			name: 'triage',
+			select: selection.handler,
+			description: 'Answers billing tickets from the ticket thread alone.',
+		})
+
+		expect(scope.select).toBe(selection.handler)
+		expect(scope.description).toBe('Answers billing tickets from the ticket thread alone.')
+		const plain = new Scope({ name: 'plain' })
+		expect(plain.select).toBeUndefined()
+		expect(plain.description).toBeUndefined()
+	})
+
+	it('keeps `name`, `description`, and `select` through `narrow` and re-mints the `id`', () => {
+		const parent = new Scope({
+			name: 'triage',
+			tools: ['search', 'reply'],
+			select: rejectSelection,
+			description: 'Answers billing tickets from the ticket thread alone.',
+		})
+
+		const child = parent.narrow({ tools: ['reply'] })
+
+		expect(child.name).toBe('triage')
+		expect(child.description).toBe('Answers billing tickets from the ticket thread alone.')
+		expect(child.select).toBe(rejectSelection)
+		expect(child.tools).toEqual(['reply'])
+		expect(child.id).not.toBe(parent.id)
+	})
+
+	it('narrows a scope without a handler or description to a child without either', () => {
+		const child = new Scope({ name: 'plain' }).narrow({ tools: [] })
+
+		expect(child.select).toBeUndefined()
+		expect(child.description).toBeUndefined()
+	})
+
+	it('refuses `select` in the `narrow` argument, which keeps the parent handler', () => {
+		expectTypeOf<Parameters<ScopeInterface['narrow']>[0]>().not.toHaveProperty('select')
+		expectTypeOf<Parameters<ScopeInterface['narrow']>[0]>().not.toHaveProperty('description')
+		const parent = new Scope({ name: 'triage', select: rejectSelection })
+		// A widened value skips the excess-property check, so the runtime ignores the extra member.
+		const config = { tools: ['reply'], select: createRecordingSelection().handler }
+
+		const child = parent.narrow(config)
+
+		expect(child.select).toBe(rejectSelection)
 	})
 })

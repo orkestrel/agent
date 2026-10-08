@@ -12,7 +12,7 @@ import type {
 	RunOutcome,
 } from './types.js'
 import type { ProviderInterface, ProviderResult } from '../providers/index.js'
-import type { AgentContextInterface } from '../contexts/index.js'
+import type { AgentContextInterface, Selection } from '../contexts/index.js'
 import type { Message } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
@@ -122,6 +122,7 @@ export class Agent implements AgentInterface {
 			...(options?.workspaces === undefined ? {} : { workspaces: options.workspaces }),
 			...(options?.scope === undefined ? {} : { scope: options.scope }),
 			...(options?.conversations === undefined ? {} : { conversations: options.conversations }),
+			...(options?.select === undefined ? {} : { select: options.select }),
 		})
 		this.#limit = options?.limit ?? DEFAULT_AGENT_LIMIT
 		this.#timeoutMs = options?.timeout
@@ -347,7 +348,18 @@ export class Agent implements AgentInterface {
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, RunOutcome> {
-		const messages: Message[] = [...this.#context.build()]
+		// The request is the user message ending the conversation at entry, captured once: a
+		// compaction can fold it into a section, so every select site receives this object. With no
+		// request the loop selects nothing and builds from `view()`.
+		const last = this.#context.conversations.active?.view().at(-1)
+		const request = last?.role === 'user' ? last : undefined
+		// Each selection's sanitized usage, folded into the outcome's `usage` at settle.
+		const spent: TokenUsage[] = []
+		const messages: Message[] = []
+		// `#select` returns `undefined` when no handler is set, so the default path awaits nothing
+		// before the first provider request.
+		const selecting = this.#select(request, messages, abort, budget, spent)
+		if (selecting !== undefined) await selecting
 		const tools = this.#context.tools
 		let content = ''
 		let thinking: string | undefined
@@ -384,7 +396,9 @@ export class Agent implements AgentInterface {
 			// Pre-first-turn: `latch: false` — an `undefined` fold here means the tail is too short
 			// yet (this run's turns haven't accumulated), not permanently futile, so it must not disable
 			// auto-compaction for the run; the growing tail can still fold on the between-turns checks.
-			if (!abort.signal.aborted) futile = await this.#trim(messages, false)
+			if (!abort.signal.aborted) {
+				futile = await this.#trim(messages, false, request, abort, budget, spent)
+			}
 		}
 		for (let turn = 0; turn < limit; turn += 1) {
 			// Observe each iteration begin (the turn index). The emitter isolates a listener
@@ -545,7 +559,9 @@ export class Agent implements AgentInterface {
 				// wasted. `compacting` gates the call, so with auto-compaction off the loop awaits nothing
 				// here. `latch: true`: the tail holds this turn's appends, so an `undefined` fold is futile
 				// and the run stops calling `#trim`.
-				if (compacting && !futile) futile = await this.#trim(messages, true)
+				if (compacting && !futile) {
+					futile = await this.#trim(messages, true, request, abort, budget, spent)
+				}
 				pending = true
 				continue
 			}
@@ -569,6 +585,7 @@ export class Agent implements AgentInterface {
 			partial = true
 			exhausted = !abort.signal.aborted
 		}
+		for (const one of spent) usage = sumUsage(usage, one)
 		return { content, thinking, usage, partial, exhausted }
 	}
 
@@ -605,7 +622,14 @@ export class Agent implements AgentInterface {
 	// No post-compact `clear()` is needed: the next check's `clear()` + `consume` re-measures the
 	// now-shrunken prompt from scratch. The summarizer call is the conversation's configured
 	// (best-effort) one, not separately bound to this run's abort signal.
-	async #trim(messages: Message[], latch: boolean): Promise<boolean> {
+	async #trim(
+		messages: Message[],
+		latch: boolean,
+		request: Message | undefined,
+		abort: AbortInterface,
+		budget: BudgetInterface<TokenUsage> | undefined,
+		spent: TokenUsage[],
+	): Promise<boolean> {
 		const conversation = this.#context.conversations.active
 		// No window or a non-summarizable active conversation (the default one can't fold) ⇒ nothing
 		// to do. (Both call sites are gated by `compacting`, so here `conversation` is the
@@ -630,10 +654,70 @@ export class Agent implements AgentInterface {
 		// over-window prompt reaches the provider. On the pre-first-turn check the tail is
 		// too short yet ⇒ report no latch, leaving later turns free to fold as the tail grows.
 		if (section === undefined) return latch
-		// Rebuild the working array from the (now smaller) compacted view through the same projection the
-		// loop opened with — so the run continues on the system block + compacted `view()`.
-		messages.splice(0, messages.length, ...this.#context.build())
+		// Rebuild the working array from the compacted view through the select site the loop opened
+		// with, so the run continues on the system block plus the compacted `view()` or the handler's
+		// selection from it.
+		const selecting = this.#select(request, messages, abort, budget, spent)
+		if (selecting !== undefined) await selecting
 		return false
+	}
+
+	// One select site: rebuild the working array from the handler's selection, or from `view()` when
+	// there is no request or no handler. Returns `undefined` on that default path, synchronously, so a
+	// caller awaits only a returned promise.
+	#select(
+		request: Message | undefined,
+		messages: Message[],
+		abort: AbortInterface,
+		budget: BudgetInterface<TokenUsage> | undefined,
+		spent: TokenUsage[],
+	): Promise<void> | undefined {
+		const pending = request === undefined ? undefined : this.#context.select(request, abort.signal)
+		if (pending === undefined) {
+			messages.splice(0, messages.length, ...this.#context.build())
+			return undefined
+		}
+		return this.#fold(pending, messages, abort, budget, spent)
+	}
+
+	// Settles a pending selection. A cancel wins over a throw or a fault, as it does on the provider
+	// path, and returned usage is charged before the abort check because judge calls were spent either
+	// way; the budget charge can itself trip the run's bound. A cancelled site builds from `view()`
+	// and emits no `select`; the loop's own abort checks then commit the partial before any provider
+	// call.
+	async #fold(
+		pending: Promise<Selection>,
+		messages: Message[],
+		abort: AbortInterface,
+		budget: BudgetInterface<TokenUsage> | undefined,
+		spent: TokenUsage[],
+	): Promise<void> {
+		let selection: Selection
+		try {
+			selection = await pending
+		} catch (error) {
+			if (!abort.signal.aborted) {
+				this.#emitter.emit('fault', error)
+				if (this.#strict) throw error
+			}
+			messages.splice(0, messages.length, ...this.#context.build())
+			return
+		}
+		if (selection.usage !== undefined) {
+			const usage = sanitizeUsage(selection.usage)
+			chargeUsage(budget, usage, 0)
+			spent.push(usage)
+		}
+		if (abort.signal.aborted) {
+			messages.splice(0, messages.length, ...this.#context.build())
+			return
+		}
+		if (selection.fault !== undefined) {
+			this.#emitter.emit('fault', selection.fault)
+			if (this.#strict) throw selection.fault
+		}
+		messages.splice(0, messages.length, ...this.#context.build(selection))
+		this.#emitter.emit('select', selection)
 	}
 
 	// Evaluate policy and emit denials before the run's final pre-dispatch abort guard:

@@ -2,6 +2,8 @@ import type {
 	AgentContextInterface,
 	InstructionManagerInterface,
 	ScopeInterface,
+	Selection,
+	SelectionHandler,
 } from '../contexts/index.js'
 import type {
 	ConversationManagerInterface,
@@ -60,7 +62,7 @@ export type AgentChunk =
  * turn) — a distinct, non-cancel cause covered by {@link RunOutcome.exhausted} (see
  * the `exhaust` {@link AgentEventMap} event). It is `false` for a turn that ran to a
  * natural finish (including a `limit: 0` run, which never enters the loop). `usage` is
- * present only when at least one provider call reported usage — an aborted run's `usage`
+ * present only when at least one provider call or selection reported usage — an aborted run's `usage`
  * includes the cancelled turn's tokens when the provider reports partial usage on the
  * abort (folded in exactly like a completed turn's); a provider that cannot observe
  * usage mid-stream (for example a daemon whose final counts never arrive before the cancel)
@@ -73,7 +75,7 @@ export interface AgentResult {
 	readonly content: string
 	/** Carries reasoning the run's provider calls separated from the answer (present when any surfaced it). */
 	readonly thinking?: string
-	/** Holds the summed {@link TokenUsage} across the turn's provider calls (present when any reported it). */
+	/** Holds the summed {@link TokenUsage} across the run's provider calls and selections (present when any reported it). */
 	readonly usage?: TokenUsage
 	/**
 	 * Reports cancellation or a turn limit reached with unresolved tool intent.
@@ -93,7 +95,7 @@ export interface AgentResult {
  * loop settles: `content` is the streamed assistant text, `thinking` the reasoning the
  * provider calls separated from it ({@link ProviderResult.thinking}, joined across calls —
  * `undefined` when none surfaced), `usage` the summed {@link TokenUsage} (present only when
- * a provider call reported it), `partial` is `true` when a cancel committed the run early or
+ * a provider call or a selection reported it), `partial` is `true` when a cancel committed the run early or
  * when the loop exhausted its `limit` with unresolved tool intent, and `exhausted` is `true`
  * in that second case specifically (a distinct, non-cancel cause the {@link AgentEventMap}
  * `exhaust` event observes). It is the settled outcome one run returns, before the agent folds
@@ -177,6 +179,14 @@ export type AgentEventMap = {
 	 * its `error` handler).
 	 */
 	readonly fault: readonly [error: unknown]
+	/**
+	 * Reports the {@link Selection} a handler returned, after the loop built the prompt from it —
+	 * at run entry and after each automatic compaction rebuild, so twice before turn 0 when the
+	 * pre-first-turn compaction folds. A returned `fault` the lenient run builds from still fires
+	 * it, so the receipt carries the cost; a thrown handler and a run aborted during selection
+	 * fire none.
+	 */
+	readonly select: readonly [selection: Selection]
 }
 
 /**
@@ -286,8 +296,14 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   `budget`'s hard abort. Omitted ⇒ no auto-compaction.
  * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
  *   (rethrown after the `fault` event, propagating through `#run` to a genuine `error`
- *   settle) instead of skipping compaction and continuing over-window. Defaults to `false`
- *   (lenient — the run continues over-window).
+ *   settle) instead of skipping compaction and continuing over-window. The selection faults (a
+ *   thrown handler, a returned `fault`, a conversation changed under the handler) settle the same
+ *   way. Defaults to `false` (lenient — the run continues over-window, or on `view()` after a
+ *   selection fault).
+ * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
+ *   active scope's `select` overrides it. The loop runs it at run entry and after each automatic
+ *   compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
+ *   selection's usage to `budget` and the result's `usage`.
  * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
  *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
  * - `workspaces` — an optional pre-built {@link WorkspaceManagerInterface} forwarded to the
@@ -359,10 +375,21 @@ export interface AgentOptions {
 	/**
 	 * If `true`, a summarizer failure during automatic compaction aborts the run — the
 	 * `fault` event still fires, then the caught error is rethrown so the run settles
-	 * `error` instead of continuing over-window. Defaults to `false` (lenient — the run
-	 * continues over-window).
+	 * `error` instead of continuing over-window. The selection faults are the second source: a
+	 * thrown handler, a returned `fault`, and a conversation changed under the handler each fire
+	 * `fault` and then settle the run `error`. If `false`, the run continues — over-window for a
+	 * summarizer failure, and on the active conversation's `view()` for a selection fault.
+	 * Default: `false`.
 	 */
 	readonly strict?: boolean
+	/**
+	 * Holds the default selection handler forwarded to the agent's context; the active scope's
+	 * `select` overrides it while that scope is active. The loop runs it at run entry and after
+	 * each automatic compaction rebuild, for the user message that ends the conversation, and
+	 * charges its usage to the cost `budget`. Omitted ⇒ with no scope handler either, the loop
+	 * builds from the active conversation's `view()` and awaits nothing.
+	 */
+	readonly select?: SelectionHandler
 }
 
 /**

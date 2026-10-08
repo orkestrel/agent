@@ -3,6 +3,8 @@ import type {
 	AgentContextOptions,
 	InstructionManagerInterface,
 	ScopeInterface,
+	Selection,
+	SelectionHandler,
 } from './types.js'
 import type {
 	ConversationInterface,
@@ -98,6 +100,8 @@ export class AgentContext implements AgentContextInterface {
 	// conversation through `conversations.switch(id)`.
 	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
+	// The agent default; the active scope's `select` overrides it at each `select` call.
+	readonly #select: SelectionHandler | undefined
 	#scope: ScopeInterface | undefined
 
 	constructor(options?: AgentContextOptions) {
@@ -116,6 +120,7 @@ export class AgentContext implements AgentContextInterface {
 		this.#conversations = options?.conversations ?? new ConversationManager()
 		if (this.#conversations.active === undefined) this.#conversations.add()
 		this.#tools = options?.tools ?? new ToolManager()
+		this.#select = options?.select
 		this.#scope = options?.scope
 	}
 
@@ -159,7 +164,14 @@ export class AgentContext implements AgentContextInterface {
 		this.#scope = scope
 	}
 
-	build(): readonly Message[] {
+	select(request: Message, signal: AbortSignal): Promise<Selection> | undefined {
+		// Returning `undefined` synchronously keeps the loop's default path free of an `await`.
+		const handler = this.#scope?.select ?? this.#select
+		if (handler === undefined) return undefined
+		return this.#check(handler, this.#conversations.active ?? this.#ensure(), request, signal)
+	}
+
+	build(selection?: Selection): readonly Message[] {
 		const scope = this.#scope
 		// 1–2. Assemble the system block parts: the prompt, then each scoped manager's
 		// section (its `open` + each item's rendering + any `close`) when it has any scoped-in
@@ -217,8 +229,8 @@ export class AgentContext implements AgentContextInterface {
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
 		// tools / workspace files). The active conversation is always present (the constructor adds
 		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
-		const active = this.#conversations.active ?? this.#ensure()
-		const conversation = active.view()
+		const conversation =
+			selection?.messages ?? (this.#conversations.active ?? this.#ensure()).view()
 		// 5. Attach the active workspace's scoped-in image files' `base64` payload to the last user
 		// message (a vision provider reads images off a user turn) — the active workspace is the
 		// sole image source. Skipped when there is none. (Applies to the conversation's view too.)
@@ -232,6 +244,36 @@ export class AgentContext implements AgentContextInterface {
 			content: parts.join('\n\n'),
 		}
 		return [system, ...tail]
+	}
+
+	// Another run can append to the conversation while the handler awaits, so the view's ids are
+	// recorded before the call (an async body runs synchronously up to its first `await`) and
+	// compared after it; a changed view turns the handler's selection into a fault over `view()`.
+	async #check(
+		handler: SelectionHandler,
+		conversation: ConversationInterface,
+		request: Message,
+		signal: AbortSignal,
+	): Promise<Selection> {
+		const before = conversation.view().map((message) => message.id)
+		const selection = await handler(conversation, request, signal)
+		const after = conversation.view()
+		if (
+			after.length === before.length &&
+			after.every((message, index) => message.id === before[index])
+		) {
+			return selection
+		}
+		const text = `conversation ${conversation.id} changed during selection: ${before.length} messages before, ${after.length} after`
+		return {
+			messages: after,
+			judgments: selection.judgments,
+			...(selection.usage === undefined ? {} : { usage: selection.usage }),
+			fault:
+				selection.fault === undefined
+					? new Error(text)
+					: new Error(text, { cause: selection.fault }),
+		}
 	}
 
 	// The total fallback that keeps `messages` / `build()` defined even if a caller's supplied

@@ -18,6 +18,7 @@ import type {
 	ProviderParserInterface,
 	ProviderRequest,
 	AgentJobInput,
+	ConversationInterface,
 	ConversationManagerInterface,
 	ConversationSnapshot,
 	ConversationStoreInterface,
@@ -30,8 +31,11 @@ import type {
 	ProviderInterface,
 	ProviderResult,
 	ProviderStreamOptions,
+	Selection,
+	SelectionHandler,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
+import type { RecorderInterface } from '@orkestrel/test'
 import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
 import {
@@ -49,7 +53,7 @@ import {
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
 import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
-import { requireValue, waitForDelay } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
@@ -728,6 +732,97 @@ export function createStubSummarizer(): {
 			calls.push(messages)
 			return `recap of ${messages.length}`
 		},
+	}
+}
+
+/** Supplies the judge usage a selection fixture reports, distinct from every provider usage. */
+export const SELECTION_USAGE: TokenUsage = Object.freeze({ prompt: 30, completion: 2, total: 32 })
+
+/** Names the arguments one {@link SelectionHandler} call receives. */
+export type SelectionCall = readonly [
+	conversation: ConversationInterface,
+	request: Message,
+	signal: AbortSignal,
+]
+
+/**
+ * Options for {@link createRecordingSelection}.
+ *
+ * @remarks
+ * - `keep` — the predicate a message of `view()` must pass to enter the selection, given the
+ *   request; omitted ⇒ the selection is `view()` unchanged (a pass-through).
+ * - `usage` — the judge usage each returned selection reports; omitted ⇒ none.
+ */
+export interface RecordingSelectionOptions {
+	readonly keep?: (message: Message, request: Message) => boolean
+	readonly usage?: TokenUsage
+}
+
+/** Records the calls a selection handler fixture receives and the selections it returns. */
+export interface RecordingSelectionInterface {
+	readonly handler: SelectionHandler
+	/** Each call's conversation, request, and signal, in call order. */
+	readonly calls: readonly SelectionCall[]
+	/** Each returned selection, in call order. */
+	readonly selections: readonly Selection[]
+}
+
+/**
+ * Creates a recording {@link SelectionHandler} that selects the messages of the conversation's
+ * `view()` passing `keep`, or the whole `view()` when `keep` is omitted.
+ *
+ * @param options - The {@link RecordingSelectionOptions} (both optional; see its `@remarks`)
+ * @returns The handler plus its live call and selection records
+ */
+export function createRecordingSelection(
+	options?: RecordingSelectionOptions,
+): RecordingSelectionInterface {
+	const recorder: RecorderInterface<SelectionCall> = createRecorder<SelectionCall>()
+	const selections: Selection[] = []
+	return {
+		get calls() {
+			return recorder.calls
+		},
+		get selections() {
+			return selections
+		},
+		handler: async (conversation, request, signal) => {
+			recorder.handler(conversation, request, signal)
+			const view = conversation.view()
+			const keep = options?.keep
+			const selection: Selection = {
+				messages: keep === undefined ? view : view.filter((message) => keep(message, request)),
+				judgments: [],
+				...(options?.usage === undefined ? {} : { usage: options.usage }),
+			}
+			selections.push(selection)
+			return selection
+		},
+	}
+}
+
+/**
+ * Rejects a selection with the error a thrown handler raises.
+ *
+ * @returns A promise rejected with `Error('the judge is unreachable')`
+ */
+export function rejectSelection(): Promise<Selection> {
+	return Promise.reject(new Error('the judge is unreachable'))
+}
+
+/**
+ * Returns the selection a handler gives up on: `fault` set, `messages` as `view()`, and the judge
+ * usage it spent ({@link SELECTION_USAGE}).
+ *
+ * @param conversation - The conversation whose `view()` the selection carries
+ * @returns A selection whose `fault` is `Error('the judge refused the needed question')`
+ */
+export async function abandonSelection(conversation: ConversationInterface): Promise<Selection> {
+	return {
+		messages: conversation.view(),
+		judgments: [],
+		usage: SELECTION_USAGE,
+		fault: new Error('the judge refused the needed question'),
 	}
 }
 

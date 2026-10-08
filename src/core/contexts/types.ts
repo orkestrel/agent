@@ -1,8 +1,10 @@
 import type {
+	ConversationInterface,
 	ConversationManagerInterface,
 	MessageManagerInterface,
 } from '../conversations/index.js'
 import type { Message } from '../types.js'
+import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { ToolManagerInterface } from '@orkestrel/tool'
 import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
@@ -220,11 +222,51 @@ export interface ScopeFilter {
 }
 
 /**
+ * Carries the conversation part of the next prompt and the receipt for it.
+ *
+ * @remarks
+ * A {@link SelectionHandler} returns one per select site, and
+ * {@link AgentContextInterface.build} folds its `messages` in place of the active conversation's
+ * `view()`. It carries no tool member: what a turn advertises and dispatches stays the scope's
+ * `tools` allow-list. What the selection omitted is `view()` minus `messages`; no second list is
+ * stored.
+ */
+export interface Selection {
+	/** Lists the messages `build` folds in place of `view()`, in prompt order. */
+	readonly messages: readonly Message[]
+	/** Lists the keys of the judgments the selection rests on, reused or recorded. */
+	readonly judgments: readonly string[]
+	/** Holds the judge usage this selection spent, on success and on failure alike. */
+	readonly usage?: TokenUsage
+	/** Holds the error a handler gave up on; `messages` is then `view()`. */
+	readonly fault?: Error
+}
+
+/**
+ * Chooses the conversation messages the next prompt carries for one user request.
+ *
+ * @remarks
+ * Receives the active conversation, the user message the run serves (passed by the loop, because
+ * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
+ * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
+ * the usage spent, rather than throwing.
+ */
+export type SelectionHandler = (
+	conversation: ConversationInterface,
+	request: Message,
+	signal: AbortSignal,
+) => Promise<Selection>
+
+/**
  * Carries the data to author a {@link ScopeInterface} — a {@link ScopeFilter} plus the
  * required `name` (a human label; the `id` is minted by the layer that stores it).
  */
 export interface ScopeInput extends ScopeFilter {
 	readonly name: string
+	/** Holds the selection handler that overrides the agent default while this scope is active. */
+	readonly select?: SelectionHandler
+	/** Describes the mode this scope stands for; `build()` never reads it. */
+	readonly description?: string
 }
 
 /**
@@ -242,10 +284,17 @@ export interface ScopeInput extends ScopeFilter {
 export interface ScopeInterface extends ScopeFilter {
 	readonly id: string
 	readonly name: string
+	/** Holds the selection handler that overrides the agent default while this scope is active. */
+	readonly select?: SelectionHandler
+	/** Describes the mode this scope stands for; `build()` never reads it. */
+	readonly description?: string
 	/**
 	 * Composes a tighter child scope — each category is the set intersection of this scope's
 	 * list and `config`'s (an `undefined` side imposing no constraint), returned as a new
 	 * scope that leaves this one unchanged.
+	 *
+	 * @remarks
+	 * The child keeps this scope's `name`, `description`, and `select`, and mints its own `id`.
 	 *
 	 * @param config - The narrowing allow-lists (a `name`-less {@link ScopeFilter})
 	 * @returns A new, tighter {@link ScopeInterface} (this one is left unchanged)
@@ -332,7 +381,9 @@ export interface ScopeManagerInterface {
  * and `build()` folds that conversation's `view()` (section summaries + live). When omitted, a fresh
  * {@link ConversationManagerInterface} is created and a default conversation is added (so
  * `messages` is always defined). All default to a context with no system prompt, empty registries,
- * no scope, and a fresh conversation registry holding one default conversation.
+ * no scope, and a fresh conversation registry holding one default conversation. `select` is the
+ * agent's default {@link SelectionHandler}, which the active scope's `select` overrides; omitted,
+ * `select()` returns `undefined` while the active scope holds no handler.
  */
 export interface AgentContextOptions {
 	readonly system?: string
@@ -364,6 +415,11 @@ export interface AgentContextOptions {
 	 * conversation through the manager's `switch(id)`.
 	 */
 	readonly conversations?: ConversationManagerInterface
+	/**
+	 * Holds the agent's default selection handler; the active scope's `select` overrides it.
+	 * Omitted ⇒ with no scope handler either, `build()` folds the active conversation's `view()`.
+	 */
+	readonly select?: SelectionHandler
 }
 
 /**
@@ -437,6 +493,31 @@ export interface AgentContextInterface {
 	 */
 	apply(scope: ScopeInterface | undefined): void
 	/**
+	 * Runs the selection handler for one request — the active scope's `select`, else the agent
+	 * default — and checks that the conversation did not change under it.
+	 *
+	 * @remarks
+	 * Resolves the handler once per call. With no handler in either home it returns `undefined`
+	 * synchronously, so a caller awaits nothing. Otherwise it records the message ids of the
+	 * active conversation's `view()`, calls the handler, and compares the ids after it settles: an
+	 * unchanged view returns the handler's {@link Selection}; a changed view returns a selection
+	 * whose `fault` names the change, whose `messages` are the current `view()`, and which carries
+	 * the handler's `judgments` and `usage`. A handler throw rejects the returned promise with the
+	 * thrown value. The context stays event-free; the agent emits the receipt.
+	 *
+	 * @param request - The user message the run serves
+	 * @param signal - The run's abort signal, passed to the handler
+	 * @returns The pending {@link Selection}, or `undefined` when no handler is set
+	 *
+	 * @example
+	 * ```ts
+	 * const request = context.messages.add({ role: 'user', content: 'Summarize the ticket.' })
+	 * const selection = await context.select(request, new AbortController().signal)
+	 * context.build(selection)
+	 * ```
+	 */
+	select(request: Message, signal: AbortSignal): Promise<Selection> | undefined
+	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
 	 * prompt, the scope-filtered instructions (each section's header and each item's rendering
 	 * resolved through the format cascade), and the active workspace's scope-filtered
@@ -477,8 +558,13 @@ export interface AgentContextInterface {
 	 * instructions manager the agent receives. Scope filtering runs before formatting, and the
 	 * workspace image data attaches to the last user message.
 	 *
+	 * **A selection.** Given a {@link Selection}, the build folds `selection.messages` in place of
+	 * `view()` and attaches the image data to the last user message of that array; the system
+	 * block is unchanged.
+	 *
+	 * @param selection - The selection whose `messages` replace `view()`; omitted ⇒ `view()`
 	 * @returns The scoped conversation, prefixed by the assembled `system` message when any
 	 *   of (the prompt, the scoped instructions, the active workspace's text files) is non-empty
 	 */
-	build(): readonly Message[]
+	build(selection?: Selection): readonly Message[]
 }
