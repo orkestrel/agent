@@ -1,6 +1,63 @@
-import type { ConversationSnapshot, Section } from './types.js'
-import { isArray, isRecord, isString } from '@orkestrel/contract'
-import { isMessage } from '../validators.js'
+import type { ConversationSnapshot, Judgment, Section } from './types.js'
+import { isTokenUsage } from '@orkestrel/budget'
+import {
+	arrayOf,
+	attempt,
+	isArray,
+	isNumber,
+	isRecord,
+	isString,
+	optionalOf,
+	objectOf,
+} from '@orkestrel/contract'
+import { isJudgeQuestion, isMessage } from '../validators.js'
+
+/**
+ * Checks whether a stored judgment carries a valid question and exactly one answer or refusal.
+ *
+ * @remarks
+ * Malformed members and unreadable inputs return false. Answer fields follow the root judge
+ * value types; this storage guard does not impose a wire's probability or candidate limits.
+ *
+ * @param value - The unknown stored record
+ * @returns True if the record satisfies the judgment contract; false otherwise
+ * @example
+ * ```ts
+ * isJudgment({ id: 'q', question: { form: 'noul' }, answer: { form: 'noul', noul: 0.9 }, model: 'judge', sources: [], state: 'text', time: 0 }) // true
+ * isJudgment({ id: 'q' }) // false
+ * ```
+ */
+export function isJudgment(value: unknown): value is Judgment {
+	const checked = attempt(() => {
+		if (!isRecord(value)) return false
+		const { answer, refusal } = value
+		if (
+			!objectOf(
+				{
+					id: isString,
+					question: isJudgeQuestion,
+					model: isString,
+					sources: arrayOf(isString),
+					state: isString,
+					time: isNumber,
+					usage: optionalOf(isTokenUsage),
+				},
+				['usage'],
+			)(value)
+		)
+			return false
+		if (answer === undefined) return objectOf({ missing: arrayOf(isString) })(refusal)
+		if (refusal !== undefined || !isRecord(answer)) return false
+		if (answer.form === 'noul') return isNumber(answer.noul)
+		if (answer.form === 'score') return arrayOf(isNumber)(answer.probabilities)
+		return (
+			answer.form === 'choice' &&
+			isRecord(answer.probabilities) &&
+			Object.values(answer.probabilities).every(isNumber)
+		)
+	})
+	return checked.success && checked.value
+}
 
 /**
  * Checks whether an `unknown` is structurally a {@link Section} record — a `string` `id` and
@@ -63,9 +120,17 @@ export function isSection(value: unknown): value is Section {
  * ```
  */
 export function isConversationSnapshot(value: unknown): value is ConversationSnapshot {
-	if (!isRecord(value)) return false
-	if (!isString(value.id)) return false
-	if (value.summary !== undefined && !isString(value.summary)) return false
-	if (!isArray(value.sections) || !value.sections.every(isSection)) return false
-	return isArray(value.messages) && value.messages.every(isMessage)
+	return (
+		isRecord(value) &&
+		objectOf(
+			{
+				id: isString,
+				summary: optionalOf(isString),
+				sections: arrayOf(isSection),
+				messages: arrayOf(isMessage),
+				judgments: optionalOf(arrayOf(isJudgment)),
+			},
+			['summary', 'judgments'],
+		)(value)
+	)
 }

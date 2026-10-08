@@ -6,6 +6,7 @@ import type {
 	ConversationReferenceOptions,
 	ConversationSnapshot,
 	ConversationSummaryHandler,
+	JudgmentManagerInterface,
 	Section,
 } from './types.js'
 import type { Message, MessageInput } from '../types.js'
@@ -16,6 +17,7 @@ import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
 import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
 import { removeEntries } from '../helpers.js'
+import { JudgmentManager } from './JudgmentManager.js'
 
 /**
  * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat
@@ -84,6 +86,7 @@ export class Conversation implements ConversationInterface {
 	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
 	// immutable messages keyed by their minted id (the flat store mechanics folded in).
 	readonly #messages = new Map<string, Message>()
+	readonly #judgments: JudgmentManager
 
 	constructor(options?: ConversationOptions) {
 		// An optional snapshot to hydrate from — its `id` is the conversation's identity (so it
@@ -94,6 +97,7 @@ export class Conversation implements ConversationInterface {
 		// every caller reaches it through — `createConversation(options)` hydrates through it, and
 		// `ConversationManager.add` passes a stored snapshot in the same options object.
 		const snapshot = options?.snapshot
+		this.#judgments = new JudgmentManager(snapshot?.judgments)
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>({
 			...(options?.on === undefined ? {} : { on: options.on }),
@@ -114,6 +118,10 @@ export class Conversation implements ConversationInterface {
 
 	get id(): string {
 		return this.#id
+	}
+
+	get judgments(): JudgmentManagerInterface {
+		return this.#judgments
 	}
 
 	get emitter(): EmitterInterface<ConversationEventMap> {
@@ -291,6 +299,7 @@ export class Conversation implements ConversationInterface {
 			...(this.#summary === undefined ? {} : { summary: this.#summary }),
 			sections: this.sections,
 			messages: this.messages(),
+			judgments: this.#judgments.judgments(),
 		}
 	}
 

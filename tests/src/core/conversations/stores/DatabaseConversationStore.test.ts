@@ -13,6 +13,7 @@ import {
 	conversationStoreTwoIds,
 	conversationStoreUpsert,
 	TOOL_SNAPSHOT,
+	JUDGMENT_SNAPSHOT,
 } from '../../../../setup.js'
 
 const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
@@ -34,6 +35,25 @@ const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
 // its TWIN-SPECIFIC blocks below: the default-driver overload, cross-instance durability over a shared
 // driver, and sibling-store non-collision.
 describe('DatabaseConversationStore', () => {
+	it('round trips judgment answers, refusals, and recorded times', async () => {
+		const store = makeStore()
+		await store.set(JUDGMENT_SNAPSHOT)
+		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+	})
+
+	it('refuses a malformed judgments member read from its real table', async () => {
+		const driver = createMemoryDriver()
+		const database = createDatabase({
+			driver,
+			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+		})
+		await database.table('conversations').set({
+			id: JUDGMENT_SNAPSHOT.id,
+			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ id: 'broken' }] },
+		})
+		await database.close()
+		expect(await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id)).toBeUndefined()
+	})
 	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
 		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
 			const { snapshot, got } = await conversationStoreRoundTrip(

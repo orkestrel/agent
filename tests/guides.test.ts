@@ -495,8 +495,8 @@ await new GuideCommand({
 			thread.clear()
 
 			// `summary?` is optional and absent until the first compaction, so an uncompacted
-			// conversation's snapshot carries `id` / `sections` / `messages` and omits it.
-			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages'])
+			// conversation's snapshot carries its messages and judgments and omits the summary.
+			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages', 'judgments'])
 		})
 
 		it('answers the conversation-store fence with real memory and database stores', async () => {

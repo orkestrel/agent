@@ -1,7 +1,60 @@
-import { isConversationSnapshot, isSection } from '@src/core'
+import { isConversationSnapshot, isJudgment, isSection } from '@src/core'
 import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { buildConversationSnapshot, TOOL_SNAPSHOT } from '../../../setup.js'
+import {
+	buildConversationSnapshot,
+	TOOL_SNAPSHOT,
+	JUDGMENT_RECORD,
+	JUDGMENT_SNAPSHOT,
+	INVALID_JUDGMENTS,
+	JUDGMENT_USAGE,
+	TEV1_CHOICE,
+	TEV1_SCORE,
+} from '../../../setup.js'
+
+describe('isJudgment and snapshot carriage', () => {
+	it('accepts answers, refusals, usage, and snapshots with or without judgments', () => {
+		expect(isJudgment(JUDGMENT_RECORD)).toBe(true)
+		expect(isJudgment({ ...JUDGMENT_RECORD, usage: JUDGMENT_USAGE })).toBe(true)
+		expect(isJudgment({ ...JUDGMENT_RECORD, answer: TEV1_CHOICE })).toBe(true)
+		expect(isJudgment({ ...JUDGMENT_RECORD, answer: TEV1_SCORE })).toBe(true)
+		expect(JUDGMENT_SNAPSHOT.judgments?.every(isJudgment)).toBe(true)
+		expect(isConversationSnapshot(JUDGMENT_SNAPSHOT)).toBe(true)
+		expect(isConversationSnapshot({ id: 'old', sections: [], messages: [] })).toBe(true)
+		expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: null })).toBe(false)
+		expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: {} })).toBe(false)
+	})
+	it.each(INVALID_JUDGMENTS)(
+		'refuses malformed record %# in isolation and in a snapshot',
+		(record) => {
+			expect(isJudgment(record)).toBe(false)
+			expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: [record] })).toBe(false)
+		},
+	)
+	it('contains unreadable fields and cyclic questions at the storage boundary', () => {
+		const hostile = new Proxy(JUDGMENT_RECORD, {
+			get() {
+				throw new Error('unreadable')
+			},
+		})
+		expect(isJudgment(hostile)).toBe(false)
+		expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: [hostile] })).toBe(false)
+		const cycle: Record<string, unknown> = {}
+		cycle.self = cycle
+		expect(
+			isJudgment({ ...JUDGMENT_RECORD, question: { form: 'noul', instructions: cycle } }),
+		).toBe(false)
+		expect(
+			isConversationSnapshot(
+				new Proxy(JUDGMENT_SNAPSHOT, {
+					get() {
+						throw new Error('unreadable')
+					},
+				}),
+			),
+		).toBe(false)
+	})
+})
 
 // The conversation read-boundary guards — `isSection` and `isConversationSnapshot`. Each is
 // TOTAL: adversarial input returns `false` and never throws, so an untrusted storage read narrows
@@ -110,7 +163,9 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 	it('accepts a snapshot revived from JSON (the storage-read shape the DB store narrows)', async () => {
 		// The exact value a DatabaseConversationStore reads back from its opaque JSON column — a plain
 		// object the guard must accept structurally (no class instances required).
-		const revived = roundTripJSON(await buildConversationSnapshot())
+		// `JSONSafe` maps the all-optional `NoulCriteria` under a judgment to `never`, so the round trip
+		// is typed `unknown`, which is what a read-boundary guard takes.
+		const revived = roundTripJSON<unknown>(await buildConversationSnapshot())
 		expect(isConversationSnapshot(revived)).toBe(true)
 	})
 })

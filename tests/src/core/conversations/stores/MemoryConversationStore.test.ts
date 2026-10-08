@@ -12,6 +12,7 @@ import {
 	conversationStoreTwoIds,
 	conversationStoreUpsert,
 	TOOL_SNAPSHOT,
+	JUDGMENT_SNAPSHOT,
 } from '../../../../setup.js'
 
 const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
@@ -33,6 +34,11 @@ const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
 // live in tests/src/core/conversations/validators.test.ts and the message guard in
 // tests/src/core/validators.test.ts, each beside its module.
 describe('MemoryConversationStore', () => {
+	it('round trips judgment answers, refusals, and recorded times', async () => {
+		const store = makeStore()
+		await store.set(JUDGMENT_SNAPSHOT)
+		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+	})
 	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
 		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
 			const { snapshot, got } = await conversationStoreRoundTrip(
@@ -104,7 +110,9 @@ describe('MemoryConversationStore — JSON driver-swap parity', () => {
 		const got = await store.get(snapshot.id)
 		expect(got).toBeDefined()
 		if (got === undefined) return
-		expect(roundTripJSON(got)).toEqual(got)
+		// `JSONSafe` maps the all-optional `NoulCriteria` under a judgment to `never`, so the round trip
+		// is typed `unknown` here.
+		expect(roundTripJSON<unknown>(got)).toEqual(got)
 	})
 })
 
@@ -114,7 +122,7 @@ describe('MemoryConversationStore — tool messages with and without call', () =
 		await store.set(TOOL_SNAPSHOT)
 		const got = requireValue(await store.get(TOOL_SNAPSHOT.id))
 		expect(got).toEqual(TOOL_SNAPSHOT)
-		expect(roundTripJSON(got)).toEqual(TOOL_SNAPSHOT)
+		expect(roundTripJSON<unknown>(got)).toEqual(TOOL_SNAPSHOT)
 		expect(got.messages.at(-1)?.call).toBe('call-oslo')
 		expect(got.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
 	})

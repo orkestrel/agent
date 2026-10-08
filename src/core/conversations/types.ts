@@ -1,5 +1,75 @@
-import type { Message, MessageInput } from '../types.js'
+import type {
+	JudgeAnswer,
+	JudgeInterface,
+	JudgeQuestion,
+	JudgeRequest,
+	Message,
+	MessageInput,
+	Refusal,
+} from '../types.js'
+import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
+
+/** Records an answered or refused question with its sources, state, model, and storage time. */
+export interface Judgment {
+	readonly id: string
+	readonly question: JudgeQuestion
+	/** Carries the answer when the question was answered; mutually exclusive with refusal. */
+	readonly answer?: JudgeAnswer
+	/** Carries the refusal when the question was refused; mutually exclusive with answer. */
+	readonly refusal?: Refusal
+	readonly model: string
+	readonly sources: readonly string[]
+	readonly state: string
+	readonly time: number
+	/** Carries usage only when the answering request held this question alone. */
+	readonly usage?: TokenUsage
+}
+
+/** Supplies an answered or refused question for storage before its time is stamped. */
+export interface JudgmentInput {
+	readonly id: string
+	readonly question: JudgeQuestion
+	readonly answer?: JudgeAnswer
+	readonly refusal?: Refusal
+	readonly model: string
+	readonly sources: readonly string[]
+	readonly state: string
+	readonly usage?: TokenUsage
+}
+
+/** Stores judgments by caller key and resolves requests by reusing matching records. */
+export interface JudgmentManagerInterface {
+	readonly count: number
+	/** Stores inputs with the current epoch milliseconds; an existing key is replaced. */
+	add(input: JudgmentInput): Judgment
+	add(inputs: readonly JudgmentInput[]): readonly Judgment[]
+	/** Returns the record for a key, or `undefined` when absent. */
+	judgment(id: string): Judgment | undefined
+	/** Returns stored records in insertion order. */
+	judgments(): readonly Judgment[]
+	/** Removes every supplied key; returns `true` only when all were present. */
+	remove(id: string): boolean
+	remove(ids: readonly string[]): boolean
+	/** Removes all records. */
+	clear(): void
+	/**
+	 * Reuses matching records and asks for the unmatched questions in one request.
+	 *
+	 * @param judge - The judge whose model identity participates in reuse
+	 * @param request - The state and keyed questions to resolve
+	 * @param sources - The ordered message ids the questions concern
+	 * @param signal - The cancellation signal checked before asking
+	 * @returns The resolved records in request key order
+	 * @throws JudgeAbortError Thrown when asking aborts, after completed partial records are stored
+	 */
+	resolve(
+		judge: JudgeInterface,
+		request: JudgeRequest,
+		sources: readonly string[],
+		signal: AbortSignal,
+	): Promise<readonly Judgment[]>
+}
 
 /**
  * Stores immutable {@link Message}s in insertion order and mints each `id` on `add` — the
@@ -248,6 +318,8 @@ export interface ConversationReferenceOptions {
  */
 export interface ConversationInterface {
 	readonly id: string
+	/** Holds the judgments recorded beside this conversation's messages. */
+	readonly judgments: JudgmentManagerInterface
 	readonly emitter: EmitterInterface<ConversationEventMap>
 	/** Holds the conversation rollup (a summary-of-summaries), regenerated on each compaction; `undefined` until the first. */
 	readonly summary: string | undefined
@@ -408,6 +480,8 @@ export interface ConversationInterface {
  */
 export interface ConversationSnapshot {
 	readonly id: string
+	/** Carries recorded judgments; absent in snapshots saved before judgment storage. */
+	readonly judgments?: readonly Judgment[]
 	/** Holds the rollup (a summary-of-summaries); `undefined` until the first compaction. */
 	readonly summary?: string
 	/** Lists the compacted history, oldest → newest (each section retains its folded originals). */

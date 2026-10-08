@@ -1,6 +1,81 @@
-import type { Section } from './types.js'
-import type { Message } from '../types.js'
+import type { Judgment, JudgmentInput, Section } from './types.js'
+import type { JudgeQuestion, JudgeRequest, JudgeResult, Message } from '../types.js'
+import { canonicalStringify } from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
+
+/**
+ * Builds records for answered or refused request keys, attaching usage only for a single question.
+ *
+ * @param request - The request whose question keys define record order
+ * @param result - The reported answers, refusals, model, and usage
+ * @param sources - The ordered source message ids
+ * @param state - The rendered state read by the judge
+ * @returns Inputs for completed question keys in request order
+ * @example
+ * ```ts
+ * buildJudgments(request, result, ['message-a'], 'Charged twice')
+ * ```
+ */
+export function buildJudgments(
+	request: JudgeRequest,
+	result: JudgeResult,
+	sources: readonly string[],
+	state: string,
+): readonly JudgmentInput[] {
+	const judgments: JudgmentInput[] = []
+	const single = Object.keys(request.questions).length === 1
+	for (const [id, question] of Object.entries(request.questions)) {
+		const answer = Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
+		const refusal =
+			result.refusals !== undefined && Object.hasOwn(result.refusals, id)
+				? result.refusals[id]
+				: undefined
+		if (answer === undefined && refusal === undefined) continue
+		judgments.push({
+			id,
+			question,
+			model: result.model,
+			sources,
+			state,
+			...(answer !== undefined ? { answer } : refusal !== undefined ? { refusal } : {}),
+			...(single && result.usage !== undefined ? { usage: result.usage } : {}),
+		})
+	}
+	return judgments
+}
+
+/**
+ * Matches a recorded question, ordered sources, rendered state, and model identity by JSON value.
+ *
+ * @param judgment - The recorded judgment to compare
+ * @param question - The question to ask
+ * @param sources - The ordered source message ids
+ * @param state - The rendered state to compare
+ * @param model - The configured judge identity
+ * @returns True if every identity component matches; false otherwise
+ * @example
+ * ```ts
+ * matchesJudgment(judgment, question, ['message-a'], 'Charged twice', judge.model)
+ * ```
+ */
+export function matchesJudgment(
+	judgment: Judgment,
+	question: JudgeQuestion,
+	sources: readonly string[],
+	state: string,
+	model: string,
+): boolean {
+	return (
+		judgment.model === model &&
+		judgment.state === state &&
+		judgment.sources.length === sources.length &&
+		judgment.sources.every((id, index) => id === sources[index]) &&
+		judgment.question.form === question.form &&
+		canonicalStringify(judgment.question.instructions) ===
+			canonicalStringify(question.instructions) &&
+		canonicalStringify(judgment.question.criteria) === canonicalStringify(question.criteria)
+	)
+}
 
 /**
  * Builds the raw synthetic summary message for one compacted section — role `'assistant'`, the

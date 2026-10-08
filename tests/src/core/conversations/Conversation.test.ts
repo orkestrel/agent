@@ -688,7 +688,9 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 		await conversation.compact()
 
 		const snapshot = conversation.snapshot()
-		expect(roundTripJSON(snapshot)).toEqual(snapshot)
+		// `JSONSafe` maps the all-optional `NoulCriteria` under a judgment to `never`, so the round trip
+		// is typed `unknown` here.
+		expect(roundTripJSON<unknown>(snapshot)).toEqual(snapshot)
 	})
 })
 

@@ -7,6 +7,9 @@ import type {
 	JudgeAnswer,
 	JudgeRequest,
 	JudgeResult,
+	Judgment,
+	JudgmentInput,
+	JudgeQuestion,
 	NoulAnswer,
 	Refusal,
 	ScoreAnswer,
@@ -41,6 +44,7 @@ import {
 	ProviderAbortError,
 	ProviderError,
 	Scope,
+	SystemOneJudge,
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
 import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
@@ -50,6 +54,108 @@ import { createBinaryContent, createFile, createTextContent } from '@orkestrel/w
 
 /** Exercises tool dispatch with authority configured and omitted. */
 export const AUTHORITY_STATES = Object.freeze([true, false])
+
+/** Supplies the question reused by judgment identity cases. */
+export const JUDGMENT_QUESTION: JudgeQuestion = Object.freeze({
+	form: 'noul',
+	instructions: 'Is a refund owed?',
+	criteria: { true: 'Charged twice', false: 'Charged once' },
+})
+
+/** Supplies a single answered question before storage stamps its time. */
+export const JUDGMENT_INPUT: JudgmentInput = Object.freeze<JudgmentInput>({
+	id: 'refund',
+	question: JUDGMENT_QUESTION,
+	answer: { form: 'noul', noul: 0.9 },
+	model: 'tev1:0.8b',
+	sources: ['message-a', 'message-b'],
+	state: 'Charged twice',
+})
+
+/** Supplies a persisted record with a fixed time for identity and restoration tests. */
+export const JUDGMENT_RECORD: Judgment = Object.freeze({ ...JUDGMENT_INPUT, time: 1234 })
+
+/** Supplies answered and refused records in one persisted snapshot. */
+export const JUDGMENT_SNAPSHOT: ConversationSnapshot = Object.freeze({
+	id: 'judged',
+	sections: [],
+	messages: [],
+	judgments: [
+		JUDGMENT_RECORD,
+		{
+			id: 'refused',
+			question: JUDGMENT_QUESTION,
+			refusal: { missing: ['true'] },
+			model: 'tev1:0.8b',
+			sources: ['message-a'],
+			state: 'Charged twice',
+			time: 2345,
+		},
+	],
+})
+
+/** Lists independently malformed judgment members for storage guard tests. */
+export const INVALID_JUDGMENTS: readonly unknown[] = Object.freeze([
+	null,
+	{},
+	{ ...JUDGMENT_RECORD, id: 1 },
+	{ ...JUDGMENT_RECORD, model: 1 },
+	{ ...JUDGMENT_RECORD, question: { form: 'other' } },
+	{ ...JUDGMENT_RECORD, sources: [1] },
+	{ ...JUDGMENT_RECORD, state: {} },
+	{ ...JUDGMENT_RECORD, time: '1234' },
+	{ ...JUDGMENT_RECORD, usage: { prompt: -1 } },
+	{ ...JUDGMENT_RECORD, answer: undefined },
+	{ ...JUDGMENT_RECORD, refusal: { missing: [] } },
+	{ ...JUDGMENT_RECORD, answer: { form: 'noul', noul: 'yes' } },
+	{ ...JUDGMENT_RECORD, answer: { form: 'score', probabilities: [0, '1'] } },
+	{ ...JUDGMENT_RECORD, answer: { form: 'choice', probabilities: { yes: '1' } } },
+	{ ...JUDGMENT_RECORD, answer: undefined, refusal: { missing: [1] } },
+])
+
+/** Supplies request usage independently of judgment construction. */
+export const JUDGMENT_USAGE: TokenUsage = Object.freeze({ prompt: 975, completion: 4, total: 979 })
+
+/** Names each independent mismatch against the shared judgment record. */
+export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = Object.freeze([
+	['source', { ...JUDGMENT_RECORD, sources: ['message-c', 'message-b'] }],
+	['source order', { ...JUDGMENT_RECORD, sources: ['message-b', 'message-a'] }],
+	[
+		'text',
+		{ ...JUDGMENT_RECORD, question: { ...JUDGMENT_QUESTION, instructions: 'Was payment valid?' } },
+	],
+	[
+		'criterion',
+		{
+			...JUDGMENT_RECORD,
+			question: {
+				form: 'noul',
+				instructions: 'Is a refund owed?',
+				criteria: { true: 'Charged thrice', false: 'Charged once' },
+			},
+		},
+	],
+	[
+		'form',
+		{
+			...JUDGMENT_RECORD,
+			question: {
+				form: 'score',
+				instructions: 'Is a refund owed?',
+				criteria: ['Charged once', 'Charged twice'],
+			},
+		},
+	],
+	['state', { ...JUDGMENT_RECORD, state: 'Charged once' }],
+	['identity', { ...JUDGMENT_RECORD, model: 'other-model' }],
+])
+
+/** Drives the real System One wire methods through the judge engine's sequential mode. */
+export class SequentialSystemOneJudge extends AgentJudge {
+	readonly name = 'systemone'
+	readonly body = SystemOneJudge.prototype.body
+	readonly read = SystemOneJudge.prototype.read
+}
 
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
