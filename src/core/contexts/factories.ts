@@ -13,10 +13,11 @@ import type {
 	SelectionOptions,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { isArray, isFiniteNumber, parseJSON } from '@orkestrel/contract'
+import { isFiniteNumber } from '@orkestrel/contract'
 import { matchesJudgment } from '../conversations/helpers.js'
 import { isJudgeAbortError } from '../errors.js'
 import { sumUsage } from '../helpers.js'
+import { SelectionError } from './errors.js'
 import {
 	buildConditionKey,
 	buildNeededQuestion,
@@ -24,6 +25,7 @@ import {
 	inferApplicability,
 	renderSelectionState,
 } from './helpers.js'
+import { parseConditionKey } from './parsers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { Scope } from './scopes/Scope.js'
@@ -40,7 +42,7 @@ import { AgentContext } from './AgentContext.js'
  *
  * @param options - The judge, screen, needed criterion, and fresh question limit
  * @returns The application-installed selection handler
- * @throws RangeError Thrown when the threshold is outside (0.5, 1] or the limit is not a nonnegative safe integer
+ * @throws SelectionError Thrown when the threshold is outside the interval above 0.5 up to and including 1 (code `'THRESHOLD'`) or the limit is not a nonnegative safe integer (code `'LIMIT'`)
  * @example
  * ```ts
  * const select = createSelection({ judge, screen, needed, limit: 12 })
@@ -50,29 +52,26 @@ export function createSelection(options: SelectionOptions): SelectionHandler {
 	const { judge, screen, limit } = options
 	const needed = { ...options.needed }
 	if (!isFiniteNumber(needed.threshold) || needed.threshold <= 0.5 || needed.threshold > 1)
-		throw new RangeError('selection threshold must be greater than 0.5 and at most 1')
+		throw new SelectionError(
+			'THRESHOLD',
+			'selection threshold must be greater than 0.5 and at most 1',
+		)
 	if (!Number.isSafeInteger(limit) || limit < 0)
-		throw new RangeError('selection limit must be a nonnegative safe integer')
+		throw new SelectionError('LIMIT', 'selection limit must be a nonnegative safe integer')
 	return async (conversation, request, signal) => {
 		const judgments: string[] = []
 		let usage: TokenUsage | undefined
 		let pending: string | undefined
 		try {
 			for (const judgment of conversation.judgments.judgments()) {
-				const key = parseJSON(judgment.id)
-				if (
-					isArray(key) &&
-					key.length === 3 &&
-					key[0] === 'needed' &&
-					typeof key[1] === 'string' &&
-					typeof key[2] === 'string' &&
-					key[2] !== request.id
-				)
-					conversation.judgments.remove(judgment.id)
+				const key = parseConditionKey(judgment.id)
+				if (key !== undefined && key[2] !== request.id) conversation.judgments.remove(judgment.id)
 			}
 			const view = conversation.view()
 			const present = new Set(view.map((message) => message.id))
-			const subjects = [...new Set(screen(conversation, request))].filter((id) => present.has(id))
+			const subjects = [...new Set(screen(conversation, request))].filter(
+				(id) => id !== request.id && present.has(id),
+			)
 			const question = buildNeededQuestion(needed)
 			let fresh = 0
 			for (const id of subjects) {

@@ -49,6 +49,7 @@ import {
 	createSelection,
 	NEEDED_CRITERION,
 	InstructionManager,
+	parseConditionKey,
 	JudgeError,
 	ProviderAbortError,
 	ProviderError,
@@ -56,7 +57,7 @@ import {
 	SystemOneJudge,
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
-import { isArray, isRecord, isString, parseJSON, parseJSONAs } from '@orkestrel/contract'
+import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
 import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
@@ -238,8 +239,8 @@ export function createStockSelectionFixture(
 		const questions: Record<string, JudgeQuestion> = {}
 		const answers: Record<string, unknown> = {}
 		for (const [id, question] of Object.entries(body.questions)) {
-			const key = parseJSON(id)
-			if (!isArray(key) || !isString(key[1]) || !isRecord(question))
+			const key = parseConditionKey(id)
+			if (key === undefined || !isRecord(question))
 				throw new Error('selection fixture received an unreadable question key')
 			const subject = key[1]
 			questions[id] = {

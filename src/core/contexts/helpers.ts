@@ -23,14 +23,14 @@ export function buildConditionKey(condition: 'needed', subject: string, object: 
 
 /**
  * Builds the fixed needed question with the application's true and false criteria.
- * @param needed - The application criterion; its threshold is used only when reading answers
+ * @param needed - The true and false criteria, such as `NEEDED_CRITERION`
  * @returns The binary question whose instructions remain stable across compaction
  * @example
  * ```ts
- * buildNeededQuestion({ yes: 'Required', no: 'Unrelated', threshold: 0.9 })
+ * buildNeededQuestion(NEEDED_CRITERION)
  * ```
  */
-export function buildNeededQuestion(needed: Criterion): NoulQuestion {
+export function buildNeededQuestion(needed: Pick<Criterion, 'yes' | 'no'>): NoulQuestion {
 	return {
 		form: 'noul',
 		instructions: NEEDED_QUESTION,
@@ -67,6 +67,11 @@ export function renderSelectionState(
 
 /**
  * Derives needed conditions from matching recorded judgments without asking a judge.
+ *
+ * @remarks
+ * The threshold must lie in the interval above 0.5 up to and including 1, and `createSelection`
+ * refuses any other value. The helper reads the true side first.
+ *
  * @param conversation - The conversation supplying the view and recorded judgments
  * @param request - The user message the selection serves
  * @param options - The judge identity, screen, and application criterion
@@ -153,11 +158,7 @@ export function filterSelectionMessages(
 			leader !== undefined &&
 			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
 		const owners = message.call === undefined ? undefined : calls.get(message.call)
-		const owner = paired
-			? leader
-			: leader === undefined && owners?.length === 1
-				? owners[0]
-				: undefined
+		const owner = paired ? leader : owners?.length === 1 ? owners[0] : undefined
 		const group = owner === undefined ? undefined : groups.get(owner)
 		if (group !== undefined) group.push(message)
 		else {

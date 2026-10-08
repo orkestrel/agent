@@ -1,15 +1,18 @@
 import { createTool, createToolManager } from '@orkestrel/tool'
 import type { Criterion, Selection } from '@src/core'
+import * as core from '@src/core'
 import {
 	buildConditionKey,
 	createAgentContext,
 	createSelection,
 	inferApplicability,
+	isSelectionError,
 	JudgeAbortError,
 	NEEDED_CRITERION,
 	NEEDED_QUESTION,
 } from '@src/core'
-import { requireValue } from '@orkestrel/test'
+import { isRecord } from '@orkestrel/contract'
+import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	buildSelectionCostMessages,
@@ -54,16 +57,32 @@ describe('createSelection', () => {
 		expectTypeOf<typeof NEEDED_CRITERION>().not.toHaveProperty('threshold')
 		expectTypeOf<Selection>().not.toHaveProperty('tools')
 		expect(NEEDED_CRITERION).not.toHaveProperty('threshold')
+		expect(NEEDED_CRITERION).toEqual({
+			yes: 'A states something the work in B must respect',
+			no: 'A can be left out and the request in B is still done correctly',
+		})
+		expect(Object.isFrozen(NEEDED_CRITERION)).toBe(true)
+		expectTypeOf({ ...NEEDED_CRITERION, threshold: 0.9 }).toExtend<Criterion>()
+		expect(Object.keys(core).filter((name) => name.includes('THRESHOLD'))).toEqual([])
+		expect(
+			Object.entries(core)
+				.filter(([, value]) => isRecord(value) && Object.hasOwn(value, 'threshold'))
+				.map(([name]) => name),
+		).toEqual([])
 		const fixture = createStockSelectionFixture(0.9)
 		expect(fixture.transport.requests).toEqual([])
 	})
 
 	it.each(INVALID_SELECTION_THRESHOLDS)('refuses invalid threshold %s', (threshold) => {
-		expect(() => createStockSelectionFixture(threshold)).toThrow(RangeError)
+		const error = captureError(() => createStockSelectionFixture(threshold))
+		expect(isSelectionError(error)).toBe(true)
+		expect(isSelectionError(error) ? error.code : undefined).toBe('THRESHOLD')
 	})
 
 	it.each(INVALID_SELECTION_LIMITS)('refuses invalid limit %s', (limit) => {
-		expect(() => createStockSelectionFixture(0.9, { limit })).toThrow(RangeError)
+		const error = captureError(() => createStockSelectionFixture(0.9, { limit }))
+		expect(isSelectionError(error)).toBe(true)
+		expect(isSelectionError(error) ? error.code : undefined).toBe('LIMIT')
 	})
 
 	it('keeps every message without usage for a zero limit or an empty screen', async () => {
@@ -87,10 +106,10 @@ describe('createSelection', () => {
 		const first = await fixture.select(fixture.conversation, fixture.request, signal)
 		expect(first.fault).toBeUndefined()
 		expect(first.messages).toEqual([fixture.request])
-		expect(first.judgments).toHaveLength(6)
-		expect(first.usage).toEqual({ prompt: 5850, completion: 24, total: 5874 })
+		expect(first.judgments).toHaveLength(5)
+		expect(first.usage).toEqual({ prompt: 4875, completion: 20, total: 4895 })
 		const second = await fixture.select(fixture.conversation, fixture.request, signal)
-		expect(fixture.transport.requests).toHaveLength(6)
+		expect(fixture.transport.requests).toHaveLength(5)
 		expect(second).toEqual({ messages: [fixture.request], judgments: first.judgments })
 		const body: unknown = await requireValue(fixture.transport.requests[0]).json()
 		expect(body).toMatchObject({
@@ -112,12 +131,12 @@ describe('createSelection', () => {
 		await fixture.select(fixture.conversation, fixture.request, signal)
 		await fixture.conversation.compact({ keep: 6 })
 		await fixture.select(fixture.conversation, fixture.request, signal)
-		expect(fixture.transport.requests).toHaveLength(6)
+		expect(fixture.transport.requests).toHaveLength(5)
 		await fixture.conversation.compact({ keep: 2 })
 		await fixture.select(fixture.conversation, fixture.request, signal)
-		expect(fixture.transport.requests).toHaveLength(9)
+		expect(fixture.transport.requests).toHaveLength(7)
 		const repeated = await fixture.select(fixture.conversation, fixture.request, signal)
-		expect(fixture.transport.requests).toHaveLength(9)
+		expect(fixture.transport.requests).toHaveLength(7)
 		expect(repeated.usage).toBeUndefined()
 		expect(
 			fixture.conversation.judgments.judgment(buildConditionKey('needed', 'unrelated', 'request'))
@@ -131,10 +150,10 @@ describe('createSelection', () => {
 		await fixture.select(fixture.conversation, fixture.request, signal)
 		fixture.conversation.remove('standing')
 		const selected = await fixture.select(fixture.conversation, fixture.request, signal)
-		expect(fixture.transport.requests).toHaveLength(11)
-		expect(selected.judgments).toHaveLength(5)
+		expect(fixture.transport.requests).toHaveLength(9)
+		expect(selected.judgments).toHaveLength(4)
 		expect(selected.judgments).not.toContain(buildConditionKey('needed', 'standing', 'request'))
-		expect(selected.usage).toEqual({ prompt: 4875, completion: 20, total: 4895 })
+		expect(selected.usage).toEqual({ prompt: 3900, completion: 16, total: 3916 })
 	})
 
 	it('spends the limit only on fresh questions and keeps the unasked subjects', async () => {
@@ -179,7 +198,7 @@ describe('createSelection', () => {
 		expect(
 			selected.messages.every((message) => fixture.conversation.view().includes(message)),
 		).toBe(true)
-		expect(fixture.transport.requests).toHaveLength(2)
+		expect(fixture.transport.requests).toHaveLength(1)
 		expect(selected).not.toHaveProperty('tools')
 	})
 
@@ -264,7 +283,7 @@ describe('createSelection', () => {
 		expect(fixture.conversation.judgments.judgments().map((record) => record.id)).toEqual([
 			'other-condition',
 		])
-		expect(fixture.transport.requests).toHaveLength(6)
+		expect(fixture.transport.requests).toHaveLength(5)
 	})
 
 	it('returns the complete view, recorded keys, and spent usage when the transport fails', async () => {
@@ -295,7 +314,28 @@ describe('createSelection', () => {
 		expect(fixture.transport.requests).toHaveLength(0)
 	})
 
+	it('checks the signal after reusing every judgment and preserves its original reason', async () => {
+		const fixture = createStockSelectionFixture(0.9)
+		const first = await fixture.select(
+			fixture.conversation,
+			fixture.request,
+			new AbortController().signal,
+		)
+		const count = fixture.transport.requests.length
+		const controller = new AbortController()
+		const cause = new Error('selection cancelled after reuse')
+		controller.abort(cause)
+		const selected = await fixture.select(fixture.conversation, fixture.request, controller.signal)
+		expect(selected.fault?.cause).toBe(cause)
+		expect(selected.messages).toEqual(fixture.conversation.view())
+		expect(selected.judgments).toEqual(first.judgments)
+		expect(selected.judgments).toHaveLength(5)
+		expect(selected.usage).toBeUndefined()
+		expect(fixture.transport.requests).toHaveLength(count)
+	})
+
 	it('charges an abort partial and lists its recorded answer without double charging', async () => {
+		// The fetch-level throw reaches the handler because the engine rethrows a JudgeAbortError unchanged, and no engine path builds this partial for a one-question request.
 		const fixture = createStockSelectionFixture(0.9, {
 			respond: (request, index) => {
 				const answers = Object.fromEntries(
@@ -340,7 +380,7 @@ describe('createSelection', () => {
 	})
 
 	it('does not report a stale pending record as reused when a refresh fails', async () => {
-		const fixture = createStockSelectionFixture(0.9, { failure: { at: 7, cause: 'unavailable' } })
+		const fixture = createStockSelectionFixture(0.9, { failure: { at: 6, cause: 'unavailable' } })
 		const signal = new AbortController().signal
 		await fixture.select(fixture.conversation, fixture.request, signal)
 		fixture.conversation.add({ role: 'assistant', content: 'Additional context.' })
@@ -365,20 +405,16 @@ describe('createSelection', () => {
 		)
 		expect(selected.messages.map((message) => message.id)).toEqual(['standing', 'request'])
 		expect(selected.usage).toBeUndefined()
-		expect(fixture.transport.requests).toHaveLength(6)
+		expect(fixture.transport.requests).toHaveLength(5)
 		expect(inferApplicability(fixture.conversation, fixture.request, fixture.options)[0]).toEqual({
 			id: 'standing',
 		})
 	})
 
-	it('keeps the default context path free of judge requests', async () => {
-		const fixture = createStockSelectionFixture(0.9)
+	it('keeps the default context path free of judge requests', () => {
 		const context = createAgentContext()
 		const request = context.messages.add({ role: 'user', content: 'Continue.' })
 		expect(context.select(request, new AbortController().signal)).toBeUndefined()
-		expect(fixture.transport.requests).toHaveLength(0)
-		await fixture.select(fixture.conversation, fixture.request, new AbortController().signal)
-		expect(fixture.transport.requests).toHaveLength(6)
 	})
 
 	it('derives the labelled stand-in expectations from recorded probabilities at the test cutoff', async () => {
@@ -424,15 +460,15 @@ describe('createSelection', () => {
 		)
 		const full = createStockSelectionFixture(0.9, { messages, limit: 30 })
 		await full.select(full.conversation, full.request, signal)
-		expect(full.transport.requests).toHaveLength(25)
+		expect(full.transport.requests).toHaveLength(24)
 		await full.conversation.compact({ keep: 16 })
 		await full.select(full.conversation, full.request, signal)
-		expect(full.transport.requests).toHaveLength(42)
+		expect(full.transport.requests).toHaveLength(40)
 		await full.conversation.compact({ keep: 10 })
 		await full.select(full.conversation, full.request, signal)
-		expect(full.transport.requests).toHaveLength(54)
+		expect(full.transport.requests).toHaveLength(51)
 		await full.conversation.compact({ keep: 4 })
 		await full.select(full.conversation, full.request, signal)
-		expect(full.transport.requests).toHaveLength(61)
+		expect(full.transport.requests).toHaveLength(57)
 	})
 })

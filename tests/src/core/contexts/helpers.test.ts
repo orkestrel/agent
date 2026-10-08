@@ -1,4 +1,4 @@
-import type { Message } from '@src/core'
+import type { Criterion, Message } from '@src/core'
 import {
 	attachImages,
 	attachUserImages,
@@ -41,14 +41,13 @@ describe('stock selection helpers', () => {
 
 	it('keeps arithmetic outside the fixed question and renders all message fields with markers', () => {
 		const request = requireValue(SELECTION_STAND_IN.at(-1))
-		expect(buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.9 })).toEqual({
+		expect(buildNeededQuestion(NEEDED_CRITERION)).toEqual({
 			form: 'noul',
 			instructions: NEEDED_QUESTION,
 			criteria: { true: NEEDED_CRITERION.yes, false: NEEDED_CRITERION.no },
 		})
-		expect(buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.6 })).toEqual(
-			buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.9 }),
-		)
+		const criterion: Criterion = { ...NEEDED_CRITERION, threshold: 0.6 }
+		expect(buildNeededQuestion(criterion)).toEqual(buildNeededQuestion(NEEDED_CRITERION))
 		const rendered = renderSelectionState(SELECTION_STAND_IN, 'standing', request)
 		expect(rendered.split('\n')[0]).toBe(
 			'[A] {"id":"standing","role":"user","content":"Use only local files; do not access the internet."}',
@@ -131,6 +130,67 @@ describe('stock selection helpers', () => {
 				request,
 			),
 		).toEqual([wrong, request])
+	})
+
+	it('joins a late result to the one assistant whose call it names inside another run', () => {
+		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
+		const messages: readonly Message[] = [
+			{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
+			{ id: 'R1', role: 'tool', content: 'first result', call: 'one' },
+			{ id: 'A2', role: 'assistant', content: '', calls: [createToolCall({ id: 'two' })] },
+			{ id: 'R2', role: 'tool', content: 'second result', call: 'two' },
+			{ id: 'L1', role: 'tool', content: 'late first result', call: 'one' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(
+				messages,
+				[
+					{ id: 'A1', needed: false },
+					{ id: 'R1', needed: false },
+				],
+				request,
+			).map((message) => message.id),
+		).toEqual(['A1', 'R1', 'A2', 'R2', 'L1', 'request'])
+	})
+
+	it('keeps a positional result with no call member in its leader group', () => {
+		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
+		const messages: readonly Message[] = [
+			{ id: 'A', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
+			{ id: 'T', role: 'tool', content: 'positional result' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(messages, [{ id: 'A', needed: false }], request).map(
+				(message) => message.id,
+			),
+		).toEqual(['A', 'T', 'request'])
+	})
+
+	it('keeps every result after a duplicate-call leader in its group, whatever call it names', () => {
+		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
+		const messages: readonly Message[] = [
+			{
+				id: 'D',
+				role: 'assistant',
+				content: '',
+				calls: [createToolCall({ id: 'same' }), createToolCall({ id: 'same' })],
+			},
+			{ id: 'Ta', role: 'tool', content: 'duplicate result', call: 'same' },
+			{ id: 'Tx', role: 'tool', content: 'other result', call: 'other' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(
+				messages,
+				[
+					{ id: 'D', needed: false },
+					{ id: 'Ta', needed: false },
+				],
+				request,
+			).map((message) => message.id),
+		).toEqual(['D', 'Ta', 'Tx', 'request'])
 	})
 })
 
