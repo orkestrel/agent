@@ -1,7 +1,8 @@
 /**
  * Sets the default number of recent live messages a {@link ConversationInterface}'s `compact()`
- * retains verbatim — `0`, so a manual `compact()` folds every current live message into one
- * summarized section and keeps no tail. A caller retains a recent tail by passing `keep` (on
+ * retains verbatim — `0`, so a manual `compact()` keeps no recent tail and folds every live
+ * message before the newest user message into one summarized section. A caller retains a recent
+ * tail by passing `keep` (on
  * {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold through
  * {@link CompactOptions}), folding only the older `count - keep` messages and leaving the most
  * recent `keep` live for the next turn. Overridable everywhere `keep` is accepted.

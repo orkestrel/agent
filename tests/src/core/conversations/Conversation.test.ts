@@ -8,7 +8,7 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer } from '../../../setup.js'
+import { createStubSummarizer, createToolCall } from '../../../setup.js'
 import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@orkestrel/test'
 
 // The framed recap content a section's summary renders as in view() — the lean RECAP label
@@ -133,8 +133,8 @@ describe('Conversation — view() before any compaction', () => {
 	})
 })
 
-describe('Conversation — compact() with the default keep (0) folds all', () => {
-	it('folds the whole live tail into ONE section, empties the tail, sets the rollup, emits', async () => {
+describe('Conversation — compact() with the default keep (0) folds up to the newest user message', () => {
+	it('folds every message before the newest user message into ONE section, sets the rollup, emits', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
@@ -149,20 +149,21 @@ describe('Conversation — compact() with the default keep (0) folds all', () =>
 
 		const section = await conversation.compact()
 
-		// A section was returned, summarizing all three folded messages.
+		// A section was returned, summarizing the two messages before the newest user message.
 		expect(section).toBeDefined()
-		expect(section?.summary).toBe('recap of 3')
-		expect(section?.messages.map((message) => message.content)).toEqual(['a', 'b', 'c'])
-		// The live tail is emptied (keep 0 folds everything).
-		expect(conversation.count).toBe(0)
-		// view() is now the single section's FRAMED recap message (the lean RECAP-label prefix
-		// + the summary), keyed by the section id, role assistant. The raw `summary` / rollup above
+		expect(section?.summary).toBe('recap of 2')
+		expect(section?.messages.map((message) => message.content)).toEqual(['a', 'b'])
+		// The newest user message stays live.
+		expect(conversation.messages().map((message) => message.content)).toEqual(['c'])
+		// view() is the section's FRAMED recap message (the lean RECAP-label prefix + the summary),
+		// keyed by the section id, role assistant, then the live tail. The raw `summary` and the rollup
 		// stay UNframed — the label is a view()-only presentation concern.
 		const view = conversation.view()
-		expect(view).toHaveLength(1)
-		expect(view[0]?.content).toBe(recap('recap of 3'))
+		expect(view).toHaveLength(2)
+		expect(view[0]?.content).toBe(recap('recap of 2'))
 		expect(view[0]?.role).toBe('assistant')
 		expect(view[0]?.id).toBe(section?.id)
+		expect(view[1]?.content).toBe('c')
 		// The rollup is the summary-of-summaries over the one section (one summary ⇒ 'recap of 1').
 		expect(conversation.summary).toBe('recap of 1')
 		expect(conversation.sections).toHaveLength(1)
@@ -177,8 +178,8 @@ describe('Conversation — compact() with the default keep (0) folds all', () =>
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		conversation.add([
-			{ role: 'user', content: 'a' },
-			{ role: 'user', content: 'b' },
+			{ role: 'assistant', content: 'a' },
+			{ role: 'assistant', content: 'b' },
 		])
 
 		await conversation.compact()
@@ -241,11 +242,12 @@ describe('Conversation — compact({ keep }) retains a recent tail', () => {
 			{ role: 'user', content: 'z' },
 		])
 
-		// Override to keep 0 → fold all three despite the constructor's keep: 2.
+		// Override to keep 0 → fold both messages before the newest user message despite the
+		// constructor's keep: 2, which folds only one.
 		const section = await conversation.compact({ keep: 0 })
 
-		expect(section?.messages).toHaveLength(3)
-		expect(conversation.count).toBe(0)
+		expect(section?.messages).toHaveLength(2)
+		expect(conversation.count).toBe(1)
 	})
 })
 
@@ -291,6 +293,83 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 
 		expect(await conversation.compact({ keep: 2 })).toBeUndefined()
 		expect(conversation.count).toBe(2)
+	})
+})
+
+describe('Conversation — compact() moves its boundary to whole exchanges', () => {
+	it('keeps an assistant call on the live side when its tool result would stay live', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'Which order is late?' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+			{ role: 'assistant', content: 'Order LH-81660 is late.' },
+			{ role: 'user', content: 'Who carries it?' },
+		])
+
+		const section = await conversation.compact({ keep: 3 })
+
+		expect(section?.messages.map((message) => message.content)).toEqual(['Which order is late?'])
+		expect(conversation.messages().map((message) => message.role)).toEqual([
+			'assistant',
+			'tool',
+			'assistant',
+			'user',
+		])
+	})
+
+	it('pairs a tool result with no call member to the assistant call that leads its run', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'Which order is late?' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'LH-81660 is late' },
+			{ role: 'user', content: 'Who carries it?' },
+		])
+
+		const section = await conversation.compact({ keep: 2 })
+
+		expect(section?.messages.map((message) => message.content)).toEqual(['Which order is late?'])
+	})
+
+	it('keeps the newest user message and every message after it live', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'My name is Ada.' },
+			{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+			{ role: 'user', content: 'Look up order LH-81660.' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+		])
+
+		const section = await conversation.compact({ keep: 0 })
+
+		expect(section?.messages.map((message) => message.content)).toEqual([
+			'My name is Ada.',
+			'Nice to meet you, Ada.',
+		])
+		expect(conversation.messages().map((message) => message.content)).toEqual([
+			'Look up order LH-81660.',
+			'',
+			'LH-81660 is late',
+		])
+	})
+
+	it('returns undefined without a summarizer call when the boundary leaves nothing to fold', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'Look up order LH-81660.' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+		])
+
+		expect(await conversation.compact({ keep: 0 })).toBeUndefined()
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.count).toBe(3)
 	})
 })
 
@@ -341,6 +420,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 			{ role: 'user', content: 'remember me' },
 			{ role: 'assistant', content: 'and me' },
 		])
+		conversation.add({ role: 'user', content: 'What did I say?' })
 		const section = await conversation.compact()
 		const id = section?.id ?? ''
 
@@ -351,7 +431,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 		expect(pulled.map((message) => message.id)).toEqual(originals.map((one) => one.id))
 		expect(events.rehydrate.calls).toEqual([[id]])
 		// `rehydrate` is a pure read — it does NOT re-add the originals to the live tail.
-		expect(conversation.count).toBe(0)
+		expect(conversation.count).toBe(1)
 	})
 
 	it('returns [] for an unknown section id (still emits rehydrate)', async () => {
@@ -411,14 +491,14 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
 		const conversation = new Conversation({ summarize: stub.summarize })
 
 		// First fold: one message → section 1; rollup over 1 section.
-		conversation.add({ role: 'user', content: 'first batch' })
+		conversation.add({ role: 'assistant', content: 'first batch' })
 		const first = await conversation.compact()
 		expect(conversation.sections).toHaveLength(1)
 		expect(conversation.summary).toBe('recap of 1')
 
 		// Second fold: two messages → section 2; rollup over 2 sections.
 		conversation.add([
-			{ role: 'user', content: 'second' },
+			{ role: 'assistant', content: 'second' },
 			{ role: 'assistant', content: 'batch' },
 		])
 		const second = await conversation.compact()
@@ -449,7 +529,7 @@ describe('Conversation — observation is side-effect-free', () => {
 				},
 			},
 		})
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 
 		const section = await conversation.compact()
 
@@ -468,7 +548,7 @@ describe('Conversation — sections snapshot independence', () => {
 	it('mutating the sections() array does not corrupt the conversation', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
 
 		const snapshot = conversation.sections
@@ -506,7 +586,7 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		for (let n = 0; n < 3; n += 1) {
-			conversation.add({ role: 'user', content: `turn ${n}` })
+			conversation.add({ role: 'assistant', content: `turn ${n}` })
 			await conversation.compact()
 		}
 		const sections = conversation.sections
@@ -582,7 +662,7 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 	it('excludes the summary when summary:false even if a rollup exists', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ id: 'planning', summarize: stub.summarize })
-		conversation.add({ role: 'user', content: 'decided on Postgres' })
+		conversation.add({ role: 'assistant', content: 'decided on Postgres' })
 		await conversation.compact()
 		expect(conversation.summary).toBeDefined()
 
@@ -722,16 +802,16 @@ describe('Conversation — sections cap', () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
 
-		conversation.add({ role: 'user', content: 'round-1' })
+		conversation.add({ role: 'assistant', content: 'round-1' })
 		const first = await conversation.compact()
-		conversation.add({ role: 'user', content: 'round-2' })
+		conversation.add({ role: 'assistant', content: 'round-2' })
 		const second = await conversation.compact()
 		expect(conversation.sections).toHaveLength(2)
 		expect(conversation.sections.map((one) => one.id)).toEqual([first?.id, second?.id])
 
 		// Third round pushes a THIRD section, overflowing the cap of 2 — the two oldest
 		// (round-1, round-2) fold into ONE merged section, leaving [merged, round-3].
-		conversation.add({ role: 'user', content: 'round-3' })
+		conversation.add({ role: 'assistant', content: 'round-3' })
 		const third = await conversation.compact()
 
 		expect(conversation.sections).toHaveLength(2)
@@ -750,13 +830,13 @@ describe('Conversation — sections cap', () => {
 			'collapse',
 		])
 
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'b' })
+		conversation.add({ role: 'assistant', content: 'b' })
 		await conversation.compact()
 		expect(events.collapse.count).toBe(0) // no overflow yet (2 sections === cap)
 
-		conversation.add({ role: 'user', content: 'c' })
+		conversation.add({ role: 'assistant', content: 'c' })
 		await conversation.compact()
 
 		expect(events.collapse.count).toBe(1)
@@ -769,7 +849,7 @@ describe('Conversation — sections cap', () => {
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2, keep: 1 })
 
 		for (let n = 0; n < 5; n += 1) {
-			conversation.add({ role: 'user', content: `msg-${n}` })
+			conversation.add({ role: 'assistant', content: `msg-${n}` })
 			await conversation.compact()
 		}
 
@@ -782,11 +862,11 @@ describe('Conversation — sections cap', () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
 
-		conversation.add({ role: 'user', content: 'the needle is here' })
+		conversation.add({ role: 'assistant', content: 'the needle is here' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'second batch' })
+		conversation.add({ role: 'assistant', content: 'second batch' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'third batch triggers the merge' })
+		conversation.add({ role: 'assistant', content: 'third batch triggers the merge' })
 		await conversation.compact()
 
 		// The first section (containing 'the needle is here') was merged into a new section —
@@ -799,9 +879,9 @@ describe('Conversation — sections cap', () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 5 })
 
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'b' })
+		conversation.add({ role: 'assistant', content: 'b' })
 		// Override to a cap of 1 for this compaction — forces an immediate merge despite the
 		// constructor's cap of 5.
 		await conversation.compact({ sections: 1 })
@@ -814,7 +894,7 @@ describe('Conversation — sections cap', () => {
 		const conversation = new Conversation({ summarize: stub.summarize })
 
 		for (let n = 0; n < 4; n += 1) {
-			conversation.add({ role: 'user', content: `turn-${n}` })
+			conversation.add({ role: 'assistant', content: `turn-${n}` })
 			await conversation.compact()
 		}
 
@@ -840,14 +920,14 @@ describe('Conversation — sections cap', () => {
 		}
 		const conversation = new Conversation({ summarize, sections: 2 })
 
-		conversation.add({ role: 'user', content: 'round-1' })
+		conversation.add({ role: 'assistant', content: 'round-1' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'round-2' })
+		conversation.add({ role: 'assistant', content: 'round-2' })
 		await conversation.compact()
 		expect(conversation.sections).toHaveLength(2)
 
 		// Round 3 overflows the cap — the merge call throws.
-		conversation.add({ role: 'user', content: 'round-3' })
+		conversation.add({ role: 'assistant', content: 'round-3' })
 		const rollupBeforeAttempt = conversation.summary
 		await expect(conversation.compact()).rejects.toBe(boom)
 
@@ -859,7 +939,7 @@ describe('Conversation — sections cap', () => {
 		expect(conversation.summary).toBe('recap of 3')
 
 		// A subsequent successful compact() restores the cap.
-		conversation.add({ role: 'user', content: 'round-4' })
+		conversation.add({ role: 'assistant', content: 'round-4' })
 		await conversation.compact()
 		expect(conversation.sections).toHaveLength(2)
 	})

@@ -186,7 +186,8 @@ export type ConversationEventMap = {
  * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
  * retains verbatim (folding only the older ones); it defaults to
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
- * folds the whole current live tail into one section). `sections` is an optional cap on the
+ * folds every live message before the newest user message into one section). `sections` is an
+ * optional cap on the
  * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
  * `sections` sections folds the oldest overflow into one merged section so the list never
  * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited.
@@ -219,8 +220,9 @@ export interface ConversationOptions {
  *
  * @remarks
  * `keep` overrides the conversation's configured retained-tail size for this compaction only
- * (the older `count - keep` live messages fold; when `count <= keep` nothing folds and
- * `compact()` is a no-op returning `undefined`). Omitted ⇒ the conversation's own `keep`
+ * (at most the older `count - keep` live messages fold, never the newest user message or a
+ * message after it; when nothing is left to fold, `compact()` is a no-op returning
+ * `undefined`). Omitted ⇒ the conversation's own `keep`
  * (its option, or `DEFAULT_CONVERSATION_KEEP`) applies. `sections` overrides the conversation's
  * configured `sections` cap for this compaction only — after the new section is pushed, an
  * overflow past `sections` folds the oldest sections into one merged section. Omitted ⇒ the
@@ -289,7 +291,8 @@ export interface ConversationReferenceOptions {
  *   cross-conversation case); `view()` carries the per-section summaries, which are the
  *   compaction benefit.
  * - **`compact()` — fold older live → a section.** Folds the oldest `count - keep` live
- *   messages into a new {@link Section} (its `summary` from `summarize`), removes
+ *   messages, cut short at the newest user message and before any call group the cut would
+ *   split, into a new {@link Section} (its `summary` from `summarize`), removes
  *   them from the live tail, regenerates the rollup (a second `summarize` over all section
  *   summaries), and emits `summary` then `compact` — returning the new section (or
  *   `undefined` when nothing folds). A compaction calls the summarizer for the section
@@ -378,15 +381,19 @@ export interface ConversationInterface {
 	 */
 	view(): readonly Message[]
 	/**
-	 * Folds the oldest `count - keep` live messages into a summarized {@link Section} through
-	 * the {@link ConversationSummaryHandler}, removes them from the live tail, regenerates the
-	 * rollup, and emits `summary` then `compact` — resolving `undefined` when nothing folds
-	 * (`count <= keep`). Throws a {@link import('./errors.js').ConversationError} when no
-	 * summarizer was supplied.
+	 * Folds the oldest `count - keep` live messages, cut short at the newest user message and
+	 * before any call group the cut would split, into a summarized {@link Section} through the
+	 * {@link ConversationSummaryHandler}, removes them from the live tail, regenerates the rollup,
+	 * and emits `summary` then `compact` — resolving `undefined` when nothing folds. Throws a
+	 * {@link import('./errors.js').ConversationError} when no summarizer was supplied.
 	 *
 	 * @remarks
 	 * The effective `keep` comes from `options`, else the conversation's own. Regenerating the
-	 * rollup runs `summarize` again, over all sections.
+	 * rollup runs `summarize` again, over all sections. The newest user message is the request a
+	 * run serves, so it and every message after it stay live. An assistant message with calls and
+	 * the tool messages that answer it, grouped as
+	 * {@link import('./helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
+	 * a group moves before its assistant message.
 	 *
 	 * @remarks
 	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow

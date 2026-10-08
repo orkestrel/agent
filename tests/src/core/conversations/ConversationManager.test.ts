@@ -192,8 +192,8 @@ describe('ConversationManager — the default summarize flows into created conve
 		const manager = new ConversationManager({ summarize: stub.summarize })
 		const conversation = manager.add()
 		conversation.add([
-			{ role: 'user', content: 'a' },
-			{ role: 'user', content: 'b' },
+			{ role: 'assistant', content: 'a' },
+			{ role: 'assistant', content: 'b' },
 		])
 
 		const section = await conversation.compact()
@@ -206,7 +206,7 @@ describe('ConversationManager — the default summarize flows into created conve
 	it('a manager with NO default summarizer creates a conversation that cannot compact', async () => {
 		const manager = new ConversationManager()
 		const conversation = manager.add()
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 
 		await expect(conversation.compact()).rejects.toSatisfy(
 			(error: unknown) => isConversationError(error) && error.code === 'SUMMARIZER',
@@ -220,8 +220,8 @@ describe('ConversationManager — the default keep flows in, and per-add overrid
 		const manager = new ConversationManager({ summarize: stub.summarize, keep: 1 })
 		const conversation = manager.add()
 		conversation.add([
-			{ role: 'user', content: 'x' },
-			{ role: 'user', content: 'y' },
+			{ role: 'assistant', content: 'x' },
+			{ role: 'assistant', content: 'y' },
 		])
 
 		await conversation.compact()
@@ -235,8 +235,8 @@ describe('ConversationManager — the default keep flows in, and per-add overrid
 		const manager = new ConversationManager({ summarize: stub.summarize, keep: 5 })
 		const conversation = manager.add({ keep: 0 })
 		conversation.add([
-			{ role: 'user', content: 'x' },
-			{ role: 'user', content: 'y' },
+			{ role: 'assistant', content: 'x' },
+			{ role: 'assistant', content: 'y' },
 		])
 
 		await conversation.compact()
@@ -250,7 +250,7 @@ describe('ConversationManager — the default keep flows in, and per-add overrid
 		const overrideStub = createStubSummarizer()
 		const manager = new ConversationManager({ summarize: managerStub.summarize })
 		const conversation = manager.add({ summarize: overrideStub.summarize })
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 
 		await conversation.compact()
 
@@ -266,9 +266,9 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 		const manager = new ConversationManager({ summarize: stub.summarize, sections: 1 })
 		const conversation = manager.add()
 
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'b' })
+		conversation.add({ role: 'assistant', content: 'b' })
 		await conversation.compact()
 
 		// sections: 1 flowed in ⇒ the second fold merges into the cap of 1.
@@ -280,9 +280,9 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 		const manager = new ConversationManager({ summarize: stub.summarize, sections: 5 })
 		const conversation = manager.add({ sections: 1 })
 
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'b' })
+		conversation.add({ role: 'assistant', content: 'b' })
 		await conversation.compact()
 
 		// The per-add sections: 1 wins over the manager's sections: 5 ⇒ capped at 1.
@@ -294,9 +294,9 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 		const manager = new ConversationManager({ summarize: stub.summarize })
 		const conversation = manager.add()
 
-		conversation.add({ role: 'user', content: 'a' })
+		conversation.add({ role: 'assistant', content: 'a' })
 		await conversation.compact()
-		conversation.add({ role: 'user', content: 'b' })
+		conversation.add({ role: 'assistant', content: 'b' })
 		await conversation.compact()
 
 		expect(conversation.sections).toHaveLength(2)
@@ -310,7 +310,7 @@ describe('ConversationManager — created conversations are independent', () => 
 		const a = manager.add({ id: 'a' })
 		const b = manager.add({ id: 'b' })
 
-		a.add({ role: 'user', content: 'only in a' })
+		a.add({ role: 'assistant', content: 'only in a' })
 		await a.compact()
 
 		expect(a.sections).toHaveLength(1)

@@ -3447,44 +3447,61 @@ const contextBudget = (max: number): ReturnType<typeof createBudget<readonly Mes
 
 describe('Agent — automatic compaction (context window budget)', () => {
 	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
-		// ABSOLUTE-MODEL threshold arithmetic (window `max` = 12, the FULL turn-1 prompt's size):
-		//  • Turn 1 provider call sees the view `[user "go"]` (1 msg). It appends asst(40x) + tool("5"),
-		//    so the working prompt becomes `[go, 40x, "5"]` → estimateMessages = 1 + 10 + 1 = 12 ≥ 12
-		//    → EXHAUSTED → compact() (keep 0) folds all 3 live messages into `recap of 3`; the working
-		//    array rebuilds to `[<recap of 3>]` (1 msg, content 'recap of 3' = ceil(10/4) = 3 tok).
-		//  • Turn 2 provider call sees `[<recap of 3>]` (1 msg). It appends asst(40y) + tool("5") →
-		//    `[<recap of 3>, 40y, "5"]` → 3 + 10 + 1 = 14 ≥ 12 → EXHAUSTED → compact() folds the 2 live
-		//    messages into `recap of 2`; the array rebuilds to `[<recap of 3>, <recap of 2>]` (2 msgs).
-		//  • Turn 3 (no tools) answers 'the answer is 42' from that 2-message compacted prompt.
-		// So compaction fires EXACTLY twice; without it turn 2 would see 3 msgs and turn 3 five. Record
-		// the conversation's own `compact` event (the observability surface — NO new Agent event).
-		const window = contextBudget(12)
-		const { agent, conversation, provider } = compactionAgent(window)
+		// An earlier exchange sits before the run's request 'go', and the window sits one token above
+		// the opening prompt, so the pre-first-turn check holds and turn 1's appends cross it:
+		//  • Turn 1 sees `[earlier, reply, go]` (3 msgs) and appends asst(40x) + tool("5") → EXHAUSTED
+		//    → compact() (keep 0) folds the 2 messages before the request into `recap of 2`; the
+		//    working array rebuilds to `[<recap of 2>, go, 40x, "5"]` (4 msgs).
+		//  • Turn 2 appends asst(40y) + tool("5") → still over the window → compact() has nothing
+		//    before the request to fold, so it returns `undefined` and the run latches futile.
+		//  • Turn 3 (no tools) answers 'the answer is 42'.
+		// So compaction fires EXACTLY once; without it turn 2 would see 5 msgs. Record the
+		// conversation's own `compact` event (the observability surface — NO added Agent event).
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'h'.repeat(40) },
+			{ role: 'assistant', content: 'k'.repeat(40) },
+			{ role: 'user', content: 'go' },
+		])
+		const tools = createToolManager()
+		tools.add(addTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: contextBudget(estimateMessages(conversation.view()) + 1),
+			limit: 5,
+		})
 		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
 			'compact',
 		])
 
 		const result = await agent.generate()
 
-		// (a) Auto-compaction fired mid-run — EXACTLY two folds (one per tool-iteration turn), each
-		// authored a `recap of <n>` section (proving the absolute prompt crossed `max` both turns).
-		expect(conversation.sections.length).toBe(2)
-		expect(conversation.sections.map((section) => section.summary)).toEqual([
-			'recap of 3',
-			'recap of 2',
+		// (a) Auto-compaction fired mid-run — EXACTLY one fold, of the earlier exchange alone.
+		expect(conversation.sections.length).toBe(1)
+		expect(conversation.sections[0]?.messages.map((message) => message.content)).toEqual([
+			'h'.repeat(40),
+			'k'.repeat(40),
 		])
 		// (b) The run still produced the CORRECT final answer (the loop continued on the compacted
 		// view through to turn 3 — proving the rebuilt working array stayed a valid prompt).
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
-		// (c) The conversation's `compact` event fired once per fold, each carrying a section.
-		expect(compacted.compact.count).toBe(2)
-		expect(compacted.compact.calls[0]?.[0]?.summary).toMatch(/^recap of/)
-		// (d) The REBUILD shrank the prompt each compaction: the post-fold turns ran on a tiny
-		// section-summary prompt (1 then 2 messages) instead of the uncompacted 3 / 5 they'd be —
-		// the absolute proof the working array was re-measured smaller after each compact().
+		// (c) The conversation's `compact` event fired once, carrying the section.
+		expect(compacted.compact.count).toBe(1)
+		expect(compacted.compact.calls[0]?.[0]?.summary).toBe('recap of 2')
+		// (d) The REBUILD shrank the prompt: turn 2 ran on 4 messages instead of the uncompacted 5,
+		// and the request stayed live in every prompt.
 		const promptSizes = provider.calls.map((call) => call.messages.length)
-		expect(promptSizes).toEqual([1, 1, 2])
+		expect(promptSizes).toEqual([3, 4, 6])
+		expect(provider.calls.map((call) => call.messages.some((one) => one.content === 'go'))).toEqual(
+			[true, true, true],
+		)
 	})
 
 	it('does NOT fire when the prompt stays below the window (same answer, budget holds the FULL prompt size)', async () => {
@@ -3594,12 +3611,13 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		})
 
 	it('PRE-FIRST-TURN: a conversation whose INITIAL prompt already exceeds the window compacts before the first provider call', async () => {
-		// Seed the conversation's live tail with ONE big user message (200 chars ⇒ ceil(200/4) = 50
-		// tok) BEFORE the run. With a window max of 20 and NO system prompt, the build()'d initial
-		// prompt (50 tok) already exceeds the window — so the loop's PRE-FIRST-TURN `#trim` fires
-		// `compact()` (keep 0 folds the one message into `recap of 1`) and rebuilds BEFORE turn 0. The
-		// single provider call must therefore see the COMPACTED view (the framed `recap of 1`), not
-		// the 200-char seed — the proof the pre-first-turn check ran ahead of the provider.
+		// Seed the conversation's live tail with ONE big earlier user message (200 chars ⇒
+		// ceil(200/4) = 50 tok) and the short request BEFORE the run. With a window max of 20 and NO
+		// system prompt, the build()'d initial prompt already exceeds the window — so the loop's
+		// PRE-FIRST-TURN `#trim` fires `compact()` (keep 0 folds the message before the request into
+		// `recap of 1`) and rebuilds BEFORE turn 0. The single provider call must therefore see the
+		// COMPACTED view (the framed `recap of 1`, then the request), not the 200-char seed — the
+		// proof the pre-first-turn check ran ahead of the provider.
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
@@ -3607,6 +3625,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const conversation = conversations.add() // auto-activates — the agent's message source
 		const seed = 'q'.repeat(200)
 		conversation.add({ role: 'user', content: seed })
+		conversation.add({ role: 'user', content: 'hi' })
 		const provider = answerProvider()
 		const agent = createAgent(provider, {
 			conversations,
@@ -3624,6 +3643,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
 			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
+			'hi',
 		])
 		expect(JSON.stringify(provider.calls[0]?.messages)).not.toContain(seed)
 		// The run still produced the correct final answer through the compacted context.
@@ -3665,6 +3685,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			keep: 0,
 		})
 		const conversation = conversations.add() // auto-activates — the agent's message source
+		// An earlier exchange gives each fold a slice before the run's request.
+		conversation.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+		])
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
@@ -3744,6 +3769,67 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		// The over-window run still ran all three scripted turns (the futile prompt proceeded to the
 		// provider rather than looping on compaction).
 		expect(provider.calls).toHaveLength(3)
+	})
+
+	it('folds nothing after a tool aborts the run, and the next run folds the whole exchange first', async () => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(40) },
+			{ role: 'assistant', content: 'Nice.' },
+			{ role: 'user', content: 'go' },
+		])
+		// The opening prompt fits the window, so only the post-dispatch check can reach it.
+		const window = contextBudget(estimateMessages(conversation.view()) + 1)
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] } },
+				{ result: { content: 'Done.' } },
+			],
+			SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
+		tools.add(
+			createTool({
+				name: 'reply',
+				execute: () => {
+					agent.abort('replied')
+					return 'sent'
+				},
+			}),
+		)
+
+		const aborted = await agent.generate()
+
+		expect(aborted.partial).toBe(true)
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.sections).toHaveLength(0)
+		expect(conversation.messages().map((message) => message.role)).toEqual([
+			'user',
+			'assistant',
+			'user',
+			'assistant',
+			'tool',
+		])
+
+		agent.context.messages.add({ role: 'user', content: 'next' })
+		const resumed = await agent.generate()
+
+		expect(resumed.content).toBe('Done.')
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.sections[0]?.messages.map((message) => message.content)).toEqual([
+			'q'.repeat(40),
+			'Nice.',
+			'go',
+			'x'.repeat(40),
+			'sent',
+		])
+		expect(provider.calls.at(-1)?.messages.map((message) => message.content)).toEqual([
+			`${CONVERSATION_RECAP_PREFIX}recap of 5`,
+			'next',
+		])
 	})
 })
 
@@ -3856,7 +3942,7 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 
 		// Round 2 — each thread now has [user, 'ok'] accumulated; the new user turn (added before
 		// generate) pushes the prompt over the window, so the pre-first-turn `#trim` folds THAT thread's
-		// whole live tail (keep 0 ⇒ all three messages) into one section.
+		// earlier exchange into one section and keeps the second request live.
 		await request(agent, manager, 'A', 'alpha-2')
 		await request(agent, manager, 'B', 'bravo-2')
 
@@ -3869,8 +3955,8 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		// A's turns, B's are B's. No leakage in either direction.
 		const aOriginals = a?.sections[0]?.messages.map((message) => message.content) ?? []
 		const bOriginals = b?.sections[0]?.messages.map((message) => message.content) ?? []
-		expect(aOriginals).toEqual(['alpha-1', 'ok', 'alpha-2'])
-		expect(bOriginals).toEqual(['bravo-1', 'ok', 'bravo-2'])
+		expect(aOriginals).toEqual(['alpha-1', 'ok'])
+		expect(bOriginals).toEqual(['bravo-1', 'ok'])
 		expect(JSON.stringify(aOriginals)).not.toContain('bravo')
 		expect(JSON.stringify(bOriginals)).not.toContain('alpha')
 		// And the SAME agent served both — its active conversation is whichever was last switched in.
@@ -4344,7 +4430,11 @@ describe('Agent — strict compaction', () => {
 			},
 			keep: 0,
 		})
-		conversations.add() // auto-activates — the agent's message source
+		// An earlier exchange gives the fold a slice before the run's request.
+		conversations.add().add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+		])
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
@@ -4690,30 +4780,34 @@ describe('Agent — the select event follows each select-site build', () => {
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
 		})
-		conversations.add()
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'h'.repeat(40) },
+			{ role: 'assistant', content: 'k'.repeat(40) },
+		])
+		const request = conversation.add({ role: 'user', content: 'go' })
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(12),
+			window: contextBudget(estimateMessages(conversation.view()) + 1),
 			limit: 5,
 			select: selection.handler,
 			on: { select: selected.handler },
 		})
-		const request = agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const result = await agent.generate()
 
 		expect(result.content).toBe('the answer is 42')
-		expect(provider.calls.map((call) => call.messages.length)).toEqual([1, 1, 2])
-		expect(selected.count).toBe(3)
+		expect(provider.calls.map((call) => call.messages.length)).toEqual([3, 4, 6])
+		expect(selected.count).toBe(2)
 		expect(selected.calls.map(([picked]) => picked)).toEqual(selection.selections)
-		expect(selection.calls.map(([, received]) => received)).toEqual([request, request, request])
+		expect(selection.calls.map(([, received]) => received)).toEqual([request, request])
 		expect(selection.calls.every(([, received]) => received === request)).toBe(true)
 		expect(selection.selections[1]?.messages.some((message) => message.id === request.id)).toBe(
-			false,
+			true,
 		)
 	})
 
@@ -4724,7 +4818,10 @@ describe('Agent — the select event follows each select-site build', () => {
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
 		})
-		conversations.add().add({ role: 'user', content: 'q'.repeat(200) })
+		conversations.add().add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
 		const provider = createScriptedProvider([{ content: 'final answer' }], SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
@@ -4742,6 +4839,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		expect(order).toEqual(['select', 'select', 'turn 0'])
 		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
 			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
+			'hi',
 		])
 	})
 
@@ -5035,14 +5133,19 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
 		})
-		conversations.add()
+		const history = conversations.add()
+		history.add([
+			{ role: 'user', content: 'h'.repeat(40) },
+			{ role: 'assistant', content: 'k'.repeat(40) },
+			{ role: 'user', content: 'go' },
+		])
 		const tools = createToolManager()
 		tools.add(addTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(12),
+			window: contextBudget(estimateMessages(history.view()) + 1),
 			limit: 5,
 			select: async (conversation, request, signal) => {
 				await gate.promise
@@ -5050,7 +5153,6 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 			},
 			on: { select: selected.handler },
 		})
-		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const run = agent.stream()
 		agent.context.apply(createScope({ name: 'second', select: second.handler }))
@@ -5058,11 +5160,10 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 		await run.result
 
 		expect(first.calls).toHaveLength(1)
-		expect(second.calls).toHaveLength(2)
+		expect(second.calls).toHaveLength(1)
 		expect(selected.calls.map(([picked]) => picked)).toEqual([
 			first.selections[0],
 			second.selections[0],
-			second.selections[1],
 		])
 	})
 

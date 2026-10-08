@@ -463,7 +463,9 @@ export interface AgentRunOptions {
  *   ends the run without dispatching, never inside a handler. An abort before dispatch
  *   appends neither the assistant call turn nor tool messages and emits no tool chunk;
  *   streamed content remains in the partial result. Cancellation after entry is cooperative:
- *   the loop awaits a running handler even when it ignores the signal.
+ *   the loop awaits a running handler even when it ignores the signal, records its tool message,
+ *   and folds nothing before the run settles; the next run's pre-first-turn check compacts
+ *   instead.
  *   The agent supplies no caller identity.
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.

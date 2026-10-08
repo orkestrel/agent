@@ -3,7 +3,7 @@ import type { ConversationInterface } from '../conversations/types.js'
 import type { Message, NoulQuestion } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
-import { matchesJudgment } from '../conversations/helpers.js'
+import { collectToolGroups, matchesJudgment } from '../conversations/helpers.js'
 import { NEEDED_QUESTION } from './templates.js'
 
 /**
@@ -118,7 +118,15 @@ export function inferApplicability(
 }
 
 /**
- * Filters decisively unneeded subjects while preserving requests and complete tool groups.
+ * Filters decisively unneeded subjects while preserving requests, whole exchanges, and complete
+ * tool groups.
+ *
+ * @remarks
+ * An exchange is a user message and every message after it up to the next user message. An
+ * exchange and a tool group from {@link import('../conversations/helpers.js').collectToolGroups}
+ * are each kept whole when any member is kept and dropped whole only when every member is
+ * dropped. A tool group that spans two exchanges joins them, so keeping one keeps both.
+ *
  * @param messages - The conversation view in prompt order
  * @param applicability - The screened subjects and their recorded conditions
  * @param request - The request whose id must be retained when present
@@ -137,43 +145,24 @@ export function filterSelectionMessages(
 		applicability.filter((entry) => entry.needed === false).map((entry) => entry.id),
 	)
 	dropped.delete(request.id)
-	const groups = new Map<Message, Message[]>()
-	const calls = new Map<string, Message[]>()
+	const exchanges: Message[][] = []
 	for (const message of messages) {
-		if (message.role !== 'assistant' || !message.calls?.length) continue
-		groups.set(message, [message])
-		for (const call of message.calls) {
-			const owners = calls.get(call.id) ?? []
-			owners.push(message)
-			calls.set(call.id, owners)
-		}
+		if (message.role === 'user') exchanges.push([message])
+		else exchanges.at(-1)?.push(message)
 	}
-	let leader: Message | undefined
-	let orphan: Message[] = []
-	const orphans: Message[][] = []
-	for (const message of messages) {
-		if (message.role !== 'tool') {
-			leader = groups.has(message) ? message : undefined
-			orphan = []
-			continue
-		}
-		const local = leader?.calls ?? []
-		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
-		const paired =
-			leader !== undefined &&
-			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
-		const owners = message.call === undefined ? undefined : calls.get(message.call)
-		const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
-		const group = owner === undefined ? undefined : groups.get(owner)
-		if (group !== undefined) group.push(message)
-		else {
-			if (orphan.length === 0) orphans.push(orphan)
-			orphan.push(message)
-		}
-	}
-	for (const group of [...groups.values(), ...orphans]) {
-		if (group.some((message) => !dropped.has(message.id))) {
-			for (const message of group) dropped.delete(message.id)
+	const units = [...collectToolGroups(messages), ...exchanges]
+	// Keeping one unit can keep a member of another, so repeat until no unit changes.
+	let changed = true
+	while (changed) {
+		changed = false
+		for (const unit of units) {
+			if (
+				unit.some((message) => dropped.has(message.id)) &&
+				unit.some((message) => !dropped.has(message.id))
+			) {
+				for (const message of unit) dropped.delete(message.id)
+				changed = true
+			}
 		}
 	}
 	return messages.filter((message) => !dropped.has(message.id))

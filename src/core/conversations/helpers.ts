@@ -125,3 +125,62 @@ export function buildRecapMessage(section: Section): Message {
 		content: `${CONVERSATION_RECAP_PREFIX}${section.summary}`,
 	}
 }
+
+/**
+ * Collects each assistant message that carries calls together with the tool messages that answer
+ * it, then each run of tool messages that no assistant message owns.
+ *
+ * @remarks
+ * A tool message belongs to the one assistant message whose calls hold its `call` id. Without that
+ * unique owner, it belongs to the assistant message that leads its run of tool messages when that
+ * leader holds the id, repeats a call id, or the tool message has no `call`. Any other tool message
+ * joins the orphan run it sits in. Compaction and the stock selection each keep a group on one side
+ * of their cut.
+ *
+ * @param messages - The messages in prompt order
+ * @returns The owned groups in owner order, then the orphan runs, each in prompt order
+ * @example
+ * ```ts
+ * collectToolGroups([
+ * 	{ id: 'lookup', role: 'assistant', content: '', calls: [{ id: 'order', name: 'lookup', arguments: {} }] },
+ * 	{ id: 'result', role: 'tool', content: 'LH-81660 is late', call: 'order' },
+ * ]) // one group holding the lookup call and its result
+ * ```
+ */
+export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
+	const groups = new Map<Message, Message[]>()
+	const calls = new Map<string, Message[]>()
+	for (const message of messages) {
+		if (message.role !== 'assistant' || !message.calls?.length) continue
+		groups.set(message, [message])
+		for (const call of message.calls) {
+			const owners = calls.get(call.id) ?? []
+			owners.push(message)
+			calls.set(call.id, owners)
+		}
+	}
+	let leader: Message | undefined
+	let orphan: Message[] = []
+	const orphans: Message[][] = []
+	for (const message of messages) {
+		if (message.role !== 'tool') {
+			leader = groups.has(message) ? message : undefined
+			orphan = []
+			continue
+		}
+		const local = leader?.calls ?? []
+		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+		const paired =
+			leader !== undefined &&
+			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
+		const owners = message.call === undefined ? undefined : calls.get(message.call)
+		const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
+		const group = owner === undefined ? undefined : groups.get(owner)
+		if (group !== undefined) group.push(message)
+		else {
+			if (orphan.length === 0) orphans.push(orphan)
+			orphan.push(message)
+		}
+	}
+	return [...groups.values(), ...orphans]
+}

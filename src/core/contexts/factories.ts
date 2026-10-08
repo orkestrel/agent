@@ -37,8 +37,11 @@ import { AgentContext } from './AgentContext.js'
  *
  * @remarks
  * Reuses matching judgments without spending usage or the fresh question limit.
- * A judge failure returns the full view, the recorded keys, spent usage, and the original cause.
- * The handler sends nothing until an application invokes or installs it.
+ * A judge error for one subject leaves that subject undecided, so it is kept, and the handler
+ * asks about the next subject. When the judge failed for every subject asked and no recorded
+ * judgment was reused, the handler returns the full view with `fault` set, its cause the first
+ * judge error. A cancel returns the full view, the recorded keys, spent usage, and the cancel
+ * cause as `fault`. The handler sends nothing until an application invokes or installs it.
  *
  * @param options - The judge, screen, needed criterion, and fresh question limit
  * @returns The application-installed selection handler
@@ -60,6 +63,7 @@ export function createSelection(options: SelectionOptions): SelectionHandler {
 		throw new SelectionError('LIMIT', 'selection limit must be a nonnegative safe integer')
 	return async (conversation, request, signal) => {
 		const judgments: string[] = []
+		const errors: unknown[] = []
 		let usage: TokenUsage | undefined
 		let pending: string | undefined
 		try {
@@ -90,12 +94,21 @@ export function createSelection(options: SelectionOptions): SelectionHandler {
 				signal.throwIfAborted()
 				pending = key
 				fresh += 1
-				const resolved = await conversation.judgments.resolve(
-					judge,
-					{ state, questions: { [key]: question } },
-					sources,
-					signal,
-				)
+				let resolved: Awaited<ReturnType<typeof conversation.judgments.resolve>>
+				try {
+					resolved = await conversation.judgments.resolve(
+						judge,
+						{ state, questions: { [key]: question } },
+						sources,
+						signal,
+					)
+				} catch (cause) {
+					if (signal.aborted || isJudgeAbortError(cause)) throw cause
+					// One subject's error leaves that subject undecided, which keeps it.
+					errors.push(cause)
+					pending = undefined
+					continue
+				}
 				for (const judgment of resolved) {
 					judgments.push(judgment.id)
 					if (judgment.usage !== undefined) usage = sumUsage(usage, judgment.usage)
@@ -103,6 +116,13 @@ export function createSelection(options: SelectionOptions): SelectionHandler {
 				pending = undefined
 			}
 			signal.throwIfAborted()
+			if (errors.length > 0 && judgments.length === 0)
+				return {
+					messages: view,
+					judgments,
+					...(usage === undefined ? {} : { usage }),
+					fault: new Error('selection failed', { cause: errors[0] }),
+				}
 			const applicability = inferApplicability(conversation, request, {
 				judge,
 				needed,

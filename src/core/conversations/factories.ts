@@ -25,7 +25,8 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
  * (each section as a summary message, then the live tail). `compact()` folds the older live
  * messages into a summarized {@link Section} and regenerates the rollup — it requires
  * a `summarize` (omitted ⇒ `compact()` throws a `ConversationError`); `keep` retains a recent
- * tail (default `DEFAULT_CONVERSATION_KEEP` — fold all). `rehydrate(id)` / `search(query)` read
+ * tail (default `DEFAULT_CONVERSATION_KEEP` — fold up to the newest user message).
+ * `rehydrate(id)` / `search(query)` read
  * the retained originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
  * through the reserved `on` option; the emitter isolates a listener throw and routes it to
  * its `error` handler (the `error` option), so it can never corrupt a compaction.

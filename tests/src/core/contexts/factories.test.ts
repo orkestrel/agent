@@ -4,6 +4,7 @@ import * as core from '@src/core'
 import {
 	buildConditionKey,
 	createAgentContext,
+	createConversation,
 	createSelection,
 	inferApplicability,
 	isSelectionError,
@@ -178,7 +179,9 @@ describe('createSelection', () => {
 			buildConditionKey('needed', 'standing', 'request'),
 			buildConditionKey('needed', 'acceptance', 'request'),
 		])
+		// The unasked reply keeps its whole exchange, so the dropped acceptance stays.
 		expect(second.messages.map((message) => message.id)).toEqual([
+			'acceptance',
 			'reply',
 			'withdrawal',
 			'unrelated',
@@ -210,6 +213,8 @@ describe('createSelection', () => {
 		const fixture = createStockSelectionFixture(0.9, {
 			probabilities: { request: SYSTEM_ONE_TEV1.answers.refund.noul },
 		})
+		// A later user message is the newest, so the fold takes the earlier request with it.
+		fixture.conversation.add({ role: 'user', content: 'Export the closed accounts too.' })
 		await fixture.conversation.compact({ keep: 0 })
 		const selected = await fixture.select(
 			fixture.conversation,
@@ -218,7 +223,7 @@ describe('createSelection', () => {
 		)
 		expect(selected.fault).toBeUndefined()
 		expect(selected.messages).toEqual([])
-		expect(fixture.transport.requests).toHaveLength(1)
+		expect(fixture.transport.requests).toHaveLength(2)
 		const record = requireValue(fixture.conversation.judgments.judgments()[0])
 		expect(record.state.endsWith(`[B] ${JSON.stringify(fixture.request)}`)).toBe(true)
 		expect(record.state).toContain('[A]')
@@ -254,16 +259,24 @@ describe('createSelection', () => {
 		).toEqual([all.request])
 	})
 
-	it('keeps a leading orphan run after compaction without keeping its recap', async () => {
+	it('keeps a leading orphan run after a recap without keeping the recap', async () => {
 		const fixture = createStockSelectionFixture(0.9, {
-			messages: SELECTION_TOOL_MESSAGES.slice(4, 7).concat([
-				requireValue(SELECTION_TOOL_MESSAGES.at(-1)),
-			]),
 			probabilities: { 'duplicate-b': SYSTEM_ONE_TEV1.answers.refund.noul },
 		})
-		await fixture.conversation.compact({ keep: 3 })
+		// Compaction never separates a call from its results, so a restored snapshot supplies the
+		// recap whose section holds the call while its results stay live.
+		const [call, first, second] = SELECTION_TOOL_MESSAGES.slice(4, 7)
+		const conversation = createConversation({
+			snapshot: {
+				id: 'orphan-run',
+				sections: [
+					{ id: 'recap', summary: 'A duplicate call ran.', messages: [requireValue(call)] },
+				],
+				messages: [requireValue(first), requireValue(second), fixture.request],
+			},
+		})
 		const selected = await fixture.select(
-			fixture.conversation,
+			conversation,
 			fixture.request,
 			new AbortController().signal,
 		)
@@ -290,7 +303,7 @@ describe('createSelection', () => {
 		expect(fixture.transport.requests).toHaveLength(5)
 	})
 
-	it('returns the complete view, recorded keys, and spent usage when the transport fails', async () => {
+	it('leaves a subject undecided when the judge fails for it and judges the remaining subjects', async () => {
 		const cause = new Error('recorded transport unavailable')
 		const fixture = createStockSelectionFixture(0.9, { failure: { at: 2, cause } })
 		const selected = await fixture.select(
@@ -298,12 +311,38 @@ describe('createSelection', () => {
 			fixture.request,
 			new AbortController().signal,
 		)
-		expect(selected.fault).toBeInstanceOf(Error)
-		expect(selected.fault?.cause).toBe(cause)
+		expect(selected.fault).toBeUndefined()
+		expect(selected.messages.map((message) => message.id)).toEqual([
+			'acceptance',
+			'reply',
+			'request',
+		])
+		expect(selected.judgments).toEqual(
+			['standing', 'reply', 'withdrawal', 'unrelated'].map((id) =>
+				buildConditionKey('needed', id, 'request'),
+			),
+		)
+		expect(selected.usage).toEqual({ prompt: 3900, completion: 16, total: 3916 })
+		expect(fixture.transport.requests).toHaveLength(5)
+	})
+
+	it('returns the complete view with the first judge error as the fault when every subject fails', async () => {
+		const causes = [1, 2, 3, 4, 5].map((index) => new Error(`transport unavailable ${index}`))
+		const fixture = createStockSelectionFixture(0.9, {
+			respond: (_request, index) => {
+				throw requireValue(causes[index - 1])
+			},
+		})
+		const selected = await fixture.select(
+			fixture.conversation,
+			fixture.request,
+			new AbortController().signal,
+		)
+		expect(selected.fault?.cause).toBe(causes[0])
 		expect(selected.messages).toEqual(fixture.conversation.view())
-		expect(selected.judgments).toEqual([buildConditionKey('needed', 'standing', 'request')])
-		expect(selected.usage).toEqual(JUDGMENT_USAGE)
-		expect(fixture.transport.requests).toHaveLength(2)
+		expect(selected.judgments).toEqual([])
+		expect(selected.usage).toBeUndefined()
+		expect(fixture.transport.requests).toHaveLength(5)
 	})
 
 	it('checks the signal before resolving a fresh question and preserves its original reason', async () => {
@@ -383,8 +422,16 @@ describe('createSelection', () => {
 		expect(fixture.transport.requests).toHaveLength(2)
 	})
 
-	it('does not report a stale pending record as reused when a refresh fails', async () => {
-		const fixture = createStockSelectionFixture(0.9, { failure: { at: 6, cause: 'unavailable' } })
+	it('does not report a stale pending record as reused when every refresh fails', async () => {
+		const fixture = createStockSelectionFixture(0.9, {
+			respond: (request, index) => {
+				if (index >= 6) throw 'unavailable'
+				const answers = Object.fromEntries(
+					Object.keys(request.questions).map((id) => [id, SYSTEM_ONE_TEV1.answers.refund]),
+				)
+				return Response.json({ ...SYSTEM_ONE_TEV1, answers })
+			},
+		})
 		const signal = new AbortController().signal
 		await fixture.select(fixture.conversation, fixture.request, signal)
 		fixture.conversation.add({ role: 'assistant', content: 'Additional context.' })
@@ -459,8 +506,9 @@ describe('createSelection', () => {
 		const signal = new AbortController().signal
 		const selected = await bounded.select(bounded.conversation, bounded.request, signal)
 		expect(bounded.transport.requests).toHaveLength(7)
+		// The unasked assistant-2 keeps its whole exchange, so the dropped note-2 stays.
 		expect(selected.messages.map((message) => message.id)).toEqual(
-			messages.slice(7).map((message) => message.id),
+			messages.slice(6).map((message) => message.id),
 		)
 		const full = createStockSelectionFixture(0.9, { messages, limit: 30 })
 		await full.select(full.conversation, full.request, signal)

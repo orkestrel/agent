@@ -15,7 +15,7 @@ import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
-import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
+import { buildRecapMessage, buildSummaryMessage, collectToolGroups } from './helpers.js'
 import { removeEntries } from '../helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
@@ -42,9 +42,11 @@ import { JudgmentManager } from './JudgmentManager.js'
  * - **`compact()`.** Folds the oldest `count - keep` live messages into a new section
  *   (its `summary` from `#summarize`), removes them from the live tail by id, regenerates the
  *   rollup (a second `#summarize` over all section summaries), and emits `summary` then
- *   `compact`. Returns the section, or `undefined` when nothing folds (`count <= keep`).
- *   Throws a {@link ConversationError} when no `#summarize` was supplied. A compaction calls
- *   the summarizer for the section digest and again for the rollup.
+ *   `compact`. The fold stops before the newest user message, so the request a run serves and
+ *   its turns stay live, and a cut inside an assistant call group moves before the group, so a
+ *   tool result never stays live without its call. Returns the section, or `undefined` when
+ *   nothing folds. Throws a {@link ConversationError} when no `#summarize` was supplied. A
+ *   compaction calls the summarizer for the section digest and again for the rollup.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns a section's full original
  *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (the caller decides
  *   whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
@@ -60,9 +62,10 @@ import { JudgmentManager } from './JudgmentManager.js'
  * conversation.add([
  * 	{ role: 'user', content: 'Hello' },
  * 	{ role: 'assistant', content: 'Hi there' },
+ * 	{ role: 'user', content: 'What did I say?' },
  * ])
- * const section = await conversation.compact() // folds both into one summarized section
- * conversation.view() // [{ role: 'assistant', content: 'recap of 2' }] — the live tail is empty
+ * const section = await conversation.compact() // folds the first two into one summarized section
+ * conversation.view() // [<recap of 2>, { role: 'user', content: 'What did I say?' }]
  * conversation.summary // 'recap of 1' — the rollup over the one section
  * ```
  */
@@ -201,8 +204,28 @@ export class Conversation implements ConversationInterface {
 		}
 		const keep = options?.keep ?? this.#keep
 		const live = [...this.#messages.values()]
-		// Fold the oldest `count - keep` live messages; nothing to fold ⇒ a no-op.
-		const fold = keep <= 0 ? live.length : live.length - keep
+		// The newest user message is the request a run serves, so it and its turns stay live.
+		const newest = live.findLastIndex((message) => message.role === 'user')
+		let fold = Math.min(
+			keep <= 0 ? live.length : live.length - keep,
+			newest === -1 ? live.length : newest,
+		)
+		// A cut inside a call group leaves a result without its call, so move it before the group;
+		// a move can land inside an earlier group, so repeat until no group straddles it.
+		const spans = collectToolGroups(live).map((group) =>
+			group.map((message) => live.indexOf(message)),
+		)
+		let moved = true
+		while (moved) {
+			moved = false
+			for (const span of spans) {
+				const start = Math.min(...span)
+				if (start < fold && fold <= Math.max(...span)) {
+					fold = start
+					moved = true
+				}
+			}
+		}
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
 		// 1. Digest the folded slice into the section summary (the first summarizer call).

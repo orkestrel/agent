@@ -228,6 +228,57 @@ describe('stock selection helpers', () => {
 			).map((message) => message.id),
 		).toEqual(['D', 'Ta', 'Tx', 'request'])
 	})
+
+	it('keeps an earlier exchange whole when its request is dropped and its call and result are kept', () => {
+		const request = {
+			id: 'request',
+			role: 'user',
+			content: 'Escalate ticket ESC-2219 to the depot lead.',
+		} satisfies Message
+		const messages: readonly Message[] = [
+			{ id: 'earlier', role: 'user', content: 'Tell the depot the pallet ships Friday.' },
+			{ id: 'send', role: 'assistant', content: '', calls: [createToolCall({ id: 'reply' })] },
+			{ id: 'sent', role: 'tool', content: 'sent', call: 'reply' },
+			{ id: 'aside', role: 'user', content: 'The office printer needs paper.' },
+			{ id: 'noted', role: 'assistant', content: 'Noted.' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(
+				messages,
+				[
+					{ id: 'earlier', needed: false },
+					{ id: 'aside', needed: false },
+					{ id: 'noted', needed: false },
+				],
+				request,
+			).map((message) => message.id),
+		).toEqual(['earlier', 'send', 'sent', 'request'])
+	})
+
+	it('keeps both exchanges whole when a kept result answers a call from the earlier exchange', () => {
+		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
+		const messages: readonly Message[] = [
+			{ id: 'U1', role: 'user', content: 'Look up order LH-81660.' },
+			{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ id: 'U2', role: 'user', content: 'Also check the carrier.' },
+			{ id: 'R1', role: 'tool', content: 'order shipped', call: 'order' },
+			{ id: 'U3', role: 'user', content: 'The office printer needs paper.' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(
+				messages,
+				[
+					{ id: 'U1', needed: false },
+					{ id: 'A1', needed: false },
+					{ id: 'U2', needed: false },
+					{ id: 'U3', needed: false },
+				],
+				request,
+			).map((message) => message.id),
+		).toEqual(['U1', 'A1', 'U2', 'R1', 'request'])
+	})
 })
 
 describe('renderFencedFile', () => {

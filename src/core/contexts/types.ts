@@ -254,7 +254,9 @@ export interface Selection {
  * Receives the active conversation, the user message the run serves (passed by the loop, because
  * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
  * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
- * the usage spent, rather than throwing.
+ * the usage spent, rather than throwing. A handler that recovers from an error returns no `fault`:
+ * the stock handler leaves a subject whose judge call failed undecided and sets `fault` only when
+ * the judge failed for every subject it asked and no recorded judgment was reused.
  *
  * @param conversation - The conversation whose messages the handler selects
  * @param request - The user message captured at run entry

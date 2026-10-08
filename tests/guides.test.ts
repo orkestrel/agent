@@ -99,7 +99,9 @@ await new GuideCommand({
 		createParser,
 		createRecordingSelection,
 		createScriptedProvider,
+		createStockSelectionFixture,
 		createStubSummarizer,
+		createToolCall,
 		JUDGE_ENVELOPE,
 		RecordedHeaders,
 		RecordedProvider,
@@ -420,7 +422,11 @@ await new GuideCommand({
 				summarize: createStubSummarizer().summarize,
 				keep: 0,
 			})
-			conversations.add()
+			// An earlier exchange gives the between-turns fold a slice before the run's request.
+			conversations.add().add([
+				{ role: 'user', content: 'Earlier question.' },
+				{ role: 'assistant', content: 'Earlier answer.' },
+			])
 			const provider = createScriptedProvider(
 				[
 					{ content: 'x'.repeat(400), tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
@@ -740,6 +746,127 @@ await new GuideCommand({
 			)
 		})
 
+		it('keeps an exchange whole when any member is kept (the stock selection exchange rule)', () => {
+			const request: Message = { id: 'request', role: 'user', content: 'Escalate ESC-2219.' }
+			const messages: readonly Message[] = [
+				{ id: 'earlier', role: 'user', content: 'Tell the depot the pallet ships Friday.' },
+				{ id: 'send', role: 'assistant', content: '', calls: [createToolCall({ id: 'reply' })] },
+				{ id: 'sent', role: 'tool', content: 'sent', call: 'reply' },
+				{ id: 'aside', role: 'user', content: 'The office printer needs paper.' },
+				request,
+			]
+			const kept = barrel.filterSelectionMessages(
+				messages,
+				[
+					{ id: 'earlier', needed: false },
+					{ id: 'aside', needed: false },
+				],
+				request,
+			)
+
+			expect(kept.map(({ id }) => id)).toEqual(['earlier', 'send', 'sent', 'request'])
+			expect(guideText).toContain(
+				'A user message and every message after it up to the next user message form one exchange, which is kept whole when any member is kept and dropped only when every member is dropped',
+			)
+		})
+
+		it('leaves a failed subject undecided and faults only when every subject fails (the judge error rule)', async () => {
+			const signal = new AbortController().signal
+			const partial = createStockSelectionFixture(0.9, {
+				failure: { at: 2, cause: new Error('judge unavailable') },
+			})
+			const kept = await partial.select(partial.conversation, partial.request, signal)
+			const cause = new Error('judge unavailable')
+			const failing = createStockSelectionFixture(0.9, {
+				respond: () => {
+					throw cause
+				},
+			})
+			const failed = await failing.select(failing.conversation, failing.request, signal)
+
+			expect(kept).not.toHaveProperty('fault')
+			expect(kept.messages.map(({ id }) => id)).toContain('acceptance')
+			expect(failed.fault?.cause).toBe(cause)
+			expect(failed.messages).toEqual(failing.conversation.view())
+			expect(failed.judgments).toEqual([])
+			expect(guideText).toContain(
+				'A judge error for one subject leaves that subject undecided, so it is kept, and the handler asks about the next subject.',
+			)
+		})
+
+		it('folds neither the newest user message nor half a call group (the compaction boundary rule)', async () => {
+			const conversation = createConversation({ summarize: createStubSummarizer().summarize })
+			conversation.add([
+				{ role: 'user', content: 'Which order is late?' },
+				{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+				{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+				{ role: 'user', content: 'Who carries it?' },
+			])
+			const split = await conversation.compact({ keep: 2 })
+			const request = createConversation({ summarize: createStubSummarizer().summarize })
+			request.add({ role: 'user', content: 'Look up order LH-81660.' })
+
+			expect(split?.messages.map(({ content }) => content)).toEqual(['Which order is late?'])
+			expect(await request.compact()).toBeUndefined()
+			expect(guideText).toContain(
+				'A fold never takes the newest user message or any message after it, because that message is the request a run serves.',
+			)
+		})
+
+		it('folds nothing after a cancel and folds on the next run (the no-fold-after-cancel bullet)', async () => {
+			const stub = createStubSummarizer()
+			const conversations = createConversationManager({ summarize: stub.summarize })
+			const conversation = conversations.add()
+			conversation.add([
+				{ role: 'user', content: 'q'.repeat(40) },
+				{ role: 'assistant', content: 'Noted.' },
+				{ role: 'user', content: 'Send the note.' },
+			])
+			const tools = createToolManager()
+			const agent = createAgent(
+				createScriptedProvider(
+					[
+						{ content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] },
+						{ content: 'Done.' },
+					],
+					{ record: true, exhaust: 'throw' },
+				),
+				{
+					conversations,
+					tools,
+					window: createBudget({
+						max: estimateMessages(conversation.view()) + 1,
+						consumer: estimateMessages,
+					}),
+				},
+			)
+			tools.add(
+				createTool({
+					name: 'reply',
+					execute: () => {
+						agent.abort('replied')
+						return 'sent'
+					},
+				}),
+			)
+			await agent.generate()
+			const folds = stub.calls.length
+			agent.context.messages.add({ role: 'user', content: 'Next.' })
+			await agent.generate()
+
+			expect(folds).toBe(0)
+			expect(conversation.sections[0]?.messages.map(({ role }) => role)).toEqual([
+				'user',
+				'assistant',
+				'user',
+				'assistant',
+				'tool',
+			])
+			expect(guideText).toContain(
+				"When the run's signal has aborted by the time tool dispatch ends, the loop records the tool messages and folds nothing",
+			)
+		})
+
 		it('switches modes loaded from plain data as the modes fence claims', async () => {
 			const provider = createScriptedProvider(
 				[
@@ -1009,9 +1136,9 @@ await new GuideCommand({
 			conversation.add([
 				{ role: 'user', content: 'My name is Ada.' },
 				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+				{ role: 'user', content: 'What did I say my name was?' },
 			])
 			await conversation.compact()
-			conversation.add({ role: 'user', content: 'What did I say my name was?' })
 			conversation.clear()
 
 			expect(conversation.messages()).toEqual([])

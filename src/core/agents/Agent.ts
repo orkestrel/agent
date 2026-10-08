@@ -606,8 +606,9 @@ export class Agent implements AgentInterface {
 	//    resilient.)
 	//  • Futile-compaction guard (the single-level limit) — when a between-turns `compact()` resolves
 	//    `undefined` (nothing left to fold) while the prompt is still over the window — that is, the live tail
-	//    is at/below `keep` and the over-window is structural (the uncompactable system block + the
-	//    section summaries) so compaction can't reduce further — set the per-run `futile` flag so
+	//    before the run's request is at/below `keep` and the over-window is structural (the uncompactable
+	//    system block, the section summaries, and the request with this run's turns, which `compact()`
+	//    never folds) so compaction can't reduce further — set the per-run `futile` flag so
 	//    auto-compaction stops for the rest of this run (no per-turn churn). The over-window prompt then
 	//    proceeds to the provider, which surfaces a genuine context-length error if it truly can't fit
 	//    (the real limit). The loop does not churn futilely. The returned flag carries that latch back to
@@ -632,8 +633,11 @@ export class Agent implements AgentInterface {
 		const conversation = this.#context.conversations.active
 		// No window or a non-summarizable active conversation (the default one can't fold) ⇒ nothing
 		// to do. (Both call sites are gated by `compacting`, so here `conversation` is the
-		// active, summarizable one; this guard keeps `#trim` total.)
-		if (this.#window === undefined || conversation?.summarizable !== true) return false
+		// active, summarizable one; this guard keeps `#trim` total.) A cancelled run is about to
+		// settle, so a fold would spend summarizer time on a prompt no provider reads; the next
+		// run's pre-first-turn check folds instead.
+		if (this.#window === undefined || conversation?.summarizable !== true || abort.signal.aborted)
+			return false
 		this.#window.clear()
 		this.#window.consume(messages)
 		if (!this.#window.exhausted) return false
