@@ -299,6 +299,7 @@ Exported from `@orkestrel/scaffold`, and reachable from
 | `blueprintToQuestions`              | function | Measures a blueprint against every law its own fields decide.                                            |
 | `blueprintToRootTsconfig`           | function | Compiles the root TypeScript configuration for a blueprint.                                              |
 | `blueprintToProjects`               | function | Projects a blueprint into the project labels its root Vitest configuration registers.                    |
+| `blueprintToOptimizedDependencies`  | function | Compiles the browser projects' pre-bundled dependency list for a blueprint.                              |
 | `blueprintToRootVite`               | function | Compiles the root Vite and Vitest configuration for a blueprint.                                         |
 | `blueprintToScripts`                | function | Projects a blueprint into the scripts its manifest declares.                                             |
 | `blueprintToSheets`                 | function | Projects a blueprint into its validated sheet-face names in stable order.                                |
