@@ -154,6 +154,33 @@ describe('stock selection helpers', () => {
 		).toEqual(['A1', 'R1', 'A2', 'R2', 'L1', 'request'])
 	})
 
+	it('joins a late result to its unique owner across a duplicate-call leader', () => {
+		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
+		const messages: readonly Message[] = [
+			{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
+			{ id: 'R1', role: 'tool', content: 'first result', call: 'one' },
+			{
+				id: 'A2',
+				role: 'assistant',
+				content: '',
+				calls: [createToolCall({ id: 'two' }), createToolCall({ id: 'two' })],
+			},
+			{ id: 'R2', role: 'tool', content: 'second result', call: 'two' },
+			{ id: 'L1', role: 'tool', content: 'late first result', call: 'one' },
+			request,
+		]
+		expect(
+			filterSelectionMessages(
+				messages,
+				[
+					{ id: 'A1', needed: false },
+					{ id: 'R1', needed: false },
+				],
+				request,
+			).map((message) => message.id),
+		).toEqual(['A1', 'R1', 'A2', 'R2', 'L1', 'request'])
+	})
+
 	it('keeps a positional result with no call member in its leader group', () => {
 		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
 		const messages: readonly Message[] = [
@@ -168,7 +195,7 @@ describe('stock selection helpers', () => {
 		).toEqual(['A', 'T', 'request'])
 	})
 
-	it('keeps every result after a duplicate-call leader in its group, whatever call it names', () => {
+	it('keeps a result after a duplicate-call leader in its group when no assistant owns its call', () => {
 		const request = { id: 'request', role: 'user', content: 'Continue.' } satisfies Message
 		const messages: readonly Message[] = [
 			{

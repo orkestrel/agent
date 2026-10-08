@@ -158,7 +158,7 @@ export function filterSelectionMessages(
 			leader !== undefined &&
 			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
 		const owners = message.call === undefined ? undefined : calls.get(message.call)
-		const owner = paired ? leader : owners?.length === 1 ? owners[0] : undefined
+		const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
 		const group = owner === undefined ? undefined : groups.get(owner)
 		if (group !== undefined) group.push(message)
 		else {
