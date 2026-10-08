@@ -80,7 +80,7 @@ export function matchesJudgment(
  * section's stable `id`, and its `summary` verbatim as content.
  *
  * @remarks
- * Pure and total. This is the unframed form the rollup regeneration digests (a
+ * Pure and total. This is the unframed form an opted-in rollup regeneration digests (a
  * summary-of-summaries over the section summaries); the recap label is a `view()`
  * presentation concern kept out of what the summarizer re-reads — see
  * {@link buildRecapMessage}.

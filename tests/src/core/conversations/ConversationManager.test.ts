@@ -220,8 +220,8 @@ describe('ConversationManager — the default keep flows in, and per-add overrid
 		const manager = new ConversationManager({ summarize: stub.summarize, keep: 1 })
 		const conversation = manager.add()
 		conversation.add([
-			{ role: 'assistant', content: 'x' },
-			{ role: 'assistant', content: 'y' },
+			{ role: 'user', content: 'x' },
+			{ role: 'user', content: 'y' },
 		])
 
 		await conversation.compact()
@@ -300,6 +300,44 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 		await conversation.compact()
 
 		expect(conversation.sections).toHaveLength(2)
+	})
+})
+
+describe('ConversationManager — the default rollup flows in, and per-add overrides win', () => {
+	it('creates conversations that generate no rollup when neither the manager nor the add asks', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize })
+		const conversation = manager.add()
+
+		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+		await conversation.compact()
+
+		expect(stub.calls).toHaveLength(1)
+		expect(conversation.summary).toBeUndefined()
+	})
+
+	it("created conversations inherit the manager's default rollup", async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
+		const conversation = manager.add()
+
+		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+		await conversation.compact()
+
+		expect(stub.calls).toHaveLength(2)
+		expect(conversation.summary).toBe('recap of 1')
+	})
+
+	it('a per-add rollup OVERRIDES the manager default', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
+		const conversation = manager.add({ rollup: false })
+
+		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+		await conversation.compact()
+
+		expect(stub.calls).toHaveLength(1)
+		expect(conversation.summary).toBeUndefined()
 	})
 })
 

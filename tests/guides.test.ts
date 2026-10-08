@@ -795,10 +795,14 @@ await new GuideCommand({
 		})
 
 		it('folds neither the newest user message nor half a call group (the compaction boundary rule)', async () => {
+			// The interjected user message puts the call and its result in two exchanges.
 			const conversation = createConversation({ summarize: createStubSummarizer().summarize })
 			conversation.add([
+				{ role: 'user', content: 'Is the depot open on Friday?' },
+				{ role: 'assistant', content: 'The depot is open on Friday.' },
 				{ role: 'user', content: 'Which order is late?' },
 				{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+				{ role: 'user', content: 'The printer needs paper.' },
 				{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
 				{ role: 'user', content: 'Who carries it?' },
 			])
@@ -806,10 +810,79 @@ await new GuideCommand({
 			const request = createConversation({ summarize: createStubSummarizer().summarize })
 			request.add({ role: 'user', content: 'Look up order LH-81660.' })
 
-			expect(split?.messages.map(({ content }) => content)).toEqual(['Which order is late?'])
+			expect(split?.messages.map(({ content }) => content)).toEqual([
+				'Is the depot open on Friday?',
+				'The depot is open on Friday.',
+			])
 			expect(await request.compact()).toBeUndefined()
 			expect(guideText).toContain(
 				'A fold never takes the newest user message or any message after it, because that message is the request a run serves.',
+			)
+		})
+
+		it('folds whole exchanges and a leading greeting only with the first (the compaction exchange rule)', async () => {
+			const stub = createStubSummarizer()
+			const conversation = createConversation({ summarize: stub.summarize })
+			conversation.add([
+				{ role: 'assistant', content: 'Enjoy the break.' },
+				{ role: 'user', content: 'Work out the refund for order LH-79215.' },
+				{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+				{ role: 'tool', content: 'Order LH-79215 totals $289.00', call: 'order' },
+				{ role: 'assistant', content: 'The refund is $289.00.' },
+				{ role: 'user', content: 'Which card is on file?' },
+				{ role: 'assistant', content: 'Mastercard ending 7719.' },
+				{ role: 'user', content: 'Send the refund to that card.' },
+			])
+			const inside = await conversation.compact({ keep: 6 })
+			const section = await conversation.compact({ keep: 2 })
+
+			expect(inside).toBeUndefined()
+			expect(stub.calls).toHaveLength(1)
+			expect(section?.messages.map(({ content }) => content)).toEqual([
+				'Enjoy the break.',
+				'Work out the refund for order LH-79215.',
+				'',
+				'Order LH-79215 totals $289.00',
+				'The refund is $289.00.',
+			])
+			expect(guideText).toContain(
+				'An exchange is a user message and every message after it up to the next user message, and a message before the first user message belongs to the first exchange. A fold removes whole exchanges: a cut inside an exchange moves back to the user message that opens it.',
+			)
+		})
+
+		it('regenerates the rollup only when the rollup option is true (the compaction fence)', async () => {
+			// The fence's summarizer calls a provider; the transcription digests through the stub.
+			const silent = createStubSummarizer()
+			const plain = createConversation({ summarize: silent.summarize, keep: 2 })
+			const counted = createStubSummarizer()
+			const rolled = createConversation({ summarize: counted.summarize, keep: 2, rollup: true })
+			for (const conversation of [plain, rolled]) {
+				conversation.add([
+					{ role: 'user', content: 'My name is Ada.' },
+					{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+					{ role: 'user', content: 'Book a table for two at 19:00.' },
+					{ role: 'assistant', content: 'Booked for two at 19:00.' },
+					{ role: 'user', content: 'What did I say my name was?' },
+				])
+			}
+			const sections = [await plain.compact(), await rolled.compact()]
+
+			expect(sections.map((section) => section?.messages.length)).toEqual([2, 2])
+			expect(rolled.view().map(({ content }) => content)).toEqual([
+				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
+				'Book a table for two at 19:00.',
+				'Booked for two at 19:00.',
+				'What did I say my name was?',
+			])
+			expect(silent.calls).toHaveLength(1)
+			expect(plain.summary).toBeUndefined()
+			expect(counted.calls).toHaveLength(2)
+			expect(rolled.summary).toBe('recap of 1')
+			expect(guideText).toContain(
+				'const section = await conversation.compact() // folds the first exchange → a summarized section',
+			)
+			expect(guideText).toContain(
+				'With `rollup: true`, each compaction also regenerates the conversation rollup `summary`, a summary of every section summary, through a further summarizer call. Without it, no summarizer call is spent on a rollup and `summary` keeps its value: `undefined`, or the summary a restored snapshot carried.',
 			)
 		})
 
@@ -1153,7 +1226,7 @@ await new GuideCommand({
 
 		it('folds a reference block written to the active workspace into the next build (the provenance pattern)', () => {
 			// The fence passes `summarize: undefined` as a placeholder; the transcription omits the key.
-			const conversations = createConversationManager()
+			const conversations = createConversationManager({ rollup: true })
 			conversations.add({ id: 'auth' })
 			const b = conversations.add({ id: 'planning' })
 			// The fence starts from a thread that already holds turns; the transcription seeds them.

@@ -17,12 +17,12 @@ import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@o
 const recap = (summary: string): string => `${CONVERSATION_RECAP_PREFIX}${summary}`
 
 // Conversation OWNS its live message tail DIRECTLY (the flat store verbs folded in, like a
-// Workspace owns its files) — a live tail plus compacted, summarized sections + a regenerated
+// Workspace owns its files) — a live tail plus compacted, summarized sections + an opt-in
 // rollup + the `summarizable` flag, with rehydrate / search over the retained originals, driven by
 // a provider-agnostic summarizer seam — real behavior, a data-stub summarizer, NOT a
 // behavior-mock; the LIVE model is exercised in tests/src/ollama).
 // `compact()` folds the older live messages into a section (its summary from the seam),
-// regenerates the rollup (a second seam call), and emits `summary` then `compact`; view() =
+// regenerates an opted-in rollup (a second seam call), and emits `summary` then `compact`; view() =
 // section summaries ++ the live tail; rehydrate/search read the retained originals.
 
 describe('Conversation — construction & accessors', () => {
@@ -136,7 +136,7 @@ describe('Conversation — view() before any compaction', () => {
 describe('Conversation — compact() with the default keep (0) folds up to the newest user message', () => {
 	it('folds every message before the newest user message into ONE section, sets the rollup, emits', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize })
+		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
 		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
 			conversation.emitter,
 			['compact', 'summary', 'rehydrate'],
@@ -174,9 +174,9 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
 		expect(events.rehydrate.count).toBe(0)
 	})
 
-	it('makes TWO summarizer calls per compaction (the section digest + the rollup)', async () => {
+	it('makes TWO summarizer calls per compaction with rollup (the section digest + the rollup)', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize })
+		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
 		conversation.add([
 			{ role: 'assistant', content: 'a' },
 			{ role: 'assistant', content: 'b' },
@@ -297,10 +297,12 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 })
 
 describe('Conversation — compact() moves its boundary to whole exchanges', () => {
-	it('keeps an assistant call on the live side when its tool result would stay live', async () => {
+	it('moves a cut inside an exchange back to the user message that opens it', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
 			{ role: 'user', content: 'Which order is late?' },
 			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
 			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
@@ -310,8 +312,12 @@ describe('Conversation — compact() moves its boundary to whole exchanges', () 
 
 		const section = await conversation.compact({ keep: 3 })
 
-		expect(section?.messages.map((message) => message.content)).toEqual(['Which order is late?'])
+		expect(section?.messages.map((message) => message.content)).toEqual([
+			'Is the depot open on Friday?',
+			'The depot is open on Friday.',
+		])
 		expect(conversation.messages().map((message) => message.role)).toEqual([
+			'user',
 			'assistant',
 			'tool',
 			'assistant',
@@ -319,10 +325,44 @@ describe('Conversation — compact() moves its boundary to whole exchanges', () 
 		])
 	})
 
-	it('pairs a tool result with no call member to the assistant call that leads its run', async () => {
+	it('folds a leading assistant greeting with the first exchange and never without it', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		conversation.add([
+			{ role: 'assistant', content: 'Enjoy the break.' },
+			{ role: 'user', content: 'Work out the refund for order LH-79215.' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'Order LH-79215 totals $289.00', call: 'order' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'reply' })] },
+			{ role: 'tool', content: 'sent', call: 'reply' },
+			{ role: 'user', content: 'Which card is on file?' },
+		])
+
+		// A cut after the greeting and the request falls inside the first exchange, so nothing folds.
+		expect(await conversation.compact({ keep: 5 })).toBeUndefined()
+		expect(stub.calls).toHaveLength(0)
+
+		const section = await conversation.compact({ keep: 0 })
+
+		expect(section?.messages.map((message) => message.role)).toEqual([
+			'assistant',
+			'user',
+			'assistant',
+			'tool',
+			'assistant',
+			'tool',
+		])
+		expect(conversation.messages().map((message) => message.content)).toEqual([
+			'Which card is on file?',
+		])
+	})
+
+	it('moves a cut inside an exchange holding a tool result with no call member', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
 			{ role: 'user', content: 'Which order is late?' },
 			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
 			{ role: 'tool', content: 'LH-81660 is late' },
@@ -331,7 +371,31 @@ describe('Conversation — compact() moves its boundary to whole exchanges', () 
 
 		const section = await conversation.compact({ keep: 2 })
 
-		expect(section?.messages.map((message) => message.content)).toEqual(['Which order is late?'])
+		expect(section?.messages.map((message) => message.content)).toEqual([
+			'Is the depot open on Friday?',
+			'The depot is open on Friday.',
+		])
+	})
+
+	it('keeps a call group that spans two exchanges on one side of the cut', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
+			{ role: 'user', content: 'Which order is late?' },
+			{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'user', content: 'The printer needs paper.' },
+			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+			{ role: 'user', content: 'Who carries it?' },
+		])
+
+		const section = await conversation.compact({ keep: 2 })
+
+		expect(section?.messages.map((message) => message.content)).toEqual([
+			'Is the depot open on Friday?',
+			'The depot is open on Friday.',
+		])
 	})
 
 	it('keeps the newest user message and every message after it live', async () => {
@@ -488,7 +552,7 @@ describe('Conversation — search(query) over sections + live (case-insensitive)
 describe('Conversation — multiple compactions accumulate sections + regenerate the rollup', () => {
 	it('appends a new section each compaction and refreshes the rollup over ALL sections', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize })
+		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
 
 		// First fold: one message → section 1; rollup over 1 section.
 		conversation.add({ role: 'assistant', content: 'first batch' })
@@ -516,12 +580,90 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
 	})
 })
 
+describe('Conversation — the rollup is opt-in', () => {
+	it('spends no summarizer call on a rollup by default and leaves summary undefined', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
+			conversation.emitter,
+			['compact', 'summary'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		const section = await conversation.compact()
+
+		expect(stub.calls).toEqual([section?.messages])
+		expect(conversation.summary).toBeUndefined()
+		expect(events.summary.count).toBe(0)
+		expect(events.compact.calls).toEqual([[section]])
+		expect('summary' in conversation.snapshot()).toBe(false)
+	})
+
+	it('regenerates the rollup with a second summarizer call when rollup is true', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
+		const events = createRecorders<ConversationEventMap, 'summary'>(conversation.emitter, [
+			'summary',
+		])
+		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		await conversation.compact()
+
+		expect(stub.calls.map((call) => call.length)).toEqual([2, 1])
+		expect(conversation.summary).toBe('recap of 1')
+		expect(events.summary.calls).toEqual([['recap of 1']])
+	})
+
+	it('merges an overflow without a rollup call when rollup is false', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 1 })
+		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
+
+		await conversation.compact()
+
+		// The first fold, the second fold, then the merge over the two section summaries.
+		expect(stub.calls.map((call) => call.length)).toEqual([1, 1, 2])
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.summary).toBeUndefined()
+	})
+
+	it('carries a restored rollup through a compaction and a snapshot when rollup is false', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({
+			summarize: stub.summarize,
+			snapshot: { id: 'desk', summary: 'Ada prefers email.', sections: [], messages: [] },
+		})
+		conversation.add([
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		await conversation.compact()
+
+		expect(stub.calls).toHaveLength(1)
+		expect(conversation.summary).toBe('Ada prefers email.')
+		expect(conversation.snapshot().summary).toBe('Ada prefers email.')
+	})
+})
+
 describe('Conversation — observation is side-effect-free', () => {
 	it('a throwing compact listener is isolated + routed to the error handler; the fold still completes', async () => {
 		const stub = createStubSummarizer()
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const conversation = new Conversation({
 			summarize: stub.summarize,
+			rollup: true,
 			error: errors.handler,
 			on: {
 				compact() {
@@ -613,7 +755,11 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 describe('Conversation — reference() renders a provenance-labeled cross-conversation block (D1)', () => {
 	it('includes the provenance label, the rollup summary, and ONLY the supplied excerpts', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ id: 'planning', summarize: stub.summarize })
+		const conversation = new Conversation({
+			id: 'planning',
+			summarize: stub.summarize,
+			rollup: true,
+		})
 		const all = conversation.add([
 			{ role: 'user', content: 'the API endpoint is /v2/sync' },
 			{ role: 'assistant', content: 'noted, /v2/sync it is' },
@@ -661,7 +807,11 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 
 	it('excludes the summary when summary:false even if a rollup exists', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ id: 'planning', summarize: stub.summarize })
+		const conversation = new Conversation({
+			id: 'planning',
+			summarize: stub.summarize,
+			rollup: true,
+		})
 		conversation.add({ role: 'assistant', content: 'decided on Postgres' })
 		await conversation.compact()
 		expect(conversation.summary).toBeDefined()
@@ -691,7 +841,12 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 describe('Conversation — snapshot() serializes id + summary + sections + live tail (C-c)', () => {
 	it('snapshot() captures id, sections, the live tail, and the rollup summary', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ id: 'snap', summarize: stub.summarize, keep: 1 })
+		const conversation = new Conversation({
+			id: 'snap',
+			summarize: stub.summarize,
+			rollup: true,
+			keep: 1,
+		})
 		conversation.add([
 			{ role: 'user', content: 'first' },
 			{ role: 'assistant', content: 'second' },
@@ -849,7 +1004,7 @@ describe('Conversation — sections cap', () => {
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2, keep: 1 })
 
 		for (let n = 0; n < 5; n += 1) {
-			conversation.add({ role: 'assistant', content: `msg-${n}` })
+			conversation.add({ role: 'user', content: `msg-${n}` })
 			await conversation.compact()
 		}
 
@@ -918,7 +1073,7 @@ describe('Conversation — sections cap', () => {
 			if (calls === 6) throw boom
 			return `recap of ${messages.length}`
 		}
-		const conversation = new Conversation({ summarize, sections: 2 })
+		const conversation = new Conversation({ summarize, sections: 2, rollup: true })
 
 		conversation.add({ role: 'assistant', content: 'round-1' })
 		await conversation.compact()

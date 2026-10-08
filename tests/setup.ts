@@ -927,7 +927,8 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
  * folded count), so a `compact()` produces a predictable section summary and the rollup is a
  * predictable summary-of-summaries (a data-stub, NOT a behavior-mock — the LIVE
  * model is exercised separately in the `src:ollama` project). Counts its calls so a test can
- * prove the TWO summarizer calls per compaction (the section digest + the rollup regeneration).
+ * prove the summarizer calls per compaction (the section digest, plus the rollup regeneration
+ * when the `rollup` option is `true`).
  *
  * @returns The summarizer plus a live `calls` recorder of every digested message-slice
  */
@@ -1131,9 +1132,9 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 /**
  * Builds a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
  * added, then a genuine `compact()` folds the oldest two into one summarized section + regenerates
- * the rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is NON-VACUOUS
- * in BOTH the compacted sections AND the live tail (and carries a rollup summary). The shared
- * store-test fixture both `{Memory,Database}ConversationStore` twins drive (one
+ * the opted-in rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is
+ * NON-VACUOUS in BOTH the compacted sections AND the live tail (and carries a rollup summary). The
+ * shared store-test fixture both `{Memory,Database}ConversationStore` twins drive (one
  * builder, not a per-file copy). The deterministic, provider-free summarizer is folded INSIDE
  * (digesting the slice into `recap(<contents>)` — NOT {@link createStubSummarizer}, whose `recap of
  * <n>` digest text differs), so a `compact()` produces a predictable section + rollup.
@@ -1148,6 +1149,7 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 			return `recap(${messages.map((message) => message.content).join('|')})`
 		},
 		keep: 1,
+		rollup: true,
 	})
 	conversation.add([
 		{ role: 'user', content: 'first' },
@@ -1559,9 +1561,9 @@ export function resolveSectionRender(options?: SectionRenderOptions): string {
 }
 
 /**
- * Registers a conversation on a {@link ConversationManagerInterface} and compacts it, so the
- * registered conversation carries a real compacted section, a live tail, and a rollup summary —
- * a durable `save` / `open` round trip over it is then NON-VACUOUS in every field.
+ * Registers a conversation on a {@link ConversationManagerInterface} and compacts it with the
+ * `rollup` option, so the registered conversation carries a real compacted section, a live tail,
+ * and a rollup summary — a durable `save` / `open` round trip over it is then NON-VACUOUS in every field.
  *
  * @param manager - The manager to register the conversation on (it supplies the summarizer and `keep`)
  * @param id - The conversation id to register
@@ -1570,7 +1572,7 @@ export async function seedConversation(
 	manager: ConversationManagerInterface,
 	id: string,
 ): Promise<void> {
-	const conversation = manager.add({ id })
+	const conversation = manager.add({ id, rollup: true })
 	conversation.add([
 		{ role: 'user', content: 'first' },
 		{ role: 'assistant', content: 'second' },

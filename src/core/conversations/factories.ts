@@ -16,22 +16,22 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
 
 /**
  * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
- * message store it owns directly, with compaction into summarized sections, a regenerated
+ * message store it owns directly, with compaction into summarized sections, an opt-in
  * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
  * provider-agnostic {@link ConversationSummaryHandler} seam.
  *
  * @remarks
  * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
  * (each section as a summary message, then the live tail). `compact()` folds the older live
- * messages into a summarized {@link Section} and regenerates the rollup — it requires
- * a `summarize` (omitted ⇒ `compact()` throws a `ConversationError`); `keep` retains a recent
- * tail (default `DEFAULT_CONVERSATION_KEEP` — fold up to the newest user message).
- * `rehydrate(id)` / `search(query)` read
- * the retained originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
+ * messages into a summarized {@link Section}, whole exchanges at a time, and regenerates the
+ * rollup when `rollup` is `true` — it requires a `summarize` (omitted ⇒ `compact()` throws a
+ * `ConversationError`); `keep` retains a recent tail (default `DEFAULT_CONVERSATION_KEEP` —
+ * fold up to the newest user message). `rehydrate(id)` / `search(query)` read the retained
+ * originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
  * through the reserved `on` option; the emitter isolates a listener throw and routes it to
  * its `error` handler (the `error` option), so it can never corrupt a compaction.
  *
- * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` (see {@link ConversationOptions})
+ * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `rollup` (see {@link ConversationOptions})
  * @returns A working {@link ConversationInterface}
  *
  * @example Conversations & compaction
@@ -54,16 +54,19 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
  * 				AbortSignal.timeout(30_000),
  * 			)
  * 		).content,
- * 	keep: 2, // retain the two most recent turns verbatim on each compaction
+ * 	keep: 2, // retain at least the two most recent messages verbatim on each compaction
+ * 	rollup: true, // also regenerate the rollup summary on each compaction
  * })
  * conversation.add([
  * 	{ role: 'user', content: 'My name is Ada.' },
  * 	{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+ * 	{ role: 'user', content: 'Book a table for two at 19:00.' },
+ * 	{ role: 'assistant', content: 'Booked for two at 19:00.' },
  * 	{ role: 'user', content: 'What did I say my name was?' },
  * ])
  *
- * const section = await conversation.compact() // folds the older turns → a summarized section
- * conversation.view() // [<section summary message>, ...the retained recent tail] — the model input
+ * const section = await conversation.compact() // folds the first exchange → a summarized section
+ * conversation.view() // [<section summary message>, ...the retained recent exchanges] — the model input
  * conversation.summary // the regenerated rollup (a summary-of-summaries over all sections)
  * conversation.search('ada') // case-insensitive across sections' originals + the live tail
  * section && conversation.rehydrate(section.id) // the section's full original messages (a pure read)

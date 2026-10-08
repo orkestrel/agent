@@ -111,8 +111,8 @@ export interface MessageManagerInterface {
 /**
  * Summarizes a conversation, provider-agnostically — the seam the agent runtime supplies so core
  * never imports a provider. Given the folded messages, it resolves their digest, the model-written
- * summary used to summarize a compacted {@link Section} and to regenerate a {@link
- * ConversationInterface}'s rollup `summary`.
+ * summary used to summarize a compacted {@link Section} and, when the `rollup` option is `true`,
+ * to regenerate a {@link ConversationInterface}'s rollup `summary`.
  *
  * @remarks
  * The agent runtime builds one from its `ProviderInterface` (for example
@@ -152,7 +152,8 @@ export interface Section {
  * `compact` carries the newly-folded {@link Section}; `collapse` carries a section
  * created by folding multiple older sections together (a bounded-`sections` cap enforcement,
  * distinct from `compact`'s fresh live-tail fold); `summary` carries the regenerated
- * conversation rollup (refreshed on each compaction); `rehydrate` carries the `id` of a
+ * conversation rollup (refreshed on each compaction when the `rollup` option is `true`, and
+ * never emitted otherwise); `rehydrate` carries the `id` of a
  * section whose originals were pulled back. Listener isolation is the emitter's:
  * every event is emitted directly and a listener throw is routed to the emitter's
  * `error` handler (the `error` option), never onto this map, so a buggy observer can never
@@ -176,7 +177,7 @@ export type ConversationEventMap = {
 /**
  * Configures `createConversation` — the optional `id`, the reserved `on` hooks, the
  * provider-agnostic `summarize` seam, the retained-tail size, an optional cap on the compacted
- * `sections` list, and a {@link ConversationSnapshot} to hydrate from.
+ * `sections` list, the `rollup` switch, and a {@link ConversationSnapshot} to hydrate from.
  *
  * @remarks
  * `id` is the conversation's identity (a random UUID when omitted). `on` is the reserved
@@ -186,11 +187,14 @@ export type ConversationEventMap = {
  * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
  * retains verbatim (folding only the older ones); it defaults to
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
- * folds every live message before the newest user message into one section). `sections` is an
+ * folds every exchange before the newest user message into one section). `sections` is an
  * optional cap on the
  * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
  * `sections` sections folds the oldest overflow into one merged section so the list never
  * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited.
+ * `rollup` decides whether each compaction regenerates the rollup `summary`, a further summarizer
+ * call over every section summary. Default: `false`, so no summarizer call is spent on a rollup
+ * and `summary` keeps its value: `undefined`, or the summary a restored snapshot carried.
  * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, rollup
  * `summary`, compacted `sections`, and live tail are restored into the new conversation, with
  * the live `summarize` / `keep` / `on` supplied alongside it (a summarizer is a function, not
@@ -210,6 +214,8 @@ export interface ConversationOptions {
 	readonly keep?: number
 	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Omitted ⇒ unlimited. */
 	readonly sections?: number
+	/** If `true`, each compaction regenerates the rollup `summary`; if `false`, none is generated. Default: `false`. */
+	readonly rollup?: boolean
 	/** Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent. */
 	readonly snapshot?: ConversationSnapshot
 }
@@ -220,8 +226,8 @@ export interface ConversationOptions {
  *
  * @remarks
  * `keep` overrides the conversation's configured retained-tail size for this compaction only
- * (at most the older `count - keep` live messages fold, never the newest user message or a
- * message after it; when nothing is left to fold, `compact()` is a no-op returning
+ * (at most the older `count - keep` live messages fold, cut back to whole exchanges, never the
+ * newest user message or a message after it; when nothing is left to fold, `compact()` is a no-op returning
  * `undefined`). Omitted ⇒ the conversation's own `keep`
  * (its option, or `DEFAULT_CONVERSATION_KEEP`) applies. `sections` overrides the conversation's
  * configured `sections` cap for this compaction only — after the new section is pushed, an
@@ -266,7 +272,7 @@ export interface ConversationReferenceOptions {
 
 /**
  * Groups messages above the flat {@link MessageManagerInterface} — a live uncompacted tail plus
- * compacted, summarized {@link Section}s and a conversation rollup `summary`, with on-demand
+ * compacted, summarized {@link Section}s and an opt-in conversation rollup `summary`, with on-demand
  * `rehydrate`, substring `search`, a cross-conversation `reference`, and a JSON `snapshot`, driven
  * by a provider-agnostic {@link ConversationSummaryHandler} seam; `summarizable` reports whether
  * that seam was supplied, and the agent loop gates automatic compaction on it.
@@ -278,7 +284,8 @@ export interface ConversationReferenceOptions {
  *   owns its files (no separate per-value manager). `sections` are the compacted history
  *   (oldest → newest), each a summarized slice that retains its originals. `summary` is the
  *   conversation rollup (a summary-of-summaries over all sections), regenerated on each
- *   compaction (`undefined` until the first compaction).
+ *   compaction when the `rollup` option is `true`; otherwise it keeps its value, `undefined` or
+ *   the summary a restored snapshot carried.
  * - **Message verbs (the inlined store).** `add` takes one {@link MessageInput} or a batch,
  *   mints each message's `id` (a random UUID), stores it, and returns the created
  *   message(s); a stored message is immutable. `message(id)` resolves one (`undefined` when
@@ -291,12 +298,13 @@ export interface ConversationReferenceOptions {
  *   cross-conversation case); `view()` carries the per-section summaries, which are the
  *   compaction benefit.
  * - **`compact()` — fold older live → a section.** Folds the oldest `count - keep` live
- *   messages, cut short at the newest user message and before any call group the cut would
- *   split, into a new {@link Section} (its `summary` from `summarize`), removes
- *   them from the live tail, regenerates the rollup (a second `summarize` over all section
- *   summaries), and emits `summary` then `compact` — returning the new section (or
+ *   messages, cut short at the newest user message and moved back to whole exchanges and
+ *   before any call group the cut would split, into a new {@link Section} (its `summary` from
+ *   `summarize`), removes them from the live tail, regenerates the rollup (a second
+ *   `summarize` over all section summaries) when the `rollup` option is `true`, and emits
+ *   `summary` (only for a regenerated rollup) then `compact` — returning the new section (or
  *   `undefined` when nothing folds). A compaction calls the summarizer for the section
- *   digest and again for the rollup. Throws a
+ *   digest, and again for the rollup only when `rollup` is `true`. Throws a
  *   {@link import('./errors.js').ConversationError} when no `summarize` was supplied.
  * - **`summarizable` — whether a `compact()` can fold.** `true` when a
  *   {@link ConversationSummaryHandler} was supplied, `false` otherwise. The agent loop's automatic
@@ -324,7 +332,7 @@ export interface ConversationInterface {
 	/** Holds the judgments recorded beside this conversation's messages. */
 	readonly judgments: JudgmentManagerInterface
 	readonly emitter: EmitterInterface<ConversationEventMap>
-	/** Holds the conversation rollup (a summary-of-summaries), regenerated on each compaction; `undefined` until the first. */
+	/** Holds the conversation rollup (a summary-of-summaries), regenerated on each compaction when the `rollup` option is `true`; otherwise `undefined` or the restored snapshot's summary. */
 	readonly summary: string | undefined
 	/** Lists the compacted history, oldest → newest. */
 	readonly sections: readonly Section[]
@@ -381,26 +389,32 @@ export interface ConversationInterface {
 	 */
 	view(): readonly Message[]
 	/**
-	 * Folds the oldest `count - keep` live messages, cut short at the newest user message and
-	 * before any call group the cut would split, into a summarized {@link Section} through the
-	 * {@link ConversationSummaryHandler}, removes them from the live tail, regenerates the rollup,
-	 * and emits `summary` then `compact` — resolving `undefined` when nothing folds. Throws a
+	 * Folds whole exchanges from the oldest `count - keep` live messages, cut short at the newest
+	 * user message, into a summarized {@link Section} through the
+	 * {@link ConversationSummaryHandler}, removes them from the live tail, regenerates the rollup
+	 * when the `rollup` option is `true`, and emits `summary` (only for a regenerated rollup) then
+	 * `compact` — resolving `undefined` when nothing folds. Throws a
 	 * {@link import('./errors.js').ConversationError} when no summarizer was supplied.
 	 *
 	 * @remarks
-	 * The effective `keep` comes from `options`, else the conversation's own. Regenerating the
-	 * rollup runs `summarize` again, over all sections. The newest user message is the request a
-	 * run serves, so it and every message after it stay live. An assistant message with calls and
-	 * the tool messages that answer it, grouped as
+	 * The effective `keep` comes from `options`, else the conversation's own. With `rollup` set,
+	 * regenerating the rollup runs `summarize` again, over all sections. The newest user message
+	 * is the request a run serves, so it and every message after it stay live. An exchange is a
+	 * user message and every message after it up to the next user message, and a message before
+	 * the first user message belongs to the first exchange; a cut inside an exchange moves back to
+	 * the user message that opens it, so a fold removes whole exchanges. An assistant message with
+	 * calls and the tool messages that answer it, grouped as
 	 * {@link import('./helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
-	 * a group moves before its assistant message.
+	 * a group moves before its assistant message, then back to whole exchanges again. Only a group
+	 * that spans two exchanges reaches that rule.
 	 *
 	 * @remarks
 	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
 	 * merge step folds the oldest sections into one — if that merge's `summarize` call throws,
-	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss) but the rollup still
-	 * regenerates over the current unmerged sections (never left stale) before the error
-	 * propagates; the next successful `compact()` self-heals the section count back to `cap`.
+	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss) but, with `rollup`
+	 * set, the rollup still regenerates over the current unmerged sections (never left stale)
+	 * before the error propagates; the next successful `compact()` self-heals the section count
+	 * back to `cap`.
 	 *
 	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
 	 * @returns The new {@link Section}, or `undefined` when nothing folded
@@ -476,9 +490,10 @@ export interface ConversationInterface {
  * @remarks
  * Pure JSON data (no class instances, no functions): each {@link Section} and
  * {@link Message} is already a plain record that `structuredClone`s / JSON-round-trips
- * losslessly. The snapshot carries the rollup `summary` (a summary-of-summaries; `undefined` until
- * the first compaction), the compacted `sections` (each retaining its folded originals), and the
- * live uncompacted tail `messages` — but not the `summarize` / `keep`, which are live config
+ * losslessly. The snapshot carries the rollup `summary` (a summary-of-summaries; absent until a
+ * compaction with the `rollup` option `true`, unless a restored snapshot carried one), the
+ * compacted `sections` (each retaining its folded originals), and the live uncompacted tail
+ * `messages` — but not the `summarize` / `keep` / `rollup`, which are live config
  * re-supplied on hydrate (a summarizer is a function, not serializable data). The snapshot the
  * container produces from itself ({@link ConversationInterface.snapshot}); the durable analogue of
  * the {@link ConversationOptions.snapshot} hydration seam. A {@link ConversationManagerInterface}
@@ -490,7 +505,7 @@ export interface ConversationSnapshot {
 	readonly id: string
 	/** Carries recorded judgments; absent in snapshots saved before judgment storage. */
 	readonly judgments?: readonly Judgment[]
-	/** Holds the rollup (a summary-of-summaries); `undefined` until the first compaction. */
+	/** Holds the rollup (a summary-of-summaries); absent until a compaction with the `rollup` option `true`. */
 	readonly summary?: string
 	/** Lists the compacted history, oldest → newest (each section retains its folded originals). */
 	readonly sections: readonly Section[]
@@ -574,14 +589,15 @@ export interface ConversationSnapshotRow {
 /**
  * Carries the data to author a {@link ConversationInterface} through a {@link
  * ConversationManagerInterface} — the optional `id`, a `summarize` override, a `keep` override, a
- * `sections` cap override, the reserved `on` hooks, and a {@link ConversationSnapshot} to hydrate
- * from.
+ * `sections` cap override, a `rollup` override, the reserved `on` hooks, and a
+ * {@link ConversationSnapshot} to hydrate from.
  *
  * @remarks
  * `id` is the conversation's identity (minted when omitted). `summarize` overrides the
  * manager's default {@link ConversationSummaryHandler} for this conversation (omitted ⇒ the
  * manager's default flows in). `keep` overrides the manager's default retained-tail size.
- * `sections` overrides the manager's default `sections` cap. `on` is the reserved listener key
+ * `sections` overrides the manager's default `sections` cap. `rollup` overrides the manager's
+ * default {@link ConversationOptions.rollup} switch. `on` is the reserved listener key
  * (initial {@link ConversationEventMap} listeners). `snapshot` is
  * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
  * `sections` / live tail are restored into the new conversation (the live `summarize` / `keep` /
@@ -600,6 +616,8 @@ export interface ConversationInput {
 	readonly keep?: number
 	/** Overrides the manager's default `sections` cap for this conversation. */
 	readonly sections?: number
+	/** Overrides the manager's default `rollup` switch for this conversation. */
+	readonly rollup?: boolean
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot}. */
 	readonly snapshot?: ConversationSnapshot
@@ -607,8 +625,8 @@ export interface ConversationInput {
 
 /**
  * Configures `createConversationManager` — the default `ConversationSummaryHandler`, retained-tail
- * size, and `sections` cap the conversations it creates inherit, plus the optional durable `store`
- * backing `open` / `save`.
+ * size, `sections` cap, and `rollup` switch the conversations it creates inherit, plus the
+ * optional durable `store` backing `open` / `save`.
  *
  * @remarks
  * `summarize` is the default summarizer flowed into every conversation the manager creates
@@ -617,7 +635,8 @@ export interface ConversationInput {
  * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it), defaulting
  * to {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
  * on a created conversation's compacted `sections` list (a per-`add` {@link ConversationInput.sections}
- * overrides it); omitted ⇒ unlimited.
+ * overrides it); omitted ⇒ unlimited. `rollup` is the default {@link ConversationOptions.rollup}
+ * switch (a per-`add` {@link ConversationInput.rollup} overrides it); omitted ⇒ `false`.
  */
 export interface ConversationManagerOptions {
 	/** Supplies the default summarizer for conversations this manager creates (a per-`add` override wins). */
@@ -626,6 +645,8 @@ export interface ConversationManagerOptions {
 	readonly keep?: number
 	/** Sets the default `sections` cap for conversations this manager creates (a per-`add` override wins); omitted ⇒ unlimited. */
 	readonly sections?: number
+	/** Sets the default `rollup` switch for conversations this manager creates (a per-`add` override wins). Default: `false`. */
+	readonly rollup?: boolean
 	/**
 	 * Holds the optional durable {@link ConversationStoreInterface} backing
 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory

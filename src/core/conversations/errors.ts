@@ -13,8 +13,8 @@ import { isInstance } from '@orkestrel/contract'
  * the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
  *
  * @remarks
- * Compaction requires a summarizer (it digests the folded slice into a section summary and
- * regenerates the rollup); a conversation created without one can still store + `view()` its
+ * Compaction requires a summarizer (it digests the folded slice into a section summary and,
+ * with the `rollup` option, regenerates the rollup); a conversation created without one can still store + `view()` its
  * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
  * {@link import('./types.js').ConversationManagerOptions} /

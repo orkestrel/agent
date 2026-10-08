@@ -21,7 +21,7 @@ import { JudgmentManager } from './JudgmentManager.js'
 
 /**
  * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat
- * message store, plus compacted, summarized {@link Section}s, a regenerated rollup `summary`, and
+ * message store, plus compacted, summarized {@link Section}s, an opt-in rollup `summary`, and
  * a `summarizable` flag, with on-demand `rehydrate` and substring `search`, driven by a
  * provider-agnostic {@link ConversationSummaryHandler} seam so `core` never imports a provider.
  * Observable through its own `emitter`.
@@ -33,20 +33,25 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   `remove` / `clear` / `count`), exactly as a `Workspace` owns its files (no separate
  *   per-value manager). `#sections` are the compacted history (oldest → newest), each a
  *   summarized slice that retains its originals. `#summary` is the rollup (a
- *   summary-of-summaries over all sections), regenerated on each compaction (`undefined`
- *   until the first).
+ *   summary-of-summaries over all sections), regenerated on each compaction when the `rollup`
+ *   option is `true`; otherwise it keeps its value, `undefined` or the restored snapshot's.
  * - **`view()`.** Each section folds to one synthetic summary message (role `'assistant'` — a
  *   prior-context recap — keyed by the section's stable `id`), then the live messages
  *   verbatim. The rollup `summary` is not injected (it is separately pull-able); `view()`
  *   carries the per-section summaries, which are the compaction benefit.
  * - **`compact()`.** Folds the oldest `count - keep` live messages into a new section
  *   (its `summary` from `#summarize`), removes them from the live tail by id, regenerates the
- *   rollup (a second `#summarize` over all section summaries), and emits `summary` then
- *   `compact`. The fold stops before the newest user message, so the request a run serves and
- *   its turns stay live, and a cut inside an assistant call group moves before the group, so a
- *   tool result never stays live without its call. Returns the section, or `undefined` when
- *   nothing folds. Throws a {@link ConversationError} when no `#summarize` was supplied. A
- *   compaction calls the summarizer for the section digest and again for the rollup.
+ *   rollup (a second `#summarize` over all section summaries) when the `rollup` option is
+ *   `true`, and emits `summary` (only for a regenerated rollup) then `compact`. The fold stops
+ *   before the newest user message, so the request a run serves and its turns stay live. An
+ *   exchange is a user message and every message after it up to the next user message, and a
+ *   message before the first user message belongs to the first exchange; a cut inside an
+ *   exchange moves back to the user message that opens it, so a fold removes whole exchanges.
+ *   A cut inside an assistant call group, which only a group spanning two exchanges allows,
+ *   moves before the group, so a tool result never stays live without its call. Returns the
+ *   section, or `undefined` when nothing folds. Throws a {@link ConversationError} when no
+ *   `#summarize` was supplied. A compaction calls the summarizer for the section digest, and
+ *   again for the rollup only when `rollup` is `true`.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns a section's full original
  *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (the caller decides
  *   whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
@@ -58,7 +63,10 @@ import { JudgmentManager } from './JudgmentManager.js'
  *
  * @example
  * ```ts
- * const conversation = new Conversation({ summarize: async (m) => `recap of ${m.length}` })
+ * const conversation = new Conversation({
+ * 	summarize: async (m) => `recap of ${m.length}`,
+ * 	rollup: true,
+ * })
  * conversation.add([
  * 	{ role: 'user', content: 'Hello' },
  * 	{ role: 'assistant', content: 'Hi there' },
@@ -82,9 +90,11 @@ export class Conversation implements ConversationInterface {
 	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
 	// after pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
 	readonly #cap: number | undefined
+	// Whether each compaction spends a further summarizer call regenerating the rollup.
+	readonly #rollup: boolean
 	// The compacted history, oldest → newest — each summarized slice retains its originals.
 	readonly #sections: Section[] = []
-	// The rollup (a summary-of-summaries over all sections), regenerated on each compaction.
+	// The rollup (a summary-of-summaries over all sections); restored from a snapshot as is.
 	#summary: string | undefined
 	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
 	// immutable messages keyed by their minted id (the flat store mechanics folded in).
@@ -112,6 +122,7 @@ export class Conversation implements ConversationInterface {
 			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
 		}
 		this.#cap = options?.sections
+		this.#rollup = options?.rollup ?? false
 		if (snapshot !== undefined) {
 			this.#summary = snapshot.summary
 			for (const section of snapshot.sections) this.#sections.push(section)
@@ -206,18 +217,32 @@ export class Conversation implements ConversationInterface {
 		const live = [...this.#messages.values()]
 		// The newest user message is the request a run serves, so it and its turns stay live.
 		const newest = live.findLastIndex((message) => message.role === 'user')
+		const first = live.findIndex((message) => message.role === 'user')
 		let fold = Math.min(
 			keep <= 0 ? live.length : live.length - keep,
 			newest === -1 ? live.length : newest,
 		)
-		// A cut inside a call group leaves a result without its call, so move it before the group;
-		// a move can land inside an earlier group, so repeat until no group straddles it.
+		// A cut inside an exchange leaves calls and results live without the request they serve, so
+		// move it back to the user message that opens the exchange; a message before the first user
+		// message belongs to the first exchange. A cut inside a call group, possible only when the
+		// group spans two exchanges, moves before the group. Each move can land inside an earlier
+		// exchange or group, so repeat until neither straddles the cut.
 		const spans = collectToolGroups(live).map((group) =>
 			group.map((message) => live.indexOf(message)),
 		)
 		let moved = true
 		while (moved) {
 			moved = false
+			if (fold < live.length) {
+				const opener = live.findLastIndex(
+					(message, index) => index <= fold && message.role === 'user',
+				)
+				const start = opener <= first ? 0 : opener
+				if (start < fold) {
+					fold = start
+					moved = true
+				}
+			}
 			for (const span of spans) {
 				const start = Math.min(...span)
 				if (start < fold && fold <= Math.max(...span)) {
@@ -254,7 +279,7 @@ export class Conversation implements ConversationInterface {
 				this.#emitter.emit('collapse', merged)
 			} catch (error) {
 				// The merge summarizer call threw — the sections stay transiently at `cap + 1`
-				// (no splice, no loss), but the rollup still regenerates over the current
+				// (no splice, no loss), but an opted-in rollup still regenerates over the current
 				// (unmerged) sections so it is never left stale, then the error propagates
 				// (manual `compact()` always surfaces a summarizer failure to its caller; the
 				// next successful `compact()` self-heals the over-cap count).
@@ -262,8 +287,8 @@ export class Conversation implements ConversationInterface {
 				throw error
 			}
 		}
-		// 4. Regenerate the rollup — a summary-of-summaries over all (now-capped) sections
-		// — then observe it, after the mutation, through the guarded path.
+		// 4. Regenerate an opted-in rollup — a summary-of-summaries over all (now-capped)
+		// sections — then observe it, after the mutation, through the guarded path.
 		await this.#regenerate(summarize)
 		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
 		this.#emitter.emit('compact', section)
@@ -326,9 +351,11 @@ export class Conversation implements ConversationInterface {
 		}
 	}
 
-	// Regenerate the rollup over every section summary, then observe it. The summarizer is a
-	// parameter because the caller has already narrowed the optional field.
+	// Regenerate the rollup over every section summary, then observe it; without the `rollup`
+	// option no summarizer call is spent. The summarizer is a parameter because the caller has
+	// already narrowed the optional field.
 	async #regenerate(summarize: ConversationSummaryHandler): Promise<void> {
+		if (!this.#rollup) return
 		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
 		this.#emitter.emit('summary', this.#summary)
 	}

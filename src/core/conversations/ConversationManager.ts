@@ -22,7 +22,7 @@ import { removeEntries } from '../helpers.js'
  * @remarks
  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`
  *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`), flowing the
- *   manager's default `#summarize` / `#keep` in unless the `input` overrides them, and stores
+ *   manager's default `#summarize` / `#keep` / `#rollup` in unless the `input` overrides them, and stores
  *   it (an already-present `id` overwrites — last write wins). `count` is the map size,
  *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the agent's message source the
@@ -59,6 +59,8 @@ export class ConversationManager implements ConversationManagerInterface {
 	readonly #keep: number
 	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.
 	readonly #sections: number | undefined
+	// The default `rollup` switch flowed into every conversation `add` creates (overridable).
+	readonly #rollup: boolean
 	// The optional durable store backing `open` / `save`; `undefined` ⇒ registry-only (both lenient).
 	readonly #store: ConversationStoreInterface | undefined
 
@@ -66,6 +68,7 @@ export class ConversationManager implements ConversationManagerInterface {
 		this.#summarize = options?.summarize
 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
 		this.#sections = options?.sections
+		this.#rollup = options?.rollup ?? false
 		this.#store = options?.store
 	}
 
@@ -87,7 +90,7 @@ export class ConversationManager implements ConversationManagerInterface {
 
 	add(input?: ConversationInput): ConversationInterface {
 		// The manager's defaults flow in unless the input overrides them — so a conversation
-		// created through the manager inherits its summarizer / keep by default. An optional
+		// created through the manager inherits its summarizer / keep / rollup by default. An optional
 		// `snapshot` hydrates the conversation through the declared `ConversationOptions.snapshot`
 		// seam — its `id` / `summary` / `sections` / live tail restored, the live summarize / keep
 		// re-supplied alongside it in the same options object.
@@ -99,6 +102,7 @@ export class ConversationManager implements ConversationManagerInterface {
 			...(summarize === undefined ? {} : { summarize }),
 			keep: input?.keep ?? this.#keep,
 			...(sections === undefined ? {} : { sections }),
+			rollup: input?.rollup ?? this.#rollup,
 			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
 		})
 		this.#conversations.set(conversation.id, conversation)
