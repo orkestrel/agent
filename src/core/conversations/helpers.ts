@@ -71,9 +71,7 @@ export function matchesJudgment(
 		judgment.state === state &&
 		judgment.sources.length === sources.length &&
 		judgment.sources.every((id, index) => id === sources[index]) &&
-		judgment.question.form === question.form &&
-		JSON.stringify(judgment.question.instructions) === JSON.stringify(question.instructions) &&
-		JSON.stringify(judgment.question.criteria) === JSON.stringify(question.criteria)
+		JSON.stringify(judgment.question) === JSON.stringify(question)
 	)
 }
 

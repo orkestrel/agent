@@ -4769,6 +4769,27 @@ describe('Agent — the select event follows each select-site build', () => {
 		expect(faults.count).toBe(0)
 		expect(agent.status).toBe('done')
 	})
+
+	it('commits partial when selection is cancelled on a run with a zero iteration limit', async () => {
+		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const selected = createRecorder<AgentEventMap['select']>()
+		const agent = createAgent(provider, {
+			limit: 0,
+			select: async (conversation, _request, signal) => {
+				await waitForAbort(signal)
+				return { messages: conversation.view(), judgments: [], usage: SELECTION_USAGE }
+			},
+			on: { select: selected.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const run = agent.stream()
+		run.abort('the operator closed the ticket')
+
+		expect(await run.result).toEqual({ content: '', usage: SELECTION_USAGE, partial: true })
+		expect(provider.calls).toHaveLength(0)
+		expect(selected.count).toBe(0)
+	})
 })
 
 describe('Agent — a selection fault follows the compaction fault rules', () => {

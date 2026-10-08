@@ -170,6 +170,17 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 	],
 	['state', { ...JUDGMENT_RECORD, state: 'Charged once' }],
 	['identity', { ...JUDGMENT_RECORD, model: 'other-model' }],
+	[
+		'question member order',
+		{
+			...JUDGMENT_RECORD,
+			question: {
+				instructions: 'Is a refund owed?',
+				criteria: { true: 'Charged twice', false: 'Charged once' },
+				form: 'noul',
+			},
+		},
+	],
 ])
 
 /** Drives the real System One wire methods through the judge engine's sequential mode. */

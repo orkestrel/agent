@@ -380,9 +380,8 @@ export class Agent implements AgentInterface {
 		// Auto-compaction runs only when a `#window` budget is set and the active conversation is
 		// summarizable; the default conversation has no summarizer, so the auto path never throws the
 		// `compact()` SUMMARIZER error. Gating the run-entry `clear()` and the pre-first-turn `#trim`
-		// behind this flag leaves no `await` before the first provider request when compaction is off,
-		// so `stream()` calls `provider.stream` before it returns and a later abort reaches the provider
-		// through the run signal.
+		// behind this flag adds no `await` from compaction when it is off; the select site before it
+		// adds one only when a handler is set.
 		// When enabled: reset `#window` at run entry so no stale `consumed` carries across runs / a
 		// conversation switch, then run a pre-first-turn `#trim` so a resumed / long conversation whose
 		// initial prompt already exceeds the window compacts at once (not only after a tool turn) —
@@ -398,6 +397,8 @@ export class Agent implements AgentInterface {
 				futile = await this.#trim(messages, false, request, abort, budget, spent)
 			}
 		}
+		// A cancel at the entry select site of a `limit: 0` run never reaches the loop's own abort checks.
+		if (abort.signal.aborted) partial = true
 		for (let turn = 0; turn < limit; turn += 1) {
 			// Observe each iteration begin (the turn index). The emitter isolates a listener
 			// throw, so it can't perturb the loop that immediately follows.
@@ -577,8 +578,8 @@ export class Agent implements AgentInterface {
 		// compaction) also takes this `pending=true; continue` path and exits through the `for` condition
 		// (never a `break`), so `broke` stays `false` even though it was a genuine cancel, not a limit
 		// exhaustion. Checking `abort.signal.aborted` here classifies that case correctly: the pump
-		// then emits `abort` (the cancel reason), never `exhaust`. A `limit: 0` run never enters the
-		// loop (`pending` stays `false`), so it stays non-partial either way.
+		// then emits `abort` (the cancel reason), never `exhaust`. An uncancelled `limit: 0` run never
+		// enters the loop (`pending` stays `false`), so it stays non-partial.
 		if (!broke && pending) {
 			partial = true
 			exhausted = !abort.signal.aborted

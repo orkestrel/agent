@@ -39,7 +39,7 @@ describe('stock selection helpers', () => {
 		])
 	})
 
-	it('keeps arithmetic outside the fixed question and renders all message fields with markers', () => {
+	it('keeps arithmetic outside the fixed question and renders every message field but images', () => {
 		const request = requireValue(SELECTION_STAND_IN.at(-1))
 		expect(buildNeededQuestion(NEEDED_CRITERION)).toEqual({
 			form: 'noul',
@@ -56,6 +56,15 @@ describe('stock selection helpers', () => {
 		expect(renderSelectionState([], request.id, request)).toBe(`[A][B] ${JSON.stringify(request)}`)
 		const tool = requireValue(SELECTION_TOOL_MESSAGES[2])
 		expect(renderSelectionState([tool], tool.id, request)).toContain(JSON.stringify(tool.calls))
+		const shot: Message = {
+			id: 'shot',
+			role: 'user',
+			content: 'See the receipt.',
+			images: ['RkxPVw=='],
+		}
+		expect(renderSelectionState([shot], shot.id, request)).toBe(
+			`[A] {"id":"shot","role":"user","content":"See the receipt."}\n[B] ${JSON.stringify(request)}`,
+		)
 	})
 
 	it('reads only matching records and remains pure across all identity mismatches', async () => {

@@ -79,6 +79,10 @@ describe('createSelection', () => {
 		expect(isSelectionError(error) ? error.code : undefined).toBe('THRESHOLD')
 	})
 
+	it('accepts the inclusive upper cutoff of 1', () => {
+		expect(() => createStockSelectionFixture(1)).not.toThrow()
+	})
+
 	it.each(INVALID_SELECTION_LIMITS)('refuses invalid limit %s', (limit) => {
 		const error = captureError(() => createStockSelectionFixture(0.9, { limit }))
 		expect(isSelectionError(error)).toBe(true)
