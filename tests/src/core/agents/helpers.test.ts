@@ -12,6 +12,7 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 	settleAgentJob,
 } from '@src/core'
+import type { TokenUsage } from '@orkestrel/budget'
 import { createBudget } from '@orkestrel/budget'
 import { describe, expect, it } from 'vitest'
 import { createScriptedProvider, createToolCall, createTokenUsage } from '../../../setup.js'
@@ -458,23 +459,35 @@ describe('denyCall — the synthesized denial result', () => {
 })
 
 describe('chargeUsage — the residual budget charge', () => {
-	const consumer = (usage: { readonly total: number }): number => usage.total
-
 	it('consumes the full prompt and only the residual over what was charged', () => {
-		const budget = createBudget({ max: 1000, consumer })
-		const charged = chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10)
+		const seen: TokenUsage[] = []
+		const budget = createBudget<TokenUsage>({
+			max: 1000,
+			consumer: (usage) => {
+				seen.push(usage)
+				return usage.total
+			},
+		})
+		chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10)
+		expect(seen).toEqual([{ prompt: 20, completion: 20, total: 40 }])
 		expect(budget.consumed).toBe(40)
-		expect(charged).toBe(30)
 	})
 
 	it('floors the residual at 0 when the estimate already exceeds the report', () => {
-		const budget = createBudget({ max: 1000, consumer })
-		const charged = chargeUsage(budget, { prompt: 5, completion: 3, total: 8 }, 12)
+		const seen: TokenUsage[] = []
+		const budget = createBudget<TokenUsage>({
+			max: 1000,
+			consumer: (usage) => {
+				seen.push(usage)
+				return usage.total
+			},
+		})
+		chargeUsage(budget, { prompt: 5, completion: 3, total: 8 }, 12)
+		expect(seen).toEqual([{ prompt: 5, completion: 0, total: 0 }])
 		expect(budget.consumed).toBe(0)
-		expect(charged).toBe(12)
 	})
 
-	it('returns the charged total without a budget', () => {
-		expect(chargeUsage(undefined, { prompt: 1, completion: 4, total: 5 }, 2)).toBe(4)
+	it('consumes nothing without a budget', () => {
+		expect(() => chargeUsage(undefined, { prompt: 1, completion: 4, total: 5 }, 2)).not.toThrow()
 	})
 })

@@ -3,4 +3,4 @@
  * the one list the {@link import('./types.js').MessageRole} union derives from, the message
  * guard tests membership against, and the message shape passes to its literal contract.
  */
-export const MESSAGE_ROLES = ['system', 'user', 'assistant', 'tool'] as const
+export const MESSAGE_ROLES = Object.freeze(['system', 'user', 'assistant', 'tool'] as const)

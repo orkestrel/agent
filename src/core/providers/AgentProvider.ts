@@ -213,7 +213,7 @@ export abstract class AgentProvider<
 		}
 	}
 
-	// Assemble the result from the splitter's separated text when present, else the folded state.
+	// Both exits assemble alike, so an aborted call's partial carries what a settled call would.
 	#assemble(
 		splitter: ThinkSplitterInterface | undefined,
 		state: ProviderIncrement,

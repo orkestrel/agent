@@ -489,19 +489,12 @@ export class Agent implements AgentInterface {
 				thinking = joinThinking(thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
-				// Sanitize the provider's normal post-turn usage before charging/folding it,
-				// exactly like the preceding abort path: a non-finite or negative field floors to `0`, a
-				// fractional field floors to its integer part. Unsanitized, a buggy provider's
-				// NaN/negative usage would poison `budget.consumed` and `sumUsage`, and never trip
-				// exhaustion (`Math.max(0, NaN - charged)` is `NaN`).
+				// Sanitize the provider's post-turn usage before charging and folding it, like the
+				// preceding abort path: unsanitized, a non-finite field would reach `budget.consume`,
+				// which refuses it with a `range` error, and a negative field would shrink `sumUsage`.
 				const resultUsage = sanitizeUsage(result.usage)
-				// Residual reconcile — the earlier mid-stream charges already consumed `charged` worth
-				// of budget against this turn's completion; charge only what remains of the full
-				// reported usage so the turn's total budget draw matches `resultUsage` exactly (never
-				// double-counted). `prompt` was never charged mid-stream (no live prompt-delta channel
-				// exists), so it is charged here in full. `sumUsage` / the emitted `usage` chunk below
-				// still carry the full sanitized `resultUsage` — reconciliation affects only the
-				// budget charge, never the reported usage.
+				// The mid-stream estimate already consumed `charged` of this turn's completion, so only
+				// the remainder is charged here while the emitted `usage` chunk carries the full report.
 				chargeUsage(budget, resultUsage, charged)
 				usage = sumUsage(usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.

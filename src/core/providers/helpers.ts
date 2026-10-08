@@ -50,8 +50,8 @@ export function buildProviderResult(
  *
  * @example
  * ```ts
- * const reader = new Response('answer').body!.getReader()
- * await releaseReader(reader)
+ * const body = new Response('answer').body
+ * if (body !== null) await releaseReader(body.getReader())
  * ```
  */
 export async function releaseReader(

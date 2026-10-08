@@ -301,30 +301,29 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
  *
  * @remarks
  * The full `prompt` count is consumed because no earlier charge covers it. Each of `completion`
- * and `total` is consumed less `charged`, floored at 0. The usage must already be sanitized;
- * a `NaN` field would poison the budget. Without a budget the call consumes nothing and still
- * returns the new charged total.
+ * and `total` is consumed less `charged`, floored at 0. The usage must already be sanitized: a
+ * non-finite field yields a non-finite charge, which the installed `Budget` refuses by throwing
+ * a `range` `ContractError`. Without a budget the call consumes nothing.
  *
  * @param budget - The budget to consume against, or `undefined` for an unmetered run
  * @param usage - The sanitized usage the provider reported
  * @param charged - The completion tokens already consumed this turn
- * @returns The completion tokens charged after the call, never below `charged`
  *
  * @example
  * ```ts
  * const budget = createBudget<TokenUsage>({ max: 1000, consumer: (usage) => usage.total })
- * chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10) // 30
+ * chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10)
+ * budget.consumed // 40
  * ```
  */
 export function chargeUsage(
 	budget: BudgetInterface<TokenUsage> | undefined,
 	usage: TokenUsage,
 	charged: number,
-): number {
+): void {
 	budget?.consume({
 		prompt: usage.prompt,
 		completion: Math.max(0, usage.completion - charged),
 		total: Math.max(0, usage.total - charged),
 	})
-	return Math.max(charged, usage.completion)
 }

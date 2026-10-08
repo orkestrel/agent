@@ -196,4 +196,8 @@ describe('MESSAGE_ROLES — the one role list', () => {
 	it('lists the four roles in wire order', () => {
 		expect(MESSAGE_ROLES).toEqual(['system', 'user', 'assistant', 'tool'])
 	})
+
+	it('is frozen, so the guard and the shape read one list', () => {
+		expect(Object.isFrozen(MESSAGE_ROLES)).toBe(true)
+	})
 })
