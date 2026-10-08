@@ -478,10 +478,12 @@ export interface AgentContextOptions {
 	 * empty one is created when omitted. The constructor adds a default conversation when the
 	 * manager has no active one, so `messages` — the manager's active
 	 * conversation's live tail — is always defined. `build()` folds the active conversation's
-	 * `view()` (the per-section summaries + the live tail) as its authoritative message inclusion —
-	 * the scope does not filter the conversation (it owns inclusion through compaction; scope filters
-	 * only instructions / tools / workspace files). The registry is structural; change its active
-	 * conversation through the manager's `switch(id)`.
+	 * `view()` (the per-section summaries + the live tail), or a passed selection's `messages`.
+	 * The scope's filters never touch messages; message inclusion is the conversation's through
+	 * compaction and, when a handler is set, the selection's. A scope change reaches the prompt at
+	 * the next build or select site (run entry, the pre-first-turn compaction fold, or a compaction
+	 * rebuild) and the tools at the next turn's snapshot. The registry is structural; change its
+	 * active conversation through the manager's `switch(id)`.
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
@@ -591,11 +593,12 @@ export interface AgentContextInterface {
 	 * prompt, the scope-filtered instructions (each section's header and each item's rendering
 	 * resolved through the format cascade), and the active workspace's scope-filtered
 	 * (`scope.files`) text files as fenced reference blocks in a `## Workspace` section, then
-	 * the active conversation's `view()`, with the active workspace's image files' `base64`
-	 * payload attached to the last user message. With no override set, each section renders on
-	 * its manager's built-in framing. The `system` message is prepended only when some part of
-	 * it exists, the workspace render covers the active workspace alone, tools are advertised
-	 * structurally rather than in the prompt, and the input is built fresh on each call.
+	 * the active conversation's `view()`, or the selection's `messages` when a selection is
+	 * passed, with the active workspace's image files' `base64` payload attached to the last user
+	 * message. With no override set, each section renders on its manager's built-in framing. The
+	 * `system` message is prepended only when some part of it exists, the workspace render covers
+	 * the active workspace alone, tools are advertised structurally rather than in the prompt, and
+	 * the input is built fresh on each call.
 	 *
 	 * @remarks
 	 * **The active workspace (rendered by carrier) — the sole document/image context.** When

@@ -2226,3 +2226,33 @@ export const SYSTEM_ONE_UNREADABLE_ANSWERS = Object.freeze([
 		message: 'judge error: question refund has an invalid System One answer',
 	},
 ])
+
+/**
+ * Answers a System One request of needed questions with the recorded envelope, one noul per
+ * question, read from the probability of the subject its key names.
+ *
+ * @param body - The parsed System One request body a fixture listener received
+ * @param probabilities - The yes probability for each subject id a needed key names
+ * @returns The recorded envelope carrying one noul answer per requested question
+ * @throws Error Thrown when the body is malformed or names a subject with no probability
+ *
+ * @example
+ * ```ts
+ * Response.json(answerNeededRequest(await request.json(), { [standing.id]: 0.9979 }))
+ * ```
+ */
+export function answerNeededRequest(
+	body: unknown,
+	probabilities: Readonly<Record<string, number>>,
+): Readonly<Record<string, unknown>> {
+	if (!isRecord(body) || !isRecord(body.questions))
+		throw new Error('needed fixture received a malformed request')
+	const answers: Record<string, unknown> = {}
+	for (const id of Object.keys(body.questions)) {
+		const subject = parseConditionKey(id)?.[1]
+		const noul = subject === undefined ? undefined : probabilities[subject]
+		if (noul === undefined) throw new Error(`needed fixture has no probability for ${id}`)
+		answers[id] = { type: 'noul', noul }
+	}
+	return { ...SYSTEM_ONE_TEV1, answers }
+}

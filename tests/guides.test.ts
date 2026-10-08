@@ -3,6 +3,7 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
+	AgentEventMap,
 	JudgeRequest,
 	JudgeResult,
 	Message,
@@ -10,6 +11,10 @@ import type {
 	ProviderOptions,
 	ProviderParserInterface,
 	ProviderRequest,
+	ScopeInterface,
+	ScreenHandler,
+	Selection,
+	SelectionHandler,
 } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
 import { GuideCommand } from '@orkestrel/guide/server'
@@ -51,6 +56,7 @@ await new GuideCommand({
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
+	const { createBudget } = await import('@orkestrel/budget')
 	// The relay fence's server half: its router and its adapter are the server application's
 	// dependencies, declared here for development so the transcription can run the real hop.
 	const { createDispatcher } = await import('@orkestrel/router')
@@ -69,13 +75,16 @@ await new GuideCommand({
 		createRelay,
 		createRelayProvider,
 		createScope,
+		createSelection,
 		createSystemOneJudge,
+		estimateMessages,
 		isJudgeAbortError,
 		isJudgeEntry,
 		isJudgeQuestion,
 		JudgeAbortError,
 		JudgeError,
 		MAX_ERROR_BODY_LENGTH,
+		NEEDED_CRITERION,
 		ProviderAbortError,
 		ProviderError,
 		providerRequestContract,
@@ -86,8 +95,11 @@ await new GuideCommand({
 		SystemOneJudge,
 	} = barrel
 	const {
+		answerNeededRequest,
 		createParser,
+		createRecordingSelection,
 		createScriptedProvider,
+		createStubSummarizer,
 		JUDGE_ENVELOPE,
 		RecordedHeaders,
 		RecordedProvider,
@@ -106,7 +118,7 @@ await new GuideCommand({
 		TEV1_REQUEST,
 		TEV1_SCORE,
 	} = await import('./setup.js')
-	const { describe, expect, it } = await import('vitest')
+	const { describe, expect, expectTypeOf, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
 	// an `it` body because `AgentProvider` is only in scope after the dynamic barrel import.
@@ -287,7 +299,7 @@ await new GuideCommand({
 			expect(guideText).toContain('no tool is advertised in the active scope')
 			expect(guideText).toContain('denied: TOOL is not in the active scope')
 			expect(guideText).toContain(
-				'A scope change through the `context.apply` method takes effect on the next turn.',
+				'A scope change through the `context.apply` method applies at each later site that reads the scope.',
 			)
 			const executed: string[] = []
 			const denials: Array<string | undefined> = []
@@ -337,6 +349,770 @@ await new GuideCommand({
 					.map((message) => message.content),
 			).toEqual(['denied: delete is not in the active scope', 'search'])
 			expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
+		})
+
+		it('applies a scope change to the next turn’s tools and the next run’s prompt (the scope-timing rule)', async () => {
+			const tools = createToolManager()
+			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
+					{ content: 'Three records are stale.' },
+					{ content: 'Deleted.' },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const agent = createAgent(provider, {
+				tools,
+				scope: createScope({ name: 'research', instructions: ['safety'], tools: ['search'] }),
+			})
+			agent.context.instructions.add([
+				{ name: 'safety', content: 'Refuse unsafe requests.' },
+				{ name: 'verbose', content: 'Explain every step.' },
+			])
+			agent.emitter.on('tool', () =>
+				agent.context.apply(
+					createScope({ name: 'cleanup', instructions: ['verbose'], tools: ['delete'] }),
+				),
+			)
+			agent.context.messages.add({ role: 'user', content: 'Find the stale records.' })
+			await agent.generate()
+			agent.context.messages.add({ role: 'user', content: 'Delete them.' })
+			await agent.generate()
+
+			const systems = provider.calls.map((call) => call.messages[0]?.content)
+			const advertised = provider.calls.map((call) => call.tools?.map(({ name }) => name))
+			// Turn 1 keeps the system block run entry built and advertises the applied scope's tools;
+			// the next run's entry build carries the applied scope's instructions.
+			expect(systems).toEqual([
+				'## Instructions\n\nRefuse unsafe requests.',
+				'## Instructions\n\nRefuse unsafe requests.',
+				'## Instructions\n\nExplain every step.',
+			])
+			expect(advertised).toEqual([['search'], ['delete'], ['delete']])
+		})
+
+		it('reaches the same turn’s tools from a turn listener and not its prompt (the scope-timing rule)', async () => {
+			const tools = createToolManager()
+			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
+			const provider = createScriptedProvider([{ content: 'Nothing is stale.' }], {
+				record: true,
+				exhaust: 'throw',
+			})
+			const agent = createAgent(provider, { tools })
+			agent.context.instructions.add({ name: 'safety', content: 'Refuse unsafe requests.' })
+			agent.emitter.on('turn', () =>
+				agent.context.apply(createScope({ name: 'research', instructions: [], tools: ['search'] })),
+			)
+			agent.context.messages.add({ role: 'user', content: 'Find the stale records.' })
+			await agent.generate()
+
+			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['search'])
+			expect(provider.calls[0]?.messages[0]?.content).toBe(
+				'## Instructions\n\nRefuse unsafe requests.',
+			)
+		})
+
+		it('carries the applied scope’s prompt from a compaction rebuild (the scope-timing rule)', async () => {
+			const tools = createToolManager()
+			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				keep: 0,
+			})
+			conversations.add()
+			const provider = createScriptedProvider(
+				[
+					{ content: 'x'.repeat(400), tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
+					{ content: 'Three records are stale.' },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const agent = createAgent(provider, {
+				tools,
+				conversations,
+				window: createBudget({ max: 60, consumer: estimateMessages }),
+				scope: createScope({ name: 'research', instructions: ['safety'], tools: ['search'] }),
+			})
+			agent.context.instructions.add([
+				{ name: 'safety', content: 'Refuse unsafe requests.' },
+				{ name: 'verbose', content: 'Explain every step.' },
+			])
+			agent.emitter.on('tool', () =>
+				agent.context.apply(
+					createScope({ name: 'cleanup', instructions: ['verbose'], tools: ['delete'] }),
+				),
+			)
+			agent.context.messages.add({ role: 'user', content: 'Find the stale records.' })
+			await agent.generate()
+
+			// The between-turns fold rebuilds the prompt, so turn 1 already reads the applied scope.
+			expect(conversations.active?.sections).toHaveLength(1)
+			expect(provider.calls.map((call) => call.messages[0]?.content)).toEqual([
+				'## Instructions\n\nRefuse unsafe requests.',
+				'## Instructions\n\nExplain every step.',
+			])
+		})
+
+		it('keeps every message under a scope that filters every category (the inclusion sentence)', () => {
+			const context = barrel.createAgentContext({
+				scope: createScope({ name: 'none', instructions: [], tools: [], files: [] }),
+			})
+			context.instructions.add({ name: 'safety', content: 'Refuse unsafe requests.' })
+			context.messages.add([
+				{ role: 'user', content: 'The invoice total is wrong.' },
+				{ role: 'assistant', content: 'Which invoice?' },
+			])
+
+			expect(context.build().map(({ content }) => content)).toEqual([
+				'The invoice total is wrong.',
+				'Which invoice?',
+			])
+			expect(guideText).toContain(
+				"The scope's filters never touch messages; message inclusion is the conversation's through compaction and, when a handler is set, the selection's.",
+			)
+		})
+
+		it('selects through the agent default and a mode’s override as the selection fence claims', async () => {
+			const provider = createScriptedProvider(
+				[{ content: 'Which line is wrong?' }, { content: 'Refunded.' }],
+				{ record: true, exhaust: 'throw' },
+			)
+			// The agent default keeps the user turns; the focus mode keeps the request alone.
+			const userTurns: SelectionHandler = async (conversation) => ({
+				messages: conversation.view().filter((message) => message.role === 'user'),
+				judgments: [],
+			})
+			const requestOnly: SelectionHandler = async (_conversation, request) => ({
+				messages: [request],
+				judgments: [],
+			})
+
+			const agent = createAgent(provider, {
+				system: 'You triage billing tickets.',
+				select: userTurns,
+			})
+			const receipts: Selection[] = []
+			agent.emitter.on('select', (selection) => receipts.push(selection))
+			agent.context.messages.add([
+				{ role: 'user', content: 'The invoice total is wrong.' },
+				{ role: 'assistant', content: 'Which invoice?' },
+				{ role: 'user', content: 'Invoice 42.' },
+			])
+			await agent.generate()
+
+			agent.context.apply(createScope({ name: 'focus', select: requestOnly }))
+			agent.context.messages.add({ role: 'user', content: 'Refund it.' })
+			await agent.generate()
+
+			expect(provider.calls.map((call) => call.messages.map(({ content }) => content))).toEqual([
+				['You triage billing tickets.', 'The invoice total is wrong.', 'Invoice 42.'],
+				['You triage billing tickets.', 'Refund it.'],
+			])
+			expect(receipts.map((selection) => selection.messages.length)).toEqual([2, 1])
+
+			const plain = createAgent(provider)
+			const request = plain.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+			expect(plain.context.select(request, new AbortController().signal)).toBeUndefined()
+		})
+
+		it('carries the selection fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"const agent = createAgent(provider, { system: 'You triage billing tickets.', select: userTurns })",
+			)
+			expect(guideText).toContain(
+				"agent.context.apply(createScope({ name: 'focus', select: requestOnly }))",
+			)
+			expect(guideText).toContain(
+				'receipts.map((selection) => selection.messages.length) // [2, 1]',
+			)
+			expect(guideText).toContain(
+				'plain.context.select(request, new AbortController().signal) // undefined — no handler in either home',
+			)
+		})
+
+		it('resolves the judgments fence’s question once over a started listener and reuses the record', async () => {
+			const posted: unknown[] = []
+			const dispatcher = createDispatcher({
+				routes: [
+					{
+						method: 'POST',
+						path: SYSTEM_ONE_PATH,
+						handler: async (request) => {
+							posted.push(JSON.parse(await request.text()))
+							return Response.json(SYSTEM_ONE_TEV1)
+						},
+					},
+				],
+			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				// The fence declares the signal and names a local Ollama origin; the transcription supplies
+				// a live signal and the fixture listener that replays the recorded response.
+				const signal = new AbortController().signal
+				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
+				const conversation = createConversation()
+				const ticket = conversation.add({
+					role: 'user',
+					content: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
+				})
+				const request: JudgeRequest = {
+					state: ticket.content,
+					questions: {
+						refund: {
+							form: 'noul',
+							instructions: 'Does the customer ask for money back?',
+							criteria: {
+								true: 'The customer asks for a refund or for money back.',
+								false: 'The customer does not ask for money back.',
+							},
+						},
+					},
+				}
+
+				const [asked] = await conversation.judgments.resolve(judge, request, [ticket.id], signal)
+				expect(asked?.model).toBe('tev1:0.8b')
+				expect(asked?.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
+				const [reused] = await conversation.judgments.resolve(judge, request, [ticket.id], signal)
+				expect(reused?.time).toBe(asked?.time)
+				expect(posted).toHaveLength(1)
+				expect(conversation.snapshot().judgments).toHaveLength(1)
+			} finally {
+				await server.stop()
+			}
+		})
+
+		it('carries the judgments fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				'const [asked] = await conversation.judgments.resolve(judge, request, [ticket.id], signal)',
+			)
+			expect(guideText).toContain("asked?.model // 'tev1:0.8b' — the configured judge")
+			expect(guideText).toContain(
+				'asked?.usage // { prompt: 975, completion: 4, total: 979 } — the request asked this one question',
+			)
+			expect(guideText).toContain(
+				'reused?.time === asked?.time // true — the matching record answers without a call',
+			)
+			expect(guideText).toContain('conversation.snapshot().judgments?.length // 1')
+		})
+
+		it('drops only the decisive no through the stock selection fence over a started listener', async () => {
+			const conversation = createConversation()
+			const [standing, , printer, header, last] = conversation.add([
+				{ role: 'user', content: 'Use only local files; do not access the internet.' },
+				{ role: 'assistant', content: 'The export will read the local SQLite database.' },
+				{ role: 'user', content: 'The office printer needs paper.' },
+				{ role: 'user', content: 'Include a header row in exports.' },
+				{ role: 'user', content: 'Export the active accounts from the local database.' },
+			])
+			const request = requireValue(last, 'Missing message: request')
+			// Each subject's yes probability is a value of the recorded envelope: the refund noul, the
+			// billing option, and the middle severity level, read at the transcription's cutoff.
+			const probabilities = {
+				[requireValue(standing, 'Missing message: standing').id]:
+					SYSTEM_ONE_TEV1.answers.refund.noul,
+				[requireValue(printer, 'Missing message: printer').id]:
+					SYSTEM_ONE_TEV1.answers.label.probabilities.billing,
+				[requireValue(header, 'Missing message: header').id]:
+					SYSTEM_ONE_TEV1.answers.severity.probabilities['1'],
+			}
+			const posted: unknown[] = []
+			const dispatcher = createDispatcher({
+				routes: [
+					{
+						method: 'POST',
+						path: SYSTEM_ONE_PATH,
+						handler: async (incoming) => {
+							const body: unknown = JSON.parse(await incoming.text())
+							posted.push(body)
+							return Response.json(answerNeededRequest(body, probabilities))
+						},
+					},
+				],
+			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				// The fence declares the cutoff, the limit, and the signal; the transcription supplies them.
+				const threshold = 0.95
+				const limit = 8
+				const signal = new AbortController().signal
+				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
+				// The application's cheap pass: only user turns are candidates.
+				const screen: ScreenHandler = (source) =>
+					source
+						.view()
+						.filter((message) => message.role === 'user')
+						.map((message) => message.id)
+				const select = createSelection({
+					judge,
+					screen,
+					needed: { ...NEEDED_CRITERION, threshold },
+					limit,
+				})
+
+				const selection = await select(conversation, request, signal)
+				expect(selection.messages.map((message) => message.content)).toEqual([
+					'Use only local files; do not access the internet.',
+					'The export will read the local SQLite database.',
+					'Include a header row in exports.',
+					'Export the active accounts from the local database.',
+				])
+				expect(selection.judgments).toHaveLength(3)
+				expect(selection).not.toHaveProperty('fault')
+				expect(posted).toHaveLength(3)
+			} finally {
+				await server.stop()
+			}
+		})
+
+		it('keeps the push surface on the Agent, the managers, and each conversation (the observation clause)', () => {
+			const conversations = createConversationManager()
+			const context = barrel.createAgentContext({ conversations })
+			const provider = new TextProvider({ url: 'https://text.test' })
+
+			expect(['emitter' in context, 'emitter' in conversations, 'emitter' in provider]).toEqual([
+				false,
+				false,
+				false,
+			])
+			expect([
+				'emitter' in context.instructions,
+				'emitter' in barrel.createScopeManager(),
+				'emitter' in requireValue(conversations.active, 'Missing conversation'),
+				'emitter' in createAgent(provider),
+			]).toEqual([true, true, true, true])
+			expectTypeOf<keyof AgentEventMap>().toEqualTypeOf<
+				| 'start'
+				| 'turn'
+				| 'tool'
+				| 'usage'
+				| 'deny'
+				| 'finish'
+				| 'error'
+				| 'abort'
+				| 'exhaust'
+				| 'fault'
+				| 'select'
+			>()
+		})
+
+		it('records and reads a judgment as the judgment-recording fence shows', () => {
+			const conversation = createConversation()
+			const complaint = conversation.add({
+				role: 'user',
+				content: 'I was charged twice for one order.',
+			})
+
+			conversation.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [complaint.id],
+				state: complaint.content,
+			})
+
+			const refund = requireValue(conversation.judgments.judgment('refund'), 'Missing judgment')
+			const recorded = conversation.judgments.judgments()
+			const snapshot = conversation.snapshot()
+			expect(refund).toMatchObject({ id: 'refund', sources: [complaint.id], model: 'tev1:0.8b' })
+			expect(Number.isSafeInteger(refund.time)).toBe(true)
+			expect(recorded).toEqual([refund])
+			expect(snapshot.judgments).toEqual([refund])
+			expect(createConversation({ snapshot }).judgments.judgments()).toEqual([refund])
+		})
+
+		it('carries the stock selection fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"declare const threshold: number // the application's cutoff: above 0.5 and at most 1",
+			)
+			expect(guideText).toContain(
+				'const select = createSelection({ judge, screen, needed: { ...NEEDED_CRITERION, threshold }, limit })',
+			)
+			expect(guideText).toContain('const selection = await select(conversation, request, signal)')
+			expect(guideText).toContain(
+				'selection.judgments.length // 3 — one recorded judgment per screened subject',
+			)
+			expect(guideText).toContain(
+				'// ] — the judge answered no for the printer note alone; the header row stays uncertain and is kept',
+			)
+		})
+
+		it('switches modes loaded from plain data as the modes fence claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{ content: 'Sorted.' },
+					{ content: 'Answered.' },
+					{ content: 'Brief.' },
+					{ content: 'Closed.' },
+					{ content: 'Quoted.' },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
+			const judged = createRecordingSelection()
+			const recent = createRecordingSelection()
+			// Plain data, as a JSON file holds it; the data names a policy because a file carries no function.
+			const MODES: ReadonlyArray<{
+				readonly name: string
+				readonly description: string
+				readonly tools: readonly string[]
+				readonly policy: string
+			}> = [
+				{ name: 'triage', description: 'Sort the ticket.', tools: ['lookup'], policy: 'recent' },
+				{ name: 'verbatim', description: 'Quote the thread unchanged.', tools: [], policy: 'none' },
+			]
+			const POLICIES: Readonly<Record<string, SelectionHandler>> = {
+				recent: recent.handler,
+				// No selection under the judging default: a pass-through handler returns view().
+				none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+			}
+			const modes = new Map<string, ScopeInterface>()
+			for (const { policy, ...data } of MODES) {
+				const select = POLICIES[policy]
+				modes.set(data.name, createScope(select === undefined ? data : { ...data, select }))
+			}
+
+			const agent = createAgent(provider, { tools, select: judged.handler })
+			// The fence's `ask` helper appends the user turn and runs; the transcription inlines it.
+			const triage = modes.get('triage')
+			agent.context.apply(triage)
+			agent.context.messages.add({ role: 'user', content: 'Sort ticket 7.' })
+			await agent.generate()
+			expect([recent.calls.length, judged.calls.length]).toEqual([1, 0])
+			agent.context.apply(triage?.narrow({ tools: [] }))
+			agent.context.messages.add({ role: 'user', content: 'Answer from what you have.' })
+			await agent.generate()
+			expect([recent.calls.length, judged.calls.length]).toEqual([2, 0])
+			agent.context.apply(createScope({ name: 'answer', tools: [] }))
+			agent.context.messages.add({ role: 'user', content: 'Answer briefly.' })
+			await agent.generate()
+			expect([recent.calls.length, judged.calls.length]).toEqual([2, 1])
+			agent.context.apply(undefined)
+			agent.context.messages.add({ role: 'user', content: 'Close ticket 7.' })
+			await agent.generate()
+			expect([recent.calls.length, judged.calls.length]).toEqual([2, 2])
+
+			const previous = agent.context.scope
+			agent.context.apply(modes.get('verbatim'))
+			try {
+				agent.context.messages.add({ role: 'user', content: 'Quote the thread.' })
+				await agent.generate()
+			} finally {
+				agent.context.apply(previous)
+			}
+			expect([recent.calls.length, judged.calls.length]).toEqual([2, 2])
+			expect(agent.context.scope).toBeUndefined()
+			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
+				['lookup'],
+				undefined,
+				undefined,
+				['lookup'],
+				undefined,
+			])
+			// The verbatim run's pass-through sends the whole view.
+			expect(provider.calls[4]?.messages).toEqual(
+				agent.context.conversations.active?.view().slice(0, -1),
+			)
+		})
+
+		it('carries the modes fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"{ name: 'triage', description: 'Sort the ticket.', tools: ['lookup'], policy: 'recent' },",
+			)
+			expect(guideText).toContain(
+				'none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),',
+			)
+			expect(guideText).toContain(
+				'modes.set(data.name, createScope(select === undefined ? data : { ...data, select }))',
+			)
+			expect(guideText).toContain(
+				"await ask('Sort ticket 7.') // `recent` selects; `lookup` is advertised",
+			)
+			expect(guideText).toContain(
+				"await ask('Answer from what you have.') // `recent` selects; no tool is advertised",
+			)
+			expect(guideText).toContain("await ask('Answer briefly.') // `judged` selects")
+			expect(guideText).toContain("await ask('Close ticket 7.') // `judged` selects")
+			expect(guideText).toContain(
+				"await ask('Quote the thread.') // the pass-through selects; `judged` is not called",
+			)
+		})
+
+		it('shares one scope across overlapping runs (the overlapping-runs sentence)', async () => {
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			const tools = createToolManager()
+			tools.add(
+				createTool({
+					name: 'lookup',
+					execute: async () => {
+						entered.resolve()
+						await release.promise
+						return 'ticket 7'
+					},
+				}),
+			)
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
+					{ content: 'Second run answered.' },
+					{ content: 'First run answered.' },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const agent = createAgent(provider, { tools })
+			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
+			const first = agent.stream()
+			await entered.promise
+			// The answer mode applied for the second run reaches the first run's next turn as well.
+			agent.context.apply(createScope({ name: 'answer', tools: [] }))
+			agent.context.messages.add({ role: 'user', content: 'Answer now.' })
+			const second = await agent.generate()
+			release.resolve()
+			const settled = await first.result
+
+			expect(second.content).toBe('Second run answered.')
+			expect(settled.content).toBe('First run answered.')
+			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
+				['lookup'],
+				undefined,
+				undefined,
+			])
+			expect(guideText).toContain(
+				'Overlapping runs on one agent share its scope and its default handler, so an `apply` made for one run reaches every run in flight at its next site.',
+			)
+		})
+
+		it('answers without tools as the answer-only fence claims', async () => {
+			const denials: Array<readonly [string, string | undefined]> = []
+			const provider = createScriptedProvider(
+				[
+					{
+						content: 'Refunds need a manager.',
+						tools: [{ id: 'refund-1', name: 'refund', arguments: {} }],
+					},
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
+			const agent = createAgent(provider, { tools })
+			agent.emitter.on('deny', (call, reason) => denials.push([call.name, reason]))
+			agent.context.apply(createScope({ name: 'answer', tools: [] }))
+			agent.context.messages.add({ role: 'user', content: 'Refund invoice 42.' })
+			const result = await agent.generate()
+
+			expect(result).toEqual({ content: 'Refunds need a manager.', partial: false })
+			expect(denials).toEqual([['refund', 'no tool is advertised in the active scope']])
+			expect(provider.calls[0]?.tools).toBeUndefined()
+			expect(guideText).toContain(
+				"agent.emitter.on('deny', (call, reason) => log(call.name, reason)) // 'refund', 'no tool is advertised in the active scope'",
+			)
+			expect(guideText).toContain(
+				"const result = await agent.generate() // { content: 'Refunds need a manager.', partial: false }",
+			)
+		})
+
+		it('reads the select receipt beside the active mode’s description as the judge pattern fence claims', async () => {
+			const posted: unknown[] = []
+			const probabilities: Record<string, number> = {}
+			const dispatcher = createDispatcher({
+				routes: [
+					{
+						method: 'POST',
+						path: SYSTEM_ONE_PATH,
+						handler: async (incoming) => {
+							const body: unknown = JSON.parse(await incoming.text())
+							posted.push(body)
+							return Response.json(answerNeededRequest(body, probabilities))
+						},
+					},
+				],
+			})
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			try {
+				const provider = createScriptedProvider([{ content: 'Exported.' }], {
+					record: true,
+					exhaust: 'throw',
+				})
+				// The fence declares the cutoff and the limit; the transcription supplies them.
+				const threshold = 0.95
+				const limit = 8
+				const shown: Array<readonly [string | undefined, number, number]> = []
+				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
+				const screen: ScreenHandler = (conversation) =>
+					conversation
+						.view()
+						.filter((message) => message.role === 'user')
+						.map((message) => message.id)
+				const agent = createAgent(provider, {
+					select: createSelection({
+						judge,
+						screen,
+						needed: { ...NEEDED_CRITERION, threshold },
+						limit,
+					}),
+				})
+				agent.context.apply(
+					createScope({ name: 'reply', description: 'Answer from the ticket thread.' }),
+				)
+				agent.emitter.on('select', (selection) =>
+					shown.push([
+						agent.context.scope?.description,
+						selection.messages.length,
+						selection.judgments.length,
+					]),
+				)
+				const receipts: Selection[] = []
+				agent.emitter.on('select', (selection) => receipts.push(selection))
+				const [standing, printer] = agent.context.messages.add([
+					{ role: 'user', content: 'Use only local files; do not access the internet.' },
+					{ role: 'user', content: 'The office printer needs paper.' },
+					{ role: 'user', content: 'Export the active accounts from the local database.' },
+				])
+				probabilities[requireValue(standing, 'Missing message: standing').id] =
+					SYSTEM_ONE_TEV1.answers.refund.noul
+				probabilities[requireValue(printer, 'Missing message: printer').id] =
+					SYSTEM_ONE_TEV1.answers.label.probabilities.billing
+				const result = await agent.generate()
+
+				expect(shown).toEqual([['Answer from the ticket thread.', 2, 2]])
+				// The receipt's keys name records in the active conversation's store, and its usage, the
+				// recorded usage once per question, is folded into the run's result beside the provider's.
+				const receipt = requireValue(receipts[0], 'Missing receipt')
+				const store = requireValue(agent.context.conversations.active, 'Missing conversation')
+				expect(receipt.judgments.map((key) => store.judgments.judgment(key)?.id)).toEqual(
+					receipt.judgments,
+				)
+				expect(receipt.usage).toEqual({ prompt: 1950, completion: 8, total: 1958 })
+				expect(result.usage).toEqual(receipt.usage)
+				expect(provider.calls[0]?.messages.map(({ content }) => content)).toEqual([
+					'Use only local files; do not access the internet.',
+					'Export the active accounts from the local database.',
+				])
+				expect(posted).toHaveLength(2)
+			} finally {
+				await server.stop()
+			}
+			expect(guideText).toContain(
+				"await agent.generate() // show('Answer from the ticket thread.', 2, 2) — the printer note is dropped",
+			)
+		})
+
+		it('empties the live tail and leaves the compacted sections (the conversation `clear` row)', async () => {
+			const conversation = createConversation({ summarize: createStubSummarizer().summarize })
+			conversation.add([
+				{ role: 'user', content: 'My name is Ada.' },
+				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+			])
+			await conversation.compact()
+			conversation.add({ role: 'user', content: 'What did I say my name was?' })
+			conversation.clear()
+
+			expect(conversation.messages()).toEqual([])
+			expect(conversation.sections).toHaveLength(1)
+			expect(conversation.view().map(({ content }) => content)).toEqual([
+				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
+			])
+			expect(guideText).toContain(
+				'Empties the live tail, leaving the compacted `sections` untouched.',
+			)
+		})
+
+		it('folds a reference block written to the active workspace into the next build (the provenance pattern)', () => {
+			// The fence passes `summarize: undefined` as a placeholder; the transcription omits the key.
+			const conversations = createConversationManager()
+			conversations.add({ id: 'auth' })
+			const b = conversations.add({ id: 'planning' })
+			// The fence starts from a thread that already holds turns; the transcription seeds them.
+			b.add([
+				{ role: 'user', content: 'Which database fits the export?' },
+				{ role: 'assistant', content: 'We chose Postgres as the database.' },
+				{ role: 'user', content: 'Book the venue.' },
+			])
+			const agent = createAgent(createScriptedProvider([]), { conversations })
+
+			const picked = b.search('database')
+			const block = b.reference({ label: 'planning', messages: picked })
+			agent.context.workspaces.add().write(`conversation:${b.id}.md`, block)
+			const system = requireValue(agent.context.build()[0], 'Missing system message').content
+
+			expect(picked.map(({ content }) => content)).toEqual([
+				'Which database fits the export?',
+				'We chose Postgres as the database.',
+			])
+			expect(system).toContain(
+				'[Reference — conversation "planning" — NOT part of this conversation]',
+			)
+			expect(system).toContain('- assistant: We chose Postgres as the database.')
+			expect(system).not.toContain('Book the venue.')
+		})
+
+		it('renders the switched workspace in the next build as the workspace-switch fence claims', async () => {
+			const provider = createScriptedProvider([{ content: 'Port 8123.' }], {
+				record: true,
+				exhaust: 'throw',
+			})
+			const agent = createAgent(provider)
+			const project = agent.context.workspaces.add()
+			project.write('src/config.ts', 'export const PORT = 8123')
+			agent.context.messages.add({ role: 'user', content: 'What port is configured?' })
+			await agent.generate()
+			const other = agent.context.workspaces.add()
+			other.write('notes.txt', 'different context')
+			agent.context.workspaces.switch(other.id)
+			const switched = requireValue(agent.context.build()[0], 'Missing system message').content
+			agent.context.apply(createScope({ name: 'cfg', files: ['src/config.ts'] }))
+
+			expect(provider.calls[0]?.messages[0]?.content).toContain('File: src/config.ts')
+			expect(switched).toContain('File: notes.txt')
+			expect(switched).not.toContain('src/config.ts')
+			expect(agent.context.build().map(({ role }) => role)).toEqual(['user', 'assistant'])
+			expect(guideText).toContain(
+				"A switch between runs changes the files the next run's prompt carries, and `scope.files` then filters the switched workspace's files by path.",
+			)
+		})
+
+		it('measures the working message array alone against the window (the automatic-compaction clause)', async () => {
+			const measured: Array<readonly Message[]> = []
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+			})
+			conversations.add()
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
+					{ content: 'Ticket 7 is open.' },
+				],
+				{ record: true, exhaust: 'throw' },
+			)
+			const agent = createAgent(provider, {
+				system: 'You triage tickets.',
+				tools,
+				conversations,
+				window: createBudget({
+					max: 1_000_000,
+					consumer: (messages: readonly Message[]) => {
+						measured.push([...messages])
+						return estimateMessages(messages)
+					},
+				}),
+			})
+			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
+			await agent.generate({ schema: { type: 'object' } })
+
+			// Each check reads the exact message array the next provider request carries, while the
+			// advertised definitions and the schema travel beside it, unmeasured.
+			expect(measured).toEqual(provider.calls.map((call) => call.messages))
+			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['lookup'])
+			expect(provider.calls[0]?.options).toEqual({ schema: { type: 'object' } })
 		})
 
 		it('answers the instructions fence’s open and per-item rendering', () => {

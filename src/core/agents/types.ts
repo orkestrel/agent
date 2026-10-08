@@ -213,10 +213,10 @@ export interface ChannelInterface<T> {
 	 * @param value - The value to enqueue
 	 */
 	push(value: T): void
-	/** Ends the channel normally — a draining consumer returns once the buffer is empty. */
+	/** Ends the channel normally — a draining consumer returns after the buffer empties. */
 	close(): void
 	/**
-	 * Ends the channel with a failure — a draining consumer throws it once the buffer is empty;
+	 * Ends the channel with a failure — a draining consumer throws it after the buffer empties;
 	 * the first failure wins.
 	 *
 	 * @param error - The failure to surface (the first one recorded wins)
@@ -332,7 +332,10 @@ export interface AgentOptions {
 	 * A reply to a turn advertising no tools ends the run as its answer, records an assistant
 	 * message without calls, and emits a `deny` event for every dropped call without marking it partial.
 	 * Other scoped-out calls produce denial tool results and messages, and the loop continues.
-	 * Changing the context scope through the `apply` method takes effect on the next turn.
+	 * A scope change through the context's `apply` method applies the tool allow-list at the next
+	 * turn's snapshot, which a `turn` listener reaches for the same turn, and the instructions,
+	 * files, and `select` at the next build or select site: run entry, the pre-first-turn
+	 * compaction fold, or a compaction rebuild.
 	 */
 	readonly scope?: ScopeInterface
 	/** Caps the tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
