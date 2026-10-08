@@ -55,8 +55,6 @@ export class Scope implements ScopeInterface {
 	}
 
 	narrow(config: ScopeFilter): ScopeInterface {
-		// A child = the per-category set-intersection of this scope and the config, keeping
-		// this scope's name, description, and handler. Immutable: a brand-new Scope, this one untouched.
 		const instructions = intersectKeys(this.instructions, config.instructions)
 		const tools = intersectKeys(this.tools, config.tools)
 		const files = intersectKeys(this.files, config.files)

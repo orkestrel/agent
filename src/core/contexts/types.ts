@@ -230,6 +230,11 @@ export interface ScopeFilter {
  * `view()`. It carries no tool member: what a turn advertises and dispatches stays the scope's
  * `tools` allow-list. What the selection omitted is `view()` minus `messages`; no second list is
  * stored.
+ *
+ * @example
+ * ```ts
+ * const selection: Selection = { messages: conversation.view(), judgments: [] }
+ * ```
  */
 export interface Selection {
 	/** Lists the messages `build` folds in place of `view()`, in prompt order. */
@@ -250,6 +255,19 @@ export interface Selection {
  * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
  * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
  * the usage spent, rather than throwing.
+ *
+ * @param conversation - The conversation whose messages the handler selects
+ * @param request - The user message captured at run entry
+ * @param signal - The run's abort signal
+ * @returns The selected messages, the judgment keys they rest on, and any usage or fault
+ *
+ * @example
+ * ```ts
+ * const select: SelectionHandler = async (conversation) => ({
+ * 	messages: conversation.view(),
+ * 	judgments: [],
+ * })
+ * ```
  */
 export type SelectionHandler = (
 	conversation: ConversationInterface,

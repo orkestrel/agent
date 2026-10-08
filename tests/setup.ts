@@ -746,7 +746,7 @@ export type SelectionCall = readonly [
 ]
 
 /**
- * Options for {@link createRecordingSelection}.
+ * Configures the recording handler's message predicate and reported usage.
  *
  * @remarks
  * - `keep` — the predicate a message of `view()` must pass to enter the selection, given the
@@ -773,6 +773,12 @@ export interface RecordingSelectionInterface {
  *
  * @param options - The {@link RecordingSelectionOptions} (both optional; see its `@remarks`)
  * @returns The handler plus its live call and selection records
+ *
+ * @example
+ * ```ts
+ * const fixture = createRecordingSelection({ usage: SELECTION_USAGE })
+ * const selected = await fixture.handler(conversation, request, signal)
+ * ```
  */
 export function createRecordingSelection(
 	options?: RecordingSelectionOptions,
@@ -805,6 +811,11 @@ export function createRecordingSelection(
  * Rejects a selection with the error a thrown handler raises.
  *
  * @returns A promise rejected with `Error('the judge is unreachable')`
+ *
+ * @example
+ * ```ts
+ * const context = createAgentContext({ select: rejectSelection })
+ * ```
  */
 export function rejectSelection(): Promise<Selection> {
 	return Promise.reject(new Error('the judge is unreachable'))
@@ -816,6 +827,11 @@ export function rejectSelection(): Promise<Selection> {
  *
  * @param conversation - The conversation whose `view()` the selection carries
  * @returns A selection whose `fault` is `Error('the judge refused the needed question')`
+ *
+ * @example
+ * ```ts
+ * const selection = await abandonSelection(conversation)
+ * ```
  */
 export async function abandonSelection(conversation: ConversationInterface): Promise<Selection> {
 	return {
@@ -825,6 +841,40 @@ export async function abandonSelection(conversation: ConversationInterface): Pro
 		fault: new Error('the judge refused the needed question'),
 	}
 }
+
+/** Describes one handler failure, the error text it settles with, and the usage its receipt carries. */
+export interface SelectionFaultCase {
+	readonly label: string
+	readonly select: SelectionHandler
+	readonly message: string
+	readonly usage?: TokenUsage
+}
+
+/**
+ * Supplies the three selection faults the `strict` rule covers: a thrown handler, a returned
+ * `fault`, and a conversation changed during selection.
+ */
+export const SELECTION_FAULT_CASES: readonly SelectionFaultCase[] = Object.freeze([
+	Object.freeze({
+		label: 'a thrown handler',
+		select: rejectSelection,
+		message: 'the judge is unreachable',
+	}),
+	Object.freeze({
+		label: 'a returned fault',
+		select: abandonSelection,
+		message: 'the judge refused the needed question',
+		usage: SELECTION_USAGE,
+	}),
+	Object.freeze({
+		label: 'a changed tail',
+		select: async (conversation: ConversationInterface): Promise<Selection> => {
+			conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
+			return { messages: conversation.view(), judgments: [] }
+		},
+		message: 'changed during selection',
+	}),
+])
 
 /** Records how many turn boundaries a {@link SchedulerInterface}'s `yield` paced. */
 export interface RecordingSchedulerInterface extends SchedulerInterface {

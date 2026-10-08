@@ -373,13 +373,12 @@ export interface AgentOptions {
 	 */
 	readonly window?: BudgetInterface<readonly Message[]>
 	/**
-	 * If `true`, a summarizer failure during automatic compaction aborts the run — the
-	 * `fault` event still fires, then the caught error is rethrown so the run settles
-	 * `error` instead of continuing over-window. The selection faults are the second source: a
-	 * thrown handler, a returned `fault`, and a conversation changed under the handler each fire
-	 * `fault` and then settle the run `error`. If `false`, the run continues — over-window for a
-	 * summarizer failure, and on the active conversation's `view()` for a selection fault.
-	 * Default: `false`.
+	 * If `true`, a summarizer failure during automatic compaction emits `fault` and settles the
+	 * run `error`; a thrown selection handler, a returned selection `fault`, and a conversation
+	 * changed during selection follow the same rule. If `false`, the run continues — over-window
+	 * after a summarizer failure, and on the active conversation's `view()` after a selection
+	 * fault. A cancel at a selection site, a `fault` listener's included, settles partial instead
+	 * of `error`. Default: `false`.
 	 */
 	readonly strict?: boolean
 	/**

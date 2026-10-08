@@ -7,7 +7,6 @@ import type {
 	AgentResult,
 	AgentStreamInterface,
 	ConversationEventMap,
-	ConversationInterface,
 	Message,
 	ProviderDelta,
 	ProviderInterface,
@@ -48,6 +47,7 @@ import {
 	type ScriptedProviderOptions,
 	type ScriptedTurn,
 	seedFramedAgent,
+	SELECTION_FAULT_CASES,
 	SELECTION_USAGE,
 } from '../../../setup.js'
 import {
@@ -4868,44 +4868,110 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 		expect(budget.consumes[0]).toEqual(SELECTION_USAGE)
 	})
 
-	it.each([
-		['a thrown handler', rejectSelection, 'the judge is unreachable'],
-		['a returned fault', abandonSelection, 'the judge refused the needed question'],
-		[
-			'a changed tail',
-			async (conversation: ConversationInterface) => {
-				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
-				return { messages: conversation.view(), judgments: [] }
-			},
-			'changed during selection',
-		],
-	])('settles error under strict for %s', async (_label, select, message) => {
-		const faults = createRecorder<AgentEventMap['fault']>()
-		const errors = createRecorder<AgentEventMap['error']>()
-		const finished = createRecorder<AgentEventMap['finish']>()
-		const selected = createRecorder<AgentEventMap['select']>()
-		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			select,
-			strict: true,
-			on: {
-				fault: faults.handler,
-				error: errors.handler,
-				finish: finished.handler,
-				select: selected.handler,
-			},
-		})
-		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+	it.each(SELECTION_FAULT_CASES)(
+		'settles error under strict for $label',
+		async ({ select, message }) => {
+			const faults = createRecorder<AgentEventMap['fault']>()
+			const errors = createRecorder<AgentEventMap['error']>()
+			const finished = createRecorder<AgentEventMap['finish']>()
+			const selected = createRecorder<AgentEventMap['select']>()
+			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const agent = createAgent(provider, {
+				select,
+				strict: true,
+				on: {
+					fault: faults.handler,
+					error: errors.handler,
+					finish: finished.handler,
+					select: selected.handler,
+				},
+			})
+			agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
-		await expect(agent.generate()).rejects.toThrow(message)
+			await expect(agent.generate()).rejects.toThrow(message)
 
-		expect(agent.status).toBe('error')
-		expect(faults.count).toBe(1)
-		expect(errors.calls).toEqual([[faults.calls[0]?.[0]]])
-		expect(finished.count).toBe(0)
-		expect(selected.count).toBe(0)
-		expect(provider.calls).toHaveLength(0)
-	})
+			expect(agent.status).toBe('error')
+			expect(faults.count).toBe(1)
+			expect(errors.calls).toEqual([[faults.calls[0]?.[0]]])
+			expect(finished.count).toBe(0)
+			expect(selected.count).toBe(0)
+			expect(provider.calls).toHaveLength(0)
+		},
+	)
+
+	// A `fault` listener runs synchronously inside the emit, so a cancel it issues lands between the
+	// emit and the strict throw or the `select` emit that would otherwise follow.
+	it.each(SELECTION_FAULT_CASES)(
+		'commits partial when a strict fault listener aborts $label',
+		async ({ select, usage }) => {
+			const controller = new AbortController()
+			const selected = createRecorder<AgentEventMap['select']>()
+			const errors = createRecorder<AgentEventMap['error']>()
+			const faults = createRecorder<AgentEventMap['fault']>()
+			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const agent = createAgent(provider, {
+				select,
+				strict: true,
+				signal: controller.signal,
+				on: {
+					fault: (error) => {
+						faults.handler(error)
+						controller.abort('the operator closed the ticket')
+					},
+					select: selected.handler,
+					error: errors.handler,
+				},
+			})
+			agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+			expect(await agent.generate()).toEqual({
+				content: '',
+				partial: true,
+				...(usage === undefined ? {} : { usage }),
+			})
+			expect(faults.count).toBe(1)
+			expect(selected.count).toBe(0)
+			expect(errors.count).toBe(0)
+			expect(provider.calls).toHaveLength(0)
+			expect(agent.status).toBe('done')
+		},
+	)
+
+	it.each(SELECTION_FAULT_CASES)(
+		'commits partial when a lenient fault listener aborts $label',
+		async ({ select, usage }) => {
+			const controller = new AbortController()
+			const selected = createRecorder<AgentEventMap['select']>()
+			const errors = createRecorder<AgentEventMap['error']>()
+			const faults = createRecorder<AgentEventMap['fault']>()
+			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const agent = createAgent(provider, {
+				select,
+				strict: false,
+				signal: controller.signal,
+				on: {
+					fault: (error) => {
+						faults.handler(error)
+						controller.abort('the operator closed the ticket')
+					},
+					select: selected.handler,
+					error: errors.handler,
+				},
+			})
+			agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+			expect(await agent.generate()).toEqual({
+				content: '',
+				partial: true,
+				...(usage === undefined ? {} : { usage }),
+			})
+			expect(faults.count).toBe(1)
+			expect(selected.count).toBe(0)
+			expect(errors.count).toBe(0)
+			expect(provider.calls).toHaveLength(0)
+			expect(agent.status).toBe('done')
+		},
+	)
 })
 
 describe('Agent — selection usage reaches the budget and the result, never a usage chunk', () => {

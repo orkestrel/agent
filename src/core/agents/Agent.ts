@@ -348,12 +348,10 @@ export class Agent implements AgentInterface {
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, RunOutcome> {
-		// The request is the user message ending the conversation at entry, captured once: a
-		// compaction can fold it into a section, so every select site receives this object. With no
-		// request the loop selects nothing and builds from `view()`.
+		// Compaction can fold the request into a section, so every select site receives the object
+		// captured at run entry.
 		const last = this.#context.conversations.active?.view().at(-1)
 		const request = last?.role === 'user' ? last : undefined
-		// Each selection's sanitized usage, folded into the outcome's `usage` at settle.
 		const spent: TokenUsage[] = []
 		const messages: Message[] = []
 		// `#select` returns `undefined` when no handler is set, so the default path awaits nothing
@@ -654,9 +652,7 @@ export class Agent implements AgentInterface {
 		// over-window prompt reaches the provider. On the pre-first-turn check the tail is
 		// too short yet ⇒ report no latch, leaving later turns free to fold as the tail grows.
 		if (section === undefined) return latch
-		// Rebuild the working array from the compacted view through the select site the loop opened
-		// with, so the run continues on the system block plus the compacted `view()` or the handler's
-		// selection from it.
+		// Compaction changes the view the handler evaluates, so rebuild through selection.
 		const selecting = this.#select(request, messages, abort, budget, spent)
 		if (selecting !== undefined) await selecting
 		return false
@@ -698,7 +694,8 @@ export class Agent implements AgentInterface {
 		} catch (error) {
 			if (!abort.signal.aborted) {
 				this.#emitter.emit('fault', error)
-				if (this.#strict) throw error
+				// A `fault` listener can cancel the run synchronously; the cancel then wins over `strict`.
+				if (this.#strict && !abort.signal.aborted) throw error
 			}
 			messages.splice(0, messages.length, ...this.#context.build())
 			return
@@ -714,6 +711,10 @@ export class Agent implements AgentInterface {
 		}
 		if (selection.fault !== undefined) {
 			this.#emitter.emit('fault', selection.fault)
+			if (abort.signal.aborted) {
+				messages.splice(0, messages.length, ...this.#context.build())
+				return
+			}
 			if (this.#strict) throw selection.fault
 		}
 		messages.splice(0, messages.length, ...this.#context.build(selection))
