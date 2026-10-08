@@ -1,6 +1,177 @@
-import type { Message } from '../types.js'
+import type { Applicability, Criterion, SelectionOptions } from './types.js'
+import type { ConversationInterface } from '../conversations/types.js'
+import type { Message, NoulQuestion } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
+import { matchesJudgment } from '../conversations/helpers.js'
+import { NEEDED_QUESTION } from './templates.js'
+
+/**
+ * Encodes a condition and its ordered message ids without separator ambiguity.
+ * @param condition - The needed condition
+ * @param subject - The screened message id
+ * @param object - The request message id
+ * @returns The JSON tuple used as the judgment key
+ * @example
+ * ```ts
+ * buildConditionKey('needed', 'a', 'b') // '["needed","a","b"]'
+ * ```
+ */
+export function buildConditionKey(condition: 'needed', subject: string, object: string): string {
+	return JSON.stringify([condition, subject, object])
+}
+
+/**
+ * Builds the fixed needed question with the application's true and false criteria.
+ * @param needed - The application criterion; its threshold is used only when reading answers
+ * @returns The binary question whose instructions remain stable across compaction
+ * @example
+ * ```ts
+ * buildNeededQuestion({ yes: 'Required', no: 'Unrelated', threshold: 0.9 })
+ * ```
+ */
+export function buildNeededQuestion(needed: Criterion): NoulQuestion {
+	return {
+		form: 'noul',
+		instructions: NEEDED_QUESTION,
+		criteria: { true: needed.yes, false: needed.no },
+	}
+}
+
+/**
+ * Renders the view with subject and request markers, appending a folded request as evidence.
+ * @param messages - The conversation view in prompt order
+ * @param subject - The screened message id marked [A]
+ * @param request - The user message marked [B], even when absent from the view
+ * @returns The complete state whose bytes determine judgment reuse
+ * @example
+ * ```ts
+ * renderSelectionState([], 'earlier', { id: 'request', role: 'user', content: 'Continue.' })
+ * ```
+ */
+export function renderSelectionState(
+	messages: readonly Message[],
+	subject: string,
+	request: Message,
+): string {
+	const evidence = messages.some((message) => message.id === request.id)
+		? messages
+		: [...messages, request]
+	return evidence
+		.map((message) => {
+			const markers = `${message.id === subject ? '[A]' : ''}${message.id === request.id ? '[B]' : ''}`
+			return `${markers} ${JSON.stringify(message)}`
+		})
+		.join('\n')
+}
+
+/**
+ * Derives needed conditions from matching recorded judgments without asking a judge.
+ * @param conversation - The conversation supplying the view and recorded judgments
+ * @param request - The user message the selection serves
+ * @param options - The judge identity, screen, and application criterion
+ * @returns One applicability per distinct screened id present in the view, in screen order
+ * @example
+ * ```ts
+ * inferApplicability(conversation, request, { judge, screen, needed })
+ * ```
+ */
+export function inferApplicability(
+	conversation: ConversationInterface,
+	request: Message,
+	options: Pick<SelectionOptions, 'judge' | 'screen' | 'needed'>,
+): readonly Applicability[] {
+	const view = conversation.view()
+	const present = new Set(view.map((message) => message.id))
+	const question = buildNeededQuestion(options.needed)
+	return [...new Set(options.screen(conversation, request))]
+		.filter((id) => present.has(id))
+		.map((id) => {
+			const judgment = conversation.judgments.judgment(buildConditionKey('needed', id, request.id))
+			if (
+				judgment === undefined ||
+				!matchesJudgment(
+					judgment,
+					question,
+					[id, request.id],
+					renderSelectionState(view, id, request),
+					options.judge.model,
+				) ||
+				judgment.answer?.form !== 'noul'
+			)
+				return { id }
+			const probability = judgment.answer.noul
+			if (probability >= options.needed.threshold) return { id, needed: true }
+			if (probability <= 1 - options.needed.threshold) return { id, needed: false }
+			return { id }
+		})
+}
+
+/**
+ * Filters decisively unneeded subjects while preserving requests and complete tool groups.
+ * @param messages - The conversation view in prompt order
+ * @param applicability - The screened subjects and their recorded conditions
+ * @param request - The request whose id must be retained when present
+ * @returns A subset of the original messages in their original order
+ * @example
+ * ```ts
+ * filterSelectionMessages(conversation.view(), applicability, request)
+ * ```
+ */
+export function filterSelectionMessages(
+	messages: readonly Message[],
+	applicability: readonly Applicability[],
+	request: Message,
+): readonly Message[] {
+	const dropped = new Set(
+		applicability.filter((entry) => entry.needed === false).map((entry) => entry.id),
+	)
+	dropped.delete(request.id)
+	const groups = new Map<Message, Message[]>()
+	const calls = new Map<string, Message[]>()
+	for (const message of messages) {
+		if (message.role !== 'assistant' || !message.calls?.length) continue
+		groups.set(message, [message])
+		for (const call of message.calls) {
+			const owners = calls.get(call.id) ?? []
+			owners.push(message)
+			calls.set(call.id, owners)
+		}
+	}
+	let leader: Message | undefined
+	let orphan: Message[] = []
+	const orphans: Message[][] = []
+	for (const message of messages) {
+		if (message.role !== 'tool') {
+			leader = groups.has(message) ? message : undefined
+			orphan = []
+			continue
+		}
+		const local = leader?.calls ?? []
+		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+		const paired =
+			leader !== undefined &&
+			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
+		const owners = message.call === undefined ? undefined : calls.get(message.call)
+		const owner = paired
+			? leader
+			: leader === undefined && owners?.length === 1
+				? owners[0]
+				: undefined
+		const group = owner === undefined ? undefined : groups.get(owner)
+		if (group !== undefined) group.push(message)
+		else {
+			if (orphan.length === 0) orphans.push(orphan)
+			orphan.push(message)
+		}
+	}
+	for (const group of [...groups.values(), ...orphans]) {
+		if (group.some((message) => !dropped.has(message.id))) {
+			for (const message of group) dropped.delete(message.id)
+		}
+	}
+	return messages.filter((message) => !dropped.has(message.id))
+}
 
 /**
  * Renders a path-addressed text body as a fenced reference block — a `File: <path>` label line

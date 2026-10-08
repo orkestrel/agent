@@ -9,12 +9,130 @@ import type {
 	ScopeInterface,
 	ScopeManagerInterface,
 	ScopeManagerOptions,
+	SelectionHandler,
+	SelectionOptions,
 } from './types.js'
+import type { TokenUsage } from '@orkestrel/budget'
+import { isArray, isFiniteNumber, parseJSON } from '@orkestrel/contract'
+import { matchesJudgment } from '../conversations/helpers.js'
+import { isJudgeAbortError } from '../errors.js'
+import { sumUsage } from '../helpers.js'
+import {
+	buildConditionKey,
+	buildNeededQuestion,
+	filterSelectionMessages,
+	inferApplicability,
+	renderSelectionState,
+} from './helpers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
 import { AgentContext } from './AgentContext.js'
+
+/**
+ * Creates a selection handler that judges screened messages and retains uncertain subjects.
+ *
+ * @remarks
+ * Reuses matching judgments without spending usage or the fresh question limit.
+ * A judge failure returns the full view, the recorded keys, spent usage, and the original cause.
+ * The handler sends nothing until an application invokes or installs it.
+ *
+ * @param options - The judge, screen, needed criterion, and fresh question limit
+ * @returns The application-installed selection handler
+ * @throws RangeError Thrown when the threshold is outside (0.5, 1] or the limit is not a nonnegative safe integer
+ * @example
+ * ```ts
+ * const select = createSelection({ judge, screen, needed, limit: 12 })
+ * ```
+ */
+export function createSelection(options: SelectionOptions): SelectionHandler {
+	const { judge, screen, limit } = options
+	const needed = { ...options.needed }
+	if (!isFiniteNumber(needed.threshold) || needed.threshold <= 0.5 || needed.threshold > 1)
+		throw new RangeError('selection threshold must be greater than 0.5 and at most 1')
+	if (!Number.isSafeInteger(limit) || limit < 0)
+		throw new RangeError('selection limit must be a nonnegative safe integer')
+	return async (conversation, request, signal) => {
+		const judgments: string[] = []
+		let usage: TokenUsage | undefined
+		let pending: string | undefined
+		try {
+			for (const judgment of conversation.judgments.judgments()) {
+				const key = parseJSON(judgment.id)
+				if (
+					isArray(key) &&
+					key.length === 3 &&
+					key[0] === 'needed' &&
+					typeof key[1] === 'string' &&
+					typeof key[2] === 'string' &&
+					key[2] !== request.id
+				)
+					conversation.judgments.remove(judgment.id)
+			}
+			const view = conversation.view()
+			const present = new Set(view.map((message) => message.id))
+			const subjects = [...new Set(screen(conversation, request))].filter((id) => present.has(id))
+			const question = buildNeededQuestion(needed)
+			let fresh = 0
+			for (const id of subjects) {
+				const key = buildConditionKey('needed', id, request.id)
+				const sources = [id, request.id]
+				const state = renderSelectionState(view, id, request)
+				const recorded = conversation.judgments.judgment(key)
+				if (
+					recorded !== undefined &&
+					matchesJudgment(recorded, question, sources, state, judge.model)
+				) {
+					judgments.push(key)
+					continue
+				}
+				if (fresh >= limit) continue
+				signal.throwIfAborted()
+				pending = key
+				fresh += 1
+				const resolved = await conversation.judgments.resolve(
+					judge,
+					{ state, questions: { [key]: question } },
+					sources,
+					signal,
+				)
+				for (const judgment of resolved) {
+					judgments.push(judgment.id)
+					if (judgment.usage !== undefined) usage = sumUsage(usage, judgment.usage)
+				}
+				pending = undefined
+			}
+			signal.throwIfAborted()
+			const applicability = inferApplicability(conversation, request, {
+				judge,
+				needed,
+				screen: () => subjects,
+			})
+			return {
+				messages: filterSelectionMessages(view, applicability, request),
+				judgments,
+				...(usage === undefined ? {} : { usage }),
+			}
+		} catch (cause) {
+			if (isJudgeAbortError(cause) && cause.partial.usage !== undefined)
+				usage = sumUsage(usage, cause.partial.usage)
+			if (
+				pending !== undefined &&
+				isJudgeAbortError(cause) &&
+				(Object.hasOwn(cause.partial.answers, pending) ||
+					(cause.partial.refusals !== undefined && Object.hasOwn(cause.partial.refusals, pending)))
+			)
+				judgments.push(pending)
+			return {
+				messages: conversation.view(),
+				judgments,
+				...(usage === undefined ? {} : { usage }),
+				fault: new Error('selection failed', { cause }),
+			}
+		}
+	}
+}
 
 /**
  * Creates an instruction — an immutable {@link InstructionInterface} (a named directive)

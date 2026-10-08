@@ -6,10 +6,133 @@ import {
 	renderFencedFile,
 	intersectKeys,
 	renderSection,
+	buildConditionKey,
+	buildNeededQuestion,
+	filterSelectionMessages,
+	inferApplicability,
+	NEEDED_CRITERION,
+	NEEDED_QUESTION,
+	renderSelectionState,
 } from '@src/core'
 import { createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
-import { createToolCall } from '../../../setup.js'
+import {
+	buildSelectionMismatches,
+	createStockSelectionFixture,
+	createToolCall,
+	SELECTION_STAND_IN,
+	SELECTION_TOOL_MESSAGES,
+	SYSTEM_ONE_TEV1,
+} from '../../../setup.js'
+import { requireValue } from '@orkestrel/test'
+
+describe('stock selection helpers', () => {
+	it('encodes separator-bearing ids without collisions', () => {
+		expect(buildConditionKey('needed', 'a:b', 'c')).toBe('["needed","a:b","c"]')
+		expect(buildConditionKey('needed', 'a:b', 'c')).not.toBe(
+			buildConditionKey('needed', 'a', 'b:c'),
+		)
+		expect(JSON.parse(buildConditionKey('needed', '["needed",', '"\\\n]'))).toEqual([
+			'needed',
+			'["needed",',
+			'"\\\n]',
+		])
+	})
+
+	it('keeps arithmetic outside the fixed question and renders all message fields with markers', () => {
+		const request = requireValue(SELECTION_STAND_IN.at(-1))
+		expect(buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.9 })).toEqual({
+			form: 'noul',
+			instructions: NEEDED_QUESTION,
+			criteria: { true: NEEDED_CRITERION.yes, false: NEEDED_CRITERION.no },
+		})
+		expect(buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.6 })).toEqual(
+			buildNeededQuestion({ ...NEEDED_CRITERION, threshold: 0.9 }),
+		)
+		const rendered = renderSelectionState(SELECTION_STAND_IN, 'standing', request)
+		expect(rendered.split('\n')[0]).toBe(
+			'[A] {"id":"standing","role":"user","content":"Use only local files; do not access the internet."}',
+		)
+		expect(rendered.split('\n').at(-1)).toBe(`[B] ${JSON.stringify(request)}`)
+		expect(renderSelectionState([], request.id, request)).toBe(`[A][B] ${JSON.stringify(request)}`)
+		const tool = requireValue(SELECTION_TOOL_MESSAGES[2])
+		expect(renderSelectionState([tool], tool.id, request)).toContain(JSON.stringify(tool.calls))
+	})
+
+	it('reads only matching records and remains pure across all identity mismatches', async () => {
+		const fixture = createStockSelectionFixture(0.9, { limit: 1 })
+		await fixture.select(fixture.conversation, fixture.request, new AbortController().signal)
+		const record = requireValue(fixture.conversation.judgments.judgments()[0])
+		expect(inferApplicability(fixture.conversation, fixture.request, fixture.options)[0]).toEqual({
+			id: 'standing',
+			needed: false,
+		})
+		for (const [_name, changed] of buildSelectionMismatches(record)) {
+			fixture.conversation.judgments.add(changed)
+			const before = fixture.conversation.snapshot()
+			expect(inferApplicability(fixture.conversation, fixture.request, fixture.options)[0]).toEqual(
+				{ id: 'standing' },
+			)
+			expect(fixture.conversation.snapshot()).toEqual(before)
+		}
+		expect(fixture.transport.requests).toHaveLength(1)
+	})
+
+	it('reinterprets recorded probabilities at both inclusive cutoffs without another ask', async () => {
+		const probability = SYSTEM_ONE_TEV1.answers.refund.noul
+		const fixture = createStockSelectionFixture(probability, {
+			limit: 1,
+			probabilities: { standing: probability },
+		})
+		await fixture.select(fixture.conversation, fixture.request, new AbortController().signal)
+		expect(inferApplicability(fixture.conversation, fixture.request, fixture.options)[0]).toEqual({
+			id: 'standing',
+			needed: true,
+		})
+		expect(
+			inferApplicability(fixture.conversation, fixture.request, {
+				...fixture.options,
+				needed: { ...NEEDED_CRITERION, threshold: 1 },
+			})[0],
+		).toEqual({ id: 'standing' })
+		const negative = createStockSelectionFixture(probability, {
+			limit: 1,
+			probabilities: { standing: 1 - probability },
+		})
+		await negative.select(negative.conversation, negative.request, new AbortController().signal)
+		expect(
+			inferApplicability(negative.conversation, negative.request, negative.options)[0],
+		).toEqual({ id: 'standing', needed: false })
+		expect(fixture.transport.requests).toHaveLength(1)
+		expect(negative.transport.requests).toHaveLength(1)
+	})
+
+	it('keeps unasked and unscreened group members and confirms unique positional call ids', () => {
+		const request = requireValue(SELECTION_TOOL_MESSAGES.at(-1))
+		const applicability = SELECTION_TOOL_MESSAGES.filter(
+			(message) => message.id !== 'duplicate-b',
+		).map((message) => ({ id: message.id, needed: false }))
+		expect(
+			filterSelectionMessages(SELECTION_TOOL_MESSAGES, applicability, request).map(
+				(message) => message.id,
+			),
+		).toEqual(['duplicate', 'duplicate-a', 'duplicate-b', 'request'])
+		const assistant = requireValue(SELECTION_TOOL_MESSAGES[2])
+		const wrong = {
+			id: 'wrong',
+			role: 'tool',
+			content: 'Unrelated result',
+			call: 'different',
+		} satisfies Message
+		expect(
+			filterSelectionMessages(
+				[assistant, wrong, request],
+				[{ id: assistant.id, needed: false }],
+				request,
+			),
+		).toEqual([wrong, request])
+	})
+})
 
 describe('renderFencedFile', () => {
 	it('assembles a `File:` label + a fenced code block tagged with the language', () => {

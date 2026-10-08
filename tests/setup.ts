@@ -33,6 +33,8 @@ import type {
 	ProviderStreamOptions,
 	Selection,
 	SelectionHandler,
+	SelectionOptions,
+	ScreenHandler,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { RecorderInterface } from '@orkestrel/test'
@@ -44,6 +46,8 @@ import {
 	AgentProvider,
 	createAgent,
 	createConversation,
+	createSelection,
+	NEEDED_CRITERION,
 	InstructionManager,
 	JudgeError,
 	ProviderAbortError,
@@ -52,7 +56,7 @@ import {
 	SystemOneJudge,
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
-import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
+import { isArray, isRecord, isString, parseJSON, parseJSONAs } from '@orkestrel/contract'
 import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
@@ -172,6 +176,202 @@ export class SequentialSystemOneJudge extends AgentJudge {
 	readonly name = 'systemone'
 	readonly body = SystemOneJudge.prototype.body
 	readonly read = SystemOneJudge.prototype.read
+}
+
+/** Supplies a fictional stand-in for the missing transcript, with no claim to reproduce the probe. */
+export const SELECTION_STAND_IN: readonly Message[] = Object.freeze([
+	{ id: 'standing', role: 'user', content: 'Use only local files; do not access the internet.' },
+	{
+		id: 'acceptance',
+		role: 'user',
+		content: 'SQLite is accepted. Include a header row in exports.',
+	},
+	{ id: 'reply', role: 'assistant', content: 'The export will read the local SQLite database.' },
+	{ id: 'withdrawal', role: 'user', content: 'Omit the header row from the export.' },
+	{ id: 'unrelated', role: 'user', content: 'The office printer needs paper.' },
+	{ id: 'request', role: 'user', content: 'Export the active accounts from the local database.' },
+])
+
+/** Configures recorded probabilities and transport failures for selection tests. */
+export interface StockSelectionFixtureOptions {
+	readonly messages?: readonly Message[]
+	readonly probabilities?: Readonly<Record<string, number>>
+	readonly screen?: ScreenHandler
+	readonly limit?: number
+	readonly model?: string
+	readonly failure?: { readonly at: number; readonly cause: unknown }
+	readonly respond?: (request: JudgeRequest, index: number) => Response | Promise<Response>
+}
+
+/** Exposes the real conversation, judge, handler, and recording transport used by a selection test. */
+export interface StockSelectionFixtureInterface {
+	readonly conversation: ConversationInterface
+	readonly request: Message
+	readonly judge: SequentialSystemOneJudge
+	readonly transport: RecordedTransport
+	readonly options: SelectionOptions
+	readonly select: SelectionHandler
+}
+
+/**
+ * Creates a real selection over recorded System One envelope data with request-derived keys.
+ * @param threshold - The test's explicit cutoff
+ * @param options - The message fixture, probabilities, and transport controls
+ * @returns The conversation and selection with their transport recorder
+ */
+export function createStockSelectionFixture(
+	threshold: number,
+	options: StockSelectionFixtureOptions = {},
+): StockSelectionFixtureInterface {
+	const messages = options.messages ?? SELECTION_STAND_IN
+	const conversation = createConversation({
+		snapshot: { id: 'selection-fixture', sections: [], messages },
+		summarize: createStubSummarizer().summarize,
+	})
+	const request = requireValue(messages.at(-1))
+	const transport: RecordedTransport = new RecordedTransport(async (): Promise<Response> => {
+		const index = transport.requests.length
+		if (options.failure !== undefined && options.failure.at === index) throw options.failure.cause
+		const body: unknown = await requireValue(transport.requests.at(-1)).clone().json()
+		if (!isRecord(body) || !isRecord(body.questions) || !isString(body.state))
+			throw new Error('selection fixture received a malformed request')
+		const questions: Record<string, JudgeQuestion> = {}
+		const answers: Record<string, unknown> = {}
+		for (const [id, question] of Object.entries(body.questions)) {
+			const key = parseJSON(id)
+			if (!isArray(key) || !isString(key[1]) || !isRecord(question))
+				throw new Error('selection fixture received an unreadable question key')
+			const subject = key[1]
+			questions[id] = {
+				form: 'noul',
+				...(isString(question.instructions) ? { instructions: question.instructions } : {}),
+			}
+			answers[id] = {
+				...SYSTEM_ONE_TEV1.answers.refund,
+				noul:
+					options.probabilities?.[subject] ?? SYSTEM_ONE_TEV1.answers.label.probabilities.billing,
+			}
+		}
+		if (options.respond !== undefined)
+			return options.respond({ state: body.state, questions }, index)
+		return Response.json({ ...SYSTEM_ONE_TEV1, answers })
+	})
+	const judge = new SequentialSystemOneJudge({
+		url: 'http://selection.test',
+		model: options.model ?? 'tev1:0.8b',
+		batch: false,
+		fetch: transport.fetch,
+	})
+	const configured: SelectionOptions = {
+		judge,
+		screen: options.screen ?? ((source) => source.view().map((message) => message.id)),
+		needed: { ...NEEDED_CRITERION, threshold },
+		limit: options.limit ?? messages.length + 1,
+	}
+	return {
+		conversation,
+		request,
+		judge,
+		transport,
+		options: configured,
+		select: createSelection(configured),
+	}
+}
+
+/** Supplies invalid cutoffs whose refusal is part of the selection factory contract. */
+export const INVALID_SELECTION_THRESHOLDS = Object.freeze([
+	0.5,
+	0,
+	-1,
+	1.01,
+	NaN,
+	Infinity,
+	-Infinity,
+])
+
+/** Supplies invalid question limits, including nonfinite and fractional values. */
+export const INVALID_SELECTION_LIMITS = Object.freeze([
+	-1,
+	0.5,
+	NaN,
+	Infinity,
+	Number.MAX_SAFE_INTEGER + 1,
+])
+
+/**
+ * Builds independent identity changes that must invalidate a needed judgment.
+ * @param record - The matching judgment
+ * @returns Named records with one identity component changed
+ */
+export function buildSelectionMismatches(
+	record: Judgment,
+): ReadonlyArray<readonly [string, Judgment]> {
+	return [
+		['model', { ...record, model: 'another-model' }],
+		['sources', { ...record, sources: ['other', 'request'] }],
+		['source order', { ...record, sources: [...record.sources].reverse() }],
+		['state', { ...record, state: 'other state' }],
+		[
+			'instructions',
+			{ ...record, question: { ...record.question, instructions: 'Another question?' } },
+		],
+		[
+			'criteria',
+			{
+				...record,
+				question: {
+					form: 'noul',
+					...(record.question.instructions === undefined
+						? {}
+						: { instructions: record.question.instructions }),
+					criteria: { true: 'Different' },
+				},
+			},
+		],
+	]
+}
+
+/** Supplies tool groups with unique calls, duplicate calls, detached results, and orphan results. */
+export const SELECTION_TOOL_MESSAGES: readonly Message[] = Object.freeze([
+	{ id: 'orphan-a', role: 'tool', content: 'lost assistant result', call: 'missing' },
+	{ id: 'orphan-b', role: 'tool', content: 'other lost result' },
+	{ id: 'unique', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
+	{ id: 'unique-result', role: 'tool', content: 'paired', call: 'one' },
+	{
+		id: 'duplicate',
+		role: 'assistant',
+		content: '',
+		calls: [createToolCall({ id: 'same' }), createToolCall({ id: 'same' })],
+	},
+	{ id: 'duplicate-a', role: 'tool', content: 'first', call: 'same' },
+	{ id: 'duplicate-b', role: 'tool', content: 'second', call: 'same' },
+	{ id: 'recap', role: 'assistant', content: 'Earlier work was summarized.' },
+	{ id: 'detached', role: 'tool', content: 'late result', call: 'one' },
+	{ id: 'ambiguous-a', role: 'tool', content: 'ambiguous result', call: 'same' },
+	{ id: 'ambiguous-b', role: 'tool', content: 'ambiguous companion', call: 'missing' },
+	{ id: 'request', role: 'user', content: 'Continue.' },
+])
+
+/**
+ * Builds a cost fixture containing repeated conversation turns and complete tool groups.
+ * @returns Messages whose known size and group structure bound selection request counts
+ */
+export function buildSelectionCostMessages(): readonly Message[] {
+	const messages: Message[] = []
+	for (let index = 0; index < 8; index += 1) {
+		messages.push(
+			{ id: `note-${index}`, role: 'user', content: `Read local record ${index}.` },
+			{
+				id: `assistant-${index}`,
+				role: 'assistant',
+				content: '',
+				calls: [createToolCall({ id: `call-${index}` })],
+			},
+			{ id: `result-${index}`, role: 'tool', content: `Record ${index}`, call: `call-${index}` },
+		)
+	}
+	messages.push({ id: 'request', role: 'user', content: 'Summarize the records.' })
+	return messages
 }
 
 /** Records each request a resolver hands it and answers nothing, so a pre-ask check is observable. */

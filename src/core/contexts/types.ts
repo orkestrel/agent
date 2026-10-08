@@ -3,7 +3,7 @@ import type {
 	ConversationManagerInterface,
 	MessageManagerInterface,
 } from '../conversations/index.js'
-import type { Message } from '../types.js'
+import type { JudgeInterface, Message } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { ToolManagerInterface } from '@orkestrel/tool'
@@ -274,6 +274,57 @@ export type SelectionHandler = (
 	request: Message,
 	signal: AbortSignal,
 ) => Promise<Selection>
+
+/**
+ * Returns the message ids the application permits selection to judge.
+ *
+ * @param conversation - The conversation to screen
+ * @param request - The user message the run serves
+ * @returns The candidate ids in asking order
+ * @example
+ * ```ts
+ * const screen: ScreenHandler = (conversation) => conversation.view().map((message) => message.id)
+ * ```
+ */
+export type ScreenHandler = (
+	conversation: ConversationInterface,
+	request: Message,
+) => readonly string[]
+
+/**
+ * Carries application criteria and a required probability cutoff.
+ *
+ * @remarks
+ * `yes` describes the true side and `no` the false side. `threshold` must be finite,
+ * greater than 0.5, and at most 1. No default is supplied. A probability at or over
+ * the cutoff means true, at or under its complement means false, and between means absent.
+ */
+export interface Criterion {
+	readonly yes: string
+	readonly no: string
+	readonly threshold: number
+}
+
+/** Carries a screened message's needed condition, absent without a decisive matching answer. */
+export interface Applicability {
+	readonly id: string
+	readonly needed?: boolean
+}
+
+/**
+ * Configures the judge, candidate screen, needed criterion, and fresh question limit.
+ *
+ * @remarks
+ * `judge` supplies the model identity and inference. `screen` supplies candidate ids.
+ * `needed` supplies the criteria text and required cutoff. `limit` is a nonnegative
+ * safe integer; reused judgments consume none of it.
+ */
+export interface SelectionOptions {
+	readonly judge: JudgeInterface
+	readonly screen: ScreenHandler
+	readonly needed: Criterion
+	readonly limit: number
+}
 
 /**
  * Carries the data to author a {@link ScopeInterface} — a {@link ScopeFilter} plus the

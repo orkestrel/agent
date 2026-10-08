@@ -469,6 +469,10 @@ The wire is strictly narrower than the domain on purpose. `providerRequestContra
 
 ### Factories
 
+| API               | Kind     | Summary                                                                                   |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `createSelection` | function | Creates a selection handler that judges screened messages and retains uncertain subjects. |
+
 | API                               | Kind     | Summary                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `createConversation`              | function | Creates a conversation — a `ConversationInterface` grouping messages above a flat message store it owns directly, with compaction into summarized sections, a regenerated rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a provider-agnostic `ConversationSummaryHandler` seam.                                                                                                      |
@@ -517,6 +521,11 @@ The wire is strictly narrower than the domain on purpose. `providerRequestContra
 | `JudgmentManager`           | class | Stores judgments in insertion order and asks a judge only for unmatched question identities.                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ### Constants
+
+| API                | Kind  | Shape                            | Summary                                                                              |
+| ------------------ | ----- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| `NEEDED_CRITERION` | const | `Pick<Criterion, 'yes' \| 'no'>` | Supplies measured needed criteria without choosing the application's threshold.      |
+| `NEEDED_QUESTION`  | const | `string`                         | Asks whether the marked subject is needed to carry out the marked request correctly. |
 
 A `Shape` cell holds the constant's declared type.
 
@@ -581,6 +590,14 @@ relayFrameContract.parse({ channel: 'error', message: 'oops', code: 'X' }) // { 
 ```
 
 ### Helpers
+
+| API                       | Kind     | Summary                                                                                    |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `buildConditionKey`       | function | Encodes a condition and its ordered message ids without separator ambiguity.               |
+| `buildNeededQuestion`     | function | Builds the fixed needed question with the application's true and false criteria.           |
+| `renderSelectionState`    | function | Renders the view with subject and request markers, appending a folded request as evidence. |
+| `inferApplicability`      | function | Derives needed conditions from matching recorded judgments without asking a judge.         |
+| `filterSelectionMessages` | function | Filters decisively unneeded subjects while preserving requests and complete tool groups.   |
 
 | API                      | Kind     | Summary                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -690,6 +707,13 @@ const snapshot = isConversationSnapshot(row) ? row : undefined
 | `isJudgeAbortError`    | function | Narrows a caught value to a `JudgeAbortError` through `instanceof`, so a `catch` can recover its `partial` result.                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Types
+
+| Type               | Kind      | Shape                                                                          | Summary                                                                                   |
+| ------------------ | --------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `ScreenHandler`    | type      | `(conversation: ConversationInterface, request: Message) => readonly string[]` | Returns the message ids the application permits selection to judge.                       |
+| `Criterion`        | interface | `{ yes, no, threshold }`                                                       | Carries application criteria and a required probability cutoff.                           |
+| `Applicability`    | interface | `{ id, needed? }`                                                              | Carries a screened message's needed condition, absent without a decisive matching answer. |
+| `SelectionOptions` | interface | `{ judge, screen, needed, limit }`                                             | Configures the judge, candidate screen, needed criterion, and fresh question limit.       |
 
 A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`. An extended interface's name comes before `plus`, with the members it adds after.
 
