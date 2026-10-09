@@ -51,6 +51,299 @@ describe('Ledger', () => {
 		}
 	})
 
+	it('recalls a call-free, non-quiet seed assistant statement and lists its amender after it in one item', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: 'Refunds from a later assistant.' },
+				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: '', tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: 'Done.' },
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, { ...options, capacity: 800, share: { tail: 0.001 } })
+		const older = ledger.conversation.add({
+			role: 'assistant',
+			content: 'Older refunds statement.',
+		})
+		const source = ledger.conversation.add({
+			role: 'assistant',
+			content: 'Refunds use code AA-10.',
+		})
+		const first = ledger.conversation.add({
+			role: 'user',
+			content: `Replace AA-10 with AA-11. ${'Keep the receipt. '.repeat(300)}`,
+		})
+		const second = ledger.conversation.add({ role: 'user', content: 'Replace AA-10 with AA-12.' })
+		const last = ledger.conversation.add({ role: 'user', content: 'Replace AA-11 with AA-13.' })
+		const quiet = ledger.conversation.add({ role: 'assistant', content: 'Quiet refunds opinion.' })
+		const called = ledger.conversation.add({
+			role: 'assistant',
+			content: 'Refunds beside a call.',
+			calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'missing' } }],
+		})
+		ledger.conversation.add({ role: 'tool', call: 'seed', content: 'No record' })
+		for (const message of [older, source, quiet, called]) {
+			ledger.conversation.judgments.add({
+				id: JSON.stringify(['topic', message.id, 'refunds']),
+				question: {
+					form: 'noul',
+					instructions: LEDGER_QUESTIONS.topic,
+					criteria: {
+						true: 'The message concerns refunds: Refund amounts',
+						false: 'The message does not concern refunds',
+					},
+				},
+				sources: [message.id],
+				state: `assistant: ${message.content}`,
+				model: judge.model,
+				answer: { form: 'noul', noul: 1 },
+			})
+		}
+		ledger.conversation.judgments.add({
+			id: JSON.stringify(['category', quiet.id]),
+			question: LEDGER_QUESTIONS.category,
+			sources: [quiet.id],
+			state: `assistant: ${quiet.content}`,
+			model: judge.model,
+			answer: { form: 'choice', probabilities: { chatter: 1 } },
+		})
+		for (const [earlier, later] of [
+			[source, first],
+			[source, second],
+			[first, last],
+		] as const) {
+			ledger.conversation.judgments.add({
+				id: JSON.stringify(['amends', earlier.id, later.id]),
+				question: LEDGER_QUESTIONS.amends,
+				sources: [earlier.id, later.id],
+				state: `Earlier message: ${earlier.role}: ${earlier.content}\nLater message: user: ${later.content}`,
+				model: judge.model,
+				answer: { form: 'noul', noul: 1 },
+			})
+		}
+		await ledger.respond('First request.')
+		await ledger.respond('Second request about refunds.')
+		const recalled = ledger.conversation
+			.messages()
+			.find((message) => message.role === 'tool' && message.call === 'recall')?.content
+		expect(recalled).toBe(
+			`${source.content}\n${first.content}\n${second.content}\n${last.content}\n1 older item not shown; name a narrower topic to narrow the recall`,
+		)
+		expect(
+			provider.calls[3]?.messages.find((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			)?.content,
+		).toBe(
+			`${LEDGER_NOTES.results}\n${source.content}\n${first.content}\n${second.content}\n${last.content}`,
+		)
+		expect(provider.calls[1]?.messages[0]?.content).not.toContain(source.content)
+	})
+
+	it('recalls both seed readings of one lookup and lists each once in the answer note', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater and BW-20931' } },
+					],
+				},
+				{ content: '' },
+				{ content: 'Done.' },
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { limit: 2 },
+			share: { tail: 0.001 },
+		})
+		const text = 'Account BW-20931: Brightwater Studio. Refund is $140.'
+		for (const id of ['earlier', 'later'])
+			ledger.conversation.add([
+				{
+					role: 'assistant',
+					content: '',
+					calls: [{ id, name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+				{ role: 'tool', call: id, content: text },
+			])
+		await ledger.respond('Check Brightwater.')
+		const line = `lookup {"id":"BW-20931"}: ${text}`
+		expect(
+			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+		).toBe(`${line}\n${line}`)
+		expect(provider.calls[0]?.messages[0]?.content.split('Refund is $140.')).toHaveLength(2)
+		expect(
+			provider.calls[2]?.messages.find((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			)?.content,
+		).toBe(`${LEDGER_NOTES.results}\n${text}`)
+	})
+
+	it('writes lookup lines in the answer note without their call text', async () => {
+		const text =
+			'Account BW-20931: Brightwater Studio.\nlookup {"id":"prose"}: preserve this prose.'
+		const lookup = requireValue(options.lookups?.[0])
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{
+					content: '',
+					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { limit: 2 },
+			lookups: [{ ...lookup, tool: createTool({ name: 'lookup', execute: () => text }) }],
+		})
+		await ledger.respond('Check the account.')
+		expect(
+			ledger.conversation
+				.messages()
+				.find((message) => message.role === 'tool' && message.call === 'recall')?.content,
+		).toBe(`lookup {"id":"BW-20931"}: ${text}`)
+		expect(
+			provider.calls[2]?.messages.find((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			)?.content,
+		).toBe(`${LEDGER_NOTES.results}\n${text}`)
+	})
+
+	it('lists an earlier answer note through a word match but never through a topic match', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{ content: 'First answer.' },
+				{
+					content: '',
+					tools: [{ id: 'words', name: 'recall', arguments: { topic: 'Brightwater refund' } }],
+				},
+				{ content: 'Second answer.' },
+				{
+					content: '',
+					tools: [{ id: 'topic', name: 'recall', arguments: { topic: 'Brightwater' } }],
+				},
+				{ content: 'Third answer.' },
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, { ...options, agent: { limit: 1 } })
+		await ledger.respond('First request.')
+		const note = requireValue(
+			ledger.conversation
+				.messages()
+				.find((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		)
+		await ledger.respond('Second request.')
+		const worded = requireValue(
+			ledger.conversation
+				.messages()
+				.find((message) => message.role === 'tool' && message.call === 'words'),
+		)
+		expect(worded.content.startsWith(`${note.content}\nlookup `)).toBe(true)
+		expect(
+			provider.calls[3]?.messages.find((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			)?.content,
+		).toBe(`${LEDGER_NOTES.results}\n${note.content}`)
+		await ledger.respond('Third request.')
+		expect(
+			ledger.conversation
+				.messages()
+				.find((message) => message.role === 'tool' && message.call === 'topic')?.content,
+		).not.toContain(LEDGER_NOTES.results)
+		for (const call of provider.calls)
+			expect(call.messages[0]?.content).not.toContain(LEDGER_NOTES.results)
+	})
+
+	it('recalls the Halvorsen shipment owner history carried by the v7 00061 answer note', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Halvorsen' } }],
+				},
+				{ content: 'First answer.' },
+				{
+					content: '',
+					tools: [{ id: 'shipment', name: 'recall', arguments: { topic: 'Halvorsen shipment' } }],
+				},
+				{ content: 'Second answer.' },
+			],
+			{ record: true },
+		)
+		const lookup = requireValue(options.lookups?.[0])
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { limit: 1 },
+			lookups: [
+				{
+					...lookup,
+					read: () => ({
+						ids: ['LH-31055', 'LH-80941'],
+						owners: [{ id: 'LH-31055', names: ['Halvorsen Interiors'] }],
+					}),
+				},
+			],
+		})
+		const source = ledger.conversation.add({
+			role: 'user',
+			content:
+				'Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.',
+		})
+		const buyer = ledger.conversation.add({
+			role: 'user',
+			content:
+				'Their buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.',
+		})
+		const corrected = ledger.conversation.add({
+			role: 'assistant',
+			content: 'Updated: the Halvorsen escalation is ESC-2219.',
+		})
+		const shipment = ledger.conversation.add({
+			role: 'user',
+			content: 'Anyway, can you check where the Halvorsen shipment actually is?',
+		})
+		ledger.conversation.add([
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'LH-80941' } }],
+			},
+			{
+				role: 'tool',
+				call: 'seed',
+				content:
+					'Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.',
+			},
+		])
+		await ledger.respond('Check Halvorsen.')
+		const note = requireValue(
+			ledger.conversation
+				.messages()
+				.find((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		)
+		await ledger.respond('Who releases the pendant lights?')
+		const recalled = ledger.conversation
+			.messages()
+			.find((message) => message.role === 'tool' && message.call === 'shipment')?.content
+		expect(recalled).toBe(`${note.content}\n${shipment.content}`)
+		expect(recalled).toContain(
+			`${shipment.content}\n${corrected.content}\n${buyer.content}\n${source.content}`,
+		)
+		expect(
+			provider.calls[3]?.messages.find((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			)?.content,
+		).toBe(`${LEDGER_NOTES.results}\n${note.content}`)
+	})
+
 	it('calibrates the replay-filtered view and prices the same messages', async () => {
 		const provider = createScriptedProvider(
 			[
@@ -638,7 +931,7 @@ describe('Ledger', () => {
 			answer.messages.some(
 				(message) =>
 					message.content ===
-					`${LEDGER_NOTES.results}\nlookup {"id":"BW-20931","detail":{"a":1,"b":2}}: Account BW-20931: Brightwater Studio. Refund is $148.50.`,
+					`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio. Refund is $148.50.`,
 			),
 		).toBe(true)
 		expect(selections[1]?.briefing).toBe(selections[0]?.briefing)
@@ -1242,7 +1535,7 @@ describe('Ledger', () => {
 		expect(states).not.toContain(`user: ${LEDGER_NOTES.cue}`)
 	})
 
-	it('removes stale sentences from the briefing, seed tail, recall, and answer digest for an unscoped request', async () => {
+	it('keeps stale sentences and superseded messages in recall results while the briefing drops them', async () => {
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { topic: 'refunds' } }] },
@@ -1256,11 +1549,19 @@ describe('Ledger', () => {
 			role: 'user',
 			content: 'Refunds over $200 require approval. Use code MX-4471.',
 		})
+		const retired = ledger.conversation.add({
+			role: 'user',
+			content: 'Refunds use the retired code MX-4471.',
+		})
+		const harmless = ledger.conversation.add({
+			role: 'user',
+			content: 'The archive explains the spelling of MX-4471.',
+		})
 		const correction = ledger.conversation.add({
 			role: 'user',
 			content: 'Correction: replace MX-4471 with MX-4486.',
 		})
-		for (const message of [old, correction]) {
+		for (const message of [old, retired, harmless, correction]) {
 			ledger.conversation.judgments.add({
 				id: JSON.stringify(['category', message.id]),
 				question: LEDGER_QUESTIONS.category,
@@ -1312,23 +1613,35 @@ describe('Ledger', () => {
 			model: judge.model,
 			answer: { form: 'noul', noul: 0 },
 		})
+		ledger.conversation.judgments.add({
+			id: JSON.stringify(['supersedes', retired.id, correction.id]),
+			question: LEDGER_QUESTIONS.supersedes,
+			sources: [retired.id, correction.id],
+			state: `Earlier message: user: ${retired.content}\nLater message: user: ${correction.content}`,
+			model: judge.model,
+			answer: { form: 'noul', noul: 1 },
+		})
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(
 			'## Rules\n- Refunds over $200 require approval.',
 		)
 		for (const call of provider.calls)
-			expect(call.messages.map((message) => message.content).join('\n')).not.toContain(
-				'Use code MX-4471.',
-			)
+			expect(call.messages[0]?.content).not.toContain('Use code MX-4471.')
+		expect(provider.calls[0]?.messages.find((message) => message.id === old.id)?.content).toBe(
+			old.content,
+		)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toContain('Refunds over $200 require approval.')
+		).toBe(`${correction.content}\n${harmless.content}\n${retired.content}\n${old.content}`)
 		expect(
 			provider.calls[2]?.messages.find((message) =>
 				message.content.startsWith(LEDGER_NOTES.results),
 			)?.content,
-		).toContain('MX-4486')
+		).toBe(
+			`${LEDGER_NOTES.results}\n${correction.content}\n${harmless.content}\n${retired.content}\n${old.content}`,
+		)
+		expect(provider.calls[0]?.messages[0]?.content).not.toContain(retired.content)
 		expect(ledger.conversation.message(old.id)?.content).toContain('Use code MX-4471.')
 	})
 
@@ -1414,7 +1727,7 @@ describe('Ledger', () => {
 		expect(briefing).toContain(`## Pinned\n${loose.content}\n${decisive.content}`)
 	})
 
-	it('renders live amendments after their loose source in briefing and recall and removes superseded turns', async () => {
+	it('renders projected amendments in the briefing and stored sources with amendments in recall', async () => {
 		const provider = createScriptedProvider(
 			[
 				{
@@ -1482,10 +1795,10 @@ describe('Ledger', () => {
 		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe(expected)
+		).toBe(`${source.content}\n${correction.content}`)
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe(`${correction.content}\nFor Mira, keep the receipt.`)
+		).toBe(`${correction.content}\n${source.content}`)
 		expect(provider.calls[0]?.messages[0]?.content).not.toContain('[amended by')
 		ledger.conversation.judgments.add({
 			id: JSON.stringify(['category', source.id]),
@@ -1619,7 +1932,7 @@ describe('Ledger', () => {
 		).toBe('nothing on "Brightwater unknown"; recall an owner name, an id, or one of refunds')
 	})
 
-	it('omits superseded user messages from an otherwise uncut seed tail', async () => {
+	it('keeps superseded user messages in an otherwise uncut seed tail', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
 		const ledger = createLedger(provider, options)
 		const old = ledger.conversation.add({ role: 'user', content: 'Use instruction 42.' })
@@ -1637,8 +1950,12 @@ describe('Ledger', () => {
 			answer: { form: 'noul', noul: 1 },
 		})
 		await ledger.respond('Request.')
-		expect(provider.calls[0]?.messages.some((message) => message.id === old.id)).toBe(false)
-		expect(provider.calls[0]?.messages.some((message) => message.id === reply.id)).toBe(false)
+		expect(provider.calls[0]?.messages.find((message) => message.id === old.id)?.content).toBe(
+			old.content,
+		)
+		expect(provider.calls[0]?.messages.find((message) => message.id === reply.id)?.content).toBe(
+			reply.content,
+		)
 		expect(
 			provider.calls[0]?.messages.find((message) => message.id === correction.id)?.content,
 		).toBe(correction.content)
@@ -1793,7 +2110,7 @@ describe('Ledger', () => {
 		expect(recalled).not.toContain('unused')
 	})
 
-	it('removes recalled results from the digest when a later empty lookup replaces their source', async () => {
+	it('keeps recalled results in the digest when a later empty lookup replaces their source', async () => {
 		const provider = createScriptedProvider(
 			[
 				{
@@ -1832,7 +2149,9 @@ describe('Ledger', () => {
 			provider.calls[3]?.messages.find((message) =>
 				message.content.startsWith(LEDGER_NOTES.results),
 			)?.content,
-		).toBe(`${LEDGER_NOTES.results}\nlookup {"id":"BW-20931"}: No record`)
+		).toBe(
+			`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio. Refund is $140.\nNo record`,
+		)
 		await ledger.respond('Check Brightwater Studio again.')
 		expect(provider.calls[4]?.messages[0]?.content).not.toContain('Refund is $140.')
 	})

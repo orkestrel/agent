@@ -403,7 +403,8 @@ export interface LedgerRecord {
  *
  * @remarks
  * `source` is the earlier message's id and `sentence` the zero-based index of the sentence. The
- * projection leaves a stale sentence out of every record and every route to the model.
+ * projection leaves a stale sentence out of the records and the briefing. Recall, answer notes,
+ * and the seed tail keep the stored content.
  */
 export interface LedgerStaleSentence {
 	readonly source: string

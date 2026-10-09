@@ -87,7 +87,7 @@ export class Ledger implements LedgerInterface {
 	readonly #results = new Map<string, ToolResult>()
 	readonly #pending = new Map<number, ToolResult>()
 	readonly #answered = new Set<string>()
-	readonly #recalled = new Map<string, readonly LedgerLine[]>()
+	readonly #recalled = new Map<string, ReadonlyMap<string, string>>()
 	#request: Message | undefined
 	#entered: Selection | undefined
 	#selected: Selection | undefined
@@ -589,7 +589,7 @@ export class Ledger implements LedgerInterface {
 				(this.#options.capacity - this.#predict) * this.#share.prompt - (this.#gauge?.fixed ?? 0),
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
-		const tail = this.#selectTail(request, total * this.#share.tail, input, projection)
+		const tail = this.#selectTail(request, total * this.#share.tail, input)
 		const cap =
 			total - (this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(tail, this.#replay))
 		const tailIds = new Set(tail.map((message) => message.id))
@@ -842,12 +842,7 @@ export class Ledger implements LedgerInterface {
 			.join('\n\n')
 	}
 
-	#selectTail(
-		request: Message,
-		cap: number,
-		input: LedgerProjectionInput,
-		projection: LedgerProjection,
-	): readonly Message[] {
+	#selectTail(request: Message, cap: number, input: LedgerProjectionInput): readonly Message[] {
 		const first = input.messages.findIndex((message) => this.#requests.has(message.id))
 		const seed = input.messages.slice(
 			0,
@@ -875,8 +870,6 @@ export class Ledger implements LedgerInterface {
 			.filter(
 				(message) =>
 					!this.#annotations.has(message.id) &&
-					(message.role !== 'user' ||
-						(input.classification.superseded.get(message.id) ?? []).length === 0) &&
 					(message.role !== 'tool' || results.has(message.id)) &&
 					!(
 						message.role === 'assistant' &&
@@ -888,19 +881,11 @@ export class Ledger implements LedgerInterface {
 			.map((message) =>
 				message.role === 'tool'
 					? this.#renderTailStub(message)
-					: message.role === 'user'
-						? {
-								...message,
-								content: this.#renderSource(
-									message.id,
-									this.#projectLines(input, projection, message.id),
-								),
-							}
-						: calls.has(message.id)
-							? (calls.get(message.id)?.length ?? 0) > 0
-								? { ...message, calls: calls.get(message.id) ?? [] }
-								: { id: message.id, role: message.role, content: message.content }
-							: message,
+					: calls.has(message.id)
+						? (calls.get(message.id)?.length ?? 0) > 0
+							? { ...message, calls: calls.get(message.id) ?? [] }
+							: { id: message.id, role: message.role, content: message.content }
+						: message,
 			)
 		const exchanges: Message[][] = []
 		for (const message of history) {
@@ -1042,17 +1027,25 @@ export class Ledger implements LedgerInterface {
 			])
 			return { words, matched }
 		})
-		const live = new Set([
-			...projection.loose,
-			...projection.records.flatMap((record) => record.members),
-		])
+		const start = input.messages.findIndex((message) => message.id === this.#request?.id)
+		const listable = new Map(
+			input.messages
+				.filter(
+					(message, at) =>
+						!this.#requests.has(message.id) && (at < start || message.role === 'tool'),
+				)
+				.map((message) => [message.id, message]),
+		)
+		const readings = new Map(input.readings.map((reading) => [reading.id, reading]))
+		const matched = new Set(searches.flatMap((search) => [...search.matched]))
+		const wordings = searches.filter(
+			(search) => search.matched.size === 0 && search.words.length > 0,
+		)
 		const listed: string[] = []
-		const matched: string[] = []
-		const recalled: LedgerLine[] = []
-		for (const message of [...input.messages].reverse()) {
-			if (!live.has(message.id)) continue
-			const lines = this.#projectLines(input, projection, message.id)
-			const text = lines.map((line) => line.text).join(' ')
+		const done = new Set<string>()
+		const recalled = new Map<string, string>()
+		for (const message of [...listable.values()].reverse()) {
+			const reading = readings.get(message.id)
 			const topics = new Set([
 				...(input.entities.get(message.id) ?? []),
 				...this.#classifier.topics(message.id),
@@ -1063,80 +1056,57 @@ export class Ledger implements LedgerInterface {
 					)
 					.map((record) => record.key.slice(LEDGER_OWNER_PREFIX.length)),
 			])
-			if (
-				!searches.some((search) =>
-					search.matched.size > 0
-						? [...search.matched].some((match) => topics.has(match))
-						: search.words.length > 0 &&
-							search.words.every((word) => text.toLowerCase().includes(word)),
+			const onTopic =
+				(message.role === 'tool'
+					? reading?.result !== undefined
+					: (message.calls?.length ?? 0) === 0 && !this.#classifier.quiet(message.id)) &&
+				[...matched].some((match) => topics.has(match))
+			const worded =
+				(message.role === 'tool' ? reading !== undefined : message.role === 'user') &&
+				wordings.some((search) =>
+					search.words.every((word) => message.content.toLowerCase().includes(word)),
 				)
-			)
-				continue
-			if (lines.length > 0) matched.push(message.id)
-		}
-		const done = new Set<string>()
-		for (const id of matched) {
-			if (done.has(id)) continue
-			const lines = this.#collectAmended(input, projection, id, new Set()).filter(
-				(line) => !done.has(line.source),
-			)
+			if (!onTopic && !worded) continue
+			const queue = [message.id]
 			const texts: string[] = []
-			for (const [source, retained] of Map.groupBy(lines, (line) => line.source)) {
-				done.add(source)
-				texts.push(this.#renderSource(source, retained))
+			while (queue.length > 0) {
+				const id = queue.shift()
+				if (id === undefined || done.has(id)) continue
+				const source = listable.get(id)
+				if (source === undefined) continue
+				done.add(id)
+				const lookup = readings.get(id)
+				const text =
+					lookup === undefined
+						? source.content
+						: `${lookup.name} ${JSON.stringify(lookup.arguments)}: ${source.content}`
+				texts.push(text)
+				if (lookup !== undefined)
+					recalled.set(text.split('\n')[0] ?? '', source.content.split('\n')[0] ?? '')
+				queue.push(...(input.classification.amended.get(id) ?? []))
 			}
 			if (texts.length > 0) listed.push(texts.join('\n'))
-			recalled.push(...lines)
 		}
 		const result =
 			listed.length === 0 ? `nothing on "${topic}"; recall ${guidance}` : cutItems(listed, room)
-		this.#recalled.set(
-			result,
-			recalled.filter((line) =>
-				result.includes(
-					this.#renderSource(line.source, this.#projectLines(input, projection, line.source)),
-				),
-			),
-		)
+		this.#recalled.set(result, recalled)
 		return result
 	}
 
 	#buildDigest(): string | undefined {
 		this.#flush()
-		const { input, projection } = this.#project()
-		const live = new Set([
-			...projection.loose,
-			...projection.records.flatMap((record) => record.members),
-		])
 		const lines: string[] = []
 		for (const message of this.#collectAfter()) {
-			if (message.role !== 'tool' || this.#results.get(message.id)?.success === false) continue
-			const reading = input.readings.find((one) => one.id === message.id)
-			const recalled = this.#recalled.get(message.content)
-			const text =
-				recalled !== undefined
-					? [
-							...Map.groupBy(
-								recalled.filter(
-									(line) =>
-										live.has(line.source) &&
-										this.#projectLines(input, projection, line.source).some(
-											(current) => current.sentence === line.sentence,
-										),
-								),
-								(line) => line.source,
-							),
-						]
-							.map(([source, retained]) => this.#renderSource(source, retained))
-							.join('\n')
-					: reading === undefined || reading.result === undefined
-						? this.#renderSource(message.id, this.#projectLines(input, projection, message.id))
-						: live.has(message.id)
-							? this.#renderSource(message.id, this.#projectLines(input, projection, message.id))
-							: ''
-			if (/^nothing on /.test(text)) continue
-			for (const line of text.split('\n'))
-				if (line !== '' && !matchesCutLine(line) && !lines.includes(line)) lines.push(line)
+			const result = this.#results.get(message.id)
+			if (message.role !== 'tool' || result?.success !== true) continue
+			const listing = result.name === 'recall'
+			if (listing && /^nothing on /.test(message.content)) continue
+			const recalled = listing ? this.#recalled.get(message.content) : undefined
+			for (const line of message.content.split('\n')) {
+				if (listing && matchesCutLine(line)) continue
+				const text = recalled?.get(line) ?? line
+				if (!lines.includes(text)) lines.push(text)
+			}
 		}
 		return lines.length === 0 ? undefined : `${this.#notes.results}\n${lines.join('\n')}`
 	}
