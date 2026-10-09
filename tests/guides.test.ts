@@ -1983,9 +1983,54 @@ await new GuideCommand({
 			for (const sentence of [
 				"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
 				"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
-				'It is the default, and a request under it carries the same messages it would carry if no thinking were recorded.',
+				'It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.',
 			])
 				expect(guideText).toContain(sentence)
+		})
+
+		it('reads recorded thinking under none replay to measure what a ledger call left (the replay section)', async () => {
+			const recalled: string[] = []
+			for (const thinking of [undefined, 'a'.repeat(800)]) {
+				const provider = createScriptedProvider(
+					[
+						{
+							content: '',
+							...(thinking === undefined ? {} : { thinking }),
+							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+							usage: { prompt: 2700, completion: 865, total: 3565 },
+						},
+						{ content: 'Done.' },
+					],
+					{ record: true, replay: 'none' },
+				)
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 4096,
+					predict: 1024,
+					gauge: { scale: 1, fixed: 0 },
+				})
+				await ledger.respond('Review.')
+				expect(provider.calls).toHaveLength(2)
+				expect(
+					provider.calls.flatMap((call) => call.messages).some((message) => 'thinking' in message),
+				).toBe(false)
+				recalled.push(
+					requireValue(
+						provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+					),
+				)
+			}
+			expect(recalled).toEqual([
+				barrel.LEDGER_NOTES.closed,
+				'nothing on "absent"; recall an owner name, an id, or one of refunds',
+			])
+			expect(guideText).toContain(
+				'a ledger still reads recorded thinking to measure what a call left.',
+			)
 		})
 
 		it('strips a relayed request again by the upstream policy, keeping what both policies keep (the replay section)', async () => {

@@ -621,7 +621,7 @@ A thinking model's reasoning arrives as `ProviderResult.thinking`, apart from th
 
 The provider's `replay` member decides which recorded thinking goes back to the model. Set it through the `replay` option of `ProviderOptions`, which `AgentProviderInput` and `RelayProviderOptions` extend, or declare it on a `ProviderInterface` you write. A `ThinkingReplay` value is one of the following:
 
-- `'none'` sends no thinking. It is the default, and a request under it carries the same messages it would carry if no thinking were recorded.
+- `'none'` sends no thinking. It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.
 - `'turn'` sends the thinking of the assistant messages after the last `user` message, the turn in progress, and drops the rest.
 - `'all'` sends the thinking of every assistant message.
 

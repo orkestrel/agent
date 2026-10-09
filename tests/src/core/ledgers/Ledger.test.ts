@@ -1,4 +1,4 @@
-import type { LedgerOptions, MessageInput, Selection } from '@src/core'
+import type { LedgerOptions, MessageInput, Selection, ThinkingReplay } from '@src/core'
 import {
 	LEDGER_NOTES,
 	LEDGER_QUESTIONS,
@@ -99,41 +99,55 @@ describe('Ledger', () => {
 		).toBe(true)
 	})
 
-	it('resolves replay and predict at construction through calibration and respond', async () => {
-		let replayReads = 0
-		let predictReads = 0
-		const provider = createScriptedProvider([
-			{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
-			{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
-			{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }] },
-			{ content: 'Done.' },
-		])
+	it('keeps the replay policy captured at construction through calibration and respond', async () => {
+		let replay: ThinkingReplay = 'none'
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+				{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+				{
+					content: '',
+					thinking: 'Recall the account.',
+					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ record: true },
+		)
 		const { gauge: _gauge, ...uncalibrated } = options
 		const ledger = createLedger(
 			{
 				id: provider.id,
 				name: provider.name,
-				get replay(): 'none' {
-					replayReads += 1
-					return 'none'
+				get replay(): ThinkingReplay {
+					return replay
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
 			},
 			{
 				...uncalibrated,
-				get predict() {
-					predictReads += 1
-					return 1024
-				},
+				predict: 1024,
 			},
 		)
-		// The ledger and its owned agent each capture the provider policy.
-		expect(replayReads).toBe(2)
-		expect(predictReads).toBe(1)
+		replay = 'all'
+		ledger.conversation.add([
+			{ role: 'user', content: 'Seed.' },
+			{ role: 'assistant', content: 'Earlier reply.', thinking: 'Check the account.' },
+		])
 		await expect(ledger.respond('Review.')).resolves.toMatchObject({ content: 'Done.' })
-		expect(replayReads).toBe(2)
-		expect(predictReads).toBe(1)
+		expect(provider.calls).toHaveLength(4)
+		for (const call of provider.calls) {
+			expect(call.messages.some((message) => message.content === 'Earlier reply.')).toBe(true)
+			expect(call.messages.some((message) => 'thinking' in message)).toBe(false)
+		}
+		expect(
+			provider.calls[3]?.messages.some((message) => message.calls?.[0]?.name === 'recall'),
+		).toBe(true)
+		expect(ledger.conversation.messages().flatMap((message) => message.thinking ?? [])).toEqual([
+			'Check the account.',
+			'Recall the account.',
+		])
 	})
 
 	it('rejects invalid generation caps with CAPACITY even before calibration', () => {
@@ -178,6 +192,34 @@ describe('Ledger', () => {
 					length === 8048,
 				)
 			}
+		}
+	})
+
+	it('defaults to the predict zero plan budget with no first-pass think option and an answer pass with thinking off', async () => {
+		// These seed exchanges straddle the 2704-unit tail boundary at capacity 4096.
+		for (const length of [10752, 10756]) {
+			const prompts: string[][] = []
+			for (const predict of [undefined, 0]) {
+				const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
+					record: true,
+					replay: 'none',
+				})
+				const ledger = createLedger(provider, {
+					...options,
+					...(predict === undefined ? {} : { predict }),
+					share: { prompt: 0.7, tail: 1 },
+				})
+				ledger.conversation.add([
+					{ role: 'user', content: 'Seed.' },
+					{ role: 'assistant', content: 'a'.repeat(length) },
+				])
+				expect((await ledger.respond('Review.')).passes).toHaveLength(2)
+				expect(provider.calls.map((call) => call.options)).toEqual([undefined, { think: false }])
+				const messages = requireValue(provider.calls[0]).messages
+				expect(messages.some((message) => message.role === 'assistant')).toBe(length === 10752)
+				prompts.push(messages.map((message) => message.content))
+			}
+			expect(prompts[0]).toEqual(prompts[1])
 		}
 	})
 
@@ -226,6 +268,43 @@ describe('Ledger', () => {
 		}
 		expect(prices[1]).toBe(prices[0])
 		expect(prompts[1]).toEqual(prompts[0])
+	})
+
+	it('strips tail thinking before capping a non-empty owner briefing', async () => {
+		const systems: string[] = []
+		for (const thinking of [undefined, 'a'.repeat(20000)]) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], {
+				record: true,
+				replay: 'none',
+			})
+			const ledger = createLedger(provider, options)
+			ledger.conversation.add([
+				{ role: 'user', content: 'Brightwater Studio called.' },
+				{
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+				{
+					role: 'tool',
+					call: 'seed',
+					content: 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+				},
+				{
+					role: 'assistant',
+					content: 'Earlier reply.',
+					...(thinking === undefined ? {} : { thinking }),
+				},
+			])
+			await ledger.respond('Check Brightwater Studio.')
+			const messages = requireValue(provider.calls[0]).messages
+			expect(messages.some((message) => message.content === 'Earlier reply.')).toBe(true)
+			expect(messages.some((message) => 'thinking' in message)).toBe(false)
+			const system = requireValue(messages.find((message) => message.role === 'system')).content
+			expect(system).toContain('Refund is $148.50.')
+			systems.push(system)
+		}
+		expect(systems[1]).toBe(systems[0])
 	})
 
 	it('reads thinking at recall and respond before sizing results and observing the reply reserve', async () => {
