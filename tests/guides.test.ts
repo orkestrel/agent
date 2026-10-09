@@ -9,6 +9,7 @@ import type {
 	JudgeRequest,
 	JudgeResult,
 	LedgerLookup,
+	LedgerThink,
 	LedgerThreshold,
 	LedgerTopic,
 	Message,
@@ -23,6 +24,7 @@ import type {
 	ScreenHandler,
 	Selection,
 	SelectionHandler,
+	ThinkingReplay,
 } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
 import { GuideCommand } from '@orkestrel/guide/server'
@@ -104,7 +106,9 @@ await new GuideCommand({
 		providerRequestContract,
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
+		RelayStream,
 		sanitizeToken,
+		stripThinking,
 		SYSTEM_ONE_PATH,
 		SystemOneJudge,
 	} = barrel
@@ -1469,7 +1473,99 @@ await new GuideCommand({
 			}
 			expect(requireValue(tails.get(0))).toBeGreaterThan(room(200))
 			expect(guideText).toContain(
-				'the `capacity` option times the `prompt` share, less the fixed cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the fixed cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+			)
+		})
+
+		it('budgets a ledger at W + P with predict P like one at W without thinking (the thinking budget)', async () => {
+			const window = 600
+			const cap = 400
+			const plan = async (capacity: number, predict?: number) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity,
+					...(predict === undefined ? {} : { predict }),
+					gauge: { scale: 1, fixed: 0 },
+				})
+				ledger.conversation.add(
+					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
+						role: 'user',
+						content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+					})),
+				)
+				await ledger.respond('Review the desk.')
+				return requireValue(provider.calls[0], 'Missing first call').messages.map(
+					({ role, content }) => [role, content],
+				)
+			}
+
+			// The plan half: the reserved cap leaves the prompt exactly the window's budget, while the
+			// same capacity without the cap plans a longer prompt.
+			const reserved = await plan(window + cap, cap)
+			expect(reserved).toEqual(await plan(window))
+			expect((await plan(window + cap)).length).toBeGreaterThan(reserved.length)
+
+			// The gauge half: under replay 'none', a call's thinking leaves the measured use, so the room
+			// and the close rule read what a call without thinking leaves at the window.
+			const thinking = new Gauge({
+				scale: 1.25,
+				fixed: 120,
+				capacity: 32_768 + 4_096,
+				predict: 4_096,
+			})
+			const plain = new Gauge({ scale: 1.25, fixed: 120, capacity: 32_768 })
+			const carried = new Gauge({
+				scale: 1.25,
+				fixed: 120,
+				capacity: 32_768 + 4_096,
+				predict: 4_096,
+				replay: 'turn',
+			})
+			const thought = [{ estimate: 400, prompt: 640, completion: 330, thinking: 300, tools: 2 }]
+			const bare = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
+			expect(thinking.left(thought) - 4_096).toBe(plain.left(bare))
+			expect(thinking.room(thought, '')).toBe(plain.room(bare, ''))
+			thinking.observe(thought, thought[0])
+			plain.observe(bare, bare[0])
+			expect(thinking.reserve(thought, '')).toBe(plain.reserve(bare, ''))
+			// Under replay 'turn' the next request carries the thinking, so the gauge counts it.
+			expect(carried.left(thought) - 4_096).toBe(plain.left(bare) - 300)
+			expect(guideText).toContain(
+				"With replay `'none'`, a ledger at a `capacity` of `W + P` with a `predict` of `P`, where `W` is a context window and `P` a generation cap, budgets like a ledger at `W` without thinking.",
+			)
+		})
+
+		it('requests or suppresses thinking on each pass through the think option (the thinking budget)', async () => {
+			const passes = async (think: LedgerThink) => {
+				const provider = createScriptedProvider(
+					[{ content: '' }, { content: 'Refunds over $100 need a manager.' }],
+					{ record: true },
+				)
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 32_768,
+					gauge: { scale: 1, fixed: 0 },
+					think,
+				})
+				const result = await ledger.respond('Does a $148.50 refund need a manager?')
+				expect(result.passes).toHaveLength(2)
+				return provider.calls.map(({ options }) => options?.think)
+			}
+
+			// An empty first pass runs the answer pass, and an absent member sends no think option.
+			expect(await passes({ first: true, answer: false })).toEqual([true, false])
+			expect(await passes({ answer: false })).toEqual([undefined, false])
+			expect(guideText).toContain(
+				"The `first` and `answer` members of the `think` option request or suppress thinking on each pass, and an absent member leaves the provider's default.",
 			)
 		})
 
@@ -1753,6 +1849,175 @@ await new GuideCommand({
 			expect(measured).toEqual(provider.calls.map((call) => call.messages))
 			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['lookup'])
 			expect(provider.calls[0]?.options).toEqual({ schema: { type: 'object' } })
+		})
+
+		// The replay fence's conversation: an answered request, then a request in a tool turn.
+		const replayMessages: readonly Message[] = [
+			{ id: '1', role: 'user', content: 'Is order BW-5512 refundable?' },
+			{
+				id: '2',
+				role: 'assistant',
+				content: 'Yes, within 30 days.',
+				thinking: 'The window is 30 days.',
+			},
+			{ id: '3', role: 'user', content: 'Refund it.' },
+			{
+				id: '4',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],
+				thinking: 'Refund through the order tool.',
+			},
+			{ id: '5', role: 'tool', call: 'call-1', content: 'Refunded $148.50.' },
+		]
+		const keptThinking = (messages: readonly Message[]) =>
+			messages.filter((message) => 'thinking' in message).map(({ id }) => id)
+
+		it('keeps only the thinking each policy allows, as the replay fence claims', () => {
+			const none = stripThinking(replayMessages, 'none')
+			const turn = stripThinking(replayMessages, 'turn')
+
+			expect(none.filter((message) => 'thinking' in message).length).toBe(0)
+			expect(keptThinking(turn)).toEqual(['4'])
+			expect(keptThinking(replayMessages)).toEqual(['2', '4'])
+			for (const line of [
+				"content: 'Yes, within 30 days.',",
+				"thinking: 'The window is 30 days.',",
+				"calls: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],",
+				"thinking: 'Refund through the order tool.',",
+				"none.filter((message) => 'thinking' in message).length // 0 — no thinking goes back",
+				"turn.filter((message) => 'thinking' in message).map(({ id }) => id) // ['4'] — the turn in progress",
+			])
+				expect(guideText).toContain(line)
+		})
+
+		it('records each call’s thinking and sends back what the replay policy keeps at every call and estimate (the replay section)', async () => {
+			const run = async (replay: ThinkingReplay | undefined) => {
+				const sent: Array<readonly Message[]> = []
+				const measured: Array<readonly Message[]> = []
+				const replies: ProviderResult[] = [
+					{
+						content: '',
+						thinking: 'Refund through the order tool.',
+						tools: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Refunded $148.50.', thinking: 'Report the amount.' },
+				]
+				const provider: ProviderInterface = {
+					id: 'scripted',
+					name: 'scripted',
+					...(replay === undefined ? {} : { replay }),
+					generate: async () => replies.shift() ?? { content: '' },
+					async *stream(messages) {
+						sent.push([...messages])
+						const reply = replies.shift() ?? { content: '' }
+						if (reply.content !== '') yield { channel: 'content', text: reply.content }
+						return reply
+					},
+				}
+				const tools = createToolManager()
+				tools.add(createTool({ name: 'refund_order', execute: () => 'Refunded $148.50.' }))
+				const conversations = createConversationManager({
+					summarize: createStubSummarizer().summarize,
+				})
+				conversations.add()
+				const agent = createAgent(provider, {
+					tools,
+					conversations,
+					window: createBudget({
+						max: 1_000_000,
+						consumer: (messages: readonly Message[]) => {
+							measured.push([...messages])
+							return estimateMessages(messages)
+						},
+					}),
+				})
+				agent.context.messages.add([
+					{ role: 'user', content: 'Is order BW-5512 refundable?' },
+					{
+						role: 'assistant',
+						content: 'Yes, within 30 days.',
+						thinking: 'The window is 30 days.',
+					},
+					{ role: 'user', content: 'Refund it.' },
+				])
+				const result = await agent.generate()
+				const thinking = (messages: readonly Message[]) =>
+					messages.flatMap((message) => (message.thinking === undefined ? [] : [message.thinking]))
+				return {
+					result,
+					recorded: thinking(agent.context.messages.messages()),
+					sent: sent.map(thinking),
+					measured,
+					wire: sent,
+				}
+			}
+
+			for (const replay of [undefined, 'none', 'turn', 'all'] satisfies ReadonlyArray<
+				ThinkingReplay | undefined
+			>) {
+				const outcome = await run(replay)
+				// Every policy records both calls' thinking and joins it into the result.
+				expect(outcome.recorded).toEqual([
+					'The window is 30 days.',
+					'Refund through the order tool.',
+					'Report the amount.',
+				])
+				expect(outcome.result.thinking).toBe('Refund through the order tool.\n\nReport the amount.')
+				// The window estimate reads the exact messages each provider call carries.
+				expect(outcome.measured).toEqual(outcome.wire)
+				// A stripped message drops the member rather than holding it as undefined.
+				expect(outcome.wire.flat().filter((message) => 'thinking' in message).length).toBe(
+					outcome.sent.flat().length,
+				)
+				expect(outcome.sent).toEqual(
+					replay === 'turn'
+						? [[], ['Refund through the order tool.']]
+						: replay === 'all'
+							? [
+									['The window is 30 days.'],
+									['The window is 30 days.', 'Refund through the order tool.'],
+								]
+							: [[], []],
+				)
+			}
+			for (const sentence of [
+				"The agent loop records each call's non-empty thinking as the `thinking` member of that call's assistant message, on a tool-call turn and on the final answer alike, and joins the run's thinking into `AgentResult.thinking`.",
+				"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
+				'It is the default, and a request under it carries the same messages it would carry if no thinking were recorded.',
+			])
+				expect(guideText).toContain(sentence)
+		})
+
+		it('strips a relayed request again by the upstream policy, keeping what both policies keep (the replay section)', async () => {
+			const received: Array<readonly Message[]> = []
+			// The browser agent has already applied its relay provider's 'turn' policy.
+			const request = { messages: stripThinking(replayMessages, 'turn') }
+			const upstreams: readonly ThinkingReplay[] = ['all', 'turn', 'none']
+			for (const replay of upstreams) {
+				const upstream: ProviderInterface = {
+					id: 'upstream',
+					name: 'upstream',
+					replay,
+					generate: async () => ({ content: 'Done.' }),
+					async *stream(messages) {
+						received.push([...messages])
+						yield { channel: 'content', text: 'Done.' }
+						return { content: 'Done.' }
+					},
+				}
+				const stream = new RelayStream({
+					provider: upstream,
+					request,
+					signal: AbortSignal.timeout(30_000),
+				})
+				await stream.response.text()
+			}
+
+			expect(received.map(keptThinking)).toEqual([['4'], ['4'], []])
+			expect(guideText).toContain(
+				'so the upstream call carries only the thinking that both policies keep',
+			)
 		})
 
 		it('answers the instructions fence’s open and per-item rendering', () => {
