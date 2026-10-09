@@ -311,9 +311,11 @@ export interface LedgerInterface {
 	 * @remarks
 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
-	 * answer pass that advertises no tools. A call while another is in flight rejects with an
-	 * `AgentError` whose `code` is `'CONCURRENCY'`. A failed calibration rejects with
+	 * answer pass that advertises no tools. A `respond` or `calibrate` call while either is in flight
+	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A failed calibration rejects with
 	 * `LedgerError` code `'GAUGE'`.
+	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
+	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
@@ -653,7 +655,7 @@ export type LedgerPlanningGroup = 1 | 2 | 3
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =
-	/** Reports a selection whose request belongs to no active respond call or ledger note. */
+	/** Reports a selection whose request is neither an active `respond` call's request nor a ledger note. */
 	| 'REQUEST'
 	/** Reports a threshold that is not finite or lies outside the interval above 0 up to and including 1. */
 	| 'THRESHOLD'

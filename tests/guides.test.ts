@@ -108,6 +108,7 @@ await new GuideCommand({
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
 		RelayStream,
+		renderStub,
 		sanitizeToken,
 		stripThinking,
 		SYSTEM_ONE_PATH,
@@ -1981,6 +1982,111 @@ await new GuideCommand({
 			)
 		})
 
+		it('faults a direct run during calibration after the answer pass rejected, as calibration admits no run', async () => {
+			const provider = createScriptedProvider([{ content: '' }], { exhaust: 'throw' })
+			const calibration = createScriptedProvider([
+				{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+			])
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			const ledger = createLedger(
+				{
+					id: provider.id,
+					name: provider.name,
+					generate: async (...args) => {
+						entered.resolve()
+						await release.promise
+						return calibration.generate(...args)
+					},
+					stream: (...args) => provider.stream(...args),
+				},
+				{
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 32_768,
+					gauge: { scale: 1, fixed: 0 },
+				},
+			)
+			const response = await ledger.respond('Review the desk.')
+			expect(response.passes.map((pass) => pass.partial)).toEqual([false, true])
+			expect(provider.started).toBe(2)
+			expect(ledger.conversation.view().at(-1)?.content).toBe(LEDGER_NOTES.cue)
+			const selections: Selection[] = []
+			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
+			await entered.promise
+			try {
+				const abort = new AbortController()
+				ledger.agent.emitter.once('select', () => abort.abort())
+				await ledger.agent.generate({ signal: abort.signal })
+				expect(selections).toHaveLength(1)
+				expect(selections[0]?.fault).toMatchObject({ code: 'REQUEST' })
+			} finally {
+				release.resolve()
+				await measuring
+			}
+			expect(guideText).toContain(
+				'Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.',
+			)
+		})
+
+		it('fits a short-id lookup at the tail boundary when its shown stub is longer, as the plan claims', async () => {
+			const request: Message = { id: 'request', role: 'user', content: 'Check BW-5512.' }
+			const seed: readonly Message[] = [
+				{ id: 'seed', role: 'user', content: 'Read the order.' },
+				{
+					id: 'leader',
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+			]
+			const hidden: Message = {
+				id: 'result',
+				role: 'tool',
+				call: 'c1',
+				content: renderStub('lookup_order', { id: 'BW-5512' }, 'hidden'),
+			}
+			const shown: Message = {
+				...hidden,
+				content: renderStub('lookup_order', { id: 'BW-5512' }, 'shown'),
+			}
+			expect(estimateMessages([shown])).toBeGreaterThan(estimateMessages([hidden]))
+			for (const boundary of [hidden, shown]) {
+				const allowance = estimateMessages([...seed, boundary, request]) + 0.25
+				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 4096,
+					gauge: { scale: 1, fixed: 0 },
+					share: { prompt: 0.7, tail: (allowance * 1.06) / (4096 * 0.7) },
+					lookups: [orderLookup],
+				})
+				ledger.conversation.add([
+					...seed,
+					{ ...hidden, content: 'Order BW-5512 belongs to Brightwater Studio.' },
+				])
+				await ledger.respond(request.content)
+				const sent = requireValue(provider.calls[0]).messages
+				expect(sent[0]?.content).toContain('Order BW-5512 belongs to Brightwater Studio.')
+				expect(estimateMessages(sent.slice(1))).toBeLessThanOrEqual(allowance)
+				expect(
+					sent.filter((message) => message.role === 'tool').map((message) => message.content),
+				).toEqual(boundary === shown ? [shown.content] : [])
+			}
+			expect(guideText).toContain(
+				'The plan prices each lookup stub in the tail at the longer of its `shown` and `hidden` forms, so a tail that fits the plan still fits after the briefing decides which results it shows.',
+			)
+		})
+
 		it('plans a direct run started while the active request is the newest message as that request, as the concurrent-run limit states', async () => {
 			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
 			const entered = Promise.withResolvers<void>()
@@ -2028,6 +2134,9 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"The ledger tells its runs apart by the newest message alone, so a direct run started while a `respond` call is active and that call's request or one of the ledger's notes is the newest message gets a planned selection, as the call's own run does.",
+			)
+			expect(guideText).toContain(
+				"Any run started during a `respond` call, faulted or planned, adds its turns and usage to that call's gauge readings and shares its repeat stop.",
 			)
 		})
 

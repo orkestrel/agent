@@ -135,6 +135,63 @@ describe('Ledger', () => {
 		)
 	})
 
+	for (const pairing of ['mixed id-and-idless', 'repeated-id'] as const) {
+		it(`sends no unmatched call and reads each result under its own arguments for a ${pairing} group`, async () => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			const readings: Array<readonly [unknown, string]> = []
+			const ledger = createLedger(provider, {
+				...options,
+				capacity: 32_768,
+				lookups: requireValue(options.lookups).map((lookup) => ({
+					...lookup,
+					read: (args, text) => {
+						readings.push([args.id, text])
+						return { ids: [String(args.id)], owners: [] }
+					},
+				})),
+			})
+			ledger.conversation.add([
+				{ role: 'user', content: 'Read both accounts.' },
+				{
+					role: 'assistant',
+					content: '',
+					calls: [
+						{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } },
+						{
+							id: pairing === 'repeated-id' ? 'c1' : 'c2',
+							name: 'lookup',
+							arguments: { id: 'LH-81660' },
+						},
+					],
+				},
+				{ role: 'tool', call: 'c1', content: 'Brightwater balance is $20.' },
+				{
+					role: 'tool',
+					...(pairing === 'repeated-id' ? { call: 'c1' } : {}),
+					content: 'Lighthouse balance is $30.',
+				},
+			])
+			await ledger.respond('Check Brightwater Studio.')
+			const sent = requireValue(provider.calls[0]).messages
+			const calls = sent.flatMap((message) => message.calls ?? [])
+			const results = sent.filter((message) => message.role === 'tool')
+			expect(calls.map((call) => call.arguments.id)).toEqual(
+				pairing === 'repeated-id' ? ['BW-5512', 'LH-81660'] : ['BW-5512'],
+			)
+			expect(results.map((message) => message.call)).toEqual(calls.map((call) => call.id))
+			expect(readings).toContainEqual(['BW-5512', 'Brightwater balance is $20.'])
+			expect([
+				...new Set(
+					readings.filter(([, text]) => text === 'Lighthouse balance is $30.').map(([id]) => id),
+				),
+			]).toEqual(pairing === 'repeated-id' ? ['LH-81660'] : [])
+			expect(readings).not.toContainEqual(['BW-5512', 'Lighthouse balance is $30.'])
+			expect(results[1]?.content.includes('lookup {"id":"LH-81660"}')).toBe(
+				pairing === 'repeated-id' ? true : undefined,
+			)
+		})
+	}
+
 	it('prices the final hidden stub before accepting a seed tail with a 400-character argument', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
 		const ledger = createLedger(provider, {
@@ -194,7 +251,7 @@ describe('Ledger', () => {
 								{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
 							]
 						: []),
-					{ content: '' },
+					{ content: '', usage: { prompt: 50, completion: 2, total: 52 } },
 					{ content: 'Recovered.' },
 				],
 				{ record: true },
@@ -226,7 +283,6 @@ describe('Ledger', () => {
 			await entered.promise
 			const judgments = ledger.conversation.judgments.judgments()
 			const asked = judge.requests.length
-			const gauge = ledger.gauge
 			ledger.conversation.add({ role: 'user', content: 'Intruding direct request.' })
 			const abort = new AbortController()
 			ledger.agent.emitter.once('select', () => abort.abort())
@@ -234,14 +290,17 @@ describe('Ledger', () => {
 			const rejected = selections.at(-1)
 			const after = judge.requests.length
 			const recorded = ledger.conversation.judgments.judgments()
-			const unchanged = ledger.gauge
 			release.resolve()
 			await pending
 			expect(isLedgerError(rejected?.fault)).toBe(true)
 			expect(rejected?.fault).toMatchObject({ code: 'REQUEST' })
 			expect(after).toBe(asked)
 			expect(recorded).toEqual(judgments)
-			expect(unchanged).toEqual(gauge)
+			expect(ledger.gauge).toEqual(
+				phase === 'first pass'
+					? { scale: 1, fixed: 0 }
+					: { scale: 10 / estimateMessages(requireValue(provider.calls[0]).messages), fixed: 10 },
+			)
 			expect(selections.at(-1)?.briefing).toBe(selections[0]?.briefing)
 			expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
 				selections[0]?.messages,

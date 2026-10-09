@@ -848,11 +848,12 @@ export class Ledger implements LedgerInterface {
 				const message = group.slice(1).find((result) => resolveLedgerCall(group, result) === call)
 				const result = message === undefined ? undefined : this.#results.get(message.id)
 				if (
+					message === undefined ||
 					!this.#options.lookups?.some((lookup) => lookup.tool.name === call.name) ||
 					(result?.success === false && result.error === this.#notes.repeat)
 				)
 					return false
-				if (message !== undefined) results.add(message.id)
+				results.add(message.id)
 				return true
 			})
 			calls.set(leader.id, kept)

@@ -34,13 +34,10 @@ export const LEDGER_RULES_KEY = 'rules'
 export const LEDGER_OWNER_PREFIX = 'owner:'
 
 /**
- * Supplies the measured wording of every question the ledger asks its judge.
+ * Supplies the wording of every question the ledger asks its judge.
  *
  * @remarks
- * The thresholds of the measured records series were fitted on exactly this wording, through the
- * Mica judge, so a cutoff fitted there holds only when the ledger asks these bytes. The wording
- * names a support desk; pass it unchanged to reuse those cutoffs, and fit your own cutoffs for
- * any other wording.
+ * The wording names a support desk. Fit the cutoffs for the wording and judge you use.
  */
 export const LEDGER_QUESTIONS: LedgerQuestion = Object.freeze({
 	category: Object.freeze({
@@ -79,7 +76,7 @@ export const LEDGER_QUESTIONS: LedgerQuestion = Object.freeze({
 })
 
 /**
- * Supplies the measured text of each ledger note, worded for a model that answers in its final
+ * Supplies the text of each ledger note, worded for a model that answers in its final
  * message.
  */
 export const LEDGER_NOTES: LedgerNote = Object.freeze({
@@ -92,10 +89,7 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 })
 
 /**
- * Supplies the measured prompt and tail shares.
- *
- * @remarks
- * The `a5-records` series of 2026-10-09 ran with a prompt share of 0.7 and a tail share of 0.35.
+ * Supplies the default prompt and tail shares.
  */
 export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 	prompt: 0.7,
@@ -103,18 +97,12 @@ export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 })
 
 /**
- * Caps the tool-iteration turns of a ledger's agent at the measured limit of 8.
- *
- * @remarks
- * The `a5-records` series of 2026-10-09 set the agent's turn limit to 8.
+ * Caps the tool-iteration turns of a ledger's agent at 8 turns.
  */
 export const DEFAULT_LEDGER_LIMIT = 8
 
 /**
- * Caps the `recall` calls of one request at the measured limit of 2.
- *
- * @remarks
- * The `a5-records` series of 2026-10-09 ran with `recall-budget 2`.
+ * Caps the `recall` calls of one request at 2 calls.
  */
 export const DEFAULT_RECALL_LIMIT = 2
 

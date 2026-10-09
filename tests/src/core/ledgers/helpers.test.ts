@@ -52,6 +52,24 @@ describe('rankLedgerCut', () => {
 })
 
 describe('resolveLedgerCall', () => {
+	it('pairs repeated call ids by position under their own arguments', () => {
+		const leader: Message = {
+			id: 'leader',
+			role: 'assistant',
+			content: '',
+			calls: [
+				{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } },
+				{ id: 'c1', name: 'lookup', arguments: { id: 'LH-81660' } },
+			],
+		}
+		const first: Message = { id: 'r1', role: 'tool', call: 'c1', content: 'Brightwater.' }
+		const second: Message = { id: 'r2', role: 'tool', call: 'c1', content: 'Lighthouse.' }
+		expect(resolveLedgerCall([leader, first, second], first)?.arguments).toEqual({ id: 'BW-5512' })
+		expect(resolveLedgerCall([leader, first, second], second)?.arguments).toEqual({
+			id: 'LH-81660',
+		})
+	})
+
 	it('pairs by call id and falls back to position only for a wholly idless group', () => {
 		const leader: Message = {
 			id: 'leader',
