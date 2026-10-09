@@ -788,6 +788,29 @@ await new GuideCommand({
 			)
 		})
 
+		it('keeps the messages before the first user message as one exchange (the stock selection exchange rule)', () => {
+			const request: Message = { id: 'request', role: 'user', content: 'Escalate ESC-2219.' }
+			const messages: readonly Message[] = [
+				{ id: 'greeting', role: 'assistant', content: 'Welcome to the Larkspur desk.' },
+				{ id: 'hours', role: 'assistant', content: 'The desk closes at 18:00 today.' },
+				request,
+			]
+			const keep = (dropped: readonly string[]) =>
+				barrel
+					.filterSelectionMessages(
+						messages,
+						dropped.map((id) => ({ id, needed: false })),
+						request,
+					)
+					.map(({ id }) => id)
+
+			expect(keep(['greeting'])).toEqual(['greeting', 'hours', 'request'])
+			expect(keep(['greeting', 'hours'])).toEqual(['request'])
+			expect(guideText).toContain(
+				'The messages before the first user message form their own exchange.',
+			)
+		})
+
 		it('leaves a failed subject undecided and faults only when every subject fails (the judge error rule)', async () => {
 			const signal = new AbortController().signal
 			const partial = createStockSelectionFixture(0.9, {
@@ -1744,7 +1767,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('lists recall matches newest first with stored content and each amender after its source, as the `recall` tool claims', async () => {
+		it('lists recall matches newest first, each source followed by the amenders the topic does not match, as the `recall` tool claims', async () => {
 			const prompts = await serveAmendedDesk()
 
 			// The correction is newer than the statement but names no refund, so it follows its source.
@@ -1752,6 +1775,8 @@ await new GuideCommand({
 				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
 					?.content,
 			).toBe([amendedStatement, amendedRule, amendedCorrection].join('\n'))
+			// The correction names Brightwater Studio, so the owner topic matches it: it lists first as its own
+			// newer item, and the rule it amends follows without it.
 			expect(
 				requireValue(prompts[2], 'Missing owner recall').findLast(({ role }) => role === 'tool')
 					?.content,
@@ -1761,7 +1786,7 @@ await new GuideCommand({
 				),
 			)
 			expect(guideText).toContain(
-				'It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a desk topic) with their stored content, newest first, each followed by the messages that amend it,',
+				"It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a desk topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
 			)
 		})
 
@@ -1782,7 +1807,7 @@ await new GuideCommand({
 				].join('\n'),
 			)
 			expect(guideText).toContain(
-				"the ledger adds an answer note that carries what the pass's lookups and recalls returned, without their call text, then the `cue` note",
+				"the ledger adds an answer note when the pass's lookups or recalls returned anything, carrying what they returned without their call text, then the `cue` note",
 			)
 		})
 
@@ -1827,7 +1852,399 @@ await new GuideCommand({
 				`${seeds.length - kept.length} older items not shown; name a narrower topic to narrow the recall`,
 			)
 			expect(guideText).toContain(
-				'and cuts the list by whole items to the room the gauge leaves for the reply, naming how many older items it left out.',
+				'The tool cuts the list by whole items to the room the gauge leaves for the reply, naming how many older items it left out.',
+			)
+		})
+
+		it('adds no answer note when the pass returned nothing, only the cue note, as the answer pass claims', async () => {
+			const provider = createScriptedProvider([{ content: '' }, { content: 'Done.' }], {
+				record: true,
+			})
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [orderLookup],
+			})
+
+			const result = await ledger.respond('Does a $148.50 refund need a manager?')
+
+			const contents = requireValue(provider.calls[1], 'Missing answer pass').messages.map(
+				({ content }) => content,
+			)
+			expect(result.passes).toHaveLength(2)
+			expect(contents.some((content) => content.startsWith(LEDGER_NOTES.results))).toBe(false)
+			expect(contents.at(-1)).toBe(LEDGER_NOTES.cue)
+		})
+
+		it('faults a direct agent run and builds it from the whole view with no briefing, as the ledger section claims', async () => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			let asks = 0
+			const phrases = createPhraseJudge(['Refunds over'])
+			const ledger = createLedger(provider, {
+				judge: {
+					...phrases,
+					ask: async (request, signal) => {
+						asks += 1
+						return phrases.ask(request, signal)
+					},
+				},
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+			})
+			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			await ledger.respond('Does a $148.50 refund need a manager?')
+			const asked = asks
+			const faults: unknown[] = []
+			const selections: Selection[] = []
+			ledger.agent.emitter.on('fault', (error) => faults.push(error))
+			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
+
+			await ledger.agent.generate()
+
+			expect(faults).toHaveLength(1)
+			expect(requireValue(selections[0], 'Missing selection').fault).toBe(faults[0])
+			expect(requireValue(selections[0], 'Missing selection').briefing).toBeUndefined()
+			expect(
+				requireValue(provider.calls[1], 'Missing direct run')
+					.messages.slice(1)
+					.map(({ content }) => content),
+			).toEqual(
+				ledger.conversation
+					.view()
+					.slice(0, -1)
+					.map(({ content }) => content),
+			)
+			expect(
+				requireValue(provider.calls[1], 'Missing direct run').messages.map(
+					({ content }) => content,
+				),
+			).toContain('Does a $148.50 refund need a manager?')
+			expect(asks).toBe(asked)
+			expect(guideText).toContain(
+				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
+			)
+			expect(guideText).toContain(
+				"Run the ledger's agent only through the `respond` method. A run the ledger didn't start, such as a direct call to the agent's `generate` method, gets a faulted selection, so the agent emits `fault` and builds the prompt from the whole conversation view with no briefing, and the ledger asks its judge nothing for that run.",
+			)
+		})
+
+		it('holds a refused question and the logprob failure and asks any other failure again, as the filing claims', async () => {
+			const refused = 'Refunds over $100 need a manager.'
+			const garbled = 'Keep the loading dock at warehouse 42 clear.'
+			const transient = 'The Northgate courier arrives on Tuesday.'
+			const asks = new Map<string, number>()
+			const phrases = createPhraseJudge([])
+			const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+				judge: {
+					...phrases,
+					ask: async (request, signal) => {
+						const state = isString(request.state) ? request.state : ''
+						for (const text of [refused, garbled, transient])
+							if (state.includes(text)) asks.set(text, (asks.get(text) ?? 0) + 1)
+						if (state.includes(refused))
+							throw new JudgeError('QUESTION', 'judge error: refused before inference')
+						if (state.includes(garbled))
+							throw new Error('judge error: invalid or duplicate top logprob token')
+						if (state.includes(transient)) throw new Error('judge error: connection reset')
+						return phrases.ask(request, signal)
+					},
+				},
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+			})
+			ledger.conversation.add(
+				[refused, garbled, transient].map((content): MessageInput => ({ role: 'user', content })),
+			)
+
+			await ledger.respond('Review the desk.')
+			const first = new Map(asks)
+			await ledger.respond('Review the desk again.')
+
+			for (const text of [refused, garbled, transient]) expect(first.get(text)).toBeGreaterThan(0)
+			expect(asks.get(refused)).toBe(first.get(refused))
+			expect(asks.get(garbled)).toBe(first.get(garbled))
+			expect(asks.get(transient)).toBe(2 * requireValue(first.get(transient)))
+			expect(guideText).toContain(
+				"A judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
+			)
+		})
+
+		it('marks an amends pair only on a shared id or number and a supersedes pair whatever they share, as the filing claims', async () => {
+			const mark = async (correction: string, supersedes: number) => {
+				const conversation = createConversation()
+				const earlier = conversation.add({
+					role: 'user',
+					content: 'Refunds over $100 need a manager.',
+				})
+				conversation.add({ role: 'user', content: correction })
+				const classifier = new Classifier({
+					conversation,
+					judge: {
+						id: 'scripted',
+						name: 'scripted',
+						model: 'scripted',
+						ask: async (request) => {
+							const state = isString(request.state) ? request.state : ''
+							const answers: Record<string, JudgeAnswer> = {}
+							for (const [id, question] of Object.entries(request.questions))
+								answers[id] =
+									question.form === 'choice'
+										? {
+												form: 'choice',
+												probabilities: state.includes('Correction')
+													? { correction: 1 }
+													: { rule: 1 },
+											}
+										: {
+												form: 'noul',
+												noul: id.startsWith('["supersedes"')
+													? supersedes
+													: id.startsWith('["amends"') ||
+														  (id.startsWith('["topic"') && state.toLowerCase().includes('refund'))
+														? 0.9
+														: 0.1,
+											}
+							return { model: 'scripted', answers }
+						},
+					},
+					questions: LEDGER_QUESTIONS,
+					topics: [refundsTopic],
+					thresholds: deskThresholds,
+					assign: () => undefined,
+					entities: () => new Set(),
+				})
+				await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+				const filing = classifier.classification()
+				return {
+					amended: filing.amended.has(earlier.id),
+					superseded: filing.superseded.has(earlier.id),
+				}
+			}
+
+			// Each amends answer of 0.9 reaches its cutoff; only the shared number marks the pair.
+			expect(await mark('Correction: refunds need a manager over $250.', 0.1)).toEqual({
+				amended: false,
+				superseded: false,
+			})
+			expect(await mark('Correction: refunds over $100 need two managers.', 0.1)).toEqual({
+				amended: true,
+				superseded: false,
+			})
+			expect(await mark('Correction: refunds need a manager over $250.', 0.9)).toEqual({
+				amended: true,
+				superseded: true,
+			})
+			expect(guideText).toContain(
+				'an `amends` answer at its cutoff marks a pair amended only when the two messages share an id or a number, and a `supersedes` answer at its cutoff marks the pair superseded and amended whatever they share.',
+			)
+		})
+
+		it('writes each record line verbatim except a pronoun-opening sentence, which opens with its party, as the records claim', () => {
+			const message: Message = {
+				id: 'call-note',
+				role: 'user',
+				content: 'The lead on BW-5512 is Dana Whitcombe. She approved the refund.',
+			}
+			const lines = barrel.buildLines(
+				{
+					system: '',
+					exclude: [],
+					owners: new Map(),
+					messages: [message],
+					readings: [],
+					entities: new Map(),
+					classification: {
+						quiet: new Set(),
+						categories: new Map(),
+						topics: new Map(),
+						amended: new Map(),
+						superseded: new Map(),
+					},
+				},
+				new Map([[message.id, message]]),
+				message.id,
+				new Set(),
+				[],
+				[],
+			)
+
+			expect(lines.map(({ text }) => text)).toEqual([
+				'The lead on BW-5512 is Dana Whitcombe.',
+				'Dana Whitcombe: She approved the refund.',
+			])
+			expect(guideText).toContain(
+				'Each line is a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon.',
+			)
+		})
+
+		it('runs both spellings of a lookup argument in one request and stops the exact repeat, as the repeat stop claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'lower', name: 'lookup_order', arguments: { id: 'bw-5512' } }],
+					},
+					{
+						content: '',
+						tools: [{ id: 'upper', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{
+						content: '',
+						tools: [{ id: 'again', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const executed: unknown[] = []
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [
+					{
+						...orderLookup,
+						tool: {
+							...orderLookup.tool,
+							execute: (args, context) => {
+								executed.push(args.id)
+								return orderLookup.tool.execute(args, context)
+							},
+						},
+					},
+				],
+			})
+
+			const first = await ledger.respond('Look up order BW-5512.')
+			await ledger.respond('Review the Brightwater Studio refund.')
+
+			expect(executed).toEqual(['bw-5512', 'BW-5512'])
+			expect(first.passes).toHaveLength(2)
+			expect(barrel.identifyLookup('lookup_order', { id: 'bw-5512' })).toBe(
+				barrel.identifyLookup('lookup_order', { id: 'BW-5512' }),
+			)
+			const briefing = requireValue(
+				provider.calls.at(-1)?.messages[0],
+				'Missing system message',
+			).content
+			expect(briefing).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
+			expect(briefing).not.toContain('Order bw-5512')
+			expect(guideText).toContain(
+				"The repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which reading replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second reading replaces the first in the records.",
+			)
+		})
+
+		it('sends a request and a lookup result over the budget whole and refuses no over-window prompt, as the plan claims', async () => {
+			const capacity = 600
+			const bulk = 'Delivery arrived Tuesday with a completed receipt. '.repeat(200).trim()
+			const request = `Review the desk. ${bulk}`
+			const reading = `Order BW-5512 for account BW-20931: Brightwater Studio. ${bulk}`
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [{ ...orderLookup, tool: { ...orderLookup.tool, execute: () => reading } }],
+			})
+
+			const result = await ledger.respond(request)
+
+			const first = requireValue(provider.calls[0], 'Missing first call').messages
+			const second = requireValue(provider.calls[1], 'Missing lookup turn').messages
+			expect(result.content).toBe('Done.')
+			expect(first.at(-1)?.content).toBe(request)
+			expect(estimateMessages(first)).toBeGreaterThan(capacity)
+			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
+			expect(guideText).toContain(
+				'The budget bounds the briefing and the tail alone: the request and each lookup result enter the prompt whole, so either can carry the prompt past the budget.',
+			)
+			expect(guideText).toContain(
+				"A request or a lookup result larger than the room the `capacity` option leaves reaches the provider whole, and the provider's own context limit decides what happens to it.",
+			)
+		})
+
+		it('tails only the seed and briefs a message added after the first request, as the seed-tail limit claims', async () => {
+			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
+			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge(['Refunds over']),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+			})
+			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			await ledger.respond('Review the desk.')
+			ledger.conversation.add({ role: 'user', content: later })
+
+			await ledger.respond('When do the refund forms arrive?')
+
+			const [system, ...tail] = requireValue(provider.calls[1], 'Missing second request').messages
+			expect(tail.map(({ content }) => content)).toEqual([
+				'Refunds over $100 need a manager.',
+				'When do the refund forms arrive?',
+			])
+			expect(requireValue(system, 'Missing system message').content).toContain(later)
+			expect(guideText).toContain(
+				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
+			)
+		})
+
+		it('keeps a seed rule in the briefing of every request, as the no-retirement limit claims', async () => {
+			const rule = 'Refunds over $100 need a manager.'
+			const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+				judge: createPhraseJudge(['Refunds over']),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+			})
+			const briefings: Array<string | undefined> = []
+			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing))
+			ledger.conversation.add({ role: 'user', content: rule })
+
+			for (const amount of [120, 135, 150, 165, 180, 195, 210, 225, 240, 255])
+				await ledger.respond(`Does a $${amount} refund need a manager?`)
+
+			expect(briefings).toHaveLength(10)
+			for (const briefing of briefings) expect(briefing).toContain(rule)
+			expect(guideText).toContain(
+				"A message stays in its record for the ledger's life unless a later message supersedes it or makes its sentences stale; no age or request count retires it",
 			)
 		})
 
