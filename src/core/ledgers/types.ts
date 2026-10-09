@@ -469,7 +469,7 @@ export interface ClassifierOptions {
 export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
-	/** Holds the error when a throw or caller abort interrupts classification; judgments and usage retain the partial result. */
+	/** Holds the error when an assign or entities handler throw, or a caller abort, interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
 }
 
@@ -486,7 +486,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The ids of the user messages the ledger serves as requests
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys and usage spent; any throw or caller abort during classification returns the partial result with `fault`
+	 * @returns The judgment keys and usage spent; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**

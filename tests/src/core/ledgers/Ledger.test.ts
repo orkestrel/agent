@@ -1059,6 +1059,77 @@ describe('Ledger', () => {
 		expect(selection?.briefing).not.toContain(correction.content)
 	})
 
+	it('leaves a live owner-record amendment out of the briefing when a decisive rule unit is amended', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
+		ledger.conversation.add([
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+		])
+		const rule = ledger.conversation.add({
+			role: 'user',
+			content: 'Brightwater Studio: keep the receipt. Code AA-10.',
+		})
+		const amendment = ledger.conversation.add({
+			role: 'user',
+			content: 'Brightwater Studio: replace AA-10 with AA-11.',
+		})
+		ledger.conversation.judgments.add({
+			id: JSON.stringify(['category', rule.id]),
+			question: LEDGER_QUESTIONS.category,
+			sources: [rule.id],
+			state: `user: ${rule.content}`,
+			model: judge.model,
+			answer: { form: 'choice', probabilities: { rule: 1 } },
+		})
+		ledger.conversation.judgments.add({
+			id: JSON.stringify(['category', amendment.id]),
+			question: LEDGER_QUESTIONS.category,
+			sources: [amendment.id],
+			state: `user: ${amendment.content}`,
+			model: judge.model,
+			answer: { form: 'choice', probabilities: { fact: 0.6, correction: 0.4 } },
+		})
+		for (const head of ['amends', 'supersedes'] as const)
+			ledger.conversation.judgments.add({
+				id: JSON.stringify([head, rule.id, amendment.id]),
+				question: LEDGER_QUESTIONS[head],
+				sources: [rule.id, amendment.id],
+				state: `Earlier message: user: ${rule.content}\nLater message: user: ${amendment.content}`,
+				model: judge.model,
+				answer: { form: 'noul', noul: head === 'amends' ? 1 : 0 },
+			})
+		await ledger.respond('Greet the desk.')
+		const request = ledger.conversation.add({ role: 'user', content: 'Inspect the full seed.' })
+		const selection = await ledger.agent.context.select(request, new AbortController().signal)
+		expect(selection?.briefing).toContain('Brightwater Studio: keep the receipt.')
+		expect(selection?.briefing).not.toContain('AA-11')
+	})
+
+	it('drops an empty seed assistant whose calls were all dropped but keeps an empty assistant without calls', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, options)
+		ledger.conversation.add([
+			{ role: 'user', content: 'Order LH-12345 is late.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'dropped', name: 'unregistered', arguments: {} }],
+			},
+			{ role: 'tool', call: 'dropped', content: 'Unregistered result.' },
+		])
+		await ledger.respond('Check LH-12345.')
+		const messages = requireValue(provider.calls[0]).messages.slice(1)
+		expect(messages.map((message) => message.content)).toEqual([
+			'Order LH-12345 is late.',
+			'Check LH-12345.',
+		])
+	})
+
 	it('matches partial owner words on units and recall but uses exact ids and label substrings for query topics', async () => {
 		const provider = createScriptedProvider(
 			[

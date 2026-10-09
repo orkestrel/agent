@@ -853,7 +853,13 @@ export class Ledger implements LedgerInterface {
 					!this.#annotations.has(message.id) &&
 					(message.role !== 'user' ||
 						(input.classification.superseded.get(message.id) ?? []).length === 0) &&
-					(message.role !== 'tool' || results.has(message.id)),
+					(message.role !== 'tool' || results.has(message.id)) &&
+					!(
+						message.role === 'assistant' &&
+						(message.calls?.length ?? 0) > 0 &&
+						(calls.get(message.id)?.length ?? 0) === 0 &&
+						message.content === ''
+					),
 			)
 			.map((message) =>
 				message.role === 'tool'
