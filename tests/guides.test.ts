@@ -4,13 +4,21 @@
 
 import type {
 	AgentEventMap,
+	JudgeAnswer,
+	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
+	LedgerLookup,
+	LedgerThreshold,
+	LedgerTopic,
 	Message,
+	MessageInput,
 	ProviderIncrement,
+	ProviderInterface,
 	ProviderOptions,
 	ProviderParserInterface,
 	ProviderRequest,
+	ProviderResult,
 	ScopeInterface,
 	ScreenHandler,
 	Selection,
@@ -50,7 +58,7 @@ await new GuideCommand({
 	reader: readInventory,
 	runner: createVitest,
 }).execute(async ({ files, report, rows }) => {
-	const { isFiniteNumber, isRecord, parseJSON } = await import('@orkestrel/contract')
+	const { isFiniteNumber, isRecord, isString, parseJSON } = await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
 	const { captureError, requireValue, waitForCondition } = await import('@orkestrel/test')
 	const { createAbort } = await import('@orkestrel/abort')
@@ -65,24 +73,30 @@ await new GuideCommand({
 	const {
 		AgentJudge,
 		AgentProvider,
+		Classifier,
 		computeReading,
 		createAgent,
 		createConversation,
 		createConversationManager,
 		createDatabaseConversationStore,
 		createInstructionManager,
+		createLedger,
 		createMemoryConversationStore,
 		createRelay,
 		createRelayProvider,
 		createScope,
 		createSelection,
 		createSystemOneJudge,
+		DEFAULT_LEDGER_SHARE,
 		estimateMessages,
+		Gauge,
 		isJudgeAbortError,
 		isJudgeEntry,
 		isJudgeQuestion,
 		JudgeAbortError,
 		JudgeError,
+		LEDGER_QUESTIONS,
+		LEDGER_SCALE_DRIFT,
 		MAX_ERROR_BODY_LENGTH,
 		NEEDED_CRITERION,
 		ProviderAbortError,
@@ -1202,6 +1216,432 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"await agent.generate() // show('Answer from the ticket thread.', 2, 2) — the printer note is dropped",
 			)
+		})
+
+		it('serves two requests and pins the looked-up owner as the ledger pattern fence claims', async () => {
+			// The fence declares the cutoffs; the transcription supplies them.
+			const thresholds: LedgerThreshold = {
+				category: 0.7,
+				topic: 0.8,
+				amends: 0.8,
+				supersedes: 0.8,
+				correction: 0.3,
+			}
+			// The fence claims what the second prompt leaves out, so the provider keeps each prompt it receives.
+			const prompts: Array<readonly Message[]> = []
+			const replies: ProviderResult[] = [
+				{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
+				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+				{
+					content: '',
+					tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
+				{ content: 'Yes. Refunds over $100 need a manager.' },
+			]
+			const provider: ProviderInterface = {
+				id: 'scripted',
+				name: 'scripted',
+				generate: async () => replies.shift() ?? { content: '' },
+				async *stream(messages) {
+					prompts.push([...messages])
+					const reply = replies.shift() ?? { content: '' }
+					if (reply.content !== '') yield { channel: 'content', text: reply.content }
+					return reply
+				},
+			}
+			const judge: JudgeInterface = {
+				id: 'scripted',
+				name: 'scripted',
+				model: 'scripted',
+				ask: async (request) => {
+					const answers: Record<string, JudgeAnswer> = {}
+					for (const [id, question] of Object.entries(request.questions)) {
+						answers[id] =
+							question.form === 'choice'
+								? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+								: { form: 'noul', noul: 0.1 }
+					}
+					return { model: 'scripted', answers }
+				},
+			}
+			const lookup: LedgerLookup = {
+				tool: {
+					name: 'lookup_order',
+					description: 'Read an order by its id.',
+					parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+					execute: (args) =>
+						`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
+				},
+				read: (args, text) =>
+					text.startsWith('No order')
+						? undefined
+						: {
+								ids: [String(args.id)],
+								owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+							},
+			}
+			const system = 'You staff the Larkspur support desk. Today is 2026-10-09.'
+			const ledger = createLedger(provider, {
+				judge,
+				system,
+				topics: [{ name: 'refunds', criterion: 'refund amounts and approvals' }],
+				questions: LEDGER_QUESTIONS,
+				thresholds,
+				capacity: 32_768,
+				lookups: [lookup],
+			})
+			const briefings: Array<string | undefined> = []
+			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing))
+			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+
+			const gauge = await ledger.calibrate(AbortSignal.timeout(30_000))
+			const first = await ledger.respond('Can Brightwater Studio get a refund on order BW-5512?')
+			const second = await ledger.respond('Does the Brightwater Studio refund need a manager?')
+
+			expect(gauge.fixed).toBe(120)
+			expect(first.content).toBe('Order BW-5512 qualifies for a $148.50 refund.')
+			expect(first.passes).toHaveLength(1)
+			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
+			expect(briefings).toEqual([
+				'## Rules\n- Refunds over $100 need a manager.',
+				'## Pinned\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.',
+			])
+			expect(replies).toEqual([])
+			// The second prompt is the system text and its briefing, the seed tail, and the request: the
+			// first request and its reply never reach it.
+			expect(prompts).toHaveLength(3)
+			expect(
+				requireValue(prompts[2], 'Missing prompt').map(({ role, content }) => [role, content]),
+			).toEqual([
+				['system', `${system}\n\n${briefings[1]}`],
+				['user', 'Refunds over $100 need a manager.'],
+				['user', 'Does the Brightwater Studio refund need a manager?'],
+			])
+			expect(guideText).toContain(
+				'gauge.fixed // 120 — what advertising the tools adds to a prompt',
+			)
+			expect(guideText).toContain(
+				"first.content // 'Order BW-5512 qualifies for a $148.50 refund.'",
+			)
+			expect(guideText).toContain("second.content // 'Yes. Refunds over $100 need a manager.'")
+			expect(guideText).toContain(
+				"briefings[0] // '## Rules\\n- Refunds over $100 need a manager.' — no lookup has named an owner yet",
+			)
+			expect(guideText).toContain(
+				"// '## Pinned\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.'",
+			)
+		})
+
+		// No unit test under `tests/src/core/ledgers` isolates these claims of the ledger section, so
+		// each scenario files by phrase: the claim, not a model, decides what the judge answers.
+		function createPhraseJudge(rules: readonly string[]): JudgeInterface {
+			return {
+				id: 'scripted',
+				name: 'scripted',
+				model: 'scripted',
+				ask: async (request) => {
+					const state = isString(request.state) ? request.state : ''
+					const answers: Record<string, JudgeAnswer> = {}
+					for (const [id, question] of Object.entries(request.questions)) {
+						answers[id] =
+							question.form === 'choice'
+								? {
+										form: 'choice',
+										probabilities: rules.some((rule) => state.includes(rule))
+											? { rule: 1 }
+											: state.includes('Correction')
+												? { correction: 1 }
+												: { fact: 1 },
+									}
+								: {
+										form: 'noul',
+										noul:
+											id.startsWith('["topic"') && state.toLowerCase().includes('refund')
+												? 0.9
+												: 0.1,
+									}
+					}
+					return { model: 'scripted', answers }
+				},
+			}
+		}
+		const deskThresholds: LedgerThreshold = {
+			category: 0.7,
+			topic: 0.8,
+			amends: 0.8,
+			supersedes: 0.8,
+			correction: 0.3,
+		}
+		const refundsTopic: LedgerTopic = { name: 'refunds', criterion: 'refund amounts and approvals' }
+		const orderLookup: LedgerLookup = {
+			tool: {
+				name: 'lookup_order',
+				description: 'Read an order by its id.',
+				parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+				execute: (args) =>
+					`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
+			},
+			read: (args) => ({
+				ids: [String(args.id)],
+				owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+			}),
+		}
+
+		it('asks the amends question about an earlier message that shares only a desk topic, as the filing claims', async () => {
+			const fileCorrection = async (topics: readonly LedgerTopic[]) => {
+				const conversation = createConversation()
+				const earlier = conversation.add({
+					role: 'user',
+					content: 'Refunds over $100 need a manager.',
+				})
+				const later = conversation.add({
+					role: 'user',
+					content: 'Correction: refunds need a manager over $250.',
+				})
+				const classifier = new Classifier({
+					conversation,
+					judge: createPhraseJudge(['Refunds over']),
+					questions: LEDGER_QUESTIONS,
+					topics,
+					thresholds: deskThresholds,
+					assign: () => undefined,
+					entities: () => new Set(),
+				})
+				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+				return {
+					pairs: filed.judgments.filter(
+						(key) => key.startsWith('["amends"') || key.startsWith('["supersedes"'),
+					),
+					amends: JSON.stringify(['amends', earlier.id, later.id]),
+				}
+			}
+
+			const shared = await fileCorrection([refundsTopic])
+			const unshared = await fileCorrection([])
+
+			// The amends answer of 0.1 stays under its cutoff, so no supersedes question follows.
+			expect(shared.pairs).toEqual([shared.amends])
+			expect(unshared.pairs).toEqual([])
+			expect(guideText).toContain(
+				'shares an id, an owner, or a desk topic with it, followed by the `supersedes` question about the same pair when the `amends` answer reaches its cutoff',
+			)
+		})
+
+		it('fits the tail inside the tail share of the prompt budget less the fixed cost, as the plan claims', async () => {
+			const capacity = 600
+			const tails = new Map<number, number>()
+			for (const fixed of [0, 200]) {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge([]),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity,
+					gauge: { scale: 1, fixed },
+				})
+				ledger.conversation.add(
+					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
+						role: 'user',
+						content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+					})),
+				)
+				await ledger.respond('Review the desk.')
+				tails.set(fixed, estimateMessages(requireValue(provider.calls[0]).messages.slice(1)))
+			}
+			const room = (fixed: number) =>
+				(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - fixed)) /
+				(1 + LEDGER_SCALE_DRIFT)
+			const exchange = estimateMessages([
+				{
+					id: 'delivery',
+					role: 'user',
+					content: 'Delivery 39 arrived Tuesday with a completed receipt.',
+				},
+			])
+
+			// A tail within one seed exchange of its room shows the room, not the history, ends it.
+			for (const [fixed, tail] of tails) {
+				expect(tail).toBeLessThanOrEqual(room(fixed))
+				expect(tail).toBeGreaterThan(room(fixed) - exchange)
+			}
+			expect(requireValue(tails.get(0))).toBeGreaterThan(room(200))
+			expect(guideText).toContain(
+				'the `capacity` option times the `prompt` share, less the fixed cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+			)
+		})
+
+		it('drops off-topic rules, then outside sources, then on-topic rules, then owner lines, as the plan claims', async () => {
+			const markers = [
+				'Keep the loading dock at warehouse 42 clear.',
+				'The Northgate courier brings refund forms on 2026-10-12.',
+				'Refunds over $100 need a manager.',
+				'Refund due $148.50.',
+				'Order BW-5512 for account BW-20931: Brightwater Studio.',
+			]
+			const brief = async (capacity: number) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const ledger = createLedger(provider, {
+					judge: createPhraseJudge(['Keep the loading', 'Refunds over']),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity,
+					gauge: { scale: 1, fixed: 0 },
+					share: { prompt: 1, tail: 0.05 },
+					lookups: [orderLookup],
+				})
+				ledger.conversation.add([
+					{ role: 'user', content: 'Keep the loading dock at warehouse 42 clear.' },
+					{ role: 'user', content: 'Refunds over $100 need a manager.' },
+					{ role: 'user', content: 'The Northgate courier brings refund forms on 2026-10-12.' },
+					{
+						role: 'assistant',
+						content: '',
+						calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{
+						role: 'tool',
+						call: 'seed',
+						content: 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.',
+					},
+				])
+				await ledger.respond('Does the Brightwater Studio refund need a manager?')
+				const system = requireValue(
+					provider.calls[0]?.messages[0],
+					'Missing system message',
+				).content
+				return markers.filter((marker) => system.includes(marker))
+			}
+
+			// Each capacity sits inside the band where exactly one more step of the order has run.
+			expect(await brief(200)).toEqual(markers)
+			expect(await brief(95)).toEqual(markers.slice(1))
+			expect(await brief(82)).toEqual(markers.slice(2))
+			expect(await brief(68)).toEqual(markers.slice(3))
+			expect(await brief(59)).toEqual(markers.slice(4))
+			expect(guideText).toContain(
+				"the ledger drops the rules off the request's topics, then the sources outside the selected records, then the rules on its topics, then the owner lines",
+			)
+		})
+
+		it("serves an earlier request's lookup result to a later request through recall, as the ledger section claims", async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+					{
+						content: '',
+						tools: [{ id: 'call-2', name: 'recall', arguments: { topic: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [orderLookup],
+			})
+			const result = 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
+
+			await ledger.respond('Look up order BW-5512.')
+			await ledger.respond('What do you hold on that order?')
+
+			const contents = requireValue(provider.calls[3], 'Missing recall turn').messages.map(
+				({ content }) => content,
+			)
+			expect(contents).not.toContain('Look up order BW-5512.')
+			expect(contents).not.toContain(result)
+			expect(contents.at(-1)).toBe(`lookup_order {"id":"BW-5512"}: ${result}`)
+			expect(guideText).toContain(
+				'what its lookups returned reaches a later request through the records and the `recall` tool',
+			)
+		})
+
+		it('files one rule and prices one request as the classifier and gauge fence claims', async () => {
+			// The fence declares the judge, the cutoffs, and the signal; the transcription supplies them.
+			const judge: JudgeInterface = {
+				id: 'scripted',
+				name: 'scripted',
+				model: 'scripted',
+				ask: async (request) => {
+					const answers: Record<string, JudgeAnswer> = {}
+					for (const [id, question] of Object.entries(request.questions)) {
+						answers[id] =
+							question.form === 'choice'
+								? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+								: { form: 'noul', noul: 0.9 }
+					}
+					return { model: 'scripted', answers }
+				},
+			}
+			const thresholds: LedgerThreshold = {
+				category: 0.7,
+				topic: 0.8,
+				amends: 0.8,
+				supersedes: 0.8,
+				correction: 0.3,
+			}
+			const signal = AbortSignal.timeout(30_000)
+
+			const conversation = createConversation()
+			const rule = conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			const classifier = new Classifier({
+				conversation,
+				judge,
+				questions: LEDGER_QUESTIONS,
+				topics: [{ name: 'refunds', criterion: 'refund amounts and approvals' }],
+				thresholds,
+				assign: () => undefined,
+				entities: () => new Set(),
+			})
+			const filed = await classifier.classify(new Set(), signal)
+
+			expect(filed.judgments).toHaveLength(2)
+			expect(classifier.category(rule.id)).toBe('rule')
+			expect(classifier.decisive(rule.id)).toBe(true)
+			expect(classifier.quiet(rule.id)).toBe(false)
+			expect(classifier.topics(rule.id)).toEqual(new Set(['refunds']))
+			expect(classifier.classification().categories.get(rule.id)).toBe('rule')
+
+			const gauge = new Gauge({ scale: 1.25, fixed: 120, capacity: 32_768 })
+			const calls = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
+			expect(estimateMessages([rule])).toBe(13)
+			expect(gauge.measure([rule])).toBe(136.25)
+			expect(gauge.rate(calls)).toBe(1.25)
+			expect(gauge.left(calls)).toBe(32_098)
+			expect(gauge.reserve(calls, '')).toBe(36.25)
+			expect(gauge.room(calls, '')).toBeCloseTo(12_824.7, 9)
+			gauge.observe(calls)
+			expect(gauge.scale).toBe(1.3)
+			// A fence comment that drifts from the value asserted earlier fails here, because each line must appear verbatim.
+			for (const line of [
+				'filed.judgments.length // 2 — the category question and the refunds topic question',
+				"classifier.category(rule.id) // 'rule'",
+				'classifier.decisive(rule.id) // true',
+				'classifier.quiet(rule.id) // false',
+				"classifier.topics(rule.id) // Set { 'refunds' }",
+				"classifier.classification().categories.get(rule.id) // 'rule'",
+				'gauge.measure([rule]) // 136.25 — the fixed 120 plus 1.25 for each of 13 estimate units',
+				'gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed',
+				"gauge.left(calls) // 32098 — the capacity less the last call's prompt and completion",
+				"gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate",
+				"gauge.room(calls, '') // 12824.7 — half of what is left beyond the reserve, in estimate units",
+				"gauge.scale // 1.3 — the first call's prompt less the fixed cost, over its estimate",
+			])
+				expect(guideText).toContain(line)
 		})
 
 		it('empties the live tail and leaves the compacted sections (the conversation `clear` row)', async () => {

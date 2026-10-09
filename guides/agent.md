@@ -6,7 +6,7 @@
 > assembly — and the bounded context → provider → tools → repeat loop that carries a turn to
 > its end.
 
-An agent is a conversation with a model and the loop that carries it forward. A `Conversation` holds the history — a live tail of immutable messages plus the sections older turns were compacted into. An `AgentContext` assembles that history into the next prompt, folding in the instructions and the active workspace and applying the active scope. An `Agent` drives that prompt through a provider, dispatches requested tools admitted by scope and authority, feeds the results back, and repeats until the model stops. Everything else in this module either configures those nouns or observes them. Source: [`src/core`](../src/core). Published through `@orkestrel/agent`.
+An agent is a conversation with a model and the loop that carries it forward. A `Conversation` holds the history — a live tail of immutable messages plus the sections older turns were compacted into. An `AgentContext` assembles that history into the next prompt, folding in the instructions and the active workspace and applying the active scope. An `Agent` drives that prompt through a provider, dispatches requested tools admitted by scope and authority, feeds the results back, and repeats until the model stops. A `Ledger` composes all three to serve one conversation through a briefing projected from what a judge filed. Everything else in this module either configures those nouns or observes them. Source: [`src/core`](../src/core). Published through `@orkestrel/agent`.
 
 Hand a provider a conversation and get back one assembled `ProviderResult` (`generate`), or a live stream of channel-tagged `ProviderDelta`s that returns that same assembled result when it ends (`stream`). Reasoning separation, the authority gate, and durable jobs sit around that boundary. The model itself is the one thing this package does not supply. `ProviderInterface` stays the boundary any backend can satisfy, and `AgentProvider` is the host-independent HTTP engine a concrete provider extends rather than rewrites: it owns the deadline, the transport, the bounded error read, the framing loop, reasoning separation, and result assembly, and the subclass fills in one vendor's wire. `RelayProvider` and `createRelay` carry that same boundary across your own server, so a browser drives a model it holds no credential for. There is no hidden global state, a plugin lifecycle, a prompt-template DSL, or an implicit memory store. This is a kit of composable primitives: the loop is the convenient way to use them, not the only one, and a caller that would rather bound and drive a provider by hand can skip it entirely.
 
@@ -18,7 +18,7 @@ The loop and its tool handlers execute in the host that constructs them. See [Pl
 
 ## Surface
 
-The agent-owned surface: the inference boundary and the HTTP engine behind it, the relay that carries that boundary to a browser, the judge boundary with its HTTP engine and the System One wire, the conversation layer, the context and its managers, the loop, the authority gate, and the durable-job bridge. Tool and workspace entities belong to their originating packages and are consumed directly — never re-exported here — and one vendor's wire belongs to the concrete provider that extends `AgentProvider`.
+The agent-owned surface: the inference boundary and the HTTP engine behind it, the relay that carries that boundary to a browser, the judge boundary with its HTTP engine and the System One wire, the conversation layer, the context and its managers, the loop, the authority gate, the durable-job bridge, and the ledger that serves a conversation through a judge's filing. Tool and workspace entities belong to their originating packages and are consumed directly — never re-exported here — and one vendor's wire belongs to the concrete provider that extends `AgentProvider`.
 
 A provider turns a conversation (plus optional tools) into a turn: `generate` resolves the assembled `ProviderResult` (content + any tool calls + any usage); `stream` yields channel-tagged `ProviderDelta`s as they arrive (`content` for answer text, `thinking` for live reasoning) and returns the same assembled result when the stream completes, so a caller can render tokens / reasoning live and still get the full outcome. Both bound the call with an `AbortSignal`:
 
@@ -197,7 +197,7 @@ const result = await provider.generate(
 )
 ```
 
-`AgentContext` wires the instruction manager and the workspace registry in. Beyond `system`, `messages`, and `tools`, a context exposes its own `instructions` manager and `workspaces` registry — pass pre-built ones through `AgentContextOptions`, or fresh empty ones are created — and `build()` folds them into the turn. The assembly order is one leading `system` message holding the system prompt, then the non-empty instructions block (its `description` header followed by every item's `format`), then the active workspace's text files under a `## Workspace` header, joined by blank lines; then the conversation. With no instructions, no active workspace, and no scope, that reduces to exactly the lean `[systemMessage?, ...messages]`. The carrier split shows here: text rides the system block, image data rides the last user message.
+`AgentContext` wires the instruction manager and the workspace registry in. Beyond `system`, `messages`, and `tools`, a context exposes its own `instructions` manager and `workspaces` registry — pass pre-built ones through `AgentContextOptions`, or fresh empty ones are created — and `build()` folds them into the turn. The assembly order is one leading `system` message holding the system prompt, then the non-empty instructions block (its `description` header followed by every item's `format`), then the active workspace's text files under a `## Workspace` header, then the non-empty `briefing` member of a selection passed to `build` without a `fault`, joined by blank lines; then the conversation. With no instructions, no active workspace, and no scope, that reduces to exactly the lean `[systemMessage?, ...messages]`. The carrier split shows here: text rides the system block, image data rides the last user message.
 
 ````ts
 import { createAgentContext } from '@orkestrel/agent'
@@ -508,6 +508,37 @@ The comments read the answers the executed transcription in [`tests/guides.test.
 Treat a judge as frozen at inference: change thresholds and criteria in code, record corrections as judgments, and train another model only offline, as a batch on rows collected for that purpose, refitting temperature on rows the training run did not see.
 
 Write criteria for a judge that reads literally (see [Jev 1.13 jaggedness](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md)). Scoping words and negations count, so keep a `noul` whose true side means yes, and keep indirection such as a double negative out of the text. Keep arithmetic and date comparison in code, filter irrelevant state before asking, and treat a note inside the state as data that can move the answer. Reorder options to check for a lean toward the first one.
+
+### Serving a conversation through a ledger
+
+A ledger serves one conversation as an event-sourced briefing with per-owner records. The `createLedger(provider, options)` factory returns a `LedgerInterface` value that owns the conversation, the agent that answers it, and that agent's tools, and its `respond` method appends a request as a user message and serves it through to the reply. The conversation is the event log, and no request reads all of it. Each request reads a briefing that the ledger projects from what a judge filed about every message, then a tail of the seed history (the messages added before the first request), then the request. An earlier request and its reply never re-enter the prompt; what its lookups returned reaches a later request through the records and the `recall` tool.
+
+The method has the following pieces, each named by its export:
+
+- **The filing.** The `Classifier` class files each message through the judge the `judge` option injects; the measured series injected Mica. The ledger files a tool result, its own notes, an assistant call, and an assistant reply after the first request by their shape, and asks the judge about the rest: the `LEDGER_QUESTIONS` category question about each remaining message, the topic question, for each desk topic, about each request and each of those messages the category question doesn't file quiet; and the `amends` question about a later user message whose `correction` probability reaches the `correction` cutoff and an earlier message that isn't quiet and shares an id, an owner, or a desk topic with it, followed by the `supersedes` question about the same pair when the `amends` answer reaches its cutoff. Every answer lands in the conversation's `judgments` store, so a later request asks only what no earlier one asked, and the `LedgerClassification` value reads the filing back at the cutoffs.
+- **The records.** The `buildRecords` helper projects the filing into one `LedgerRecord` value per owner a lookup result names, plus one rules record for the rules and corrections no owner claims. Each line is a verbatim sentence of a live message. A message filed quiet or superseded isn't live, and a sentence that shares an id or a number with a later message that amends it is stale: the projection lists it in its `stale` member and leaves it out of every record and every route to the model.
+- **The plan.** For each request, the ledger selects the records the request names through the `selectRecords` helper and fits the briefing and the tail inside a token budget: the `capacity` option times the `prompt` share, less the fixed cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share. The `share` option sets both shares, and the `DEFAULT_LEDGER_SHARE` constant holds the measured ones. Until the briefing fits, the ledger drops the rules off the request's topics, then the sources outside the selected records, then the rules on its topics, then the owner lines. The `Gauge` class prices the prompt; without the `gauge` option, the ledger calibrates before its first pass, and the `calibrate` method measures the price on demand. A lookup in the tail reaches the model as the stub the `renderStub` helper writes, which says whether the briefing shows its result. The plan reaches the agent as a `Selection` value: its `messages` member is the tail, and its `briefing` member is the text the `build` method appends as the last part of the system message.
+- **The `recall` tool.** The ledger registers a `recall` tool beside the application's lookups. It returns the live lines that match a topic (an owner name, an id, or a desk topic), newest first, cut to the room the gauge leaves for the reply. A request can call it as many times as the `limit` member of the `recall` option allows, the `DEFAULT_RECALL_LIMIT` constant by default; after that, or when the capacity left falls under twice the reply's reserve, it returns the `closed` note.
+- **The repeat stop.** A lookup or `recall` call that repeats an earlier call of the same request, compared by tool name and canonical arguments, returns the `repeat` note as its failure, and the ledger aborts the pass.
+- **The answer pass.** When the first pass ends partial or without final text and the caller didn't abort, the ledger adds a note that carries what the pass's lookups and recalls returned, then the `cue` note, and runs one answer pass that advertises no tools. The `passes` member of the `LedgerResult` value holds both passes, and its `content` member is the last pass's.
+
+The application supplies the following through `LedgerOptions`:
+
+- the judge, through the `judge` option;
+- the question wording, through the `questions` option, where the `LEDGER_QUESTIONS` constant is the measured wording, and its own cutoffs through the `thresholds` option, which has no default because a cutoff holds only for the wording and the judge it was fitted on;
+- the desk topics, through the `topics` option;
+- the lookups, through the `lookups` option, each a tool the model calls and a reading handler that names the ids and the owners in its result;
+- the capacity, through the `capacity` option, the model's context window in tokens.
+
+The method has the following documented limits:
+
+- **The person prefix trusts capital letters.** A sentence that opens with a pronoun takes the last capitalized name of the sentence before it as its party, so a capitalized word that names no person, such as a carrier named mid-sentence, is read as the party.
+- **A desk-wide correction stays in one owner's record.** A message that names an owner joins that owner's record and not the rules record, so a correction to a desk-wide rule stated inside one owner's message isn't among the rules a request about another owner reads.
+- **Recall identity is the topic alone.** The repeat stop compares two `recall` calls by their trimmed `topic` argument, so a second call with the same topic is a repeat whatever other arguments it carries.
+- **A seed tool message counts as successful.** A tool message the application adds to the conversation has no recorded result, so the ledger reads it as a successful lookup and files it as a fact, and its reading handler decides what the result names.
+- **An abort during calibration rejects.** When the caller's signal aborts while the ledger calibrates, the `respond` method rejects with the abort reason instead of resolving a partial result; after calibration, an abort ends the request partial and skips the answer pass.
+
+On a 48-message support-shift benchmark measured on 2026-10-09, with the 2B Qwen model (`qwen3.5:2b-q4_K_M` tag, thinking off) answering and the Mica judge (`hf.co/sky7350/Mica-v0.1-4B` tag) filing, over 8 reworded copies under a blind two-sided audit, the records design passed 6.50 to 6.75 of every 10 requests per copy, the refined briefing (the same briefing without the records) 5.63 to 6.13, and the full conversation view 4.38 to 5.13. The records design and the refined briefing each cleared the paired band against the full view, and the records design against the refined briefing stayed inside the noise. That reading describes that benchmark and those two models alone.
 
 ### Customizing the format (the cascade)
 
@@ -1132,11 +1163,172 @@ const queueHandler = handleAgentQueueJob.bind(undefined, registry, false)
 const runnerHandler = handleAgentRunnerJob.bind(undefined, registry, false)
 ```
 
+### Ledgers module
+
+The `ledgers` module serves a conversation through an event-sourced briefing: the `Ledger` entity, the `Classifier` class that files messages through a judge, the `Gauge` class that prices a prompt, and the pure projection helpers. For the method, see [Serving a conversation through a ledger](#serving-a-conversation-through-a-ledger); for a ledger built end to end, see [Serving requests through a ledger](#serving-requests-through-a-ledger).
+
+#### Types
+
+The following table lists the types the ledger declares, each with its shape:
+
+| Type                      | Kind      | Shape                                                                                                           | Summary                                                                                                                                                                                    |
+| ------------------------- | --------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LedgerCategory`          | type      | `'fact' \| 'rule' \| 'correction' \| 'request' \| 'opinion' \| 'chatter' \| 'distractor'`                       | Names the category the ledger files a message under, one of `LEDGER_CATEGORIES`.                                                                                                           |
+| `LedgerQuestion`          | interface | `{ category, topic, amends, supersedes }`                                                                       | Carries the wording of every question the ledger asks its judge.                                                                                                                           |
+| `LedgerThreshold`         | interface | `{ category, topic, amends, supersedes, correction }`                                                           | Carries the probability cutoff of each reading the ledger takes from its judge.                                                                                                            |
+| `LedgerTopic`             | interface | `{ name, criterion, requests? }`                                                                                | Carries one desk topic: the subject the ledger asks its judge about for every message.                                                                                                     |
+| `LedgerShare`             | interface | `{ prompt, tail }`                                                                                              | Carries the share of the context capacity the prompt can take and the share of that budget the tail can take.                                                                              |
+| `LedgerNote`              | interface | `{ cue, results, repeat, closed }`                                                                              | Carries the text of each note the ledger writes into its conversation or returns to the model.                                                                                             |
+| `LedgerRecallOptions`     | interface | `{ limit?, description? }`                                                                                      | Configures the ledger's `recall` tool.                                                                                                                                                     |
+| `LedgerOwner`             | interface | `{ id, names }`                                                                                                 | Carries one owner a lookup result names: its id and the names it goes by.                                                                                                                  |
+| `LedgerLookupResult`      | interface | `{ ids, owners }`                                                                                               | Carries what a lookup handler read from one lookup result: the ids it names and the owners among them.                                                                                     |
+| `LedgerLookupHandler`     | type      | `(args, text) => LedgerLookupResult \| undefined`                                                               | Reads one successful lookup result into the ids and owners it names.                                                                                                                       |
+| `LedgerLookup`            | interface | `{ tool, read }`                                                                                                | Carries one application lookup: the tool the model calls and the handler that reads its results.                                                                                           |
+| `LedgerLookupReading`     | interface | `{ id, name, arguments, text, result }`                                                                         | Carries one successful lookup result as the ledger read it.                                                                                                                                |
+| `LedgerLookupState`       | type      | `'failed' \| 'empty' \| 'shown' \| 'hidden'`                                                                    | Names what became of a lookup of an earlier request, as the tail stub of its result reports it.                                                                                            |
+| `LedgerRegistry`          | interface | `{ ids, owners }`                                                                                               | Carries the ids the ledger's lookups named and the owners among them.                                                                                                                      |
+| `LedgerGauge`             | interface | `{ scale, fixed }`                                                                                              | Carries the price of a prompt in tokens, measured against the model the ledger serves.                                                                                                     |
+| `LedgerAgentOptions`      | type      | `Pick<AgentOptions, 'limit' \| 'timeout' \| 'budget' \| 'signal' \| 'on' \| 'error'>`                           | Selects the agent bounds and hooks a ledger passes through to the agent it builds.                                                                                                         |
+| `LedgerOptions`           | interface | `{ judge, system, topics, questions, thresholds, capacity, gauge?, lookups?, share?, recall?, notes?, agent? }` | Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the context capacity, and the optional lookups, gauge, shares, recall, notes, and agent bounds. |
+| `LedgerResult`            | interface | `{ content, thinking?, usage?, partial, passes }`                                                               | Carries the outcome of one request a ledger served: the agent result of its reply and every pass it took.                                                                                  |
+| `LedgerInterface`         | interface | `{ agent, conversation, gauge } plus respond, calibrate`                                                        | Serves the requests of one conversation through an agent whose prompt the ledger projects from what the judge filed.                                                                       |
+| `LedgerTokenSet`          | interface | `{ ids, numbers }`                                                                                              | Carries the id-shaped tokens and the numbers of a text.                                                                                                                                    |
+| `LedgerClassification`    | interface | `{ quiet, categories, topics, amended, superseded }`                                                            | Carries the ledger's filing of its conversation's messages, keyed by message id.                                                                                                           |
+| `LedgerLine`              | interface | `{ text, source, sentence, party?, topics, role }`                                                              | Carries one record line: a verbatim sentence of a live message.                                                                                                                            |
+| `LedgerRecord`            | interface | `{ key, title, members, lines }`                                                                                | Carries one record: the live messages placed on one owner or on the rules, as lines.                                                                                                       |
+| `LedgerStaleSentence`     | interface | `{ source, sentence, tokens }`                                                                                  | Carries one sentence a later message made stale, with the tokens the two share.                                                                                                            |
+| `LedgerProjection`        | interface | `{ records, stale, loose }`                                                                                     | Carries the records projected from a conversation, the stale sentences, and the live messages no record placed.                                                                            |
+| `LedgerProjectionInput`   | interface | `{ system, exclude, owners, messages, readings, entities, classification }`                                     | Carries what a projection reads.                                                                                                                                                           |
+| `LedgerProjectionRequest` | interface | `{ owners, topics }`                                                                                            | Carries the owners and the desk topics one request names, which select its records.                                                                                                        |
+| `LedgerCategoryHandler`   | type      | `(message) => LedgerCategory \| undefined`                                                                      | Reads a message's category from its shape, or returns undefined to leave it to the judge.                                                                                                  |
+| `LedgerEntityHandler`     | type      | `(text, partial) => ReadonlySet<string>`                                                                        | Lists the registry ids and owner ids a text names.                                                                                                                                         |
+| `ClassifierOptions`       | interface | `{ conversation, judge, questions, topics, thresholds, assign, entities }`                                      | Configures a classifier: the conversation it files, the judge and the wording it asks with, the desk topics, the cutoffs, and the ledger's handlers.                                       |
+| `ClassifierResult`        | interface | `{ judgments, usage?, fault? }`                                                                                 | Carries the judgment keys one classification rests on and the judge usage it spent.                                                                                                        |
+| `ClassifierInterface`     | interface | `{} plus classify, category, quiet, decisive, topics, classification`                                           | Files a conversation's messages through a judge and reads the filing.                                                                                                                      |
+| `GaugeCall`               | interface | `{ estimate, prompt?, completion?, tools }`                                                                     | Carries one agent call as the gauge reads it.                                                                                                                                              |
+| `GaugeOptions`            | interface | `{ scale, fixed, capacity }`                                                                                    | Configures a gauge: its starting price of a prompt and the context capacity it measures against.                                                                                           |
+| `GaugeInterface`          | interface | `{ scale, fixed } plus measure, rate, left, reserve, room, observe`                                             | Prices prompts in tokens and measures the room a request has left.                                                                                                                         |
+| `LedgerErrorCode`         | type      | `'THRESHOLD' \| 'SHARE' \| 'CAPACITY' \| 'LIMIT' \| 'TOPIC' \| 'LOOKUP' \| 'GAUGE'`                             | Names the machine-readable conditions a `LedgerError` error reports.                                                                                                                       |
+
+#### Constants
+
+The following table lists the constants that hold the ledger's categories, record keys, measured wording, shares, and limits:
+
+| API                         | Kind  | Shape                       | Summary                                                                                                                                                      |
+| --------------------------- | ----- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LEDGER_CATEGORIES`         | const | `readonly LedgerCategory[]` | Lists the categories the ledger files a message under, in the order the category question names them — the one list the `LedgerCategory` union derives from. |
+| `QUIET_CATEGORIES`          | const | `readonly LedgerCategory[]` | Lists the categories whose messages the projection leaves out as quiet.                                                                                      |
+| `DECISIVE_CATEGORIES`       | const | `readonly LedgerCategory[]` | Lists the categories whose messages state what the desk acts on, which the briefing renders.                                                                 |
+| `PLACED_CATEGORIES`         | const | `readonly LedgerCategory[]` | Lists the categories that place a message no owner claims on the rules record.                                                                               |
+| `LEDGER_RULES_KEY`          | const | `string`                    | Names the key of the record that holds the rules no owner claims.                                                                                            |
+| `LEDGER_OWNER_PREFIX`       | const | `string`                    | Prefixes the key of an owner's record, which the owner's id follows.                                                                                         |
+| `LEDGER_QUESTIONS`          | const | `LedgerQuestion`            | Supplies the measured wording of every question the ledger asks its judge.                                                                                   |
+| `LEDGER_NOTES`              | const | `LedgerNote`                | Supplies the measured text of each ledger note, worded for a model that answers in its final message.                                                        |
+| `DEFAULT_LEDGER_SHARE`      | const | `LedgerShare`               | Supplies the measured prompt and tail shares.                                                                                                                |
+| `DEFAULT_LEDGER_LIMIT`      | const | `number`                    | Caps the tool-iteration turns of a ledger's agent at the measured limit of 8.                                                                                |
+| `DEFAULT_RECALL_LIMIT`      | const | `number`                    | Caps the `recall` calls of one request at the measured limit of 2.                                                                                           |
+| `LEDGER_SCALE_DRIFT`        | const | `number`                    | Holds back the share of the prompt budget the scale can rise by between calibration and a request's first call.                                              |
+| `DETERMINISTIC_JUDGE_ERROR` | const | `RegExp`                    | Matches the judge error the measured harness holds as deterministic (`tmp/bench3/bench.mjs:867`).                                                            |
+
+#### Errors
+
+The following table lists the error the ledger raises and the guard that narrows it:
+
+| API             | Kind     | Summary                                                                                                                                    |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LedgerError`   | class    | Reports a ledger configuration that `createLedger` refuses, or a calibration that receives no usage, carrying the machine-readable `code`. |
+| `isLedgerError` | function | Narrows an unknown caught value to a `LedgerError` through `instanceof`, so a `catch` can branch on its `code`.                            |
+
+#### Factories
+
+The following table lists the factory that builds a ledger:
+
+| API            | Kind     | Signature                                | Summary                                                                                  |
+| -------------- | -------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `createLedger` | function | `(provider, options) => LedgerInterface` | Creates a conversation ledger after checking its thresholds, allocation, and tool names. |
+
+#### Classes
+
+The following table lists the classes that serve, file, and price a conversation:
+
+| API          | Kind  | Summary                                                                                                  |
+| ------------ | ----- | -------------------------------------------------------------------------------------------------------- |
+| `Ledger`     | class | Serves one conversation through classified records, a bounded briefing, and a final answer pass.         |
+| `Classifier` | class | Files messages through the conversation's judgment manager and reads their categories and corrections.   |
+| `Gauge`      | class | Prices prompts in tokens from a measured scale and fixed cost, and measures the room a request has left. |
+
+#### Helpers
+
+The following table lists the pure helpers that read text, project and select records, render a briefing, and fit a price:
+
+| API                  | Kind     | Signature                                                           | Summary                                                                                                     |
+| -------------------- | -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `splitSentences`     | function | `(text) => readonly string[]`                                       | Splits a message into its sentences.                                                                        |
+| `extractTokens`      | function | `(text) => LedgerTokenSet`                                          | Reads the id-shaped tokens and the numbers of a text.                                                       |
+| `collectNames`       | function | `(text) => readonly string[]`                                       | Collects the capitalized name runs of a text, leaving out the run that opens each sentence.                 |
+| `identifyLookup`     | function | `(name, args) => string`                                            | Identifies a lookup call by its tool name and its canonical arguments.                                      |
+| `linkOwners`         | function | `(readings, owners) => ReadonlyMap<string, string>`                 | Links each id-shaped lookup argument to its owner.                                                          |
+| `collectRegistry`    | function | `(readings) => LedgerRegistry`                                      | Collects the ids and the owner names the lookup readings named.                                             |
+| `matchEntities`      | function | `(registry, text, partial) => ReadonlySet<string>`                  | Matches the registry ids and owners a text names.                                                           |
+| `buildRecords`       | function | `(input) => LedgerProjection`                                       | Projects the owner records and the rules record from a conversation's messages.                             |
+| `selectRecords`      | function | `(projection, request) => readonly LedgerRecord[]`                  | Selects a request's view of the projected records.                                                          |
+| `renderLedgerRecord` | function | `(record) => string`                                                | Renders one record as a heading and one list item per line.                                                 |
+| `renderLedgerPinned` | function | `(record) => string`                                                | Renders one owner record under a `###` heading, which the briefing nests under its one `## Pinned` heading. |
+| `splitTopic`         | function | `(topic) => readonly string[]`                                      | Splits a recall topic at its joints.                                                                        |
+| `cutItems`           | function | `(items, room) => string`                                           | Cuts items to a room and names how many it left out.                                                        |
+| `matchesCutLine`     | function | `(line) => boolean`                                                 | Checks whether a line is the cut line `cutItems` writes.                                                    |
+| `renderStub`         | function | `(name, args, state) => string`                                     | Renders the tail stub of a lookup result from an earlier request.                                           |
+| `fitSlope`           | function | `(groups) => number \| undefined`                                   | Fits the marginal tokens one estimate unit adds within a request.                                           |
+| `collectLive`        | function | `(input) => readonly string[]`                                      | Collects the ids of the live messages in conversation order.                                                |
+| `placeMember`        | function | `(input, links, amending, id, seen) => ReadonlySet<string>`         | Places a message on the record keys it joins.                                                               |
+| `collectStale`       | function | `(input, byId, live) => readonly LedgerStaleSentence[]`             | Collects the sentences that live messages made stale.                                                       |
+| `buildLines`         | function | `(input, byId, id, dead, holders, system) => readonly LedgerLine[]` | Builds the record lines of one message.                                                                     |
+
+The `Classifier` and `Gauge` classes the ledger composes are public, so a harness can file a conversation or price a prompt without a ledger. The following classifier files one rule, and the following gauge prices the calls of one request:
+
+```ts
+import type { JudgeInterface, LedgerThreshold } from '@orkestrel/agent'
+import { Classifier, createConversation, Gauge, LEDGER_QUESTIONS } from '@orkestrel/agent'
+
+declare const judge: JudgeInterface // answers 0.9 for the rule category and 0.9 for the topic
+declare const thresholds: LedgerThreshold // fitted on LEDGER_QUESTIONS and this judge
+declare const signal: AbortSignal
+
+const conversation = createConversation()
+const rule = conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+const classifier = new Classifier({
+	conversation,
+	judge,
+	questions: LEDGER_QUESTIONS,
+	topics: [{ name: 'refunds', criterion: 'refund amounts and approvals' }],
+	thresholds,
+	assign: () => undefined, // the judge decides every message
+	entities: () => new Set(), // no lookups, so no shared id asks a pair question
+})
+const filed = await classifier.classify(new Set(), signal)
+filed.judgments.length // 2 — the category question and the refunds topic question
+classifier.category(rule.id) // 'rule'
+classifier.decisive(rule.id) // true
+classifier.quiet(rule.id) // false
+classifier.topics(rule.id) // Set { 'refunds' }
+classifier.classification().categories.get(rule.id) // 'rule'
+
+const gauge = new Gauge({ scale: 1.25, fixed: 120, capacity: 32_768 })
+const calls = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
+gauge.measure([rule]) // 136.25 — the fixed 120 plus 1.25 for each of 13 estimate units
+gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed
+gauge.left(calls) // 32098 — the capacity less the last call's prompt and completion
+gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate
+gauge.room(calls, '') // 12824.7 — half of what is left beyond the reserve, in estimate units
+gauge.observe(calls)
+gauge.scale // 1.3 — the first call's prompt less the fixed cost, over its estimate
+```
+
 Agent-owned readonly data members stay in the preceding Surface tables; their call-signature methods are documented under [`## Methods`](#methods). Tool contracts resolve to [`tool.md`](tool.md) and workspace contracts to [`workspace.md`](workspace.md) — neither dependency surface is duplicated or re-exported here. Note where the boundary falls inside the context: `instructions`, `conversations`, and `workspaces` are the managers `build()` renders a prompt from, while `tools` is loop machinery for advertising and dispatch and is never read by `build()` at all.
 
 ## Methods
 
-The tables list every public call-signature member of `ProviderInterface`, `AgentProviderInterface`, `ProviderParserInterface`, `RelayProvider`, `JudgeInterface`, `AgentJudgeInterface`, `SystemOneJudge`, `ThinkSplitterInterface`, `JudgmentManagerInterface`, `MessageManagerInterface`, `InstructionManagerInterface`, `ScopeInterface`, `ScopeManagerInterface`, `AgentContextInterface`, `AgentInterface`, `StreamInterface`, `ChannelInterface`, `AuthorityInterface`, `AgentRegistryInterface`, `ConversationInterface`, `ConversationManagerInterface`, `ConversationStoreInterface`, `MemoryConversationStore`, and `DatabaseConversationStore`. Their readonly data members remain Surface rows. `AgentProvider`, `AgentJudge`, `ThinkSplitter`, `InstructionManager`, `Scope`, `ScopeManager`, `AgentContext`, `Agent`, `Authority`, `AgentRegistry`, `Conversation`, `ConversationManager`, and `JudgmentManager` implement their interfaces exactly, so the tables also describe those classes' instance methods. `RelayProvider`, `SystemOneJudge`, and the store classes keep explicit tables because their class names have no same-name interface contract. `MessageManagerInterface` has no separate concrete class here: the active `Conversation` satisfies it structurally. `RelayStream` exposes `response` alone, a data member, so it keeps its Surface row and takes no table. Tool and workspace methods live in their dependency guides.
+The tables list every public call-signature member of `ProviderInterface`, `AgentProviderInterface`, `ProviderParserInterface`, `RelayProvider`, `JudgeInterface`, `AgentJudgeInterface`, `SystemOneJudge`, `ThinkSplitterInterface`, `JudgmentManagerInterface`, `MessageManagerInterface`, `InstructionManagerInterface`, `ScopeInterface`, `ScopeManagerInterface`, `AgentContextInterface`, `AgentInterface`, `StreamInterface`, `ChannelInterface`, `AuthorityInterface`, `AgentRegistryInterface`, `ConversationInterface`, `ConversationManagerInterface`, `ConversationStoreInterface`, `MemoryConversationStore`, `DatabaseConversationStore`, `LedgerInterface`, `ClassifierInterface`, and `GaugeInterface`. Their readonly data members remain Surface rows. `AgentProvider`, `AgentJudge`, `ThinkSplitter`, `InstructionManager`, `Scope`, `ScopeManager`, `AgentContext`, `Agent`, `Authority`, `AgentRegistry`, `Conversation`, `ConversationManager`, `JudgmentManager`, `Ledger`, `Classifier`, and `Gauge` implement their interfaces exactly, so the tables also describe those classes' instance methods. `RelayProvider`, `SystemOneJudge`, and the store classes keep explicit tables because their class names have no same-name interface contract. `MessageManagerInterface` has no separate concrete class here: the active `Conversation` satisfies it structurally. `RelayStream` exposes `response` alone, a data member, so it keeps its Surface row and takes no table. Tool and workspace methods live in their dependency guides.
 
 #### `ProviderInterface`
 
@@ -1413,6 +1605,41 @@ The driver-backed implementation keeps an explicit table because its class name 
 | `set`    | `Promise<void>`                              | Inserts or replaces under the snapshot's own `id` (no separate id param) — the row is `{ id, snapshot }`.    |
 | `delete` | `Promise<void>`                              | Drops a snapshot by id; an absent id is a no-op (no throw).                                                  |
 
+#### `LedgerInterface`
+
+The conversation ledger. The `respond` method serves one request through to its reply, and the `calibrate` method measures the price of a prompt. The `agent`, `conversation`, and `gauge` data members stay Surface rows. A call to either method while the other or itself is in flight rejects with `AgentError` code `CONCURRENCY`.
+
+| Method      | Returns                 | Summary                                                                 |
+| ----------- | ----------------------- | ----------------------------------------------------------------------- |
+| `respond`   | `Promise<LedgerResult>` | Appends `content` as a user message and serves it through to its reply. |
+| `calibrate` | `Promise<LedgerGauge>`  | Measures the gauge, holds it as `gauge`, and returns it.                |
+
+#### `ClassifierInterface`
+
+The ledger's filing engine. The `classify` method asks the judge what the conversation's recorded judgments lack, and the readers derive every answer from those judgments and the cutoffs. It carries no data members.
+
+| Method           | Returns                       | Summary                                                                                          |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `classify`       | `Promise<ClassifierResult>`   | Asks every filing question the conversation's judgments lack an answer for.                      |
+| `category`       | `LedgerCategory \| undefined` | Returns the category a message is filed under, or undefined when no category reaches its cutoff. |
+| `quiet`          | `boolean`                     | Returns true if the message is filed as quiet; false otherwise.                                  |
+| `decisive`       | `boolean`                     | Returns true if the message is filed as decisive; false otherwise.                               |
+| `topics`         | `ReadonlySet<string>`         | Returns the desk topics the message is filed under.                                              |
+| `classification` | `LedgerClassification`        | Returns the filing of every message in the conversation.                                         |
+
+#### `GaugeInterface`
+
+The prompt price. The `measure` method prices messages, the `rate`, `left`, `reserve`, and `room` methods read the calls of the request in progress, and the `observe` method folds a finished request in. The `scale` and `fixed` data members stay Surface rows.
+
+| Method    | Returns  | Summary                                                                                              |
+| --------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `measure` | `number` | Returns the tokens the messages cost at the current scale.                                           |
+| `rate`    | `number` | Returns the tokens one more estimate unit adds within a request, fitted over the observed calls.     |
+| `left`    | `number` | Returns the tokens of the capacity the last call left.                                               |
+| `reserve` | `number` | Returns the tokens a reply turn needs after the calls, given the longest reply text written so far.  |
+| `room`    | `number` | Returns the estimate units a recall result can take without taking the reply's room.                 |
+| `observe` | `void`   | Rescales from a completed request's first call and keeps its calls and the final reply's completion. |
+
 ## Contract
 
 These invariants hold across `src/core` ↔ `agent.md`:
@@ -1424,7 +1651,7 @@ These invariants hold across `src/core` ↔ `agent.md`:
 5. **The caller's signal and the engine's deadline both bound the call.** `generate` and `stream` take an `AbortSignal`, and an already-aborted signal rejects before any content streams. `AgentProvider` folds a per-call `Timeout` of `AgentProviderInput.timeout` milliseconds (`DEFAULT_PROVIDER_TIMEOUT` when omitted) with that signal through `AbortSignal.any`, covering the `headers` hook, the error-body read, and the stream. The deadline is cleared on every exit.
 6. **A local cancel and a remotely reported one are different failures.** A `stream` cancelled by its bound throws `ProviderAbortError` whose `partial` holds what was assembled locally, with a throw that raced the cancel carried as its `cause`. A relay `abort` frame makes `RelayProvider.read` throw a reconstructed `ProviderAbortError` carrying the upstream partial while the local signal stays unaborted, and the engine propagates that instance unchanged.
 7. **The message-store contract (`MessageManagerInterface`).** `context.messages` is typed to `MessageManagerInterface`, which the active `Conversation` satisfies structurally. `add` mints each message's `id`, carries `calls` only when supplied, and returns the stored immutable message that `message(id)` later resolves; `remove` reports `true` only when every supplied id was removed.
-8. **The richer turn context (`AgentContext`).** `AgentContext` composes the optional `system` prompt, the `instructions`, `workspaces`, and `conversations` managers, `messages`, the `tools` registry, and a readonly active `scope`, creating each omitted manager fresh. `build()` folds the system prompt, the scope-filtered instructions, and the active workspace's scope-filtered text files into one leading `system` message, then appends the active conversation's `view()`, or a passed selection's `messages`. It never reads `tools`, never mutates a manager or a stored message, and builds fresh on each call.
+8. **The richer turn context (`AgentContext`).** `AgentContext` composes the optional `system` prompt, the `instructions`, `workspaces`, and `conversations` managers, `messages`, the `tools` registry, and a readonly active `scope`, creating each omitted manager fresh. `build()` folds the system prompt, the scope-filtered instructions, and the active workspace's scope-filtered text files into one leading `system` message, with a passed selection's non-empty `briefing` as its last part when the selection has no `fault`, then appends the active conversation's `view()`, or a passed selection's `messages`. It never reads `tools`, never mutates a manager or a stored message, and builds fresh on each call.
 9. **Scope filtering.** A scope holds one three-way allow-list per category (`instructions` by `name`, `tools` by `name`, `files` by `path`), applied through `filterAllowList`, and `narrow` intersects each list, so narrowing only tightens. The scope's filters never touch messages; message inclusion is the conversation's through compaction and, when a handler is set, the selection's. The loop filters the advertised definitions by `scope.tools`, so a scoped-out tool is neither described nor callable, and `build()` never contains a tool's name or schema.
 10. **The agent loop (`Agent` / `createAgent`).** `Agent` builds the provider input, then iterates up to `limit`: stream a turn, fold its usage, append any assistant tool calls, and dispatch them. Each `ToolResult` becomes a tool message whose `call` names the paired call, in the reply's call order, because ids can repeat; a string value is the content unchanged, another value is `JSON.stringify(result.value)`, and a failure's content is its `error`. A reply with no tool calls ends the loop.
 11. **One run shared by `generate` and `stream`.** `generate` drains the private run `stream` exposes, so a `generate` result deep-equals a drained `stream` on the same input.
@@ -1464,7 +1691,7 @@ These invariants hold across `src/core` ↔ `agent.md`:
 45. **The System One response model and usage.** On the System One wire, `JudgeResult.model` reports the model the response named, verbatim, and a response that names no model reports the configured `model` option. `extractSystemOneUsage` maps `input_tokens` and `output_tokens` onto `{ prompt, completion, total }`, and `usage` is absent when either count is missing, `null`, negative, or not finite.
 46. **Header-hook authentication.** Both engines read the `headers` hook through `readHeaders`: the headers start from `Content-Type: application/json`, the hook is awaited with the call's combined signal and raced against it, and each entry it returns is set over the defaults.
 47. **Two selection homes.** `AgentOptions.select` is the agent default and the active scope's `select` overrides it, and `context.select` resolves the handler once per call and returns `undefined` when neither home holds one, so the default path awaits nothing.
-48. **Select sites and the receipt.** The loop calls the handler with the request captured at run entry and the run's signal at run entry, the pre-first-turn compaction fold, and each compaction rebuild, folds the result through `build(selection)`, and then emits `select`. A `Selection` has no tool member, so advertising and admission stay the scope's.
+48. **Select sites and the receipt.** The loop calls the handler with the request captured at run entry and the run's signal at run entry, the pre-first-turn compaction fold, and each compaction rebuild, folds the result through `build(selection)`, which appends a non-empty `briefing` as the last system part unless the selection has a `fault`, and then emits `select`. A `Selection` has no tool member, so advertising and admission stay the scope's.
 49. **Selection faults.** A thrown handler, a returned `fault`, and a conversation changed under the handler each emit `fault`; a throw builds from `view()` with no `select` event, and a returned `fault` charges its usage before `fault` fires. A cancel at a select site wins over every fault, and the run commits partial without a further provider call.
 50. **Selection cost.** Selection usage is charged in full to the cost `budget` and folded into `AgentResult.usage`, with no `usage` chunk or `usage` event.
 51. **Judgments.** A conversation's `judgments` store keys each record by the caller's question id, last write wins in place, stamps `time` on `add`, and attaches `usage` only for a one-question request. `resolve` reuses each record whose question JSON text, ordered sources, rendered state, and configured judge `model` match, asks once for the rest, and keeps the completed records when a cancel interrupts it.
@@ -2133,6 +2360,98 @@ await agent.generate() // show('Answer from the ticket thread.', 2, 2) — the p
 
 As in [The stock selection](#the-stock-selection), the executed transcription serves recorded probabilities from a loopback listener and supplies the cutoff and the limit.
 
+### Serving requests through a ledger
+
+Build a ledger from a provider, a judge, the lookups, and the measured questions, add the seed history to its conversation, and send each request through the `respond` method. Read the `briefing` member of each `select` event's receipt to see what the ledger told the model. The following ledger serves two requests; a scripted provider stands in for the model and a scripted judge for Mica:
+
+```ts
+import type {
+	JudgeAnswer,
+	JudgeInterface,
+	LedgerLookup,
+	LedgerThreshold,
+	ProviderInterface,
+	ProviderResult,
+} from '@orkestrel/agent'
+import { createLedger, LEDGER_QUESTIONS } from '@orkestrel/agent'
+
+declare const thresholds: LedgerThreshold // fitted on LEDGER_QUESTIONS and your judge
+
+// Each provider call takes the next reply: two calibration calls, then one reply per turn.
+const replies: ProviderResult[] = [
+	{ content: '', usage: { prompt: 160, completion: 0, total: 160 } }, // calibration with the tools
+	{ content: '', usage: { prompt: 40, completion: 0, total: 40 } }, // calibration without them
+	{ content: '', tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }] },
+	{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
+	{ content: 'Yes. Refunds over $100 need a manager.' },
+]
+const provider: ProviderInterface = {
+	id: 'scripted',
+	name: 'scripted',
+	generate: async () => replies.shift() ?? { content: '' },
+	async *stream() {
+		const reply = replies.shift() ?? { content: '' }
+		if (reply.content !== '') yield { channel: 'content', text: reply.content }
+		return reply
+	},
+}
+// The judge files every message it categorizes as a rule and answers no to every noul question.
+const judge: JudgeInterface = {
+	id: 'scripted',
+	name: 'scripted',
+	model: 'scripted',
+	ask: async (request) => {
+		const answers: Record<string, JudgeAnswer> = {}
+		for (const [id, question] of Object.entries(request.questions)) {
+			answers[id] =
+				question.form === 'choice'
+					? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+					: { form: 'noul', noul: 0.1 }
+		}
+		return { model: 'scripted', answers }
+	},
+}
+// One lookup: the tool the model calls and the handler that reads the owner out of its result.
+const lookup: LedgerLookup = {
+	tool: {
+		name: 'lookup_order',
+		description: 'Read an order by its id.',
+		parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+		execute: (args) =>
+			`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
+	},
+	read: (args, text) =>
+		text.startsWith('No order')
+			? undefined // the lookup found nothing
+			: { ids: [String(args.id)], owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }] },
+}
+
+const ledger = createLedger(provider, {
+	judge,
+	system: 'You staff the Larkspur support desk. Today is 2026-10-09.',
+	topics: [{ name: 'refunds', criterion: 'refund amounts and approvals' }],
+	questions: LEDGER_QUESTIONS,
+	thresholds,
+	capacity: 32_768,
+	lookups: [lookup],
+})
+const briefings: Array<string | undefined> = []
+ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing))
+ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+
+const gauge = await ledger.calibrate(AbortSignal.timeout(30_000))
+gauge.fixed // 120 — what advertising the tools adds to a prompt
+const first = await ledger.respond('Can Brightwater Studio get a refund on order BW-5512?')
+first.content // 'Order BW-5512 qualifies for a $148.50 refund.'
+const second = await ledger.respond('Does the Brightwater Studio refund need a manager?')
+second.content // 'Yes. Refunds over $100 need a manager.'
+briefings[0] // '## Rules\n- Refunds over $100 need a manager.' — no lookup has named an owner yet
+briefings[1]
+// '## Pinned\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.'
+```
+
+The second request names Brightwater Studio, so its briefing pins that owner's record, built from the first request's lookup result, while neither the first request nor its reply reaches the second prompt. The executed transcription runs this fence with its own cutoffs and reads the prompts the provider received; see [the `tests/guides.test.ts` parity test](../tests/guides.test.ts).
+
 ### Removing / clearing entries, and the less-common accessors
 
 Agent-owned registries expose their less-common removal, clearing, persistence, and lookup methods here. Tool and workspace registry operations are documented in their dependency guides.
@@ -2223,7 +2542,7 @@ void agent
 
 ## Tests
 
-- [`tests/guides.test.ts`](../tests/guides.test.ts) — the Surface and method parity with `src/core`, the `Summary`, titled example, and pitch equality, and the executed flagship fences with the Contract clauses they back: scope timing, selection, judgments, the stock selection, modes, answer-only runs, the relay over a loopback listener, and the System One judge over a recorded response.
+- [`tests/guides.test.ts`](../tests/guides.test.ts) — the Surface and method parity with `src/core`, the `Summary`, titled example, and pitch equality, and the executed flagship fences with the Contract clauses they back: scope timing, selection, judgments, the stock selection, modes, answer-only runs, the ledger over a scripted provider and judge, the classifier and the gauge, the relay over a loopback listener, and the System One judge over a recorded response.
 - [`tests/src/core/helpers.test.ts`](../tests/src/core/helpers.test.ts) — the root helpers `filterAllowList`, `joinThinking`, `sanitizeToken`, `sanitizeUsage`, `sumUsage`, `removeEntries`, and `copyJSON`, and the `MESSAGE_ROLES` role list.
 - [`tests/src/core/validators.test.ts`](../tests/src/core/validators.test.ts) — the root guards `isMessage`, `isJudgeEntry`, and `isJudgeQuestion`, each total over hostile input.
 - [`tests/src/core/contracts.test.ts`](../tests/src/core/contracts.test.ts) — the message contract's round trip and malformed paths, and function-valued arguments accepted in the domain and refused on the wire.
@@ -2262,6 +2581,11 @@ void agent
 - [`tests/src/core/agents/Channel.test.ts`](../tests/src/core/agents/Channel.test.ts) — the channel's lost-wakeup, `undefined` values, buffer-before-close, `fail`, FIFO order, and end semantics.
 - [`tests/src/core/agents/factories.test.ts`](../tests/src/core/agents/factories.test.ts) — `createChannel`, `createAgent`, `createAgentRegistry`, `createAgentQueue` with its durability, partial policy, and lifecycle, `createAgentRunner` with fan-out, and the `AgentJobError` / `isAgentJobError` block.
 - [`tests/src/core/agents/helpers.test.ts`](../tests/src/core/agents/helpers.test.ts) — `agentResultToJSON`, `estimateMessages`, `settleAgentJob`, `assembleResult`, `denyCall`, and `chargeUsage`.
+- [`tests/src/core/ledgers/Ledger.test.ts`](../tests/src/core/ledgers/Ledger.test.ts) — the ledger over a scripted provider: owner records, seed stubs, and the seed tail, the repeat stop, the answer pass and the abort that skips it, calibration and its refusals, the filing of notes and failed lookups, the `recall` tool's limit and room, and stale sentences across the briefing, the tail, `recall`, and the answer digest.
+- [`tests/src/core/ledgers/Classifier.test.ts`](../tests/src/core/ledgers/Classifier.test.ts) — the measured question bytes and asking order, judgment reuse and usage, exact cutoffs, pair questions, deterministic and transient judge failures, and abort faults that keep the completed judgments.
+- [`tests/src/core/ledgers/Gauge.test.ts`](../tests/src/core/ledgers/Gauge.test.ts) — the gauge's construction refusals and its `measure`, `observe`, `rate`, `left`, `reserve`, and `room` methods.
+- [`tests/src/core/ledgers/factories.test.ts`](../tests/src/core/ledgers/factories.test.ts) — `createLedger` and its `LedgerError` refusals for thresholds, shares, capacity, limits, topics, lookups, and a supplied gauge, and the barrel exports of the ledger module.
+- [`tests/src/core/ledgers/helpers.test.ts`](../tests/src/core/ledgers/helpers.test.ts) — the projection helpers from `splitSentences` through `buildRecords` and `selectRecords`, the record renderers, `splitTopic`, `cutItems` and `matchesCutLine`, `renderStub`, and `fitSlope`.
 
 ### Placement proofs
 
