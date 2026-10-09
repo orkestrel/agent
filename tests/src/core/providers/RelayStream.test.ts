@@ -14,9 +14,31 @@ import {
 	createToolCall,
 	FailingProvider,
 	RecordedProvider,
+	RecordedTransport,
+	ScriptedWire,
 } from '../../../setup.js'
 
 describe('RelayStream', () => {
+	it('strips received thinking under the upstream none replay policy', async () => {
+		const transport = new RecordedTransport(() => new Response('c:answer'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			replay: 'none',
+		})
+		const relay = new RelayStream({
+			provider,
+			request: {
+				messages: [{ id: 'reply', role: 'assistant', content: 'answer', thinking: 'reason' }],
+			},
+			signal: new AbortController().signal,
+		})
+		expect(await relay.response.text()).toContain('answer')
+		expect(await requireValue(transport.requests[0]).text()).toBe(
+			'{"messages":[{"id":"reply","role":"assistant","content":"answer"}]}',
+		)
+	})
+
 	it('returns and finalizes the generator on inbound abort with a queued unread frame', async () => {
 		const provider = new RecordedProvider()
 		const abort = new AbortController()

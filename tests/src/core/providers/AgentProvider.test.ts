@@ -23,6 +23,13 @@ import {
 } from '../../../setup.js'
 
 describe('AgentProvider — identity, transport, and request composition', () => {
+	it('exposes the replay input and defaults to none', () => {
+		expect(new ScriptedWire({ url: 'https://provider.test' }).replay).toBe('none')
+		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'none' }).replay).toBe('none')
+		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'turn' }).replay).toBe('turn')
+		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'all' }).replay).toBe('all')
+	})
+
 	it('mints a distinct instance UUID per provider beside the exported transport limits', () => {
 		const provider = new ScriptedWire({ url: 'https://provider.test' })
 		const other = new ScriptedWire({ url: 'https://provider.test' })

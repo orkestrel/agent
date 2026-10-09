@@ -3,6 +3,7 @@ import { ContractError, parseJSONAs } from '@orkestrel/contract'
 import { requireValue, roundTripJSON } from '@orkestrel/test'
 import {
 	createRelayProvider,
+	AgentProvider,
 	providerRequestContract,
 	relayFrameContract,
 	ProviderAbortError,
@@ -22,6 +23,21 @@ import {
 } from '../../../setup.js'
 
 describe('RelayProvider', () => {
+	it('inherits the base replay getter and forwards its configured policy', () => {
+		const provider = new RelayProvider({
+			url: 'https://relay.test',
+			parser: createParser,
+			replay: 'turn',
+		})
+		expect(provider.replay).toBe('turn')
+		expect(Object.hasOwn(provider, 'replay')).toBe(false)
+		expect(Object.hasOwn(RelayProvider.prototype, 'replay')).toBe(false)
+		expect(Object.getOwnPropertyDescriptor(AgentProvider.prototype, 'replay')?.get).toBeDefined()
+		expect(new RelayProvider({ url: 'https://relay.test', parser: createParser }).replay).toBe(
+			'none',
+		)
+	})
+
 	it('sends the snapshot of hostile parameters and never consults their serializer', async () => {
 		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({

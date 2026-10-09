@@ -10,10 +10,12 @@ import type {
 	Message,
 	ProviderDelta,
 	ProviderInterface,
+	ProviderIncrement,
 	ProviderResult,
 	Selection,
 } from '@src/core'
 import { createScheduler } from '@orkestrel/workflow'
+import { parseJSONAs } from '@orkestrel/contract'
 import { createBudget, createTokenBudget } from '@orkestrel/budget'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
@@ -28,6 +30,7 @@ import {
 	isAgentError,
 	isProviderAbortError,
 	ProviderAbortError,
+	providerRequestContract,
 	Scope,
 } from '@src/core'
 import {
@@ -49,6 +52,8 @@ import {
 	seedFramedAgent,
 	SELECTION_FAULT_CASES,
 	SELECTION_USAGE,
+	RecordedTransport,
+	ScriptedWire,
 } from '../../../setup.js'
 import {
 	collect,
@@ -132,6 +137,194 @@ function createRecordingBudget(max: number): RecordingBudgetInterface {
 	}
 }
 
+describe('Agent — thinking replay', () => {
+	it('defaults an absent provider policy to none and omits empty thinking on both assistant paths', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', thinking: 'first thoughts', tools: [createToolCall()] },
+				{ content: '', thinking: '', tools: [createToolCall({ id: 'second' })] },
+				{ content: 'done', thinking: '' },
+			],
+			SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		tools.add(addTool())
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		expect(provider.replay).toBeUndefined()
+		await agent.generate()
+		expect(provider.calls).toHaveLength(3)
+		expect(
+			provider.calls
+				.flatMap((call) => call.messages)
+				.some((message) => Object.hasOwn(message, 'thinking')),
+		).toBe(false)
+		const assistants = agent.context.messages
+			.messages()
+			.filter((message) => message.role === 'assistant')
+		expect(assistants.map((message) => Object.hasOwn(message, 'thinking'))).toEqual([
+			true,
+			false,
+			false,
+		])
+	})
+
+	it('stores each call thinking and applies every replay policy within and across user turns', async () => {
+		for (const replay of [undefined, 'none', 'turn', 'all'] as const) {
+			const responses = ['tool', 'answer', 'empty']
+			const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+			const provider = new ScriptedWire({
+				url: 'https://provider.test',
+				fetch: transport.fetch,
+				...(replay === undefined ? {} : { replay }),
+				records: new Map<string, ProviderIncrement>([
+					['tool', { content: '', thinking: 'first thoughts', tools: [createToolCall()] }],
+					['answer', { content: 'done', thinking: 'final thoughts', tools: [] }],
+					[
+						'empty',
+						{ content: '', thinking: '', tools: [], result: { content: 'later', thinking: '' } },
+					],
+				]),
+			})
+			const tools = createToolManager()
+			tools.add(addTool())
+			const agent = createAgent(provider, { tools })
+			agent.context.messages.add({ role: 'user', content: 'go' })
+			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+			agent.context.messages.add({ role: 'user', content: 'again' })
+			expect(await agent.generate()).toMatchObject({ content: 'later', partial: false })
+			const assistants = agent.context.messages
+				.messages()
+				.filter((message) => message.role === 'assistant')
+			expect(assistants.map((message) => message.thinking)).toEqual([
+				'first thoughts',
+				'final thoughts',
+				undefined,
+			])
+			expect(requireValue(assistants[0]).calls).toEqual([createToolCall()])
+			expect(Object.hasOwn(requireValue(assistants[2]), 'thinking')).toBe(false)
+			expect(transport.requests).toHaveLength(3)
+			const opening = requireValue(
+				parseJSONAs(await requireValue(transport.requests[0]).text(), providerRequestContract.is),
+			)
+			const followup = requireValue(
+				parseJSONAs(await requireValue(transport.requests[1]).text(), providerRequestContract.is),
+			)
+			const later = requireValue(
+				parseJSONAs(await requireValue(transport.requests[2]).text(), providerRequestContract.is),
+			)
+			expect(opening.messages.some((message) => Object.hasOwn(message, 'thinking'))).toBe(false)
+			expect(
+				followup.messages
+					.filter((message) => Object.hasOwn(message, 'thinking'))
+					.map((message) => message.thinking),
+			).toEqual(replay === 'turn' || replay === 'all' ? ['first thoughts'] : [])
+			expect(
+				later.messages
+					.filter((message) => Object.hasOwn(message, 'thinking'))
+					.map((message) => message.thinking),
+			).toEqual(replay === 'all' ? ['first thoughts', 'final thoughts'] : [])
+		}
+	})
+
+	it('keeps request bytes equal with and without result thinking for none and absent replay', async () => {
+		for (const replay of [undefined, 'none'] as const) {
+			const bodies: string[][] = []
+			for (const thinking of [undefined, 'private reasoning']) {
+				const responses = ['tool', 'answer']
+				const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+				const provider = new ScriptedWire({
+					url: 'https://provider.test',
+					fetch: transport.fetch,
+					...(replay === undefined ? {} : { replay }),
+					records: new Map<string, ProviderIncrement>([
+						[
+							'tool',
+							{
+								content: '',
+								thinking: '',
+								tools: [],
+								result: {
+									content: '',
+									tools: [createToolCall()],
+									...(thinking === undefined ? {} : { thinking }),
+								},
+							},
+						],
+						[
+							'answer',
+							{
+								content: '',
+								thinking: '',
+								tools: [],
+								result: { content: 'done', ...(thinking === undefined ? {} : { thinking }) },
+							},
+						],
+					]),
+				})
+				const tools = createToolManager()
+				tools.add(addTool())
+				const agent = createAgent(provider, { tools })
+				agent.context.messages.add({ role: 'user', content: 'go' })
+				await agent.generate()
+				expect(transport.requests).toHaveLength(2)
+				const sent: string[] = []
+				for (const request of transport.requests) {
+					const body = await request.text()
+					expect(body).not.toContain('"thinking"')
+					const parsed = requireValue(parseJSONAs(body, providerRequestContract.is))
+					// Independent conversations mint UUIDs; align only those identities before comparing bytes.
+					let aligned = body
+					for (const [index, message] of parsed.messages.entries()) {
+						aligned = aligned.replaceAll(message.id, `message-${index}`)
+					}
+					sent.push(aligned)
+				}
+				bodies.push(sent)
+			}
+			expect(bodies[1]).toEqual(bodies[0])
+		}
+	})
+
+	it('estimates replayed thinking at run entry and between tool calls before compacting', async () => {
+		for (const replay of ['none', 'all'] as const) {
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				keep: 0,
+			})
+			const conversation = conversations.add()
+			conversation.add([
+				{ role: 'user', content: 'earlier' },
+				{ role: 'assistant', content: 'reply', thinking: 'h'.repeat(8000) },
+				{ role: 'user', content: 'go' },
+			])
+			const window = createBudget<readonly Message[]>({ max: 100, consumer: estimateMessages })
+			expect(estimateMessages(conversation.view())).toBeGreaterThan(window.max)
+			const responses = ['tool', 'answer']
+			const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+			const provider = new ScriptedWire({
+				url: 'https://provider.test',
+				fetch: transport.fetch,
+				replay,
+				records: new Map<string, ProviderIncrement>([
+					['tool', { content: '', thinking: 't'.repeat(8000), tools: [createToolCall()] }],
+					['answer', { content: 'done', thinking: '', tools: [] }],
+				]),
+			})
+			const tools = createToolManager()
+			tools.add(addTool())
+			const agent = createAgent(provider, { tools, conversations, window })
+			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+			expect(conversation.sections).toHaveLength(replay === 'none' ? 0 : 1)
+			const sent = requireValue(
+				parseJSONAs(await requireValue(transport.requests[1]).text(), providerRequestContract.is),
+			)
+			expect(window.consumed).toBe(estimateMessages(sent.messages))
+			expect(window.exhausted).toBe(replay === 'all')
+		}
+	})
+})
+
 describe('Agent — single turn', () => {
 	it('generate returns the content of a no-tools turn', async () => {
 		const provider = createScriptedProvider(
@@ -149,7 +342,7 @@ describe('Agent — single turn', () => {
 	it('joins provider thinking onto the result; omitted when no call surfaced any (H4)', async () => {
 		// A tool round whose turn carries separated reasoning, then a final turn with its
 		// own — the loop JOINS them (blank-line separated) onto AgentResult.thinking, while
-		// the content / messages stay clean (thinking never re-enters the conversation).
+		// message content stays separate from the stored thinking.
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => 'ok' }))
 		const provider = createScriptedProvider(
@@ -168,7 +361,7 @@ describe('Agent — single turn', () => {
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
 		expect(result.thinking).toBe('first thoughts\n\nfinal thoughts')
-		// The conversation never saw the reasoning — no stored message carries it.
+		// Reasoning stays out of message content.
 		expect(
 			agent.context.messages.messages().some((message) => message.content.includes('thoughts')),
 		).toBe(false)

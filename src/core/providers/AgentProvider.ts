@@ -9,6 +9,7 @@ import type {
 	ProviderResult,
 	ProviderStreamOptions,
 	ThinkSplitterInterface,
+	ThinkingReplay,
 } from './types.js'
 import type { Message } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
@@ -28,6 +29,7 @@ import { joinThinking } from '../helpers.js'
  * content while content deltas already yielded cannot be recalled. A subclass fills
  * `name`, `frame`, `body`, `read`, and `finish`; the constructor takes the `split`
  * and `strict` switches to control reasoning separation and settled-result requirements.
+ * The `replay` input names which stored thinking the agent and relay send back. Default: `'none'`.
  *
  * @example Writing a provider for a new wire
  * ```ts
@@ -74,6 +76,7 @@ export abstract class AgentProvider<
 	TRecord = Readonly<Record<string, unknown>>,
 > implements AgentProviderInterface<TRecord> {
 	readonly #id: string
+	readonly #replay: ThinkingReplay
 	readonly #url: string
 	readonly #path: string
 	readonly #timeout: number
@@ -84,6 +87,7 @@ export abstract class AgentProvider<
 
 	constructor(input: AgentProviderInput) {
 		this.#id = crypto.randomUUID()
+		this.#replay = input.replay ?? 'none'
 		this.#url = input.url
 		this.#path = input.path ?? ''
 		this.#timeout = input.timeout ?? DEFAULT_PROVIDER_TIMEOUT
@@ -99,6 +103,11 @@ export abstract class AgentProvider<
 	/** Exposes the instance's minted UUID. */
 	get id(): string {
 		return this.#id
+	}
+
+	/** Names which stored assistant thinking the agent and relay send back. */
+	get replay(): ThinkingReplay {
+		return this.#replay
 	}
 
 	/** Creates fresh framing state for the call. */

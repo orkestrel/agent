@@ -28,7 +28,7 @@ import { AgentContext } from '../contexts/index.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError } from './errors.js'
 import { Channel } from './Channel.js'
-import { assembleResult, chargeUsage, denyCall, estimateTokens } from './helpers.js'
+import { assembleResult, chargeUsage, denyCall, estimateTokens, stripThinking } from './helpers.js'
 import { filterAllowList, joinThinking, sanitizeUsage, sumUsage } from '../helpers.js'
 import { isProviderAbortError } from '../providers/index.js'
 
@@ -51,7 +51,9 @@ import { isProviderAbortError } from '../providers/index.js'
  *   running total + the `budget` and yield a `usage` chunk; if the model requested
  *   tools, append the assistant turn, `execute` them, yield a `tool` chunk per call,
  *   append each tool result message, and continue; otherwise append the final
- *   assistant message and stop.
+ *   assistant message and stop. Each assistant message stores its call's non-empty thinking.
+ *   Provider calls and prompt estimates apply the provider's `replay` policy to the working
+ *   array; an absent policy means `'none'`.
  * - **Bounded.** Each run arms one cancel through `createAbort({ signal: AbortSignal.any([
  *   …]) })` folding the external `signal`, the `timeout` deadline, and the `budget`
  *   signal; `abort()` fires it. Any trip stops the loop and commits a partial result
@@ -86,7 +88,7 @@ export class Agent implements AgentInterface {
 	readonly #authority: AuthorityInterface | undefined
 	// The context budget for automatic conversation compaction — its `consumer` is a token estimator,
 	// its `max` the context window. `#trim` re-measures the absolute current prompt against it
-	// (clear() + consume(messages)) before the first provider request and between turns; `undefined`
+	// after the provider's replay policy before the first request and between turns; `undefined`
 	// ⇒ disabled, and the loop never calls `#trim`. Reset (`clear()`) at run entry so no stale
 	// `consumed` carries across runs / a conversation switch. Not the hard cost `budget` ceiling —
 	// when the prompt reaches its `max` this compacts + continues (non-fatal on a summarizer throw,
@@ -530,6 +532,9 @@ export class Agent implements AgentInterface {
 					role: 'assistant',
 					content: result.content,
 					calls: result.tools,
+					...(result.thinking === undefined || result.thinking.length === 0
+						? {}
+						: { thinking: result.thinking }),
 				})
 				messages.push(assistant)
 				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
@@ -565,7 +570,15 @@ export class Agent implements AgentInterface {
 				continue
 			}
 			// No tools: this turn's content is the final answer — record it and finish.
-			messages.push(this.#context.messages.add({ role: 'assistant', content: result.content }))
+			messages.push(
+				this.#context.messages.add({
+					role: 'assistant',
+					content: result.content,
+					...(result.thinking === undefined || result.thinking.length === 0
+						? {}
+						: { thinking: result.thinking }),
+				}),
+			)
 			content = result.content
 			pending = false
 			broke = true
@@ -594,9 +607,9 @@ export class Agent implements AgentInterface {
 	// — its `consumer` a token estimator (for example `estimateMessages`), its `max` the context
 	// window — the same consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action
 	// is compaction, not abort. It measures the absolute current prompt: `clear()` then
-	// `consume(messages)` makes `#window.consumed` the estimated footprint of the exact next prompt
-	// (the working `messages` array = the system block + the conversation's `view()` + this turn's
-	// appended messages — the real input the next `provider.stream` will receive), and `exhausted`
+	// consuming the working messages after the provider's replay policy makes `#window.consumed`
+	// the estimated footprint of the next prompt (the system block + the conversation's `view()` +
+	// this turn's appended messages, with only the thinking that policy permits), and `exhausted`
 	// means that prompt has reached `max`.
 	// What the check does:
 	//  • Non-fatal summarizer failure — `conversation.compact()` is wrapped: a thrown summarizer error
@@ -639,7 +652,7 @@ export class Agent implements AgentInterface {
 		if (this.#window === undefined || conversation?.summarizable !== true || abort.signal.aborted)
 			return false
 		this.#window.clear()
-		this.#window.consume(messages)
+		this.#window.consume(stripThinking(messages, this.#provider.replay ?? 'none'))
 		if (!this.#window.exhausted) return false
 		let section: Awaited<ReturnType<typeof conversation.compact>>
 		try {
@@ -800,7 +813,8 @@ export class Agent implements AgentInterface {
 	// not answer content) — returning the provider's assembled result. The per-run `think` / `schema`
 	// preferences ride into `provider.stream` as {@link ProviderStreamOptions}, composed together —
 	// keys are omitted when undefined, so the provider receives no options object at all when both
-	// are absent. Kept separate so the loop reads as one straight line.
+	// are absent. The messages carry only the thinking the provider's replay policy permits (default
+	// `'none'`). Kept separate so the loop reads as one straight line.
 	async *#provide(
 		messages: readonly Message[],
 		signal: AbortSignal,
@@ -813,7 +827,7 @@ export class Agent implements AgentInterface {
 		if (think !== undefined) options.think = think
 		if (schema !== undefined) options.schema = schema
 		const generator = this.#provider.stream(
-			messages,
+			stripThinking(messages, this.#provider.replay ?? 'none'),
 			signal,
 			definitions,
 			Object.keys(options).length > 0 ? options : undefined,

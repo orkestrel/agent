@@ -2,6 +2,7 @@ import type { ProviderDelta, ProviderResult, RelayFrame, RelayStreamOptions } fr
 import { RELAY_CONTENT_TYPE, RELAY_PROVIDER_MESSAGE } from './constants.js'
 import { ProviderError, isProviderAbortError } from './errors.js'
 import { relayFrameContract } from './contracts.js'
+import { stripThinking } from '../agents/helpers.js'
 
 /**
  * Streams a provider call as validated NDJSON frames under response backpressure.
@@ -37,7 +38,7 @@ export class RelayStream {
 		this.#listener = this.#cancel.bind(this)
 		if (this.#signal.aborted) this.#abortProvider()
 		this.#iterator = options.provider.stream(
-			options.request.messages,
+			stripThinking(options.request.messages, options.provider.replay ?? 'none'),
 			this.#upstream.signal,
 			options.request.tools,
 			options.request.options,

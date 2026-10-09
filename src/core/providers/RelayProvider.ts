@@ -3,7 +3,6 @@ import type {
 	ProviderParserInterface,
 	ProviderRequest,
 	RelayProviderOptions,
-	ThinkingReplay,
 } from './types.js'
 import { cloneJSONValue } from '@orkestrel/contract'
 import { AgentProvider } from './AgentProvider.js'
@@ -49,7 +48,7 @@ export class RelayProvider extends AgentProvider {
 	readonly #parser: () => ProviderParserInterface
 
 	constructor(options: RelayProviderOptions) {
-		const { url, timeout, fetch, headers } = options
+		const { url, timeout, fetch, headers, replay } = options
 		super({
 			url,
 			split: false,
@@ -57,13 +56,10 @@ export class RelayProvider extends AgentProvider {
 			...(timeout === undefined ? {} : { timeout }),
 			...(fetch === undefined ? {} : { fetch }),
 			...(headers === undefined ? {} : { headers }),
+			...(replay === undefined ? {} : { replay }),
 		})
 		this.#parser = options.parser
-		this.replay = options.replay ?? 'none'
 	}
-
-	/** Names which assistant thinking the relay sends back; `'none'` when the options set none. */
-	readonly replay: ThinkingReplay
 
 	/** Identifies the relay backend. */
 	readonly name = 'relay'
