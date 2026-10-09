@@ -4580,7 +4580,9 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('advertises the same definitions on every turn with a subset selection as without a handler', async () => {
-		expectTypeOf<keyof Selection>().toEqualTypeOf<'messages' | 'judgments' | 'usage' | 'fault'>()
+		expectTypeOf<keyof Selection>().toEqualTypeOf<
+			'messages' | 'judgments' | 'usage' | 'fault' | 'briefing'
+		>()
 		const subset = createRecordingSelection({ keep: (message) => message.role === 'user' })
 		const advertised = await Promise.all(
 			[undefined, subset.handler].map(async (select) => {
@@ -4771,6 +4773,25 @@ describe('Agent — the select event follows each select-site build', () => {
 
 		expect(order).toEqual(['select', 'turn 0'])
 		expect(selected.calls[0]?.[0]).toBe(selection.selections[0])
+	})
+
+	it('sends a system message ending in the briefing and emits the selection unchanged', async () => {
+		const selected = createRecorder<AgentEventMap['select']>()
+		const briefing = 'Plan: refund invoice 42.'
+		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			system: 'Be brief.',
+			select: async (conversation) => ({ messages: conversation.view(), judgments: [], briefing }),
+			on: { select: selected.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		await agent.generate()
+
+		const sent = provider.calls[0]?.messages
+		expect(sent?.[0]?.role).toBe('system')
+		expect(sent?.[0]?.content).toBe('Be brief.\n\nPlan: refund invoice 42.')
+		expect(selected.calls[0]?.[0].briefing).toBe(briefing)
 	})
 
 	it('fires again after each compaction rebuild with the request captured at entry', async () => {

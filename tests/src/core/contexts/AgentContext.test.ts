@@ -1,4 +1,4 @@
-import type { AgentContextInterface, MessageInput, Message } from '@src/core'
+import type { AgentContextInterface, MessageInput, Message, Selection } from '@src/core'
 import { Tool, ToolManager } from '@orkestrel/tool'
 import {
 	WorkspaceManager,
@@ -1340,5 +1340,72 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		const built = context.build({ messages: [], judgments: [] })
 
 		expect(built.map((message) => message.role)).toEqual(['system'])
+	})
+
+	it('appends the briefing as the last system part after the workspace section', () => {
+		const context = seedWorkspaceContext()
+		const plain = requireValue(context.build({ messages: [], judgments: [] })[0])
+
+		const built = context.build({
+			messages: [],
+			judgments: [],
+			briefing: 'Plan: refund invoice 42.',
+		})
+
+		expect(built).toHaveLength(1)
+		expect(built[0]?.content).toBe(`${String(plain.content)}\n\nPlan: refund invoice 42.`)
+	})
+
+	it('yields one system message holding exactly a lone briefing', () => {
+		const context = new AgentContext()
+
+		const built = context.build({ messages: [], judgments: [], briefing: 'Only this.' })
+
+		expect(built).toHaveLength(1)
+		expect(built[0]).toEqual({
+			id: requireValue(built[0]).id,
+			role: 'system',
+			content: 'Only this.',
+		})
+	})
+
+	it('adds no briefing for a faulted selection, an empty briefing, or an absent briefing', () => {
+		const context = seedWorkspaceContext()
+		const expected = requireValue(context.build({ messages: [], judgments: [] })[0]).content
+		const selections: readonly Selection[] = [
+			{ messages: [], judgments: [], briefing: 'Void plan.', fault: new Error('gave up') },
+			{ messages: [], judgments: [], briefing: '' },
+			{ messages: [], judgments: [] },
+		]
+
+		for (const selection of selections) {
+			expect(context.build(selection)[0]?.content).toBe(expected)
+		}
+		expect(context.build()[0]?.content).toBe(expected)
+	})
+
+	it('keeps the briefing when the scope filters instructions', () => {
+		const context = new AgentContext({ system: 'Be brief.' })
+		context.apply(new Scope({ name: 'narrow', instructions: [] }))
+
+		const built = context.build({ messages: [], judgments: [], briefing: 'Plan.' })
+
+		expect(built[0]?.content).toBe('Be brief.\n\nPlan.')
+	})
+
+	it('drops the briefing from the view-change fault', async () => {
+		const context = new AgentContext({
+			select: async (conversation) => {
+				const view = conversation.view()
+				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
+				return { messages: view, judgments: [], briefing: 'Stale plan.' }
+			},
+		})
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const selected = requireValue(await context.select(request, new AbortController().signal))
+
+		expect(selected.briefing).toBeUndefined()
+		expect(selected.fault).toBeInstanceOf(Error)
 	})
 })

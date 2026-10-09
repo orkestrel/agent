@@ -236,6 +236,16 @@ export class AgentContext implements AgentContextInterface {
 		// sole image source. Skipped when there is none. (Applies to the conversation's view too.)
 		const tail = attachUserImages(conversation, collectImageData(files))
 
+		// A faulted selection's messages are `view()`, so the plan its briefing rested on is void.
+		if (
+			selection !== undefined &&
+			selection.fault === undefined &&
+			selection.briefing !== undefined &&
+			selection.briefing !== ''
+		) {
+			parts.push(selection.briefing)
+		}
+
 		// 3. Prepend one assembled system message only when some part exists.
 		if (parts.length === 0) return tail
 		const system: Message = {

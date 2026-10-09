@@ -245,6 +245,8 @@ export interface Selection {
 	readonly usage?: TokenUsage
 	/** Holds the error a handler gave up on; `messages` is then `view()`. */
 	readonly fault?: Error
+	/** Holds the text `build` appends as the last part of the system message. */
+	readonly briefing?: string
 }
 
 /**
@@ -633,8 +635,9 @@ export interface AgentContextInterface {
 	 * workspace image data attaches to the last user message.
 	 *
 	 * **A selection.** Given a {@link Selection}, the build folds `selection.messages` in place of
-	 * `view()` and attaches the image data to the last user message of that array; the system
-	 * block is unchanged.
+	 * `view()` and attaches the image data to the last user message of that array, and appends a
+	 * non-empty `selection.briefing` as the last system part when the selection has no `fault`; the
+	 * rest of the system block is unchanged.
 	 *
 	 * @param selection - The selection whose `messages` replace `view()`; omitted ⇒ `view()`
 	 * @returns The scoped conversation, prefixed by the assembled `system` message when any
