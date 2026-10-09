@@ -27,6 +27,12 @@ export const DECISIVE_CATEGORIES: readonly LedgerCategory[] = Object.freeze([
 /** Lists the categories that place a message no owner claims on the rules record. */
 export const PLACED_CATEGORIES: readonly LedgerCategory[] = Object.freeze(['rule', 'correction'])
 
+/** Names the key of the record that holds the rules no owner claims. */
+export const LEDGER_RULES_KEY = 'rules'
+
+/** Prefixes the key of an owner's record, which the owner's id follows. */
+export const LEDGER_OWNER_PREFIX = 'owner:'
+
 /**
  * Supplies the measured wording of every question the ledger asks its judge.
  *
@@ -92,7 +98,10 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
  * The `a5-records` series ran with a prompt share of 0.7 and a tail share of 0.35
  * (`tmp/bench/results/v9/a5-records-v1.log`, 2026-10-09).
  */
-export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({ prompt: 0.7, tail: 0.35 })
+export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
+	prompt: 0.7,
+	tail: 0.35,
+})
 
 /**
  * Caps the tool-iteration turns of a ledger's agent at the measured limit of 8.
