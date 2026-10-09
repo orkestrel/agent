@@ -96,6 +96,7 @@ await new GuideCommand({
 		isJudgeQuestion,
 		JudgeAbortError,
 		JudgeError,
+		LEDGER_NOTES,
 		LEDGER_QUESTIONS,
 		LEDGER_SCALE_DRIFT,
 		MAX_ERROR_BODY_LENGTH,
@@ -1338,7 +1339,10 @@ await new GuideCommand({
 
 		// No unit test under `tests/src/core/ledgers` isolates these claims of the ledger section, so
 		// each scenario files by phrase: the claim, not a model, decides what the judge answers.
-		function createPhraseJudge(rules: readonly string[]): JudgeInterface {
+		function createPhraseJudge(
+			rules: readonly string[],
+			amenders: readonly string[] = [],
+		): JudgeInterface {
 			return {
 				id: 'scripted',
 				name: 'scripted',
@@ -1360,7 +1364,9 @@ await new GuideCommand({
 								: {
 										form: 'noul',
 										noul:
-											id.startsWith('["topic"') && state.toLowerCase().includes('refund')
+											(id.startsWith('["topic"') && state.toLowerCase().includes('refund')) ||
+											(id.startsWith('["amends"') &&
+												amenders.some((amender) => state.includes(amender)))
 												? 0.9
 												: 0.1,
 									}
@@ -1662,6 +1668,166 @@ await new GuideCommand({
 			expect(contents.at(-1)).toBe(`lookup_order {"id":"BW-5512"}: ${result}`)
 			expect(guideText).toContain(
 				'what its lookups returned reaches a later request through the records and the `recall` tool',
+			)
+		})
+
+		// A seed rule whose code sentence a later correction amends through the owner they share, a seed
+		// assistant statement, and a seed lookup, served to one request that recalls a desk topic and an
+		// owner and then ends without text.
+		const amendedRule = 'Refunds for Brightwater Studio need a manager. Use code AA-10.'
+		const amendedStatement = 'Refund forms go to the Northgate desk.'
+		const amendedCorrection = 'Correction: Brightwater Studio uses code AA-12 in place of AA-10.'
+		const amendedReading =
+			'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
+		async function serveAmendedDesk(): Promise<ReadonlyArray<readonly Message[]>> {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'desk', name: 'recall', arguments: { topic: 'refunds' } }] },
+					{
+						content: '',
+						tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Brightwater' } }],
+					},
+					{ content: '' },
+					{ content: 'Use code AA-12.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge(['Refunds for'], ['uses code AA-12']),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 32_768,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [orderLookup],
+			})
+			ledger.conversation.add([
+				{
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ role: 'tool', call: 'seed', content: amendedReading },
+				{ role: 'user', content: amendedRule },
+				{ role: 'assistant', content: amendedStatement },
+				{ role: 'user', content: amendedCorrection },
+			])
+			const result = await ledger.respond('Review the Brightwater Studio refund.')
+			expect(result.passes).toHaveLength(2)
+			return provider.calls.map(({ messages }) => messages)
+		}
+
+		it('drops a stale sentence from the briefing alone and keeps it in recall, the answer note, and the seed tail, as the records claim', async () => {
+			const prompts = await serveAmendedDesk()
+			const first = requireValue(prompts[0], 'Missing first prompt')
+
+			expect(requireValue(first[0], 'Missing system message').content).toContain(
+				'- Refunds for Brightwater Studio need a manager.\n',
+			)
+			for (const prompt of prompts)
+				expect(requireValue(prompt[0], 'Missing system message').content).not.toContain(
+					'Use code AA-10.',
+				)
+			expect(first.map(({ content }) => content)).toContain(amendedRule)
+			expect(
+				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
+					?.content,
+			).toContain(amendedRule)
+			expect(
+				requireValue(prompts[3], 'Missing answer pass').find(({ content }) =>
+					content.startsWith(LEDGER_NOTES.results),
+				)?.content,
+			).toContain(amendedRule)
+			expect(guideText).toContain(
+				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool, the answer note, and the seed tail keep the stored content of each message they carry, stale sentences included.',
+			)
+		})
+
+		it('lists recall matches newest first with stored content and each amender after its source, as the `recall` tool claims', async () => {
+			const prompts = await serveAmendedDesk()
+
+			// The correction is newer than the statement but names no refund, so it follows its source.
+			expect(
+				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
+					?.content,
+			).toBe([amendedStatement, amendedRule, amendedCorrection].join('\n'))
+			expect(
+				requireValue(prompts[2], 'Missing owner recall').findLast(({ role }) => role === 'tool')
+					?.content,
+			).toBe(
+				[amendedCorrection, amendedRule, `lookup_order {"id":"BW-5512"}: ${amendedReading}`].join(
+					'\n',
+				),
+			)
+			expect(guideText).toContain(
+				'It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a desk topic) with their stored content, newest first, each followed by the messages that amend it,',
+			)
+		})
+
+		it('writes what the pass returned into the answer note without call text, as the answer pass claims', async () => {
+			const prompts = await serveAmendedDesk()
+
+			expect(
+				requireValue(prompts[3], 'Missing answer pass').find(({ content }) =>
+					content.startsWith(LEDGER_NOTES.results),
+				)?.content,
+			).toBe(
+				[
+					LEDGER_NOTES.results,
+					amendedStatement,
+					amendedRule,
+					amendedCorrection,
+					amendedReading,
+				].join('\n'),
+			)
+			expect(guideText).toContain(
+				"the ledger adds an answer note that carries what the pass's lookups and recalls returned, without their call text, then the `cue` note",
+			)
+		})
+
+		it('cuts a recall listing by whole items, newest first, to the room the gauge leaves, as the `recall` tool claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }],
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity: 350,
+				gauge: { scale: 1, fixed: 0 },
+				share: { prompt: 0.2, tail: 0.1 },
+			})
+			const seeds = Array.from(
+				{ length: 20 },
+				(_unused, at) => `Refund ${at} reached the Northgate desk with a completed receipt.`,
+			)
+			ledger.conversation.add(seeds.map((content): MessageInput => ({ role: 'user', content })))
+			await ledger.respond('Review the desk.')
+
+			const lines = requireValue(
+				requireValue(provider.calls[1], 'Missing recall turn').messages.findLast(
+					({ role }) => role === 'tool',
+				)?.content,
+				'Missing recall result',
+			).split('\n')
+			const kept = lines.slice(0, -1)
+			expect(kept.length).toBeGreaterThan(0)
+			expect(kept).toEqual(seeds.slice(-kept.length).reverse())
+			expect(lines.at(-1)).toBe(
+				`${seeds.length - kept.length} older items not shown; name a narrower topic to narrow the recall`,
+			)
+			expect(guideText).toContain(
+				'and cuts the list by whole items to the room the gauge leaves for the reply, naming how many older items it left out.',
 			)
 		})
 
