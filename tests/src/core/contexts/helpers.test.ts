@@ -133,7 +133,14 @@ describe('stock selection helpers', () => {
 			filterSelectionMessages(SELECTION_TOOL_MESSAGES, applicability, request).map(
 				(message) => message.id,
 			),
-		).toEqual(['duplicate', 'duplicate-a', 'duplicate-b', 'request'])
+		).toEqual(SELECTION_TOOL_MESSAGES.map((message) => message.id))
+		expect(
+			filterSelectionMessages(
+				SELECTION_TOOL_MESSAGES,
+				SELECTION_TOOL_MESSAGES.map((message) => ({ id: message.id, needed: false })),
+				request,
+			),
+		).toEqual([request])
 		const assistant = requireValue(SELECTION_TOOL_MESSAGES[2])
 		const wrong = {
 			id: 'wrong',
@@ -147,7 +154,7 @@ describe('stock selection helpers', () => {
 				[{ id: assistant.id, needed: false }],
 				request,
 			),
-		).toEqual([wrong, request])
+		).toEqual([assistant, wrong, request])
 	})
 
 	it('joins a late result to the one assistant whose call it names inside another run', () => {

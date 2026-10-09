@@ -77,6 +77,22 @@ import {
 // on a `Promise.withResolvers<void>()` or throws mid-stream to drive the abort / error / concurrency /
 // cancel paths — which are scenario behaviour, not replayable data.
 
+it('commits a partial agent result when final usage aborts the caller', async () => {
+	const provider = createScriptedProvider(
+		[{ content: 'Done.', usage: { prompt: 10, completion: 2, total: 12 } }],
+		{ record: true, exhaust: 'throw' },
+	)
+	const controller = new AbortController()
+	const agent = createAgent(provider, { signal: controller.signal })
+	agent.context.messages.add({ role: 'user', content: 'Finish the request.' })
+	agent.emitter.on('usage', () => controller.abort())
+	const result = await agent.generate()
+	expect(result.partial).toBe(true)
+	expect(result.content).toBe('Done.')
+	expect(result.usage).toEqual({ prompt: 10, completion: 2, total: 12 })
+	expect(provider.calls).toHaveLength(1)
+})
+
 const USAGE = createTokenUsage()
 
 // This file's uniform options for the shared scripted provider: every loop test records the

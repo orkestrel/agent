@@ -1,6 +1,7 @@
 import type { Message } from '../types.js'
 import type {
 	GaugeCall,
+	LedgerCategory,
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupState,
@@ -16,6 +17,26 @@ import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contrac
 import { estimateMessages } from '../agents/helpers.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
+
+/**
+ * Ranks a briefing source for removal before the next prompt.
+ *
+ * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, or 3 for a name match
+ * @param loose - If `true`, the source is a user message without a decisive category; if `false`, it is another source
+ * @param category - The source's recorded category, or undefined when undecided
+ * @returns The ascending removal rank: name matches, loose sources, off-topic corrections, off-topic rules, then topic matches
+ * @example
+ * ```ts
+ * rankLedgerCut(2, false, 'rule') // 3
+ * ```
+ */
+export function rankLedgerCut(
+	group: number,
+	loose: boolean,
+	category: LedgerCategory | undefined,
+): number {
+	return group === 3 ? 0 : loose ? 1 : group === 2 ? (category === 'rule' ? 3 : 2) : 4
+}
 
 /**
  * Resolves the generation cap and checks it against the context capacity.
@@ -146,11 +167,13 @@ export function collectNames(text: string): readonly string[] {
 }
 
 /**
- * Identifies a lookup call by its tool name and its canonical arguments.
+ * Identifies a lookup reading for projection by its tool name and normalized arguments.
  *
  * @remarks
  * Two calls share an identity whatever the key order of their arguments at any depth. A top-level
  * string argument is trimmed and uppercased first, so `"lh-1 "` and `"LH-1"` name one call.
+ * The ledger's repeat stop instead compares the tool name and canonical arguments without this
+ * string normalization, so those argument spellings remain distinct within a request.
  *
  * @param name - The tool name
  * @param args - The arguments the call carried
@@ -499,32 +522,32 @@ export function splitTopic(topic: string): readonly string[] {
  * `N older items not shown; name a narrower topic to narrow the recall`, which
  * {@link matchesCutLine} recognizes.
  *
- * @param items - The items in the order they are kept
+ * @param entries - The entries in the order they are kept
  * @param room - The estimate units the joined items can take
  * @returns The kept items followed by the cut line when any were left out, joined by newlines
  *
  * @example
  * ```ts
- * cutItems(['first item', 'second item'], 1) // 'first item\n1 older item not shown; name a narrower topic to narrow the recall'
+ * cutListing(['first item', 'second item'], 1) // 'first item\n1 older item not shown; name a narrower topic to narrow the recall'
  * ```
  */
-export function cutItems(items: readonly string[], room: number): string {
+export function cutListing(entries: readonly string[], room: number): string {
 	const kept: string[] = []
-	for (const item of items) {
+	for (const entry of entries) {
 		if (
 			kept.length > 0 &&
 			estimateMessages([
 				{
 					id: 'recall',
 					role: 'tool',
-					content: [...kept, item].join('\n'),
+					content: [...kept, entry].join('\n'),
 				},
 			]) > room
 		)
 			break
-		kept.push(item)
+		kept.push(entry)
 	}
-	const left = items.length - kept.length
+	const left = entries.length - kept.length
 	if (left > 0) {
 		kept.push(
 			`${left} older item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
@@ -534,7 +557,7 @@ export function cutItems(items: readonly string[], room: number): string {
 }
 
 /**
- * Checks whether a line is the cut line {@link cutItems} writes.
+ * Checks whether a line is the cut line {@link cutListing} writes.
  *
  * @param line - The line to check
  * @returns True if the line is a cut line; false otherwise

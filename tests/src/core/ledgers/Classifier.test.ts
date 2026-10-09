@@ -10,10 +10,45 @@ import {
 } from '../../../../src/core/ledgers/constants.js'
 import { extractTokens, matchEntities } from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
-import { RecordedTransport, RecordingJudge, SequentialSystemOneJudge } from '../../../setup.js'
+import {
+	RecordedTransport,
+	RecordingJudge,
+	ScriptedJudge,
+	SequentialSystemOneJudge,
+} from '../../../setup.js'
 import { buildLedgerMessage } from '../../../setupLedger.js'
 
 describe('Classifier', () => {
+	it('holds a QUESTION rejection without asking the refused spec twice', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const key = JSON.stringify(['category', message.id])
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'filing',
+			refuse: key,
+			fetch: new RecordedTransport(() => Response.json({ model: 'filing' })).fetch,
+		})
+		const classifier = new Classifier({
+			conversation,
+			judge,
+			questions: LEDGER_QUESTIONS,
+			topics: [],
+			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
+			assign: () => undefined,
+			entities: () => new Set(),
+		})
+		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
+			judgments: [],
+		})
+		expect(judge.bodies).toHaveLength(1)
+		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
+			judgments: [],
+		})
+		expect(judge.bodies).toHaveLength(1)
+		expect(classifier.category(message.id)).toBeUndefined()
+	})
+
 	it('pins measured category, topic, and pair bytes, asking order, request trimming, reuse, and usage', async () => {
 		const conversation = createConversation({
 			snapshot: {
@@ -67,7 +102,7 @@ describe('Classifier', () => {
 			questions: LEDGER_QUESTIONS,
 			topics: [
 				{ name: 'refunds', criterion: 'Refund amounts' },
-				{ name: 'warehouse', criterion: 'Warehouse work', requests: false },
+				{ name: 'warehouse', criterion: 'Warehouse work', requested: false },
 			],
 			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
 			assign: (message) => (message.role === 'tool' ? 'fact' : undefined),

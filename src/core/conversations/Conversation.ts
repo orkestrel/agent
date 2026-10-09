@@ -16,7 +16,7 @@ import { Emitter } from '@orkestrel/emitter'
 import { stripThinking } from '../helpers.js'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
-import { buildRecapMessage, buildSummaryMessage, collectToolGroups } from './helpers.js'
+import { buildRecapMessage, buildSummaryMessage, collectExchanges } from './helpers.js'
 import { removeEntries } from '../helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
@@ -45,9 +45,9 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   rollup (a second `#summarize` over all section summaries) when the `rollup` option is
  *   `true`, and emits `summary` (only for a regenerated rollup) then `compact`. The fold stops
  *   before the newest user message, so the request a run serves and its turns stay live. An
- *   exchange is a user message and every message after it up to the next user message, and a
- *   message before the first user message belongs to the first exchange; a cut inside an
- *   exchange moves back to the user message that opens it, so a fold removes whole exchanges.
+ *   exchange is a user message and every message after it up to the next user message. Leading
+ *   messages form a separate exchange, retained until the first user exchange can also fold.
+ *   A cut inside an exchange moves back to its start, so a fold removes whole exchanges.
  *   A cut inside an assistant call group, which only a group spanning two exchanges allows,
  *   moves before the group, so a tool result never stays live without its call. Returns the
  *   section, or `undefined` when nothing folds. Throws a {@link ConversationError} when no
@@ -223,35 +223,14 @@ export class Conversation implements ConversationInterface {
 			keep <= 0 ? live.length : live.length - keep,
 			newest === -1 ? live.length : newest,
 		)
-		// A cut inside an exchange leaves calls and results live without the request they serve, so
-		// move it back to the user message that opens the exchange; a message before the first user
-		// message belongs to the first exchange. A cut inside a call group, possible only when the
-		// group spans two exchanges, moves before the group. Each move can land inside an earlier
-		// exchange or group, so repeat until neither straddles the cut.
-		const spans = collectToolGroups(live).map((group) =>
-			group.map((message) => live.indexOf(message)),
-		)
-		let moved = true
-		while (moved) {
-			moved = false
-			if (fold < live.length) {
-				const opener = live.findLastIndex(
-					(message, index) => index <= fold && message.role === 'user',
-				)
-				const start = opener <= first ? 0 : opener
-				if (start < fold) {
-					fold = start
-					moved = true
-				}
-			}
-			for (const span of spans) {
-				const start = Math.min(...span)
-				if (start < fold && fold <= Math.max(...span)) {
-					fold = start
-					moved = true
-				}
-			}
+		let start = 0
+		for (const exchange of collectExchanges(live)) {
+			const end = start + exchange.length
+			if (start < fold && fold < end) fold = start
+			start = end
 		}
+		// Retain the leading context until the first user exchange can fold with it.
+		if (first >= 0 && fold <= first) fold = 0
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
 		// 1. Digest the folded slice into the section summary (the first summarizer call).

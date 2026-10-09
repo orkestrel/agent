@@ -249,9 +249,7 @@ describe('createSelection', () => {
 			new AbortController().signal,
 		)
 		expect(selected.messages.map((message) => message.id)).toEqual(
-			SELECTION_TOOL_MESSAGES.filter((message) => message.id !== 'recap').map(
-				(message) => message.id,
-			),
+			SELECTION_TOOL_MESSAGES.map((message) => message.id),
 		)
 		const all = createStockSelectionFixture(0.9, { messages: SELECTION_TOOL_MESSAGES })
 		expect(
@@ -259,7 +257,7 @@ describe('createSelection', () => {
 		).toEqual([all.request])
 	})
 
-	it('keeps a leading orphan run after a recap without keeping the recap', async () => {
+	it('keeps a leading orphan run and its recap in the same exchange', async () => {
 		const fixture = createStockSelectionFixture(0.9, {
 			probabilities: { 'duplicate-b': SYSTEM_ONE_TEV1.answers.refund.noul },
 		})
@@ -281,6 +279,7 @@ describe('createSelection', () => {
 			new AbortController().signal,
 		)
 		expect(selected.messages.map((message) => message.id)).toEqual([
+			'recap',
 			'duplicate-a',
 			'duplicate-b',
 			'request',

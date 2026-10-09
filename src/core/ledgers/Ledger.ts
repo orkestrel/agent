@@ -29,7 +29,7 @@ import { AgentError } from '../agents/errors.js'
 import { estimateMessages } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
 import { createConversationManager } from '../conversations/factories.js'
-import { collectToolGroups } from '../conversations/helpers.js'
+import { collectExchanges, collectToolGroups } from '../conversations/helpers.js'
 import { joinThinking, stripThinking, sumUsage } from '../helpers.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
@@ -49,10 +49,11 @@ import {
 	collectNames,
 	collectRegistry,
 	computeThinking,
-	cutItems,
+	cutListing,
 	extractTokens,
 	linkOwners,
 	matchEntities,
+	rankLedgerCut,
 	resolvePredict,
 	matchesCutLine,
 	renderLedgerPinned,
@@ -547,6 +548,7 @@ export class Ledger implements LedgerInterface {
 	async #select(request: Message, signal: AbortSignal): Promise<Selection> {
 		let filing: ClassifierResult = { judgments: [] }
 		try {
+			if (!this.#active) throw new Error('ledger agent generation requires an active respond call')
 			if (this.#annotations.has(request.id) && this.#entered !== undefined)
 				return {
 					messages: [...this.#entered.messages, ...this.#collectAfter()],
@@ -668,6 +670,7 @@ export class Ledger implements LedgerInterface {
 					loose,
 					score,
 					category,
+					cut: rankLedgerCut(group, loose, category),
 				},
 			]
 		})
@@ -678,33 +681,12 @@ export class Ledger implements LedgerInterface {
 				((left.group === 1 && left.loose) || left.group === 3 ? right.score - left.score : 0) ||
 				left.position - right.position,
 		)
-		const cuts = [...ordered].sort((left, right) => {
-			const leftCut =
-				left.group === 3
-					? 0
-					: left.loose
-						? 1
-						: left.group === 2
-							? left.category === 'rule'
-								? 3
-								: 2
-							: 4
-			const rightCut =
-				right.group === 3
-					? 0
-					: right.loose
-						? 1
-						: right.group === 2
-							? right.category === 'rule'
-								? 3
-								: 2
-							: 4
-			return (
-				leftCut - rightCut ||
-				(leftCut === 0 || leftCut === 1 || leftCut === 4 ? left.score - right.score : 0) ||
-				right.position - left.position
-			)
-		})
+		const cuts = [...ordered].sort(
+			(left, right) =>
+				left.cut - right.cut ||
+				(left.cut === 0 || left.cut === 1 || left.cut === 4 ? left.score - right.score : 0) ||
+				right.position - left.position,
+		)
 		const kept = records.map((record) => ({ ...record, lines: [...record.lines] }))
 		const rules = kept.find((record) => record.key === LEDGER_RULES_KEY)
 		const steps = [
@@ -721,23 +703,13 @@ export class Ledger implements LedgerInterface {
 				.reverse(),
 		]
 		const included = new Set(ordered.map((unit) => unit.source))
+		const mapped = ordered.map((unit) => ({
+			source: unit.source,
+			record: this.#buildUnitRecord(unit.source, unit.category, input, projection, held),
+		}))
 		let briefing = this.#render(
 			kept,
-			ordered
-				.filter((unit) => included.has(unit.source))
-				.map((unit) => ({
-					key: unit.category === 'rule' ? LEDGER_RULES_KEY : unit.source,
-					title: '',
-					members: [unit.source],
-					lines: this.#collectAmended(
-						input,
-						projection,
-						unit.source,
-						unit.category === 'rule'
-							? new Set(projection.records.flatMap((record) => record.members))
-							: held,
-					),
-				})),
+			mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
 		)
 		for (const step of steps) {
 			const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
@@ -750,21 +722,7 @@ export class Ledger implements LedgerInterface {
 			if (step.source !== undefined) included.delete(step.source)
 			briefing = this.#render(
 				kept,
-				ordered
-					.filter((unit) => included.has(unit.source))
-					.map((unit) => ({
-						key: unit.category === 'rule' ? LEDGER_RULES_KEY : unit.source,
-						title: '',
-						members: [unit.source],
-						lines: this.#collectAmended(
-							input,
-							projection,
-							unit.source,
-							unit.category === 'rule'
-								? new Set(projection.records.flatMap((record) => record.members))
-								: held,
-						),
-					})),
+				mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
 			)
 		}
 		const shown = new Set<string>(included)
@@ -782,6 +740,28 @@ export class Ledger implements LedgerInterface {
 				message.role === 'tool' ? this.#renderTailStub(message, shown) : message,
 			),
 			...(briefing === '' ? {} : { briefing }),
+		}
+	}
+
+	#buildUnitRecord(
+		source: string,
+		category: LedgerCategory | undefined,
+		input: LedgerProjectionInput,
+		projection: LedgerProjection,
+		held: ReadonlySet<string>,
+	): LedgerRecord {
+		return {
+			key: category === 'rule' ? LEDGER_RULES_KEY : source,
+			title: '',
+			members: [source],
+			lines: this.#collectAmended(
+				input,
+				projection,
+				source,
+				category === 'rule'
+					? new Set(projection.records.flatMap((record) => record.members))
+					: held,
+			),
 		}
 	}
 
@@ -887,14 +867,8 @@ export class Ledger implements LedgerInterface {
 							: { id: message.id, role: message.role, content: message.content }
 						: message,
 			)
-		const exchanges: Message[][] = []
-		for (const message of history) {
-			if (message.role === 'user' || exchanges.length === 0) exchanges.push([])
-			exchanges.at(-1)?.push(message)
-		}
 		let tail = [request]
-		for (const exchange of exchanges.reverse()) {
-			if (exchange[0]?.role !== 'user') continue
+		for (const exchange of collectExchanges(history).toReversed()) {
 			const next = [...exchange, ...tail]
 			if ((this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(next, this.#replay)) > cap)
 				break
@@ -1088,7 +1062,7 @@ export class Ledger implements LedgerInterface {
 			if (texts.length > 0) listed.push(texts.join('\n'))
 		}
 		const result =
-			listed.length === 0 ? `nothing on "${topic}"; recall ${guidance}` : cutItems(listed, room)
+			listed.length === 0 ? `nothing on "${topic}"; recall ${guidance}` : cutListing(listed, room)
 		this.#recalled.set(result, recalled)
 		return result
 	}

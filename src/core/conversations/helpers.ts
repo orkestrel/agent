@@ -3,6 +3,48 @@ import type { JudgeQuestion, JudgeRequest, JudgeResult, Message } from '../types
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 
 /**
+ * Collects whole exchanges, joining every exchange spanned by a tool group.
+ *
+ * @remarks
+ * A user message opens an exchange that ends before the next user message. Leading messages
+ * form their own exchange. A tool group joins every exchange between its first and last member.
+ *
+ * @param messages - The messages in prompt order
+ * @returns The exchanges in prompt order, with each message retained unchanged
+ * @example
+ * ```ts
+ * collectExchanges([
+ * 	{ id: 'greeting', role: 'assistant', content: 'Welcome.' },
+ * 	{ id: 'request', role: 'user', content: 'Read the order.' },
+ * ]) // a leading exchange and a request exchange
+ * ```
+ */
+export function collectExchanges(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
+	const boundaries = new Set([0])
+	const positions = new Map(messages.map((message, index) => [message, index]))
+	for (const [index, message] of messages.entries())
+		if (message.role === 'user') boundaries.add(index)
+	for (const group of collectToolGroups(messages)) {
+		let start = messages.length
+		let end = 0
+		for (const message of group) {
+			const position = positions.get(message)
+			if (position === undefined) continue
+			start = Math.min(start, position)
+			end = Math.max(end, position)
+		}
+		for (const boundary of boundaries)
+			if (start < boundary && boundary <= end) boundaries.delete(boundary)
+	}
+	const exchanges: Message[][] = []
+	for (const [index, message] of messages.entries()) {
+		if (boundaries.has(index)) exchanges.push([])
+		exchanges.at(-1)?.push(message)
+	}
+	return exchanges
+}
+
+/**
  * Builds records for answered or refused request keys, attaching usage only for a single question.
  *
  * @param request - The request whose question keys define record order

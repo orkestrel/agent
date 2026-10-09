@@ -3,7 +3,7 @@ import type { ConversationInterface } from '../conversations/types.js'
 import type { Message, NoulQuestion } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
-import { collectToolGroups, matchesJudgment } from '../conversations/helpers.js'
+import { collectExchanges, matchesJudgment } from '../conversations/helpers.js'
 import { NEEDED_QUESTION } from './templates.js'
 
 /**
@@ -124,8 +124,9 @@ export function inferApplicability(
  * tool groups.
  *
  * @remarks
- * An exchange is a user message and every message after it up to the next user message. An
- * exchange and a tool group from {@link import('../conversations/helpers.js').collectToolGroups}
+ * An exchange is a user message and every message after it up to the next user message. Leading
+ * messages form their own exchange. An exchange and a tool group from
+ * {@link import('../conversations/helpers.js').collectToolGroups}
  * are each kept whole when any member is kept and dropped whole only when every member is
  * dropped. A tool group that spans two exchanges joins them, so keeping one keeps both.
  *
@@ -147,27 +148,9 @@ export function filterSelectionMessages(
 		applicability.filter((entry) => entry.needed === false).map((entry) => entry.id),
 	)
 	dropped.delete(request.id)
-	const exchanges: Message[][] = []
-	for (const message of messages) {
-		if (message.role === 'user') exchanges.push([message])
-		else exchanges.at(-1)?.push(message)
-	}
-	const units = [...collectToolGroups(messages), ...exchanges]
-	// Keeping one unit can keep a member of another, so repeat until no unit changes.
-	let changed = true
-	while (changed) {
-		changed = false
-		for (const unit of units) {
-			if (
-				unit.some((message) => dropped.has(message.id)) &&
-				unit.some((message) => !dropped.has(message.id))
-			) {
-				for (const message of unit) dropped.delete(message.id)
-				changed = true
-			}
-		}
-	}
-	return messages.filter((message) => !dropped.has(message.id))
+	return collectExchanges(messages).flatMap((exchange) =>
+		exchange.some((message) => !dropped.has(message.id)) ? exchange : [],
+	)
 }
 
 /**

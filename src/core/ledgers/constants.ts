@@ -95,8 +95,7 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
  * Supplies the measured prompt and tail shares.
  *
  * @remarks
- * The `a5-records` series ran with a prompt share of 0.7 and a tail share of 0.35
- * (`tmp/bench/results/v9/a5-records-v1.log`, 2026-10-09).
+ * The `a5-records` series of 2026-10-09 ran with a prompt share of 0.7 and a tail share of 0.35.
  */
 export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 	prompt: 0.7,
@@ -107,8 +106,7 @@ export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
  * Caps the tool-iteration turns of a ledger's agent at the measured limit of 8.
  *
  * @remarks
- * The measured harness set the agent's turn limit to 8 (`tmp/bench3/bench.mjs:3330`) in every
- * records run of 2026-10-09.
+ * The `a5-records` series of 2026-10-09 set the agent's turn limit to 8.
  */
 export const DEFAULT_LEDGER_LIMIT = 8
 
@@ -116,8 +114,7 @@ export const DEFAULT_LEDGER_LIMIT = 8
  * Caps the `recall` calls of one request at the measured limit of 2.
  *
  * @remarks
- * The `a5-records` series ran with `recall-budget 2` (`tmp/bench/results/v9/a5-records-v1.log`,
- * 2026-10-09).
+ * The `a5-records` series of 2026-10-09 ran with `recall-budget 2`.
  */
 export const DEFAULT_RECALL_LIMIT = 2
 
@@ -126,11 +123,11 @@ export const DEFAULT_RECALL_LIMIT = 2
  * request's first call.
  *
  * @remarks
- * Across the records of `results/v3/ledger-deny` and `results/v3/ledger-admit` (2026-10-08), a
+ * Across the `ledger-deny` and `ledger-admit` series of 2026-10-08, a
  * request's first-call tokens per estimate unit rose at most from 1.150 at the seed to 1.212, 5.4
  * percent; the ledger divides its prompt budget by 1.06.
  */
 export const LEDGER_SCALE_DRIFT = 0.06
 
-/** Matches the judge error the measured harness holds as deterministic (`tmp/bench3/bench.mjs:867`). */
+/** Matches the judge error the `a5-records` series of 2026-10-09 holds as deterministic. */
 export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/

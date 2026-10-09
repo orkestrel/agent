@@ -9,7 +9,8 @@ import {
 	collectStale,
 	computeThinking,
 	resolvePredict,
-	cutItems,
+	rankLedgerCut,
+	cutListing,
 	extractTokens,
 	fitSlope,
 	identifyLookup,
@@ -36,6 +37,17 @@ import {
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
 } from '../../../setupLedger.js'
+
+describe('rankLedgerCut', () => {
+	it('ranks name matches before loose sources, off-topic corrections, rules, and on-topic sources', () => {
+		expect(rankLedgerCut(3, true, 'rule')).toBe(0)
+		expect(rankLedgerCut(1, true, 'fact')).toBe(1)
+		expect(rankLedgerCut(2, false, 'correction')).toBe(2)
+		expect(rankLedgerCut(2, false, 'rule')).toBe(3)
+		expect(rankLedgerCut(1, false, 'rule')).toBe(4)
+		expect(rankLedgerCut(1, false, undefined)).toBe(4)
+	})
+})
 
 describe('computeThinking', () => {
 	it('rounds the character share and caps it at the completion', () => {
@@ -979,32 +991,32 @@ function buildCall(estimate: number, prompt: number | undefined, tools: number):
 	return prompt === undefined ? { estimate, tools } : { estimate, prompt, tools }
 }
 
-describe('cutItems and matchesCutLine', () => {
+describe('cutListing and matchesCutLine', () => {
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
 
 	it('keeps every item that fits and adds no cut line', () => {
-		expect(cutItems(items, measureRoom(items))).toBe(items.join('\n'))
-		expect(cutItems([], 10)).toBe('')
+		expect(cutListing(items, measureRoom(items))).toBe(items.join('\n'))
+		expect(cutListing([], 10)).toBe('')
 	})
 
 	it('cuts at the first item that overflows and names how many it left out', () => {
-		expect(cutItems(items, measureRoom(items.slice(0, 2)))).toBe(
+		expect(cutListing(items, measureRoom(items.slice(0, 2)))).toBe(
 			'first recalled line\nsecond recalled line\n1 older item not shown; name a narrower topic to narrow the recall',
 		)
-		expect(cutItems(items, measureRoom(items.slice(0, 1)))).toBe(
+		expect(cutListing(items, measureRoom(items.slice(0, 1)))).toBe(
 			'first recalled line\n2 older items not shown; name a narrower topic to narrow the recall',
 		)
 	})
 
 	it('keeps at least one item whatever the room', () => {
-		expect(cutItems(items, 0)).toBe(
+		expect(cutListing(items, 0)).toBe(
 			'first recalled line\n2 older items not shown; name a narrower topic to narrow the recall',
 		)
-		expect(cutItems(items, -5).startsWith('first recalled line\n')).toBe(true)
+		expect(cutListing(items, -5).startsWith('first recalled line\n')).toBe(true)
 	})
 
 	it('matches the cut line it writes and no other line', () => {
-		const cut = cutItems(items, 0).split('\n')
+		const cut = cutListing(items, 0).split('\n')
 		expect(cut.map(matchesCutLine)).toEqual([false, true])
 		expect(matchesCutLine('1 older item not shown; add a topic')).toBe(true)
 		expect(matchesCutLine('3 older items not shown; ')).toBe(true)

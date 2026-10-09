@@ -71,7 +71,7 @@ export interface LedgerTopic {
 	 * If `true`, the ledger asks this topic about each request as well as about each statement;
 	 * if `false`, it asks it about statements only. Default: `true`.
 	 */
-	readonly requests?: boolean
+	readonly requested?: boolean
 }
 
 /**
@@ -164,6 +164,9 @@ export type LedgerLookupHandler = (
  * @remarks
  * The ledger registers the tool behind a repeat stop beside its own `recall` tool, so the tool must
  * not be named `recall`, and no two lookups can share a tool name.
+ * The repeat stop compares the tool name and canonical arguments without normalizing strings.
+ * The projection uses {@link identifyLookup}, which trims and uppercases top-level string
+ * arguments when deciding which reading replaces an earlier one.
  * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no reading.
  * A seed tool message with no recorded result counts as a successful lookup.
  */
@@ -517,14 +520,14 @@ export interface ClassifierInterface {
 	 * Returns true if the message is filed as quiet; false otherwise.
 	 *
 	 * @param id - The id of the message
-	 * @returns Whether the message is quiet
+	 * @returns True if the message is quiet; false otherwise.
 	 */
 	quiet(id: string): boolean
 	/**
 	 * Returns true if the message is filed as decisive; false otherwise.
 	 *
 	 * @param id - The id of the message
-	 * @returns Whether the message is decisive
+	 * @returns True if the message is decisive; false otherwise.
 	 */
 	decisive(id: string): boolean
 	/**

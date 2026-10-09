@@ -400,9 +400,9 @@ export interface ConversationInterface {
 	 * The effective `keep` comes from `options`, else the conversation's own. With `rollup` set,
 	 * regenerating the rollup runs `summarize` again, over all sections. The newest user message
 	 * is the request a run serves, so it and every message after it stay live. An exchange is a
-	 * user message and every message after it up to the next user message, and a message before
-	 * the first user message belongs to the first exchange; a cut inside an exchange moves back to
-	 * the user message that opens it, so a fold removes whole exchanges. An assistant message with
+	 * user message and every message after it up to the next user message. Leading messages form
+	 * their own exchange, retained until the first user exchange can also fold. A cut inside an
+	 * exchange moves back to its start, so a fold removes whole exchanges. An assistant message with
 	 * calls and the tool messages that answer it, grouped as
 	 * {@link import('./helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
 	 * a group moves before its assistant message, then back to whole exchanges again. Only a group

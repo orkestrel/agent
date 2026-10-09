@@ -51,6 +51,67 @@ describe('Ledger', () => {
 		}
 	})
 
+	it('commits a partial reply without an answer pass when final usage aborts the caller', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'Done.', usage: { prompt: 10, completion: 2, total: 12 } }],
+			{ record: true, exhaust: 'throw' },
+		)
+		const ledger = createLedger(provider, options)
+		const controller = new AbortController()
+		ledger.agent.emitter.on('usage', () => controller.abort())
+		const result = await ledger.respond('Finish the request.', controller.signal)
+		expect(result.partial).toBe(true)
+		expect(result.passes).toHaveLength(1)
+		expect(result.passes[0]?.partial).toBe(true)
+		expect(result.usage).toMatchObject({ prompt: 10, completion: 2, total: 12 })
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it('keeps interleaved seed calls and results on the same side of the tail cut', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
+		ledger.conversation.add([
+			{ role: 'user', content: `Look up order BW-5512. ${'x'.repeat(40_000)}` },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } }],
+			},
+			{ role: 'user', content: 'The printer needs paper.' },
+			{ role: 'tool', call: 'c1', content: 'Order BW-5512 is ready.' },
+		])
+		await ledger.respond('What is next?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.some((message) => message.role === 'tool' && message.call === 'c1')).toBe(false)
+		expect(sent.flatMap((message) => message.calls ?? [])).toEqual([])
+	})
+
+	it('sends a leading assistant seed exchange when it fits the tail', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, options)
+		const seed = ledger.conversation.add({ role: 'assistant', content: 'Enjoy the break.' })
+		await ledger.respond('What is next?')
+		expect(requireValue(provider.calls[0]).messages).toContainEqual(seed)
+	})
+
+	it('faults direct agent generation without planning for the earlier request', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, options)
+		await ledger.respond('Earlier request.')
+		const judgments = ledger.conversation.judgments.judgments()
+		const requests = judge.requests.length
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const request = ledger.conversation.add({ role: 'user', content: 'Direct request.' })
+		await ledger.agent.generate()
+		expect(selections).toHaveLength(1)
+		expect(selections[0]?.fault).toBeInstanceOf(Error)
+		expect(selections[0]?.briefing).toBeUndefined()
+		expect(selections[0]?.messages).toContainEqual(request)
+		expect(judge.requests).toHaveLength(requests)
+		expect(ledger.conversation.judgments.judgments()).toEqual(judgments)
+	})
+
 	it('recalls a call-free, non-quiet seed assistant statement and lists its amender after it in one item', async () => {
 		const provider = createScriptedProvider(
 			[
@@ -842,7 +903,7 @@ describe('Ledger', () => {
 		expect(ledger.conversation.sections).toEqual([])
 	})
 
-	it('opens the seed tail on a user and keeps empty assistants and text from dropped calls', async () => {
+	it('keeps leading seed messages, empty assistants, and text from dropped calls', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
 		const ledger = createLedger(provider, options)
 		const seed = ledger.conversation.add([
@@ -859,6 +920,7 @@ describe('Ledger', () => {
 		await ledger.respond('Check LH-12345.')
 		const messages = requireValue(provider.calls[0]).messages.slice(1)
 		expect(messages.map((message) => message.content)).toEqual([
+			'Welcome to the desk.',
 			'Order LH-12345 is late.',
 			'',
 			'The earlier call was dropped.',
@@ -1199,7 +1261,7 @@ describe('Ledger', () => {
 		})
 		let failed = false
 		const fault = new Error('system unavailable')
-		const ledger = createLedger(createScriptedProvider([]), {
+		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
 			...options,
 			topics: [],
 			judge: new SequentialSystemOneJudge({
@@ -1215,9 +1277,12 @@ describe('Ledger', () => {
 		})
 		const request = ledger.conversation.add({ role: 'user', content: 'Statement.' })
 		failed = true
-		const selection = await ledger.agent.context.select(request, new AbortController().signal)
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		await ledger.respond('Inspect the statement.')
+		const selection = selections[0]
 		expect(selection).toEqual({
-			messages: ledger.conversation.view(),
+			messages: ledger.conversation.view().slice(0, -1),
 			judgments: [JSON.stringify(['category', request.id])],
 			usage: { prompt: 50, completion: 1, total: 51 },
 			fault,
@@ -1808,8 +1873,10 @@ describe('Ledger', () => {
 			model: judge.model,
 			answer: { form: 'choice', probabilities: { rule: 1 } },
 		})
-		const request = ledger.conversation.add({ role: 'user', content: 'Inspect the full seed.' })
-		const selection = await ledger.agent.context.select(request, new AbortController().signal)
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		await ledger.respond('Inspect the full seed.')
+		const selection = selections[0]
 		expect(selection?.messages.some((message) => message.id === retired.id)).toBe(false)
 		expect(selection?.briefing).toContain('For Mira, keep the receipt.')
 		expect(selection?.briefing).not.toContain(correction.content)
@@ -1860,8 +1927,10 @@ describe('Ledger', () => {
 				answer: { form: 'noul', noul: head === 'amends' ? 1 : 0 },
 			})
 		await ledger.respond('Greet the desk.')
-		const request = ledger.conversation.add({ role: 'user', content: 'Inspect the full seed.' })
-		const selection = await ledger.agent.context.select(request, new AbortController().signal)
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		await ledger.respond('Inspect the full seed.')
+		const selection = selections[0]
 		expect(selection?.briefing).toContain('Brightwater Studio: keep the receipt.')
 		expect(selection?.briefing).not.toContain('AA-11')
 	})

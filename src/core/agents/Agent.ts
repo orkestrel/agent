@@ -588,6 +588,7 @@ export class Agent implements AgentInterface {
 				}),
 			)
 			content = result.content
+			partial = abort.signal.aborted
 			pending = false
 			broke = true
 			break

@@ -13,6 +13,7 @@ import { isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
 import { matchesJudgment } from '../conversations/helpers.js'
 import { isJudgeAbortError } from '../errors.js'
 import { sumUsage } from '../helpers.js'
+import { isJudgeError } from '../providers/errors.js'
 import {
 	DECISIVE_CATEGORIES,
 	DETERMINISTIC_JUDGE_ERROR,
@@ -62,7 +63,7 @@ export class Classifier implements ClassifierInterface {
 			for (const message of asked) {
 				if (!requests.has(message.id) && this.quiet(message.id)) continue
 				for (const topic of this.#options.topics) {
-					if (requests.has(message.id) && topic.requests === false) continue
+					if (requests.has(message.id) && topic.requested === false) continue
 					results.push(await this.#ask(this.#buildTopic(message.id, topic), signal, results))
 				}
 			}
@@ -133,7 +134,7 @@ export class Classifier implements ClassifierInterface {
 	/**
 	 * Reports whether a message files under a quiet category.
 	 * @param id - The message id
-	 * @returns `true` when the assigned or recorded category is quiet
+	 * @returns True if the assigned or recorded category is quiet; false otherwise.
 	 */
 	quiet(id: string): boolean {
 		const message = this.#options.conversation.message(id)
@@ -146,7 +147,7 @@ export class Classifier implements ClassifierInterface {
 	/**
 	 * Reports whether a message files under a decisive category.
 	 * @param id - The message id
-	 * @returns `true` when the recorded decisive weight reaches the category cutoff
+	 * @returns True if the recorded decisive weight reaches the category cutoff; false otherwise.
 	 */
 	decisive(id: string): boolean {
 		return this.#weigh(id, DECISIVE_CATEGORIES) >= this.#options.thresholds.category
@@ -353,7 +354,10 @@ export class Classifier implements ClassifierInterface {
 							: [],
 					...(error.partial.usage === undefined ? {} : { usage: error.partial.usage }),
 				})
-			if (DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error)))
+			if (
+				(isJudgeError(error) && error.code === 'QUESTION') ||
+				DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error))
+			)
 				this.#failed.set(spec.id, fingerprint)
 			if (signal.aborted) throw error
 			return { judgments: [] }
