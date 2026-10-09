@@ -9,7 +9,6 @@ import type {
 	JudgeRequest,
 	JudgeResult,
 	LedgerLookup,
-	LedgerThink,
 	LedgerThreshold,
 	LedgerTopic,
 	Message,
@@ -1540,8 +1539,8 @@ await new GuideCommand({
 			)
 		})
 
-		it('requests or suppresses thinking on each pass through the think option (the thinking budget)', async () => {
-			const passes = async (think: LedgerThink) => {
+		it('selects first-pass thinking and always disables answer-pass thinking (the thinking budget)', async () => {
+			for (const think of [true, false, undefined]) {
 				const provider = createScriptedProvider(
 					[{ content: '' }, { content: 'Refunds over $100 need a manager.' }],
 					{ record: true },
@@ -1554,18 +1553,18 @@ await new GuideCommand({
 					thresholds: deskThresholds,
 					capacity: 32_768,
 					gauge: { scale: 1, fixed: 0 },
-					think,
+					...(think === undefined ? {} : { think }),
 				})
 				const result = await ledger.respond('Does a $148.50 refund need a manager?')
 				expect(result.passes).toHaveLength(2)
-				return provider.calls.map(({ options }) => options?.think)
+				expect(provider.calls.map(({ options }) => options)).toEqual([
+					think === undefined ? undefined : { think },
+					{ think: false },
+				])
 			}
 
-			// An empty first pass runs the answer pass, and an absent member sends no think option.
-			expect(await passes({ first: true, answer: false })).toEqual([true, false])
-			expect(await passes({ answer: false })).toEqual([undefined, false])
 			expect(guideText).toContain(
-				"The `first` and `answer` members of the `think` option request or suppress thinking on each pass, and an absent member leaves the provider's default.",
+				"The `think` option requests or suppresses thinking for the first pass, and omission leaves the provider's default; the answer pass always runs with thinking off.",
 			)
 		})
 

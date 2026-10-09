@@ -337,7 +337,7 @@ export class Ledger implements LedgerInterface {
 			this.#closed = false
 			this.#answered.clear()
 			this.#recalled.clear()
-			const first = await this.#runPass(caller, this.#options.think?.first)
+			const first = await this.#runPass(caller, this.#options.think)
 			const passes = [first]
 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
 				const digest = this.#buildDigest()
@@ -362,7 +362,7 @@ export class Ledger implements LedgerInterface {
 					}),
 				)
 				try {
-					passes.push(await this.#runPass(caller, this.#options.think?.answer))
+					passes.push(await this.#runPass(caller, false))
 				} finally {
 					this.#agent.context.apply(previous)
 				}

@@ -181,13 +181,8 @@ describe('Ledger', () => {
 		}
 	})
 
-	it('forwards thinking per pass and omits each absent member', async () => {
-		for (const think of [
-			undefined,
-			{ first: true, answer: false },
-			{ first: false },
-			{ answer: true },
-		]) {
+	it('forwards first-pass thinking when given and always disables answer-pass thinking', async () => {
+		for (const think of [true, false, undefined]) {
 			const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
 				record: true,
 			})
@@ -197,8 +192,8 @@ describe('Ledger', () => {
 			})
 			expect((await ledger.respond('Review.')).passes).toHaveLength(2)
 			expect(provider.calls.map((call) => call.options)).toEqual([
-				think?.first === undefined ? undefined : { think: think.first },
-				think?.answer === undefined ? undefined : { think: think.answer },
+				think === undefined ? undefined : { think },
+				{ think: false },
 			])
 		}
 	})

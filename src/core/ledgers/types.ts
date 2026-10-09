@@ -231,20 +231,9 @@ export type LedgerAgentOptions = Pick<
 >
 
 /**
- * Selects thinking separately for the first pass and the answer pass.
- *
- * @remarks
- * If `first` or `answer` is `true`, that pass requests thinking; if `false`, it suppresses
- * thinking. An absent member leaves the provider's default in effect.
- */
-export interface LedgerThink {
-	readonly first?: boolean
-	readonly answer?: boolean
-}
-
-/**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional lookups, gauge, shares, recall, notes, and agent bounds.
+ * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall, notes,
+ * and agent bounds.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -257,7 +246,7 @@ export interface LedgerThink {
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - fixed) / (1 + LEDGER_SCALE_DRIFT)`.
- * Recall closes when `left - predict < 2 * reserve`. `think` selects thinking per pass.
+ * Recall closes when `left - predict < 2 * reserve`.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -267,7 +256,14 @@ export interface LedgerOptions {
 	readonly thresholds: LedgerThreshold
 	readonly capacity: number
 	readonly predict?: number
-	readonly think?: LedgerThink
+	/**
+	 * Selects thinking for the first pass; the answer pass always runs with thinking off.
+	 * If `true`, the first pass requests thinking; if `false`, it suppresses thinking; omission
+	 * leaves the provider's default in effect.
+	 * A thinking model asked for a reply with no tools can end its turn inside its reasoning or
+	 * think to the generation cap, and the answer pass exists to produce the reply.
+	 */
+	readonly think?: boolean
 	readonly gauge?: LedgerGauge
 	readonly lookups?: readonly LedgerLookup[]
 	readonly share?: Partial<LedgerShare>
