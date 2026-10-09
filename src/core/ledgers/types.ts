@@ -260,7 +260,7 @@ export interface LedgerOptions {
 	 * Selects thinking for the first pass; the answer pass always runs with thinking off.
 	 * If `true`, the first pass requests thinking; if `false`, it suppresses thinking; omission
 	 * leaves the provider's default in effect.
-	 * A thinking model asked for a reply with no tools can end its turn inside its reasoning or
+	 * A thinking model asked for a reply with no tools might end its turn inside its reasoning or
 	 * think to the generation cap, and the answer pass exists to produce the reply.
 	 */
 	readonly think?: boolean
