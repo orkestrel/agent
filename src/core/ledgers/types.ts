@@ -293,11 +293,14 @@ export interface LedgerInterface {
 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
 	 * answer pass that advertises no tools. A call while another is in flight rejects with an
-	 * `AgentError` whose `code` is `'CONCURRENCY'`.
+	 * `AgentError` whose `code` is `'CONCURRENCY'`. A failed calibration rejects with
+	 * `LedgerError` code `'GAUGE'`.
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
 	 * @returns The reply and the passes the request took
+	 * @throws {LedgerError} Thrown when calibration fails (code `'GAUGE'`)
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
 	/**
@@ -307,12 +310,13 @@ export interface LedgerInterface {
 	 * The ledger sends its system message and its conversation's view to the provider twice, with
 	 * and without the tool definitions. The call without tools prices the messages and the
 	 * difference between the calls is the fixed cost.
-	 * An abort during calibration rejects with the abort reason. A call during `respond` rejects
+	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
 	 * with `AgentError` code `'CONCURRENCY'`.
 	 *
 	 * @param signal - The signal that aborts both calls
 	 * @returns The measured gauge
-	 * @throws {LedgerError} Thrown when a call reports no prompt usage (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	calibrate(signal: AbortSignal): Promise<LedgerGauge>
 }
@@ -465,6 +469,7 @@ export interface ClassifierOptions {
 export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
+	/** Holds the error when a throw or caller abort interrupts classification; judgments and usage retain the partial result. */
 	readonly fault?: Error
 }
 
@@ -481,7 +486,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The ids of the user messages the ledger serves as requests
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys, usage spent, and a fault if classification was interrupted
+	 * @returns The judgment keys and usage spent; any throw or caller abort during classification returns the partial result with `fault`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**
@@ -607,5 +612,5 @@ export type LedgerErrorCode =
 	| 'TOPIC'
 	/** Reports a lookup tool named `recall` or a name another lookup tool carries. */
 	| 'LOOKUP'
-	/** Reports a supplied gauge outside its bounds, or a calibration call that reports no prompt usage. */
+	/** Reports a supplied gauge outside its bounds, or a calibration call that reports no prompt usage, or a prompt usage of 0 or less. */
 	| 'GAUGE'

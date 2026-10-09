@@ -99,6 +99,7 @@ export class Ledger implements LedgerInterface {
 	 * Composes the conversation, classifier, tools, and agent.
 	 * @param provider - The provider that serves the conversation
 	 * @param options - The filing policy, capacity, and request bounds
+	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {
@@ -242,13 +243,19 @@ export class Ledger implements LedgerInterface {
 
 	/**
 	 * Measures message scale and tool overhead from provider prompt usage.
-	 * @param signal - The signal bounding both calibration calls
+	 * @param signal - The signal bounding both calibration calls; an abort rejects with its reason
 	 * @returns The stored scale and fixed cost
-	 * @throws {LedgerError} Thrown when either call reports no usable prompt usage
+	 * @throws {LedgerError} Thrown when either call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	async calibrate(signal: AbortSignal): Promise<LedgerGauge> {
 		if (this.#active) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
-		return this.#measureGauge(signal)
+		this.#active = true
+		try {
+			return await this.#measureGauge(signal)
+		} finally {
+			this.#active = false
+		}
 	}
 
 	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
@@ -285,10 +292,12 @@ export class Ledger implements LedgerInterface {
 
 	/**
 	 * Appends a request and serves it, recovering an unfinished first pass with one answer pass.
+	 * A failed calibration rejects with `LedgerError` code `'GAUGE'`.
 	 * @param content - The request text
-	 * @param signal - The caller's cancellation signal
+	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass and the usage of every pass
-	 * @throws {AgentError} Thrown when another request is active
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown when calibration fails (code `'GAUGE'`)
 	 */
 	async respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
 		if (this.#active) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
@@ -323,6 +332,7 @@ export class Ledger implements LedgerInterface {
 						tools: [],
 						select: async (_conversation, request, selecting) => {
 							const selection = await this.#select(request, selecting)
+							if (selection.fault !== undefined) return selection
 							return {
 								...selection,
 								messages: selection.messages.filter(
@@ -699,7 +709,9 @@ export class Ledger implements LedgerInterface {
 						input,
 						projection,
 						unit.source,
-						new Set(projection.records.flatMap((record) => record.members)),
+						unit.category === 'rule'
+							? new Set(projection.records.flatMap((record) => record.members))
+							: held,
 					),
 				})),
 		)
@@ -724,7 +736,9 @@ export class Ledger implements LedgerInterface {
 							input,
 							projection,
 							unit.source,
-							new Set(projection.records.flatMap((record) => record.members)),
+							unit.category === 'rule'
+								? new Set(projection.records.flatMap((record) => record.members))
+								: held,
 						),
 					})),
 			)
@@ -771,14 +785,7 @@ export class Ledger implements LedgerInterface {
 	}
 
 	#render(records: readonly LedgerRecord[], units: readonly LedgerRecord[]): string {
-		const views = records.map((record) => ({
-			...record,
-			lines: record.lines.map((line) => ({
-				...line,
-				text: line.role === 'tool' ? this.#renderSource(line.source, [line]) : line.text,
-			})),
-		}))
-		const owners = views
+		const owners = records
 			.filter((record) => record.key !== LEDGER_RULES_KEY && record.lines.length > 0)
 			.map(renderLedgerPinned)
 			.join('\n\n')
@@ -796,7 +803,9 @@ export class Ledger implements LedgerInterface {
 			}
 		}
 		const body = [owners, pinned.join('\n')].filter((text) => text !== '').join('\n\n')
-		const rules = views.find((record) => record.key === LEDGER_RULES_KEY && record.lines.length > 0)
+		const rules = records.find(
+			(record) => record.key === LEDGER_RULES_KEY && record.lines.length > 0,
+		)
 		return [
 			body === '' ? '' : `## Pinned\n${body}`,
 			rules === undefined
@@ -842,9 +851,6 @@ export class Ledger implements LedgerInterface {
 			.filter(
 				(message) =>
 					!this.#annotations.has(message.id) &&
-					(message.role !== 'assistant' ||
-						(calls.get(message.id)?.length ?? 0) > 0 ||
-						message.content.trim() !== '') &&
 					(message.role !== 'user' ||
 						(input.classification.superseded.get(message.id) ?? []).length === 0) &&
 					(message.role !== 'tool' || results.has(message.id)),
@@ -855,16 +861,15 @@ export class Ledger implements LedgerInterface {
 					: message.role === 'user'
 						? {
 								...message,
-								content:
-									(input.classification.superseded.get(message.id) ?? []).length === 0
-										? this.#renderSource(
-												message.id,
-												this.#projectLines(input, projection, message.id),
-											)
-										: '',
+								content: this.#renderSource(
+									message.id,
+									this.#projectLines(input, projection, message.id),
+								),
 							}
 						: calls.has(message.id)
-							? { ...message, calls: calls.get(message.id) ?? [] }
+							? (calls.get(message.id)?.length ?? 0) > 0
+								? { ...message, calls: calls.get(message.id) ?? [] }
+								: { id: message.id, role: message.role, content: message.content }
 							: message,
 			)
 		const exchanges: Message[][] = []
@@ -874,6 +879,7 @@ export class Ledger implements LedgerInterface {
 		}
 		let tail = [request]
 		for (const exchange of exchanges.reverse()) {
+			if (exchange[0]?.role !== 'user') continue
 			const next = [...exchange, ...tail]
 			if ((this.#gauge?.scale ?? 1) * estimateMessages(next) > cap) break
 			tail = next
@@ -955,7 +961,8 @@ export class Ledger implements LedgerInterface {
 			this.#closed = true
 		if (this.#closed) throw new Error(this.#notes.closed)
 		this.#recalls += 1
-		if (topic === '') throw new Error('recall needs an owner name, an id, or a desk topic')
+		const guidance = `an owner name, an id, or one of ${this.#options.topics.map((one) => one.name).join(', ')}`
+		if (topic === '') throw new Error(`recall needs a topic: ${guidance}`)
 		const room =
 			(gauge?.room(this.#calls, this.#findLongest()) ?? 0) -
 			estimateMessages([
@@ -1019,15 +1026,8 @@ export class Ledger implements LedgerInterface {
 				continue
 			if (lines.length > 0) matched.push(message.id)
 		}
-		const amended = new Set(
-			matched.flatMap((id) =>
-				this.#collectAmended(input, projection, id, new Set())
-					.map((line) => line.source)
-					.filter((source) => source !== id),
-			),
-		)
 		const done = new Set<string>()
-		for (const id of [...matched.filter((source) => !amended.has(source)), ...matched]) {
+		for (const id of matched) {
 			if (done.has(id)) continue
 			const lines = this.#collectAmended(input, projection, id, new Set()).filter(
 				(line) => !done.has(line.source),
@@ -1041,9 +1041,7 @@ export class Ledger implements LedgerInterface {
 			recalled.push(...lines)
 		}
 		const result =
-			listed.length === 0
-				? `nothing on "${topic}"; recall a customer name, an order or account id, or one of ${this.#options.topics.map((one) => one.name).join(', ')}`
-				: cutItems(listed, room)
+			listed.length === 0 ? `nothing on "${topic}"; recall ${guidance}` : cutItems(listed, room)
 		this.#recalled.set(
 			result,
 			recalled.filter((line) =>

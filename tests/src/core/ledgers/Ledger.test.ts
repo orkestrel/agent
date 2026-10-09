@@ -2,6 +2,7 @@ import type { LedgerOptions, MessageInput, Selection } from '@src/core'
 import {
 	LEDGER_NOTES,
 	LEDGER_QUESTIONS,
+	Ledger,
 	createLedger,
 	createScope,
 	estimateMessages,
@@ -90,9 +91,8 @@ describe('Ledger', () => {
 		expect(first.messages.find((message) => message.calls?.length)?.content).toBe(
 			'Reading the seed account.',
 		)
-		expect(first.messages[0]?.content).toContain(
-			'lookup {"id":"BW-20931"}: Account BW-20931: Brightwater Studio.',
-		)
+		expect(first.messages[0]?.content).toContain('- Account BW-20931: Brightwater Studio.')
+		expect(first.messages[0]?.content).not.toContain('lookup {"id":"BW-20931"}:')
 		expect(first.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
 		await ledger.respond('Check the desk again.')
 		const second = requireValue(provider.calls[1])
@@ -104,6 +104,31 @@ describe('Ledger', () => {
 		).toBe(false)
 		expect(ledger.conversation.summarizable).toBe(false)
 		expect(ledger.conversation.sections).toEqual([])
+	})
+
+	it('opens the seed tail on a user and keeps empty assistants and text from dropped calls', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, options)
+		const seed = ledger.conversation.add([
+			{ role: 'assistant', content: 'Welcome to the desk.' },
+			{ role: 'user', content: 'Order LH-12345 is late.' },
+			{ role: 'assistant', content: '' },
+			{
+				role: 'assistant',
+				content: 'The earlier call was dropped.',
+				calls: [{ id: 'dropped', name: 'unregistered', arguments: {} }],
+			},
+			{ role: 'tool', call: 'dropped', content: 'Unregistered result.' },
+		])
+		await ledger.respond('Check LH-12345.')
+		const messages = requireValue(provider.calls[0]).messages.slice(1)
+		expect(messages.map((message) => message.content)).toEqual([
+			'Order LH-12345 is late.',
+			'',
+			'The earlier call was dropped.',
+			'Check LH-12345.',
+		])
+		expect(messages.find((message) => message.id === seed[3]?.id)).not.toHaveProperty('calls')
 	})
 
 	it('detects repeats with reused call ids and nested argument order, then collapses every call including the seed', async () => {
@@ -295,6 +320,80 @@ describe('Ledger', () => {
 			code: 'GAUGE',
 		})
 		expect(ledger.gauge).toBeUndefined()
+	})
+
+	it('validates constructor options with LedgerError', () => {
+		expect(() => new Ledger(createScriptedProvider([]), { ...options, capacity: 0 })).toThrow(
+			expect.objectContaining({ code: 'CAPACITY' }),
+		)
+	})
+
+	it('holds calibration admission until it settles and releases it after success or failure', async () => {
+		for (const prompt of [0, 30]) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt, completion: 1, total: prompt + 1 } },
+					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, options)
+			const pending = ledger.calibrate(new AbortController().signal)
+			const settled = Promise.allSettled([pending])
+			await Promise.all([
+				expect(ledger.respond('Concurrent request.')).rejects.toMatchObject({
+					code: 'CONCURRENCY',
+				}),
+				expect(ledger.calibrate(new AbortController().signal)).rejects.toMatchObject({
+					code: 'CONCURRENCY',
+				}),
+			])
+			expect((await settled)[0]?.status).toBe(prompt === 0 ? 'rejected' : 'fulfilled')
+			expect((await ledger.respond('After calibration.')).content).toBe('Done.')
+			expect(provider.calls).toHaveLength(3)
+		}
+	})
+
+	it('preserves the full view and fault on answer-pass selection failure', async () => {
+		const provider = createScriptedProvider([{ content: '' }, { content: 'Recovered.' }], {
+			record: true,
+		})
+		let failed = false
+		const fault = new Error('planning failed')
+		const ledger = createLedger(provider, {
+			...options,
+			get system() {
+				if (failed) throw fault
+				return options.system
+			},
+		})
+		ledger.conversation.add([
+			{ role: 'user', content: 'Read the account.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+		])
+		const selections: Selection[] = []
+		const views: Array<readonly MessageInput[]> = []
+		ledger.agent.emitter.on('start', () => {
+			failed = true
+		})
+		ledger.agent.emitter.on('select', (selection) => {
+			failed = false
+			selections.push(selection)
+			views.push(ledger.conversation.view())
+		})
+		expect((await ledger.respond('Check the account.')).content).toBe('Recovered.')
+		expect(selections).toHaveLength(2)
+		expect(selections[1]?.fault).toBe(fault)
+		expect(selections[1]?.messages).toEqual(views[1])
+		expect(provider.calls[1]?.messages.slice(1)).toEqual(views[1])
+		expect(provider.calls[1]?.tools).toBeUndefined()
+		expect(ledger.agent.context.scope).toBeUndefined()
 	})
 
 	it('refuses nonpositive priced usage and recovers the next respond after GAUGE', async () => {
@@ -571,15 +670,17 @@ describe('Ledger', () => {
 				.messages()
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
-		).toEqual(['recall needs an owner name, an id, or a desk topic', LEDGER_NOTES.closed])
+		).toEqual([
+			'recall needs a topic: an owner name, an id, or one of refunds',
+			LEDGER_NOTES.closed,
+		])
 		const short = createLedger(createScriptedProvider([]), { ...options, capacity: 1 })
 		const result = await short.agent.context.tools.execute([
 			{ id: 'short', name: 'recall', arguments: { topic: 'absent' } },
 		])
 		expect(result[0]).toMatchObject({
 			success: true,
-			value:
-				'nothing on "absent"; recall a customer name, an order or account id, or one of refunds',
+			value: 'nothing on "absent"; recall an owner name, an id, or one of refunds',
 		})
 	})
 
@@ -875,20 +976,32 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Mira and AA-11' } }],
+					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Mira' } }],
+				},
+				{
+					content: '',
+					tools: [{ id: 'joined', name: 'recall', arguments: { topic: 'Mira and AA-11' } }],
 				},
 				{ content: 'Done.' },
 			],
 			{ record: true },
 		)
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
+		ledger.conversation.add([
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+		])
 		const source = ledger.conversation.add({
 			role: 'user',
 			content: 'For Mira, keep the receipt. Code AA-10.',
 		})
 		const correction = ledger.conversation.add({
 			role: 'user',
-			content: 'Replace AA-10 with AA-11.',
+			content: 'Brightwater Studio: replace AA-10 with AA-11.',
 		})
 		const retired = ledger.conversation.add({ role: 'user', content: 'Retired instruction 42.' })
 		ledger.conversation.judgments.add({
@@ -922,15 +1035,28 @@ describe('Ledger', () => {
 				})
 		}
 		await ledger.respond('Check Mira receipt.')
-		const expected = 'For Mira, keep the receipt.\nReplace AA-10 with AA-11.'
+		const expected = `For Mira, keep the receipt.\n${correction.content}`
 		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(expected)
+		expect(
+			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
+		).toBe(`${correction.content}\nFor Mira, keep the receipt.`)
 		expect(provider.calls[0]?.messages[0]?.content).not.toContain('[amended by')
+		ledger.conversation.judgments.add({
+			id: JSON.stringify(['category', source.id]),
+			question: LEDGER_QUESTIONS.category,
+			sources: [source.id],
+			state: `user: ${source.content}`,
+			model: judge.model,
+			answer: { form: 'choice', probabilities: { rule: 1 } },
+		})
 		const request = ledger.conversation.add({ role: 'user', content: 'Inspect the full seed.' })
 		const selection = await ledger.agent.context.select(request, new AbortController().signal)
 		expect(selection?.messages.some((message) => message.id === retired.id)).toBe(false)
+		expect(selection?.briefing).toContain('For Mira, keep the receipt.')
+		expect(selection?.briefing).not.toContain(correction.content)
 	})
 
 	it('matches partial owner words on units and recall but uses exact ids and label substrings for query topics', async () => {
@@ -976,15 +1102,14 @@ describe('Ledger', () => {
 			).toContain('For Brightwater, keep receipt 42.')
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe(
-			'nothing on "Brightwater unknown"; recall a customer name, an order or account id, or one of refunds',
-		)
+		).toBe('nothing on "Brightwater unknown"; recall an owner name, an id, or one of refunds')
 	})
 
 	it('omits superseded user messages from an otherwise uncut seed tail', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
 		const ledger = createLedger(provider, options)
 		const old = ledger.conversation.add({ role: 'user', content: 'Use instruction 42.' })
+		const reply = ledger.conversation.add({ role: 'assistant', content: 'Using instruction 42.' })
 		const correction = ledger.conversation.add({
 			role: 'user',
 			content: 'Replace instruction 42 with 43.',
@@ -999,6 +1124,7 @@ describe('Ledger', () => {
 		})
 		await ledger.respond('Request.')
 		expect(provider.calls[0]?.messages.some((message) => message.id === old.id)).toBe(false)
+		expect(provider.calls[0]?.messages.some((message) => message.id === reply.id)).toBe(false)
 		expect(
 			provider.calls[0]?.messages.find((message) => message.id === correction.id)?.content,
 		).toBe(correction.content)
@@ -1027,7 +1153,7 @@ describe('Ledger', () => {
 		await ledger.respond('Second request.')
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing on "absent"; recall a customer name, an order or account id, or one of refunds')
+		).toBe('nothing on "absent"; recall an owner name, an id, or one of refunds')
 	})
 
 	it('cuts off-topic rules before owner lines and keeps tail exchanges and call groups whole', async () => {
@@ -1109,8 +1235,8 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'nothing on "one"; recall a customer name, an order or account id, or one of refunds',
-			'nothing on "two"; recall a customer name, an order or account id, or one of refunds',
+			'nothing on "one"; recall an owner name, an id, or one of refunds',
+			'nothing on "two"; recall an owner name, an id, or one of refunds',
 			LEDGER_NOTES.closed,
 		])
 	})

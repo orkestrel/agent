@@ -420,6 +420,80 @@ describe('Classifier', () => {
 		})
 		expect(transport.requests).toHaveLength(2)
 	})
+	it('returns a partial fault when a classification handler throws', async () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'A statement.' })
+		const fault = new Error('assignment failed')
+		const classifier = new Classifier({
+			conversation,
+			judge: new RecordingJudge(),
+			questions: LEDGER_QUESTIONS,
+			topics: [],
+			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
+			assign: () => {
+				throw fault
+			},
+			entities: () => new Set(),
+		})
+		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
+			judgments: [],
+			fault,
+		})
+	})
+
+	it('folds an aborted judge partial into completed usage and answered or refused keys', async () => {
+		for (const refused of [false, true]) {
+			const conversation = createConversation()
+			const messages = conversation.add([
+				{ role: 'user', content: 'First statement.' },
+				{ role: 'user', content: 'Second statement.' },
+				{ role: 'user', content: 'Unasked statement.' },
+			])
+			const controller = new AbortController()
+			const asked: string[] = []
+			const classifier = new Classifier({
+				conversation,
+				judge: {
+					id: 'partial',
+					name: 'partial',
+					model: 'partial',
+					ask(request: JudgeRequest): Promise<JudgeResult> {
+						const key = requireValue(Object.keys(request.questions)[0])
+						asked.push(key)
+						if (asked.length === 1)
+							return Promise.resolve({
+								model: 'partial',
+								answers: { [key]: { form: 'choice', probabilities: { fact: 1 } } },
+								usage: { prompt: 4, completion: 1, total: 5 },
+							})
+						controller.abort()
+						return Promise.reject(
+							new JudgeAbortError({
+								model: 'partial',
+								answers: refused ? {} : { [key]: { form: 'choice', probabilities: { fact: 1 } } },
+								...(refused ? { refusals: { [key]: { missing: ['evidence'] } } } : {}),
+								usage: { prompt: 40, completion: 1, total: 41 },
+							}),
+						)
+					},
+				},
+				questions: LEDGER_QUESTIONS,
+				topics: [],
+				thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
+				assign: () => undefined,
+				entities: () => new Set(),
+			})
+			const result = await classifier.classify(new Set(), controller.signal)
+			expect(result.fault).toBeInstanceOf(JudgeAbortError)
+			expect(result.judgments).toEqual(
+				messages.slice(0, 2).map((message) => JSON.stringify(['category', message.id])),
+			)
+			expect(result.usage).toEqual({ prompt: 44, completion: 2, total: 46 })
+			expect(asked).toEqual(result.judgments)
+			expect(conversation.judgments.count).toBe(2)
+		}
+	})
+
 	it('leaves an item undecided when the judge aborts under a live signal and asks the following spec', async () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'First statement.' })

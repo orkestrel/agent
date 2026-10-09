@@ -11,6 +11,7 @@ import type {
 import type { TokenUsage } from '@orkestrel/budget'
 import { isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
 import { matchesJudgment } from '../conversations/helpers.js'
+import { isJudgeAbortError } from '../errors.js'
 import { sumUsage } from '../helpers.js'
 import {
 	DECISIVE_CATEGORIES,
@@ -46,7 +47,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The ids of the messages that belong to the current request
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The ids of the judgments that answer the questions and their summed usage
+	 * @returns The judgment keys and summed usage; any throw or caller abort during classification returns the partial result with `fault`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -56,13 +57,13 @@ export class Classifier implements ClassifierInterface {
 			const asked = messages.filter((message) => this.#options.assign(message) === undefined)
 			for (const message of asked) {
 				if (!requests.has(message.id))
-					results.push(await this.#ask(this.#buildCategory(message.id), signal))
+					results.push(await this.#ask(this.#buildCategory(message.id), signal, results))
 			}
 			for (const message of asked) {
 				if (!requests.has(message.id) && this.quiet(message.id)) continue
 				for (const topic of this.#options.topics) {
 					if (requests.has(message.id) && topic.requests === false) continue
-					results.push(await this.#ask(this.#buildTopic(message.id, topic), signal))
+					results.push(await this.#ask(this.#buildTopic(message.id, topic), signal, results))
 				}
 			}
 			for (const later of asked) {
@@ -82,10 +83,10 @@ export class Classifier implements ClassifierInterface {
 					)
 						continue
 					const spec = this.#buildPair('amends', earlier.id, later.id)
-					results.push(await this.#ask(spec, signal))
+					results.push(await this.#ask(spec, signal, results))
 					if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
 						results.push(
-							await this.#ask(this.#buildPair('supersedes', earlier.id, later.id), signal),
+							await this.#ask(this.#buildPair('supersedes', earlier.id, later.id), signal, results),
 						)
 				}
 			}
@@ -320,7 +321,11 @@ export class Classifier implements ClassifierInterface {
 		return parts.join(' <- ')
 	}
 
-	async #ask(spec: JudgmentInput, signal: AbortSignal): Promise<ClassifierResult> {
+	async #ask(
+		spec: JudgmentInput,
+		signal: AbortSignal,
+		results: ClassifierResult[],
+	): Promise<ClassifierResult> {
 		if (this.#read(spec) !== undefined) return { judgments: [spec.id] }
 		const fingerprint = JSON.stringify(spec)
 		if (this.#failed.get(spec.id) === fingerprint) return { judgments: [] }
@@ -339,6 +344,15 @@ export class Classifier implements ClassifierInterface {
 						...(judgment.usage === undefined ? {} : { usage: judgment.usage }),
 					}
 		} catch (error) {
+			if (isJudgeAbortError(error))
+				results.push({
+					judgments:
+						Object.hasOwn(error.partial.answers, spec.id) ||
+						(error.partial.refusals !== undefined && Object.hasOwn(error.partial.refusals, spec.id))
+							? [spec.id]
+							: [],
+					...(error.partial.usage === undefined ? {} : { usage: error.partial.usage }),
+				})
 			if (DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error)))
 				this.#failed.set(spec.id, fingerprint)
 			if (signal.aborted) throw error
