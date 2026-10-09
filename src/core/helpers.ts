@@ -1,3 +1,4 @@
+import type { Message, ThinkingReplay } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { attempt, isFiniteNumber, parseJSON } from '@orkestrel/contract'
 
@@ -49,8 +50,10 @@ export function filterAllowList<T>(
  *
  * @remarks
  * Pure and total. `running` is `undefined` until a call surfaces reasoning, so the first join
- * returns `next` verbatim. The result stays out of `content`, is recorded on the assistant
- * message, and returns only as `replay` allows.
+ * returns `next` verbatim. Each call's non-empty thinking is recorded on the assistant message
+ * that call appends. The joined result also includes thinking from calls that appended no
+ * message, such as an aborted call. Only recorded thinking can return to a provider,
+ * as its `replay` policy allows. Thinking stays out of `content`.
  *
  * @param running - The reasoning accumulated so far (`undefined` before the first)
  * @param next - This call's separated reasoning
@@ -66,6 +69,45 @@ export function filterAllowList<T>(
 export function joinThinking(running: string | undefined, next: string): string {
 	if (running === undefined || running.length === 0) return next
 	return next.length === 0 ? running : `${running}\n\n${next}`
+}
+
+/**
+ * Applies a {@link ThinkingReplay} policy to a conversation, returning the messages a provider
+ * sends with only the assistant thinking the policy allows.
+ *
+ * @remarks
+ * Pure and total. `'all'` returns the input array itself. `'none'` drops `thinking` from every
+ * message that carries it. `'turn'` drops it from every message at or before the last `user`
+ * message and keeps it after, the turn in progress; with no `user` message every message counts
+ * as inside the turn. A message without `thinking`, or one that keeps it, is the same object;
+ * a message that loses it is a copy without that member, so no `undefined` member is written.
+ *
+ * @param messages - The conversation to project (left unchanged)
+ * @param replay - The policy naming which thinking stays
+ * @returns The messages with the policy applied
+ *
+ * @example
+ * ```ts
+ * const messages = [
+ * 	{ id: '1', role: 'user', content: 'Plan the trip' },
+ * 	{ id: '2', role: 'assistant', content: 'Booked', thinking: 'Compare fares first' },
+ * ]
+ * stripThinking(messages, 'none') // [{ id: '1', ... }, { id: '2', role: 'assistant', content: 'Booked' }]
+ * stripThinking(messages, 'turn') // the thinking on '2' stays: it follows the last user message
+ * ```
+ */
+export function stripThinking(
+	messages: readonly Message[],
+	replay: ThinkingReplay,
+): readonly Message[] {
+	if (replay === 'all') return messages
+	const last =
+		replay === 'none' ? messages.length - 1 : messages.findLastIndex((one) => one.role === 'user')
+	return messages.map((message, index) => {
+		if (message.thinking === undefined || index > last) return message
+		const { thinking: _thinking, ...rest } = message
+		return rest
+	})
 }
 
 /**

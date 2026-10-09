@@ -1982,7 +1982,7 @@ await new GuideCommand({
 				)
 			}
 			for (const sentence of [
-				"The agent loop records each call's non-empty thinking as the `thinking` member of that call's assistant message, on a tool-call turn and on the final answer alike, and joins the run's thinking into `AgentResult.thinking`.",
+				"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
 				"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
 				'It is the default, and a request under it carries the same messages it would carry if no thinking were recorded.',
 			])

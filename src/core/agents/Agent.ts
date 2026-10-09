@@ -13,7 +13,7 @@ import type {
 } from './types.js'
 import type { ProviderInterface, ProviderResult } from '../providers/index.js'
 import type { AgentContextInterface, Selection } from '../contexts/index.js'
-import type { Message } from '../types.js'
+import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterInterface } from '@orkestrel/emitter'
@@ -28,8 +28,14 @@ import { AgentContext } from '../contexts/index.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError } from './errors.js'
 import { Channel } from './Channel.js'
-import { assembleResult, chargeUsage, denyCall, estimateTokens, stripThinking } from './helpers.js'
-import { filterAllowList, joinThinking, sanitizeUsage, sumUsage } from '../helpers.js'
+import { assembleResult, chargeUsage, denyCall, estimateTokens } from './helpers.js'
+import {
+	filterAllowList,
+	joinThinking,
+	sanitizeUsage,
+	stripThinking,
+	sumUsage,
+} from '../helpers.js'
 import { isProviderAbortError } from '../providers/index.js'
 
 /**
@@ -79,6 +85,7 @@ import { isProviderAbortError } from '../providers/index.js'
 export class Agent implements AgentInterface {
 	readonly #id: string
 	readonly #provider: ProviderInterface
+	readonly #replay: ThinkingReplay
 	readonly #context: AgentContextInterface
 	readonly #limit: number
 	readonly #timeoutMs: number | undefined
@@ -117,6 +124,7 @@ export class Agent implements AgentInterface {
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
 		this.#id = crypto.randomUUID()
 		this.#provider = provider
+		this.#replay = provider.replay ?? 'none'
 		this.#context = new AgentContext({
 			...(options?.system === undefined ? {} : { system: options.system }),
 			...(options?.tools === undefined ? {} : { tools: options.tools }),
@@ -500,6 +508,10 @@ export class Agent implements AgentInterface {
 				}
 				throw error
 			}
+			const recorded =
+				result.thinking === undefined || result.thinking.length === 0
+					? {}
+					: { thinking: result.thinking }
 			if (result.thinking !== undefined && result.thinking.length > 0) {
 				thinking = joinThinking(thinking, result.thinking)
 			}
@@ -532,9 +544,7 @@ export class Agent implements AgentInterface {
 					role: 'assistant',
 					content: result.content,
 					calls: result.tools,
-					...(result.thinking === undefined || result.thinking.length === 0
-						? {}
-						: { thinking: result.thinking }),
+					...recorded,
 				})
 				messages.push(assistant)
 				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
@@ -574,9 +584,7 @@ export class Agent implements AgentInterface {
 				this.#context.messages.add({
 					role: 'assistant',
 					content: result.content,
-					...(result.thinking === undefined || result.thinking.length === 0
-						? {}
-						: { thinking: result.thinking }),
+					...recorded,
 				}),
 			)
 			content = result.content
@@ -652,7 +660,7 @@ export class Agent implements AgentInterface {
 		if (this.#window === undefined || conversation?.summarizable !== true || abort.signal.aborted)
 			return false
 		this.#window.clear()
-		this.#window.consume(stripThinking(messages, this.#provider.replay ?? 'none'))
+		this.#window.consume(stripThinking(messages, this.#replay))
 		if (!this.#window.exhausted) return false
 		let section: Awaited<ReturnType<typeof conversation.compact>>
 		try {
@@ -827,7 +835,7 @@ export class Agent implements AgentInterface {
 		if (think !== undefined) options.think = think
 		if (schema !== undefined) options.schema = schema
 		const generator = this.#provider.stream(
-			stripThinking(messages, this.#provider.replay ?? 'none'),
+			stripThinking(messages, this.#replay),
 			signal,
 			definitions,
 			Object.keys(options).length > 0 ? options : undefined,

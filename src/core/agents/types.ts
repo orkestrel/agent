@@ -68,12 +68,18 @@ export type AgentChunk =
  * usage mid-stream (for example a daemon whose final counts never arrive before the cancel)
  * reports none for that turn, and none is fabricated. `thinking` is present
  * only when a call surfaced reasoning ({@link ProviderResult.thinking}, joined across calls);
- * it stays out of `content`, is recorded on the assistant message, and returns only as
- * `replay` allows.
+ * it stays out of `content`. Each call's non-empty thinking is recorded on the assistant
+ * message that call appends. The joined result also includes thinking from calls that appended
+ * no message, such as an aborted call. Only recorded thinking can return to a provider,
+ * as its `replay` policy allows.
  */
 export interface AgentResult {
 	readonly content: string
-	/** Carries reasoning the run's provider calls separated from the answer (present when any surfaced it). */
+	/**
+	 * Carries the calls' joined reasoning, including calls that appended no message, such as an
+	 * aborted call. Each appended assistant message records only its own call's non-empty thinking;
+	 * only recorded thinking can return to a provider under its `replay` policy.
+	 */
 	readonly thinking?: string
 	/** Holds the summed {@link TokenUsage} across the run's provider calls and selections (present when any reported it). */
 	readonly usage?: TokenUsage

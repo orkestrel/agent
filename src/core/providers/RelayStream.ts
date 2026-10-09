@@ -1,8 +1,9 @@
 import type { ProviderDelta, ProviderResult, RelayFrame, RelayStreamOptions } from './types.js'
+import type { ThinkingReplay } from '../types.js'
 import { RELAY_CONTENT_TYPE, RELAY_PROVIDER_MESSAGE } from './constants.js'
 import { ProviderError, isProviderAbortError } from './errors.js'
 import { relayFrameContract } from './contracts.js'
-import { stripThinking } from '../agents/helpers.js'
+import { stripThinking } from '../helpers.js'
 
 /**
  * Streams a provider call as validated NDJSON frames under response backpressure.
@@ -25,6 +26,7 @@ import { stripThinking } from '../agents/helpers.js'
  * ```
  */
 export class RelayStream {
+	readonly #replay: ThinkingReplay
 	readonly #upstream = new AbortController()
 	readonly #encoder = new TextEncoder()
 	readonly #iterator: AsyncGenerator<ProviderDelta, ProviderResult>
@@ -34,11 +36,12 @@ export class RelayStream {
 	#settled = false
 
 	constructor(options: RelayStreamOptions) {
+		this.#replay = options.provider.replay ?? 'none'
 		this.#signal = options.signal
 		this.#listener = this.#cancel.bind(this)
 		if (this.#signal.aborted) this.#abortProvider()
 		this.#iterator = options.provider.stream(
-			stripThinking(options.request.messages, options.provider.replay ?? 'none'),
+			stripThinking(options.request.messages, this.#replay),
 			this.#upstream.signal,
 			options.request.tools,
 			options.request.options,

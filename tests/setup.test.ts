@@ -248,6 +248,12 @@ describe('createScriptedProvider abort', () => {
 })
 
 describe('createScriptedProvider identity and recorders', () => {
+	it('exposes each supplied thinking replay policy and leaves an absent policy absent', () => {
+		expect(createScriptedProvider([]).replay).toBeUndefined()
+		for (const replay of ['none', 'turn', 'all'] as const)
+			expect(createScriptedProvider([], { replay }).replay).toBe(replay)
+	})
+
 	it('names the provider through name, defaulting to scripted', async () => {
 		const fallback = createScriptedProvider([{ content: 'x' }])
 		expect([fallback.id, fallback.name]).toEqual(['scripted', 'scripted'])

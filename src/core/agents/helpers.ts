@@ -1,4 +1,3 @@
-import type { ThinkingReplay } from '../providers/types.js'
 import type { Message } from '../types.js'
 import type {
 	AgentInterface,
@@ -112,7 +111,7 @@ export function estimateTokens(text: string): number {
 
 /**
  * Estimates the context-token footprint of a batch of messages — each message's content plus
- * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, and
+ * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, a thinking estimate, and
  * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The default
  * `consumer` estimator for an agent's context budget (the
  * {@link import('./types.js').AgentOptions} `window`), total and never throwing, and a
@@ -160,45 +159,6 @@ export function estimateMessages(messages: readonly Message[]): number {
 		const thinking = message.thinking === undefined ? 0 : estimateTokens(message.thinking)
 		return sum + content + calls + images + thinking
 	}, 0)
-}
-
-/**
- * Applies a {@link ThinkingReplay} policy to a conversation, returning the messages a provider
- * sends with only the assistant thinking the policy allows.
- *
- * @remarks
- * Pure and total. `'all'` returns the input array itself. `'none'` drops `thinking` from every
- * message that carries it. `'turn'` drops it from every message at or before the last `user`
- * message and keeps it after, the turn in progress; with no `user` message every message counts
- * as inside the turn. A message without `thinking`, or one that keeps it, is the same object;
- * a message that loses it is a copy without that member, so no `undefined` member is written.
- *
- * @param messages - The conversation to project (left unchanged)
- * @param replay - The policy naming which thinking stays
- * @returns The messages with the policy applied
- *
- * @example
- * ```ts
- * const messages = [
- * 	{ id: '1', role: 'user', content: 'Plan the trip' },
- * 	{ id: '2', role: 'assistant', content: 'Booked', thinking: 'Compare fares first' },
- * ]
- * stripThinking(messages, 'none') // [{ id: '1', ... }, { id: '2', role: 'assistant', content: 'Booked' }]
- * stripThinking(messages, 'turn') // the thinking on '2' stays: it follows the last user message
- * ```
- */
-export function stripThinking(
-	messages: readonly Message[],
-	replay: ThinkingReplay,
-): readonly Message[] {
-	if (replay === 'all') return messages
-	const last =
-		replay === 'none' ? messages.length - 1 : messages.findLastIndex((one) => one.role === 'user')
-	return messages.map((message, index) => {
-		if (message.thinking === undefined || index > last) return message
-		const { thinking: _thinking, ...rest } = message
-		return rest
-	})
 }
 
 /**

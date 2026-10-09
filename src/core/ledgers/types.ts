@@ -1,6 +1,6 @@
 import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
-import type { ThinkingReplay } from '../providers/types.js'
+import type { ThinkingReplay } from '../types.js'
 import type {
 	ChoiceQuestion,
 	JudgeEntry,
@@ -572,8 +572,11 @@ export interface GaugeCall {
  * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
- * Measured use is `prompt + completion - thinking` for `'none'`, and `prompt + completion`
- * otherwise. The reply reserve excludes thinking for every policy. Recall room is
+ * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
+ * otherwise; absent completion counts as 0. Without prompt usage, use is `fixed + scale * estimate`.
+ * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall framing at the marginal
+ * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
+ * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is
  * `max(0, (left - predict - reserve) / 2 / rate)`; recall closes at `left - predict < 2 * reserve`.
  */
 export interface GaugeOptions extends LedgerGauge {
@@ -607,9 +610,7 @@ export interface GaugeInterface extends LedgerGauge {
 	 * Returns the tokens of the capacity the last call left.
 	 *
 	 * @remarks
-	 * Returns `max(0, capacity - used)`. A measured call uses `prompt + completion - carried`,
-	 * where `carried` is `thinking ?? 0` for replay `'none'`, and 0 for `'turn'` or `'all'`.
-	 * A call without prompt usage uses `fixed + scale * estimate`.
+	 * Applies the measured-use and fallback formulas in {@link GaugeOptions}.
 	 *
 	 * @param calls - The calls of the request so far
 	 * @returns The tokens left
@@ -619,9 +620,7 @@ export interface GaugeInterface extends LedgerGauge {
 	 * Returns the tokens a reply turn needs after the calls, given the longest reply text written so far.
 	 *
 	 * @remarks
-	 * Adds the recall framing at the marginal rate to the largest observed reply's
-	 * `completion - (thinking ?? 0)`, whatever the replay policy. Without a positive reply
-	 * observation, prices the longest text at that rate.
+	 * Applies the reply reserve described in {@link GaugeOptions}.
 	 *
 	 * @param calls - The calls of the request so far
 	 * @param longest - The longest reply text written so far
@@ -632,8 +631,8 @@ export interface GaugeInterface extends LedgerGauge {
 	 * Returns the estimate units a recall result can take without taking the reply's room.
 	 *
 	 * @remarks
-	 * Returns `max(0, (left - predict - reserve) / 2 / rate)`. The ledger closes recall when
-	 * `left - predict < 2 * reserve`.
+	 * Applies the recall-room formula in {@link GaugeOptions}; {@link LedgerOptions} describes
+	 * the ledger's close rule.
 	 *
 	 * @param calls - The calls of the request so far
 	 * @param longest - The longest reply text written so far

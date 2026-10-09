@@ -35,6 +35,7 @@ import type {
 	SelectionHandler,
 	SelectionOptions,
 	ScreenHandler,
+	ThinkingReplay,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { RecorderInterface } from '@orkestrel/test'
@@ -453,6 +454,7 @@ export type DeltasOf = (content: string) => readonly string[]
  *   `maxInFlight`); defaults to `0`.
  * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
  *   providers are distinguishable); defaults to `'scripted'`.
+ * - `replay` — exposes the supplied thinking policy; omitted leaves the member absent.
  * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
  *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
  *   form) overrides this for that turn.
@@ -462,6 +464,7 @@ export type DeltasOf = (content: string) => readonly string[]
  * - `record` — when `true`, every call appends its `messages` / `tools` / `signal` to `calls`.
  */
 export interface ScriptedProviderOptions {
+	readonly replay?: ThinkingReplay
 	readonly delay?: number
 	readonly name?: string
 	readonly deltasOf?: DeltasOf
@@ -606,6 +609,7 @@ export function createHostileSerializer(): Readonly<Record<string, unknown>> {
  * {@link createScriptedProvider}.
  */
 export class ScriptedProvider implements ScriptedProviderInterface {
+	readonly replay?: ThinkingReplay
 	readonly #turns: readonly ScriptedTurn[]
 	readonly #deltasOf: DeltasOf
 	readonly #exhaust: 'repeat' | 'throw'
@@ -619,6 +623,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 	#started = 0
 
 	constructor(turns: readonly ScriptedTurn[], options?: ScriptedProviderOptions) {
+		if (options?.replay !== undefined) this.replay = options.replay
 		this.#turns = turns
 		this.#deltasOf = options?.deltasOf ?? chunkWholeDelta
 		this.#exhaust = options?.exhaust ?? 'repeat'

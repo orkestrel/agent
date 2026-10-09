@@ -149,6 +149,24 @@ describe('Conversation — view() before any compaction', () => {
 })
 
 describe('Conversation — compact() with the default keep (0) folds up to the newest user message', () => {
+	it('omits thinking from the summarizer input and retains it in the stored section', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'First request.' },
+			{ role: 'assistant', content: 'First reply.', thinking: 'private plan' },
+			{ role: 'user', content: 'Next request.' },
+		])
+		const section = await conversation.compact()
+		expect(stub.calls).toHaveLength(1)
+		expect(stub.calls[0]?.map((message) => message.content)).toEqual([
+			'First request.',
+			'First reply.',
+		])
+		expect(stub.calls[0]?.some((message) => 'thinking' in message)).toBe(false)
+		expect(section?.messages[1]?.thinking).toBe('private plan')
+	})
+
 	it('folds every message before the newest user message into ONE section, sets the rollup, emits', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })

@@ -9,9 +9,8 @@ import type {
 	ProviderResult,
 	ProviderStreamOptions,
 	ThinkSplitterInterface,
-	ThinkingReplay,
 } from './types.js'
-import type { Message } from '../types.js'
+import type { Message, ThinkingReplay } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'

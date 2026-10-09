@@ -8,6 +8,7 @@ import {
 	collectRegistry,
 	collectStale,
 	computeThinking,
+	resolvePredict,
 	cutItems,
 	extractTokens,
 	fitSlope,
@@ -42,7 +43,6 @@ describe('computeThinking', () => {
 		expect(computeThinking({ thinking: 'a', content: 'bb' }, 10)).toBe(3)
 		expect(computeThinking({ thinking: 'a', content: 'b' }, 1)).toBe(1)
 		expect(computeThinking({ thinking: 'plan', content: '' }, 10)).toBe(10)
-		expect(computeThinking({ thinking: 'plan', content: '' }, 0.75)).toBe(0.75)
 		expect(computeThinking({ thinking: 'plan', content: '' }, 0)).toBe(0)
 	})
 
@@ -56,17 +56,28 @@ describe('computeThinking', () => {
 		expect(computeThinking({ thinking: 'a'.repeat(45), content: '', calls }, 20)).toBe(10)
 	})
 
-	it('reports a serialization failure for calls with bigint arguments', () => {
-		expect(() =>
+	it('uses zero call characters when calls cannot serialize', () => {
+		expect(
 			computeThinking(
 				{
 					thinking: 'plan',
-					content: '',
+					content: 'ok',
 					calls: [{ id: 'one', name: 'recall', arguments: { count: 1n } }],
 				},
 				10,
 			),
-		).toThrow(TypeError)
+		).toBe(7)
+	})
+})
+
+describe('resolvePredict', () => {
+	it('resolves the default, preserves valid boundaries, and refuses invalid caps', () => {
+		expect(resolvePredict(undefined, 4096)).toBe(0)
+		for (const predict of [0, -0, 4095]) expect(resolvePredict(predict, 4096)).toBe(predict)
+		for (const predict of [-1, 0.5, 4096, 4097, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+			expect(() => resolvePredict(predict, 4096)).toThrow(
+				expect.objectContaining({ code: 'CAPACITY' }),
+			)
 	})
 })
 

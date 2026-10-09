@@ -7,6 +7,7 @@ import type {
 	Message,
 	NoulCriteria,
 	ScoreCriteria,
+	ThinkingReplay,
 } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
@@ -78,17 +79,11 @@ export interface ProviderStreamOptions {
 }
 
 /**
- * Names which assistant thinking a provider sends back: `'none'` sends none, `'turn'` sends the
- * thinking of the assistant messages that follow the last `user` message (the turn in progress),
- * and `'all'` sends every assistant message's thinking.
- */
-export type ThinkingReplay = 'none' | 'turn' | 'all'
-
-/**
  * Defines the pluggable LLM inference boundary — the one contract every agent chunk depends on. A
  * provider turns a conversation (plus optional tools) into either a single assembled {@link
  * ProviderResult} (`generate`) or a stream of {@link ProviderDelta}s that returns the assembled
- * result (`stream`).
+ * result (`stream`). The agent loop, a relay server, and a ledger apply its `replay` policy
+ * before calling it. A direct `generate` or `stream` call sends messages as given.
  *
  * @remarks
  * - `id` is a stable per-instance trace label; `name` identifies the backend
@@ -103,7 +98,10 @@ export type ThinkingReplay = 'none' | 'turn' | 'all'
 export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
-	/** Names which assistant thinking the provider sends back; absent means `'none'`. */
+	/**
+	 * Names the policy the agent loop, a relay server, and a ledger apply before calling the
+	 * provider; absent means `'none'`. A direct `generate` or `stream` call sends messages as given.
+	 */
 	readonly replay?: ThinkingReplay
 	/**
 	 * Generates one complete turn — resolves the assembled {@link ProviderResult}.

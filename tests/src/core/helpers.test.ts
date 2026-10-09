@@ -1,7 +1,9 @@
+import type { Message } from '@src/core'
 import {
 	copyJSON,
 	filterAllowList,
 	joinThinking,
+	stripThinking,
 	MESSAGE_ROLES,
 	removeEntries,
 	sanitizeToken,
@@ -10,6 +12,64 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createToolCall, createTokenUsage } from '../../setup.js'
+
+describe('stripThinking', () => {
+	const messages: readonly Message[] = [
+		{ id: 'u1', role: 'user', content: 'Plan the trip' },
+		{ id: 'a1', role: 'assistant', content: 'Fares found', thinking: 'first reasoning' },
+		{ id: 'u2', role: 'user', content: 'Book it' },
+		{ id: 'a2', role: 'assistant', content: 'Booked', thinking: 'second reasoning' },
+		{ id: 'a3', role: 'assistant', content: 'Receipt sent' },
+	]
+
+	it("drops all thinking under 'none' without writing an undefined member", () => {
+		const stripped = stripThinking(messages, 'none')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		])
+		expect('thinking' in (stripped[1] ?? {})).toBe(false)
+		expect(stripped[1]).toEqual({ id: 'a1', role: 'assistant', content: 'Fares found' })
+		expect(messages[1]?.thinking).toBe('first reasoning')
+	})
+
+	it("keeps only the thinking after the last user message under 'turn'", () => {
+		const stripped = stripThinking(messages, 'turn')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			'second reasoning',
+			undefined,
+		])
+		expect('thinking' in (stripped[1] ?? {})).toBe(false)
+	})
+
+	it("keeps all thinking under 'turn' when no user message exists", () => {
+		const open = messages.filter((one) => one.role === 'assistant')
+		const stripped = stripThinking(open, 'turn')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			'first reasoning',
+			'second reasoning',
+			undefined,
+		])
+	})
+
+	it("returns the same array under 'all'", () => {
+		expect(stripThinking(messages, 'all')).toBe(messages)
+	})
+
+	it('keeps the identity of a message without thinking', () => {
+		const stripped = stripThinking(messages, 'none')
+		expect(stripped[0]).toBe(messages[0])
+		expect(stripped[4]).toBe(messages[4])
+		expect(stripped[1]).not.toBe(messages[1])
+		expect(stripThinking(messages, 'turn')[3]).toBe(messages[3])
+	})
+})
 
 describe('filterAllowList', () => {
 	it('keeps admitted tool calls by name with their identity and reply order', () => {

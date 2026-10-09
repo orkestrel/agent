@@ -1,10 +1,9 @@
-import type { Message } from '../types.js'
-import type { ThinkingReplay } from '../providers/types.js'
+import type { Message, ThinkingReplay } from '../types.js'
 import type { GaugeCall, GaugeInterface, GaugeOptions } from './types.js'
 import { isFiniteNumber } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { LedgerError } from './errors.js'
-import { fitSlope } from './helpers.js'
+import { fitSlope, resolvePredict } from './helpers.js'
 
 /**
  * Prices prompts in tokens from a measured scale and fixed cost, and measures the room a request
@@ -14,10 +13,8 @@ import { fitSlope } from './helpers.js'
  * `observe` rescales from the first call of each finished request with the fixed cost taken out,
  * and keeps that request's calls for the marginal rate and the longest final completion for the reply
  * reserve after subtracting its thinking. `fixed` never changes after construction.
- * Measured use is `prompt + completion - thinking` for replay `'none'`, and the whole prompt
- * plus completion for `'turn'` and `'all'`. Recall room is
- * `max(0, (left - predict - reserve) / 2 / rate)`, reserving the generation cap before recall.
- * The ledger closes recall when `left - predict < 2 * reserve`.
+ * {@link GaugeOptions} defines the measured use, reply reserve, and recall-room formulas.
+ * {@link LedgerOptions} defines the ledger's plan budget and recall close rule.
  *
  * @example
  * ```ts
@@ -52,17 +49,10 @@ export class Gauge implements GaugeInterface {
 		if (!Number.isSafeInteger(options.capacity) || options.capacity <= 0) {
 			throw new LedgerError('CAPACITY', 'gauge capacity must be a positive safe integer')
 		}
-		const predict = options.predict ?? 0
-		if (!Number.isSafeInteger(predict) || predict < 0 || predict >= options.capacity) {
-			throw new LedgerError(
-				'CAPACITY',
-				'gauge predict must be a nonnegative safe integer less than capacity',
-			)
-		}
 		this.#scale = options.scale
 		this.#fixed = options.fixed
 		this.#capacity = options.capacity
-		this.#predict = predict
+		this.#predict = resolvePredict(options.predict, options.capacity)
 		this.#replay = options.replay ?? 'none'
 	}
 

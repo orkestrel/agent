@@ -13,6 +13,7 @@ import type { Message, MessageInput } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { stripThinking } from '../helpers.js'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
 import { buildRecapMessage, buildSummaryMessage, collectToolGroups } from './helpers.js'
@@ -254,7 +255,7 @@ export class Conversation implements ConversationInterface {
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
 		// 1. Digest the folded slice into the section summary (the first summarizer call).
-		const summary = await summarize(slice)
+		const summary = await summarize(stripThinking(slice, 'none'))
 		const section: Section = {
 			id: crypto.randomUUID(),
 			summary,

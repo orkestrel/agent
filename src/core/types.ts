@@ -7,6 +7,13 @@ import type { MESSAGE_ROLES } from './constants.js'
 export type MessageRole = (typeof MESSAGE_ROLES)[number]
 
 /**
+ * Names which thinking the agent loop, a relay server, and a ledger retain before calling a
+ * provider: `'none'` retains none, `'turn'` retains thinking after the last `user` message,
+ * and `'all'` retains all thinking. A direct `generate` or `stream` call sends messages as given.
+ */
+export type ThinkingReplay = 'none' | 'turn' | 'all'
+
+/**
  * Represents one conversation turn fed to a {@link ProviderInterface} — a stored, identified
  * message.
  *
@@ -20,8 +27,9 @@ export type MessageRole = (typeof MESSAGE_ROLES)[number]
  * one call only where the ids within one assistant turn are unique.
  * For a successful tool result, a string is the content as is; any other value is
  * JSON-encoded. A failed tool result carries its error text unchanged. `thinking` is present
- * only on an assistant turn whose call surfaced reasoning, and a provider sends it back only as
- * its `replay` policy allows.
+ * only on an assistant turn whose call surfaced reasoning. The agent loop, a relay server, and
+ * a ledger apply the provider's `replay` policy before calling it. A direct `generate` or
+ * `stream` call sends messages as given.
  */
 export interface Message {
 	readonly id: string
@@ -40,8 +48,9 @@ export interface Message {
 	/**
 	 * Holds the reasoning the provider call that produced an assistant turn separated from its
 	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
-	 * enters `content`, judge state, or a briefing. A provider sends it back only as its `replay`
-	 * policy allows.
+	 * enters `content`, judge state, a briefing, or a summary. The agent loop, a relay server, and
+	 * a ledger apply the provider's `replay` policy before calling it. A direct `generate` or
+	 * `stream` call sends messages as given.
 	 */
 	readonly thinking?: string
 }
@@ -65,8 +74,9 @@ export interface MessageInput {
 	/**
 	 * Holds the reasoning the provider call that produced an assistant turn separated from its
 	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
-	 * enters `content`, judge state, or a briefing. A provider sends it back only as its `replay`
-	 * policy allows.
+	 * enters `content`, judge state, a briefing, or a summary. The agent loop, a relay server, and
+	 * a ledger apply the provider's `replay` policy before calling it. A direct `generate` or
+	 * `stream` call sends messages as given.
 	 */
 	readonly thinking?: string
 }

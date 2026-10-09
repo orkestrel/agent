@@ -138,6 +138,43 @@ function createRecordingBudget(max: number): RecordingBudgetInterface {
 }
 
 describe('Agent — thinking replay', () => {
+	it('resolves replay at construction for every call and context estimate', async () => {
+		let reads = 0
+		const provider = createScriptedProvider(
+			[
+				{ content: '', thinking: 'first', tools: [createToolCall()] },
+				{ content: 'done', thinking: 'last' },
+			],
+			{ record: true },
+		)
+		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
+		conversations.add()
+		const tools = createToolManager()
+		tools.add(addTool())
+		const agent = createAgent(
+			{
+				id: provider.id,
+				name: provider.name,
+				get replay(): 'none' {
+					reads += 1
+					return 'none'
+				},
+				generate: provider.generate.bind(provider),
+				stream: provider.stream.bind(provider),
+			},
+			{
+				tools,
+				conversations,
+				window: createBudget<readonly Message[]>({ max: 10000, consumer: estimateMessages }),
+			},
+		)
+		expect(reads).toBe(1)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		await agent.generate()
+		expect(provider.calls).toHaveLength(2)
+		expect(reads).toBe(1)
+	})
+
 	it('defaults an absent provider policy to none and omits empty thinking on both assistant paths', async () => {
 		const provider = createScriptedProvider(
 			[
@@ -1410,26 +1447,32 @@ describe('Agent — iteration cap', () => {
 })
 
 describe('Agent — abort', () => {
-	it('omits empty thinking from an abort partial', async () => {
-		const abort = new AbortController()
-		const failure = new ProviderAbortError({ content: 'x', thinking: '' })
-		const provider: ProviderInterface = {
-			id: 'empty-thinking',
-			name: 'empty-thinking',
-			async *stream() {
-				yield { channel: 'content', text: 'x' }
-				abort.abort()
-				throw failure
-			},
-			async generate() {
-				throw failure
-			},
+	it('joins nonempty abort thinking without recording a message and omits empty thinking', async () => {
+		for (const thinking of ['', 'unfinished plan']) {
+			const abort = new AbortController()
+			const failure = new ProviderAbortError({ content: 'x', thinking })
+			const provider: ProviderInterface = {
+				id: 'empty-thinking',
+				name: 'empty-thinking',
+				async *stream() {
+					yield { channel: 'content', text: 'x' }
+					abort.abort()
+					throw failure
+				},
+				async generate() {
+					throw failure
+				},
+			}
+			const agent = createAgent(provider, { signal: abort.signal })
+			agent.context.messages.add({ role: 'user', content: 'hi' })
+			const result = await agent.generate()
+			expect(result).toEqual({
+				content: 'x',
+				partial: true,
+				...(thinking === '' ? {} : { thinking }),
+			})
+			expect(agent.context.messages.messages().map((message) => message.role)).toEqual(['user'])
 		}
-		const agent = createAgent(provider, { signal: abort.signal })
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-		const result = await agent.generate()
-		expect(result).toEqual({ content: 'x', partial: true })
-		expect('thinking' in result).toBe(false)
 	})
 
 	it('a pre-aborted external signal commits a partial without calling the provider', async () => {

@@ -15,6 +15,29 @@ import type {
 import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
+import { LedgerError } from './errors.js'
+
+/**
+ * Resolves the generation cap and checks it against the context capacity.
+ *
+ * @param predict - The optional generation cap in tokens; see {@link LedgerOptions}
+ * @param capacity - The context capacity in tokens
+ * @returns The validated cap
+ * @throws {LedgerError} Thrown when the cap is not a nonnegative safe integer less than capacity (code `'CAPACITY'`)
+ * @example
+ * ```ts
+ * resolvePredict(1024, 4096) // 1024
+ * ```
+ */
+export function resolvePredict(predict: number | undefined, capacity: number): number {
+	const resolved = predict ?? 0
+	if (!Number.isSafeInteger(resolved) || resolved < 0 || resolved >= capacity)
+		throw new LedgerError(
+			'CAPACITY',
+			'predict must be a nonnegative safe integer less than capacity',
+		)
+	return resolved
+}
 
 /**
  * Computes the completion tokens attributable to a message's thinking.
@@ -22,12 +45,12 @@ import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './cons
  * @remarks
  * Weights the completion by thinking characters divided by the combined characters of thinking,
  * content, and JSON-serialized calls. Rounds to the nearest integer and caps at the completion.
- * An empty generation yields 0. The completion must be a finite nonnegative token count.
+ * An empty generation yields 0. The completion must be a finite nonnegative integer token count.
+ * Calls that cannot be JSON-serialized contribute 0 characters.
  *
  * @param message - The generated thinking, content, and optional calls
  * @param completion - The tokens reported for the completion
  * @returns The thinking share in tokens, or 0 when no thinking characters exist
- * @throws {TypeError} Thrown when calls cannot be JSON-serialized, including cycles or bigint arguments
  *
  * @example
  * ```ts
@@ -40,10 +63,13 @@ export function computeThinking(
 ): number {
 	const thinking = message.thinking?.length ?? 0
 	if (thinking === 0) return 0
-	const generated =
-		thinking +
-		message.content.length +
-		(message.calls === undefined ? 0 : JSON.stringify(message.calls).length)
+	let calls = 0
+	try {
+		calls = message.calls === undefined ? 0 : JSON.stringify(message.calls).length
+	} catch {
+		// Non-JSON arguments still belong to the domain call contract.
+	}
+	const generated = thinking + message.content.length + calls
 	return Math.min(completion, Math.round(completion * (thinking / generated)))
 }
 

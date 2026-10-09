@@ -51,6 +51,91 @@ describe('Ledger', () => {
 		}
 	})
 
+	it('calibrates the replay-filtered view and prices the same messages', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 140, completion: 0, total: 140 } },
+				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+			],
+			{ record: true, replay: 'none' },
+		)
+		const { gauge: _gauge, ...uncalibrated } = options
+		const ledger = createLedger(provider, uncalibrated)
+		ledger.conversation.add([
+			{ role: 'user', content: 'Seed.' },
+			{ role: 'assistant', content: 'Earlier reply.', thinking: 'secret'.repeat(100) },
+		])
+		// System: 4 + 4; user: 2 + 4; assistant: 4 + 4 = 22 estimate units.
+		await expect(ledger.calibrate(new AbortController().signal)).resolves.toEqual({
+			scale: 1.8181818181818181,
+			fixed: 100,
+		})
+		expect(provider.calls).toHaveLength(2)
+		expect(provider.calls[0]?.messages).toEqual(provider.calls[1]?.messages)
+		expect(
+			provider.calls.flatMap((call) => call.messages).some((message) => 'thinking' in message),
+		).toBe(false)
+		expect(ledger.conversation.messages()[1]?.thinking).toBe('secret'.repeat(100))
+	})
+
+	it('resolves when a thinking call carries cyclic arguments', async () => {
+		const args: Record<string, unknown> = {}
+		args.self = args
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					thinking: 'plan',
+					tools: [{ id: 'cycle', name: 'lookup', arguments: args }],
+					usage: { prompt: 100, completion: 10, total: 110 },
+				},
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, { ...options, agent: { limit: 1 } })
+		await expect(ledger.respond('Review.')).resolves.toMatchObject({ thinking: 'plan\n\nplan' })
+		expect(
+			ledger.conversation.messages().some((message) => message.calls?.[0]?.arguments === args),
+		).toBe(true)
+	})
+
+	it('resolves replay and predict at construction through calibration and respond', async () => {
+		let replayReads = 0
+		let predictReads = 0
+		const provider = createScriptedProvider([
+			{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+			{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+			{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }] },
+			{ content: 'Done.' },
+		])
+		const { gauge: _gauge, ...uncalibrated } = options
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				get replay(): 'none' {
+					replayReads += 1
+					return 'none'
+				},
+				generate: provider.generate.bind(provider),
+				stream: provider.stream.bind(provider),
+			},
+			{
+				...uncalibrated,
+				get predict() {
+					predictReads += 1
+					return 1024
+				},
+			},
+		)
+		// The ledger and its owned agent each capture the provider policy.
+		expect(replayReads).toBe(2)
+		expect(predictReads).toBe(1)
+		await expect(ledger.respond('Review.')).resolves.toMatchObject({ content: 'Done.' })
+		expect(replayReads).toBe(2)
+		expect(predictReads).toBe(1)
+	})
+
 	it('rejects invalid generation caps with CAPACITY even before calibration', () => {
 		const { gauge: _gauge, ...uncalibrated } = options
 		for (const predict of [
@@ -139,7 +224,8 @@ describe('Ledger', () => {
 			const messages = requireValue(provider.calls[0]).messages
 			expect(messages.some((message) => message.content === 'Earlier reply.')).toBe(true)
 			expect(messages.every((message) => message.thinking === undefined)).toBe(true)
-			expect(ledger.gauge?.scale).toBe(200 / estimateMessages(messages))
+			// System 8, seed 6, earlier reply 8, request 6: 28 units; 200 / 28.
+			expect(ledger.gauge?.scale).toBe(7.142857142857143)
 			prices.push(ledger.gauge?.scale)
 			prompts.push(messages.map((message) => message.content))
 		}
@@ -147,7 +233,7 @@ describe('Ledger', () => {
 		expect(prompts[1]).toEqual(prompts[0])
 	})
 
-	it('reads thinking before recall sizes its result and before the following call observation', async () => {
+	it('reads thinking at recall and respond before sizing results and observing the reply reserve', async () => {
 		const results: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(800)]) {
 			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }]
@@ -190,20 +276,17 @@ describe('Ledger', () => {
 		for (const replay of ['none', 'turn', 'all'] as const) {
 			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }]
 			const completion = JSON.stringify(calls).length + 800
-			const provider = Object.assign(
-				createScriptedProvider(
-					[
-						{
-							content: '',
-							tools: calls,
-							thinking: 'a'.repeat(800),
-							usage: { prompt: 2700, completion, total: 2700 + completion },
-						},
-						{ content: 'Done.' },
-					],
-					{ record: true },
-				),
-				{ replay },
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: calls,
+						thinking: 'a'.repeat(800),
+						usage: { prompt: 2700, completion, total: 2700 + completion },
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true, replay },
 			)
 			const ledger = createLedger(provider, { ...options, predict: 1024 })
 			await ledger.respond('Review.')
@@ -240,6 +323,70 @@ describe('Ledger', () => {
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe('nothing on "absent"; recall an owner name, an id, or one of refunds')
+	})
+
+	it('passes predict to a calibrated gauge while recall remains open', async () => {
+		for (const predict of [0, 1024]) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+					{
+						content: '',
+						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }],
+						usage: { prompt: 2700, completion: 72, total: 2772 },
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const { gauge: _gauge, ...uncalibrated } = options
+			const ledger = createLedger(provider, { ...uncalibrated, predict })
+			await ledger.calibrate(new AbortController().signal)
+			ledger.conversation.add(
+				Array.from({ length: 20 }, (_unused, at): MessageInput => ({
+					role: 'user',
+					content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+				})),
+			)
+			await ledger.respond('Review.')
+			const recalled = requireValue(
+				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
+			)
+			expect(recalled).toContain('Delivery 19 arrived Tuesday with a completed receipt.')
+			expect(recalled).not.toBe(LEDGER_NOTES.closed)
+			expect(recalled.includes('Delivery 0 arrived')).toBe(predict === 0)
+			expect(recalled.includes('older items not shown')).toBe(predict === 1024)
+		}
+	})
+
+	it('passes replay to a calibrated gauge when deciding whether recall closes', async () => {
+		for (const replay of ['none', 'turn'] as const) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+					{
+						content: '',
+						thinking: 'a'.repeat(800),
+						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+						usage: { prompt: 2700, completion: 865, total: 3565 },
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true, replay },
+			)
+			const { gauge: _gauge, ...uncalibrated } = options
+			const ledger = createLedger(provider, { ...uncalibrated, predict: 1024 })
+			await ledger.respond('Review.')
+			expect(
+				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(
+				replay === 'none'
+					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+					: LEDGER_NOTES.closed,
+			)
+		}
 	})
 
 	it('passes the generation reserve to supplied and calibrated gauges', async () => {

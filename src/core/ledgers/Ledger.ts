@@ -2,7 +2,7 @@ import type { AgentInterface, AgentResult } from '../agents/types.js'
 import type { Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { ProviderInterface } from '../providers/types.js'
-import type { Message } from '../types.js'
+import type { Message, ThinkingReplay } from '../types.js'
 import type {
 	ClassifierResult,
 	GaugeCall,
@@ -26,11 +26,11 @@ import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
-import { estimateMessages, stripThinking } from '../agents/helpers.js'
+import { estimateMessages } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
 import { createConversationManager } from '../conversations/factories.js'
 import { collectToolGroups } from '../conversations/helpers.js'
-import { joinThinking, sumUsage } from '../helpers.js'
+import { joinThinking, stripThinking, sumUsage } from '../helpers.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
 import {
@@ -53,6 +53,7 @@ import {
 	extractTokens,
 	linkOwners,
 	matchEntities,
+	resolvePredict,
 	matchesCutLine,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -74,6 +75,8 @@ import {
 export class Ledger implements LedgerInterface {
 	readonly #provider: ProviderInterface
 	readonly #options: LedgerOptions
+	readonly #replay: ThinkingReplay
+	readonly #predict: number
 	readonly #notes: LedgerNote
 	readonly #share: LedgerShare
 	readonly #conversation: ConversationInterface
@@ -116,12 +119,7 @@ export class Ledger implements LedgerInterface {
 		}
 		if (!Number.isSafeInteger(options.capacity) || options.capacity <= 0)
 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
-		const predict = options.predict ?? 0
-		if (!Number.isSafeInteger(predict) || predict < 0 || predict >= options.capacity)
-			throw new LedgerError(
-				'CAPACITY',
-				'predict must be a nonnegative safe integer less than capacity',
-			)
+		this.#predict = resolvePredict(options.predict, options.capacity)
 		for (const value of [options.recall?.limit, options.agent?.limit]) {
 			if (value !== undefined && (!Number.isSafeInteger(value) || value < 0))
 				throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
@@ -139,6 +137,7 @@ export class Ledger implements LedgerInterface {
 			lookups.add(lookup.tool.name)
 		}
 		this.#provider = provider
+		this.#replay = provider.replay ?? 'none'
 		this.#options = options
 		this.#notes = { ...LEDGER_NOTES, ...options.notes }
 		this.#share = { ...DEFAULT_LEDGER_SHARE, ...options.share }
@@ -146,8 +145,8 @@ export class Ledger implements LedgerInterface {
 			this.#gauge = new Gauge({
 				...options.gauge,
 				capacity: options.capacity,
-				predict,
-				replay: provider.replay ?? 'none',
+				predict: this.#predict,
+				replay: this.#replay,
 			})
 		const conversations = createConversationManager()
 		this.#conversation = conversations.add()
@@ -274,10 +273,13 @@ export class Ledger implements LedgerInterface {
 
 	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
 		try {
-			const messages: readonly Message[] = [
-				{ id: 'system', role: 'system', content: this.#options.system },
-				...this.#conversation.view(),
-			]
+			const messages = stripThinking(
+				[
+					{ id: 'system', role: 'system', content: this.#options.system },
+					...this.#conversation.view(),
+				],
+				this.#replay,
+			)
 			const priced = await this.#provider.generate(
 				messages,
 				signal,
@@ -294,8 +296,8 @@ export class Ledger implements LedgerInterface {
 				throw new LedgerError('GAUGE', 'calibration requires prompt usage from both calls')
 			this.#gauge = new Gauge({
 				capacity: this.#options.capacity,
-				predict: this.#options.predict ?? 0,
-				replay: this.#provider.replay ?? 'none',
+				predict: this.#predict,
+				replay: this.#replay,
 				scale: bare.usage.prompt / estimateMessages(messages),
 				fixed: Math.max(0, priced.usage.prompt - bare.usage.prompt),
 			})
@@ -366,7 +368,7 @@ export class Ledger implements LedgerInterface {
 				}
 			}
 			const last = passes.at(-1) ?? first
-			this.#readThinking()
+			this.#recordThinking()
 			this.#gauge?.observe(
 				this.#calls,
 				!last.partial && last.content.trim() !== '' ? this.#calls.at(-1) : undefined,
@@ -584,15 +586,12 @@ export class Ledger implements LedgerInterface {
 		const total =
 			Math.max(
 				0,
-				(this.#options.capacity - (this.#options.predict ?? 0)) * this.#share.prompt -
-					(this.#gauge?.fixed ?? 0),
+				(this.#options.capacity - this.#predict) * this.#share.prompt - (this.#gauge?.fixed ?? 0),
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
 		const tail = this.#selectTail(request, total * this.#share.tail, input, projection)
 		const cap =
-			total -
-			(this.#gauge?.scale ?? 1) *
-				estimateMessages(stripThinking(tail, this.#provider.replay ?? 'none'))
+			total - (this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(tail, this.#replay))
 		const tailIds = new Set(tail.map((message) => message.id))
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
 		const held = new Set(
@@ -743,13 +742,7 @@ export class Ledger implements LedgerInterface {
 		for (const step of steps) {
 			const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
 			if (
-				(this.#gauge?.scale ?? 1) *
-					estimateMessages(
-						stripThinking(
-							[{ id: 'system', role: 'system', content }],
-							this.#provider.replay ?? 'none',
-						),
-					) <=
+				(this.#gauge?.scale ?? 1) * estimateMessages([{ id: 'system', role: 'system', content }]) <=
 				cap
 			)
 				break
@@ -918,11 +911,7 @@ export class Ledger implements LedgerInterface {
 		for (const exchange of exchanges.reverse()) {
 			if (exchange[0]?.role !== 'user') continue
 			const next = [...exchange, ...tail]
-			if (
-				(this.#gauge?.scale ?? 1) *
-					estimateMessages(stripThinking(next, this.#provider.replay ?? 'none')) >
-				cap
-			)
+			if ((this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(next, this.#replay)) > cap)
 				break
 			tail = next
 		}
@@ -954,15 +943,12 @@ export class Ledger implements LedgerInterface {
 
 	#observeTurn(): void {
 		this.#flush()
-		this.#readThinking()
 		const selection = this.#selected
 		const additions = this.#conversation.messages().slice(this.#boundary)
 		const messages = this.#agent.context.build(selection)
 		const names = this.#agent.context.scope?.tools
 		this.#calls.push({
-			estimate: estimateMessages(
-				stripThinking([...messages, ...additions], this.#provider.replay ?? 'none'),
-			),
+			estimate: estimateMessages(stripThinking([...messages, ...additions], this.#replay)),
 			tools: this.#agent.context.tools
 				.definitions()
 				.filter((tool) => names === undefined || names.includes(tool.name)).length,
@@ -970,7 +956,7 @@ export class Ledger implements LedgerInterface {
 		this.#position = this.#conversation.messages().length
 	}
 
-	#readThinking(): void {
+	#recordThinking(): void {
 		const call = this.#calls.at(-1)
 		if (this.#position === undefined || call?.completion === undefined) return
 		const message = this.#conversation
@@ -1009,7 +995,7 @@ export class Ledger implements LedgerInterface {
 	}
 
 	#recall(args: Readonly<Record<string, unknown>>): string {
-		this.#readThinking()
+		this.#recordThinking()
 		const topic = isString(args.topic) ? args.topic.trim() : ''
 		this.#repeat('recall', { topic })
 		const gauge = this.#gauge
@@ -1017,7 +1003,7 @@ export class Ledger implements LedgerInterface {
 			this.#recalls >= (this.#options.recall?.limit ?? DEFAULT_RECALL_LIMIT) ||
 			(gauge !== undefined &&
 				this.#calls.length > 0 &&
-				gauge.left(this.#calls) - (this.#options.predict ?? 0) <
+				gauge.left(this.#calls) - this.#predict <
 					2 * gauge.reserve(this.#calls, this.#findLongest()))
 		)
 			this.#closed = true
