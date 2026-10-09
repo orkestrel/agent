@@ -129,5 +129,5 @@ export const DEFAULT_RECALL_LIMIT = 2
  */
 export const LEDGER_SCALE_DRIFT = 0.06
 
-/** Matches the judge error the `a5-records` series of 2026-10-09 holds as deterministic. */
+/** Matches the logprob decoding failure `invalid or duplicate top logprob token`, which the ledger holds for the ledger's life. */
 export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/

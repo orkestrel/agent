@@ -94,6 +94,7 @@ await new GuideCommand({
 		isJudgeAbortError,
 		isJudgeEntry,
 		isJudgeQuestion,
+		isLedgerError,
 		JudgeAbortError,
 		JudgeError,
 		LEDGER_NOTES,
@@ -887,7 +888,7 @@ await new GuideCommand({
 				'The refund is $289.00.',
 			])
 			expect(guideText).toContain(
-				'An exchange is a user message and every message after it up to the next user message, and a message before the first user message belongs to the first exchange. A fold removes whole exchanges: a cut inside an exchange moves back to the user message that opens it.',
+				'An exchange is a user message and every message after it up to the next user message. The messages before the first user message form their own exchange, which folds only together with the first user exchange. A fold removes whole exchanges: a cut inside an exchange moves back to its start.',
 			)
 		})
 
@@ -1881,25 +1882,49 @@ await new GuideCommand({
 			expect(contents.at(-1)).toBe(LEDGER_NOTES.cue)
 		})
 
-		it('faults a direct agent run and builds it from the whole view with no briefing, as the ledger section claims', async () => {
-			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		it('faults an unowned run whose newest message is a user message and selects nothing for any other run, as the ledger section claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{ content: 'Done.' },
+					{ content: 'Done.' },
+					{ content: 'Done.' },
+					{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+				],
+				{ record: true },
+			)
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			let calibrating = false
 			let asks = 0
 			const phrases = createPhraseJudge(['Refunds over'])
-			const ledger = createLedger(provider, {
-				judge: {
-					...phrases,
-					ask: async (request, signal) => {
-						asks += 1
-						return phrases.ask(request, signal)
+			const ledger = createLedger(
+				{
+					id: provider.id,
+					name: provider.name,
+					generate: async (...args) => {
+						entered.resolve()
+						if (calibrating) await release.promise
+						return provider.generate(...args)
 					},
+					stream: (...args) => provider.stream(...args),
 				},
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-			})
+				{
+					judge: {
+						...phrases,
+						ask: async (request, signal) => {
+							asks += 1
+							return phrases.ask(request, signal)
+						},
+					},
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 32_768,
+					gauge: { scale: 1, fixed: 0 },
+				},
+			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.respond('Does a $148.50 refund need a manager?')
 			const asked = asks
@@ -1907,34 +1932,102 @@ await new GuideCommand({
 			const selections: Selection[] = []
 			ledger.agent.emitter.on('fault', (error) => faults.push(error))
 			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
-			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
 
+			// The newest message is the reply, so the run has no request to select for.
+			const replied = ledger.conversation.view()
 			await ledger.agent.generate()
-
-			expect(faults).toHaveLength(1)
-			expect(requireValue(selections[0], 'Missing selection').fault).toBe(faults[0])
-			expect(requireValue(selections[0], 'Missing selection').briefing).toBeUndefined()
+			expect(selections).toEqual([])
+			expect(faults).toEqual([])
 			expect(
-				requireValue(provider.calls[1], 'Missing direct run')
+				requireValue(provider.calls[1], 'Missing reply run')
 					.messages.slice(1)
-					.map(({ content }) => content),
-			).toEqual(
-				ledger.conversation
-					.view()
-					.slice(0, -1)
-					.map(({ content }) => content),
-			)
+					.map(({ role, content }) => [role, content]),
+			).toEqual(replied.map(({ role, content }) => [role, content]))
+
+			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
+			const asking = ledger.conversation.view()
+			await ledger.agent.generate()
+			const direct = requireValue(selections[0], 'Missing direct selection')
+			expect(isLedgerError(direct.fault)).toBe(true)
+			expect(direct.fault).toMatchObject({ code: 'REQUEST' })
+			expect(faults).toEqual([direct.fault])
+			expect(direct.briefing).toBeUndefined()
 			expect(
-				requireValue(provider.calls[1], 'Missing direct run').messages.map(
-					({ content }) => content,
-				),
-			).toContain('Does a $148.50 refund need a manager?')
+				requireValue(provider.calls[2], 'Missing direct run')
+					.messages.slice(1)
+					.map(({ role, content }) => [role, content]),
+			).toEqual(asking.map(({ role, content }) => [role, content]))
+			expect(asks).toBe(asked)
+
+			calibrating = true
+			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
+			await entered.promise
+			ledger.conversation.add({ role: 'user', content: 'Can the desk skip the manager this once?' })
+			const abort = new AbortController()
+			ledger.agent.emitter.once('select', () => abort.abort())
+			await ledger.agent.generate({ signal: abort.signal })
+			release.resolve()
+			await measuring
+			const measured = requireValue(selections[1], 'Missing calibration-time selection')
+			expect(isLedgerError(measured.fault)).toBe(true)
+			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
+			expect(faults).toEqual([direct.fault, measured.fault])
 			expect(asks).toBe(asked)
 			expect(guideText).toContain(
 				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
 			)
 			expect(guideText).toContain(
-				"Run the ledger's agent only through the `respond` method. A run the ledger didn't start, such as a direct call to the agent's `generate` method, gets a faulted selection, so the agent emits `fault` and builds the prompt from the whole conversation view with no briefing, and the ledger asks its judge nothing for that run.",
+				"An active `respond` call owns a run whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole conversation view with no briefing, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
+			)
+		})
+
+		it('plans a direct run started while the active request is the newest message as that request, as the concurrent-run limit states', async () => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			const ledger = createLedger(
+				{
+					id: provider.id,
+					name: provider.name,
+					generate: (...args) => provider.generate(...args),
+					stream: async function* (...args) {
+						entered.resolve()
+						await release.promise
+						return yield* provider.stream(...args)
+					},
+				},
+				{
+					judge: createPhraseJudge(['Refunds over']),
+					system: 'Serve the desk.',
+					topics: [refundsTopic],
+					questions: LEDGER_QUESTIONS,
+					thresholds: deskThresholds,
+					capacity: 32_768,
+					gauge: { scale: 1, fixed: 0 },
+				},
+			)
+			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			const selections: Selection[] = []
+			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const responding = ledger.respond('Does a $148.50 refund need a manager?')
+			await entered.promise
+			const abort = new AbortController()
+			ledger.agent.emitter.once('select', () => abort.abort())
+			await ledger.agent.generate({ signal: abort.signal })
+			release.resolve()
+			await responding
+
+			const [owned, concurrent] = selections
+			expect(selections).toHaveLength(2)
+			expect(requireValue(concurrent, 'Missing concurrent selection').fault).toBeUndefined()
+			expect(requireValue(concurrent, 'Missing concurrent selection').briefing).toBe(
+				requireValue(owned, 'Missing owned selection').briefing,
+			)
+			expect(requireValue(concurrent, 'Missing concurrent selection').briefing).toContain(
+				'Refunds over $100 need a manager.',
+			)
+			expect(guideText).toContain(
+				"The ledger tells its runs apart by the newest message alone, so a direct run started while a `respond` call is active and that call's request or one of the ledger's notes is the newest message gets a planned selection, as the call's own run does.",
 			)
 		})
 
@@ -2148,7 +2241,7 @@ await new GuideCommand({
 			expect(briefing).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
 			expect(briefing).not.toContain('Order bw-5512')
 			expect(guideText).toContain(
-				"The repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which reading replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second reading replaces the first in the records.",
+				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which reading replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second reading replaces the first in the records.",
 			)
 		})
 
@@ -2187,10 +2280,73 @@ await new GuideCommand({
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
 			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
 			expect(guideText).toContain(
-				'The budget bounds the briefing and the tail alone: the request and each lookup result enter the prompt whole, so either can carry the prompt past the budget.',
+				"The budget bounds only the briefing and the tail of a request's first call. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 			expect(guideText).toContain(
-				"A request or a lookup result larger than the room the `capacity` option leaves reaches the provider whole, and the provider's own context limit decides what happens to it.",
+				"A request, a lookup result, the pass's own turns, the answer note, or the whole view a faulted selection builds from reaches the provider whole when it's larger than the room the `capacity` option leaves, and the provider's own context limit decides what happens to it.",
+			)
+		})
+
+		it("sends the pass's own turns, the answer note, and a faulted selection's view over the budget whole, as the plan claims", async () => {
+			const capacity = 600
+			const budget = (capacity * DEFAULT_LEDGER_SHARE.prompt) / (1 + LEDGER_SCALE_DRIFT)
+			const bulk = 'Delivery arrived Tuesday with a completed receipt. '.repeat(200).trim()
+			const narration = `Checking order BW-5512 before answering. ${bulk}`
+			const reading = `Order BW-5512 for account BW-20931: Brightwater Studio. ${bulk}`
+			const provider = createScriptedProvider(
+				[
+					{
+						content: narration,
+						tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: '' },
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				judge: createPhraseJudge([]),
+				system: 'Serve the desk.',
+				topics: [refundsTopic],
+				questions: LEDGER_QUESTIONS,
+				thresholds: deskThresholds,
+				capacity,
+				gauge: { scale: 1, fixed: 0 },
+				lookups: [{ ...orderLookup, tool: { ...orderLookup.tool, execute: () => reading } }],
+			})
+
+			const result = await ledger.respond('Review order BW-5512.')
+			ledger.conversation.add({ role: 'user', content: 'Does the refund need a manager?' })
+			const view = ledger.conversation.view()
+			await ledger.agent.generate()
+
+			const turn = requireValue(provider.calls[1], 'Missing second call of the pass').messages
+			const answer = requireValue(provider.calls[2], 'Missing answer pass').messages
+			const direct = requireValue(provider.calls[3], 'Missing faulted run').messages
+			const narrated = (message: Message) => message.content === narration
+			const noted = (message: Message) => message.content.startsWith(LEDGER_NOTES.results)
+			expect(result.passes).toHaveLength(2)
+			expect(turn.filter(narrated)).toHaveLength(1)
+			expect(estimateMessages(turn.filter((message) => message.role !== 'tool'))).toBeGreaterThan(
+				budget,
+			)
+			expect(
+				estimateMessages(turn.filter((message) => message.role !== 'tool' && !narrated(message))),
+			).toBeLessThanOrEqual(budget)
+			expect(answer.some((message) => message.role === 'tool' || narrated(message))).toBe(false)
+			expect(answer.filter(noted).map(({ content }) => content)).toEqual([
+				`${LEDGER_NOTES.results}\n${reading}`,
+			])
+			expect(estimateMessages(answer)).toBeGreaterThan(budget)
+			expect(estimateMessages(answer.filter((message) => !noted(message)))).toBeLessThanOrEqual(
+				budget,
+			)
+			expect(direct.slice(1).map(({ role, content }) => [role, content])).toEqual(
+				view.map(({ role, content }) => [role, content]),
+			)
+			expect(estimateMessages(direct)).toBeGreaterThan(budget)
+			expect(guideText).toContain(
+				"The budget bounds only the briefing and the tail of a request's first call. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 		})
 
@@ -2223,28 +2379,88 @@ await new GuideCommand({
 			)
 		})
 
-		it('keeps a seed rule in the briefing of every request, as the no-retirement limit claims', async () => {
+		it('retires a record message only through a replacing reading or a quiet filing and never by request count, as the no-retirement limit claims', async () => {
 			const rule = 'Refunds over $100 need a manager.'
-			const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
-				judge: createPhraseJudge(['Refunds over']),
+			const caller = 'Brightwater Studio called twice about order BW-5512.'
+			const provider = createScriptedProvider([
+				{
+					content: '',
+					tools: [{ id: 'upper', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ content: 'Done.' },
+				{
+					content: '',
+					tools: [{ id: 'lower', name: 'lookup_order', arguments: { id: 'bw-5512' } }],
+				},
+				{ content: 'Done.' },
+			])
+			let filing: 'failing' | 'chatter' = 'failing'
+			const phrases = createPhraseJudge(['Refunds over'])
+			const ledger = createLedger(provider, {
+				judge: {
+					...phrases,
+					ask: async (request, signal) => {
+						const state = isString(request.state) ? request.state : ''
+						const choice = Object.values(request.questions).some(
+							(question) => question.form === 'choice',
+						)
+						if (choice && state.includes(caller)) {
+							if (filing === 'failing') throw new Error('judge error: connection reset')
+							return {
+								model: 'scripted',
+								answers: Object.fromEntries(
+									Object.keys(request.questions).map((id): [string, JudgeAnswer] => [
+										id,
+										{ form: 'choice', probabilities: { chatter: 1 } },
+									]),
+								),
+							}
+						}
+						return phrases.ask(request, signal)
+					},
+				},
 				system: 'Serve the desk.',
 				topics: [refundsTopic],
 				questions: LEDGER_QUESTIONS,
 				thresholds: deskThresholds,
 				capacity: 32_768,
 				gauge: { scale: 1, fixed: 0 },
+				lookups: [
+					{
+						...orderLookup,
+						tool: {
+							...orderLookup.tool,
+							execute: (args) =>
+								`Order BW-5512 for account BW-20931: Brightwater Studio. Refund due ${args.id === 'BW-5512' ? '$148.50' : '$90.00'}.`,
+						},
+					},
+				],
 			})
-			const briefings: Array<string | undefined> = []
-			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing))
-			ledger.conversation.add({ role: 'user', content: rule })
+			const briefings: string[] = []
+			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing ?? ''))
+			ledger.conversation.add([
+				{ role: 'user', content: rule },
+				{ role: 'user', content: caller },
+			])
 
-			for (const amount of [120, 135, 150, 165, 180, 195, 210, 225, 240, 255])
-				await ledger.respond(`Does a $${amount} refund need a manager?`)
+			await ledger.respond('Look up order BW-5512.')
+			await ledger.respond('Look up order bw-5512 again for Brightwater Studio.')
+			filing = 'chatter'
+			for (const amount of [120, 135, 150])
+				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
-			expect(briefings).toHaveLength(10)
+			const [, second, ...later] = briefings
+			expect(briefings).toHaveLength(5)
 			for (const briefing of briefings) expect(briefing).toContain(rule)
+			expect(second).toContain('- Refund due $148.50.')
+			expect(second).toContain(caller)
+			for (const briefing of later) {
+				expect(briefing).toContain('- Refund due $90.00.')
+				expect(briefing).not.toContain('$148.50')
+				expect(briefing).not.toContain(caller)
+			}
 			expect(guideText).toContain(
-				"A message stays in its record for the ledger's life unless a later message supersedes it or makes its sentences stale; no age or request count retires it",
+				'No age or request count retires a message: it leaves the records only when a later message supersedes it or makes its sentences stale, a later reading of the same lookup replaces it, or a later answer files it quiet.',
 			)
 		})
 
