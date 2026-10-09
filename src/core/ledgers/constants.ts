@@ -131,3 +131,6 @@ export const DEFAULT_RECALL_LIMIT = 2
  * percent; the ledger divides its prompt budget by 1.06.
  */
 export const LEDGER_SCALE_DRIFT = 0.06
+
+/** Matches the judge error the measured harness holds as deterministic (`tmp/bench3/bench.mjs:867`). */
+export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/
