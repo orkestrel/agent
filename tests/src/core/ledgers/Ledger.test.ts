@@ -6,6 +6,7 @@ import {
 	createLedger,
 	createScope,
 	estimateMessages,
+	isLedgerError,
 } from '@src/core'
 import { isRecord, isString } from '@orkestrel/contract'
 import { createTool } from '@orkestrel/tool'
@@ -66,6 +67,190 @@ describe('Ledger', () => {
 		expect(result.usage).toMatchObject({ prompt: 10, completion: 2, total: 12 })
 		expect(provider.calls).toHaveLength(1)
 	})
+
+	it('keeps reordered seed results paired with their retained lookup calls', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
+		ledger.conversation.add([
+			{ role: 'user', content: 'Read the account.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [
+					{ id: 'c1', name: 'unregistered', arguments: {} },
+					{ id: 'c2', name: 'lookup', arguments: { id: 'BW-20931' } },
+				],
+			},
+			{ role: 'tool', call: 'c2', content: 'Account BW-20931: Brightwater Studio.' },
+			{ role: 'tool', call: 'c1', content: 'Sent.' },
+		])
+		await ledger.respond('What is next?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.flatMap((message) => message.calls ?? []).map((call) => call.id)).toEqual(['c2'])
+		expect(
+			sent.filter((message) => message.role === 'tool').map((message) => message.call),
+		).toEqual(['c2'])
+	})
+
+	it('files reordered lookup text under its own owner and names its own call in each stub', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, {
+			...options,
+			capacity: 32_768,
+			lookups: requireValue(options.lookups).map((lookup) => ({
+				...lookup,
+				read: (args, text) => {
+					const id = String(args.id)
+					return {
+						ids: [id],
+						owners: [
+							{ id, names: [text.includes('$20') ? 'Brightwater Studio' : 'Lighthouse Studio'] },
+						],
+					}
+				},
+			})),
+		})
+		ledger.conversation.add([
+			{ role: 'user', content: 'Read both accounts.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [
+					{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } },
+					{ id: 'c2', name: 'lookup', arguments: { id: 'LH-81660' } },
+				],
+			},
+			{ role: 'tool', call: 'c2', content: 'Account LH-81660 has a balance of $30.' },
+			{ role: 'tool', call: 'c1', content: 'Account BW-5512 has a balance of $20.' },
+		])
+		await ledger.respond('Check Brightwater Studio.')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent[0]?.content).toContain('balance of $20.')
+		expect(sent[0]?.content).not.toContain('balance of $30.')
+		expect(sent.find((message) => message.call === 'c1')?.content).toContain(
+			'lookup {"id":"BW-5512"}',
+		)
+		expect(sent.find((message) => message.call === 'c2')?.content).toContain(
+			'lookup {"id":"LH-81660"}',
+		)
+	})
+
+	it('prices the final hidden stub before accepting a seed tail with a 400-character argument', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const ledger = createLedger(provider, {
+			...options,
+			capacity: 400,
+			share: { prompt: 0.7, tail: 1 },
+		})
+		ledger.conversation.add([
+			{ role: 'user', content: 'Read it.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'x'.repeat(400) } }],
+			},
+			{ role: 'tool', call: 'c1', content: 'Account BW-20931: Brightwater Studio.' },
+		])
+		await ledger.respond('Next?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(estimateMessages(sent.slice(1, -1))).toBeLessThanOrEqual((400 * 0.7) / 1.06)
+	})
+
+	it('calibrates turn and all replay at the next user boundary', async () => {
+		for (const replay of ['turn', 'all'] as const) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+					{ content: 'Done.' },
+				],
+				{ record: true, replay },
+			)
+			const { gauge: _gauge, ...uncalibrated } = options
+			const ledger = createLedger(provider, uncalibrated)
+			ledger.conversation.add([
+				{ role: 'user', content: 'Seed.' },
+				{ role: 'assistant', content: 'Earlier.', thinking: 'PRIVATE' },
+			])
+			await ledger.respond('Next.')
+			const thinking = provider.calls.map((call) =>
+				call.messages.flatMap((message) => message.thinking ?? []),
+			)
+			expect(thinking[0]).toEqual(thinking[2])
+			expect(thinking[1]).toEqual(thinking[2])
+			expect(thinking[2]).toEqual(replay === 'all' ? ['PRIVATE'] : [])
+		}
+	})
+
+	for (const phase of ['calibration', 'first pass'] as const) {
+		it(`faults a direct run during ${phase} without judging or replacing the active selection`, async () => {
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			const provider = createScriptedProvider(
+				[
+					...(phase === 'calibration'
+						? [
+								{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+								{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+							]
+						: []),
+					{ content: '' },
+					{ content: 'Recovered.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(
+				{
+					id: provider.id,
+					name: provider.name,
+					generate: async (...args) => {
+						entered.resolve()
+						await release.promise
+						return provider.generate(...args)
+					},
+					stream: async function* (...args) {
+						entered.resolve()
+						await release.promise
+						return yield* provider.stream(...args)
+					},
+				},
+				options,
+			)
+			ledger.conversation.add({ role: 'user', content: 'Seed.' })
+			const selections: Selection[] = []
+			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const pending =
+				phase === 'calibration'
+					? ledger.calibrate(new AbortController().signal)
+					: ledger.respond('Active request.')
+			await entered.promise
+			const judgments = ledger.conversation.judgments.judgments()
+			const asked = judge.requests.length
+			const gauge = ledger.gauge
+			ledger.conversation.add({ role: 'user', content: 'Intruding direct request.' })
+			const abort = new AbortController()
+			ledger.agent.emitter.once('select', () => abort.abort())
+			await ledger.agent.generate({ signal: abort.signal })
+			const rejected = selections.at(-1)
+			const after = judge.requests.length
+			const recorded = ledger.conversation.judgments.judgments()
+			const unchanged = ledger.gauge
+			release.resolve()
+			await pending
+			expect(isLedgerError(rejected?.fault)).toBe(true)
+			expect(rejected?.fault).toMatchObject({ code: 'REQUEST' })
+			expect(after).toBe(asked)
+			expect(recorded).toEqual(judgments)
+			expect(unchanged).toEqual(gauge)
+			expect(selections.at(-1)?.briefing).toBe(selections[0]?.briefing)
+			expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
+				selections[0]?.messages,
+			)
+			expect(
+				provider.calls.at(-1)?.messages.some((message) => message.content === 'Active request.'),
+			).toBe(phase === 'first pass')
+		})
+	}
 
 	it('keeps interleaved seed calls and results on the same side of the tail cut', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })

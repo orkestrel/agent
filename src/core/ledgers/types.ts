@@ -369,7 +369,7 @@ export interface LedgerClassification {
 }
 
 /**
- * Carries one record line: a verbatim sentence of a live message.
+ * Carries one record line: a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon.
  *
  * @remarks
  * `source` is the message id and `sentence` the zero-based index of the sentence in it. `party` is
@@ -648,8 +648,13 @@ export interface GaugeInterface extends LedgerGauge {
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
+/** Names a briefing source's planning group: a topic match, an off-topic rule or correction, or a name match. */
+export type LedgerPlanningGroup = 1 | 2 | 3
+
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =
+	/** Reports a selection whose request belongs to no active respond call or ledger note. */
+	| 'REQUEST'
 	/** Reports a threshold that is not finite or lies outside the interval above 0 up to and including 1. */
 	| 'THRESHOLD'
 	/** Reports a share that is not finite or lies outside the interval above 0 up to and including 1. */

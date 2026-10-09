@@ -42,7 +42,7 @@ import {
 	LEDGER_RULES_KEY,
 	LEDGER_SCALE_DRIFT,
 } from './constants.js'
-import { LedgerError } from './errors.js'
+import { isLedgerError, LedgerError } from './errors.js'
 import {
 	buildLines,
 	buildRecords,
@@ -55,6 +55,7 @@ import {
 	matchEntities,
 	rankLedgerCut,
 	resolvePredict,
+	resolveLedgerCall,
 	matchesCutLine,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -214,6 +215,7 @@ export class Ledger implements LedgerInterface {
 			}
 		})
 		this.#agent.emitter.on('select', (selection) => {
+			if (isLedgerError(selection.fault) && selection.fault.code === 'REQUEST') return
 			this.#selected = selection
 			this.#boundary = this.#conversation.messages().length
 			if (selection.usage !== undefined) this.#usage = sumUsage(this.#usage, selection.usage)
@@ -278,9 +280,10 @@ export class Ledger implements LedgerInterface {
 				[
 					{ id: 'system', role: 'system', content: this.#options.system },
 					...this.#conversation.view(),
+					{ id: 'calibration', role: 'user', content: '' },
 				],
 				this.#replay,
-			)
+			).slice(0, -1)
 			const priced = await this.#provider.generate(
 				messages,
 				signal,
@@ -389,6 +392,7 @@ export class Ledger implements LedgerInterface {
 			}
 		} finally {
 			this.#flush()
+			this.#request = undefined
 			this.#active = false
 		}
 	}
@@ -439,9 +443,8 @@ export class Ledger implements LedgerInterface {
 		this.#flush()
 		const readings: LedgerLookupReading[] = []
 		for (const group of collectToolGroups(this.#conversation.messages())) {
-			const [leader, ...results] = group
-			for (const [at, message] of results.entries()) {
-				const call = leader?.calls?.[at]
+			for (const message of group.slice(1)) {
+				const call = resolveLedgerCall(group, message)
 				const lookup = this.#options.lookups?.find((one) => one.tool.name === call?.name)
 				if (
 					call === undefined ||
@@ -548,14 +551,22 @@ export class Ledger implements LedgerInterface {
 	async #select(request: Message, signal: AbortSignal): Promise<Selection> {
 		let filing: ClassifierResult = { judgments: [] }
 		try {
-			if (!this.#active) throw new Error('ledger agent generation requires an active respond call')
+			if (
+				!this.#active ||
+				this.#request === undefined ||
+				(request.id !== this.#request.id && !this.#annotations.has(request.id))
+			)
+				throw new LedgerError(
+					'REQUEST',
+					'ledger selection requires a request owned by an active respond call',
+				)
 			if (this.#annotations.has(request.id) && this.#entered !== undefined)
 				return {
 					messages: [...this.#entered.messages, ...this.#collectAfter()],
 					judgments: [],
 					...(this.#entered.briefing === undefined ? {} : { briefing: this.#entered.briefing }),
 				}
-			const selected = this.#request ?? request
+			const selected = this.#request
 			filing = await this.#classifier.classify(this.#requests, signal)
 			if (filing.fault !== undefined) throw filing.fault
 			const plan = this.#plan(selected)
@@ -833,8 +844,8 @@ export class Ledger implements LedgerInterface {
 		for (const group of collectToolGroups(seed)) {
 			const leader = group[0]
 			if (leader === undefined) continue
-			const kept = (leader.calls ?? []).filter((call, at) => {
-				const message = group[at + 1]
+			const kept = (leader.calls ?? []).filter((call) => {
+				const message = group.slice(1).find((result) => resolveLedgerCall(group, result) === call)
 				const result = message === undefined ? undefined : this.#results.get(message.id)
 				if (
 					!this.#options.lookups?.some((lookup) => lookup.tool.name === call.name) ||
@@ -881,9 +892,10 @@ export class Ledger implements LedgerInterface {
 		const group = collectToolGroups(this.#conversation.messages()).find((entries) =>
 			entries.some((one) => one.id === message.id),
 		)
-		const at = group?.findIndex((one) => one.id === message.id) ?? -1
-		const call = group?.[0]?.calls?.[at - 1]
+		const call = group === undefined ? undefined : resolveLedgerCall(group, message)
 		const reading = this.#readLookups().find((one) => one.id === message.id)
+		const hidden = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'hidden')
+		const visible = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'shown')
 		return {
 			...message,
 			content: renderStub(
@@ -893,9 +905,13 @@ export class Ledger implements LedgerInterface {
 					? 'failed'
 					: reading?.result === undefined
 						? 'empty'
-						: shown === undefined || shown.has(message.id)
-							? 'shown'
-							: 'hidden',
+						: shown === undefined
+							? hidden.length > visible.length
+								? 'hidden'
+								: 'shown'
+							: shown.has(message.id)
+								? 'shown'
+								: 'hidden',
 			),
 		}
 	}

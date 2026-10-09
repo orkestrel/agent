@@ -5,6 +5,7 @@ import type {
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupState,
+	LedgerPlanningGroup,
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerProjectionRequest,
@@ -13,10 +14,33 @@ import type {
 	LedgerStaleSentence,
 	LedgerTokenSet,
 } from './types.js'
+import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
+
+/**
+ * Resolves the call that owns a tool message within a collected tool group.
+ * @param group - The assistant leader followed by its tool results
+ * @param message - The tool result to pair; any result id disables positional fallback for the group
+ * @returns The call matching the result's call id, or its position when every result lacks an id; undefined when unpaired
+ * @example
+ * ```ts
+ * resolveLedgerCall(group, result)?.arguments
+ * ```
+ */
+export function resolveLedgerCall(
+	group: readonly Message[],
+	message: Message,
+): ToolCall | undefined {
+	const [leader, ...results] = group
+	const at = results.findIndex((result) => result.id === message.id)
+	if (message.role !== 'tool' || at < 0) return undefined
+	return results.some((result) => result.call !== undefined)
+		? leader?.calls?.find((call) => call.id === message.call)
+		: leader?.calls?.[at]
+}
 
 /**
  * Ranks a briefing source for removal before the next prompt.
@@ -25,13 +49,16 @@ import { LedgerError } from './errors.js'
  * @param loose - If `true`, the source is a user message without a decisive category; if `false`, it is another source
  * @param category - The source's recorded category, or undefined when undecided
  * @returns The ascending removal rank: name matches, loose sources, off-topic corrections, off-topic rules, then topic matches
+ * @remarks
+ * The planner removes lower ranks first. Equal ranks 0, 1, and 4 remove lower scores first;
+ * every equal rank then removes later conversation positions first.
  * @example
  * ```ts
  * rankLedgerCut(2, false, 'rule') // 3
  * ```
  */
 export function rankLedgerCut(
-	group: number,
+	group: LedgerPlanningGroup,
 	loose: boolean,
 	category: LedgerCategory | undefined,
 ): number {
@@ -329,7 +356,7 @@ export function matchEntities(
  * Projects the owner records and the rules record from a conversation's messages.
  *
  * @remarks
- * Each line is a verbatim sentence of a live message. A message is live when it is a user message,
+ * Each line is a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon. A message is live when it is a user message,
  * or a tool message whose reading is the last reading of its call, and the input neither excludes it nor
  * files it quiet or superseded. A reading with an undefined `result` still replaces the earlier
  * reading of the same call, so the earlier result leaves every record.
@@ -515,20 +542,20 @@ export function splitTopic(topic: string): readonly string[] {
 }
 
 /**
- * Cuts items to a room and names how many it left out.
+ * Cuts entries to a room and names how many it left out.
  *
  * @remarks
- * The cut keeps at least one item. When it leaves items out, its last line reads
+ * The cut keeps at least one entry. When it leaves entries out, its last line reads
  * `N older items not shown; name a narrower topic to narrow the recall`, which
  * {@link matchesCutLine} recognizes.
  *
  * @param entries - The entries in the order they are kept
- * @param room - The estimate units the joined items can take
- * @returns The kept items followed by the cut line when any were left out, joined by newlines
+ * @param room - The estimate units the joined entries can take
+ * @returns The kept entries followed by the cut line when any were left out, joined by newlines
  *
  * @example
  * ```ts
- * cutListing(['first item', 'second item'], 1) // 'first item\n1 older item not shown; name a narrower topic to narrow the recall'
+ * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower topic to narrow the recall'
  * ```
  */
 export function cutListing(entries: readonly string[], room: number): string {

@@ -1,4 +1,5 @@
 import type { GaugeCall, LedgerLookupReading } from '../../../../src/core/ledgers/types.js'
+import type { Message } from '@src/core'
 import { estimateMessages } from '../../../../src/core/agents/helpers.js'
 import {
 	buildLines,
@@ -9,6 +10,7 @@ import {
 	collectStale,
 	computeThinking,
 	resolvePredict,
+	resolveLedgerCall,
 	rankLedgerCut,
 	cutListing,
 	extractTokens,
@@ -46,6 +48,31 @@ describe('rankLedgerCut', () => {
 		expect(rankLedgerCut(2, false, 'rule')).toBe(3)
 		expect(rankLedgerCut(1, false, 'rule')).toBe(4)
 		expect(rankLedgerCut(1, false, undefined)).toBe(4)
+	})
+})
+
+describe('resolveLedgerCall', () => {
+	it('pairs by call id and falls back to position only for a wholly idless group', () => {
+		const leader: Message = {
+			id: 'leader',
+			role: 'assistant',
+			content: '',
+			calls: [
+				{ id: 'c1', name: 'first', arguments: {} },
+				{ id: 'c2', name: 'second', arguments: {} },
+			],
+		}
+		const first: Message = { id: 'r1', role: 'tool', content: 'First.', call: 'c1' }
+		const second: Message = { id: 'r2', role: 'tool', content: 'Second.', call: 'c2' }
+		const anonymous: Message = { id: 'r3', role: 'tool', content: 'Anonymous.' }
+		const other: Message = { id: 'r4', role: 'tool', content: 'Other.' }
+		expect(resolveLedgerCall([leader, second, first], first)?.name).toBe('first')
+		expect(resolveLedgerCall([leader, second, first], second)?.name).toBe('second')
+		expect(resolveLedgerCall([leader, second, anonymous], anonymous)).toBeUndefined()
+		expect(resolveLedgerCall([leader, anonymous, other], anonymous)?.name).toBe('first')
+		expect(resolveLedgerCall([leader, anonymous, other], other)?.name).toBe('second')
+		expect(resolveLedgerCall([leader, first], second)).toBeUndefined()
+		expect(resolveLedgerCall([first], first)).toBeUndefined()
 	})
 })
 

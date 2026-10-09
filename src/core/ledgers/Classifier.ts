@@ -34,7 +34,7 @@ import { extractTokens } from './helpers.js'
  */
 export class Classifier implements ClassifierInterface {
 	readonly #options: ClassifierOptions
-	readonly #failed = new Map<string, string>()
+	readonly #failed = new Set<string>()
 
 	/**
 	 * Creates the filing engine with the ledger's handlers and calibrated questions.
@@ -329,7 +329,7 @@ export class Classifier implements ClassifierInterface {
 	): Promise<ClassifierResult> {
 		if (this.#read(spec) !== undefined) return { judgments: [spec.id] }
 		const fingerprint = JSON.stringify(spec)
-		if (this.#failed.get(spec.id) === fingerprint) return { judgments: [] }
+		if (this.#failed.has(fingerprint)) return { judgments: [] }
 		signal.throwIfAborted()
 		try {
 			const [judgment] = await this.#options.conversation.judgments.resolve(
@@ -358,7 +358,7 @@ export class Classifier implements ClassifierInterface {
 				(isJudgeError(error) && error.code === 'QUESTION') ||
 				DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error))
 			)
-				this.#failed.set(spec.id, fingerprint)
+				this.#failed.add(fingerprint)
 			if (signal.aborted) throw error
 			return { judgments: [] }
 		}

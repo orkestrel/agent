@@ -19,6 +19,42 @@ import {
 import { buildLedgerMessage } from '../../../setupLedger.js'
 
 describe('Classifier', () => {
+	it('keeps held fingerprints when the judge model alternates A B A', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		let model = 'A'
+		const transport = new RecordedTransport(() => {
+			throw new JudgeError('QUESTION', 'refused question')
+		})
+		const judge = new SequentialSystemOneJudge({
+			url: 'http://judge.test',
+			model: 'A',
+			fetch: transport.fetch,
+		})
+		const classifier = new Classifier({
+			conversation,
+			judge: {
+				id: judge.id,
+				name: judge.name,
+				get model() {
+					return model
+				},
+				ask: judge.ask.bind(judge),
+			},
+			questions: LEDGER_QUESTIONS,
+			topics: [],
+			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
+			assign: () => undefined,
+			entities: () => new Set(),
+		})
+		for (const next of ['A', 'A', 'B', 'B', 'A']) {
+			model = next
+			await classifier.classify(new Set(), new AbortController().signal)
+		}
+		expect(transport.requests).toHaveLength(2)
+		expect(classifier.category(message.id)).toBeUndefined()
+	})
+
 	it('holds a QUESTION rejection without asking the refused spec twice', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })

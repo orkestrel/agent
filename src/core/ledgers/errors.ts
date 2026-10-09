@@ -2,14 +2,15 @@ import type { LedgerErrorCode } from './types.js'
 import { isInstance } from '@orkestrel/contract'
 
 /**
- * Reports a ledger configuration that `createLedger` refuses, or a calibration that receives no
- * usage, carrying the machine-readable `code`.
+ * Reports an invalid ledger configuration, failed calibration, or unowned request selection,
+ * carrying the machine-readable `code`.
  *
  * @remarks
  * A threshold, share, capacity, limit, topic, lookup, or gauge outside its bounds is a programmer
  * error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
  * no prompt usage throws this with `'GAUGE'`. Narrow a caught value with {@link isLedgerError} and
- * branch on `error.code`.
+ * branch on `error.code`. A selection without an active `respond` call, or for a request other than
+ * that call's request or a ledger note, reports `'REQUEST'` through the selection's fault.
  */
 export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */
