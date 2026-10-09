@@ -183,6 +183,29 @@ describe('RelayProvider', () => {
 		expect(request.messages[0]?.calls?.[0]).toBe(call)
 		expect(call.context.caller).toEqual({ subject: 'local-only' })
 	})
+	it('carries thinking in the relay body and exposes the replay policy', () => {
+		const provider = new RelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			replay: 'turn',
+		})
+		const wire = provider.body({
+			messages: [
+				{ id: 'a', role: 'assistant', content: 'answer', thinking: 'weigh the fares' },
+				{ id: 'b', role: 'assistant', content: 'plain' },
+			],
+		})
+		expect(wire).toEqual({
+			messages: [
+				{ id: 'a', role: 'assistant', content: 'answer', thinking: 'weigh the fares' },
+				{ id: 'b', role: 'assistant', content: 'plain' },
+			],
+		})
+		expect(provider.replay).toBe('turn')
+		expect(new RelayProvider({ url: 'http://relay.test/', parser: createParser }).replay).toBe(
+			'none',
+		)
+	})
 	it('rejects non-JSON arguments before fetching', async () => {
 		const transport = createRefusingTransport()
 		const provider = createRelayProvider({

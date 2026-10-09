@@ -361,7 +361,7 @@ export class Conversation implements ConversationInterface {
 	}
 
 	// Mint an immutable live-tail message from one input — a fresh UUID id plus the input's
-	// role / content, carrying `calls`, `call`, and `images` only when the input supplied them (each
+	// role / content, carrying `calls`, `call`, `images`, and `thinking` only when the input supplied them (each
 	// spread in conditionally, so an absent optional is never stored as `undefined`). Stored
 	// by id and returned; never mutated after creation.
 	#create(input: MessageInput): Message {
@@ -372,6 +372,7 @@ export class Conversation implements ConversationInterface {
 			...(input.calls === undefined ? {} : { calls: input.calls }),
 			...(input.call === undefined ? {} : { call: input.call }),
 			...(input.images === undefined ? {} : { images: input.images }),
+			...(input.thinking === undefined ? {} : { thinking: input.thinking }),
 		}
 		this.#messages.set(message.id, message)
 		return message

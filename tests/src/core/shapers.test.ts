@@ -19,6 +19,15 @@ describe('wire shapes', () => {
 		expect(contract.is({ id: 't1', role: 'tool', content: 'sunny' })).toBe(true)
 		expect(contract.is({ id: 't1', role: 'tool', content: 'sunny', call: 7 })).toBe(false)
 	})
+	it('round-trips the optional string thinking on the message wire projection', () => {
+		expectTypeOf<Infer<typeof messageShape>['thinking']>().toEqualTypeOf<string | undefined>()
+		const contract = createContract(messageShape)
+		const answer = { id: 'a1', role: 'assistant', content: 'Booked', thinking: 'Compare fares' }
+		expect(contract.is(answer)).toBe(true)
+		expect(contract.parse(answer)).toEqual(answer)
+		expect(contract.is({ id: 'a1', role: 'assistant', content: 'Booked' })).toBe(true)
+		expect(contract.is({ ...answer, thinking: 3 })).toBe(false)
+	})
 	it('keeps execution context separate from the tool call and wire shape', () => {
 		expectTypeOf<keyof ToolCall>().toEqualTypeOf<'id' | 'name' | 'arguments'>()
 		expectTypeOf<ToolContext['signal']>().toEqualTypeOf<AbortSignal>()

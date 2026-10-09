@@ -67,9 +67,9 @@ export type AgentChunk =
  * abort (folded in exactly like a completed turn's); a provider that cannot observe
  * usage mid-stream (for example a daemon whose final counts never arrive before the cancel)
  * reports none for that turn, and none is fabricated. `thinking` is present
- * only when a provider call surfaced reasoning it separated from the answer
- * ({@link ProviderResult.thinking}, joined across the run's calls) — display/audit
- * metadata that never re-enters the conversation.
+ * only when a call surfaced reasoning ({@link ProviderResult.thinking}, joined across calls);
+ * it stays out of `content`, is recorded on the assistant message, and returns only as
+ * `replay` allows.
  */
 export interface AgentResult {
 	readonly content: string

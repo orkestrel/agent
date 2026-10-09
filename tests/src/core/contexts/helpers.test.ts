@@ -67,6 +67,15 @@ describe('stock selection helpers', () => {
 		)
 	})
 
+	it('renders byte-equal selection state with and without thinking', () => {
+		const request = requireValue(SELECTION_STAND_IN.at(-1))
+		const plain: Message = { id: 'turn', role: 'assistant', content: 'Booked.' }
+		const reasoned: Message = { ...plain, thinking: 'Compare fares first.' }
+		expect(renderSelectionState([reasoned], reasoned.id, request)).toBe(
+			renderSelectionState([plain], plain.id, request),
+		)
+	})
+
 	it('reads only matching records and remains pure across all identity mismatches', async () => {
 		const fixture = createStockSelectionFixture(0.9, { limit: 1 })
 		await fixture.select(fixture.conversation, fixture.request, new AbortController().signal)

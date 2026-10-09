@@ -11,6 +11,7 @@ import {
 	isAgentJobError,
 	MESSAGE_TOKEN_OVERHEAD,
 	settleAgentJob,
+	stripThinking,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import { createBudget } from '@orkestrel/budget'
@@ -293,6 +294,14 @@ describe('estimateMessages', () => {
 		expect(estimateMessages(messages)).toBe(4 * MESSAGE_TOKEN_OVERHEAD)
 	})
 
+	it('grows by estimateTokens over thinking when a message carries it', () => {
+		const plain: Message = { id: 'm', role: 'assistant', content: 'Booked' }
+		const thinking = 'Compare the fares before booking'
+		expect(estimateMessages([{ ...plain, thinking }])).toBe(
+			estimateMessages([plain]) + estimateTokens(thinking),
+		)
+	})
+
 	it('adds the JSON-stringified calls estimate when a message has calls', () => {
 		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: { q: 'acme' } })]
 		const withCalls: Message = { id: 'm', role: 'assistant', content: '', calls }
@@ -489,5 +498,63 @@ describe('chargeUsage — the residual budget charge', () => {
 
 	it('consumes nothing without a budget', () => {
 		expect(() => chargeUsage(undefined, { prompt: 1, completion: 4, total: 5 }, 2)).not.toThrow()
+	})
+})
+
+describe('stripThinking', () => {
+	const messages: readonly Message[] = [
+		{ id: 'u1', role: 'user', content: 'Plan the trip' },
+		{ id: 'a1', role: 'assistant', content: 'Fares found', thinking: 'first reasoning' },
+		{ id: 'u2', role: 'user', content: 'Book it' },
+		{ id: 'a2', role: 'assistant', content: 'Booked', thinking: 'second reasoning' },
+		{ id: 'a3', role: 'assistant', content: 'Receipt sent' },
+	]
+
+	it("drops all thinking under 'none' without writing an undefined member", () => {
+		const stripped = stripThinking(messages, 'none')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		])
+		expect('thinking' in (stripped[1] ?? {})).toBe(false)
+		expect(stripped[1]).toEqual({ id: 'a1', role: 'assistant', content: 'Fares found' })
+		expect(messages[1]?.thinking).toBe('first reasoning')
+	})
+
+	it("keeps only the thinking after the last user message under 'turn'", () => {
+		const stripped = stripThinking(messages, 'turn')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			'second reasoning',
+			undefined,
+		])
+		expect('thinking' in (stripped[1] ?? {})).toBe(false)
+	})
+
+	it("keeps all thinking under 'turn' when no user message exists", () => {
+		const open = messages.filter((one) => one.role === 'assistant')
+		const stripped = stripThinking(open, 'turn')
+		expect(stripped.map((one) => one.thinking)).toEqual([
+			'first reasoning',
+			'second reasoning',
+			undefined,
+		])
+	})
+
+	it("returns the same array under 'all'", () => {
+		expect(stripThinking(messages, 'all')).toBe(messages)
+	})
+
+	it('keeps the identity of a message without thinking', () => {
+		const stripped = stripThinking(messages, 'none')
+		expect(stripped[0]).toBe(messages[0])
+		expect(stripped[4]).toBe(messages[4])
+		expect(stripped[1]).not.toBe(messages[1])
+		expect(stripThinking(messages, 'turn')[3]).toBe(messages[3])
 	})
 })

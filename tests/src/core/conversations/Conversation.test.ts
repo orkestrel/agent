@@ -100,6 +100,21 @@ describe('Conversation — construction & accessors', () => {
 		expect('calls' in rich).toBe(false)
 	})
 
+	it('stores thinking from the input and leaves the member absent without it', () => {
+		const conversation = new Conversation()
+
+		const plain = conversation.add({ role: 'assistant', content: 'Booked' })
+		expect('thinking' in plain).toBe(false)
+
+		const reasoned = conversation.add({
+			role: 'assistant',
+			content: 'Booked',
+			thinking: 'Compare fares first',
+		})
+		expect(reasoned.thinking).toBe('Compare fares first')
+		expect(conversation.messages().at(-1)?.thinking).toBe('Compare fares first')
+	})
+
 	it('stores the call a tool message answers, and omits call when absent', () => {
 		const conversation = new Conversation()
 

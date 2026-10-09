@@ -49,8 +49,8 @@ export function filterAllowList<T>(
  *
  * @remarks
  * Pure and total. `running` is `undefined` until a call surfaces reasoning, so the first join
- * returns `next` verbatim (no leading separator). The result is display/audit metadata that
- * never re-enters the conversation.
+ * returns `next` verbatim. The result stays out of `content`, is recorded on the assistant
+ * message, and returns only as `replay` allows.
  *
  * @param running - The reasoning accumulated so far (`undefined` before the first)
  * @param next - This call's separated reasoning

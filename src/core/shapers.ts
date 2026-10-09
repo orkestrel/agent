@@ -38,4 +38,5 @@ export const messageShape = objectShape({
 	calls: optionalShape(arrayShape(toolCallShape)),
 	call: optionalShape(stringShape()),
 	images: optionalShape(arrayShape(stringShape())),
+	thinking: optionalShape(stringShape()),
 }) satisfies ContractShape

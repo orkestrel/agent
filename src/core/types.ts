@@ -19,7 +19,9 @@ export type MessageRole = (typeof MESSAGE_ROLES)[number]
  * turn answer its `calls` in order. `call` is the record's reference, and it identifies
  * one call only where the ids within one assistant turn are unique.
  * For a successful tool result, a string is the content as is; any other value is
- * JSON-encoded. A failed tool result carries its error text unchanged.
+ * JSON-encoded. A failed tool result carries its error text unchanged. `thinking` is present
+ * only on an assistant turn whose call surfaced reasoning, and a provider sends it back only as
+ * its `replay` policy allows.
  */
 export interface Message {
 	readonly id: string
@@ -35,6 +37,13 @@ export interface Message {
 	 * per-message `images` array). Present only on a multimodal turn; absent otherwise.
 	 */
 	readonly images?: readonly string[]
+	/**
+	 * Holds the reasoning the provider call that produced an assistant turn separated from its
+	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
+	 * enters `content`, judge state, or a briefing. A provider sends it back only as its `replay`
+	 * policy allows.
+	 */
+	readonly thinking?: string
 }
 
 /**
@@ -53,6 +62,13 @@ export interface MessageInput {
 	 * vision-capable provider (carried verbatim onto the stored {@link Message}).
 	 */
 	readonly images?: readonly string[]
+	/**
+	 * Holds the reasoning the provider call that produced an assistant turn separated from its
+	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
+	 * enters `content`, judge state, or a briefing. A provider sends it back only as its `replay`
+	 * policy allows.
+	 */
+	readonly thinking?: string
 }
 
 /** Carries text or structured JSON the model reads; mirrors the TypeSafe `EntryType` without its null arm. */

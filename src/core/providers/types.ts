@@ -20,15 +20,15 @@ import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
  * `thinking` is present only when the turn produced reasoning the provider split
  * away from the answer (an in-content `<think>…</think>` span a thinking model
  * emitted, or a wire-side reasoning field) — `content` is always the clean answer,
- * and the thinking never re-enters the conversation (it is display/audit metadata,
- * not prompt text). `tools` is present only when the model wants tool calls (an
+ * and the thinking is recorded on the assistant message and returns only as `replay`
+ * allows. `tools` is present only when the model wants tool calls (an
  * empty array is never surfaced — its absence means "no calls"). `usage` is present
  * only when the wire reported it (on the stream's `done` line, or the non-stream
  * body), so a caller folds it into a token budget exactly when it exists.
  */
 export interface ProviderResult {
 	readonly content: string
-	/** Carries reasoning the provider separated from the answer when present — never re-enters the conversation. */
+	/** Carries separated reasoning when present; the assistant message records it and `replay` governs its return. */
 	readonly thinking?: string
 	/** Carries the tool calls the model wants when present. */
 	readonly tools?: readonly ToolCall[]
@@ -48,8 +48,8 @@ export interface ProviderResult {
  * reasoning the provider separated from the answer (the daemon's native
  * `message.thinking` wire channel), surfaced live so a consumer can stream it into a
  * collapsible without waiting for the assembled result. `text` is the delta's literal
- * text. Thinking never re-enters the conversation — it is display/audit metadata, exactly
- * as {@link ProviderResult.thinking} (the authoritative final accumulation) is.
+ * text. Thinking stays out of `content`, is recorded on the assistant message, and returns
+ * only as `replay` allows, like the authoritative {@link ProviderResult.thinking}.
  */
 export type ProviderDelta =
 	| { readonly channel: 'content'; readonly text: string }
@@ -78,6 +78,13 @@ export interface ProviderStreamOptions {
 }
 
 /**
+ * Names which assistant thinking a provider sends back: `'none'` sends none, `'turn'` sends the
+ * thinking of the assistant messages that follow the last `user` message (the turn in progress),
+ * and `'all'` sends every assistant message's thinking.
+ */
+export type ThinkingReplay = 'none' | 'turn' | 'all'
+
+/**
  * Defines the pluggable LLM inference boundary — the one contract every agent chunk depends on. A
  * provider turns a conversation (plus optional tools) into either a single assembled {@link
  * ProviderResult} (`generate`) or a stream of {@link ProviderDelta}s that returns the assembled
@@ -96,6 +103,8 @@ export interface ProviderStreamOptions {
 export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
+	/** Names which assistant thinking the provider sends back; absent means `'none'`. */
+	readonly replay?: ThinkingReplay
 	/**
 	 * Generates one complete turn — resolves the assembled {@link ProviderResult}.
 	 *
@@ -215,6 +224,7 @@ export interface ProviderIncrement {
  *
  * @remarks
  * `timeout` is an integer duration in milliseconds. Default: 120_000.
+ * `replay` is a {@link ThinkingReplay} that configures the provider's `replay`. Default: `'none'`.
  * `fetch` defaults to the global transport bound to its global receiver.
  * `headers` runs for each request inside its deadline and receives the combined caller
  * and deadline signal so token requests can share that bound. It overrides the JSON
@@ -222,6 +232,7 @@ export interface ProviderIncrement {
  */
 export interface ProviderOptions {
 	readonly timeout?: number
+	readonly replay?: ThinkingReplay
 	readonly fetch?: typeof globalThis.fetch
 	readonly headers?: (
 		signal: AbortSignal,

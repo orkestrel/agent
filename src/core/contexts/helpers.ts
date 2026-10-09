@@ -42,8 +42,8 @@ export function buildNeededQuestion(needed: Pick<Criterion, 'yes' | 'no'>): Noul
  * Renders the view with subject and request markers, appending a folded request as evidence.
  *
  * @remarks
- * A message's `images` member is left out, so a base64 payload never enters the state nor the
- * bytes a judgment reuse compares.
+ * A message's `images` and `thinking` members are left out, so neither a base64 payload nor
+ * reasoning enters the state or the bytes a judgment reuse compares.
  * @param messages - The conversation view in prompt order
  * @param subject - The screened message id marked [A]
  * @param request - The user message marked [B], even when absent from the view
@@ -64,7 +64,9 @@ export function renderSelectionState(
 	return evidence
 		.map((message) => {
 			const markers = `${message.id === subject ? '[A]' : ''}${message.id === request.id ? '[B]' : ''}`
-			const text = Object.fromEntries(Object.entries(message).filter(([key]) => key !== 'images'))
+			const text = Object.fromEntries(
+				Object.entries(message).filter(([key]) => key !== 'images' && key !== 'thinking'),
+			)
 			return `${markers} ${JSON.stringify(text)}`
 		})
 		.join('\n')

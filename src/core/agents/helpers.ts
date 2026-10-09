@@ -1,3 +1,4 @@
+import type { ThinkingReplay } from '../providers/types.js'
 import type { Message } from '../types.js'
 import type {
 	AgentInterface,
@@ -121,7 +122,7 @@ export function estimateTokens(text: string): number {
  * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` char
  * heuristic) plus {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (a fixed per-message
  * role/framing overhead) plus, when present, {@link estimateTokens} over its JSON-stringified
- * `calls` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
+ * `calls` plus, when present, {@link estimateTokens} over its `thinking` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
  * deliberately-approximate per-image cost — a base64 length is not a token proxy). Deterministic
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
@@ -156,8 +157,48 @@ export function estimateMessages(messages: readonly Message[]): number {
 			}
 		}
 		const images = (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE
-		return sum + content + calls + images
+		const thinking = message.thinking === undefined ? 0 : estimateTokens(message.thinking)
+		return sum + content + calls + images + thinking
 	}, 0)
+}
+
+/**
+ * Applies a {@link ThinkingReplay} policy to a conversation, returning the messages a provider
+ * sends with only the assistant thinking the policy allows.
+ *
+ * @remarks
+ * Pure and total. `'all'` returns the input array itself. `'none'` drops `thinking` from every
+ * message that carries it. `'turn'` drops it from every message at or before the last `user`
+ * message and keeps it after, the turn in progress; with no `user` message every message counts
+ * as inside the turn. A message without `thinking`, or one that keeps it, is the same object;
+ * a message that loses it is a copy without that member, so no `undefined` member is written.
+ *
+ * @param messages - The conversation to project (left unchanged)
+ * @param replay - The policy naming which thinking stays
+ * @returns The messages with the policy applied
+ *
+ * @example
+ * ```ts
+ * const messages = [
+ * 	{ id: '1', role: 'user', content: 'Plan the trip' },
+ * 	{ id: '2', role: 'assistant', content: 'Booked', thinking: 'Compare fares first' },
+ * ]
+ * stripThinking(messages, 'none') // [{ id: '1', ... }, { id: '2', role: 'assistant', content: 'Booked' }]
+ * stripThinking(messages, 'turn') // the thinking on '2' stays: it follows the last user message
+ * ```
+ */
+export function stripThinking(
+	messages: readonly Message[],
+	replay: ThinkingReplay,
+): readonly Message[] {
+	if (replay === 'all') return messages
+	const last =
+		replay === 'none' ? messages.length - 1 : messages.findLastIndex((one) => one.role === 'user')
+	return messages.map((message, index) => {
+		if (message.thinking === undefined || index > last) return message
+		const { thinking: _thinking, ...rest } = message
+		return rest
+	})
 }
 
 /**

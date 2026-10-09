@@ -8,6 +8,14 @@ describe('isMessage — the per-message shape guard (total + defensive)', () => 
 		expect(isMessage({ id: '1', role: 'user', content: '', images })).toBe(false)
 	})
 
+	it('accepts an absent or string thinking and refuses any other value', () => {
+		expect(
+			isMessage({ id: '1', role: 'assistant', content: '', thinking: 'weigh the fares' }),
+		).toBe(true)
+		expect(isMessage({ id: '1', role: 'assistant', content: '' })).toBe(true)
+		expect(isMessage({ id: '1', role: 'assistant', content: '', thinking: 1 })).toBe(false)
+	})
+
 	it('rejects calls with a hostile own every method', () => {
 		const calls = Object.assign([null], { every: approveEvery })
 		expect(isMessage({ id: '1', role: 'assistant', content: '', calls })).toBe(false)
