@@ -18,6 +18,23 @@ function readCode(build: () => unknown): string | undefined {
 }
 
 describe('Gauge construction', () => {
+	it('refuses an invalid generation cap and accepts its boundaries', () => {
+		for (const predict of [
+			-1,
+			0.5,
+			SEED.capacity,
+			SEED.capacity + 1,
+			Number.NaN,
+			Infinity,
+			Number.MAX_SAFE_INTEGER + 1,
+		]) {
+			expect(readCode(() => new Gauge({ ...SEED, predict }))).toBe('CAPACITY')
+		}
+		for (const predict of [0, -0, SEED.capacity - 1]) {
+			expect(readCode(() => new Gauge({ ...SEED, predict }))).toBeUndefined()
+		}
+	})
+
 	it('refuses a scale that is nonfinite or not above 0', () => {
 		for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
 			expect(readCode(() => new Gauge({ ...SEED, scale }))).toBe('GAUGE')
@@ -151,6 +168,19 @@ describe('Gauge.rate', () => {
 })
 
 describe('Gauge.left', () => {
+	it('counts the whole completion when thinking is replayed within a turn or across turns', () => {
+		for (const replay of ['turn', 'all'] as const) {
+			const retained = new Gauge({ scale: 1, fixed: 0, capacity: 1000, replay })
+			expect(
+				retained.left([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
+			).toBe(600)
+		}
+		const dropped = new Gauge({ scale: 1, fixed: 0, capacity: 1000 })
+		expect(
+			dropped.left([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
+		).toBe(850)
+	})
+
 	const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
 
 	it('subtracts the last prompt and completion', () => {
@@ -182,6 +212,14 @@ describe('Gauge.left', () => {
 })
 
 describe('Gauge.reserve', () => {
+	it('excludes thinking from the reply reserve under every replay policy', () => {
+		for (const replay of ['none', 'turn', 'all'] as const) {
+			const gauge = new Gauge({ scale: 1, fixed: 0, capacity: 1000, replay })
+			gauge.observe([], { estimate: 10, completion: 900, thinking: 850, tools: 0 })
+			expect(gauge.reserve([], '')).toBe(75)
+		}
+	})
+
 	it('prices the longest text and one recall call at the rate before any reply is observed', () => {
 		// Rate 2. Longest 40 characters: 10 + 4 = 14 units. Recall call 25 units. (14 + 25) * 2 = 78.
 		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
@@ -223,6 +261,30 @@ describe('Gauge.reserve', () => {
 })
 
 describe('Gauge.room', () => {
+	it('preserves room, reserve, and recall closure when capacity grows by the generation cap', () => {
+		const plain = new Gauge({ scale: 1, fixed: 0, capacity: 3072 })
+		const thinking = new Gauge({
+			scale: 1,
+			fixed: 0,
+			capacity: 4096,
+			predict: 1024,
+			replay: 'none',
+		})
+		plain.observe([], { estimate: 100, completion: 100, tools: 0 })
+		thinking.observe([], { estimate: 100, completion: 500, thinking: 400, tools: 0 })
+		for (const prompt of [1000, 2600, 2822, 2823, 2900]) {
+			const plainCalls = [{ estimate: 100, prompt, completion: 0, tools: 0 }]
+			const thinkingCalls = [{ estimate: 100, prompt, completion: 700, thinking: 700, tools: 0 }]
+			expect(thinking.left(thinkingCalls) - 1024).toBe(plain.left(plainCalls))
+			expect(thinking.reserve(thinkingCalls, '')).toBe(plain.reserve(plainCalls, ''))
+			expect(thinking.room(thinkingCalls, '')).toBe(plain.room(plainCalls, ''))
+			expect(thinking.left(thinkingCalls) - 1024 < 2 * thinking.reserve(thinkingCalls, '')).toBe(
+				prompt > 2822,
+			)
+			expect(plain.left(plainCalls) < 2 * plain.reserve(plainCalls, '')).toBe(prompt > 2822)
+		}
+	})
+
 	it('halves what the call left beyond the reserve and divides by the rate', () => {
 		// Left 10000 - 2100 = 7900. Reserve 78 at rate 2. (7900 - 78) / 2 / 2 = 1955.5.
 		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })

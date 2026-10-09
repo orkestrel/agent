@@ -51,6 +51,228 @@ describe('Ledger', () => {
 		}
 	})
 
+	it('rejects invalid generation caps with CAPACITY even before calibration', () => {
+		const { gauge: _gauge, ...uncalibrated } = options
+		for (const predict of [
+			-1,
+			0.5,
+			4096,
+			4097,
+			Number.NaN,
+			Infinity,
+			Number.MAX_SAFE_INTEGER + 1,
+		]) {
+			expect(() => new Ledger(createScriptedProvider([]), { ...uncalibrated, predict })).toThrow(
+				expect.objectContaining({ code: 'CAPACITY' }),
+			)
+		}
+		for (const predict of [0, -0, 4095]) {
+			expect(
+				() => new Ledger(createScriptedProvider([]), { ...uncalibrated, predict }),
+			).not.toThrow()
+		}
+	})
+
+	it('fits the same plan at 4096 with predict 1024 as at 3072 without predict', async () => {
+		// The tail total is 2150.4 / 1.06 = 2028.679... units: 2028 fits, 2029 does not.
+		for (const length of [8048, 8052]) {
+			for (const capacity of [3072, 4096]) {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const ledger = createLedger(provider, {
+					...options,
+					capacity,
+					...(capacity === 4096 ? { predict: 1024 } : {}),
+					share: { prompt: 0.7, tail: 1 },
+				})
+				ledger.conversation.add([
+					{ role: 'user', content: 'Seed.' },
+					{ role: 'assistant', content: 'a'.repeat(length) },
+				])
+				await ledger.respond('Review.')
+				expect(provider.calls[0]?.messages.some((message) => message.role === 'assistant')).toBe(
+					length === 8048,
+				)
+			}
+		}
+	})
+
+	it('forwards thinking per pass and omits each absent member', async () => {
+		for (const think of [
+			undefined,
+			{ first: true, answer: false },
+			{ first: false },
+			{ answer: true },
+		]) {
+			const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
+				record: true,
+			})
+			const ledger = createLedger(provider, {
+				...options,
+				...(think === undefined ? {} : { think }),
+			})
+			expect((await ledger.respond('Review.')).passes).toHaveLength(2)
+			expect(provider.calls.map((call) => call.options)).toEqual([
+				think?.first === undefined ? undefined : { think: think.first },
+				think?.answer === undefined ? undefined : { think: think.answer },
+			])
+		}
+	})
+
+	it('prices the wire tail and turn observation without discarded thinking', async () => {
+		const prices: Array<number | undefined> = []
+		const prompts: string[][] = []
+		for (const thinking of [undefined, 'a'.repeat(20000)]) {
+			const provider = createScriptedProvider(
+				[{ content: 'Done.', usage: { prompt: 200, completion: 4, total: 204 } }],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, options)
+			ledger.conversation.add([
+				{ role: 'user', content: 'Seed.' },
+				{
+					role: 'assistant',
+					content: 'Earlier reply.',
+					...(thinking === undefined ? {} : { thinking }),
+				},
+			])
+			await ledger.respond('Review.')
+			const messages = requireValue(provider.calls[0]).messages
+			expect(messages.some((message) => message.content === 'Earlier reply.')).toBe(true)
+			expect(messages.every((message) => message.thinking === undefined)).toBe(true)
+			expect(ledger.gauge?.scale).toBe(200 / estimateMessages(messages))
+			prices.push(ledger.gauge?.scale)
+			prompts.push(messages.map((message) => message.content))
+		}
+		expect(prices[1]).toBe(prices[0])
+		expect(prompts[1]).toEqual(prompts[0])
+	})
+
+	it('reads thinking before recall sizes its result and before the following call observation', async () => {
+		const results: string[] = []
+		for (const thinking of [undefined, 'a'.repeat(800)]) {
+			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }]
+			const completion = JSON.stringify(calls).length + (thinking?.length ?? 0)
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: calls,
+						...(thinking === undefined ? {} : { thinking }),
+						usage: { prompt: 2700, completion, total: 2700 + completion },
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const ledger = createLedger(provider, {
+				...options,
+				capacity: thinking === undefined ? 3072 : 4096,
+				...(thinking === undefined ? {} : { predict: 1024 }),
+			})
+			ledger.conversation.add(
+				Array.from({ length: 20 }, (_unused, at): MessageInput => ({
+					role: 'user',
+					content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+				})),
+			)
+			await ledger.respond('Review.')
+			const recalled = requireValue(
+				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+			)
+			expect(recalled).toContain('Delivery 19')
+			expect(recalled).toContain('older items not shown')
+			results.push(recalled)
+		}
+		expect(results[1]).toBe(results[0])
+	})
+
+	it('reserves the generation cap and retains within-pass thinking when closing recall', async () => {
+		for (const replay of ['none', 'turn', 'all'] as const) {
+			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }]
+			const completion = JSON.stringify(calls).length + 800
+			const provider = Object.assign(
+				createScriptedProvider(
+					[
+						{
+							content: '',
+							tools: calls,
+							thinking: 'a'.repeat(800),
+							usage: { prompt: 2700, completion, total: 2700 + completion },
+						},
+						{ content: 'Done.' },
+					],
+					{ record: true },
+				),
+				{ replay },
+			)
+			const ledger = createLedger(provider, { ...options, predict: 1024 })
+			await ledger.respond('Review.')
+			expect(
+				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(
+				replay === 'none'
+					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+					: LEDGER_NOTES.closed,
+			)
+		}
+	})
+
+	it('reads the final reply thinking before observing its reserve for a later request', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: 'Done.',
+					thinking: 'a'.repeat(3995),
+					usage: { prompt: 100, completion: 4000, total: 4100 },
+				},
+				{
+					content: '',
+					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+					usage: { prompt: 2000, completion: 20, total: 2020 },
+				},
+				{ content: 'Done.' },
+			],
+			{ record: true },
+		)
+		const ledger = createLedger(provider, { ...options, predict: 1024 })
+		await ledger.respond('First.')
+		await ledger.respond('Second.')
+		expect(
+			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
+		).toBe('nothing on "absent"; recall an owner name, an id, or one of refunds')
+	})
+
+	it('passes the generation reserve to supplied and calibrated gauges', async () => {
+		for (const calibrated of [false, true]) {
+			const provider = createScriptedProvider(
+				[
+					...(calibrated
+						? [
+								{ content: '', usage: { prompt: 8, completion: 1, total: 9 } },
+								{ content: '', usage: { prompt: 8, completion: 1, total: 9 } },
+							]
+						: []),
+					{
+						content: '',
+						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+						usage: { prompt: 3500, completion: 1, total: 3501 },
+					},
+					{ content: 'Done.' },
+				],
+				{ record: true },
+			)
+			const { gauge: _gauge, ...uncalibrated } = options
+			const ledger = createLedger(provider, {
+				...(calibrated ? uncalibrated : options),
+				predict: 1024,
+			})
+			await ledger.respond('Review.')
+			expect(
+				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(LEDGER_NOTES.closed)
+		}
+	})
+
 	it('answers in one pass with owner records, a truthful seed stub, and a seed-only tail', async () => {
 		const provider = createScriptedProvider(
 			[{ content: 'Approved.', usage: { prompt: 100, completion: 3, total: 103 } }],

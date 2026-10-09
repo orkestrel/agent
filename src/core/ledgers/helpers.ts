@@ -17,6 +17,37 @@ import { estimateMessages } from '../agents/helpers.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 
 /**
+ * Computes the completion tokens attributable to a message's thinking.
+ *
+ * @remarks
+ * Weights the completion by thinking characters divided by the combined characters of thinking,
+ * content, and JSON-serialized calls. Rounds to the nearest integer and caps at the completion.
+ * An empty generation yields 0. The completion must be a finite nonnegative token count.
+ *
+ * @param message - The generated thinking, content, and optional calls
+ * @param completion - The tokens reported for the completion
+ * @returns The thinking share in tokens, or 0 when no thinking characters exist
+ * @throws {TypeError} Thrown when calls cannot be JSON-serialized, including cycles or bigint arguments
+ *
+ * @example
+ * ```ts
+ * computeThinking({ thinking: 'plan', content: 'ok' }, 10) // 7
+ * ```
+ */
+export function computeThinking(
+	message: Pick<Message, 'thinking' | 'content' | 'calls'>,
+	completion: number,
+): number {
+	const thinking = message.thinking?.length ?? 0
+	if (thinking === 0) return 0
+	const generated =
+		thinking +
+		message.content.length +
+		(message.calls === undefined ? 0 : JSON.stringify(message.calls).length)
+	return Math.min(completion, Math.round(completion * (thinking / generated)))
+}
+
+/**
  * Splits a message into its sentences.
  *
  * @remarks

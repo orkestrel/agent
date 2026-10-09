@@ -7,6 +7,7 @@ import {
 	collectNames,
 	collectRegistry,
 	collectStale,
+	computeThinking,
 	cutItems,
 	extractTokens,
 	fitSlope,
@@ -34,6 +35,40 @@ import {
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
 } from '../../../setupLedger.js'
+
+describe('computeThinking', () => {
+	it('rounds the character share and caps it at the completion', () => {
+		expect(computeThinking({ thinking: 'plan', content: 'ok' }, 10)).toBe(7)
+		expect(computeThinking({ thinking: 'a', content: 'bb' }, 10)).toBe(3)
+		expect(computeThinking({ thinking: 'a', content: 'b' }, 1)).toBe(1)
+		expect(computeThinking({ thinking: 'plan', content: '' }, 10)).toBe(10)
+		expect(computeThinking({ thinking: 'plan', content: '' }, 0.75)).toBe(0.75)
+		expect(computeThinking({ thinking: 'plan', content: '' }, 0)).toBe(0)
+	})
+
+	it('counts serialized calls and returns zero for absent thinking or an empty generation', () => {
+		const calls = [{ id: 'one', name: 'recall', arguments: {} }]
+		expect(computeThinking({ content: '' }, 20)).toBe(0)
+		expect(computeThinking({ thinking: '', content: '' }, 20)).toBe(0)
+		expect(computeThinking({ content: '', calls }, 20)).toBe(0)
+		// Calls serialize to 45 characters; the thinking contributes another 45.
+		expect(JSON.stringify(calls)).toHaveLength(45)
+		expect(computeThinking({ thinking: 'a'.repeat(45), content: '', calls }, 20)).toBe(10)
+	})
+
+	it('reports a serialization failure for calls with bigint arguments', () => {
+		expect(() =>
+			computeThinking(
+				{
+					thinking: 'plan',
+					content: '',
+					calls: [{ id: 'one', name: 'recall', arguments: { count: 1n } }],
+				},
+				10,
+			),
+		).toThrow(TypeError)
+	})
+})
 
 // Ledger-owned pure helpers on fictional desk fixtures: the sentence and token readings, lookup identity,
 // the registry and entity matching, the record projection with the three fixes (R5a, R2b, R8), the

@@ -1,4 +1,5 @@
 import type { Message } from '../types.js'
+import type { ThinkingReplay } from '../providers/types.js'
 import type { GaugeCall, GaugeInterface, GaugeOptions } from './types.js'
 import { isFiniteNumber } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
@@ -12,7 +13,11 @@ import { fitSlope } from './helpers.js'
  * @remarks
  * `observe` rescales from the first call of each finished request with the fixed cost taken out,
  * and keeps that request's calls for the marginal rate and the longest final completion for the reply
- * reserve. `fixed` never changes after construction.
+ * reserve after subtracting its thinking. `fixed` never changes after construction.
+ * Measured use is `prompt + completion - thinking` for replay `'none'`, and the whole prompt
+ * plus completion for `'turn'` and `'all'`. Recall room is
+ * `max(0, (left - predict - reserve) / 2 / rate)`, reserving the generation cap before recall.
+ * The ledger closes recall when `left - predict < 2 * reserve`.
  *
  * @example
  * ```ts
@@ -22,6 +27,8 @@ import { fitSlope } from './helpers.js'
  */
 export class Gauge implements GaugeInterface {
 	readonly #capacity: number
+	readonly #predict: number
+	readonly #replay: ThinkingReplay
 	readonly #history: Array<readonly GaugeCall[]> = []
 	#scale: number
 	#fixed: number
@@ -33,6 +40,7 @@ export class Gauge implements GaugeInterface {
 	 * @param options - The starting `scale` and `fixed` price and the context `capacity`
 	 * @throws {LedgerError} Thrown when `scale` is not finite and above 0, or `fixed` is not finite and at least 0 (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when `capacity` is not a positive safe integer (code `'CAPACITY'`)
+	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
 	 */
 	constructor(options: GaugeOptions) {
 		if (!isFiniteNumber(options.scale) || options.scale <= 0) {
@@ -44,9 +52,18 @@ export class Gauge implements GaugeInterface {
 		if (!Number.isSafeInteger(options.capacity) || options.capacity <= 0) {
 			throw new LedgerError('CAPACITY', 'gauge capacity must be a positive safe integer')
 		}
+		const predict = options.predict ?? 0
+		if (!Number.isSafeInteger(predict) || predict < 0 || predict >= options.capacity) {
+			throw new LedgerError(
+				'CAPACITY',
+				'gauge predict must be a nonnegative safe integer less than capacity',
+			)
+		}
 		this.#scale = options.scale
 		this.#fixed = options.fixed
 		this.#capacity = options.capacity
+		this.#predict = predict
+		this.#replay = options.replay ?? 'none'
 	}
 
 	get scale(): number {
@@ -79,7 +96,7 @@ export class Gauge implements GaugeInterface {
 	left(calls: readonly GaugeCall[]): number {
 		const call = calls.at(-1)
 		const used = isFiniteNumber(call?.prompt)
-			? call.prompt + (call.completion ?? 0)
+			? call.prompt + (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
 			: this.#fixed + this.#scale * (call?.estimate ?? 0)
 		return Math.max(0, this.#capacity - used)
 	}
@@ -106,7 +123,10 @@ export class Gauge implements GaugeInterface {
 	}
 
 	room(calls: readonly GaugeCall[], longest: string): number {
-		return Math.max(0, (this.left(calls) - this.reserve(calls, longest)) / 2 / this.rate(calls))
+		return Math.max(
+			0,
+			(this.left(calls) - this.#predict - this.reserve(calls, longest)) / 2 / this.rate(calls),
+		)
 	}
 
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void {
@@ -116,6 +136,7 @@ export class Gauge implements GaugeInterface {
 			if (priced > 0) this.#scale = priced / first.estimate
 		}
 		this.#history.push([...calls])
-		if (isFiniteNumber(reply?.completion)) this.#reply = Math.max(this.#reply, reply.completion)
+		if (isFiniteNumber(reply?.completion))
+			this.#reply = Math.max(this.#reply, reply.completion - (reply.thinking ?? 0))
 	}
 }

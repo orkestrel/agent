@@ -1,5 +1,6 @@
 import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
+import type { ThinkingReplay } from '../providers/types.js'
 import type {
 	ChoiceQuestion,
 	JudgeEntry,
@@ -230,6 +231,18 @@ export type LedgerAgentOptions = Pick<
 >
 
 /**
+ * Selects thinking separately for the first pass and the answer pass.
+ *
+ * @remarks
+ * If `first` or `answer` is `true`, that pass requests thinking; if `false`, it suppresses
+ * thinking. An absent member leaves the provider's default in effect.
+ */
+export interface LedgerThink {
+	readonly first?: boolean
+	readonly answer?: boolean
+}
+
+/**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
  * context capacity, and the optional lookups, gauge, shares, recall, notes, and agent bounds.
  *
@@ -240,6 +253,11 @@ export type LedgerAgentOptions = Pick<
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, the ledger calibrates before its first pass. `share` and `notes`
  * default leaf by leaf to the `DEFAULT_LEDGER_SHARE` and `LEDGER_NOTES` constants.
+ * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
+ * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
+ * `'CAPACITY'` otherwise. The plan budgets
+ * `max(0, (capacity - predict) * share.prompt - fixed) / (1 + LEDGER_SCALE_DRIFT)`.
+ * Recall closes when `left - predict < 2 * reserve`. `think` selects thinking per pass.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -248,6 +266,8 @@ export interface LedgerOptions {
 	readonly questions: LedgerQuestion
 	readonly thresholds: LedgerThreshold
 	readonly capacity: number
+	readonly predict?: number
+	readonly think?: LedgerThink
 	readonly gauge?: LedgerGauge
 	readonly lookups?: readonly LedgerLookup[]
 	readonly share?: Partial<LedgerShare>
@@ -532,17 +552,34 @@ export interface ClassifierInterface {
  * `estimate` is the `estimateMessages` estimate of the call's messages. `prompt` and `completion`
  * are the tokens the provider reported, absent when it reported none. `tools` is the count of tool
  * definitions the call advertised.
+ * `thinking` estimates the completion tokens spent on thinking from its share of the generated
+ * characters, rounded to the nearest integer and capped at `completion`. With replay `'none'`,
+ * the measured call uses `prompt + completion - thinking`; other policies retain the whole
+ * completion. The reply reserve reads `completion - (thinking ?? 0)` for every replay policy.
  */
 export interface GaugeCall {
 	readonly estimate: number
 	readonly prompt?: number
 	readonly completion?: number
+	readonly thinking?: number
 	readonly tools: number
 }
 
-/** Configures a gauge: its starting price of a prompt and the context capacity it measures against. */
+/**
+ * Configures a gauge: its starting price of a prompt and the context capacity it measures against.
+ *
+ * @remarks
+ * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
+ * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
+ * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
+ * Measured use is `prompt + completion - thinking` for `'none'`, and `prompt + completion`
+ * otherwise. The reply reserve excludes thinking for every policy. Recall room is
+ * `max(0, (left - predict - reserve) / 2 / rate)`; recall closes at `left - predict < 2 * reserve`.
+ */
 export interface GaugeOptions extends LedgerGauge {
 	readonly capacity: number
+	readonly predict?: number
+	readonly replay?: ThinkingReplay
 }
 
 /**
@@ -569,12 +606,22 @@ export interface GaugeInterface extends LedgerGauge {
 	/**
 	 * Returns the tokens of the capacity the last call left.
 	 *
+	 * @remarks
+	 * Returns `max(0, capacity - used)`. A measured call uses `prompt + completion - carried`,
+	 * where `carried` is `thinking ?? 0` for replay `'none'`, and 0 for `'turn'` or `'all'`.
+	 * A call without prompt usage uses `fixed + scale * estimate`.
+	 *
 	 * @param calls - The calls of the request so far
 	 * @returns The tokens left
 	 */
 	left(calls: readonly GaugeCall[]): number
 	/**
 	 * Returns the tokens a reply turn needs after the calls, given the longest reply text written so far.
+	 *
+	 * @remarks
+	 * Adds the recall framing at the marginal rate to the largest observed reply's
+	 * `completion - (thinking ?? 0)`, whatever the replay policy. Without a positive reply
+	 * observation, prices the longest text at that rate.
 	 *
 	 * @param calls - The calls of the request so far
 	 * @param longest - The longest reply text written so far
@@ -583,6 +630,10 @@ export interface GaugeInterface extends LedgerGauge {
 	reserve(calls: readonly GaugeCall[], longest: string): number
 	/**
 	 * Returns the estimate units a recall result can take without taking the reply's room.
+	 *
+	 * @remarks
+	 * Returns `max(0, (left - predict - reserve) / 2 / rate)`. The ledger closes recall when
+	 * `left - predict < 2 * reserve`.
 	 *
 	 * @param calls - The calls of the request so far
 	 * @param longest - The longest reply text written so far
@@ -604,7 +655,7 @@ export type LedgerErrorCode =
 	| 'THRESHOLD'
 	/** Reports a share that is not finite or lies outside the interval above 0 up to and including 1. */
 	| 'SHARE'
-	/** Reports a capacity that is not a positive safe integer. */
+	/** Reports an invalid capacity or a generation cap that is not a nonnegative safe integer less than capacity. */
 	| 'CAPACITY'
 	/** Reports a recall limit or an agent limit that is not a nonnegative safe integer. */
 	| 'LIMIT'
