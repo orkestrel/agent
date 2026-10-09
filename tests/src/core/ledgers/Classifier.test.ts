@@ -361,7 +361,7 @@ describe('Classifier', () => {
 		})
 	})
 
-	it('rethrows aborts while retaining completed judgments and refuses an already aborted ask', async () => {
+	it('returns abort faults with completed judgments and usage and refuses an already aborted ask', async () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'First statement.' })
 		conversation.add({ role: 'user', content: 'Second statement.' })
@@ -372,6 +372,7 @@ describe('Classifier', () => {
 			if (!isRecord(request) || !isRecord(request.questions)) throw new Error('invalid request')
 			return Response.json({
 				model: 'filing',
+				usage: { input_tokens: 50, output_tokens: 1 },
 				answers: Object.fromEntries(
 					Object.keys(request.questions).map((key) => [
 						key,
@@ -406,13 +407,17 @@ describe('Classifier', () => {
 			assign: () => undefined,
 			entities: () => new Set(),
 		})
-		await expect(classifier.classify(new Set(), controller.signal)).rejects.toBeInstanceOf(
-			JudgeAbortError,
-		)
+		const result = await classifier.classify(new Set(), controller.signal)
+		expect(result.fault).toBeInstanceOf(JudgeAbortError)
+		expect(result.judgments).toEqual([JSON.stringify(['category', conversation.messages()[0]?.id])])
+		expect(result.usage).toEqual({ prompt: 50, completion: 1, total: 51 })
 		expect(conversation.judgments.count).toBeGreaterThanOrEqual(1)
 		expect(classifier.category(requireValue(conversation.messages()[0]).id)).toBe('fact')
 		conversation.judgments.clear()
-		await expect(classifier.classify(new Set(), AbortSignal.abort())).rejects.toThrow(/abort/i)
+		expect(await classifier.classify(new Set(), AbortSignal.abort())).toMatchObject({
+			judgments: [],
+			fault: expect.objectContaining({ name: 'AbortError' }),
+		})
 		expect(transport.requests).toHaveLength(2)
 	})
 	it('leaves an item undecided when the judge aborts under a live signal and asks the following spec', async () => {

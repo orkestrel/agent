@@ -45,51 +45,59 @@ export class Classifier implements ClassifierInterface {
 	/**
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The ids of the messages that belong to the current request
-	 * @param signal - The caller's signal; an aborted signal rethrows
+	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
 	 * @returns The ids of the judgments that answer the questions and their summed usage
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
-		const messages = this.#options.conversation.messages()
-		const asked = messages.filter((message) => this.#options.assign(message) === undefined)
 		const results: ClassifierResult[] = []
-		for (const message of asked) {
-			if (!requests.has(message.id))
-				results.push(await this.#ask(this.#buildCategory(message.id), signal))
-		}
-		for (const message of asked) {
-			if (!requests.has(message.id) && this.quiet(message.id)) continue
-			for (const topic of this.#options.topics) {
-				if (requests.has(message.id) && topic.requests === false) continue
-				results.push(await this.#ask(this.#buildTopic(message.id, topic), signal))
+		let fault: Error | undefined
+		try {
+			const messages = this.#options.conversation.messages()
+			const asked = messages.filter((message) => this.#options.assign(message) === undefined)
+			for (const message of asked) {
+				if (!requests.has(message.id))
+					results.push(await this.#ask(this.#buildCategory(message.id), signal))
 			}
-		}
-		for (const later of asked) {
-			if (
-				later.role !== 'user' ||
-				(this.#readCategories(later.id)?.probabilities.correction ?? 0) <
-					this.#options.thresholds.correction
-			)
-				continue
-			const near = this.#collectNear(later)
-			if (near.size === 0) continue
-			for (const earlier of messages) {
-				if (earlier.id === later.id) break
+			for (const message of asked) {
+				if (!requests.has(message.id) && this.quiet(message.id)) continue
+				for (const topic of this.#options.topics) {
+					if (requests.has(message.id) && topic.requests === false) continue
+					results.push(await this.#ask(this.#buildTopic(message.id, topic), signal))
+				}
+			}
+			for (const later of asked) {
 				if (
-					this.quiet(earlier.id) ||
-					![...this.#collectNear(earlier)].some((topic) => near.has(topic))
+					later.role !== 'user' ||
+					(this.#readCategories(later.id)?.probabilities.correction ?? 0) <
+						this.#options.thresholds.correction
 				)
 					continue
-				const spec = this.#buildPair('amends', earlier.id, later.id)
-				results.push(await this.#ask(spec, signal))
-				if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
-					results.push(await this.#ask(this.#buildPair('supersedes', earlier.id, later.id), signal))
+				const near = this.#collectNear(later)
+				if (near.size === 0) continue
+				for (const earlier of messages) {
+					if (earlier.id === later.id) break
+					if (
+						this.quiet(earlier.id) ||
+						![...this.#collectNear(earlier)].some((topic) => near.has(topic))
+					)
+						continue
+					const spec = this.#buildPair('amends', earlier.id, later.id)
+					results.push(await this.#ask(spec, signal))
+					if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
+						results.push(
+							await this.#ask(this.#buildPair('supersedes', earlier.id, later.id), signal),
+						)
+				}
 			}
+		} catch (error) {
+			fault = isError(error) ? error : new Error(String(error))
 		}
 		let usage: TokenUsage | undefined
 		for (const result of results)
 			if (result.usage !== undefined) usage = sumUsage(usage, result.usage)
 		return {
 			judgments: results.flatMap((result) => result.judgments),
+			...(fault === undefined ? {} : { fault }),
 			...(usage === undefined ? {} : { usage }),
 		}
 	}

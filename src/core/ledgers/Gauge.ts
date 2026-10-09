@@ -11,7 +11,7 @@ import { fitSlope } from './helpers.js'
  *
  * @remarks
  * `observe` rescales from the first call of each finished request with the fixed cost taken out,
- * and keeps that request's calls for the marginal rate and the longest completion for the reply
+ * and keeps that request's calls for the marginal rate and the longest final completion for the reply
  * reserve. `fixed` never changes after construction.
  *
  * @example
@@ -109,15 +109,13 @@ export class Gauge implements GaugeInterface {
 		return Math.max(0, (this.left(calls) - this.reserve(calls, longest)) / 2 / this.rate(calls))
 	}
 
-	observe(calls: readonly GaugeCall[]): void {
+	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void {
 		const first = calls[0]
 		if (first !== undefined && isFiniteNumber(first.prompt) && first.estimate > 0) {
 			const priced = first.prompt - this.#fixed
 			if (priced > 0) this.#scale = priced / first.estimate
 		}
 		this.#history.push([...calls])
-		for (const call of calls) {
-			if (isFiniteNumber(call.completion)) this.#reply = Math.max(this.#reply, call.completion)
-		}
+		if (isFiniteNumber(reply?.completion)) this.#reply = Math.max(this.#reply, reply.completion)
 	}
 }

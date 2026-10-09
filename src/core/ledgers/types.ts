@@ -111,6 +111,7 @@ export interface LedgerNote {
  * {@link LedgerNote} `closed` text; it must be a nonnegative safe integer. Default: the
  * `DEFAULT_RECALL_LIMIT` constant. `description` replaces the tool description the ledger builds
  * from its topics.
+ * Recall identity is the trimmed `{ topic }` alone; other arguments do not change its identity.
  */
 export interface LedgerRecallOptions {
 	readonly limit?: number
@@ -162,6 +163,8 @@ export type LedgerLookupHandler = (
  * @remarks
  * The ledger registers the tool behind a repeat stop beside its own `recall` tool, so the tool must
  * not be named `recall`, and no two lookups can share a tool name.
+ * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no reading.
+ * A seed tool message with no recorded result counts as a successful lookup.
  */
 export interface LedgerLookup {
 	readonly tool: ToolInterface
@@ -217,13 +220,13 @@ export interface LedgerGauge {
  * Selects the agent bounds and hooks a ledger passes through to the agent it builds.
  *
  * @remarks
- * `limit` must be a positive safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
+ * `limit` must be a nonnegative safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
  * the scope.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
-	'limit' | 'timeout' | 'budget' | 'signal' | 'strict' | 'on' | 'error'
+	'limit' | 'timeout' | 'budget' | 'signal' | 'on' | 'error'
 >
 
 /**
@@ -293,7 +296,7 @@ export interface LedgerInterface {
 	 * `AgentError` whose `code` is `'CONCURRENCY'`.
 	 *
 	 * @param content - The request text
-	 * @param signal - An optional caller signal; its abort ends the request partial and skips the answer pass
+	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
 	 * @returns The reply and the passes the request took
 	 */
 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
@@ -304,6 +307,8 @@ export interface LedgerInterface {
 	 * The ledger sends its system message and its conversation's view to the provider twice, with
 	 * and without the tool definitions. The call without tools prices the messages and the
 	 * difference between the calls is the fixed cost.
+	 * An abort during calibration rejects with the abort reason. A call during `respond` rejects
+	 * with `AgentError` code `'CONCURRENCY'`.
 	 *
 	 * @param signal - The signal that aborts both calls
 	 * @returns The measured gauge
@@ -460,6 +465,7 @@ export interface ClassifierOptions {
 export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
+	readonly fault?: Error
 }
 
 /**
@@ -475,7 +481,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The ids of the user messages the ledger serves as requests
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys the filing rests on and the usage spent
+	 * @returns The judgment keys, usage spent, and a fault if classification was interrupted
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**
@@ -579,11 +585,12 @@ export interface GaugeInterface extends LedgerGauge {
 	 */
 	room(calls: readonly GaugeCall[], longest: string): number
 	/**
-	 * Rescales from a completed request's first call and keeps its calls and its longest reply.
+	 * Rescales from a completed request's first call and keeps its calls and the final reply's completion.
 	 *
 	 * @param calls - The calls of the completed request
+	 * @param reply - The call that delivered the final answer, absent when no final answer was delivered
 	 */
-	observe(calls: readonly GaugeCall[]): void
+	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */
@@ -594,7 +601,7 @@ export type LedgerErrorCode =
 	| 'SHARE'
 	/** Reports a capacity that is not a positive safe integer. */
 	| 'CAPACITY'
-	/** Reports a recall limit that is not a nonnegative safe integer or an agent limit that is not a positive safe integer. */
+	/** Reports a recall limit or an agent limit that is not a nonnegative safe integer. */
 	| 'LIMIT'
 	/** Reports a topic with an empty name or a name another topic carries. */
 	| 'TOPIC'

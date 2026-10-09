@@ -188,18 +188,37 @@ describe('Gauge.reserve', () => {
 		expect(gauge.reserve([], 'a'.repeat(40))).toBe(78)
 	})
 
-	it('uses the longest observed completion instead of the text', () => {
+	it('uses the final answer completion instead of a larger tool completion', () => {
 		// Observing (100, 300) sets scale 3 and rate 3. Reply 70, recall 25 * 3 = 75.
 		const gauge = new Gauge({ scale: 2, fixed: 0, capacity: 10000 })
-		gauge.observe([{ estimate: 100, prompt: 300, completion: 70, tools: 0 }])
+		gauge.observe(
+			[
+				{ estimate: 100, prompt: 300, completion: 900, tools: 1 },
+				{ estimate: 100, prompt: 300, completion: 70, tools: 0 },
+			],
+			{ estimate: 100, prompt: 300, completion: 70, tools: 0 },
+		)
 		expect(gauge.reserve([], 'a'.repeat(4000))).toBe(145)
 	})
 
 	it('keeps the longest completion across requests', () => {
 		const gauge = new Gauge({ scale: 2, fixed: 0, capacity: 10000 })
-		gauge.observe([{ estimate: 100, prompt: 300, completion: 70, tools: 0 }])
-		gauge.observe([{ estimate: 100, prompt: 300, completion: 40, tools: 0 }])
+		gauge.observe([{ estimate: 100, prompt: 300, completion: 70, tools: 0 }], {
+			estimate: 100,
+			completion: 70,
+			tools: 0,
+		})
+		gauge.observe([{ estimate: 100, prompt: 300, completion: 40, tools: 0 }], {
+			estimate: 100,
+			completion: 40,
+			tools: 0,
+		})
 		expect(gauge.reserve([], '')).toBe(145)
+	})
+	it('keeps the text fallback when a request delivered no final answer', () => {
+		const gauge = new Gauge({ scale: 1, fixed: 0, capacity: 10000 })
+		gauge.observe([{ estimate: 100, prompt: 100, completion: 900, tools: 1 }])
+		expect(gauge.reserve([], '')).toBe(29)
 	})
 })
 
