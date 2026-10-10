@@ -92,7 +92,7 @@ describe('createAgent', () => {
 		const instructions = createInstructionManager()
 		instructions.add({ name: 'tone', content: 'Be terse.' })
 		const noTools = createScope({ name: 'reader', tools: [], instructions: [] })
-		const provider = createScriptedProvider([{ content: 'ok' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'ok' }], { recorded: true })
 		const agent = createAgent(provider, { tools, instructions, scope: noTools })
 
 		expect(agent.context.scope).toBe(noTools)
@@ -161,8 +161,8 @@ describe('createAgentQueue', () => {
 			queue.enqueue(createAgentJob({ messages: [{ role: 'user', content: '3' }] })),
 			queue.enqueue(createAgentJob({ messages: [{ role: 'user', content: '4' }] })),
 		])
-		expect(provider.maxInFlight).toBeLessThanOrEqual(2)
-		expect(provider.maxInFlight).toBe(2)
+		expect(provider.peak).toBeLessThanOrEqual(2)
+		expect(provider.peak).toBe(2)
 		expect(provider.started).toBe(4)
 	})
 
@@ -554,8 +554,8 @@ describe('createAgentQueue — lifecycle + batch', () => {
 		expect(results.map((r) => r.content)).toEqual(turns.map((t) => t.content))
 		expect(results.every((r) => r.partial === false)).toBe(true)
 		expect(provider.started).toBe(12)
-		expect(provider.maxInFlight).toBeLessThanOrEqual(3)
-		expect(provider.maxInFlight).toBe(3)
+		expect(provider.peak).toBeLessThanOrEqual(3)
+		expect(provider.peak).toBe(3)
 	})
 })
 

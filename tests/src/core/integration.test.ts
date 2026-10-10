@@ -92,7 +92,7 @@ describe('in-process relay hop', () => {
 		}
 		const provider = createScriptedProvider(
 			[{ result, deltas: ['<think>literal</think>', ' answer'], thoughts: ['rea', 'son'] }],
-			{ record: true },
+			{ recorded: true },
 		)
 		const handler = createRelay({
 			provider,
@@ -178,7 +178,7 @@ describe('in-process relay hop', () => {
 	it('propagates browser abort through the request and upstream signals', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'first second third' }, deltas: ['first', ' second', ' third'] }],
-			{ record: true },
+			{ recorded: true },
 		)
 		const handler = createRelay({ provider, authorize: () => true })
 		const requests: Request[] = []
@@ -264,7 +264,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const agent = createAgent(
 			createScriptedProvider([{ content: 'one two three', usage: INTEGRATION_USAGE }], {
 				name: 'alpha',
-				deltasOf: splitWordDeltas,
+				chunk: splitWordDeltas,
 			}),
 		)
 		agent.context.messages.add({ role: 'user', content: 'count' })
@@ -298,7 +298,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 				{ content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] },
 				{ content: 'the sum is 5', usage: INTEGRATION_USAGE },
 			],
-			{ name: 'alpha', record: true },
+			{ name: 'alpha', recorded: true },
 		)
 		const agent = createAgent(provider, { tools, limit: 4 })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
@@ -331,7 +331,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const agent = createAgent(
 			createScriptedProvider([{ content: 'a b c d e' }], {
 				name: 'alpha',
-				deltasOf: splitWordDeltas,
+				chunk: splitWordDeltas,
 			}),
 		)
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -370,7 +370,7 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		// A model's framing preference reaches the request through the instructions manager the
 		// agent receives, so one provider type sends XML framing from one agent and the built-in
 		// Markdown header from the other, through the real loop.
-		const framed = createScriptedProvider([{ content: 'ok' }], { name: 'framed', record: true })
+		const framed = createScriptedProvider([{ content: 'ok' }], { name: 'framed', recorded: true })
 		const framedAgent = createAgent(framed, {
 			instructions: createInstructionManager({
 				format: {
@@ -384,7 +384,7 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		framedAgent.context.messages.add({ role: 'user', content: 'hi' })
 		await framedAgent.generate()
 
-		const plain = createScriptedProvider([{ content: 'ok' }], { name: 'plain', record: true })
+		const plain = createScriptedProvider([{ content: 'ok' }], { name: 'plain', recorded: true })
 		const plainAgent = createAgent(plain)
 		plainAgent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		plainAgent.context.messages.add({ role: 'user', content: 'hi' })

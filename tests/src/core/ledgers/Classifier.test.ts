@@ -97,7 +97,7 @@ describe('Classifier', () => {
 				],
 			},
 		})
-		const transport = new RecordedTransport(async () => {
+		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(
 				requireValue(transport.requests.at(-1)),
 				(key, question) =>
@@ -424,7 +424,7 @@ describe('Classifier', () => {
 		conversation.add({ role: 'user', content: 'First statement.' })
 		conversation.add({ role: 'user', content: 'Second statement.' })
 		const controller = new AbortController()
-		const transport = new RecordedTransport(async () => {
+		const transport: RecordedTransport = new RecordedTransport(async () => {
 			if (transport.requests.length === 2) controller.abort()
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})

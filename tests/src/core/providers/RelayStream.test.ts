@@ -22,7 +22,7 @@ import {
 describe('RelayStream', () => {
 	it('resolves the upstream policy when the stream is constructed', async () => {
 		let replay: ThinkingReplay = 'none'
-		const provider = createScriptedProvider([{ content: 'done' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'done' }], { recorded: true })
 		const relay = new RelayStream({
 			provider: {
 				id: provider.id,
@@ -95,7 +95,7 @@ describe('RelayStream', () => {
 		}
 		const provider = createScriptedProvider(
 			[{ result, deltas: ['an', 'swer'], thoughts: ['reason'] }],
-			{ record: true },
+			{ recorded: true },
 		)
 		const signal = new AbortController().signal
 		const relay = new RelayStream({ provider, request: { messages: [] }, signal })
@@ -231,7 +231,7 @@ describe('RelayStream', () => {
 	it('links an already-aborted inbound signal before the upstream turn starts', async () => {
 		const abort = new AbortController()
 		abort.abort(new Error('cancelled'))
-		const provider = createScriptedProvider([{ content: 'unread' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'unread' }], { recorded: true })
 		const response = new RelayStream({ provider, request: { messages: [] }, signal: abort.signal })
 			.response
 		expect(parseJSONAs(await response.text(), relayFrameContract.is)).toEqual({

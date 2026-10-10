@@ -1,29 +1,65 @@
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
+import { Channel, createAgent, ProviderAbortError } from '@src/core'
+import { createRecorder } from '@orkestrel/test'
+import {
+	createAuthorityContext,
+	createMessage,
+	computeUsageTotal,
+	returnUndefined,
+	collectPaced,
+	CountingAgentResult,
+	createInvalidAgentResultCases,
+	seedCompactionAgent,
+	requestConversation,
+	createConversationEchoProvider,
+	createEchoProvider,
+	createAnswerProvider,
+	createTurnRegistry,
+	createInterleavedThinkingProvider,
+	createPacedProvider,
+	createGatedProvider,
+	createAbortingGatedProvider,
+	createObservedGatedProvider,
+	createIndependentGatedProvider,
+	createSharedGatedProvider,
+	createThrowingProvider,
+	createAbortingResultProvider,
+	createSecondTurnFailureProvider,
+	createFailingScheduler,
+} from './setup.js'
 import {
 	LedgerError,
 	LEDGER_QUESTIONS,
 	buildRecords,
 	CONVERSATION_RECAP_PREFIX,
+	createSystemOneJudge,
 	ConversationManager,
 	createConversation,
+	createMemoryConversationStore,
 	isConversationSnapshot,
 	isProviderAbortError,
+	ThinkSplitter,
 } from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	JUDGMENT_QUESTION,
 	buildCallsSnapshot,
+	buildSystemOneProbabilityCases,
+	driveThinkSplitter,
+	JUDGE_PROTOCOL_CASES,
 	buildConversationSnapshot,
 	chunkWholeDelta,
 	compactSeedTurns,
 	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
 	createAddTool,
 	createAgentJob,
-	createFixtureStore,
 	createLoopTool,
 	createRecordingScheduler,
+	createRecordedJudge,
+	RecordingJudge,
+	buildProviderPartial,
 	createRefusingTransport,
 	createRelayRequest,
 	createScriptedProvider,
@@ -39,9 +75,11 @@ import {
 	exerciseConversationStoreRoundTrip,
 	exerciseConversationStoreTwoIds,
 	exerciseConversationStoreUpsert,
+	plantConversationRow,
 	RecordedBody,
 	RecordedProvider,
 	RecordedTransport,
+	SYSTEM_ONE_TEV1,
 	recordGlobalTransport,
 	rejectTransportOnAbort,
 	renderRecap,
@@ -52,6 +90,10 @@ import {
 	ScriptedWire,
 	seedConversation,
 	seedFramedAgent,
+	buildExchangeMessages,
+	buildToolGroupMessages,
+	generateReply,
+	splitWordDeltas,
 	seedInstructionContext,
 	seedWorkspaceContext,
 	splitTurn,
@@ -84,6 +126,8 @@ import {
 	buildLedgerResponse,
 	createLedgerJudge,
 } from './setup.js'
+import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { rawShape, stringShape } from '@orkestrel/contract'
 
 // setup.test.ts — the proof of `tests/setup.ts`, the host-independent shared test-infrastructure
 // module. Its subject is the exported HELPERS' behaviour, the behaviour every suite in
@@ -103,6 +147,165 @@ import {
 // is enough for every case that does not assert on what was passed through.
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
 
+describe('agent scenario infrastructure', () => {
+	it('builds authority and message fixtures and totals recorded usage', () => {
+		expect(createAuthorityContext('read', { path: 'note' })).toEqual({
+			call: { id: 'c1', name: 'read', arguments: { path: 'note' } },
+		})
+		expect(createMessage('hello')).toEqual({ id: 'm', role: 'user', content: 'hello' })
+		expect(
+			computeUsageTotal(
+				[[{ prompt: 2, completion: 3, total: 5 }], [{ prompt: 1, completion: 1, total: 2 }]],
+				'total',
+			),
+		).toBe(7)
+		expect(returnUndefined()).toBeUndefined()
+	})
+
+	it('collects paced values and preserves a channel failure', async () => {
+		const channel = new Channel<number>()
+		const collection = collectPaced(channel, 0)
+		channel.push(1)
+		channel.push(2)
+		channel.close()
+		expect(await collection).toEqual([1, 2])
+		const failed = new Channel<number>()
+		failed.fail(new Error('paced failure'))
+		await expect(collectPaced(failed, 0)).rejects.toThrow('paced failure')
+	})
+
+	it('records each result getter and supplies hostile projection cases', () => {
+		const counted = new CountingAgentResult()
+		expect(counted.content).toBe('done')
+		expect(counted.thinking).toBe('reasoning')
+		expect(counted.partial).toBe(false)
+		const usage = counted.usage
+		expect([usage.prompt, usage.completion, usage.total]).toEqual([2, 1, 3])
+		expect(counted.counter).toEqual({
+			content: 1,
+			thinking: 1,
+			partial: 1,
+			usage: 1,
+			prompt: 1,
+			completion: 1,
+			total: 1,
+		})
+		const cases = createInvalidAgentResultCases()
+		expect(cases.length).toBeGreaterThan(0)
+		expect(cases.map(([name]) => name)).toContain('revoked root proxy')
+	})
+
+	it('seeds the compaction scenario and drives a named conversation request', async () => {
+		const seeded = seedCompactionAgent(undefined)
+		expect(seeded.conversation.messages().map((message) => message.content)).toEqual(['go'])
+		expect(seeded.agent.context.tools.definitions().map((tool) => tool.name)).toEqual(['add'])
+		expect((await seeded.agent.generate()).content).toBe('the answer is 42')
+		const agent = createAgent(createConversationEchoProvider())
+		const result = await requestConversation(
+			agent,
+			agent.context.conversations,
+			'thread',
+			'question',
+		)
+		expect(result.content).toBe('answer:question')
+		expect(agent.context.conversations.active?.id).toBe('thread')
+		expect(
+			(await createEchoProvider().generate([createMessage('input')], new AbortController().signal))
+				.content,
+		).toBe('ok:input')
+		expect((await createAnswerProvider().generate([], new AbortController().signal)).content).toBe(
+			'final answer',
+		)
+		expect(
+			(await createTurnRegistry({ content: 'registered' }).build(createAgentJob()).generate())
+				.content,
+		).toBe('registered')
+	})
+
+	it('preserves interleaved thinking and paced content deltas', async () => {
+		const signal = new AbortController().signal
+		const thinking = await drainProvider(createInterleavedThinkingProvider().stream([], signal))
+		expect(thinking.deltas).toEqual([
+			{ channel: 'thinking', text: 'plan ' },
+			{ channel: 'content', text: 'answer' },
+			{ channel: 'thinking', text: 'check' },
+		])
+		expect(thinking.result).toEqual({ content: 'answer', thinking: 'plan check' })
+		expect((await drainProvider(createPacedProvider().stream([], signal))).deltas).toEqual([
+			{ channel: 'content', text: 'a' },
+			{ channel: 'content', text: 'b' },
+		])
+	})
+
+	it('holds a gated result and reports observed cancellation with partial usage', async () => {
+		const gate = Promise.withResolvers<void>()
+		const signal = new AbortController()
+		const held = createGatedProvider(gate).stream([], signal.signal)
+		expect(await held.next()).toEqual({ done: false, value: { channel: 'content', text: 'part' } })
+		gate.resolve()
+		expect(await held.next()).toEqual({ done: true, value: { content: 'full' } })
+		const abortGate = Promise.withResolvers<void>()
+		const partial = createAbortingGatedProvider(abortGate, {
+			prompt: 2,
+			completion: 1,
+			total: 3,
+		}).stream([], signal.signal)
+		await partial.next()
+		signal.abort()
+		abortGate.resolve()
+		await expect(partial.next()).rejects.toMatchObject({
+			partial: { content: 'part', usage: { prompt: 2, completion: 1, total: 3 } },
+		})
+		const observed = createRecorder<[boolean]>()
+		const stream = createObservedGatedProvider(abortGate, observed.handler).stream(
+			[],
+			signal.signal,
+		)
+		await stream.next()
+		await expect(stream.next()).rejects.toMatchObject({ partial: { content: 'part' } })
+		expect(observed.calls).toEqual([[true]])
+	})
+
+	it('keeps concurrent provider gates and results distinct', async () => {
+		const first = Promise.withResolvers<void>()
+		const second = Promise.withResolvers<void>()
+		const controller = new AbortController()
+		const provider = createIndependentGatedProvider(first, second)
+		const left = provider.stream([], controller.signal)
+		const right = provider.stream([], controller.signal)
+		await left.next()
+		await right.next()
+		first.resolve()
+		second.resolve()
+		expect(await left.next()).toEqual({ done: true, value: { content: 'full-1' } })
+		expect(await right.next()).toEqual({ done: true, value: { content: 'full-2' } })
+		const shared = createSharedGatedProvider(first, second)
+		expect((await drainProvider(shared.stream([], controller.signal))).result.content).toBe('full')
+	})
+
+	it('supplies provider and scheduler failure boundaries', async () => {
+		const signal = new AbortController()
+		const throwing = createThrowingProvider('broken', 'prefix')
+		const stream = throwing.stream([], signal.signal)
+		expect((await stream.next()).value).toEqual({ channel: 'content', text: 'prefix' })
+		await expect(stream.next()).rejects.toThrow('broken')
+		await expect(throwing.generate([], signal.signal)).rejects.toThrow('broken')
+		const failure = new ProviderAbortError({ content: 'x' })
+		const aborting = createAbortingResultProvider(signal, failure).stream([], signal.signal)
+		await aborting.next()
+		await expect(aborting.next()).rejects.toBe(failure)
+		expect(signal.signal.aborted).toBe(true)
+		const secondTurn = createSecondTurnFailureProvider()
+		expect(
+			(await drainProvider(secondTurn.stream([], new AbortController().signal))).result.tools,
+		).toEqual([createToolCall()])
+		await expect(secondTurn.stream([], new AbortController().signal).next()).rejects.toThrow(
+			'turn 2 boom',
+		)
+		await expect(createFailingScheduler().yield()).rejects.toThrow('scheduler fault')
+	})
+})
+
 describe('createScriptedProvider replay', () => {
 	it('consumes one turn per call and returns that turn in script order', async () => {
 		const provider = createScriptedProvider([{ content: 'one' }, { content: 'two' }])
@@ -120,7 +323,7 @@ describe('createScriptedProvider replay', () => {
 	})
 
 	it('throws past the end of the script under exhaust throw', async () => {
-		const provider = createScriptedProvider([{ content: 'only' }], { exhaust: 'throw' })
+		const provider = createScriptedProvider([{ content: 'only' }], { repeat: false })
 		await provider.generate(messages, AbortSignal.timeout(1_000))
 		await expect(provider.generate(messages, AbortSignal.timeout(1_000))).rejects.toThrow(
 			/exhausted at turn 1/,
@@ -142,29 +345,29 @@ describe('createScriptedProvider streaming', () => {
 		expect(drained.result).toEqual(result)
 	})
 
-	it('chunks a turn through deltasOf, and the deltas reassemble into the content', async () => {
+	it('chunks a turn through chunk, and the deltas reassemble into the content', async () => {
 		const content = 'chunked'
 		const provider = createScriptedProvider([{ content }], {
-			deltasOf: (text) => [...text],
+			chunk: (text) => [...text],
 		})
 		const drained = await drainProvider(provider.stream(messages, AbortSignal.timeout(1_000)))
 		// Reassembly is the second route: the deltas are proven against the content by joining
-		// them back, not by restating whatever `deltasOf` produced.
+		// them back, not by restating whatever `chunk` produced.
 		expect(drained.deltas.map((delta) => delta.text).join('')).toBe(content)
 		expect(drained.deltas).toHaveLength(content.length)
 		expect(drained.deltas.every((delta) => delta.channel === 'content')).toBe(true)
 	})
 
-	it('lets a per-turn deltas list override deltasOf for that one turn', async () => {
+	it('lets a per-turn deltas list override chunk for that one turn', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'whole' }, deltas: ['x', 'y'] }, { content: 'later' }],
-			{ deltasOf: () => ['ignored'] },
+			{ chunk: () => ['ignored'] },
 		)
 		const overridden = await drainProvider(provider.stream(messages, AbortSignal.timeout(1_000)))
 		expect(overridden.deltas.map((delta) => delta.text)).toEqual(['x', 'y'])
 		// The override governs the STREAM alone; the turn's own result still returns whole.
 		expect(overridden.result.content).toBe('whole')
-		// And it is per-turn: the next turn falls back to the provider-wide `deltasOf`.
+		// And it is per-turn: the next turn falls back to the provider-wide `chunk`.
 		const next = await drainProvider(provider.stream(messages, AbortSignal.timeout(1_000)))
 		expect(next.deltas.map((delta) => delta.text)).toEqual(['ignored'])
 	})
@@ -208,8 +411,8 @@ describe('createScriptedProvider streaming', () => {
 			content: 'parity',
 			tools: [{ id: 'c9', name: 'add', arguments: { left: 1 } }],
 		}
-		const streamed = createScriptedProvider([turn], { deltasOf: (text) => [...text] })
-		const generated = createScriptedProvider([turn], { deltasOf: (text) => [...text] })
+		const streamed = createScriptedProvider([turn], { chunk: (text) => [...text] })
+		const generated = createScriptedProvider([turn], { chunk: (text) => [...text] })
 		const drained = await drainProvider(streamed.stream(messages, AbortSignal.timeout(1_000)))
 		// `generate` drives the same generator to its return, so the two entry points agree
 		// exactly — the parity every generate/stream test in `tests/src` leans on.
@@ -285,7 +488,7 @@ describe('createScriptedProvider identity and recorders', () => {
 	it('records each call messages, tools, options and signal only under record', async () => {
 		const tools: readonly ToolDefinition[] = [{ name: 'add', description: 'adds' }]
 		const signal = AbortSignal.timeout(1_000)
-		const recording = createScriptedProvider([{ content: 'x' }], { record: true })
+		const recording = createScriptedProvider([{ content: 'x' }], { recorded: true })
 		await recording.generate(messages, signal, tools, { think: true })
 		expect(recording.calls).toHaveLength(1)
 		expect(recording.calls[0]?.messages).toEqual(messages)
@@ -306,7 +509,7 @@ describe('createScriptedProvider identity and recorders', () => {
 		const serial = provider.generate(messages, AbortSignal.timeout(1_000))
 		await serial
 		// One at a time so far, and the test itself is the second route on the count.
-		expect(provider.maxInFlight).toBe(1)
+		expect(provider.peak).toBe(1)
 		expect(provider.started).toBe(1)
 		await Promise.all([
 			provider.generate(messages, AbortSignal.timeout(1_000)),
@@ -314,7 +517,7 @@ describe('createScriptedProvider identity and recorders', () => {
 			provider.generate(messages, AbortSignal.timeout(1_000)),
 		])
 		// The mark is a high-water mark, not a live gauge: it holds after the calls settled.
-		expect(provider.maxInFlight).toBe(3)
+		expect(provider.peak).toBe(3)
 		expect(provider.started).toBe(4)
 	})
 })
@@ -414,9 +617,9 @@ describe('buildConversationSnapshot', () => {
 		expect(section.messages.length).toBeGreaterThan(1)
 		expect(snapshot.messages).toHaveLength(1)
 		// The section matches the declared literals, not a formula the module folded with.
-		expect(section.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary)
+		expect(section.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary)
 		expect(section.messages.map((message) => message.content)).toEqual(
-			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
+			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
 		)
 		expect('summary' in snapshot).toBe(false)
 		// The folded originals never linger in the live tail.
@@ -438,19 +641,19 @@ describe('conversation-store contract scenarios run against a conforming store',
 	describe('set → get round-trip (sections + live tail)', () => {
 		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
 			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
-				createFixtureStore,
+				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
 			expect(got).toEqual(snapshot)
 			expect(got?.sections).toHaveLength(1)
 			expect(got?.sections[0]?.summary).toBe(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary,
 			)
 			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
 			)
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail,
 			)
 		})
 	})
@@ -458,7 +661,7 @@ describe('conversation-store contract scenarios run against a conforming store',
 	describe('upsert (set replaces under the same id)', () => {
 		it('set replaces an existing snapshot under the same id', async () => {
 			const { second, got } = await exerciseConversationStoreUpsert(
-				createFixtureStore,
+				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
 			expect(got).toEqual(second)
@@ -468,7 +671,7 @@ describe('conversation-store contract scenarios run against a conforming store',
 	describe('delete & absent', () => {
 		it('set → delete → get returns undefined', async () => {
 			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
-				createFixtureStore,
+				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
 			expect(beforeDelete).toBeDefined()
@@ -477,19 +680,24 @@ describe('conversation-store contract scenarios run against a conforming store',
 
 		it('deleting an absent id does not throw (a no-op)', async () => {
 			await expect(
-				exerciseConversationStoreDeleteAbsent(createFixtureStore),
+				exerciseConversationStoreDeleteAbsent(createMemoryConversationStore),
 			).resolves.toBeUndefined()
 		})
 
 		it('get of an absent id returns undefined', async () => {
-			expect(await exerciseConversationStoreGetAbsent(createFixtureStore)).toBeUndefined()
+			expect(
+				await exerciseConversationStoreGetAbsent(createMemoryConversationStore),
+			).toBeUndefined()
 		})
 	})
 
 	describe('two distinct conversation ids coexist', () => {
 		it('two distinct conversation ids coexist without cross-contamination', async () => {
 			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
-				await exerciseConversationStoreTwoIds(createFixtureStore, buildConversationSnapshot)
+				await exerciseConversationStoreTwoIds(
+					createMemoryConversationStore,
+					buildConversationSnapshot,
+				)
 			expect(gotAlpha).toEqual(alpha)
 			expect(gotBeta).toEqual(beta)
 			expect(gotAlphaAfterDelete).toBeUndefined()
@@ -521,11 +729,67 @@ describe('splitTurn', () => {
 	})
 })
 
+describe('root test infrastructure', () => {
+	it('generates the provider reply through an identified user turn', async () => {
+		const provider = createScriptedProvider([{ content: 'A depot reply.' }], { recorded: true })
+		expect(await generateReply(provider)).toBe('A depot reply.')
+		expect(provider.calls[0]?.messages).toContainEqual(
+			expect.objectContaining({ role: 'user', content: 'who are you?' }),
+		)
+	})
+
+	it('splits empty and repeated-space content into lossless word deltas', () => {
+		expect(splitWordDeltas('')).toEqual([''])
+		expect(splitWordDeltas('depot  open')).toEqual(['depot', ' ', ' open'])
+		expect(splitWordDeltas(' depot open ').join('')).toBe(' depot open ')
+	})
+
+	it('builds fresh interleaved exchange messages with independent calls', () => {
+		const exchanges = buildExchangeMessages()
+		const other = buildExchangeMessages()
+		expect(exchanges.map((message) => message.id)).toEqual([
+			'lead',
+			'u1',
+			'a1',
+			'u2',
+			'a2',
+			'r1',
+			'u3',
+			'r2',
+			'u4',
+		])
+		expect(exchanges[2]?.calls?.[0]?.id).toBe('c1')
+		expect(exchanges[5]?.call).toBe('c1')
+		expect(other).not.toBe(exchanges)
+		expect(other[2]).not.toBe(exchanges[2])
+		expect(other[2]?.calls?.[0]).not.toBe(exchanges[2]?.calls?.[0])
+	})
+
+	it('builds fresh messages for positional, unique, and missing call references', () => {
+		const groups = buildToolGroupMessages()
+		expect(groups.map((message) => message.id)).toEqual([
+			'U',
+			'A1',
+			'R1',
+			'A2',
+			'R2',
+			'L1',
+			'N',
+			'O1',
+			'O2',
+		])
+		expect(groups[2]?.call).toBeUndefined()
+		expect(groups[5]?.call).toBe('one')
+		expect(groups[7]?.call).toBe('missing')
+		expect(buildToolGroupMessages()[1]?.calls?.[0]).not.toBe(groups[1]?.calls?.[0])
+	})
+})
+
 describe('chunkWholeDelta', () => {
 	it('reports the whole content as one delta — the provider’s default chunking', () => {
 		expect(chunkWholeDelta('hello world')).toEqual(['hello world'])
 		expect(chunkWholeDelta('')).toEqual([''])
-		// The default a scripted provider applies when no per-turn `deltas` and no `deltasOf` override.
+		// The default a scripted provider applies when no per-turn `deltas` and no `chunk` override.
 		expect(chunkWholeDelta('x').join('')).toBe('x')
 	})
 })
@@ -614,14 +878,16 @@ describe('seedFramedAgent', () => {
 describe('resolveSectionOpen / resolveSectionRender', () => {
 	it('resolves the section header at the built-in floor and at the manager-options level', () => {
 		expect(resolveSectionOpen()).toBe('## Instructions')
-		expect(resolveSectionOpen({ managerOpen: 'M' })).toBe('M')
+		expect(resolveSectionOpen({ manager: { open: 'M' } })).toBe('M')
 	})
 
 	it('resolves an item’s rendering at the built-in floor and at each override level', () => {
 		expect(resolveSectionRender()).toBe('BUILTIN')
-		expect(resolveSectionRender({ managerRender: 'M' })).toBe('M')
-		expect(resolveSectionRender({ itemOverride: 'I' })).toBe('I')
-		expect(resolveSectionRender({ managerRender: 'M', itemOverride: 'I' })).toBe('I')
+		expect(resolveSectionRender({ manager: { render: 'M' } })).toBe('M')
+		expect(resolveSectionRender({ instruction: { override: 'I' } })).toBe('I')
+		expect(resolveSectionRender({ manager: { render: 'M' }, instruction: { override: 'I' } })).toBe(
+			'I',
+		)
 	})
 })
 
@@ -661,6 +927,32 @@ describe('renderRecap', () => {
 	it('prefixes the summary with the exported recap prefix', () => {
 		expect(renderRecap('recap of 2')).toBe('[Summary of earlier messages] recap of 2')
 		expect(renderRecap('')).toBe(CONVERSATION_RECAP_PREFIX)
+	})
+})
+
+describe('provider fixture tables and splitter driver', () => {
+	it('provides fresh null and invalid JSON responses with their refusal messages', async () => {
+		const [missing, invalid] = JUDGE_PROTOCOL_CASES
+		const [missingResponse, missingMessage] = requireValue(missing)
+		const [invalidResponse, invalidMessage] = requireValue(invalid)
+		expect(missingResponse().body).toBeNull()
+		expect(missingMessage).toBe('judge error: no response body')
+		expect(await invalidResponse().text()).toBe('{"model":')
+		expect(invalidResponse()).not.toBe(invalidResponse())
+		expect(invalidMessage).toBe('judge error: invalid JSON body')
+	})
+	it('places the supplied probability in every recorded question form', () => {
+		expect(buildSystemOneProbabilityCases(0.25)).toEqual({
+			label: { type: 'choice', probabilities: { billing: 0.25, bug: 0.5, account: 0 } },
+			refund: { type: 'noul', noul: 0.25 },
+			severity: { type: 'score', probabilities: [0, 0.25, 0.5] },
+		})
+	})
+	it('joins clean deltas and includes the flushed partial tag', () => {
+		const splitter = new ThinkSplitter()
+		expect(driveThinkSplitter(splitter, ['<thi', 'nk>plan</think>answer<thi'])).toBe('answer<thi')
+		expect(splitter.thinking).toBe('plan')
+		expect(driveThinkSplitter(new ThinkSplitter(), [])).toBe('')
 	})
 })
 
@@ -709,7 +1001,7 @@ describe('provider wire fixtures', () => {
 		expect(wire.read('result')).toBe(increment)
 		expect(() => wire.read('error')).toThrow(error)
 		const request = { messages: [] }
-		expect(wire.body(request)).toBe(request)
+		expect(wire.encode(request)).toBe(request)
 		const frame = wire.frame()
 		expect(wire.parsers).toEqual([frame])
 		expect(wire.finish(frame)).toEqual([])
@@ -807,6 +1099,67 @@ describe('provider wire fixtures', () => {
 	})
 })
 
+describe('createRecordedJudge', () => {
+	it('pairs a real judge with a fresh transport that supplies the recorded envelope', async () => {
+		const { judge, transport } = createRecordedJudge()
+		expect(judge.model).toBe('tev1:0.8b')
+		expect(judge.name).toBe('systemone')
+		expect(transport.requests).toEqual([])
+		const response = await transport.fetch('http://judge.test')
+		expect(await response.json()).toEqual(SYSTEM_ONE_TEV1)
+		expect(transport.requests).toHaveLength(1)
+		expect(createRecordedJudge().transport.requests).toEqual([])
+	})
+
+	it('uses the supplied response, real factory, and transport callback', async () => {
+		const configured = createRecorder<readonly [Parameters<typeof createSystemOneJudge>[0]]>()
+		const callbacks = createRecorder<readonly [RecordedTransport]>()
+		const response = new Response('custom')
+		const { judge, transport } = createRecordedJudge({
+			create: (options) => {
+				configured.handler(options)
+				return createSystemOneJudge(options)
+			},
+			respond: (recorded) => {
+				callbacks.handler(recorded)
+				return response
+			},
+		})
+		expect(judge.model).toBe('tev1:0.8b')
+		expect(configured.calls).toEqual([
+			[{ url: 'http://judge.test', model: 'tev1:0.8b', fetch: transport.fetch }],
+		])
+		expect(await transport.fetch('http://judge.test')).toBe(response)
+		expect(callbacks.calls).toEqual([[transport]])
+		const custom = createRecordedJudge({ response: { envelope: 'custom' } })
+		expect(await (await custom.transport.fetch('http://judge.test')).json()).toEqual({
+			envelope: 'custom',
+		})
+		expect(
+			await (
+				await createRecordedJudge({ response: null }).transport.fetch('http://judge.test')
+			).json(),
+		).toBeNull()
+	})
+})
+
+describe('plantConversationRow', () => {
+	it('stores malformed opaque snapshot rows on the supplied driver and closes for reopening', async () => {
+		const driver = createMemoryDriver()
+		const row = { id: 'unreadable', snapshot: { id: 'unreadable', messages: 'malformed' } }
+		await plantConversationRow(driver, row)
+		const database = createDatabase({
+			driver,
+			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+		})
+		try {
+			expect(await database.table('conversations').get('unreadable')).toEqual(row)
+		} finally {
+			await database.close()
+		}
+	})
+})
+
 describe('compactSeedTurns', () => {
 	it('adds three turns and folds the oldest two into one summarized section', async () => {
 		const conversation = createConversation({
@@ -824,23 +1177,34 @@ describe('compactSeedTurns', () => {
 	})
 })
 
-describe('createFixtureStore', () => {
-	it('creates an independent empty store on every call', async () => {
-		const first = createFixtureStore()
-		const second = createFixtureStore()
-		const snapshot = { id: 'held', sections: [], messages: [] }
-		await first.set(snapshot)
-
-		expect(await first.get('held')).toEqual(snapshot)
-		expect(await second.get('held')).toBeUndefined()
-	})
-})
-
 describe('CONVERSATION_STORE_ROUND_TRIP_EXPECTATION', () => {
 	it('freezes the declaration and its lists', () => {
 		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION)).toBe(true)
-		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages)).toBe(true)
-		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail)).toBe(true)
+	})
+})
+
+describe('buildProviderPartial', () => {
+	it('preserves content and omits absent reasoning', () => {
+		expect(buildProviderPartial('', '')).toEqual({ content: '' })
+		expect(buildProviderPartial('prefix', '')).toEqual({ content: 'prefix' })
+		expect(buildProviderPartial('prefix', 'plan')).toEqual({ content: 'prefix', thinking: 'plan' })
+		expect(buildProviderPartial('', ' ')).toEqual({ content: '', thinking: ' ' })
+	})
+})
+
+describe('RecordingJudge', () => {
+	it('records requests in order while preserving its empty-answer boundary', async () => {
+		const judge = new RecordingJudge()
+		const first = { state: 'first', questions: {} }
+		const second = { state: 'second', questions: {} }
+		expect(judge.requests).toEqual([])
+		expect(await judge.ask(first)).toEqual({ model: 'recording-model', answers: {} })
+		await judge.ask(second)
+		expect(judge.requests).toEqual([first, second])
+		expect(new RecordingJudge().requests).toEqual([])
 	})
 })
 

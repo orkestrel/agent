@@ -43,7 +43,7 @@ describe('Ledger', () => {
 				{ content: '' },
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -72,7 +72,7 @@ describe('Ledger', () => {
 	it('commits a partial reply without an answer pass when final usage aborts the caller', async () => {
 		const provider = createScriptedProvider(
 			[{ content: 'Done.', usage: { prompt: 10, completion: 2, total: 12 } }],
-			{ record: true, exhaust: 'throw' },
+			{ recorded: true, repeat: false },
 		)
 		const ledger = createLedger(provider, options)
 		const controller = new AbortController()
@@ -86,7 +86,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps reordered seed results paired with their retained lookup calls', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
 		ledger.conversation.add([
 			{ role: 'user', content: 'Read the account.' },
@@ -110,7 +110,7 @@ describe('Ledger', () => {
 	})
 
 	it('files reordered lookup text under its own owner and names its own call in each stub', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
 			capacity: 32_768,
@@ -154,7 +154,7 @@ describe('Ledger', () => {
 
 	for (const pairing of ['mixed id-and-idless', 'repeated-id'] as const) {
 		it(`sends no unmatched call and reads each result under its own arguments for a ${pairing} group`, async () => {
-			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const readings: Array<readonly [unknown, string]> = []
 			const ledger = createLedger(provider, {
 				...options,
@@ -210,7 +210,7 @@ describe('Ledger', () => {
 	}
 
 	it('prices the final hidden stub before accepting a seed tail with a 400-character argument', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
 			capacity: 400,
@@ -238,7 +238,7 @@ describe('Ledger', () => {
 					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
 					{ content: 'Done.' },
 				],
-				{ record: true, replay },
+				{ recorded: true, replay },
 			)
 			const { gauge: _gauge, ...uncalibrated } = options
 			const ledger = createLedger(provider, uncalibrated)
@@ -271,7 +271,7 @@ describe('Ledger', () => {
 					{ content: '', usage: { prompt: 50, completion: 2, total: 52 } },
 					{ content: 'Recovered.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const ledger = createLedger(
 				{
@@ -327,7 +327,7 @@ describe('Ledger', () => {
 	}
 
 	it('keeps interleaved seed calls and results on the same side of the tail cut', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
 		ledger.conversation.add([
 			{ role: 'user', content: `Look up order BW-5512. ${'x'.repeat(40_000)}` },
@@ -346,7 +346,7 @@ describe('Ledger', () => {
 	})
 
 	it('sends a leading assistant seed exchange when it fits the tail', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const seed = ledger.conversation.add({ role: 'assistant', content: 'Enjoy the break.' })
 		await ledger.respond('What is next?')
@@ -354,7 +354,7 @@ describe('Ledger', () => {
 	})
 
 	it('faults direct agent generation without planning for the earlier request', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		await ledger.respond('Earlier request.')
 		const judgments = ledger.conversation.judgments.judgments()
@@ -379,7 +379,7 @@ describe('Ledger', () => {
 				{ content: '', tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'refunds' } }] },
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, capacity: 800, share: { tail: 0.001 } })
 		const older = ledger.conversation.add({
@@ -469,7 +469,7 @@ describe('Ledger', () => {
 				{ content: '' },
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -512,7 +512,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -548,7 +548,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Third answer.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, agent: { limit: 1 } })
 		await ledger.respond('First request.')
@@ -593,7 +593,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Second answer.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const lookup = requireValue(options.lookups?.[0])
 		const ledger = createLedger(provider, {
@@ -667,7 +667,7 @@ describe('Ledger', () => {
 				{ content: '', usage: { prompt: 140, completion: 0, total: 140 } },
 				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
 			],
-			{ record: true, replay: 'none' },
+			{ recorded: true, replay: 'none' },
 		)
 		const { gauge: _gauge, ...uncalibrated } = options
 		const ledger = createLedger(provider, uncalibrated)
@@ -700,7 +700,7 @@ describe('Ledger', () => {
 					usage: { prompt: 100, completion: 10, total: 110 },
 				},
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, agent: { limit: 1 } })
 		await expect(ledger.respond('Review.')).resolves.toMatchObject({ thinking: 'plan\n\nplan' })
@@ -722,7 +722,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const { gauge: _gauge, ...uncalibrated } = options
 		const ledger = createLedger(
@@ -786,7 +786,7 @@ describe('Ledger', () => {
 		// The tail total is 2150.4 / 1.06 = 2028.679... units: 2028 fits, 2029 does not.
 		for (const length of [8048, 8052]) {
 			for (const capacity of [3072, 4096]) {
-				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(provider, {
 					...options,
 					capacity,
@@ -811,7 +811,7 @@ describe('Ledger', () => {
 			const prompts: string[][] = []
 			for (const predict of [undefined, 0]) {
 				const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
-					record: true,
+					recorded: true,
 					replay: 'none',
 				})
 				const ledger = createLedger(provider, {
@@ -836,7 +836,7 @@ describe('Ledger', () => {
 	it('forwards first-pass thinking when given and always disables answer-pass thinking', async () => {
 		for (const think of [true, false, undefined]) {
 			const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
-				record: true,
+				recorded: true,
 			})
 			const ledger = createLedger(provider, {
 				...options,
@@ -856,7 +856,7 @@ describe('Ledger', () => {
 		for (const thinking of [undefined, 'a'.repeat(20000)]) {
 			const provider = createScriptedProvider(
 				[{ content: 'Done.', usage: { prompt: 200, completion: 4, total: 204 } }],
-				{ record: true },
+				{ recorded: true },
 			)
 			const ledger = createLedger(provider, options)
 			ledger.conversation.add([
@@ -884,7 +884,7 @@ describe('Ledger', () => {
 		const systems: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(20000)]) {
 			const provider = createScriptedProvider([{ content: 'Done.' }], {
-				record: true,
+				recorded: true,
 				replay: 'none',
 			})
 			const ledger = createLedger(provider, options)
@@ -923,7 +923,7 @@ describe('Ledger', () => {
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const ledger = createLedger(provider, {
 				...options,
@@ -961,7 +961,7 @@ describe('Ledger', () => {
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true, replay },
+				{ recorded: true, replay },
 			)
 			const ledger = createLedger(provider, { ...options, predict: 1024 })
 			await ledger.respond('Review.')
@@ -990,7 +990,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, predict: 1024 })
 		await ledger.respond('First.')
@@ -1013,7 +1013,7 @@ describe('Ledger', () => {
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const { gauge: _gauge, ...uncalibrated } = options
 			const ledger = createLedger(provider, { ...uncalibrated, predict })
@@ -1049,7 +1049,7 @@ describe('Ledger', () => {
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true, replay },
+				{ recorded: true, replay },
 			)
 			const { gauge: _gauge, ...uncalibrated } = options
 			const ledger = createLedger(provider, { ...uncalibrated, predict: 1024 })
@@ -1081,7 +1081,7 @@ describe('Ledger', () => {
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const { gauge: _gauge, ...uncalibrated } = options
 			const ledger = createLedger(provider, {
@@ -1098,7 +1098,7 @@ describe('Ledger', () => {
 	it('answers in one pass with owner records, a truthful seed stub, and a seed-only tail', async () => {
 		const provider = createScriptedProvider(
 			[{ content: 'Approved.', usage: { prompt: 100, completion: 3, total: 103 } }],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
@@ -1151,7 +1151,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps leading seed messages, empty assistants, and text from dropped calls', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const seed = ledger.conversation.add([
 			{ role: 'assistant', content: 'Welcome to the desk.' },
@@ -1199,7 +1199,7 @@ describe('Ledger', () => {
 					usage: { prompt: 130, completion: 8, total: 138 },
 				},
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
@@ -1263,7 +1263,7 @@ describe('Ledger', () => {
 
 	it('runs an answer pass after an empty result or an exhausted first pass', async () => {
 		const empty = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
-			record: true,
+			recorded: true,
 		})
 		const ledger = createLedger(empty, options)
 		expect((await ledger.respond('Answer this.')).passes).toHaveLength(2)
@@ -1273,7 +1273,7 @@ describe('Ledger', () => {
 				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 				{ content: 'Recovered.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const bounded = createLedger(exhausted, { ...options, agent: { limit: 1 } })
 		expect((await bounded.respond('Read the account.')).passes.map((pass) => pass.partial)).toEqual(
@@ -1293,8 +1293,8 @@ describe('Ledger', () => {
 				{ content: 'Recovered.', usage: { prompt: 20, completion: 3, total: 23 } },
 			],
 			{
-				record: true,
-				deltasOf: (content) => {
+				recorded: true,
+				chunk: (content) => {
 					if (content === 'transport failed') throw new Error(content)
 					return [content]
 				},
@@ -1307,7 +1307,7 @@ describe('Ledger', () => {
 		expect(result.content).toBe('Recovered.')
 		expect(result.usage).toEqual({ prompt: 30, completion: 5, total: 35 })
 		expect(broken.calls[2]?.tools).toBeUndefined()
-		const slow = createScriptedProvider([{ content: 'Delayed.' }], { delay: 15, record: true })
+		const slow = createScriptedProvider([{ content: 'Delayed.' }], { delay: 15, recorded: true })
 		const timed = createLedger(slow, { ...options, agent: { timeout: 1 } })
 		expect((await timed.respond('Check the account.')).passes).toHaveLength(2)
 		expect(slow.calls[1]?.tools).toBeUndefined()
@@ -1315,7 +1315,10 @@ describe('Ledger', () => {
 
 	it('skips the answer pass after caller abort and refuses concurrency before appending', async () => {
 		const caller = new AbortController()
-		const provider = createScriptedProvider([{ content: 'Delayed.' }], { delay: 10, record: true })
+		const provider = createScriptedProvider([{ content: 'Delayed.' }], {
+			delay: 10,
+			recorded: true,
+		})
 		const ledger = createLedger(provider, options)
 		ledger.agent.emitter.on('turn', () => caller.abort('caller'))
 		const first = ledger.respond('First request.', caller.signal)
@@ -1339,7 +1342,7 @@ describe('Ledger', () => {
 				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
 				{ content: 'Answer.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const { gauge: _gauge, ...uncalibrated } = options
 		const ledger = createLedger(provider, uncalibrated)
@@ -1415,7 +1418,7 @@ describe('Ledger', () => {
 					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const ledger = createLedger(provider, options)
 			const pending = ledger.calibrate(new AbortController().signal)
@@ -1436,7 +1439,7 @@ describe('Ledger', () => {
 
 	it('preserves the full view and fault on answer-pass selection failure', async () => {
 		const provider = createScriptedProvider([{ content: '' }, { content: 'Recovered.' }], {
-			record: true,
+			recorded: true,
 		})
 		let failed = false
 		const fault = new Error('planning failed')
@@ -1504,7 +1507,7 @@ describe('Ledger', () => {
 					: ledger.calibrate(AbortSignal.abort(reason)),
 			).rejects.toBe(reason)
 		}
-		const provider = createScriptedProvider([{ content: 'Answer.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Answer.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const pending = ledger.respond('Request.')
 		await expect(ledger.calibrate(new AbortController().signal)).rejects.toMatchObject({
@@ -1515,7 +1518,7 @@ describe('Ledger', () => {
 	})
 
 	it('returns fallback selections with judgments and spent usage when planning fails', async () => {
-		const transport = new RecordedTransport(async () => {
+		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
 		let failed = false
@@ -1550,11 +1553,11 @@ describe('Ledger', () => {
 
 	it('retains judge usage when the caller aborts classification', async () => {
 		const controller = new AbortController()
-		const transport = new RecordedTransport(async () => {
+		const transport: RecordedTransport = new RecordedTransport(async () => {
 			if (transport.requests.length === 2) controller.abort()
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
 			topics: [],
@@ -1582,7 +1585,7 @@ describe('Ledger', () => {
 				{ content: 'First.', usage: { prompt: 100, completion: 2, total: 102 } },
 				{ content: 'Second.', usage: { prompt: 200, completion: 2, total: 202 } },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		await ledger.respond('First request.')
@@ -1612,7 +1615,7 @@ describe('Ledger', () => {
 				{ content: 'First.' },
 				{ content: 'Second.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -1733,7 +1736,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Recalled.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
@@ -1763,7 +1766,7 @@ describe('Ledger', () => {
 				{ content: '', tools: [{ id: 'two', name: 'recall', arguments: { topic: 'refunds' } }] },
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(limited, { ...options, recall: { limit: 1 } })
 		ledger.conversation.add({ role: 'user', content: 'Delivery arrived Tuesday.' })
@@ -1783,7 +1786,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const tight = createLedger(crowded, options)
 		await tight.respond('Check the desk.')
@@ -1823,7 +1826,7 @@ describe('Ledger', () => {
 				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { topic: 'refunds' } }] },
 				{ content: 'Use the corrected code.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		const old = ledger.conversation.add({
@@ -1924,7 +1927,7 @@ describe('Ledger', () => {
 	})
 
 	it('pins owner corrections while holding owner rules for a request with no owner', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		ledger.conversation.add([
 			{
@@ -1971,7 +1974,7 @@ describe('Ledger', () => {
 	})
 
 	it('orders group three by score regardless of whether a source is decisive', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		const decisive = ledger.conversation.add({ role: 'user', content: 'For Mira, quantity 10.' })
 		const loose = ledger.conversation.add({
@@ -2012,7 +2015,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		ledger.conversation.add([
@@ -2084,7 +2087,7 @@ describe('Ledger', () => {
 	})
 
 	it('leaves a live owner-record amendment out of the briefing when a decisive rule unit has an amendment', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		ledger.conversation.add([
 			{
@@ -2131,7 +2134,7 @@ describe('Ledger', () => {
 	})
 
 	it('drops an empty seed assistant whose calls were all dropped but keeps an empty assistant without calls', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
 			{ role: 'user', content: 'Order LH-12345 is late.' },
@@ -2169,7 +2172,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -2197,7 +2200,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps replaced user messages in an otherwise uncut seed tail', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const old = ledger.conversation.add({ role: 'user', content: 'Use instruction 42.' })
 		const reply = ledger.conversation.add({ role: 'assistant', content: 'Using instruction 42.' })
@@ -2241,7 +2244,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		await ledger.respond('First request.')
@@ -2252,7 +2255,7 @@ describe('Ledger', () => {
 	})
 
 	it('cuts off-topic rules before owner lines and keeps tail exchanges and call groups whole', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
 			capacity: 260,
@@ -2297,7 +2300,7 @@ describe('Ledger', () => {
 				content: '',
 				tools: [{ id: `call-${at}`, name: 'lookup', arguments: { id: `BW-${at}` } }],
 			})),
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
 		const result = await ledger.respond('Check the desk.')
@@ -2339,7 +2342,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Done.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const ledger = createLedger(provider, {
 			...options,
@@ -2373,7 +2376,7 @@ describe('Ledger', () => {
 				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 				{ content: 'No record remains.' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const lookup = requireValue(options.lookups?.[0])
 		const ledger = createLedger(provider, {

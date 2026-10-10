@@ -87,7 +87,7 @@ import {
 it('commits a partial agent result when final usage aborts the caller', async () => {
 	const provider = createScriptedProvider(
 		[{ content: 'Done.', usage: { prompt: 10, completion: 2, total: 12 } }],
-		{ record: true, exhaust: 'throw' },
+		{ recorded: true, repeat: false },
 	)
 	const controller = new AbortController()
 	const agent = createAgent(provider, { signal: controller.signal })
@@ -102,7 +102,7 @@ it('commits a partial agent result when final usage aborts the caller', async ()
 
 // This file's uniform options for the shared scripted provider: every loop test records the
 // messages / tools each call saw (asserted through `provider.calls`) and treats over-running the
-// script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
+// script as a loud failure (`repeat: false`) rather than the default silent last-turn
 // repeat — so a loop that had to stop (a cap / budget / cancel) but didn't is caught.
 
 // The real per-turn deadline every timeout test arms, in milliseconds. Real host timers
@@ -117,7 +117,7 @@ describe('Agent — thinking replay', () => {
 				{ content: '', thinking: 'first', tools: [createToolCall()] },
 				{ content: 'done', thinking: 'last' },
 			],
-			{ record: true },
+			{ recorded: true },
 		)
 		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
 		conversations.add()
@@ -2870,7 +2870,7 @@ describe('Agent — status transitions and getters', () => {
 	// runs (guides/agent.md's concurrency clause), so a first run settling `done` while a second
 	// is still in flight must NOT be observable as `done`.
 	it('reports running while a SECOND overlapping run is still in flight', async () => {
-		// `exhaust: 'repeat'` (the default) so the second overlapping run has a turn to replay.
+		// `repeat: true` (the default) so the second overlapping run has a turn to replay.
 		const provider = createScriptedProvider([{ result: { content: 'a' } }], { delay: 20 })
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2890,10 +2890,10 @@ describe('Agent — status transitions and getters', () => {
 	// A settled label never outranks a LIVE run: after a run settles `error`, the next `stream()`
 	// reads `running` while it is in flight rather than the stale `error`, and settles its own.
 	it('a live run outranks the previous run’s settled label', async () => {
-		// `exhaust: 'throw'` makes every call past the first turn throw a genuine (non-abort)
+		// `repeat: false` makes every call past the first turn throw a genuine (non-abort)
 		// error, so the agent settles `error` twice with a live window between them.
 		const provider = createScriptedProvider([{ result: { content: 'ok' } }], {
-			exhaust: 'throw',
+			repeat: false,
 			delay: 5,
 		})
 		const agent = createAgent(provider)
@@ -3521,7 +3521,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 describe('Agent — automatic compaction (production hardening)', () => {
 	// A no-tools provider that ALWAYS finishes its turn with a fixed answer regardless of the prompt
 	// content (so a run is exactly ONE provider turn) — the cleanest driver for the PRE-FIRST-TURN
-	// check (the only compaction point when there is no tool iteration). `record: true` so a test can
+	// check (the only compaction point when there is no tool iteration). `recorded: true` so a test can
 	// read what the single provider call actually saw.
 
 	it('PRE-FIRST-TURN: a conversation whose INITIAL prompt already exceeds the window compacts before the first provider call', async () => {
@@ -3818,8 +3818,8 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		const manager = createConversationManager({ summarize, keep: 0 })
 		const provider = createScriptedProvider([{ result: { content: 'ok' } }], {
 			name: 'ans',
-			record: true,
-			exhaust: 'repeat',
+			recorded: true,
+			repeat: true,
 		})
 		// A window small enough that a 2nd-request prompt (prior user "alpha-1"/"bravo-1" + 'ok' answer
 		// + new user turn — three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
@@ -3878,11 +3878,11 @@ describe('Agent — limit exhaustion', () => {
 				},
 			}),
 		)
-		// Every turn requests the tool -- the model never naturally finishes (exhaust: 'repeat'
+		// Every turn requests the tool -- the model never naturally finishes (repeat: true
 		// so a single scripted turn can serve as many calls as the loop makes).
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
-			{ ...AGENT_SCRIPT_OPTIONS, exhaust: 'repeat' },
+			{ ...AGENT_SCRIPT_OPTIONS, repeat: true },
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {

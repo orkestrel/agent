@@ -449,7 +449,7 @@ describe('AgentJudge — cancellation and partial results', () => {
 			model: 'm',
 			fetch: transport.fetch,
 			answers: TEV1_ANSWERS,
-			readAbort: abort,
+			abort: abort,
 		})
 		const error: unknown = await judge
 			.ask(TEV1_REQUEST, abort.signal)

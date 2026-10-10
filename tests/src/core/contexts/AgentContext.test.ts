@@ -794,7 +794,7 @@ describe('AgentContext — format cascade: the instructions open (header)', () =
 	})
 
 	it('(b) manager-options override BEATS the built-in', () => {
-		expect(resolveSectionOpen({ managerOpen: 'M-HEADER' })).toBe('M-HEADER')
+		expect(resolveSectionOpen({ manager: { open: 'M-HEADER' } })).toBe('M-HEADER')
 	})
 })
 
@@ -804,15 +804,17 @@ describe('AgentContext — format cascade: an instruction item (render)', () => 
 	})
 
 	it('(b) manager-options override BEATS the built-in', () => {
-		expect(resolveSectionRender({ managerRender: 'M-RENDER' })).toBe('M-RENDER')
+		expect(resolveSectionRender({ manager: { render: 'M-RENDER' } })).toBe('M-RENDER')
 	})
 
 	it('(c) item override BEATS the manager-options override (and everything below)', () => {
-		expect(resolveSectionRender({ managerRender: 'M-RENDER', itemOverride: 'ITEM' })).toBe('ITEM')
+		expect(
+			resolveSectionRender({ manager: { render: 'M-RENDER' }, instruction: { override: 'ITEM' } }),
+		).toBe('ITEM')
 	})
 
 	it('an item override alone beats the built-in (no manager override)', () => {
-		expect(resolveSectionRender({ itemOverride: 'ITEM' })).toBe('ITEM')
+		expect(resolveSectionRender({ instruction: { override: 'ITEM' } })).toBe('ITEM')
 	})
 })
 

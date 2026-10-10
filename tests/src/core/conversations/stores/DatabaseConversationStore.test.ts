@@ -59,13 +59,13 @@ describe('DatabaseConversationStore', () => {
 			// It carries a compacted section AND a live tail (round-trip is non-vacuous).
 			expect(got?.sections).toHaveLength(1)
 			expect(got?.sections[0]?.summary).toBe(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary,
 			)
 			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
 			)
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail,
 			)
 		})
 	})

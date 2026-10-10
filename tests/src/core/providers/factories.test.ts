@@ -76,7 +76,7 @@ describe('createRelay', () => {
 		expect(provider.entries).toBe(0)
 	})
 	it('refuses false authorization before reading the body or calling the provider', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const request = createRelayRequest('invalid')
 		const response = await createRelay({ provider, authorize: () => false })(request)
 		expect(response.status).toBe(401)
@@ -85,7 +85,7 @@ describe('createRelay', () => {
 		expect(provider.calls).toEqual([])
 	})
 	it('fails closed when authorization throws', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const handler = createRelay({
 			provider,
 			authorize: () => {
@@ -98,13 +98,13 @@ describe('createRelay', () => {
 		expect(provider.started).toBe(0)
 	})
 	it('fails closed when asynchronous authorization rejects', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const handler = createRelay({ provider, authorize: () => Promise.reject(new Error('secret')) })
 		expect((await handler(createRelayRequest())).status).toBe(401)
 		expect(provider.started).toBe(0)
 	})
 	it('rejects missing malformed and contract-invalid bodies before calling the provider', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const handler = createRelay({ provider, authorize: () => true })
 		expect((await handler(new Request('http://relay.test/'))).status).toBe(400)
 		expect((await handler(createRelayRequest('not json'))).status).toBe(400)
@@ -116,7 +116,7 @@ describe('createRelay', () => {
 		expect(provider.started).toBe(0)
 	})
 	it('rejects default limit plus one before calling the provider', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const body = '{"messages":[]}'.padEnd(DEFAULT_RELAY_LIMIT + 1)
 		expect(new TextEncoder().encode(body).byteLength).toBe(DEFAULT_RELAY_LIMIT + 1)
 		const response = await createRelay({ provider, authorize: () => true })(
@@ -137,7 +137,7 @@ describe('createRelay', () => {
 		expect(provider.entries).toBe(0)
 	})
 	it('accepts valid JSON at the default limit minus one', async () => {
-		const provider = createScriptedProvider([{ content: 'answer' }], { record: true })
+		const provider = createScriptedProvider([{ content: 'answer' }], { recorded: true })
 		const body = '{"messages":[]}'.padEnd(DEFAULT_RELAY_LIMIT - 1)
 		expect(new TextEncoder().encode(body).byteLength).toBe(DEFAULT_RELAY_LIMIT - 1)
 		const response = await createRelay({ provider, authorize: () => Promise.resolve(true) })(
@@ -148,7 +148,7 @@ describe('createRelay', () => {
 		expect(provider.started).toBe(1)
 	})
 	it('uses completion rather than decoded length for a custom limit with a BOM', async () => {
-		const provider = createScriptedProvider([], { record: true })
+		const provider = createScriptedProvider([], { recorded: true })
 		const handler = createRelay({ provider, authorize: () => true, limit: 19 })
 		expect((await handler(createRelayRequest('\uFEFF{"messages":[]} '))).status).toBe(413)
 		expect(provider.started).toBe(0)

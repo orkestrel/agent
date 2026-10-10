@@ -1,3 +1,10 @@
+import type { createBudget } from '@orkestrel/budget'
+import type {
+	AgentResult,
+	AgentRegistryInterface,
+	AuthorityContext,
+	ChannelInterface,
+} from '@src/core'
 import type {
 	ClassifierOptions,
 	GaugeCall,
@@ -34,6 +41,9 @@ import type {
 	ConversationInterface,
 	ConversationManagerInterface,
 	ConversationSnapshot,
+	ConversationSnapshotRow,
+	Section,
+	SystemOneJudgeOptions,
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
 	Message,
@@ -46,14 +56,24 @@ import type {
 	ProviderStreamOptions,
 	Selection,
 	SelectionHandler,
-	SelectionOptions,
-	ScreenHandler,
 	ThinkingReplay,
+	ThinkSplitterInterface,
 } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
+import type { DriverInterface } from '@orkestrel/database'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
 import type { SchedulerInterface, SchedulerOptions } from '@orkestrel/workflow'
+import { createAgentRegistry, createConversationManager } from '@src/core'
+import { createToolManager } from '@orkestrel/tool'
+import {
+	arrayShape,
+	integerShape,
+	literalShape,
+	objectShape,
+	optionalShape,
+	stringShape,
+} from '@orkestrel/contract'
 import {
 	buildRecords,
 	collectNames,
@@ -69,18 +89,17 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createConversation,
-	createSelection,
-	NEEDED_CRITERION,
 	InstructionManager,
-	parseConditionKey,
 	JudgeError,
 	ProviderAbortError,
 	ProviderError,
 	Scope,
+	createSystemOneJudge,
 	SystemOneJudge,
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
-import { canonicalStringify, isRecord, isString, parseJSONAs } from '@orkestrel/contract'
+import { canonicalStringify, isRecord, isString, parseJSONAs, rawShape } from '@orkestrel/contract'
+import { createDatabase } from '@orkestrel/database'
 import {
 	captureError,
 	createRecorder,
@@ -91,6 +110,528 @@ import {
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
+/** Supplies usage shared by agent runs. */
+export const AGENT_USAGE = Object.freeze(createTokenUsage())
+
+/** Configures recorded agent turn scripts. */
+export const AGENT_SCRIPT_OPTIONS: ScriptedProviderOptions = Object.freeze({
+	name: 'script',
+	recorded: true,
+	repeat: false,
+})
+
+/** Sets the agent timeout fixture deadline in milliseconds. */
+export const AGENT_DEADLINE = 25
+
+/** Sums one field of recorded budget consumption. */
+export function computeUsageTotal(
+	calls: ReadonlyArray<readonly [TokenUsage]>,
+	field: keyof TokenUsage,
+): number {
+	return calls.reduce((total, [usage]) => total + usage[field], 0)
+}
+
+/** Names the agent lifecycle events observed by the suite. */
+export const AGENT_EVENTS = Object.freeze([
+	'start',
+	'turn',
+	'tool',
+	'usage',
+	'deny',
+	'finish',
+	'error',
+	'abort',
+	'fault',
+] as const)
+/** Names one observed agent lifecycle event. */
+export type AgentEventName = (typeof AGENT_EVENTS)[number]
+
+/** Echoes the last message with usage for reusable agent runs. */
+export function createEchoProvider(): ProviderInterface {
+	return {
+		id: 'reuse',
+		name: 'reuse',
+		async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
+			// Echo the last user message's content into the answer, so two runs with
+			// different conversations produce distinguishable results.
+			const last = messages.at(-1)
+			yield { channel: 'content', text: 'ok:' }
+			return { content: `ok:${last?.content ?? ''}`, usage: AGENT_USAGE }
+		},
+		async generate(messages) {
+			const last = messages.at(-1)
+			return { content: `ok:${last?.content ?? ''}`, usage: AGENT_USAGE }
+		},
+	}
+}
+
+/** Supplies tool turns followed by a final answer for compaction. */
+export const COMPACT_SCRIPT: readonly ScriptedTurn[] = Object.freeze([
+	{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
+	{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
+	{ result: { content: 'the answer is 42' } },
+])
+
+/** Seeds an agent and conversation for automatic compaction. */
+export function seedCompactionAgent(
+	window: ReturnType<typeof createBudget<readonly Message[]>> | undefined,
+): {
+	readonly agent: ReturnType<typeof createAgent>
+	readonly conversation: ReturnType<typeof createConversation>
+	readonly provider: ReturnType<typeof createScriptedProvider>
+} {
+	const conversations = createConversationManager({
+		summarize: createStubSummarizer().summarize,
+		keep: 0,
+	})
+	const conversation = conversations.add() // auto-activates — the agent's message source
+	const tools = createToolManager()
+	tools.add(createAddTool())
+	const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+	// The registry is injected through the AGENT (forwarded to its context), so
+	// `agent.context.messages` IS the active conversation's live tail — seed the user turn there.
+	const agent = createAgent(provider, {
+		conversations,
+		tools,
+		...(window === undefined ? {} : { window }),
+		limit: 5,
+	})
+	agent.context.messages.add({ role: 'user', content: 'go' })
+	return { agent, conversation, provider }
+}
+
+/** Creates the final-answer provider used by compaction cases. */
+export const createAnswerProvider = (): ReturnType<typeof createScriptedProvider> =>
+	createScriptedProvider([{ result: { content: 'final answer' } }], {
+		name: 'answer',
+		recorded: true,
+		repeat: true,
+	})
+
+/** Switches a conversation, appends the request, and generates its reply. */
+export const requestConversation = async (
+	agent: ReturnType<typeof createAgent>,
+	manager: ReturnType<typeof createConversationManager>,
+	id: string,
+	content: string,
+): Promise<AgentResult> => {
+	if (manager.conversation(id) === undefined) manager.add({ id })
+	manager.switch(id)
+	agent.context.messages.add({ role: 'user', content })
+	return agent.generate()
+}
+
+/** Holds a provider turn after its first content delta. */
+export const createGatedProvider = (gate: PromiseWithResolvers<void>): ProviderInterface => ({
+	id: 'gated',
+	name: 'gated',
+	async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+		yield { channel: 'content', text: 'part' }
+		await gate.promise
+		return { content: 'full' }
+	},
+	async generate() {
+		return { content: 'full' }
+	},
+})
+
+/** Aborts the caller while a provider reports its partial result. */
+export function createAbortingResultProvider(
+	abort: AbortController,
+	failure: ProviderAbortError,
+): ProviderInterface {
+	return {
+		id: 'empty-thinking',
+		name: 'empty-thinking',
+		async *stream() {
+			yield { channel: 'content', text: 'x' }
+			abort.abort()
+			throw failure
+		},
+		async generate() {
+			throw failure
+		},
+	}
+}
+
+/** Coordinates overlapping provider calls through caller-owned gates. */
+export function createSharedGatedProvider(
+	g1: PromiseWithResolvers<void>,
+	g2: PromiseWithResolvers<void>,
+): ProviderInterface {
+	let started = 0
+	return {
+		id: 'm',
+		name: 'm',
+		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
+			started += 1
+			const gate = started === 1 ? g1 : g2
+			yield { channel: 'content', text: 'part' }
+			await gate.promise
+			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
+			return { content: 'full' }
+		},
+		async generate() {
+			return { content: 'full' }
+		},
+	}
+}
+
+/** Coordinates overlapping provider calls through caller-owned gates. */
+export function createIndependentGatedProvider(
+	g1: PromiseWithResolvers<void>,
+	g2: PromiseWithResolvers<void>,
+): ProviderInterface {
+	let started = 0
+	return {
+		id: 'own',
+		name: 'own',
+		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
+			started += 1
+			const me = started
+			const gate = me === 1 ? g1 : g2
+			yield { channel: 'content', text: 'part' }
+			await gate.promise
+			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
+			return { content: `full-${me}` }
+		},
+		async generate() {
+			return { content: 'full' }
+		},
+	}
+}
+
+/** Requests a tool then fails the following provider turn. */
+export function createSecondTurnFailureProvider(): ProviderInterface {
+	let calls = 0
+	return {
+		id: 'fault',
+		name: 'fault',
+		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+			calls += 1
+			if (calls === 1) {
+				yield { channel: 'content', text: '' }
+				return { content: '', tools: [createToolCall()] }
+			}
+			throw new Error('turn 2 boom')
+		},
+		async generate() {
+			throw new Error('turn 2 boom')
+		},
+	}
+}
+
+/** Replies with the last message for conversation switching. */
+export function createConversationEchoProvider(): ProviderInterface {
+	return {
+		id: 'echo',
+		name: 'echo',
+		async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
+			const last = messages.at(-1)
+			yield { channel: 'content', text: 'ok' }
+			return { content: `answer:${last?.content ?? ''}` }
+		},
+		async generate(messages) {
+			const last = messages.at(-1)
+			return { content: `answer:${last?.content ?? ''}` }
+		},
+	}
+}
+
+/** Rejects scheduler yielding to exercise agent failure propagation. */
+export function createFailingScheduler(): SchedulerInterface {
+	return {
+		async yield() {
+			throw new Error('scheduler fault')
+		},
+		async delay() {},
+	}
+}
+
+/** Streams one delta, waits on a gate, then reports a partial result on abort. */
+export function createAbortingGatedProvider(
+	gate: PromiseWithResolvers<void>,
+	usage?: TokenUsage,
+): ProviderInterface {
+	return {
+		id: 'gated-abort',
+		name: 'gated-abort',
+		async *stream(_messages, signal) {
+			yield { channel: 'content', text: 'part' }
+			await gate.promise
+			if (signal.aborted)
+				throw new ProviderAbortError({ content: 'part', ...(usage === undefined ? {} : { usage }) })
+			return { content: 'partfull' }
+		},
+		async generate() {
+			return { content: 'partfull' }
+		},
+	}
+}
+/** Fails provider generation and streaming after an optional content delta. */
+export function createThrowingProvider(message: string, delta?: string): ProviderInterface {
+	return {
+		id: 'throwing',
+		name: 'throwing',
+		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+			if (delta !== undefined) yield { channel: 'content', text: delta }
+			throw new Error(message)
+		},
+		async generate() {
+			throw new Error(message)
+		},
+	}
+}
+
+/** Builds the call context evaluated by an authority. */
+export function createAuthorityContext(
+	name: string,
+	args: Readonly<Record<string, unknown>> = {},
+): AuthorityContext {
+	const call: ToolCall = { id: 'c1', name, arguments: args }
+	return { call }
+}
+
+/** Builds a user message for estimation. */
+export function createMessage(content: string): Message {
+	return { id: 'm', role: 'user', content }
+}
+
+/** Records accesses while a result is projected. */
+export class AgentResultAccessCounter {
+	content = 0
+	thinking = 0
+	usage = 0
+	partial = 0
+	prompt = 0
+	completion = 0
+	total = 0
+}
+
+/** Records accesses while a result is projected. */
+export class CountingTokenUsage {
+	#counter: AgentResultAccessCounter
+
+	constructor(counter: AgentResultAccessCounter) {
+		this.#counter = counter
+	}
+
+	get prompt(): number {
+		this.#counter.prompt += 1
+		return 2
+	}
+
+	get completion(): number {
+		this.#counter.completion += 1
+		return 1
+	}
+
+	get total(): number {
+		this.#counter.total += 1
+		return 3
+	}
+}
+
+/** Records accesses while a result is projected. */
+export class CountingAgentResult {
+	readonly counter = new AgentResultAccessCounter()
+	#usage = new CountingTokenUsage(this.counter)
+
+	get content(): string {
+		this.counter.content += 1
+		return 'done'
+	}
+
+	get thinking(): string {
+		this.counter.thinking += 1
+		return 'reasoning'
+	}
+
+	get usage(): CountingTokenUsage {
+		this.counter.usage += 1
+		return this.#usage
+	}
+
+	get partial(): boolean {
+		this.counter.partial += 1
+		return false
+	}
+}
+
+/** Builds hostile and malformed result cases for total projection. */
+export function createInvalidAgentResultCases(): ReadonlyArray<readonly [string, unknown]> {
+	const throwingAccessor = { partial: false }
+	const throwingGetter = Proxy.revocable(() => 'done', {})
+	throwingGetter.revoke()
+	Object.defineProperty(throwingAccessor, 'content', {
+		enumerable: true,
+		get: throwingGetter.proxy,
+	})
+
+	const usageAccessor = { content: 'done', partial: false, usage: { completion: 1, total: 2 } }
+	const usageGetter = Proxy.revocable(() => 1, {})
+	usageGetter.revoke()
+	Object.defineProperty(usageAccessor.usage, 'prompt', {
+		enumerable: true,
+		get: usageGetter.proxy,
+	})
+
+	const revokedRoot = Proxy.revocable({ content: 'done', partial: false }, {})
+	revokedRoot.revoke()
+	const getTrap = Proxy.revocable(() => undefined, {})
+	getTrap.revoke()
+	const throwingGet = new Proxy({}, { get: getTrap.proxy })
+	const revokedUsage = Proxy.revocable({ prompt: 1, completion: 1, total: 2 }, {})
+	const nestedRevoked = { content: 'done', usage: revokedUsage.proxy, partial: false }
+	revokedUsage.revoke()
+
+	return Object.freeze<ReadonlyArray<readonly [string, unknown]>>([
+		['missing content', { partial: false }],
+		['missing partial', { content: 'done' }],
+		['wrong content type', { content: 1, partial: false }],
+		['wrong partial type', { content: 'done', partial: 'false' }],
+		['wrong thinking type', { content: 'done', thinking: 1, partial: false }],
+		['null usage', { content: 'done', usage: null, partial: false }],
+		['wrong usage type', { content: 'done', usage: 'tokens', partial: false }],
+		[
+			'NaN usage',
+			{ content: 'done', usage: { prompt: NaN, completion: 1, total: 2 }, partial: false },
+		],
+		[
+			'positive-infinite usage',
+			{
+				content: 'done',
+				usage: { prompt: 1, completion: Infinity, total: 2 },
+				partial: false,
+			},
+		],
+		[
+			'negative-infinite usage',
+			{
+				content: 'done',
+				usage: { prompt: 1, completion: 1, total: -Infinity },
+				partial: false,
+			},
+		],
+		['missing usage field', { content: 'done', usage: { prompt: 1, total: 2 }, partial: false }],
+		['throwing root accessor', throwingAccessor],
+		['nested usage accessor', usageAccessor],
+		['throwing get trap', throwingGet],
+		['revoked root proxy', revokedRoot.proxy],
+		['revoked nested usage proxy', nestedRevoked],
+		['undefined input', undefined],
+		['null input', null],
+		['string input', 'done'],
+		['number input', 1],
+		['boolean input', false],
+		['function input', returnUndefined],
+		['symbol input', Symbol('result')],
+		['bigint input', 1n],
+	])
+}
+
+/** Creates a registry for one scripted provider turn. */
+export function createTurnRegistry(turn: ScriptedTurn): AgentRegistryInterface {
+	return createAgentRegistry({ providers: { main: createScriptedProvider([turn]) } })
+}
+
+/** Collects channel values with a real pause between pulls. */
+export async function collectPaced<T>(
+	channel: ChannelInterface<T>,
+	pause: number,
+): Promise<readonly T[]> {
+	const values: T[] = []
+	for await (const value of channel.drain()) {
+		values.push(value)
+		await waitForDelay(pause)
+	}
+	return values
+}
+
+/** Supplies usage for job budget exhaustion. */
+export const JOB_USAGE = Object.freeze(createTokenUsage({ prompt: 3, total: 10 }))
+
+/** Supplies a repeated tool turn that exhausts the job budget. */
+export const PARTIAL_TURNS = Object.freeze([
+	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
+] as const)
+
+/** Describes the serializable job fields exercised by durable queue cases. */
+export const AGENT_JOB_SHAPE = Object.freeze(
+	objectShape({
+		provider: stringShape(),
+		messages: arrayShape(
+			objectShape({
+				role: literalShape(['system', 'user', 'assistant', 'tool']),
+				content: stringShape(),
+			}),
+		),
+		system: optionalShape(stringShape()),
+		tools: optionalShape(arrayShape(stringShape())),
+		limit: optionalShape(integerShape({ min: 0 })),
+		budget: optionalShape(integerShape({ min: 0 })),
+	}),
+)
+
+/** Records the abort state when a parked provider resumes. */
+export function createObservedGatedProvider(
+	gate: PromiseWithResolvers<void>,
+	record: (aborted: boolean) => void,
+): ProviderInterface {
+	return {
+		id: 'observed-gate',
+		name: 'observed-gate',
+		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
+			yield { channel: 'content', text: 'part' }
+			await gate.promise
+			record(signal.aborted)
+			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
+			return { content: 'full' }
+		},
+		async generate() {
+			return { content: 'full' }
+		},
+	}
+}
+
+/** Streams the scenario deltas in their declared order. */
+export function createInterleavedThinkingProvider(): ProviderInterface {
+	return {
+		id: 'thinking',
+		name: 'thinking',
+		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+			yield { channel: 'thinking', text: 'plan ' }
+			yield { channel: 'content', text: 'answer' }
+			yield { channel: 'thinking', text: 'check' }
+			return { content: 'answer', thinking: 'plan check' }
+		},
+		async generate() {
+			return { content: 'answer', thinking: 'plan check' }
+		},
+	}
+}
+
+/** Streams the scenario deltas in their declared order. */
+export function createPacedProvider(): ProviderInterface {
+	return {
+		id: 'w',
+		name: 'w',
+		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+			yield { channel: 'content', text: 'a' }
+			await waitForDelay() // consumer drains 'a', then parks on the empty buffer
+			yield { channel: 'content', text: 'b' }
+			return { content: 'ab' }
+		},
+		async generate() {
+			return { content: 'ab' }
+		},
+	}
+}
+
+/** Returns an absent value for malformed-input cases. */
+export function returnUndefined(): undefined {
+	return undefined
+}
 /** Exercises tool dispatch with authority configured and omitted. */
 export const AUTHORITY_STATES = Object.freeze([true, false])
 
@@ -263,204 +804,8 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 /** Drives the real System One wire methods through the judge engine's sequential mode. */
 export class SequentialSystemOneJudge extends AgentJudge {
 	readonly name = 'systemone'
-	readonly body = SystemOneJudge.prototype.body
+	readonly encode = SystemOneJudge.prototype.encode
 	readonly read = SystemOneJudge.prototype.read
-}
-
-/** Supplies a fictional stand-in for the missing transcript, with no claim to reproduce the probe. */
-export const SELECTION_STAND_IN: readonly Message[] = Object.freeze([
-	{ id: 'standing', role: 'user', content: 'Use only local files; do not access the internet.' },
-	{
-		id: 'acceptance',
-		role: 'user',
-		content: 'SQLite is accepted. Include a header row in exports.',
-	},
-	{ id: 'reply', role: 'assistant', content: 'The export will read the local SQLite database.' },
-	{ id: 'withdrawal', role: 'user', content: 'Omit the header row from the export.' },
-	{ id: 'unrelated', role: 'user', content: 'The office printer needs paper.' },
-	{ id: 'request', role: 'user', content: 'Export the active accounts from the local database.' },
-])
-
-/** Configures recorded probabilities and transport failures for selection tests. */
-export interface StockSelectionFixtureOptions {
-	readonly messages?: readonly Message[]
-	readonly probabilities?: Readonly<Record<string, number>>
-	readonly screen?: ScreenHandler
-	readonly limit?: number
-	readonly model?: string
-	readonly failure?: { readonly at: number; readonly cause: unknown }
-	readonly respond?: (request: JudgeRequest, index: number) => Response | Promise<Response>
-}
-
-/** Exposes the real conversation, judge, handler, and recording transport used by a selection test. */
-export interface StockSelectionFixtureInterface {
-	readonly conversation: ConversationInterface
-	readonly request: Message
-	readonly judge: SequentialSystemOneJudge
-	readonly transport: RecordedTransport
-	readonly options: SelectionOptions
-	readonly select: SelectionHandler
-}
-
-/**
- * Creates a real selection over recorded System One envelope data with request-derived keys.
- * @param threshold - The test's explicit cutoff
- * @param options - The message fixture, probabilities, and transport controls
- * @returns The conversation and selection with their transport recorder
- */
-export function createStockSelectionFixture(
-	threshold: number,
-	options: StockSelectionFixtureOptions = {},
-): StockSelectionFixtureInterface {
-	const messages = options.messages ?? SELECTION_STAND_IN
-	const conversation = createConversation({
-		snapshot: { id: 'selection-fixture', sections: [], messages },
-		summarize: createStubSummarizer().summarize,
-	})
-	const request = requireValue(messages.at(-1))
-	const transport: RecordedTransport = new RecordedTransport(async (): Promise<Response> => {
-		const index = transport.requests.length
-		if (options.failure !== undefined && options.failure.at === index) throw options.failure.cause
-		const body: unknown = await requireValue(transport.requests.at(-1)).clone().json()
-		if (!isRecord(body) || !isRecord(body.questions) || !isString(body.state))
-			throw new Error('selection fixture received a malformed request')
-		const questions: Record<string, JudgeQuestion> = {}
-		const answers: Record<string, unknown> = {}
-		for (const [id, question] of Object.entries(body.questions)) {
-			const key = parseConditionKey(id)
-			if (key === undefined || !isRecord(question))
-				throw new Error('selection fixture received an unreadable question key')
-			const subject = key[1]
-			questions[id] = {
-				form: 'noul',
-				...(isString(question.instructions) ? { instructions: question.instructions } : {}),
-			}
-			answers[id] = {
-				...SYSTEM_ONE_TEV1.answers.refund,
-				noul:
-					options.probabilities?.[subject] ?? SYSTEM_ONE_TEV1.answers.label.probabilities.billing,
-			}
-		}
-		if (options.respond !== undefined)
-			return options.respond({ state: body.state, questions }, index)
-		return Response.json({ ...SYSTEM_ONE_TEV1, answers })
-	})
-	const judge = new SequentialSystemOneJudge({
-		url: 'http://selection.test',
-		model: options.model ?? 'tev1:0.8b',
-		batch: false,
-		fetch: transport.fetch,
-	})
-	const configured: SelectionOptions = {
-		judge,
-		screen: options.screen ?? ((source) => source.view().map((message) => message.id)),
-		needed: { ...NEEDED_CRITERION, threshold },
-		limit: options.limit ?? messages.length + 1,
-	}
-	return {
-		conversation,
-		request,
-		judge,
-		transport,
-		options: configured,
-		select: createSelection(configured),
-	}
-}
-
-/** Supplies invalid cutoffs whose refusal is part of the selection factory contract. */
-export const INVALID_SELECTION_THRESHOLDS = Object.freeze([
-	0.5,
-	0,
-	-1,
-	1.01,
-	NaN,
-	Infinity,
-	-Infinity,
-])
-
-/** Supplies invalid question limits, including nonfinite and fractional values. */
-export const INVALID_SELECTION_LIMITS = Object.freeze([
-	-1,
-	0.5,
-	NaN,
-	Infinity,
-	Number.MAX_SAFE_INTEGER + 1,
-])
-
-/**
- * Builds independent identity changes that must invalidate a needed judgment.
- * @param record - The matching judgment
- * @returns Named records with one identity component changed
- */
-export function buildSelectionMismatches(
-	record: Judgment,
-): ReadonlyArray<readonly [string, Judgment]> {
-	return [
-		['model', { ...record, model: 'another-model' }],
-		['sources', { ...record, sources: ['other', 'request'] }],
-		['source order', { ...record, sources: [...record.sources].reverse() }],
-		['state', { ...record, state: 'other state' }],
-		[
-			'instructions',
-			{ ...record, question: { ...record.question, instructions: 'Another question?' } },
-		],
-		[
-			'criteria',
-			{
-				...record,
-				question: {
-					form: 'noul',
-					...(record.question.instructions === undefined
-						? {}
-						: { instructions: record.question.instructions }),
-					criteria: { true: 'Different' },
-				},
-			},
-		],
-	]
-}
-
-/** Supplies tool groups with unique calls, duplicate calls, detached results, and orphan results. */
-export const SELECTION_TOOL_MESSAGES: readonly Message[] = Object.freeze([
-	{ id: 'orphan-a', role: 'tool', content: 'lost assistant result', call: 'missing' },
-	{ id: 'orphan-b', role: 'tool', content: 'other lost result' },
-	{ id: 'unique', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
-	{ id: 'unique-result', role: 'tool', content: 'paired', call: 'one' },
-	{
-		id: 'duplicate',
-		role: 'assistant',
-		content: '',
-		calls: [createToolCall({ id: 'same' }), createToolCall({ id: 'same' })],
-	},
-	{ id: 'duplicate-a', role: 'tool', content: 'first', call: 'same' },
-	{ id: 'duplicate-b', role: 'tool', content: 'second', call: 'same' },
-	{ id: 'recap', role: 'assistant', content: 'Earlier work was summarized.' },
-	{ id: 'detached', role: 'tool', content: 'late result', call: 'one' },
-	{ id: 'ambiguous-a', role: 'tool', content: 'ambiguous result', call: 'same' },
-	{ id: 'ambiguous-b', role: 'tool', content: 'ambiguous companion', call: 'missing' },
-	{ id: 'request', role: 'user', content: 'Continue.' },
-])
-
-/**
- * Builds a cost fixture containing repeated conversation turns and complete tool groups.
- * @returns Messages whose known size and group structure bound selection request counts
- */
-export function buildSelectionCostMessages(): readonly Message[] {
-	const messages: Message[] = []
-	for (let index = 0; index < 8; index += 1) {
-		messages.push(
-			{ id: `note-${index}`, role: 'user', content: `Read local record ${index}.` },
-			{
-				id: `assistant-${index}`,
-				role: 'assistant',
-				content: '',
-				calls: [createToolCall({ id: `call-${index}` })],
-			},
-			{ id: `result-${index}`, role: 'tool', content: `Record ${index}`, call: `call-${index}` },
-		)
-	}
-	messages.push({ id: 'request', role: 'user', content: 'Summarize the records.' })
-	return messages
 }
 
 /** Records each request a resolver hands it and answers nothing, so a pre-ask check is observable. */
@@ -468,24 +813,23 @@ export class RecordingJudge implements JudgeInterface {
 	readonly id = 'recording'
 	readonly name = 'recording'
 	readonly model = 'recording-model'
-	readonly requests: JudgeRequest[] = []
+	readonly #requests = createRecorder<readonly [JudgeRequest]>()
+
+	get requests(): readonly JudgeRequest[] {
+		return this.#requests.calls.map(([request]) => request)
+	}
 
 	ask(request: JudgeRequest): Promise<JudgeResult> {
-		this.requests.push(request)
+		this.#requests.handler(request)
 		return Promise.resolve({ model: this.model, answers: {} })
 	}
 }
 
-// ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
-//
-// The scripted provider is a real `ProviderInterface`, not a mock of the agent: `stream`
-// chunks the turn's content into deltas and returns the result, honouring its `signal`
-// between every delta (an abort throws a `ProviderAbortError` carrying the accumulated
-// partial), so an abort threaded into the agent commits a genuine partial.
+// Deterministic provider turns isolate the agent loop from model and transport variation.
 
 /**
  * Replays one turn of a {@link createScriptedProvider} script — either a bare {@link ProviderResult}
- * (chunked by the provider's `deltasOf`) or a `{ result, deltas?, thoughts? }` pair whose per-turn
+ * (chunked by the provider's `chunk`) or a `{ result, deltas?, thoughts? }` pair whose per-turn
  * `deltas` override how that one turn's content streams and whose `thoughts` stream live
  * reasoning deltas before the content. A `deltas` of `[]` streams the content as zero deltas
  * (the result still returns).
@@ -499,7 +843,7 @@ export type ScriptedTurn =
 	  }
 
 /**
- * Describes one recorded `generate` / `stream` call on a {@link createScriptedProvider} (when `record`).
+ * Describes one recorded `generate` / `stream` call on a {@link createScriptedProvider} when recording is enabled.
  *
  * @remarks
  * `signal` is the live bound the call was handed — the agent's composed run signal (external
@@ -517,44 +861,38 @@ export interface ScriptedCall {
 export type DeltaFunction = (content: string) => readonly string[]
 
 /**
- * Carries the options {@link createScriptedProvider} reads — every field optional, defaulting
- * to the original single-delta / repeat-on-exhaust behaviour.
+ * Configures the scripted provider's chunking, recording, and repeat behavior.
  *
  * @remarks
- * - `delay` — ms paused at the start of each call (lets a test observe concurrency through
- *   `maxInFlight`); defaults to `0`.
- * - `name` — sets the provider's `id` and `name` (so a drop-in-swap test can prove two
- *   providers are distinguishable); defaults to `'scripted'`.
- * - `replay` — exposes the supplied thinking policy; omitted leaves the member absent.
- * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
- *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
- *   form) overrides this for that turn.
- * - `exhaust` — what happens after the turn list is consumed: `'repeat'` (the DEFAULT — the
- *   last turn repeats, so a job with extra tool-iterations still resolves) or `'throw'` (a
- *   call past the end throws, to assert a bounded loop never over-ran the script).
- * - `record` — when `true`, every call appends its `messages` / `tools` / `signal` to `calls`.
+ * - `delay` - Milliseconds paused at the start of each call. Default: `0`.
+ * - `name` - The provider id and name. Default: `'scripted'`.
+ * - `replay` - The supplied thinking policy; omission leaves the member absent.
+ * - `chunk` - Content chunking. Default: one whole delta. A per-turn `deltas` list overrides it.
+ * - `repeat` - Whether the last turn repeats after the script ends. Default: `true`.
+ *   With `false`, a call past the end throws.
+ * - `recorded` - Whether calls retain their messages, tools, options, and signal. Default: `false`.
  */
 export interface ScriptedProviderOptions {
 	readonly replay?: ThinkingReplay
 	readonly delay?: number
 	readonly name?: string
-	readonly deltasOf?: DeltaFunction
-	readonly exhaust?: 'repeat' | 'throw'
-	readonly record?: boolean
+	readonly chunk?: DeltaFunction
+	readonly repeat?: boolean
+	readonly recorded?: boolean
 }
 
 /**
- * Extends a scripted {@link ProviderInterface} with its live recorders — `maxInFlight` is the
+ * Extends a scripted {@link ProviderInterface} with its live recorders — `peak` is the
  * high-water mark of concurrent calls (so a test can prove a queue / runner bounded the
- * agent jobs, for example `concurrency: 2` ⇒ `maxInFlight <= 2`), `started` counts calls, and
- * `calls` records each call's `messages` / `tools` / `signal` (populated only under `record: true`).
+ * agent jobs, for example `concurrency: 2` ⇒ `peak <= 2`), `started` counts calls, and
+ * `calls` records each call's `messages` / `tools` / `signal` (populated only under `recorded: true`).
  */
 export interface ScriptedProviderInterface extends ProviderInterface {
 	/** The highest number of `stream` calls in flight at once across this provider's life. */
-	readonly maxInFlight: number
+	readonly peak: number
 	/** How many `stream` calls have started in total. */
 	readonly started: number
-	/** Each call's `messages` / `tools` / `signal`, in order — populated only when `record: true`. */
+	/** Each call's `messages` / `tools` / `signal`, in order — populated only when `recorded: true`. */
 	readonly calls: readonly ScriptedCall[]
 }
 
@@ -578,7 +916,7 @@ export function splitTurn(turn: ScriptedTurn): {
 
 /**
  * Chunks a turn's whole content into ONE stream delta — the default {@link DeltaFunction} a
- * {@link ScriptedProvider} applies when neither a per-turn `deltas` nor an options `deltasOf`
+ * {@link ScriptedProvider} applies when neither a per-turn `deltas` nor an options `chunk`
  * overrides it.
  *
  * @param content - The turn's content
@@ -591,12 +929,12 @@ export function chunkWholeDelta(content: string): readonly string[] {
 /**
  * Creates the shared scripted {@link ProviderInterface} for deterministic, Ollama-free agent
  * tests — each `generate` / `stream` call consumes the next {@link ScriptedTurn}, streams
- * its content as deltas (per-turn `deltas`, else `deltasOf(content)`, else the whole content
+ * its content as deltas (per-turn `deltas`, else `chunk(content)`, else the whole content
  * as one delta), and RETURNS the turn's result. The call honours its `signal` between every
  * delta: an already-aborted (or mid-stream aborted) signal throws a `ProviderAbortError`
- * carrying the accumulated partial, so a cancel threaded into the agent commits a genuine
- * partial. After the turn list is exhausted the last turn repeats (`exhaust: 'repeat'`, the
- * default) unless `exhaust: 'throw'` is set.
+ * carrying the accumulated partial, so an abort threaded into the agent commits a genuine
+ * partial. After the turn list is exhausted the last turn repeats (`repeat: true`, the
+ * default) unless `repeat: false` is set.
  *
  * @param turns - The {@link ScriptedTurn}s to replay in order (the last repeats by default)
  * @param options - The {@link ScriptedProviderOptions} (all optional; see its `@remarks`)
@@ -607,6 +945,21 @@ export function createScriptedProvider(
 	options?: ScriptedProviderOptions,
 ): ScriptedProviderInterface {
 	return new ScriptedProvider(turns, options)
+}
+
+/**
+ * Builds the partial provider result accumulated before an abort.
+ *
+ * @param content - The content emitted before the abort
+ * @param thinking - The reasoning emitted before the abort
+ * @returns The accumulated content with reasoning only when it is present
+ * @example
+ * ```ts
+ * buildProviderPartial('answer', 'plan') // { content: 'answer', thinking: 'plan' }
+ * ```
+ */
+export function buildProviderPartial(content: string, thinking: string): ProviderResult {
+	return thinking.length > 0 ? { content, thinking } : { content }
 }
 
 /** Frames newline-delimited JSON records without replacing relay behavior. */
@@ -677,7 +1030,7 @@ export function createHostileSerializer(): Readonly<Record<string, unknown>> {
 }
 
 /**
- * Replays the turns {@link createScriptedProvider} scripts — a REAL {@link ProviderInterface}
+ * Replays the turns {@link createScriptedProvider} scripts through a {@link ProviderInterface}
  * that honours its signal between every delta and records its calls.
  *
  * @remarks
@@ -688,23 +1041,23 @@ export function createHostileSerializer(): Readonly<Record<string, unknown>> {
 export class ScriptedProvider implements ScriptedProviderInterface {
 	readonly replay?: ThinkingReplay
 	readonly #turns: readonly ScriptedTurn[]
-	readonly #deltasOf: DeltaFunction
-	readonly #exhaust: 'repeat' | 'throw'
-	readonly #record: boolean
+	readonly #chunk: DeltaFunction
+	readonly #repeat: boolean
+	readonly #recorded: boolean
 	readonly #delay: number
 	readonly #name: string
-	readonly #calls: ScriptedCall[] = []
+	readonly #calls = createRecorder<readonly [ScriptedCall]>()
 	#index = 0
 	#inFlight = 0
-	#maxInFlight = 0
+	#peak = 0
 	#started = 0
 
 	constructor(turns: readonly ScriptedTurn[], options?: ScriptedProviderOptions) {
 		if (options?.replay !== undefined) this.replay = options.replay
 		this.#turns = turns
-		this.#deltasOf = options?.deltasOf ?? chunkWholeDelta
-		this.#exhaust = options?.exhaust ?? 'repeat'
-		this.#record = options?.record === true
+		this.#chunk = options?.chunk ?? chunkWholeDelta
+		this.#repeat = options?.repeat ?? true
+		this.#recorded = options?.recorded === true
 		this.#delay = options?.delay ?? 0
 		this.#name = options?.name ?? 'scripted'
 	}
@@ -717,8 +1070,8 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		return this.#name
 	}
 
-	get maxInFlight(): number {
-		return this.#maxInFlight
+	get peak(): number {
+		return this.#peak
 	}
 
 	get started(): number {
@@ -726,51 +1079,44 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 	}
 
 	get calls(): readonly ScriptedCall[] {
-		return this.#calls
+		return this.#calls.calls.map(([call]) => call)
 	}
 
 	async *stream(
 		messages: readonly Message[],
 		signal: AbortSignal,
 		tools?: readonly ToolDefinition[],
-		run?: ProviderStreamOptions,
+		options?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
-		if (this.#record) {
-			this.#calls.push({ messages: [...messages], tools, options: run, signal })
+		if (this.#recorded) {
+			this.#calls.handler({ messages: [...messages], tools, options, signal })
 		}
 		this.#started += 1
 		this.#inFlight += 1
-		this.#maxInFlight = Math.max(this.#maxInFlight, this.#inFlight)
+		this.#peak = Math.max(this.#peak, this.#inFlight)
 		try {
 			if (signal.aborted) throw new ProviderAbortError({ content: '' })
 			if (this.#delay > 0) await waitForDelay(this.#delay)
 			const { result, deltas, thoughts } = splitTurn(this.#next())
-			// Per-turn `deltas` win; else chunk the content through `deltasOf`.
-			const chunks = deltas ?? this.#deltasOf(result.content)
+			const chunks = deltas ?? this.#chunk(result.content)
 			let streamed = ''
 			let reasoned = ''
 			for (const thought of thoughts ?? []) {
 				if (signal.aborted) {
-					const partial: ProviderResult =
-						reasoned.length > 0 ? { content: streamed, thinking: reasoned } : { content: streamed }
-					throw new ProviderAbortError(partial)
+					throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
 				}
 				reasoned += thought
 				if (thought.length > 0) yield { channel: 'thinking', text: thought }
 			}
 			for (const delta of chunks) {
 				if (signal.aborted) {
-					const partial: ProviderResult =
-						reasoned.length > 0 ? { content: streamed, thinking: reasoned } : { content: streamed }
-					throw new ProviderAbortError(partial)
+					throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
 				}
 				streamed += delta
 				if (delta.length > 0) yield { channel: 'content', text: delta }
 			}
 			if (signal.aborted) {
-				const partial: ProviderResult =
-					reasoned.length > 0 ? { content: streamed, thinking: reasoned } : { content: streamed }
-				throw new ProviderAbortError(partial)
+				throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
 			}
 			return result
 		} finally {
@@ -782,17 +1128,16 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		messages: readonly Message[],
 		signal: AbortSignal,
 		tools?: readonly ToolDefinition[],
-		run?: ProviderStreamOptions,
+		options?: ProviderStreamOptions,
 	): Promise<ProviderResult> {
-		const generator = this.stream(messages, signal, tools, run)
+		const generator = this.stream(messages, signal, tools, options)
 		let step = await generator.next()
 		while (!step.done) step = await generator.next()
 		return step.value
 	}
 
-	// Consume the next turn: past the end either repeat the last ('repeat') or throw ('throw').
 	#next(): ScriptedTurn {
-		if (this.#index >= this.#turns.length && this.#exhaust === 'throw') {
+		if (this.#index >= this.#turns.length && !this.#repeat) {
 			throw new Error(`createScriptedProvider exhausted at turn ${this.#index}`)
 		}
 		const turn = this.#turns[Math.min(this.#index, this.#turns.length - 1)] ?? { content: '' }
@@ -805,7 +1150,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 export class FailingProvider extends ScriptedProvider {
 	readonly #failure: Error
 	constructor(result: ProviderResult, failure: Error) {
-		super([result], { record: true })
+		super([result], { recorded: true })
 		this.#failure = failure
 	}
 	override async *stream(
@@ -837,7 +1182,7 @@ export class RecordedProvider extends ScriptedProvider {
 		gate = Promise.resolve(),
 		failure?: Error,
 	) {
-		super(turns, { record: true })
+		super(turns, { recorded: true })
 		this.#gate = gate
 		this.#failure = failure
 	}
@@ -965,6 +1310,96 @@ export function createTokenUsage(overrides?: Partial<TokenUsage>): TokenUsage {
 	return { prompt: 5, completion: 7, total: 12, ...overrides }
 }
 
+/** Supplies assistant thinking before and after the last user turn. */
+export const THINKING_MESSAGES: readonly Message[] = Object.freeze([
+	Object.freeze({ id: 'u1', role: 'user', content: 'Plan the trip' }),
+	Object.freeze({
+		id: 'a1',
+		role: 'assistant',
+		content: 'Fares found',
+		thinking: 'first reasoning',
+	}),
+	Object.freeze({ id: 'u2', role: 'user', content: 'Book it' }),
+	Object.freeze({ id: 'a2', role: 'assistant', content: 'Booked', thinking: 'second reasoning' }),
+	Object.freeze({ id: 'a3', role: 'assistant', content: 'Receipt sent' }),
+])
+
+/** Supplies ordered keys for allow-list filtering. */
+export const ALLOW_LIST_MEMBERS = Object.freeze([
+	Object.freeze({ name: 'a' }),
+	Object.freeze({ name: 'b' }),
+	Object.freeze({ name: 'c' }),
+])
+
+/** Supplies distinct records whose extracted keys decide admission. */
+export const ALLOW_LIST_MATCH_MEMBERS = Object.freeze([
+	Object.freeze({ name: 'a', extra: 1 }),
+	Object.freeze({ name: 'z', extra: 2 }),
+])
+
+/** Supplies the usage shared by provider composition proofs. */
+export const INTEGRATION_USAGE: TokenUsage = Object.freeze(createTokenUsage())
+
+/**
+ * Builds exchanges spanned by interleaved tool results.
+ *
+ * @returns Fresh messages with independent tool calls
+ */
+export function buildExchangeMessages(): readonly Message[] {
+	return [
+		{ id: 'lead', role: 'assistant', content: 'Welcome.' },
+		{ id: 'u1', role: 'user', content: 'Read the order.' },
+		{ id: 'a1', role: 'assistant', content: '', calls: [createToolCall({ id: 'c1' })] },
+		{ id: 'u2', role: 'user', content: 'Read the account.' },
+		{ id: 'a2', role: 'assistant', content: '', calls: [createToolCall({ id: 'c2' })] },
+		{ id: 'r1', role: 'tool', content: 'Order.', call: 'c1' },
+		{ id: 'u3', role: 'user', content: 'Continue.' },
+		{ id: 'r2', role: 'tool', content: 'Account.', call: 'c2' },
+		{ id: 'u4', role: 'user', content: 'Finish.' },
+	]
+}
+
+/**
+ * Builds unique, positional, and orphan tool-result groups.
+ *
+ * @returns Fresh messages with independent tool calls
+ */
+export function buildToolGroupMessages(): readonly Message[] {
+	return [
+		{ id: 'U', role: 'user', content: 'Which order is late?' },
+		{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
+		{ id: 'R1', role: 'tool', content: 'positional result' },
+		{ id: 'A2', role: 'assistant', content: '', calls: [createToolCall({ id: 'two' })] },
+		{ id: 'R2', role: 'tool', content: 'second result', call: 'two' },
+		{ id: 'L1', role: 'tool', content: 'late first result', call: 'one' },
+		{ id: 'N', role: 'assistant', content: 'Order LH-81660 is late.' },
+		{ id: 'O1', role: 'tool', content: 'lost result', call: 'missing' },
+		{ id: 'O2', role: 'tool', content: 'other lost result' },
+	]
+}
+
+/**
+ * Generates a reply through the real agent loop for a provider.
+ *
+ * @param provider - The provider to compose
+ * @returns The generated content
+ */
+export async function generateReply(provider: ProviderInterface): Promise<string> {
+	const agent = createAgent(provider)
+	agent.context.messages.add({ role: 'user', content: 'who are you?' })
+	return (await agent.generate()).content
+}
+
+/**
+ * Splits content into word deltas while retaining each intervening space.
+ *
+ * @param content - The content to split
+ * @returns The first word followed by space-prefixed words
+ */
+export function splitWordDeltas(content: string): readonly string[] {
+	return content.split(' ').map((word, index) => (index === 0 ? word : ` ${word}`))
+}
+
 /**
  * Builds the canonical `add` tool — a REAL {@link ToolInterface} that returns a fixed `5`, the
  * single most-repeated tool literal across the agent loop / registry tests (where the loop
@@ -1004,26 +1439,22 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
 }
 
 /**
- * Creates a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
- * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
- * folded count), so a `compact()` produces a predictable section summary and a `sections` cap
- * merge a predictable merged summary (a data stub, not a behavior mock). Counts its calls so a
- * test can prove the summarizer calls per compaction (the section digest, plus the merge when a
- * cap overflows).
+ * Creates a deterministic summarizer that returns the message count and records each slice.
+ * Conversation tests use the count to distinguish section compaction from a cap merge.
  *
- * @returns The summarizer plus a live `calls` recorder of every digested message-slice
+ * @returns The summarizer and its readonly recorded slices
  */
 export function createStubSummarizer(): {
 	readonly summarize: ConversationSummaryHandler
 	readonly calls: ReadonlyArray<readonly Message[]>
 } {
-	const calls: Array<readonly Message[]> = []
+	const recorder = createRecorder<readonly [readonly Message[]]>()
 	return {
 		get calls() {
-			return calls
+			return recorder.calls.map(([messages]) => messages)
 		},
 		async summarize(messages) {
-			calls.push(messages)
+			recorder.handler(messages)
 			return `recap of ${messages.length}`
 		},
 	}
@@ -1070,6 +1501,7 @@ export interface RecordingSelectionInterface {
  *
  * @example
  * ```ts
+ * // ... conversation, request, and signal setup omitted
  * const fixture = createRecordingSelection({ usage: SELECTION_USAGE })
  * const selected = await fixture.handler(conversation, request, signal)
  * ```
@@ -1170,45 +1602,33 @@ export const SELECTION_FAULT_CASES: readonly SelectionFaultCase[] = Object.freez
 	}),
 ])
 
-/** Records how many turn boundaries a {@link SchedulerInterface}'s `yield` paced. */
+/** Records how many turn boundaries the `yield` method of a {@link SchedulerInterface} paced. */
 export interface RecordingSchedulerInterface extends SchedulerInterface {
 	/** How many times `yield` ran — the turn boundaries the loop paced through this scheduler. */
 	readonly yields: number
 }
 
 /**
- * Creates a {@link RecordingSchedulerInterface} — a real `SchedulerInterface` whose
- * `yield` counts each call (the turn boundary it paced) and resolves immediately, so a
- * test can prove pacing ran BETWEEN turns (not after the last). It honours its signal
- * exactly like the real scheduler — an already-aborted signal rejects with the reason —
- * and its `delay` is a no-op. Not a mock: a genuine scheduler the agent loop drives.
+ * Creates a scheduler boundary fixture that records successful yields and resolves immediately.
+ * An aborted signal rejects with its reason; delay resolves without a timer so loop tests isolate pacing.
  *
- * @returns A scheduler whose `yields` reports the turn boundaries it paced
+ * @returns A scheduler whose yields report successful turn boundaries
  */
 export function createRecordingScheduler(): RecordingSchedulerInterface {
-	let yields = 0
+	const recorder = createRecorder<readonly []>()
 	return {
 		get yields() {
-			return yields
+			return recorder.count
 		},
 		async yield(options?: SchedulerOptions) {
 			if (options?.signal?.aborted) throw options.signal.reason
-			yields += 1
+			recorder.handler()
 		},
 		async delay() {},
 	}
 }
 
-// ── Store-pair contract batteries (Memory ⇄ Database twins, environment-agnostic) ──
-//
-// The `{Memory,Database}{Conversation,Workspace}Store` twins each persist the
-// SAME self-contained, pure-JSON snapshot behind the SAME `{X}StoreInterface` seam (get / set /
-// delete, async, keyed by the snapshot's own id), so the round-trip / upsert / delete / two-ids
-// battery is IDENTICAL across each pair. Each pair's snapshot builder + shared battery are
-// promoted here so the contract lives in ONE place; every twin invokes the battery ONCE with its
-// own store factory and KEEPS its twin-specific blocks local. Real data only — NO mocks. All
-// plain `@src/core` without Node or DOM imports, so they load in every project. The assertions are
-// plain-JSON `toEqual` (no class-identity `toBe`).
+// Store scenarios share this host-independent battery so each backend exercises the same snapshots.
 
 /**
  * Adds three turns (`first`, `second`, `third`) to a conversation and compacts it, so a
@@ -1238,7 +1658,7 @@ export async function compactSeedTurns(conversation: ConversationInterface): Pro
  * (digesting the slice into `recap(<contents>)` — NOT {@link createStubSummarizer}, whose `recap of
  * <n>` digest text differs), so a `compact()` produces a predictable section.
  *
- * @param id - The conversation id (and snapshot key); defaults to `'chat'`
+ * @param id - The conversation id (and snapshot key); Default: `'chat'`
  * @returns The settled conversation's snapshot (sections + live tail)
  */
 export async function buildConversationSnapshot(id = 'chat'): Promise<ConversationSnapshot> {
@@ -1286,7 +1706,7 @@ export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSna
 	],
 })
 
-// Every scenario below drives the store operations and returns their plain results. It asserts
+// Every following scenario drives the store operations and returns their plain results. It asserts
 // nothing, because no `describe` / `it` / `expect` may enter this module. A consuming suite's own
 // `it` block calls the scenario, then asserts on what it returns.
 
@@ -1296,44 +1716,27 @@ export type ConversationStoreFunction = () => ConversationStoreInterface
 /** Builds the snapshot a scenario stores; {@link buildConversationSnapshot} is the shared form. */
 export type ConversationSnapshotFunction = (id?: string) => Promise<ConversationSnapshot>
 
-/**
- * Creates a conforming {@link ConversationStoreInterface} that holds snapshots in a map. The
- * scenarios need a store to run against, and persistence stays with the store twins' own suites.
- *
- * @returns A fresh, empty store keyed by each snapshot's own id
- */
-export function createFixtureStore(): ConversationStoreInterface {
-	const held = new Map<string, ConversationSnapshot>()
-	return {
-		async get(id) {
-			return held.get(id)
-		},
-		async set(snapshot) {
-			held.set(snapshot.id, snapshot)
-		},
-		async delete(id) {
-			held.delete(id)
-		},
-	}
-}
-
 /** Names the literal values a {@link exerciseConversationStoreRoundTrip} result must carry, shared by every twin. */
 export interface ConversationStoreRoundTripExpectation {
-	readonly sectionSummary: string
-	readonly sectionMessages: readonly string[]
-	readonly liveTail: readonly string[]
+	readonly section: {
+		readonly summary: string
+		readonly messages: readonly string[]
+	}
+	readonly tail: readonly string[]
 }
 
 /**
- * Holds the literal values `buildConversationSnapshot()`'s round trip must reproduce — the fold's section
+ * Holds the literal values a round trip of `buildConversationSnapshot()` must reproduce — the fold's section
  * summary + retained messages, and the live tail. Shared so both twin suites (and
- * `setup.test.ts`'s own proof) assert the SAME literals rather than each retyping them.
+ * the setup proof) assert the SAME literals rather than each retyping them.
  */
 export const CONVERSATION_STORE_ROUND_TRIP_EXPECTATION: ConversationStoreRoundTripExpectation =
 	Object.freeze({
-		sectionSummary: 'recap(first|second)',
-		sectionMessages: Object.freeze(['first', 'second']),
-		liveTail: Object.freeze(['third']),
+		section: Object.freeze({
+			summary: 'recap(first|second)',
+			messages: Object.freeze(['first', 'second']),
+		}),
+		tail: Object.freeze(['third']),
 	})
 
 /**
@@ -1481,7 +1884,7 @@ export async function exerciseConversationStoreTwoIds(
  * Builds a {@link ToolManagerInterface} pre-seeded with working tools — the registry the agent
  * loop tests hand to an agent so the model has SOMETHING callable.
  *
- * @param tools - The tools to seed; defaults to the canonical {@link createAddTool}
+ * @param tools - The tools to seed; Default: the canonical {@link createAddTool}
  * @returns A tool manager holding the supplied tools
  */
 export function createSeededToolManager(tools?: readonly ToolInterface[]): ToolManagerInterface {
@@ -1590,7 +1993,7 @@ export function seedFramedAgent(provider: ProviderInterface): AgentInterface {
 }
 
 /**
- * Pins the messages a provider receives from {@link seedFramedAgent}'s first `generate` call,
+ * Pins the messages a provider receives from the first `generate` call of {@link seedFramedAgent},
  * every field except the minted `id`.
  *
  * @remarks
@@ -1611,13 +2014,13 @@ export const RECORDED_REQUEST: readonly MessageInput[] = Object.freeze([
 
 /** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
 export interface SectionOpenOptions {
-	readonly managerOpen?: string
+	readonly manager?: { readonly open?: string }
 }
 
 /** Carries the manager-options `render` and the per-item override that {@link resolveSectionRender} reads. */
 export interface SectionRenderOptions {
-	readonly managerRender?: string
-	readonly itemOverride?: string
+	readonly manager?: { readonly render?: string }
+	readonly instruction?: { readonly override?: string }
 }
 
 /**
@@ -1632,7 +2035,7 @@ export interface SectionRenderOptions {
  * @returns The resolved section header
  */
 export function resolveSectionOpen(options?: SectionOpenOptions): string {
-	const managerOpen = options?.managerOpen
+	const managerOpen = options?.manager?.open
 	const instructions =
 		managerOpen === undefined
 			? new InstructionManager()
@@ -1655,7 +2058,7 @@ export function resolveSectionOpen(options?: SectionOpenOptions): string {
  * @returns The resolved item rendering
  */
 export function resolveSectionRender(options?: SectionRenderOptions): string {
-	const managerRender = options?.managerRender
+	const managerRender = options?.manager?.render
 	const instructions =
 		managerRender === undefined
 			? new InstructionManager()
@@ -1670,7 +2073,9 @@ export function resolveSectionRender(options?: SectionRenderOptions): string {
 	context.instructions.add({
 		name: 'a',
 		content: 'BUILTIN',
-		...(options?.itemOverride === undefined ? {} : { override: options.itemOverride }),
+		...(options?.instruction?.override === undefined
+			? {}
+			: { override: options.instruction.override }),
 	})
 	const block = requireValue(context.build()[0]).content
 	return requireValue(block.split('\n\n')[1])
@@ -1766,7 +2171,7 @@ export class ScriptedFrame implements ProviderParserInterface<string> {
 
 /**
  * Holds scripted wire records, optional end-of-input buffering, and the controller a scripted
- * failure aborts in the turn it throws, so a decoder throw races the cancel.
+ * failure aborts in the turn it throws, so a decoder throw races the abort.
  */
 export interface ScriptedWireOptions extends AgentProviderInput {
 	readonly records?: ReadonlyMap<string, ProviderIncrement | Error>
@@ -1799,7 +2204,7 @@ export class ScriptedWire extends AgentProvider<string> {
 		this.#parsers.push(parser)
 		return parser
 	}
-	body(request: ProviderRequest): object {
+	encode(request: ProviderRequest): object {
 		return request
 	}
 	read(record: string): ProviderIncrement {
@@ -1822,10 +2227,65 @@ export class ScriptedWire extends AgentProvider<string> {
 	}
 }
 
+/** Supplies response factories and expected messages for judge protocol refusals. */
+export const JUDGE_PROTOCOL_CASES: ReadonlyArray<readonly [() => Response, string]> = Object.freeze(
+	[
+		Object.freeze<readonly [() => Response, string]>([
+			() => new Response(null),
+			'judge error: no response body',
+		]),
+		Object.freeze<readonly [() => Response, string]>([
+			() => new Response('{"model":'),
+			'judge error: invalid JSON body',
+		]),
+	],
+)
+
+/**
+ * Builds each System One answer form with the supplied probability.
+ *
+ * @param probability - The probability placed in each answer's tested candidate
+ * @returns Answers keyed by the recorded request's question ids
+ * @example
+ * ```ts
+ * buildSystemOneProbabilityCases(0.5).refund // { type: 'noul', noul: 0.5 }
+ * ```
+ */
+export function buildSystemOneProbabilityCases(
+	probability: unknown,
+): Readonly<Record<string, unknown>> {
+	return {
+		label: { type: 'choice', probabilities: { billing: probability, bug: 0.5, account: 0 } },
+		refund: { type: 'noul', noul: probability },
+		severity: { type: 'score', probabilities: [0, probability, 0.5] },
+	}
+}
+
+/**
+ * Drives a splitter through a delta sequence and flushes its remaining content.
+ *
+ * @param splitter - The real splitter whose state is advanced
+ * @param deltas - The wire chunks in delivery order
+ * @returns The joined content deltas and final flush
+ * @example
+ * ```ts
+ * // ... ThinkSplitter import omitted
+ * driveThinkSplitter(new ThinkSplitter(), ['<think>plan</think>answer']) // 'answer'
+ * ```
+ */
+export function driveThinkSplitter(
+	splitter: ThinkSplitterInterface,
+	deltas: readonly string[],
+): string {
+	let content = ''
+	for (const delta of deltas) content += splitter.split(delta)
+	return content + splitter.flush()
+}
+
 /** Records byte delivery and cancellation on a real readable stream. */
 export class RecordedBody {
 	readonly #chunks: readonly Uint8Array[]
-	readonly #close: boolean
+	readonly #closed: boolean
 	readonly #failure: Error | undefined
 	readonly #cancellation: Error | undefined
 	readonly stream: ReadableStream<Uint8Array>
@@ -1834,9 +2294,9 @@ export class RecordedBody {
 	#bytes = 0
 	#cancelled = false
 	#reason: unknown
-	constructor(chunks: readonly Uint8Array[], close = true, failure?: Error, cancellation?: Error) {
+	constructor(chunks: readonly Uint8Array[], closed = true, failure?: Error, cancellation?: Error) {
 		this.#chunks = chunks
-		this.#close = close
+		this.#closed = closed
 		this.#failure = failure
 		this.#cancellation = cancellation
 		this.stream = new ReadableStream(this, { highWaterMark: 0 })
@@ -1863,7 +2323,7 @@ export class RecordedBody {
 			this.#bytes += chunk.byteLength
 			controller.enqueue(chunk)
 		} else if (this.#failure !== undefined) controller.error(this.#failure)
-		else if (this.#close) controller.close()
+		else if (this.#closed) controller.close()
 		else this.#pending.resolve()
 	}
 	cancel(reason?: unknown): void | Promise<void> {
@@ -1966,6 +2426,79 @@ export class RecordedTransport {
 	}
 }
 
+/** Supplies an empty section shared by summary and recap message cases. */
+export const CONVERSATION_SECTION: Section = Object.freeze({
+	id: 's1',
+	summary: 'recap of 2',
+	messages: Object.freeze([]),
+})
+
+/** Configures the response, real judge factory, and recorded transport for a judge fixture. */
+export interface RecordedJudgeOptions {
+	readonly response?: unknown
+	readonly create?: (options: SystemOneJudgeOptions) => JudgeInterface
+	readonly respond?: (transport: RecordedTransport) => Response | Promise<Response>
+}
+
+/** Exposes a real judge and the transport that records its requests. */
+export interface RecordedJudgeInterface {
+	readonly judge: JudgeInterface
+	readonly transport: RecordedTransport
+}
+
+/**
+ * Creates a real System One judge with a recording transport and a customizable response.
+ *
+ * @param options - The response envelope, judge factory, and response callback
+ * @returns The real judge and its recording transport
+ * @example
+ * ```ts
+ * const { judge, transport } = createRecordedJudge()
+ * judge.model // 'tev1:0.8b'
+ * transport.requests.length // 0
+ * ```
+ */
+export function createRecordedJudge(options: RecordedJudgeOptions = {}): RecordedJudgeInterface {
+	const transport: RecordedTransport = new RecordedTransport(() =>
+		options.respond === undefined
+			? Response.json(options.response === undefined ? SYSTEM_ONE_TEV1 : options.response)
+			: options.respond(transport),
+	)
+	const judge = (options.create ?? createSystemOneJudge)({
+		url: 'http://judge.test',
+		model: 'tev1:0.8b',
+		fetch: transport.fetch,
+	})
+	return { judge, transport }
+}
+
+/**
+ * Plants an opaque snapshot row through a real database over the supplied driver.
+ *
+ * @param driver - The driver shared with the conversation store under test
+ * @param row - The row to persist, including malformed or older snapshot shapes
+ * @returns A promise that settles after the row is stored and the database closes
+ * @example
+ * ```ts
+ * // ... driver setup omitted
+ * await plantConversationRow(driver, { id: 'unreadable', snapshot: { id: 'unreadable' } })
+ * ```
+ */
+export async function plantConversationRow(
+	driver: DriverInterface,
+	row: ConversationSnapshotRow,
+): Promise<void> {
+	const database = createDatabase({
+		driver,
+		tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+	})
+	try {
+		await database.table('conversations').set(row)
+	} finally {
+		await database.close()
+	}
+}
+
 /**
  * Drains a provider generator and retains its yielded deltas and terminal value.
  *
@@ -2007,7 +2540,7 @@ export function recordGlobalTransport(
 }
 
 /**
- * Returns a callable value for non-JSON domain argument fixtures.
+ * Returns the string `domain`; the function itself supplies a non-JSON argument fixture.
  *
  * @returns The string `domain`
  */
@@ -2100,8 +2633,8 @@ export interface ScriptedJudgeOptions extends AgentJudgeInput {
 	readonly answers?: Readonly<Record<string, JudgeAnswer>>
 	readonly refusals?: Readonly<Record<string, Refusal>>
 	readonly refuse?: string
-	/** Holds the controller `read` aborts before it returns, so a cancel lands during decoding. */
-	readonly readAbort?: AbortController
+	/** Holds the controller `read` aborts before it returns, so an abort lands during decoding. */
+	readonly abort?: AbortController
 }
 
 /**
@@ -2112,7 +2645,7 @@ export class ScriptedJudge extends AgentJudge {
 	readonly #answers: Readonly<Record<string, JudgeAnswer>>
 	readonly #refusals: Readonly<Record<string, Refusal>>
 	readonly #refuse: string | undefined
-	readonly #readAbort: AbortController | undefined
+	readonly #abort: AbortController | undefined
 	readonly #bodies: JudgeRequest[] = []
 	readonly #values: unknown[] = []
 	readonly name = 'scripted'
@@ -2121,7 +2654,7 @@ export class ScriptedJudge extends AgentJudge {
 		this.#answers = options.answers ?? {}
 		this.#refusals = options.refusals ?? {}
 		this.#refuse = options.refuse
-		this.#readAbort = options.readAbort
+		this.#abort = options.abort
 	}
 	get bodies(): readonly JudgeRequest[] {
 		return this.#bodies
@@ -2129,7 +2662,7 @@ export class ScriptedJudge extends AgentJudge {
 	get values(): readonly unknown[] {
 		return this.#values
 	}
-	body(request: JudgeRequest): object {
+	encode(request: JudgeRequest): object {
 		this.#bodies.push(request)
 		if (this.#refuse !== undefined && Object.hasOwn(request.questions, this.#refuse)) {
 			throw new JudgeError('QUESTION', `judge error: question ${this.#refuse} is refused`)
@@ -2138,7 +2671,7 @@ export class ScriptedJudge extends AgentJudge {
 	}
 	read(value: unknown, request: JudgeRequest): JudgeResult {
 		this.#values.push(value)
-		this.#readAbort?.abort()
+		this.#abort?.abort()
 		if (!isRecord(value)) throw new JudgeError('PROTOCOL', 'judge error: invalid envelope')
 		let answers: Readonly<Record<string, JudgeAnswer>> = {}
 		let refusals: Readonly<Record<string, Refusal>> = {}
@@ -2386,35 +2919,17 @@ export const SYSTEM_ONE_UNREADABLE_ANSWERS = Object.freeze([
 	},
 ])
 
-/**
- * Answers a System One request of needed questions with the recorded envelope, one noul per
- * question, read from the probability of the subject its key names.
- *
- * @param body - The parsed System One request body a fixture listener received
- * @param probabilities - The yes probability for each subject id a needed key names
- * @returns The recorded envelope carrying one noul answer per requested question
- * @throws Error Thrown when the body is malformed or names a subject with no probability
- *
- * @example
- * ```ts
- * Response.json(answerNeededRequest(await request.json(), { [standing.id]: 0.9979 }))
- * ```
- */
-export function answerNeededRequest(
-	body: unknown,
-	probabilities: Readonly<Record<string, number>>,
-): Readonly<Record<string, unknown>> {
-	if (!isRecord(body) || !isRecord(body.questions))
-		throw new Error('needed fixture received a malformed request')
-	const answers: Record<string, unknown> = {}
-	for (const id of Object.keys(body.questions)) {
-		const subject = parseConditionKey(id)?.[1]
-		const noul = subject === undefined ? undefined : probabilities[subject]
-		if (noul === undefined) throw new Error(`needed fixture has no probability for ${id}`)
-		answers[id] = { type: 'noul', noul }
-	}
-	return { ...SYSTEM_ONE_TEV1, answers }
-}
+/** Lists the instruction manager events recorded by its tests. */
+export const INSTRUCTION_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
+
+/** Names an instruction manager event recorded by its tests. */
+export type InstructionEventName = (typeof INSTRUCTION_EVENTS)[number]
+
+/** Lists the scope manager events recorded by its tests. */
+export const SCOPE_EVENTS = Object.freeze(['create', 'remove', 'clear'] as const)
+
+/** Names a scope manager event recorded by its tests. */
+export type ScopeEventName = (typeof SCOPE_EVENTS)[number]
 
 /** Matches a generated handle such as `m12`, `r8`, or `[r8]`, which no helper writes into a text. */
 export const LEDGER_HANDLE = /\b[mrp]\d+\b/g
