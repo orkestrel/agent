@@ -9,14 +9,7 @@ import type { TestContext } from 'vitest'
 import { isArray, isRecord, isString } from '@orkestrel/contract'
 import { createScratch, destroyScratch, removeTree } from '@orkestrel/test/server'
 import { spawnSync } from 'node:child_process'
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	statSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

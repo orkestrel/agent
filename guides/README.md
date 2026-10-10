@@ -4,24 +4,32 @@ A dual-axis index into this repository's guides — by concept, and by directory
 
 ## By concept
 
+The following table maps each concept to its guide, source, and tests:
+
 | Concept                                                                                  | Spec                   | Source                    | Tests                                 |
 | ---------------------------------------------------------------------------------------- | ---------------------- | ------------------------- | ------------------------------------- |
 | `Agent`, `AgentProvider`, `AgentJudge`, `RelayProvider`, `RelayStream`, `SystemOneJudge` | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
+| `Ledger`, `Classifier`, `Gauge`                                                          | [`agent.md`](agent.md) | [`src/core`](../src/core) | [`tests/src/core`](../tests/src/core) |
 
 The `Agent` class is the conversation loop, the `AgentProvider` class the host-independent HTTP
 engine a concrete provider extends, the `AgentJudge` class the engine a judge wire extends with the
 `SystemOneJudge` class as its System One wire, and the `RelayProvider` and `RelayStream` classes
 the browser end and the server end of the relay hop the `createRelay` function mounts.
+The `Ledger` class serves one conversation through a briefing it projects from what a judge
+filed, the `Classifier` class files messages through that judge, and the `Gauge` class prices
+the prompt.
 
-The `providers`, `conversations`, `contexts`, and `agents` modules under `src/core` are one layer
-concept, the conversation runtime, so `agent.md` is the one guide over all four. The root files of
+The `providers`, `conversations`, `contexts`, `agents`, and `ledgers` modules under `src/core` are
+one layer concept, the conversation runtime, so `agent.md` is the one guide over all of them. The root files of
 `src/core` hold the declarations two or more of those modules import — the `Message` and
 `MessageInput` types, `filterAllowList`, `joinThinking`, `sanitizeUsage`, and `sumUsage` — beside
-the message wire shape, `isMessage`, and the judge value types. One barrel, `src/core/index.ts`,
-publishes the root and the four modules. The `@orkestrel/scaffold` guide index maps `src/core`,
+the message wire shape and the judge value types. One barrel, `src/core/index.ts`,
+publishes the root and those modules. The `@orkestrel/scaffold` guide index maps `src/core`,
 `src/server`, and `src/bin` to one `scaffold.md` the same way.
 
 ## By directory
+
+The following table maps each source directory to its guide:
 
 | Directory                | Guide                  |
 | ------------------------ | ---------------------- |
@@ -30,79 +38,80 @@ publishes the root and the four modules. The `@orkestrel/scaffold` guide index m
 | `src/core/conversations` | [`agent.md`](agent.md) |
 | `src/core/contexts`      | [`agent.md`](agent.md) |
 | `src/core/agents`        | [`agent.md`](agent.md) |
+| `src/core/ledgers`       | [`agent.md`](agent.md) |
 
 ## Dependency reference
 
-[`abort.md`](abort.md) is a byte-identical mirror of the guide for
+See [Abort](abort.md), a byte-identical mirror of the guide for
 `@orkestrel/abort` — a runtime dependency, the cancellation primitive an
 agent turn's `signal` is folded from. It documents **that package's** surface
 (a typed `AbortController` wrapper), not anything sourced in this repo; it is
 kept here so a reader of this package can see the primitive it is built from
 without leaving this guide set.
 
-[`budget.md`](budget.md) is a byte-identical mirror of the guide for
+See [Budget](budget.md), a byte-identical mirror of the guide for
 `@orkestrel/budget` — a runtime dependency, the token-cost primitive bounding
 a provider call / an agent turn and driving automatic conversation
 compaction. It documents **that package's** surface (the `Budget` class,
 `BudgetInterface`, and token-usage accounting), not anything sourced in this
 repo; it is kept here for the same reason.
 
-[`contract.md`](contract.md) is a byte-identical mirror of the guide
+See [Contract](contract.md), a byte-identical mirror of the guide
 for `@orkestrel/contract` — a runtime dependency, the shape DSL other tools
-(for example `@orkestrel/toolbox`'s `createWorkspaceTool`) compile their contracts
+(for example the `createWorkspaceTool` function of the `@orkestrel/toolbox` package) compile their contracts
 through. It documents **that package's** surface (guards, combinators,
 parsers, and the shape DSL), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitives it is built from
 without leaving this guide set.
 
-[`tool.md`](tool.md) is a byte-identical mirror of the guide for
+See [Tool](tool.md), a byte-identical mirror of the guide for
 `@orkestrel/tool` — a runtime dependency, the callable-tool runtime the agent
 loop advertises definitions from and dispatches calls through. It documents
 **that package's** tool definitions, results, and execution, not anything
 sourced in this repo.
 
-[`workspace.md`](workspace.md) is a byte-identical mirror of the guide
+See [Workspace](workspace.md), a byte-identical mirror of the guide
 for `@orkestrel/workspace` — a runtime dependency, the file domain whose active
 workspace `AgentContext` renders into a turn. It documents **that package's**
 files, editing, persistence, and manager surface, not anything sourced in this
-repo; the carrier split that turns those files into prompt content is agent's
-own and is documented in [`agent.md`](agent.md).
+repo; the carrier split that turns those files into prompt content is this
+package's own; see [Agent](agent.md).
 
-[`database.md`](database.md) is a byte-identical mirror of the guide
+See [Database](database.md), a byte-identical mirror of the guide
 for `@orkestrel/database` — a runtime dependency, the storage layer
 `DatabaseConversationStore` persists a conversation snapshot over. It
 documents **that package's** surface (the database, tables, and driver layer),
 not anything sourced in this repo; it is kept here so a reader of this guide
 can see the persistence layer without leaving this guide set.
 
-[`emitter.md`](emitter.md) is a byte-identical mirror of the guide
+See [Emitter](emitter.md), a byte-identical mirror of the guide
 for `@orkestrel/emitter` — a runtime dependency, the typed push-observation
 surface the `Agent`, `Conversation`, and observable agent-owned managers
 expose as `emitter`. It documents **that package's** surface, not anything
 sourced in this repo; it is kept here for the same reason.
 
-[`queue.md`](queue.md) is a byte-identical mirror of the guide for
+See [Queue](queue.md), a byte-identical mirror of the guide for
 `@orkestrel/queue` — a runtime dependency, the bounded-concurrency, retrying,
 durable substrate `createAgentQueue` composes for many durable agent jobs. It
 documents **that package's** surface (the `Queue` class and `QueueInterface`,
 `createMemoryQueueStore` / `createDatabaseQueueStore`), not anything sourced
 in this repo; it is kept here for the same reason.
 
-[`timeout.md`](timeout.md) is a byte-identical mirror of the guide
+See [Timeout](timeout.md), a byte-identical mirror of the guide
 for `@orkestrel/timeout` — a runtime dependency, the wall-clock deadline
 primitive bounding an agent turn. It documents **that package's** surface
 (a typed countdown timer), not anything sourced in this repo; it is kept
 here so a reader of this package can see the primitive it is built from
 without leaving this guide set.
 
-[`workflow.md`](workflow.md) is a byte-identical mirror of the guide
+See [Workflow](workflow.md), a byte-identical mirror of the guide
 for `@orkestrel/workflow` — a runtime dependency, the source of the
 `SchedulerInterface` the agent loop yields to between turns and of the
 `Runner` `createAgentRunner` composes. It documents **that package's**
 surface, not anything sourced in this repo; it is kept here for the same
 reason.
 
-[`guide.md`](guide.md) is a byte-identical mirror of the guide for
+See [Guide](guide.md), a byte-identical mirror of the guide for
 `@orkestrel/guide` — the devDependency powering this repo's guides-parity
 test suite (`tests/guides.test.ts`). It documents **that
 package's** surface (`Guide` / `Source`, the manifest and comparison
@@ -110,7 +119,7 @@ helpers), not anything sourced in this repo; it is kept here so a reader of
 the parity suite can see the primitives it is built from without leaving
 this guide set.
 
-[`scaffold.md`](scaffold.md) is a byte-identical mirror of the guide
+See [Scaffold](scaffold.md), a byte-identical mirror of the guide
 for `@orkestrel/scaffold` — the devDependency whose blueprint compiler keeps
 this repository's own structure, configuration, and tooling on the shared
 canon. It documents **that package's** surface (blueprints, plans, artifacts,
@@ -119,4 +128,6 @@ here for the same reason.
 
 ## See also
 
-- [`AGENTS.md`](../AGENTS.md) — the repository's authority pointer; the coding rules it resolves to live in `@orkestrel/scaffold`.
+The following file points to the coding rules this repository follows:
+
+- [AGENTS.md](../AGENTS.md) — the repository's authority pointer; the coding rules it resolves to live in `@orkestrel/scaffold`.

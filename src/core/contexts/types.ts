@@ -126,8 +126,8 @@ export interface InstructionManagerInterface {
 	 */
 	readonly close: string | undefined
 	/**
-	 * Adds one {@link InstructionInput}, or a batch — mints each `id`; a re-`add` of the same
-	 * name overwrites it, last write wins.
+	 * Adds one {@link InstructionInput}, or a batch — mints each `id`; adding an instruction whose
+	 * name is already stored overwrites it, last write wins.
 	 */
 	add(input: InstructionInput): InstructionInterface
 	add(inputs: readonly InstructionInput[]): readonly InstructionInterface[]

@@ -1298,7 +1298,7 @@ await new GuideCommand({
 				)?.content,
 			).toContain(LEDGER_AMENDED_RULE)
 			expect(guideText).toContain(
-				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool, the answer note, and the seed tail keep the stored content of each message they carry, stale sentences included.',
+				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool and the answer note keep the stored content of each message they carry, stale sentences included. The seed tail keeps stored content except for lookup results, which the plan replaces with stubs.',
 			)
 		})
 
@@ -2449,7 +2449,9 @@ await new GuideCommand({
 				'runs the agent tool loop in Node and feeds the result into the next provider turn',
 			)
 			expect(guideText).toContain('`src:core` project')
-			expect(guideText).toContain("`@orkestrel/mcp` checkout's `tests/distribution.test.ts`")
+			expect(guideText).toContain(
+				'the `tests/distribution.test.ts` file of the `@orkestrel/mcp` checkout',
+			)
 			expect(guideText).toContain(
 				'planned proof “executes a page tool through an agent without network requests”',
 			)
@@ -2509,7 +2511,7 @@ await new GuideCommand({
 
 		it('carries the snapshot fence line the transcription copies', () => {
 			expect(guideText).toContain(
-				'thread.snapshot() // { id, summary?, sections, messages, judgments? } — the durable payload',
+				'thread.snapshot() // { id, sections, messages, judgments? } — the durable payload',
 			)
 		})
 
@@ -3023,13 +3025,13 @@ await new GuideCommand({
 			expect(guideText).toContain("result.model // 'tev1:0.8b' — the model the server named")
 			expect(guideText).toContain('result.usage // { prompt: 975, completion: 4, total: 979 }')
 			expect(guideText).toContain(
-				"readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to four decimals",
+				"readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals",
 			)
 			expect(guideText).toContain(
-				"readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to four decimals",
+				"readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals",
 			)
 			expect(guideText).toContain(
-				"readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to four decimals",
+				"readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals",
 			)
 		})
 

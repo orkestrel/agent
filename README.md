@@ -15,16 +15,22 @@ own server. Callable tools come from `@orkestrel/tool` and documents from
 
 ## Install
 
+Install the package from npm:
+
 ```sh
 npm install @orkestrel/agent
 ```
 
 ## Requirements
 
-- Node.js >= 22
+The package targets the following runtime and module formats:
+
+- Node.js >= 22.12.0
 - Dual ESM + CommonJS builds (`import` and `require` both supported)
 
 ## Usage
+
+The following example builds an agent with one tool and streams a turn:
 
 ```ts
 import { createAgent } from '@orkestrel/agent'
@@ -52,11 +58,11 @@ const result = await stream.result // { content, usage?, partial }
 
 ## Guide
 
-[`guides/agent.md`](guides/agent.md) documents the agent-owned surface:
+See [Agent](guides/agent.md) for the agent-owned surface:
 the provider boundary, the `AgentProvider` HTTP engine, the relay, conversations,
-instructions, scopes, authority, durable jobs, the loop, and `AgentContext`. The
-packages it consumes are mirrored alongside it — [`guides/tool.md`](guides/tool.md)
-for callable tools and [`guides/workspace.md`](guides/workspace.md) for files.
+instructions, scopes, authority, durable jobs, the loop, `AgentContext`, and the
+ledger. The packages it consumes are mirrored alongside it; see
+[Tool](guides/tool.md) for callable tools and [Workspace](guides/workspace.md) for files.
 
 ## Package
 

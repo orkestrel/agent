@@ -14,14 +14,14 @@ import { Instruction } from './Instruction.js'
 
 /**
  * Registers the immutable {@link Instruction} instances a richer context assembles a directives block
- * from — keyed by `name` so a re-`add` overwrites, last write wins, and listed by descending
- * `priority`, carrying the `open` / `render` / `close` build contract and an observable `emitter`.
+ * from — keyed by `name` so adding an instruction whose name is already stored overwrites it,
+ * last write wins, and listed by descending `priority`, carrying the `open` / `render` / `close` build contract and an observable `emitter`.
  *
  * @remarks
  * - **Registry.** Instructions live in an insertion-ordered `Map` keyed by `name`;
  *   `add` takes one {@link InstructionInput} or a batch, mints each instruction's
- *   `id`, and a re-`add` of the same name overwrites it (last write wins). `count` is the
- *   map size, `instruction(name)` looks one up, and `instructions()` lists them sorted by
+ *   `id`, and adding an instruction whose name is already stored overwrites it (last write wins).
+ *   `count` is the map size, `instruction(name)` looks one up, and `instructions()` lists them sorted by
  *   descending `priority` (a stable sort, so equal priorities keep insertion order).
  * - **Build contract (the whole format cascade).** `open` is the section header a context
  *   renders the instructions under, `render(instruction)` renders one instruction, and

@@ -101,11 +101,30 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * @returns The concrete relay provider
  * @example Reaching the relay from the browser
  * ```ts
- * import type { ProviderInterface } from '@orkestrel/agent'
- * import { createRelayProvider } from '@orkestrel/agent'
+ * import type { ProviderInterface, ProviderParserInterface } from '@orkestrel/agent'
+ * import { createRelayProvider, ProviderError } from '@orkestrel/agent'
  * import { createAbort } from '@orkestrel/abort'
- * // The browser application supplies this parser dependency.
- * import { createNDJSONParser } from '@orkestrel/ndjson'
+ * import { isRecord, parseJSONAs } from '@orkestrel/contract'
+ *
+ * class RelayFrameParser implements ProviderParserInterface {
+ * 	#pending = ''
+ * 	parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
+ * 		this.#pending += chunk
+ * 		const lines = this.#pending.split(/\r\n|\n/)
+ * 		this.#pending = lines.pop() ?? ''
+ * 		const records: Array<Readonly<Record<string, unknown>>> = []
+ * 		for (const line of lines) {
+ * 			if (line.trim().length === 0) continue
+ * 			const record = parseJSONAs(line, isRecord)
+ * 			if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+ * 			records.push(record)
+ * 		}
+ * 		return records
+ * 	}
+ * 	clear(): void {
+ * 		this.#pending = ''
+ * 	}
+ * }
  *
  * declare const bearer: string
  * const abort = createAbort()
@@ -113,7 +132,7 @@ export function createRelay(options: RelayOptions): RelayHandler {
  *
  * const browser: ProviderInterface = createRelayProvider({
  * 	url: 'https://app.example/relay',
- * 	parser: createNDJSONParser,
+ * 	parser: () => new RelayFrameParser(),
  * 	headers: () => ({ authorization: `Bearer ${bearer}` }),
  * })
  * const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's
