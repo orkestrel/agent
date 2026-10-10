@@ -188,8 +188,9 @@ export type ConversationEventMap = {
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
  * folds every exchange before the newest user message into one section). `sections` is an
  * optional cap on the compacted `sections` list — when set (`>= 1`), a `compact()` that would
- * leave more than `sections` sections folds the oldest overflow into one merged section so the
- * list never exceeds `sections`, emitting `collapse`. Default: no cap.
+ * leave more than `sections` entries folds the oldest overflow into one merged section,
+ * emitting `collapse`. A successful capped merge retains at most `Math.ceil(sections)` entries;
+ * fractions and positive infinity are accepted. Default: no cap.
  * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, compacted
  * `sections`, and live tail are restored into the conversation, with the live `summarize` /
  * `keep` / `on` supplied alongside it (a summarizer is a function, not serialized data).

@@ -205,9 +205,7 @@ export class Conversation implements ConversationInterface {
 		}
 		for (const message of slice) this.#messages.delete(message.id)
 		this.#sections = [...this.#sections, section]
-		// An overflow past `cap` folds the oldest sections into one merged section, a further
-		// summarizer call over their summaries, so `#sections.length === cap` afterward. A throwing
-		// merge call leaves the sections at `cap + 1` and propagates before `compact` is emitted.
+		// Preserve the original sections if the merge fails by replacing them only after summarizing.
 		if (cap !== undefined && this.#sections.length > cap) {
 			const overflow = this.#sections.length - cap + 1
 			const folded = this.#sections.slice(0, overflow)

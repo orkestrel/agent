@@ -178,9 +178,9 @@ export function findLedgerCall(group: readonly Message[], message: Message): Too
  * Ranks a briefing source for removal before the next prompt.
  *
  * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, or 3 for a name match
- * @param loose - If `true`, the source is a user message without a decisive category; if `false`, it is another source
+ * @param unsettled - If `true`, the source is a user message without a decisive category; if `false`, it is another source
  * @param category - The source's recorded category, or undefined when undecided
- * @returns The ascending removal rank: name matches, loose sources, off-topic corrections, off-topic rules, then topic matches
+ * @returns The ascending removal rank: name matches, unsettled sources, off-topic corrections, off-topic rules, then topic matches
  * @remarks
  * The planner removes lower ranks first. Equal ranks 0, 1, and 4 remove lower scores first;
  * every equal rank then removes later conversation positions first.
@@ -191,10 +191,10 @@ export function findLedgerCall(group: readonly Message[], message: Message): Too
  */
 export function rankLedgerCut(
 	group: LedgerPlanningGroup,
-	loose: boolean,
+	unsettled: boolean,
 	category: LedgerCategory | undefined,
 ): number {
-	return group === 3 ? 0 : loose ? 1 : group === 2 ? (category === 'rule' ? 3 : 2) : 4
+	return group === 3 ? 0 : unsettled ? 1 : group === 2 ? (category === 'rule' ? 3 : 2) : 4
 }
 
 /**
@@ -494,7 +494,7 @@ export function matchEntities(
  *
  * A live message joins the owner records its entities name, directly or through a linked lookup
  * argument. A message that names no owner joins where its earlier side of an amendment pair joins,
- * or on the rules record when it is filed as a rule or a correction, and is loose otherwise.
+ * or on the rules record when it is filed as a rule or a correction, and is an orphan otherwise.
  *
  * A sentence an amending message made stale is left out and listed in `stale`. An amending message
  * that is itself replaced keeps that effect, so the old value never revives.
@@ -539,10 +539,10 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const holders = [...input.owners.values()].flat()
 	const system = collectNames(input.system)
 	const members = new Map<string, string[]>()
-	const loose: string[] = []
+	const orphans: string[] = []
 	for (const id of live) {
 		const keys = placeMember(input, links, amending, id, new Set())
-		if (keys.size === 0) loose.push(id)
+		if (keys.size === 0) orphans.push(id)
 		for (const key of keys) members.set(key, [...(members.get(key) ?? []), id])
 	}
 	const records = [...members]
@@ -575,7 +575,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 				(left.record.key < right.record.key ? -1 : left.record.key > right.record.key ? 1 : 0),
 		)
 		.map(({ record }) => record)
-	return { records, stale, orphans: loose }
+	return { records, stale, orphans }
 }
 
 /**
@@ -860,7 +860,7 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
  * @param amending - The earlier sides of each message's amendment pairs
  * @param id - The message id
  * @param seen - The ids already visited, which stops a cycle of amendment pairs
- * @returns The record keys, empty when the message is loose
+ * @returns The record keys, empty when the message is an orphan
  *
  * @example
  * ```ts

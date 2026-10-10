@@ -936,6 +936,34 @@ describe('Conversation — sections cap', () => {
 		expect(() => new Conversation({ sections: 1.5 })).not.toThrow()
 	})
 
+	it('retains at most the ceiling of a fractional cap after a successful merge', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 1.5 })
+		const events = createRecorders<ConversationEventMap, 'collapse'>(conversation.emitter, [
+			'collapse',
+		])
+		conversation.add([
+			{ role: 'user', content: 'First request.' },
+			{ role: 'assistant', content: 'First answer.' },
+			{ role: 'user', content: 'Second request.' },
+		])
+		await conversation.compact()
+		conversation.add([
+			{ role: 'assistant', content: 'Second answer.' },
+			{ role: 'user', content: 'Third request.' },
+		])
+		await conversation.compact()
+
+		expect(conversation.sections).toHaveLength(2)
+		expect(conversation.sections.length).toBeLessThanOrEqual(Math.ceil(1.5))
+		expect(events.collapse.count).toBe(1)
+		expect(events.collapse.calls[0]?.[0].messages.map(({ content }) => content)).toEqual([
+			'First request.',
+			'First answer.',
+		])
+		expect(stub.calls.map((messages) => messages.length)).toEqual([2, 2, 1])
+	})
+
 	it('throws ConversationError code SECTIONS for a zero or negative per-compact override', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })

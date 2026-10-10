@@ -3,6 +3,7 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
+	AgentEventMap,
 	JudgeAnswer,
 	JudgeInterface,
 	JudgeRequest,
@@ -164,7 +165,7 @@ await new GuideCommand({
 		LEDGER_DESK_THRESHOLDS,
 	} = await import('./setup.js')
 	const { createFixtureServer } = await import('./setupServer.js')
-	const { describe, expect, it } = await import('vitest')
+	const { describe, expect, expectTypeOf, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
 	// an `it` body because `AgentProvider` is only in scope after the dynamic barrel import.
@@ -687,6 +688,63 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				'A fold never takes the newest user message or any message after it, because that message is the request a run serves.',
 			)
+		})
+
+		it('keeps the push surface on the Agent, the managers, and each conversation (the observation clause)', () => {
+			const conversations = createConversationManager()
+			const context = barrel.createAgentContext({ conversations })
+			const provider = new TextProvider({ url: 'https://text.test' })
+
+			expect(['emitter' in context, 'emitter' in conversations, 'emitter' in provider]).toEqual([
+				false,
+				false,
+				false,
+			])
+			expect([
+				'emitter' in context.instructions,
+				'emitter' in barrel.createScopeManager(),
+				'emitter' in requireValue(conversations.active, 'Missing conversation'),
+				'emitter' in createAgent(provider),
+			]).toEqual([true, true, true, true])
+			expectTypeOf<keyof AgentEventMap>().toEqualTypeOf<
+				| 'start'
+				| 'turn'
+				| 'tool'
+				| 'usage'
+				| 'deny'
+				| 'finish'
+				| 'error'
+				| 'abort'
+				| 'exhaust'
+				| 'fault'
+				| 'select'
+			>()
+		})
+
+		it('records and reads a judgment as the judgment-recording fence shows', () => {
+			const conversation = createConversation()
+			const complaint = conversation.add({
+				role: 'user',
+				content: 'I was charged twice for one order.',
+			})
+
+			conversation.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [complaint.id],
+				state: complaint.content,
+			})
+
+			const refund = requireValue(conversation.judgments.judgment('refund'), 'Missing judgment')
+			const recorded = conversation.judgments.judgments()
+			const snapshot = conversation.snapshot()
+			expect(refund).toMatchObject({ id: 'refund', sources: [complaint.id], model: 'tev1:0.8b' })
+			expect(Number.isSafeInteger(refund.time)).toBe(true)
+			expect(recorded).toEqual([refund])
+			expect(snapshot.judgments).toEqual([refund])
+			expect(createConversation({ snapshot }).judgments.judgments()).toEqual([refund])
 		})
 
 		it('folds whole exchanges and a leading greeting only with the first (the compaction exchange rule)', async () => {

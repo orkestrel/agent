@@ -141,7 +141,7 @@ describe('extracted ledger leaves', () => {
 })
 
 describe('rankLedgerCut', () => {
-	it('ranks name matches before loose sources, off-topic corrections, rules, and on-topic sources', () => {
+	it('ranks name matches before unsettled sources, off-topic corrections, rules, and on-topic sources', () => {
 		expect(rankLedgerCut(3, true, 'rule')).toBe(0)
 		expect(rankLedgerCut(1, true, 'fact')).toBe(1)
 		expect(rankLedgerCut(2, false, 'correction')).toBe(2)
@@ -648,7 +648,7 @@ describe('placeMember', () => {
 		])
 	})
 
-	it('stops at a cycle of amendment pairs and leaves a message with no category loose', () => {
+	it('stops at a cycle of amendment pairs and leaves a message with no category as an orphan', () => {
 		const cycle = new Map([
 			['user-05', ['user-07']],
 			['user-07', ['user-05']],
@@ -881,7 +881,7 @@ describe('buildRecords', () => {
 		expect(buildRecords(input).records.map((record) => record.title)).toEqual(['account BW-20931'])
 	})
 
-	it('lists a live message that no record placed as loose', () => {
+	it('lists a live message that no record placed as an orphan', () => {
 		const input = buildLedgerInput({
 			messages: [buildLedgerMessage('user-a', 'user', 'Nothing names an owner here.')],
 		})

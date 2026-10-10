@@ -793,10 +793,10 @@ export class Ledger implements LedgerInterface {
 			.map(renderLedgerPinned)
 			.join('\n\n')
 		const pinned: string[] = []
-		const unsettled: string[] = []
+		const rules: string[] = []
 		const done = new Set<string>()
 		for (const unit of units) {
-			const block = unit.key === LEDGER_RULES_KEY ? unsettled : pinned
+			const block = unit.key === LEDGER_RULES_KEY ? rules : pinned
 			for (const [source, lines] of Map.groupBy(unit.lines, (line) => line.source)) {
 				if (done.has(source)) continue
 				done.add(source)
@@ -806,16 +806,16 @@ export class Ledger implements LedgerInterface {
 			}
 		}
 		const body = [owners, pinned.join('\n')].filter((text) => text !== '').join('\n\n')
-		const rules = records.find(
-			(record) => record.key === LEDGER_RULES_KEY && record.lines.length > 0,
+		const record = records.find(
+			(candidate) => candidate.key === LEDGER_RULES_KEY && candidate.lines.length > 0,
 		)
 		return [
 			body === '' ? '' : `## Pinned\n${body}`,
-			rules === undefined
-				? unsettled.length === 0
+			record === undefined
+				? rules.length === 0
 					? ''
-					: ['## Rules', ...unsettled].join('\n')
-				: [renderLedgerRecord(rules), ...unsettled].join('\n'),
+					: ['## Rules', ...rules].join('\n')
+				: [renderLedgerRecord(record), ...rules].join('\n'),
 		]
 			.filter((text) => text !== '')
 			.join('\n\n')
