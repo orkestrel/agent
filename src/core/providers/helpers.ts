@@ -1,12 +1,13 @@
 import type {
 	ProviderOptions,
 	ProviderResult,
+	Reading,
 	SystemOneAnswer,
 	SystemOneQuestion,
 	SystemOneUsage,
 	TextRead,
 } from './types.js'
-import type { JudgeAnswer, JudgeQuestion, JudgeResult, Reading, Refusal } from '../types.js'
+import type { JudgeAnswer, JudgeQuestion, JudgeResult, Refusal } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall } from '@orkestrel/tool'
 import { isTokenUsage } from '@orkestrel/budget'

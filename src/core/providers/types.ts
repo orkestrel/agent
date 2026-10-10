@@ -369,6 +369,16 @@ export type JudgeErrorCode =
 	/** Reports a request refused before inference: an empty question map, a malformed question or state, a wire limit, or a judge configuration that would refuse every request. */
 	| 'QUESTION'
 
+/** Carries the measures `computeReading` derives from an answer; nothing stores them. */
+export interface Reading {
+	/** Holds the first strictly greatest candidate in enumeration order: an option name, a level index, or true or false. */
+	readonly winner: string
+	readonly probability: number
+	readonly confidence: number
+	/** Holds the expected level of a score answer; the protocol's score field. */
+	readonly score?: number
+}
+
 /** Configures the System One server, model, transport, authentication, and deadline. */
 export interface SystemOneJudgeOptions extends Pick<
 	ProviderOptions,

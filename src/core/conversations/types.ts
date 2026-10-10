@@ -1,42 +1,12 @@
 import type {
-	JudgeAnswer,
 	JudgeInterface,
-	JudgeQuestion,
 	JudgeRequest,
+	Judgment,
+	JudgmentInput,
 	Message,
 	MessageInput,
-	Refusal,
 } from '../types.js'
-import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
-
-/** Records an answered or refused question with its sources, state, model, and storage time. */
-export interface Judgment {
-	readonly id: string
-	readonly question: JudgeQuestion
-	/** Carries the answer when the question was answered; mutually exclusive with refusal. */
-	readonly answer?: JudgeAnswer
-	/** Carries the refusal when the question was refused; mutually exclusive with answer. */
-	readonly refusal?: Refusal
-	readonly model: string
-	readonly sources: readonly string[]
-	readonly state: string
-	readonly time: number
-	/** Carries usage only when the answering request held this question alone. */
-	readonly usage?: TokenUsage
-}
-
-/** Supplies an answered or refused question for storage before its time is stamped. */
-export interface JudgmentInput {
-	readonly id: string
-	readonly question: JudgeQuestion
-	readonly answer?: JudgeAnswer
-	readonly refusal?: Refusal
-	readonly model: string
-	readonly sources: readonly string[]
-	readonly state: string
-	readonly usage?: TokenUsage
-}
 
 /** Stores judgments by caller key and resolves requests by reusing matching records. */
 export interface JudgmentManagerInterface {
@@ -404,7 +374,7 @@ export interface ConversationInterface {
 	 * their own exchange, retained until the first user exchange can also fold. A cut inside an
 	 * exchange moves back to its start, so a fold removes whole exchanges. An assistant message with
 	 * calls and the tool messages that answer it, grouped as
-	 * {@link import('./helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
+	 * {@link import('../helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
 	 * a group moves before its assistant message, then back to whole exchanges again. Only a group
 	 * that spans two exchanges reaches that rule.
 	 *

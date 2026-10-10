@@ -59,7 +59,7 @@ import {
 } from '@src/core'
 import { isTokenUsage } from '@orkestrel/budget'
 import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
-import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForAbort, waitForDelay } from '@orkestrel/test'
 import { createTool, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
@@ -402,15 +402,10 @@ export class RecordingJudge implements JudgeInterface {
 
 // ── Scripted ProviderInterface (Ollama-free agent fixture) ───────────────────
 //
-// The ONE general scripted `ProviderInterface` every Ollama-free agent
-// test drives — the agent-job tests, the deterministic loop tests (tool iteration, the
-// chunk stream, generate↔stream parity, abort / budget bounds, status, the emitter),
-// and the provider-agnosticism proof. The LIVE model is exercised separately in the
-// `src:ollama` project. It is a real provider (NOT a mock of the agent): `stream`
-// chunks the turn's content into deltas and RETURNS the result, honouring its `signal`
-// between every delta exactly like the Ollama provider (an abort throws a
-// `ProviderAbortError` carrying the accumulated partial), so a cancel threaded into the
-// agent commits a genuine partial.
+// The scripted provider is a real `ProviderInterface`, not a mock of the agent: `stream`
+// chunks the turn's content into deltas and returns the result, honouring its `signal`
+// between every delta (an abort throws a `ProviderAbortError` carrying the accumulated
+// partial), so an abort threaded into the agent commits a genuine partial.
 
 /**
  * Replays one turn of a {@link createScriptedProvider} script — either a bare {@link ProviderResult}
@@ -443,11 +438,11 @@ export interface ScriptedCall {
 }
 
 /** Chunks a turn's content into the stream deltas a {@link createScriptedProvider} emits. */
-export type DeltasOf = (content: string) => readonly string[]
+export type DeltaFunction = (content: string) => readonly string[]
 
 /**
- * Options for {@link createScriptedProvider} — every field optional, defaulting to the
- * original single-delta / repeat-on-exhaust behaviour.
+ * Carries the options {@link createScriptedProvider} reads — every field optional, defaulting
+ * to the original single-delta / repeat-on-exhaust behaviour.
  *
  * @remarks
  * - `delay` — ms paused at the start of each call (lets a test observe concurrency through
@@ -458,7 +453,7 @@ export type DeltasOf = (content: string) => readonly string[]
  * - `deltasOf` — how a turn's content is chunked into stream deltas; defaults to one whole
  *   delta (`(content) => [content]`). A per-turn `deltas` (the `{ result, deltas }` turn
  *   form) overrides this for that turn.
- * - `exhaust` — what happens once the turn list is consumed: `'repeat'` (the DEFAULT — the
+ * - `exhaust` — what happens after the turn list is consumed: `'repeat'` (the DEFAULT — the
  *   last turn repeats, so a job with extra tool-iterations still resolves) or `'throw'` (a
  *   call past the end throws, to assert a bounded loop never over-ran the script).
  * - `record` — when `true`, every call appends its `messages` / `tools` / `signal` to `calls`.
@@ -467,7 +462,7 @@ export interface ScriptedProviderOptions {
 	readonly replay?: ThinkingReplay
 	readonly delay?: number
 	readonly name?: string
-	readonly deltasOf?: DeltasOf
+	readonly deltasOf?: DeltaFunction
 	readonly exhaust?: 'repeat' | 'throw'
 	readonly record?: boolean
 }
@@ -495,7 +490,7 @@ export interface ScriptedProviderInterface extends ProviderInterface {
  * @param turn - The scripted turn to normalize
  * @returns The turn's `result` plus its per-turn `deltas` / `thoughts` (`undefined` for a bare result)
  */
-export function turnParts(turn: ScriptedTurn): {
+export function splitTurn(turn: ScriptedTurn): {
 	readonly result: ProviderResult
 	readonly deltas: readonly string[] | undefined
 	readonly thoughts: readonly string[] | undefined
@@ -506,7 +501,7 @@ export function turnParts(turn: ScriptedTurn): {
 }
 
 /**
- * Chunks a turn's whole content into ONE stream delta — the default {@link DeltasOf} a
+ * Chunks a turn's whole content into ONE stream delta — the default {@link DeltaFunction} a
  * {@link ScriptedProvider} applies when neither a per-turn `deltas` nor an options `deltasOf`
  * overrides it.
  *
@@ -524,7 +519,7 @@ export function chunkWholeDelta(content: string): readonly string[] {
  * as one delta), and RETURNS the turn's result. The call honours its `signal` between every
  * delta: an already-aborted (or mid-stream aborted) signal throws a `ProviderAbortError`
  * carrying the accumulated partial, so a cancel threaded into the agent commits a genuine
- * partial. Once the turn list is exhausted the last turn repeats (`exhaust: 'repeat'`, the
+ * partial. After the turn list is exhausted the last turn repeats (`exhaust: 'repeat'`, the
  * default) unless `exhaust: 'throw'` is set.
  *
  * @param turns - The {@link ScriptedTurn}s to replay in order (the last repeats by default)
@@ -559,35 +554,41 @@ export class RelayParser implements ProviderParserInterface {
 	}
 }
 
-/** Creates fresh NDJSON framing for a relay response. */
+/**
+ * Creates fresh NDJSON framing for a relay response.
+ *
+ * @returns A parser that frames newline-delimited JSON records
+ */
 export function createParser(): ProviderParserInterface {
 	return new RelayParser()
 }
 
-/** Creates a real POST request carrying the supplied relay body. */
-export function createRelayRequest(body = '{"messages":[]}', signal?: AbortSignal): Request {
-	return new Request('http://relay.test/', {
-		method: 'POST',
-		body,
-		...(signal === undefined ? {} : { signal }),
-	})
-}
-
-/** Creates a streamed POST request for body-read failure and cancellation proofs. */
-export function createStreamingRelayRequest(
-	body: ReadableStream<Uint8Array>,
+/**
+ * Creates a real POST request carrying the supplied relay body. A stream body adds the
+ * `duplex: 'half'` member a streamed request needs.
+ *
+ * @param body - The request body: a string, or a stream for body-read failure and abort proofs
+ * @param signal - The signal the request carries; omitted leaves the request unbound
+ * @returns The POST request
+ */
+export function createRelayRequest(
+	body: string | ReadableStream<Uint8Array> = '{"messages":[]}',
 	signal?: AbortSignal,
 ): Request {
 	const options = {
 		method: 'POST',
 		body,
-		duplex: 'half',
+		...(typeof body === 'string' ? {} : { duplex: 'half' }),
 		...(signal === undefined ? {} : { signal }),
 	}
 	return new Request('http://relay.test/', options)
 }
 
-/** Creates a JSON-shaped proxy with a synthetic serializer that returns a bigint. */
+/**
+ * Creates a JSON-shaped proxy with a synthetic serializer that returns a bigint.
+ *
+ * @returns A record whose `toJSON` member returns a bigint
+ */
 export function createHostileSerializer(): Readonly<Record<string, unknown>> {
 	return new Proxy(
 		{ x: 1 },
@@ -611,7 +612,7 @@ export function createHostileSerializer(): Readonly<Record<string, unknown>> {
 export class ScriptedProvider implements ScriptedProviderInterface {
 	readonly replay?: ThinkingReplay
 	readonly #turns: readonly ScriptedTurn[]
-	readonly #deltasOf: DeltasOf
+	readonly #deltasOf: DeltaFunction
 	readonly #exhaust: 'repeat' | 'throw'
 	readonly #record: boolean
 	readonly #delay: number
@@ -667,7 +668,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		try {
 			if (signal.aborted) throw new ProviderAbortError({ content: '' })
 			if (this.#delay > 0) await waitForDelay(this.#delay)
-			const { result, deltas, thoughts } = turnParts(this.#next())
+			const { result, deltas, thoughts } = splitTurn(this.#next())
 			// Per-turn `deltas` win; else chunk the content through `deltasOf`.
 			const chunks = deltas ?? this.#deltasOf(result.content)
 			let streamed = ''
@@ -754,7 +755,7 @@ export class RecordedProvider extends ScriptedProvider {
 	#maximum = 0
 	#steps = 0
 	#returns = 0
-	#cancelled = false
+	#aborted = false
 	constructor(
 		turns: readonly ScriptedTurn[] = [{ content: 'queued' }],
 		gate = Promise.resolve(),
@@ -788,8 +789,8 @@ export class RecordedProvider extends ScriptedProvider {
 	get returns(): number {
 		return this.#returns
 	}
-	get cancelled(): boolean {
-		return this.#cancelled
+	get aborted(): boolean {
+		return this.#aborted
 	}
 	override stream(
 		messages: readonly Message[],
@@ -844,7 +845,7 @@ export class RecordedProvider extends ScriptedProvider {
 		result: ProviderResult | PromiseLike<ProviderResult>,
 	): Promise<IteratorResult<ProviderDelta, ProviderResult>> {
 		this.#returns += 1
-		this.#cancelled = signal.aborted
+		this.#aborted = signal.aborted
 		return iterator.return(result)
 	}
 	// A Node 22 generator carries no `Symbol.asyncDispose`, so disposal is the wrapper's own
@@ -897,7 +898,7 @@ export function createTokenUsage(overrides?: Partial<TokenUsage>): TokenUsage {
  *
  * @returns A working `add` tool returning `5`
  */
-export function addTool(): ToolInterface {
+export function createAddTool(): ToolInterface {
 	return createTool({ name: 'add', execute: () => 5 })
 }
 
@@ -908,7 +909,7 @@ export function addTool(): ToolInterface {
  *
  * @returns A working `loop` tool
  */
-export function loopTool(): ToolInterface {
+export function createLoopTool(): ToolInterface {
 	return createTool({ name: 'loop', execute: () => 'again' })
 }
 
@@ -930,10 +931,9 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
  * Creates a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
  * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
  * folded count), so a `compact()` produces a predictable section summary and the rollup is a
- * predictable summary-of-summaries (a data-stub, NOT a behavior-mock — the LIVE
- * model is exercised separately in the `src:ollama` project). Counts its calls so a test can
- * prove the summarizer calls per compaction (the section digest, plus the rollup regeneration
- * when the `rollup` option is `true`).
+ * predictable summary-of-summaries (a data stub, not a behavior mock). Counts its calls so a
+ * test can prove the summarizer calls per compaction (the section digest, plus the rollup
+ * regeneration when the `rollup` option is `true`).
  *
  * @returns The summarizer plus a live `calls` recorder of every digested message-slice
  */
@@ -1135,6 +1135,24 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 // plain-JSON `toEqual` (no class-identity `toBe`).
 
 /**
+ * Adds three turns (`first`, `second`, `third`) to a conversation and compacts it, so a
+ * conversation configured with `keep: 1` folds the oldest two into one summarized section and
+ * keeps the last live. {@link buildConversationSnapshot} and {@link seedConversation} share
+ * this one copy of the turn data and the fold.
+ *
+ * @param conversation - The conversation to seed and compact
+ * @returns A promise that settles after the compaction
+ */
+export async function compactSeedTurns(conversation: ConversationInterface): Promise<void> {
+	conversation.add([
+		{ role: 'user', content: 'first' },
+		{ role: 'assistant', content: 'second' },
+		{ role: 'user', content: 'third' },
+	])
+	await conversation.compact()
+}
+
+/**
  * Builds a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
  * added, then a genuine `compact()` folds the oldest two into one summarized section + regenerates
  * the opted-in rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is
@@ -1156,13 +1174,7 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 		keep: 1,
 		rollup: true,
 	})
-	conversation.add([
-		{ role: 'user', content: 'first' },
-		{ role: 'assistant', content: 'second' },
-		{ role: 'user', content: 'third' },
-	])
-	// Fold the oldest two into one summarized section + regenerate the rollup; the last stays live.
-	await conversation.compact()
+	await compactSeedTurns(conversation)
 	return conversation.snapshot()
 }
 
@@ -1200,14 +1212,38 @@ export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSna
 	],
 })
 
-// A `makeStore` builds a fresh, empty store for one scenario; `build` is
-// {@link buildConversationSnapshot}. Every scenario below RUNS the store operations and RETURNS
-// their plain results — it asserts nothing, since NO `describe` / `it` / `expect` may enter this
-// module. A consuming suite's own `it` block calls the scenario, then asserts on what it returns.
-export type MakeConversationStore = () => ConversationStoreInterface
-export type BuildConversationSnapshot = (id?: string) => Promise<ConversationSnapshot>
+// Every scenario below drives the store operations and returns their plain results. It asserts
+// nothing, because no `describe` / `it` / `expect` may enter this module. A consuming suite's own
+// `it` block calls the scenario, then asserts on what it returns.
 
-/** Names the literal values a {@link conversationStoreRoundTrip} result must carry, shared by every twin. */
+/** Builds a fresh, empty store for one scenario; each twin supplies its own. */
+export type ConversationStoreFunction = () => ConversationStoreInterface
+
+/** Builds the snapshot a scenario stores; {@link buildConversationSnapshot} is the shared form. */
+export type ConversationSnapshotFunction = (id?: string) => Promise<ConversationSnapshot>
+
+/**
+ * Creates a conforming {@link ConversationStoreInterface} that holds snapshots in a map. The
+ * scenarios need a store to run against, and persistence stays with the store twins' own suites.
+ *
+ * @returns A fresh, empty store keyed by each snapshot's own id
+ */
+export function createFixtureStore(): ConversationStoreInterface {
+	const held = new Map<string, ConversationSnapshot>()
+	return {
+		async get(id) {
+			return held.get(id)
+		},
+		async set(snapshot) {
+			held.set(snapshot.id, snapshot)
+		},
+		async delete(id) {
+			held.delete(id)
+		},
+	}
+}
+
+/** Names the literal values a {@link exerciseConversationStoreRoundTrip} result must carry, shared by every twin. */
 export interface ConversationStoreRoundTripExpectation {
 	readonly sectionSummary: string
 	readonly sectionMessages: readonly string[]
@@ -1220,31 +1256,32 @@ export interface ConversationStoreRoundTripExpectation {
  * summary + retained messages, the live tail, and the rollup summary. Shared so both twin suites (and
  * `setup.test.ts`'s own proof) assert the SAME literals rather than each retyping them.
  */
-export const conversationStoreRoundTripExpectation: ConversationStoreRoundTripExpectation = {
-	sectionSummary: 'recap(first|second)',
-	sectionMessages: ['first', 'second'],
-	liveTail: ['third'],
-	rollupSummary: 'recap(recap(first|second))',
-}
+export const CONVERSATION_STORE_ROUND_TRIP_EXPECTATION: ConversationStoreRoundTripExpectation =
+	Object.freeze({
+		sectionSummary: 'recap(first|second)',
+		sectionMessages: Object.freeze(['first', 'second']),
+		liveTail: Object.freeze(['third']),
+		rollupSummary: 'recap(recap(first|second))',
+	})
 
 /**
- * Runs the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
+ * Drives the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
  * {@link buildConversationSnapshot} snapshot, then get it back. Returns what was stored and what came
  * back, sections + live tail + rollup summary intact, so the caller's `it` block asserts the equality
- * (and the literals in {@link conversationStoreRoundTripExpectation}) itself.
+ * (and the literals in {@link CONVERSATION_STORE_ROUND_TRIP_EXPECTATION}) itself.
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @param build - The snapshot builder ({@link buildConversationSnapshot})
  * @returns The stored `snapshot` and the retrieved `got`
  */
-export async function conversationStoreRoundTrip(
-	makeStore: MakeConversationStore,
-	build: BuildConversationSnapshot,
+export async function exerciseConversationStoreRoundTrip(
+	create: ConversationStoreFunction,
+	build: ConversationSnapshotFunction,
 ): Promise<{
 	readonly snapshot: ConversationSnapshot
 	readonly got: ConversationSnapshot | undefined
 }> {
-	const store = makeStore()
+	const store = create()
 	const snapshot = await build()
 	await store.set(snapshot)
 	const got = await store.get(snapshot.id)
@@ -1252,22 +1289,22 @@ export async function conversationStoreRoundTrip(
 }
 
 /**
- * Runs the upsert scenario: `set` keys off the snapshot's OWN id (no separate id param), so
+ * Drives the upsert scenario: `set` keys off the snapshot's OWN id (no separate id param), so
  * re-setting the same id REPLACES — insert-or-replace semantics, not an append (one entry, latest
  * wins). Returns the replacement and what `get` reads back, for the caller to assert equal.
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @param build - The snapshot builder ({@link buildConversationSnapshot})
  * @returns The replacement `second` snapshot and the retrieved `got`
  */
-export async function conversationStoreUpsert(
-	makeStore: MakeConversationStore,
-	build: BuildConversationSnapshot,
+export async function exerciseConversationStoreUpsert(
+	create: ConversationStoreFunction,
+	build: ConversationSnapshotFunction,
 ): Promise<{
 	readonly second: ConversationSnapshot
 	readonly got: ConversationSnapshot | undefined
 }> {
-	const store = makeStore()
+	const store = create()
 	const first = await build('c')
 	const second: ConversationSnapshot = {
 		id: 'c',
@@ -1280,21 +1317,21 @@ export async function conversationStoreUpsert(
 }
 
 /**
- * Runs the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
+ * Drives the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
  * again — the caller asserts `beforeDelete` is defined and `afterDelete` is `undefined`.
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @param build - The snapshot builder ({@link buildConversationSnapshot})
  * @returns The snapshot read before and after the delete
  */
-export async function conversationStoreDeleteThenAbsent(
-	makeStore: MakeConversationStore,
-	build: BuildConversationSnapshot,
+export async function exerciseConversationStoreDeleteThenAbsent(
+	create: ConversationStoreFunction,
+	build: ConversationSnapshotFunction,
 ): Promise<{
 	readonly beforeDelete: ConversationSnapshot | undefined
 	readonly afterDelete: ConversationSnapshot | undefined
 }> {
-	const store = makeStore()
+	const store = create()
 	const snapshot = await build()
 	await store.set(snapshot)
 	const beforeDelete = await store.get(snapshot.id)
@@ -1304,41 +1341,43 @@ export async function conversationStoreDeleteThenAbsent(
 }
 
 /**
- * Runs the absent-delete scenario: deleting an id that was never stored — the caller asserts the
+ * Drives the absent-delete scenario: deleting an id that was never stored — the caller asserts the
  * settled promise resolves `undefined` rather than rejecting (a no-op).
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @returns The store's own `delete` promise, unsettled
  */
-export function conversationStoreDeleteAbsent(makeStore: MakeConversationStore): Promise<void> {
-	return makeStore().delete('never-stored')
+export function exerciseConversationStoreDeleteAbsent(
+	create: ConversationStoreFunction,
+): Promise<void> {
+	return create().delete('never-stored')
 }
 
 /**
- * Runs the absent-get scenario: getting an id that was never stored — the caller asserts the result
+ * Drives the absent-get scenario: getting an id that was never stored — the caller asserts the result
  * is `undefined`.
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @returns What `get` resolves for an id the store never saw
  */
-export function conversationStoreGetAbsent(
-	makeStore: MakeConversationStore,
+export function exerciseConversationStoreGetAbsent(
+	create: ConversationStoreFunction,
 ): Promise<ConversationSnapshot | undefined> {
-	return makeStore().get('never-stored')
+	return create().get('never-stored')
 }
 
 /**
- * Runs the two-ids-coexist scenario: a real durable store holds many conversations, so distinct ids
+ * Drives the two-ids-coexist scenario: a real durable store holds many conversations, so distinct ids
  * must not clobber each other, and dropping one must leave the other intact. Returns every snapshot
  * and every read, before and after the `alpha` delete, for the caller to assert.
  *
- * @param makeStore - Builds a fresh, empty store (the twin's own factory)
+ * @param create - Builds a fresh, empty store (the twin's own factory)
  * @param build - The snapshot builder ({@link buildConversationSnapshot})
  * @returns The two stored snapshots and the reads before/after dropping `alpha`
  */
-export async function conversationStoreTwoIds(
-	makeStore: MakeConversationStore,
-	build: BuildConversationSnapshot,
+export async function exerciseConversationStoreTwoIds(
+	create: ConversationStoreFunction,
+	build: ConversationSnapshotFunction,
 ): Promise<{
 	readonly alpha: ConversationSnapshot
 	readonly beta: ConversationSnapshot
@@ -1347,7 +1386,7 @@ export async function conversationStoreTwoIds(
 	readonly gotAlphaAfterDelete: ConversationSnapshot | undefined
 	readonly gotBetaAfterDelete: ConversationSnapshot | undefined
 }> {
-	const store = makeStore()
+	const store = create()
 	const alpha = await build('alpha')
 	const beta = await build('beta')
 	await store.set(alpha)
@@ -1370,12 +1409,12 @@ export async function conversationStoreTwoIds(
  * Builds a {@link ToolManagerInterface} pre-seeded with working tools — the registry the agent
  * loop tests hand to an agent so the model has SOMETHING callable.
  *
- * @param tools - The tools to seed; defaults to the canonical {@link addTool}
+ * @param tools - The tools to seed; defaults to the canonical {@link createAddTool}
  * @returns A tool manager holding the supplied tools
  */
 export function createSeededToolManager(tools?: readonly ToolInterface[]): ToolManagerInterface {
 	const manager = new ToolManager()
-	manager.add(tools === undefined ? [addTool()] : [...tools])
+	manager.add(tools === undefined ? [createAddTool()] : [...tools])
 	return manager
 }
 
@@ -1498,12 +1537,12 @@ export const RECORDED_REQUEST: readonly MessageInput[] = Object.freeze([
 	{ role: 'user', content: 'Start with the total.', images: ['RkxPVw=='] },
 ])
 
-/** Options for {@link resolveSectionOpen} — the manager-options `open` override, when one applies. */
+/** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
 export interface SectionOpenOptions {
 	readonly managerOpen?: string
 }
 
-/** Options for {@link resolveSectionRender} — the manager-options `render` and the per-item override. */
+/** Carries the manager-options `render` and the per-item override that {@link resolveSectionRender} reads. */
 export interface SectionRenderOptions {
 	readonly managerRender?: string
 	readonly itemOverride?: string
@@ -1577,13 +1616,7 @@ export async function seedConversation(
 	manager: ConversationManagerInterface,
 	id: string,
 ): Promise<void> {
-	const conversation = manager.add({ id, rollup: true })
-	conversation.add([
-		{ role: 'user', content: 'first' },
-		{ role: 'assistant', content: 'second' },
-		{ role: 'user', content: 'third' },
-	])
-	await conversation.compact()
+	await compactSeedTurns(manager.add({ id, rollup: true }))
 }
 
 /** Holds signals recorded by a transport that rejects every request. */
@@ -1592,7 +1625,11 @@ export interface RefusingTransportInterface {
 	readonly fetch: typeof globalThis.fetch
 }
 
-/** Builds a transport that records the request signal and rejects without network access. */
+/**
+ * Builds a transport that records the request signal and rejects without network access.
+ *
+ * @returns The transport with the signals it recorded
+ */
 export function createRefusingTransport(): RefusingTransportInterface {
 	const signals: AbortSignal[] = []
 	return {
@@ -1607,7 +1644,12 @@ export function createRefusingTransport(): RefusingTransportInterface {
 	}
 }
 
-/** Builds a transport that enqueues each supplied UTF-8 chunk verbatim and closes. */
+/**
+ * Builds a transport that enqueues each supplied UTF-8 chunk verbatim and closes.
+ *
+ * @param chunks - The text chunks the response body delivers, in order
+ * @returns A fetch function that answers every request with an NDJSON stream of the chunks
+ */
 export function createStreamingTransport(chunks: readonly string[]): typeof globalThis.fetch {
 	return () =>
 		Promise.resolve(
@@ -1791,25 +1833,36 @@ export class RecordedHeaders {
 	}
 }
 
-/** Rejects a transport with its own abort exception when the supplied signal expires. */
-export function rejectTransportOnAbort(
+/**
+ * Rejects a transport with its own abort exception when the supplied signal expires.
+ *
+ * @param _input - The request target; unread
+ * @param init - The request init whose `signal` the rejection waits on
+ * @returns A promise rejected with an `AbortError` exception after the signal aborts
+ * @throws Error Thrown when `init` carries no signal
+ */
+export async function rejectTransportOnAbort(
 	_input: RequestInfo | URL,
 	init?: RequestInit,
 ): Promise<Response> {
-	const signal = requireValue(init?.signal)
-	return new Promise((_resolve, reject) => {
-		signal.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')), {
-			once: true,
-		})
-	})
+	await waitForAbort(requireValue(init?.signal))
+	throw new DOMException('x', 'AbortError')
 }
 
-/** Returns true as an array's own hostile `every`, exposing a guard that trusts the method. */
+/**
+ * Returns true as an array's own hostile `every`, exposing a guard that trusts the method.
+ *
+ * @returns True always
+ */
 export function approveEvery(): boolean {
 	return true
 }
 
-/** Throws when a hostile proxy field is read. */
+/**
+ * Throws when a hostile proxy field is read.
+ *
+ * @throws Error Thrown on every call
+ */
 export function throwProxyRead(): never {
 	throw new Error('unreadable field')
 }
@@ -1841,7 +1894,12 @@ export class RecordedTransport {
 	}
 }
 
-/** Drains a provider generator and retains its yielded deltas and terminal value. */
+/**
+ * Drains a provider generator and retains its yielded deltas and terminal value.
+ *
+ * @param stream - The provider generator to drain
+ * @returns Every yielded delta and the generator's returned result
+ */
 export async function drainProvider(
 	stream: AsyncGenerator<ProviderDelta, ProviderResult>,
 ): Promise<{
@@ -1857,7 +1915,13 @@ export async function drainProvider(
 	return { deltas, result: step.value }
 }
 
-/** Records the global fetch receiver while returning a real response without network access. */
+/**
+ * Records the global fetch receiver while returning a real response without network access.
+ *
+ * @param input - The request target
+ * @param init - The request init
+ * @returns A response whose body names the receiver (`c:global` or `c:unbound`) and whose `X-Request` header carries the request method
+ */
 export function recordGlobalTransport(
 	this: unknown,
 	input: RequestInfo | URL,
@@ -1870,8 +1934,12 @@ export function recordGlobalTransport(
 	)
 }
 
-/** Supplies a callable value for non-JSON domain argument fixtures. */
-export function domainArgument(): string {
+/**
+ * Returns a callable value for non-JSON domain argument fixtures.
+ *
+ * @returns The string `domain`
+ */
+export function returnDomain(): string {
 	return 'domain'
 }
 
@@ -2017,7 +2085,8 @@ export class ScriptedJudge extends AgentJudge {
 		}
 	}
 }
-/** Holds the exact Ollama 0.40.0 request recorded in systemone-tev1-request.json on 2026-10-07. */
+
+/** Holds the exact Ollama 0.40.0 request recorded on 2026-10-07 for the tev1 label, refund, and severity questions. */
 export const SYSTEM_ONE_TEV1_REQUEST = Object.freeze({
 	model: 'tev1:0.8b',
 	state: 'Our checkout has returned 500 errors since 9am. I want a refund for today.',
@@ -2043,7 +2112,7 @@ export const SYSTEM_ONE_TEV1_REQUEST = Object.freeze({
 	},
 })
 
-/** Holds the HTTP 200 body recorded in systemone-tev1.json on 2026-10-07. */
+/** Holds the HTTP 200 body recorded on 2026-10-07 for {@link SYSTEM_ONE_TEV1_REQUEST}. */
 export const SYSTEM_ONE_TEV1 = Object.freeze({
 	model: 'tev1:0.8b',
 	answers: {
@@ -2077,7 +2146,7 @@ export const SYSTEM_ONE_TEV1 = Object.freeze({
 	usage: { input_tokens: 975, output_tokens: 4 },
 })
 
-/** Holds the exact request recorded in systemone-tev1-object-request.json on 2026-10-07. */
+/** Holds the exact request recorded on 2026-10-07 for a structured state and one intent question. */
 export const SYSTEM_ONE_OBJECT_REQUEST = Object.freeze({
 	model: 'tev1:0.8b',
 	state: { message: 'Hi, I was charged twice', plan: 'pro' },
@@ -2090,7 +2159,7 @@ export const SYSTEM_ONE_OBJECT_REQUEST = Object.freeze({
 	},
 })
 
-/** Holds the HTTP 200 body recorded in systemone-tev1-object.json on 2026-10-07. */
+/** Holds the HTTP 200 body recorded on 2026-10-07 for {@link SYSTEM_ONE_OBJECT_REQUEST}. */
 export const SYSTEM_ONE_OBJECT = Object.freeze({
 	model: 'tev1:0.8b',
 	answers: {
@@ -2137,7 +2206,7 @@ export const SYSTEM_ONE_MICA = Object.freeze({
 	usage: { input_tokens: 975, output_tokens: 0 },
 })
 
-/** Holds the HTTP 400 responses recorded in systemone-errors.json and systemone-mica-refusal.json. */
+/** Holds the HTTP 400 responses recorded for malformed System One requests and a model without decision support. */
 export const SYSTEM_ONE_ERRORS = Object.freeze([
 	{ status: 400, body: { error: 'questions must contain 1–64 fields' } },
 	{ status: 400, body: { error: 'question "q": type must be choice, noul, or score' } },
@@ -2194,7 +2263,7 @@ export const SYSTEM_ONE_JUDGE_OBJECT: JudgeRequest = Object.freeze<JudgeRequest>
 	},
 })
 
-/** Holds the TypeSafe quickstart sentence from introduction/quickstart.md as recorded on 2026-10-07. */
+/** Holds the quickstart sentence of the System One documentation, recorded on 2026-10-07. */
 export const SYSTEM_ONE_QUICKSTART_STATE =
 	"Hi, I've been trying to connect my Stripe account for 3 days and the integration keeps failing. I'm losing sales. Please help ASAP."
 

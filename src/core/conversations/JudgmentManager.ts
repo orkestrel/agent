@@ -1,11 +1,18 @@
-import type { Judgment, JudgmentInput, JudgmentManagerInterface } from './types.js'
-import type { JudgeInterface, JudgeQuestion, JudgeRequest } from '../types.js'
+import type { JudgmentManagerInterface } from './types.js'
+import type {
+	JudgeInterface,
+	JudgeQuestion,
+	JudgeRequest,
+	Judgment,
+	JudgmentInput,
+} from '../types.js'
 import { isArray, isRecord } from '@orkestrel/contract'
 import { ConversationError } from './errors.js'
-import { buildJudgments, matchesJudgment } from './helpers.js'
+import { buildJudgments } from './helpers.js'
 import { isJudgment } from './validators.js'
+import { copyJSON } from '../cloners.js'
 import { JudgeAbortError, isJudgeAbortError } from '../errors.js'
-import { copyJSON, removeEntries } from '../helpers.js'
+import { matchesJudgment, removeEntries } from '../helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**

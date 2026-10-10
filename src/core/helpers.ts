@@ -1,6 +1,6 @@
-import type { Message, ThinkingReplay } from './types.js'
+import type { JudgeQuestion, Judgment, Message, ThinkingReplay } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { attempt, isFiniteNumber, parseJSON } from '@orkestrel/contract'
+import { isFiniteNumber } from '@orkestrel/contract'
 
 /**
  * Filters a list of items by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
@@ -205,23 +205,132 @@ export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean
 }
 
 /**
- * Owns a value by serializing it to JSON and parsing the text, so the copy shares nothing with its source.
+ * Collects whole exchanges, joining every exchange spanned by a tool group.
  *
  * @remarks
- * A value that JSON cannot carry, such as a cycle or a bigint, and a value that serializes to
- * nothing, such as a function, both return undefined, so a guard over the result refuses them.
- * A proxied value serializes through its traps, where a structured clone refuses it.
+ * A user message opens an exchange that ends before the next user message. Leading messages
+ * form their own exchange. A tool group joins every exchange between its first and last member.
  *
- * @param value - The value to own
- * @returns The owned JSON copy, or undefined when the value is not JSON
+ * @param messages - The messages in prompt order
+ * @returns The exchanges in prompt order, with each message retained unchanged
  * @example
  * ```ts
- * copyJSON({ state: 'A ticket.' }) // { state: 'A ticket.' }
- * copyJSON(() => 1) // undefined
+ * collectExchanges([
+ * 	{ id: 'greeting', role: 'assistant', content: 'Welcome.' },
+ * 	{ id: 'request', role: 'user', content: 'Read the order.' },
+ * ]) // a leading exchange and a request exchange
  * ```
  */
-export function copyJSON(value: unknown): unknown {
-	const text = attempt(() => JSON.stringify(value))
-	if (!text.success || typeof text.value !== 'string') return undefined
-	return parseJSON(text.value)
+export function collectExchanges(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
+	const boundaries = new Set([0])
+	const positions = new Map(messages.map((message, index) => [message, index]))
+	for (const [index, message] of messages.entries())
+		if (message.role === 'user') boundaries.add(index)
+	for (const group of collectToolGroups(messages)) {
+		let start = messages.length
+		let end = 0
+		for (const message of group) {
+			const position = positions.get(message)
+			if (position === undefined) continue
+			start = Math.min(start, position)
+			end = Math.max(end, position)
+		}
+		for (const boundary of boundaries)
+			if (start < boundary && boundary <= end) boundaries.delete(boundary)
+	}
+	const exchanges: Message[][] = []
+	for (const [index, message] of messages.entries()) {
+		if (boundaries.has(index)) exchanges.push([])
+		exchanges.at(-1)?.push(message)
+	}
+	return exchanges
+}
+
+/**
+ * Collects each assistant message that carries calls together with the tool messages that answer
+ * it, then each run of tool messages that no assistant message owns.
+ *
+ * @remarks
+ * A tool message belongs to the one assistant message whose calls hold its `call` id. Without that
+ * unique owner, it belongs to the assistant message that leads its run of tool messages when that
+ * leader holds the id, repeats a call id, or the tool message has no `call`. Any other tool message
+ * joins the orphan run it sits in. Compaction and the stock selection each keep a group on one side
+ * of their cut.
+ *
+ * @param messages - The messages in prompt order
+ * @returns The owned groups in owner order, then the orphan runs, each in prompt order
+ * @example
+ * ```ts
+ * collectToolGroups([
+ * 	{ id: 'lookup', role: 'assistant', content: '', calls: [{ id: 'order', name: 'lookup', arguments: {} }] },
+ * 	{ id: 'result', role: 'tool', content: 'LH-81660 is late', call: 'order' },
+ * ]) // one group holding the lookup call and its result
+ * ```
+ */
+export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
+	const groups = new Map<Message, Message[]>()
+	const calls = new Map<string, Message[]>()
+	for (const message of messages) {
+		if (message.role !== 'assistant' || !message.calls?.length) continue
+		groups.set(message, [message])
+		for (const call of message.calls) {
+			const owners = calls.get(call.id) ?? []
+			owners.push(message)
+			calls.set(call.id, owners)
+		}
+	}
+	let leader: Message | undefined
+	let orphan: Message[] = []
+	const orphans: Message[][] = []
+	for (const message of messages) {
+		if (message.role !== 'tool') {
+			leader = groups.has(message) ? message : undefined
+			orphan = []
+			continue
+		}
+		const local = leader?.calls ?? []
+		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+		const paired =
+			leader !== undefined &&
+			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
+		const owners = message.call === undefined ? undefined : calls.get(message.call)
+		const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
+		const group = owner === undefined ? undefined : groups.get(owner)
+		if (group !== undefined) group.push(message)
+		else {
+			if (orphan.length === 0) orphans.push(orphan)
+			orphan.push(message)
+		}
+	}
+	return [...groups.values(), ...orphans]
+}
+
+/**
+ * Matches a recorded question, ordered sources, rendered state, and judge identity by JSON text, so key order counts.
+ *
+ * @param judgment - The recorded judgment to compare
+ * @param question - The question to ask
+ * @param sources - The ordered source message ids
+ * @param state - The rendered state to compare
+ * @param model - The configured judge identity
+ * @returns True if every identity component matches; false otherwise
+ * @example
+ * ```ts
+ * matchesJudgment(judgment, question, ['message-a'], 'Charged twice', judge.model)
+ * ```
+ */
+export function matchesJudgment(
+	judgment: Judgment,
+	question: JudgeQuestion,
+	sources: readonly string[],
+	state: string,
+	model: string,
+): boolean {
+	return (
+		judgment.model === model &&
+		judgment.state === state &&
+		judgment.sources.length === sources.length &&
+		judgment.sources.every((id, index) => id === sources[index]) &&
+		JSON.stringify(judgment.question) === JSON.stringify(question)
+	)
 }

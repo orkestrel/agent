@@ -1,5 +1,4 @@
-import type { JudgeEntry, JudgeQuestion, Message } from './types.js'
-import { MESSAGE_ROLES } from './constants.js'
+import type { JudgeEntry, JudgeQuestion } from './types.js'
 import {
 	arrayOf,
 	attempt,
@@ -10,40 +9,6 @@ import {
 	nullableOf,
 	optionalOf,
 } from '@orkestrel/contract'
-import { isToolCall } from '@orkestrel/tool'
-
-/**
- * Checks whether a value satisfies the domain conversation-message contract.
- *
- * @remarks
- * Roles belong to MessageRole, image elements are strings, `thinking` is a string, and `call` is a string on any
- * role, as the flat Message type admits. Tool arguments may carry non-JSON values, as the
- * domain type permits; the message wire contract is narrower. Unreadable fields and hostile
- * inputs return false.
- *
- * @param value - The unknown message candidate
- * @returns True if the domain message fields are valid; false otherwise
- * @example
- * ```ts
- * isMessage({ id: '1', role: 'user', content: 'hi' }) // true
- * isMessage({ id: '1', role: 'other', content: '' }) // false
- * isMessage({ id: '1', role: 'user', content: '', images: [1] }) // false
- * isMessage({ id: '1', role: 'assistant', content: '', thinking: 1 }) // false
- * ```
- */
-export function isMessage(value: unknown): value is Message {
-	const checked = attempt(() => {
-		if (!isRecord(value)) return false
-		const { id, role, content, calls, call, images, thinking } = value
-		if (!isString(id) || !isString(content)) return false
-		if (!MESSAGE_ROLES.some((one) => one === role)) return false
-		if (calls !== undefined && !arrayOf(isToolCall)(calls)) return false
-		if (call !== undefined && !isString(call)) return false
-		if (images !== undefined && !arrayOf(isString)(images)) return false
-		return thinking === undefined || isString(thinking)
-	})
-	return checked.success && checked.value
-}
 
 /**
  * Checks whether a value is a judge entry: a string, a JSON record, or a JSON array.

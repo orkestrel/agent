@@ -29,8 +29,13 @@ import { AgentError } from '../agents/errors.js'
 import { estimateMessages } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
 import { createConversationManager } from '../conversations/factories.js'
-import { collectExchanges, collectToolGroups } from '../conversations/helpers.js'
-import { joinThinking, stripThinking, sumUsage } from '../helpers.js'
+import {
+	collectExchanges,
+	collectToolGroups,
+	joinThinking,
+	stripThinking,
+	sumUsage,
+} from '../helpers.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
 import {

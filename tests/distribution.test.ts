@@ -6,37 +6,29 @@
 // the published surface moves.
 import type { SpawnSyncReturns } from 'node:child_process'
 import type { TestContext } from 'vitest'
-import { isArray, isObject, isString } from '@orkestrel/contract'
+import { isArray, isRecord, isString } from '@orkestrel/contract'
+import { createScratch, destroyScratch, removeTree } from '@orkestrel/test/server'
 import { spawnSync } from 'node:child_process'
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	rmSync,
 	statSync,
 	writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 // The compiler this workspace installs, run as a command rather than called in
 // process: the command and its plain-text diagnostics are the same across the
 // compiler majors this toolchain supports, and its in-process API is not. It is
 // resolved from the workspace under proof, so a consumer of the packed artifact is
 // checked by the same compiler that workspace's own `check` script runs.
 const TSC = createRequire(join(ROOT, 'package.json')).resolve('typescript/bin/tsc')
-// Windows needs a shell to launch a `.cmd`: Node refuses one directly since the
-// batch-argument hardening, and `spawnSync` returns `EINVAL` with a null status
-// rather than an exit code a caller can read. Every following argument is a literal or
-// a path this file built, so the shell has nothing to escape.
-const SHELL = process.platform === 'win32'
 // `prepublishOnly` runs this proof as `npm run test:distribution -- --mode release`.
 // Release is the publish gate, so evidence it cannot obtain fails there and skips
 // everywhere else: a gate that passes on missing evidence proves nothing.
@@ -178,10 +170,6 @@ interface Stage {
 	readonly targets: readonly string[]
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-	return isObject(value) && !isArray(value)
-}
-
 function isNames(value: unknown): value is readonly string[] {
 	return isArray(value) && value.every((name) => isString(name))
 }
@@ -225,12 +213,41 @@ function readOutput(result: SpawnSyncReturns<string>): string {
 	return `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
 }
 
+// The JavaScript entry of the npm that is running this proof, so npm is spawned
+// through `process.execPath` and never through a `.cmd` shim or a shell. The entry
+// `npm_execpath` names is read only when it is npm's own, because a run through
+// `npx` names the `npx` entry, which takes different arguments.
+function resolveNpmEntry(): string {
+	const named = process.env.npm_execpath
+	const candidates = [
+		...(named !== undefined && basename(named) === 'npm-cli.js' ? [named] : []),
+		join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+		join(dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+	]
+	const entry = candidates.find((candidate) => existsSync(candidate))
+	if (entry === undefined) {
+		throw new Error(`No npm JavaScript entry exists at any of: ${candidates.join(', ')}`)
+	}
+	return entry
+}
+
+// A child environment that drops every inherited variable an added one claims, folding
+// names by case: a Windows environment block folds them, and npm reads its
+// `npm_config_` variables case-insensitively on every host.
+function mergeEnvironment(
+	inherited: NodeJS.ProcessEnv,
+	added: Readonly<Record<string, string>>,
+): NodeJS.ProcessEnv {
+	const claimed = new Set(Object.keys(added).map((name) => name.toLowerCase()))
+	const kept = Object.entries(inherited).filter(([name]) => !claimed.has(name.toLowerCase()))
+	return { ...Object.fromEntries(kept), ...added }
+}
+
 function runNpm(args: readonly string[], cwd: string): SpawnSyncReturns<string> {
-	return spawnSync(NPM, [...args], {
+	return spawnSync(process.execPath, [NPM_ENTRY, ...args], {
 		cwd,
 		encoding: 'utf8',
-		env: { ...process.env, npm_config_cache: CACHE },
-		shell: SHELL,
+		env: CHILD_ENVIRONMENT,
 		windowsHide: true,
 	})
 }
@@ -586,8 +603,8 @@ function driveRuntime(stage: Stage, specifier: string, driver: string): readonly
 // published surface back off the installed tree. Every later claim reads this
 // result, so a failure here is raised where it happens rather than once per entry.
 function buildStage(): Stage {
-	const packed = join(SCRATCH, 'packed')
-	const consumer = join(SCRATCH, 'consumer')
+	const packed = join(SCRATCH.path, 'packed')
+	const consumer = join(SCRATCH.path, 'consumer')
 	mkdirSync(packed, { recursive: true })
 	const pack = runNpm(['pack', '--ignore-scripts', '--pack-destination', packed], ROOT)
 	if (pack.status !== 0) throw new Error(`npm pack refused this workspace: ${readOutput(pack)}`)
@@ -660,13 +677,15 @@ function buildStage(): Stage {
 	return { consumer, installed, archives, entries, subpaths, undeclared, excluded, targets }
 }
 
-const SCRATCH = mkdtempSync(join(tmpdir(), 'distribution-'))
-const CACHE = join(SCRATCH, 'cache')
-mkdirSync(CACHE, { recursive: true })
 // The scratch tree holds the npm cache, the packed archive, and the installed
 // consumer, so its removal is registered before the first thing that can throw.
-afterAll(() => {
-	rmSync(SCRATCH, { force: true, recursive: true })
+const SCRATCH = createScratch({ prefix: 'distribution-' })
+afterAll(async () => {
+	await destroyScratch(SCRATCH)
+})
+const NPM_ENTRY = resolveNpmEntry()
+const CHILD_ENVIRONMENT = mergeEnvironment(process.env, {
+	npm_config_cache: SCRATCH.ensure('cache'),
 })
 
 // Installing the packed archive resolves its own runtime dependencies, so an
@@ -685,7 +704,10 @@ function openStage(): Stage | undefined {
 		}
 		return buildStage()
 	} catch (error) {
-		rmSync(SCRATCH, { force: true, recursive: true })
+		// A removal that fails here must not replace the error that ended the stage.
+		try {
+			removeTree(SCRATCH.path)
+		} catch {}
 		throw error
 	}
 }
@@ -695,7 +717,7 @@ const STAGED = STAGE !== undefined
 
 describe('distribution classifiers', () => {
 	it('classifies synthetic export mappings without a registry stage', () => {
-		const root = join(SCRATCH, 'classifiers')
+		const root = join(SCRATCH.path, 'classifiers')
 		writeFile(
 			join(root, 'package.json'),
 			JSON.stringify({
@@ -853,12 +875,12 @@ describe('installed package consumer', () => {
 	})
 
 	// This proof drives a Node import and a Node require and carries no browser
-	// branch: the workspace published no browser face when it was written, and the
-	// browser drive measures the packed artifact, so only a published face is owed
-	// one. A private browser application does not select this branch. It declares the
-	// browser launcher and its Vitest browser provider and gets the generated browser
-	// configuration module beside it, but installed browser tooling does not stand for
-	// a published browser face. `vite` selects nothing either, though the branch
+	// branch: the workspace publishes no browser face, and the browser drive
+	// measures the packed artifact, so only a published face is owed one. A private
+	// browser application does not select this branch. It declares the browser launcher
+	// and its Vitest browser provider and gets the generated browser configuration
+	// module beside it, but installed browser tooling does not stand for a published
+	// browser face. `vite` selects nothing either, though the branch
 	// imports it: scaffold puts `vite` in every workspace's base development
 	// dependencies, whatever that workspace publishes. The later Node
 	// `it.runIf` predicates retire each matching Node drive for a face published

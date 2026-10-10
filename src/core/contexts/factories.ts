@@ -14,9 +14,8 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { isFiniteNumber } from '@orkestrel/contract'
-import { matchesJudgment } from '../conversations/helpers.js'
 import { isJudgeAbortError } from '../errors.js'
-import { sumUsage } from '../helpers.js'
+import { matchesJudgment, sumUsage } from '../helpers.js'
 import { SelectionError } from './errors.js'
 import {
 	buildConditionKey,

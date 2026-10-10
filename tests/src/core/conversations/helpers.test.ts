@@ -1,96 +1,13 @@
-import type { Message } from '@src/core'
 import {
 	buildJudgments,
-	matchesJudgment,
 	buildRecapMessage,
 	buildSummaryMessage,
-	collectToolGroups,
-	collectExchanges,
 	CONVERSATION_RECAP_PREFIX,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import {
-	createToolCall,
-	JUDGMENT_INPUT,
-	JUDGMENT_RECORD,
-	JUDGMENT_QUESTION,
-	JUDGMENT_MISMATCHES,
-	JUDGMENT_USAGE,
-} from '../../../setup.js'
-
-describe('collectExchanges', () => {
-	it('keeps leading messages separate and joins exchanges spanned by tool groups', () => {
-		const messages: readonly Message[] = [
-			{ id: 'lead', role: 'assistant', content: 'Welcome.' },
-			{ id: 'u1', role: 'user', content: 'Read the order.' },
-			{ id: 'a1', role: 'assistant', content: '', calls: [createToolCall({ id: 'c1' })] },
-			{ id: 'u2', role: 'user', content: 'Read the account.' },
-			{ id: 'a2', role: 'assistant', content: '', calls: [createToolCall({ id: 'c2' })] },
-			{ id: 'r1', role: 'tool', content: 'Order.', call: 'c1' },
-			{ id: 'u3', role: 'user', content: 'Continue.' },
-			{ id: 'r2', role: 'tool', content: 'Account.', call: 'c2' },
-			{ id: 'u4', role: 'user', content: 'Finish.' },
-		]
-		expect(
-			collectExchanges(messages).map((exchange) => exchange.map((message) => message.id)),
-		).toEqual([['lead'], ['u1', 'a1', 'u2', 'a2', 'r1', 'u3', 'r2'], ['u4']])
-		expect(collectExchanges([])).toEqual([])
-		expect(collectExchanges(messages.slice(0, 1))).toEqual([messages.slice(0, 1)])
-		expect(messages).toHaveLength(9)
-	})
-})
-
-describe('collectToolGroups', () => {
-	it('groups a result with its unique owner, a positional result with its leader, and an orphan run', () => {
-		const messages: readonly Message[] = [
-			{ id: 'U', role: 'user', content: 'Which order is late?' },
-			{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
-			{ id: 'R1', role: 'tool', content: 'positional result' },
-			{ id: 'A2', role: 'assistant', content: '', calls: [createToolCall({ id: 'two' })] },
-			{ id: 'R2', role: 'tool', content: 'second result', call: 'two' },
-			{ id: 'L1', role: 'tool', content: 'late first result', call: 'one' },
-			{ id: 'N', role: 'assistant', content: 'Order LH-81660 is late.' },
-			{ id: 'O1', role: 'tool', content: 'lost result', call: 'missing' },
-			{ id: 'O2', role: 'tool', content: 'other lost result' },
-		]
-
-		expect(collectToolGroups(messages).map((group) => group.map(({ id }) => id))).toEqual([
-			['A1', 'R1', 'L1'],
-			['A2', 'R2'],
-			['O1', 'O2'],
-		])
-	})
-
-	it('returns no group for messages without calls or tool results', () => {
-		expect(collectToolGroups([{ id: 'U', role: 'user', content: 'Which order is late?' }])).toEqual(
-			[],
-		)
-	})
-})
+import { JUDGMENT_INPUT, JUDGMENT_QUESTION, JUDGMENT_USAGE } from '../../../setup.js'
 
 describe('judgment helpers', () => {
-	it('matches the shared record and ignores its time', () => {
-		expect(
-			matchesJudgment(
-				JUDGMENT_RECORD,
-				JUDGMENT_QUESTION,
-				JUDGMENT_INPUT.sources,
-				JUDGMENT_INPUT.state,
-				JUDGMENT_INPUT.model,
-			),
-		).toBe(true)
-	})
-	it.each(JUDGMENT_MISMATCHES)('rejects a changed %s alone', (_name, record) => {
-		expect(
-			matchesJudgment(
-				record,
-				JUDGMENT_QUESTION,
-				JUDGMENT_INPUT.sources,
-				JUDGMENT_INPUT.state,
-				JUDGMENT_INPUT.model,
-			),
-		).toBe(false)
-	})
 	it('builds the answered record and attaches single-question usage', () => {
 		expect(
 			buildJudgments(

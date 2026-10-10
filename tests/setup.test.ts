@@ -1,51 +1,51 @@
-import type {
-	ConversationSnapshot,
-	ConversationStoreInterface,
-	Message,
-	ProviderResult,
-} from '@src/core'
+import type { Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { ConversationManager, isProviderAbortError } from '@src/core'
+import { ConversationManager, createConversation, isProviderAbortError } from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
-	addTool,
 	buildConversationSnapshot,
 	chunkWholeDelta,
-	conversationStoreDeleteAbsent,
-	conversationStoreDeleteThenAbsent,
-	conversationStoreGetAbsent,
-	conversationStoreRoundTrip,
-	conversationStoreRoundTripExpectation,
-	conversationStoreTwoIds,
-	conversationStoreUpsert,
+	compactSeedTurns,
+	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
+	createAddTool,
 	createAgentJob,
-	createRefusingTransport,
-	createStreamingTransport,
-	domainArgument,
-	drainProvider,
-	RecordedBody,
-	RecordedTransport,
-	recordGlobalTransport,
-	ScriptedFrame,
-	ScriptedWire,
+	createFixtureStore,
+	createLoopTool,
 	createRecordingScheduler,
+	createRefusingTransport,
+	createRelayRequest,
 	createScriptedProvider,
 	createSeededToolManager,
+	createStreamingTransport,
 	createStubSummarizer,
-	createToolCall,
 	createTokenUsage,
-	loopTool,
+	createToolCall,
+	drainProvider,
+	exerciseConversationStoreDeleteAbsent,
+	exerciseConversationStoreDeleteThenAbsent,
+	exerciseConversationStoreGetAbsent,
+	exerciseConversationStoreRoundTrip,
+	exerciseConversationStoreTwoIds,
+	exerciseConversationStoreUpsert,
+	RecordedBody,
+	RecordedProvider,
+	RecordedTransport,
+	recordGlobalTransport,
+	rejectTransportOnAbort,
 	resolveSectionOpen,
 	resolveSectionRender,
+	returnDomain,
+	ScriptedFrame,
+	ScriptedWire,
 	seedConversation,
 	seedFramedAgent,
 	seedInstructionContext,
 	seedWorkspaceContext,
-	turnParts,
+	splitTurn,
 } from './setup.js'
 
-// setup.test.ts — the proof of `tests/setup.ts`, the workspace's ONE shared test-infrastructure
+// setup.test.ts — the proof of `tests/setup.ts`, the host-independent shared test-infrastructure
 // module. Its subject is the exported HELPERS' behaviour, the behaviour every suite in
 // `tests/src/**` codes against: what the scripted provider streams and returns, what the data
 // builders default to and how an override lands, what the recorders record, what shape
@@ -54,33 +54,14 @@ import {
 // loop, the conversation, and the two store twins each have their own mirrored suite, and this
 // file asserts nothing about them.
 //
-// Every expectation is derived a SECOND way wherever the helper could otherwise be compared
-// against itself: a chunked stream is checked by reassembling its deltas, a folded snapshot's
-// summaries are recomputed from the originals the section retained, and a concurrency high-water
-// mark is read against calls the test itself holds open.
+// Each expectation compares the helper with a declaration or a second mechanism that could
+// disagree with it: a chunked stream is reassembled from its deltas, a folded snapshot is compared
+// with the declared round-trip literals, and a concurrency high-water mark is read against calls
+// the test itself holds open.
 
 // The messages every scripted call is handed. A provider is framing-agnostic, so one seed turn
 // is enough for every case that does not assert on what was passed through.
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
-
-// Proof-local conforming `ConversationStoreInterface` — the minimal real boundary the exported
-// battery is run against. The battery's subject is the CONTRACT it registers, so running it
-// through `MemoryConversationStore` here would re-run that store's own suite inside the setup
-// proof; persistence stays with the twins and this store exists only to let the battery execute.
-function createFixtureStore(): ConversationStoreInterface {
-	const held = new Map<string, ConversationSnapshot>()
-	return {
-		async get(id) {
-			return held.get(id)
-		},
-		async set(snapshot) {
-			held.set(snapshot.id, snapshot)
-		},
-		async delete(id) {
-			held.delete(id)
-		},
-	}
-}
 
 describe('createScriptedProvider replay', () => {
 	it('consumes one turn per call and returns that turn in script order', async () => {
@@ -328,21 +309,21 @@ describe('agent data builders', () => {
 
 describe('canonical tools', () => {
 	it('returns a real callable add tool that resolves 5', async () => {
-		const tool = addTool()
+		const tool = createAddTool()
 		expect(tool.name).toBe('add')
 		// A real `ToolInterface`, not a stub: the loop calls `execute` and feeds the result back.
 		expect(await tool.execute({}, { signal: new AbortController().signal })).toBe(5)
 	})
 
 	it('returns a real callable loop tool that resolves again', async () => {
-		const tool = loopTool()
+		const tool = createLoopTool()
 		expect(tool.name).toBe('loop')
 		expect(await tool.execute({}, { signal: new AbortController().signal })).toBe('again')
 	})
 
 	it('mints an independent tool on every call', () => {
-		expect(addTool()).not.toBe(addTool())
-		expect(loopTool()).not.toBe(loopTool())
+		expect(createAddTool()).not.toBe(createAddTool())
+		expect(createLoopTool()).not.toBe(createLoopTool())
 	})
 })
 
@@ -355,10 +336,9 @@ describe('createStubSummarizer', () => {
 		]
 		const single: readonly Message[] = [{ id: 'c', role: 'user', content: 'third' }]
 		const digests = [await stub.summarize(pair), await stub.summarize(single)]
-		// The digest names the slice's OWN length, so two different slices digest differently —
+		// The digest names the slice's own length, so two different slices digest differently —
 		// the property a compaction test leans on when it reads a section summary back.
-		expect(digests).toEqual([`recap of ${pair.length}`, `recap of ${single.length}`])
-		expect(digests[0]).not.toBe(digests[1])
+		expect(digests).toEqual(['recap of 2', 'recap of 1'])
 		// The recorder holds each digested slice in order, so a test can prove the TWO
 		// summarizer calls one compaction makes.
 		expect(stub.calls).toEqual([pair, single])
@@ -393,13 +373,12 @@ describe('buildConversationSnapshot', () => {
 		// and the live tail still carries the kept turn.
 		expect(section.messages.length).toBeGreaterThan(1)
 		expect(snapshot.messages).toHaveLength(1)
-		// The section summary recomputed from the originals the section RETAINED — a second
-		// route to the digest, rather than restating the literal the module folded.
-		expect(section.summary).toBe(
-			`recap(${section.messages.map((message) => message.content).join('|')})`,
+		// The section and the rollup match the declared literals, not a formula the module folded with.
+		expect(section.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary)
+		expect(section.messages.map((message) => message.content)).toEqual(
+			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
 		)
-		// And the rollup is a summary-of-summaries over those sections, by the same route.
-		expect(snapshot.summary).toBe(`recap(${snapshot.sections.map((one) => one.summary).join('|')})`)
+		expect(snapshot.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.rollupSummary)
 		// The folded originals never linger in the live tail.
 		const live = snapshot.messages.map((message) => message.id)
 		expect(section.messages.some((message) => live.includes(message.id))).toBe(false)
@@ -418,26 +397,28 @@ describe('buildConversationSnapshot', () => {
 describe('conversation-store contract scenarios run against a conforming store', () => {
 	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
 		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
-			const { snapshot, got } = await conversationStoreRoundTrip(
+			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
 				createFixtureStore,
 				buildConversationSnapshot,
 			)
 			expect(got).toEqual(snapshot)
 			expect(got?.sections).toHaveLength(1)
-			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
+			expect(got?.sections[0]?.summary).toBe(
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary,
+			)
 			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				conversationStoreRoundTripExpectation.sectionMessages,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
 			)
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				conversationStoreRoundTripExpectation.liveTail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
 			)
-			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+			expect(got?.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.rollupSummary)
 		})
 	})
 
 	describe('upsert (set replaces under the same id)', () => {
 		it('set replaces an existing snapshot under the same id', async () => {
-			const { second, got } = await conversationStoreUpsert(
+			const { second, got } = await exerciseConversationStoreUpsert(
 				createFixtureStore,
 				buildConversationSnapshot,
 			)
@@ -447,7 +428,7 @@ describe('conversation-store contract scenarios run against a conforming store',
 
 	describe('delete & absent', () => {
 		it('set → delete → get returns undefined', async () => {
-			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
 				createFixtureStore,
 				buildConversationSnapshot,
 			)
@@ -456,18 +437,20 @@ describe('conversation-store contract scenarios run against a conforming store',
 		})
 
 		it('deleting an absent id does not throw (a no-op)', async () => {
-			await expect(conversationStoreDeleteAbsent(createFixtureStore)).resolves.toBeUndefined()
+			await expect(
+				exerciseConversationStoreDeleteAbsent(createFixtureStore),
+			).resolves.toBeUndefined()
 		})
 
 		it('get of an absent id returns undefined', async () => {
-			expect(await conversationStoreGetAbsent(createFixtureStore)).toBeUndefined()
+			expect(await exerciseConversationStoreGetAbsent(createFixtureStore)).toBeUndefined()
 		})
 	})
 
 	describe('two distinct conversation ids coexist', () => {
 		it('two distinct conversation ids coexist without cross-contamination', async () => {
 			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
-				await conversationStoreTwoIds(createFixtureStore, buildConversationSnapshot)
+				await exerciseConversationStoreTwoIds(createFixtureStore, buildConversationSnapshot)
 			expect(gotAlpha).toEqual(alpha)
 			expect(gotBeta).toEqual(beta)
 			expect(gotAlphaAfterDelete).toBeUndefined()
@@ -476,10 +459,10 @@ describe('conversation-store contract scenarios run against a conforming store',
 	})
 })
 
-describe('turnParts', () => {
+describe('splitTurn', () => {
 	it('reports a bare ProviderResult with no per-turn deltas and no thoughts', () => {
 		const result: ProviderResult = { content: 'plain' }
-		const parts = turnParts(result)
+		const parts = splitTurn(result)
 
 		expect(parts.result).toBe(result)
 		expect(parts.deltas).toBeUndefined()
@@ -488,14 +471,14 @@ describe('turnParts', () => {
 
 	it('carries a pair turn’s result, deltas, and thoughts through unchanged', () => {
 		const result: ProviderResult = { content: 'ab' }
-		const parts = turnParts({ result, deltas: ['a', 'b'], thoughts: ['plan'] })
+		const parts = splitTurn({ result, deltas: ['a', 'b'], thoughts: ['plan'] })
 
 		expect(parts.result).toBe(result)
 		expect(parts.deltas).toEqual(['a', 'b'])
 		expect(parts.thoughts).toEqual(['plan'])
 		// A pair turn carrying only some of the optionals leaves the rest absent.
-		expect(turnParts({ result, deltas: [] }).thoughts).toBeUndefined()
-		expect(turnParts({ result, thoughts: ['plan'] }).deltas).toBeUndefined()
+		expect(splitTurn({ result, deltas: [] }).thoughts).toBeUndefined()
+		expect(splitTurn({ result, thoughts: ['plan'] }).deltas).toBeUndefined()
 	})
 })
 
@@ -518,7 +501,7 @@ describe('createSeededToolManager', () => {
 	})
 
 	it('seeds exactly the supplied tools instead', () => {
-		const manager = createSeededToolManager([loopTool(), addTool()])
+		const manager = createSeededToolManager([createLoopTool(), createAddTool()])
 
 		expect(manager.definitions().map((one) => one.name)).toEqual(['loop', 'add'])
 	})
@@ -715,6 +698,90 @@ describe('provider wire fixtures', () => {
 		)
 	})
 	it('supplies a callable non-JSON domain value', () => {
-		expect(domainArgument()).toBe('domain')
+		expect(returnDomain()).toBe('domain')
+	})
+	it('creates a POST relay request from the default body, a string body, and a signal', async () => {
+		const fallback = createRelayRequest()
+		expect(fallback.method).toBe('POST')
+		expect(fallback.url).toBe('http://relay.test/')
+		expect(await fallback.text()).toBe('{"messages":[]}')
+		const controller = new AbortController()
+		const bound = createRelayRequest('query', controller.signal)
+		expect(await bound.text()).toBe('query')
+		expect(bound.signal.aborted).toBe(false)
+		controller.abort()
+		expect(bound.signal.aborted).toBe(true)
+	})
+	it('creates a POST relay request over a stream body', async () => {
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new TextEncoder().encode('streamed'))
+				controller.close()
+			},
+		})
+		const request = createRelayRequest(stream)
+		expect(request.method).toBe('POST')
+		expect(await request.text()).toBe('streamed')
+	})
+	it('rejects a transport with an AbortError exception after its signal aborts', async () => {
+		const controller = new AbortController()
+		const pending = rejectTransportOnAbort('https://provider.test', { signal: controller.signal })
+		const settled = pending.catch((error: unknown) => error)
+		controller.abort()
+		expect(await settled).toMatchObject({ name: 'AbortError' })
+		await expect(
+			rejectTransportOnAbort('https://provider.test', { signal: AbortSignal.abort() }),
+		).rejects.toMatchObject({ name: 'AbortError' })
+		await expect(rejectTransportOnAbort('https://provider.test')).rejects.toThrow(
+			'Value is required',
+		)
+	})
+	it('reports a recorded provider aborted only when a return follows an aborted signal', async () => {
+		const live = new RecordedProvider()
+		await live.stream(messages, new AbortController().signal).return({ content: '' })
+		expect(live.returns).toBe(1)
+		expect(live.aborted).toBe(false)
+		const controller = new AbortController()
+		controller.abort()
+		const stopped = new RecordedProvider()
+		await stopped.stream(messages, controller.signal).return({ content: '' })
+		expect(stopped.aborted).toBe(true)
+	})
+})
+
+describe('compactSeedTurns', () => {
+	it('adds three turns and folds the oldest two into one summarized section', async () => {
+		const conversation = createConversation({
+			summarize: createStubSummarizer().summarize,
+			keep: 1,
+		})
+		await compactSeedTurns(conversation)
+
+		expect(conversation.sections).toHaveLength(1)
+		expect(requireValue(conversation.sections[0]).messages.map((one) => one.content)).toEqual([
+			'first',
+			'second',
+		])
+		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
+	})
+})
+
+describe('createFixtureStore', () => {
+	it('creates an independent empty store on every call', async () => {
+		const first = createFixtureStore()
+		const second = createFixtureStore()
+		const snapshot = { id: 'held', sections: [], messages: [] }
+		await first.set(snapshot)
+
+		expect(await first.get('held')).toEqual(snapshot)
+		expect(await second.get('held')).toBeUndefined()
+	})
+})
+
+describe('CONVERSATION_STORE_ROUND_TRIP_EXPECTATION', () => {
+	it('freezes the declaration and its lists', () => {
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail)).toBe(true)
 	})
 })

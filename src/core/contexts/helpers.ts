@@ -3,7 +3,7 @@ import type { ConversationInterface } from '../conversations/types.js'
 import type { Message, NoulQuestion } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
-import { collectExchanges, matchesJudgment } from '../conversations/helpers.js'
+import { collectExchanges, matchesJudgment } from '../helpers.js'
 import { NEEDED_QUESTION } from './templates.js'
 
 /**
@@ -126,7 +126,7 @@ export function inferApplicability(
  * @remarks
  * An exchange is a user message and every message after it up to the next user message. Leading
  * messages form their own exchange. An exchange and a tool group from
- * {@link import('../conversations/helpers.js').collectToolGroups}
+ * {@link import('../helpers.js').collectToolGroups}
  * are each kept whole when any member is kept and dropped whole only when every member is
  * dropped. A tool group that spans two exchanges joins them, so keeping one keeps both.
  *

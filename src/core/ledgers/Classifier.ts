@@ -1,5 +1,4 @@
-import type { Judgment, JudgmentInput } from '../conversations/types.js'
-import type { ChoiceAnswer, Message } from '../types.js'
+import type { ChoiceAnswer, Judgment, JudgmentInput, Message } from '../types.js'
 import type {
 	ClassifierInterface,
 	ClassifierOptions,
@@ -10,9 +9,8 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
-import { matchesJudgment } from '../conversations/helpers.js'
 import { isJudgeAbortError } from '../errors.js'
-import { sumUsage } from '../helpers.js'
+import { matchesJudgment, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
 import {
 	DECISIVE_CATEGORIES,

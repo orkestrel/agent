@@ -13,11 +13,10 @@ import type { Message, MessageInput } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
-import { stripThinking } from '../helpers.js'
+import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
-import { buildRecapMessage, buildSummaryMessage, collectExchanges } from './helpers.js'
-import { removeEntries } from '../helpers.js'
+import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
 /**

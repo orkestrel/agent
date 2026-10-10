@@ -175,12 +175,30 @@ export interface JudgeInterface {
 	ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult>
 }
 
-/** Carries the measures `computeReading` derives from an answer; nothing stores them. */
-export interface Reading {
-	/** Holds the first strictly greatest candidate in enumeration order: an option name, a level index, or true or false. */
-	readonly winner: string
-	readonly probability: number
-	readonly confidence: number
-	/** Holds the expected level of a score answer; the protocol's score field. */
-	readonly score?: number
+/** Records an answered or refused question with its sources, state, model, and storage time. */
+export interface Judgment {
+	readonly id: string
+	readonly question: JudgeQuestion
+	/** Carries the answer when the question was answered; mutually exclusive with refusal. */
+	readonly answer?: JudgeAnswer
+	/** Carries the refusal when the question was refused; mutually exclusive with answer. */
+	readonly refusal?: Refusal
+	readonly model: string
+	readonly sources: readonly string[]
+	readonly state: string
+	readonly time: number
+	/** Carries usage only when the answering request held this question alone. */
+	readonly usage?: TokenUsage
+}
+
+/** Supplies an answered or refused question for storage before its time is stamped. */
+export interface JudgmentInput {
+	readonly id: string
+	readonly question: JudgeQuestion
+	readonly answer?: JudgeAnswer
+	readonly refusal?: Refusal
+	readonly model: string
+	readonly sources: readonly string[]
+	readonly state: string
+	readonly usage?: TokenUsage
 }
