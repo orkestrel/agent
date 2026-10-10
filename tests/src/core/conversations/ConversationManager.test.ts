@@ -6,12 +6,13 @@ import {
 	isConversationError,
 	isConversationSnapshot,
 } from '@src/core'
-import { rawShape, stringShape } from '@orkestrel/contract'
-import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { createMemoryDriver } from '@orkestrel/database'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	compactSeedTurns,
 	createStubSummarizer,
+	plantConversationRow,
 	renderRecap,
 	seedConversation,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
@@ -348,12 +349,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		// Persist a conversation through one manager, with keep: 1 so BOTH a section and a live tail exist.
 		const source = new ConversationManager({ summarize: createStubSummarizer().summarize, keep: 1 })
 		const original = source.add({ id: 'persisted' })
-		original.add([
-			{ role: 'user', content: 'first' },
-			{ role: 'assistant', content: 'second' },
-			{ role: 'user', content: 'third' },
-		])
-		await original.compact()
+		await compactSeedTurns(original)
 		await store.set(original.snapshot())
 
 		// A FRESH manager over the SAME store opens the persisted id back — a registry miss hydrates it.
@@ -381,12 +377,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		const store = createMemoryConversationStore()
 		const source = new ConversationManager({ summarize: createStubSummarizer().summarize, keep: 1 })
 		const original = source.add({ id: 'live' })
-		original.add([
-			{ role: 'user', content: 'alpha fact' },
-			{ role: 'assistant', content: 'beta reply' },
-			{ role: 'user', content: 'gamma tail' },
-		])
-		await original.compact()
+		await compactSeedTurns(original)
 		await store.set(original.snapshot())
 
 		const manager = new ConversationManager({
@@ -401,10 +392,10 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		// view() = the section folded to ONE recap message, then the live tail verbatim.
 		const view = opened.view()
 		expect(view).toHaveLength(2) // 1 section recap + 1 live message
-		expect(view[1]?.content).toBe('gamma tail')
+		expect(view[1]?.content).toBe('third')
 		// search() scans the section's RETAINED originals AND the live tail.
-		expect(opened.search('alpha').map((one) => one.content)).toEqual(['alpha fact']) // a folded original
-		expect(opened.search('gamma').map((one) => one.content)).toEqual(['gamma tail']) // the live tail
+		expect(opened.search('first').map((one) => one.content)).toEqual(['first']) // a folded original
+		expect(opened.search('third').map((one) => one.content)).toEqual(['third']) // the live tail
 	})
 
 	it('the rehydrated conversation can CONTINUE (its summarizer was re-supplied, so compact works)', async () => {
@@ -413,11 +404,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		const store = createMemoryConversationStore()
 		const source = new ConversationManager({ summarize: createStubSummarizer().summarize, keep: 1 })
 		const original = source.add({ id: 'cont' })
-		original.add([
-			{ role: 'user', content: 'a' },
-			{ role: 'user', content: 'b' },
-		])
-		await original.compact()
+		await compactSeedTurns(original)
 		await store.set(original.snapshot())
 
 		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize, store })
@@ -514,15 +501,10 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 describe('ConversationManager — open reads a 0.0.29 snapshot without its conversation summary', () => {
 	it('narrows the persisted row, hydrates sections and tail, and drops the summary from the next snapshot', async () => {
 		const driver = createMemoryDriver()
-		const database = createDatabase({
-			driver,
-			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
-		})
-		await database.table('conversations').set({
+		await plantConversationRow(driver, {
 			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
 			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
 		})
-		await database.close()
 		const manager = new ConversationManager({
 			summarize: createStubSummarizer().summarize,
 			store: createDatabaseConversationStore(driver),

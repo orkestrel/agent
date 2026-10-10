@@ -9,6 +9,7 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	CONVERSATION_SECTION,
 	INVALID_JUDGMENTS,
 	JUDGMENT_INPUT,
 	JUDGMENT_QUESTION,
@@ -68,10 +69,8 @@ describe('judgment helpers', () => {
 })
 
 describe('buildSummaryMessage / buildRecapMessage — a section as a message', () => {
-	const section = { id: 's1', summary: 'recap of 2', messages: [] }
-
 	it('carries the section summary verbatim, keyed by the section id', () => {
-		expect(buildSummaryMessage(section)).toEqual({
+		expect(buildSummaryMessage(CONVERSATION_SECTION)).toEqual({
 			id: 's1',
 			role: 'assistant',
 			content: 'recap of 2',
@@ -79,7 +78,7 @@ describe('buildSummaryMessage / buildRecapMessage — a section as a message', (
 	})
 
 	it('frames the recap with the prefix a small model reads it by', () => {
-		expect(buildRecapMessage(section)).toEqual({
+		expect(buildRecapMessage(CONVERSATION_SECTION)).toEqual({
 			id: 's1',
 			role: 'assistant',
 			content: `${CONVERSATION_RECAP_PREFIX}recap of 2`,

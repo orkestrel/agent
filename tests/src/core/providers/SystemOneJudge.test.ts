@@ -11,6 +11,7 @@ import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	RecordedTransport,
+	buildSystemOneProbabilityCases,
 	SYSTEM_ONE_ERRORS,
 	SYSTEM_ONE_INVALID_PROBABILITIES,
 	SYSTEM_ONE_JUDGE_OBJECT,
@@ -32,7 +33,7 @@ describe('SystemOneJudge', () => {
 		expect(judge.name).toBe('systemone')
 		expect(judge.model).toBe('jev-latest')
 		expect(
-			judge.body({
+			judge.encode({
 				state: SYSTEM_ONE_QUICKSTART_STATE,
 				questions: {
 					urgency: { form: 'noul', instructions: 'Does this message express urgency?' },
@@ -82,7 +83,7 @@ describe('SystemOneJudge', () => {
 			model: 'tev1:0.8b',
 			fetch: transport.fetch,
 		})
-		expect(judge.body(SYSTEM_ONE_JUDGE_OBJECT)).toEqual(SYSTEM_ONE_OBJECT_REQUEST)
+		expect(judge.encode(SYSTEM_ONE_JUDGE_OBJECT)).toEqual(SYSTEM_ONE_OBJECT_REQUEST)
 		expect(await judge.ask(SYSTEM_ONE_JUDGE_OBJECT, new AbortController().signal)).toEqual({
 			model: 'tev1:0.8b',
 			answers: {
@@ -150,11 +151,7 @@ describe('SystemOneJudge', () => {
 		'names each question for invalid probability %s',
 		(probability) => {
 			const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'tev1:0.8b' })
-			const answers = {
-				label: { type: 'choice', probabilities: { billing: probability, bug: 0.5, account: 0 } },
-				refund: { type: 'noul', noul: probability },
-				severity: { type: 'score', probabilities: [0, probability, 0.5] },
-			}
+			const answers = buildSystemOneProbabilityCases(probability)
 			for (const [id, answer] of Object.entries(answers)) {
 				const error = captureError(() =>
 					judge.read(
@@ -178,7 +175,7 @@ describe('SystemOneJudge', () => {
 				['__proto__']: { form: 'choice', criteria: { ['__proto__']: null, other: null } },
 			},
 		}
-		expect(Object.keys(judge.body(request).questions)).toEqual(['__proto__'])
+		expect(Object.keys(judge.encode(request).questions)).toEqual(['__proto__'])
 		expect(
 			judge.read(
 				{

@@ -1,9 +1,16 @@
 import type { AgentResult, Message } from '@src/core'
+import type { TokenUsage } from '@orkestrel/budget'
+import {
+	createMessage,
+	CountingAgentResult,
+	createInvalidAgentResultCases,
+	createTurnRegistry,
+	AGENT_USAGE,
+} from '../../../setup.js'
 import {
 	agentResultToJSON,
 	assembleResult,
 	chargeUsage,
-	createAgentRegistry,
 	denyCall,
 	estimateMessages,
 	estimateTokens,
@@ -11,11 +18,36 @@ import {
 	isAgentJobError,
 	MESSAGE_TOKEN_OVERHEAD,
 	settleAgentJob,
+	requireEntry,
+	extractQueueOptions,
 } from '@src/core'
-import type { TokenUsage } from '@orkestrel/budget'
 import { createBudget } from '@orkestrel/budget'
 import { describe, expect, it } from 'vitest'
-import { createScriptedProvider, createToolCall, createTokenUsage } from '../../../setup.js'
+import { createToolCall, createTokenUsage } from '../../../setup.js'
+
+describe('requireEntry', () => {
+	it('returns the registered value without copying it', () => {
+		const value = { name: 'registered' }
+		expect(requireEntry(new Map([['main', value]]), 'provider', 'main')).toBe(value)
+	})
+
+	it('reports the category and missing name with a registry code', () => {
+		expect(() => requireEntry(new Map(), 'tool', 'missing')).toThrow(
+			expect.objectContaining({ code: 'REGISTRY', message: 'unknown tool: missing' }),
+		)
+	})
+})
+
+describe('extractQueueOptions', () => {
+	it('omits absent options and preserves explicit zero bounds', () => {
+		expect(extractQueueOptions({})).toEqual({})
+		expect(extractQueueOptions({ concurrency: 2, retries: 0, timeout: 0 })).toEqual({
+			concurrency: 2,
+			retries: 0,
+			timeout: 0,
+		})
+	})
+})
 
 // Agent-owned pure helpers: estimateMessages is the default context-budget token estimator
 // (the per-message sum of the estimateTokens char heuristic). Plus settleAgentJob —
@@ -26,69 +58,6 @@ import { createScriptedProvider, createToolCall, createTokenUsage } from '../../
 
 // A minimal Message fixture — only the fields estimateMessages reads (content);
 // id/role round out the shape so it is a real message, not a partial.
-const message = (content: string): Message => ({ id: 'm', role: 'user', content })
-
-function returnUndefined(): undefined {
-	return undefined
-}
-
-class AgentResultAccessCounter {
-	content = 0
-	thinking = 0
-	usage = 0
-	partial = 0
-	prompt = 0
-	completion = 0
-	total = 0
-}
-
-class CountingTokenUsage {
-	#counter: AgentResultAccessCounter
-
-	constructor(counter: AgentResultAccessCounter) {
-		this.#counter = counter
-	}
-
-	get prompt(): number {
-		this.#counter.prompt += 1
-		return 2
-	}
-
-	get completion(): number {
-		this.#counter.completion += 1
-		return 1
-	}
-
-	get total(): number {
-		this.#counter.total += 1
-		return 3
-	}
-}
-
-class CountingAgentResult {
-	readonly counter = new AgentResultAccessCounter()
-	#usage = new CountingTokenUsage(this.counter)
-
-	get content(): string {
-		this.counter.content += 1
-		return 'done'
-	}
-
-	get thinking(): string {
-		this.counter.thinking += 1
-		return 'reasoning'
-	}
-
-	get usage(): CountingTokenUsage {
-		this.counter.usage += 1
-		return this.#usage
-	}
-
-	get partial(): boolean {
-		this.counter.partial += 1
-		return false
-	}
-}
 
 describe('agentResultToJSON', () => {
 	it('keeps the projection field map exhaustive over AgentResult', () => {
@@ -185,87 +154,21 @@ describe('agentResultToJSON', () => {
 		})
 	})
 
-	const throwingAccessor = { partial: false }
-	const throwingGetter = Proxy.revocable(() => 'done', {})
-	throwingGetter.revoke()
-	Object.defineProperty(throwingAccessor, 'content', {
-		enumerable: true,
-		get: throwingGetter.proxy,
-	})
-
-	const usageAccessor = { content: 'done', partial: false, usage: { completion: 1, total: 2 } }
-	const usageGetter = Proxy.revocable(() => 1, {})
-	usageGetter.revoke()
-	Object.defineProperty(usageAccessor.usage, 'prompt', {
-		enumerable: true,
-		get: usageGetter.proxy,
-	})
-
-	const revokedRoot = Proxy.revocable({ content: 'done', partial: false }, {})
-	revokedRoot.revoke()
-	const getTrap = Proxy.revocable(() => undefined, {})
-	getTrap.revoke()
-	const throwingGet = new Proxy({}, { get: getTrap.proxy })
-	const revokedUsage = Proxy.revocable({ prompt: 1, completion: 1, total: 2 }, {})
-	const nestedRevoked = { content: 'done', usage: revokedUsage.proxy, partial: false }
-	revokedUsage.revoke()
-
-	const invalid: ReadonlyArray<readonly [string, unknown]> = [
-		['missing content', { partial: false }],
-		['missing partial', { content: 'done' }],
-		['wrong content type', { content: 1, partial: false }],
-		['wrong partial type', { content: 'done', partial: 'false' }],
-		['wrong thinking type', { content: 'done', thinking: 1, partial: false }],
-		['null usage', { content: 'done', usage: null, partial: false }],
-		['wrong usage type', { content: 'done', usage: 'tokens', partial: false }],
-		[
-			'NaN usage',
-			{ content: 'done', usage: { prompt: NaN, completion: 1, total: 2 }, partial: false },
-		],
-		[
-			'positive-infinite usage',
-			{
-				content: 'done',
-				usage: { prompt: 1, completion: Infinity, total: 2 },
-				partial: false,
-			},
-		],
-		[
-			'negative-infinite usage',
-			{
-				content: 'done',
-				usage: { prompt: 1, completion: 1, total: -Infinity },
-				partial: false,
-			},
-		],
-		['missing usage field', { content: 'done', usage: { prompt: 1, total: 2 }, partial: false }],
-		['throwing root accessor', throwingAccessor],
-		['nested usage accessor', usageAccessor],
-		['throwing get trap', throwingGet],
-		['revoked root proxy', revokedRoot.proxy],
-		['revoked nested usage proxy', nestedRevoked],
-		['undefined input', undefined],
-		['null input', null],
-		['string input', 'done'],
-		['number input', 1],
-		['boolean input', false],
-		['function input', returnUndefined],
-		['symbol input', Symbol('result')],
-		['bigint input', 1n],
-	]
-
-	it.each(invalid)('returns undefined without throwing for %s', (_label, input) => {
-		let projected: unknown = 'not called'
-		expect(() => {
-			projected = agentResultToJSON(input)
-		}).not.toThrow()
-		expect(projected).toBeUndefined()
-	})
+	it.each(createInvalidAgentResultCases())(
+		'returns undefined without throwing for %s',
+		(_label, input) => {
+			let projected: unknown = 'not called'
+			expect(() => {
+				projected = agentResultToJSON(input)
+			}).not.toThrow()
+			expect(projected).toBeUndefined()
+		},
+	)
 })
 
 describe('estimateMessages', () => {
 	it('sums estimateTokens over each message content plus the per-message overhead', () => {
-		const messages = [message('hello'), message('a'.repeat(40))]
+		const messages = [createMessage('hello'), createMessage('a'.repeat(40))]
 		// (ceil(5/4)=2 + overhead) + (ceil(40/4)=10 + overhead) — content + fixed framing per message.
 		expect(estimateMessages(messages)).toBe(
 			estimateTokens('hello') +
@@ -279,17 +182,19 @@ describe('estimateMessages', () => {
 		expect(estimateMessages([])).toBe(0)
 	})
 
-	it('treats empty-content messages as just the per-message overhead', () => {
+	it('treats empty-content messages as the per-message overhead', () => {
 		// An empty content contributes 0 content tokens, so each message is exactly its overhead.
-		expect(estimateMessages([message(''), message('')])).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
+		expect(estimateMessages([createMessage(''), createMessage('')])).toBe(
+			2 * MESSAGE_TOKEN_OVERHEAD,
+		)
 		// And a mix is the non-empty member's content estimate plus both messages' overhead.
-		expect(estimateMessages([message(''), message('hello')])).toBe(
+		expect(estimateMessages([createMessage(''), createMessage('hello')])).toBe(
 			estimateTokens('hello') + 2 * MESSAGE_TOKEN_OVERHEAD,
 		)
 	})
 
 	it('counts the per-message overhead for N messages (N * MESSAGE_TOKEN_OVERHEAD)', () => {
-		const messages = [message(''), message(''), message(''), message('')]
+		const messages = [createMessage(''), createMessage(''), createMessage(''), createMessage('')]
 		expect(estimateMessages(messages)).toBe(4 * MESSAGE_TOKEN_OVERHEAD)
 	})
 
@@ -353,12 +258,9 @@ describe('settleAgentJob', () => {
 	// finish resolves with the run's result; a PARTIAL (forced through a pre-aborted signal,
 	// which commits an empty partial before the provider runs) THROWS an AgentJobError when
 	// partials are disallowed and RESOLVES the partial when allowed.
-	const USAGE = createTokenUsage()
-	const registry = (turn: { content: string; usage?: typeof USAGE }) =>
-		createAgentRegistry({ providers: { main: createScriptedProvider([turn]) } })
 
 	it('resolves a naturally-finished run with its result (partial: false)', async () => {
-		const agent = registry({ content: 'done', usage: USAGE }).build({
+		const agent = createTurnRegistry({ content: 'done', usage: AGENT_USAGE }).build({
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 		})
@@ -366,14 +268,14 @@ describe('settleAgentJob', () => {
 		const result = await settleAgentJob(agent, false)
 		expect(result.partial).toBe(false)
 		expect(result.content).toBe('done')
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(AGENT_USAGE)
 	})
 
 	it('throws an AgentJobError carrying the partial when the run ends partial and partials are DISALLOWED', async () => {
 		// A pre-aborted signal commits an empty partial before the provider ever runs.
 		const controller = new AbortController()
 		controller.abort()
-		const agent = registry({ content: 'never' }).build(
+		const agent = createTurnRegistry({ content: 'never' }).build(
 			{ provider: 'main', messages: [{ role: 'user', content: 'go' }] },
 			controller.signal,
 		)
@@ -392,7 +294,7 @@ describe('settleAgentJob', () => {
 	it('resolves the partial as success when the run ends partial and partials are ALLOWED', async () => {
 		const controller = new AbortController()
 		controller.abort()
-		const agent = registry({ content: 'never' }).build(
+		const agent = createTurnRegistry({ content: 'never' }).build(
 			{ provider: 'main', messages: [{ role: 'user', content: 'go' }] },
 			controller.signal,
 		)

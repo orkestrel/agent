@@ -13,7 +13,7 @@ import { removeEntries } from '../../helpers.js'
 import { Instruction } from './Instruction.js'
 
 /**
- * Registers the immutable {@link Instruction}s a richer context assembles a directives block
+ * Registers the immutable {@link Instruction} instances a richer context assembles a directives block
  * from — keyed by `name` so a re-`add` overwrites, last write wins, and listed by descending
  * `priority`, carrying the `open` / `render` / `close` build contract and an observable `emitter`.
  *
@@ -57,10 +57,7 @@ export class InstructionManager implements InstructionManagerInterface {
 	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
 
 	constructor(options?: InstructionManagerOptions) {
-		this.#emitter = new Emitter<InstructionManagerEventMap>({
-			...(options?.on === undefined ? {} : { on: options.on }),
-			...(options?.error === undefined ? {} : { error: options.error }),
-		})
+		this.#emitter = new Emitter<InstructionManagerEventMap>(options)
 		this.#format = options?.format
 	}
 

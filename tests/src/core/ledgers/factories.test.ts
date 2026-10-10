@@ -1,28 +1,25 @@
 import type { LedgerAgentOptions, LedgerOptions } from '@src/core'
-import { Classifier, Gauge, Ledger, LEDGER_QUESTIONS, createLedger } from '@src/core'
+import { Classifier, Gauge, Ledger, createLedger } from '@src/core'
 import { createTool } from '@orkestrel/tool'
 import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest'
-import { RecordingJudge, createScriptedProvider } from '../../../setup.js'
+import { buildLedgerOptions, createScriptedProvider } from '../../../setup.js'
 
 describe('createLedger', () => {
 	let options: LedgerOptions
 	beforeEach(() => {
-		options = {
-			judge: new RecordingJudge(),
-			system: 'Serve the desk.',
-			questions: LEDGER_QUESTIONS,
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			topics: [],
-			capacity: 4096,
-			gauge: { scale: 1, fixed: 0 },
-		}
+		options = buildLedgerOptions({ topics: [], lookups: [] })
 	})
 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('strict')
+		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('budget')
+		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('signal')
+		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('error')
+		expectTypeOf<LedgerOptions>().not.toHaveProperty('notes')
+		expectTypeOf<Gauge>().not.toHaveProperty('measure')
 		const ledger = createLedger(createScriptedProvider([]), options)
 		expect(ledger).toBeInstanceOf(Ledger)
 		expect(Classifier).toBeTypeOf('function')
-		expect(new Gauge({ scale: 1, fixed: 0, capacity: 4096 }).scale).toBe(1)
+		expect(new Gauge({ scale: 1, overhead: 0, capacity: 4096 }).scale).toBe(1)
 		expect(ledger.conversation.summarizable).toBe(false)
 		expect(ledger.agent.context.conversations.count).toBe(1)
 	})
@@ -37,40 +34,6 @@ describe('createLedger', () => {
 				expect.objectContaining({ code: 'THRESHOLD' }),
 			)
 		}
-	})
-	it('validates constructor options without relying on the factory', () => {
-		const provider = createScriptedProvider([])
-		const { gauge: _gauge, ...bare } = options
-		expect(() => new Ledger(provider, { ...bare, capacity: -1 })).toThrow(
-			expect.objectContaining({ code: 'CAPACITY' }),
-		)
-		expect(
-			() => new Ledger(provider, { ...options, thresholds: { ...options.thresholds, topic: 0 } }),
-		).toThrow(expect.objectContaining({ code: 'THRESHOLD' }))
-		expect(() => new Ledger(provider, { ...options, share: { tail: 0 } })).toThrow(
-			expect.objectContaining({ code: 'SHARE' }),
-		)
-		expect(() => new Ledger(provider, { ...options, agent: { limit: -1 } })).toThrow(
-			expect.objectContaining({ code: 'LIMIT' }),
-		)
-		expect(() => new Ledger(provider, { ...options, recall: { limit: -1 } })).toThrow(
-			expect.objectContaining({ code: 'LIMIT' }),
-		)
-		expect(
-			() => new Ledger(provider, { ...options, topics: [{ name: '', criterion: '' }] }),
-		).toThrow(expect.objectContaining({ code: 'TOPIC' }))
-		expect(
-			() =>
-				new Ledger(provider, {
-					...options,
-					lookups: [
-						{ tool: createTool({ name: 'recall', execute: () => '' }), read: () => undefined },
-					],
-				}),
-		).toThrow(expect.objectContaining({ code: 'LOOKUP' }))
-		expect(() => new Ledger(provider, { ...options, gauge: { scale: 0, fixed: 0 } })).toThrow(
-			expect.objectContaining({ code: 'GAUGE' }),
-		)
 	})
 	it('rejects every threshold outside (0, 1] with THRESHOLD', () => {
 		for (const key of Object.keys(options.thresholds))
@@ -151,11 +114,11 @@ describe('createLedger', () => {
 	it('refuses invalid supplied gauge values', () => {
 		for (const scale of [0, -1, NaN, Infinity])
 			expect(() =>
-				createLedger(createScriptedProvider([]), { ...options, gauge: { scale, fixed: 0 } }),
+				createLedger(createScriptedProvider([]), { ...options, gauge: { scale, overhead: 0 } }),
 			).toThrow(expect.objectContaining({ code: 'GAUGE' }))
-		for (const fixed of [-1, NaN, Infinity])
+		for (const overhead of [-1, NaN, Infinity])
 			expect(() =>
-				createLedger(createScriptedProvider([]), { ...options, gauge: { scale: 1, fixed } }),
+				createLedger(createScriptedProvider([]), { ...options, gauge: { scale: 1, overhead } }),
 			).toThrow(expect.objectContaining({ code: 'GAUGE' }))
 	})
 })

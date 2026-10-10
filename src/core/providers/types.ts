@@ -22,7 +22,7 @@ import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
  * away from the answer (an in-content `<think>…</think>` span a thinking model
  * emitted, or a wire-side reasoning field) — `content` is always the clean answer,
  * and the thinking is recorded on the assistant message and returns only as `replay`
- * allows. `tools` is present only when the model wants tool calls (an
+ * allows. `tools` is present only when the model requests tool calls (an
  * empty array is never surfaced — its absence means "no calls"). `usage` is present
  * only when the wire reported it (on the stream's `done` line, or the non-stream
  * body), so a caller folds it into a token budget exactly when it exists.
@@ -31,14 +31,14 @@ export interface ProviderResult {
 	readonly content: string
 	/** Carries separated reasoning when present; the assistant message records it and `replay` governs its return. */
 	readonly thinking?: string
-	/** Carries the tool calls the model wants when present. */
+	/** Carries the tool calls the model requests when present. */
 	readonly tools?: readonly ToolCall[]
 	/** Carries token consumption for this turn when present (from the wire's `done` line / body). */
 	readonly usage?: TokenUsage
 }
 
 /**
- * Represents one streamed delta a {@link ProviderInterface}'s `stream` yields — a unit tagged by
+ * Represents one streamed delta the `stream` method of a {@link ProviderInterface} yields — a unit tagged by
  * the channel it belongs to, so the agent loop can re-surface answer content and live reasoning
  * separately as it pumps.
  *
@@ -57,31 +57,31 @@ export type ProviderDelta =
 	| { readonly channel: 'thinking'; readonly text: string }
 
 /**
- * Carries the per-call options threaded into a {@link ProviderInterface}'s `generate` / `stream` —
+ * Carries the per-call options threaded into the `generate` and `stream` methods of a {@link ProviderInterface} —
  * the bag a caller passes to influence one inference call without reconfiguring the provider
  * instance.
  *
  * @remarks
  * `think` overrides the provider's constructed reasoning preference for this call: `true`
  * asks the backend to separate reasoning natively (a thinking model returns it on its
- * `message.thinking` channel, surfaced as `'thinking'` {@link ProviderDelta}s + the final
+ * `message.thinking` channel, surfaced as `'thinking'` {@link ProviderDelta} values + the final
  * {@link ProviderResult.thinking}); `false` suppresses it. `schema`, when given, asks the
  * backend to constrain its response to the given JSON-Schema shape (the same open
  * JSON-Schema record {@link ToolDefinition.parameters} already carries) — a structured-output
- * request for this call only. Both omitted ⇒ the provider's own defaults apply: its constructed
- * reasoning preference and no schema constraint.
+ * request for this call only. Default: the provider's constructed reasoning preference
+ * and no schema constraint.
  */
 export interface ProviderStreamOptions {
-	/** Overrides the provider's reasoning preference for this call; omitted ⇒ the provider default. */
+	/** Overrides the provider's reasoning preference for this call. Default: the provider's constructed preference. */
 	readonly think?: boolean
-	/** Constrains the response to this JSON-Schema shape (the same open record {@link ToolDefinition.parameters} uses); omitted ⇒ no constraint. */
+	/** Constrains the response to this JSON-Schema shape (the same open record {@link ToolDefinition.parameters} uses). Default: no constraint. */
 	readonly schema?: Readonly<Record<string, unknown>>
 }
 
 /**
  * Defines the pluggable LLM inference boundary — the one contract every agent chunk depends on. A
  * provider turns a conversation (plus optional tools) into either a single assembled {@link
- * ProviderResult} (`generate`) or a stream of {@link ProviderDelta}s that returns the assembled
+ * ProviderResult} (`generate`) or a stream of {@link ProviderDelta} values that returns the assembled
  * result (`stream`). The agent loop, a relay server, and a ledger apply its `replay` policy
  * before calling it. A direct `generate` or `stream` call sends messages as given.
  *
@@ -93,14 +93,14 @@ export interface ProviderStreamOptions {
  *   surfaces a `ProviderAbortError` carrying the partial result.
  * - `tools`, when given non-empty, advertises the callable tools for this turn.
  * - `options` carries the optional per-call {@link ProviderStreamOptions} (for example `think`),
- *   overriding the provider's constructed defaults for that one call; omitted ⇒ defaults.
+ *   overriding the provider's constructed defaults for that one call. Default: the provider's constructed defaults.
  */
 export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
 	/**
 	 * Names the policy the agent loop, a relay server, and a ledger apply before calling the
-	 * provider; absent means `'none'`. A direct `generate` or `stream` call sends messages as given.
+	 * provider. Default: `'none'`. A direct `generate` or `stream` call sends messages as given.
 	 */
 	readonly replay?: ThinkingReplay
 	/**
@@ -109,7 +109,7 @@ export interface ProviderInterface {
 	 * @param messages - The conversation so far
 	 * @param signal - Bounds the request; an abort rejects the call
 	 * @param tools - Optional tools the model may call this turn
-	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`); omitted ⇒ defaults
+	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`). Default: the provider's constructed defaults
 	 * @returns The assembled result (content + any tool calls + any usage)
 	 */
 	generate(
@@ -119,7 +119,7 @@ export interface ProviderInterface {
 		options?: ProviderStreamOptions,
 	): Promise<ProviderResult>
 	/**
-	 * Streams one turn — yields channel-tagged `content` / `thinking` {@link ProviderDelta}s as
+	 * Streams one turn — yields channel-tagged `content` / `thinking` {@link ProviderDelta} values as
 	 * they arrive and returns the assembled {@link ProviderResult} (the concatenated content,
 	 * any separated reasoning, any tool calls, and any usage) when the stream completes. A
 	 * mid-stream abort throws a `ProviderAbortError` carrying the partial result.
@@ -131,8 +131,8 @@ export interface ProviderInterface {
 	 * @param messages - The conversation so far
 	 * @param signal - Bounds the request; an abort throws `ProviderAbortError`
 	 * @param tools - Optional tools the model may call this turn
-	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`); omitted ⇒ defaults
-	 * @returns A generator of {@link ProviderDelta}s, returning the assembled result
+	 * @param options - Optional per-call {@link ProviderStreamOptions} (for example `think`). Default: the provider's constructed defaults
+	 * @returns A generator of {@link ProviderDelta} values, returning the assembled result
 	 */
 	stream(
 		messages: readonly Message[],
@@ -223,7 +223,7 @@ export interface ProviderIncrement {
  * @remarks
  * `timeout` is an integer duration in milliseconds. Default: 120_000.
  * `replay` is a {@link ThinkingReplay} that configures the provider's `replay`. Default: `'none'`.
- * `fetch` defaults to the global transport bound to its global receiver.
+ * `fetch` is the request transport. Default: the global `fetch` bound to `globalThis`.
  * `headers` runs for each request inside its deadline and receives the combined caller
  * and deadline signal so token requests can share that bound. It overrides the JSON
  * content type only when it returns that header.
@@ -260,7 +260,7 @@ export interface AgentProviderInterface<
 	/** Creates fresh framing state for a call. */
 	frame(): ProviderParserInterface<TRecord>
 	/** Projects a request to the concrete protocol's serializable body. */
-	body(request: ProviderRequest): object
+	encode(request: ProviderRequest): object
 	/** Decodes a framed record into its contribution to the turn. */
 	read(record: TRecord): ProviderIncrement
 	/** Returns records retained at end of input before the parser is cleared. */
@@ -326,6 +326,12 @@ export interface RelayProviderOptions extends ProviderOptions {
 	readonly parser: () => ProviderParserInterface
 }
 
+/** Carries an HTTP failure message and the underlying body-read cause when available. */
+export interface FailureRead {
+	readonly message: string
+	readonly cause?: unknown
+}
+
 /** Carries a decoded stream prefix and whether the stream ended within its byte budget. */
 export interface TextRead {
 	readonly text: string
@@ -355,7 +361,7 @@ export interface AgentJudgeInput extends Pick<ProviderOptions, 'timeout' | 'fetc
 /** Defines the wire seams of the shared judge engine. */
 export interface AgentJudgeInterface extends JudgeInterface {
 	/** Projects one call's request onto the concrete protocol's serializable body. */
-	body(request: JudgeRequest): object
+	encode(request: JudgeRequest): object
 	/** Decodes one call's parsed response body into the answers for that call's questions. */
 	read(value: unknown, request: JudgeRequest): JudgeResult
 }

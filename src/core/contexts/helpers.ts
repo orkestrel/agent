@@ -1,162 +1,11 @@
-import type { Applicability, Criterion, SelectionOptions } from './types.js'
-import type { ConversationInterface } from '../conversations/types.js'
-import type { Message, NoulQuestion } from '../types.js'
+import type { Message } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
-import { collectExchanges, matchesJudgment } from '../helpers.js'
-import { NEEDED_QUESTION } from './templates.js'
-
-/**
- * Encodes a condition and its ordered message ids without separator ambiguity.
- * @param condition - The needed condition
- * @param subject - The screened message id
- * @param object - The request message id
- * @returns The JSON tuple used as the judgment key
- * @example
- * ```ts
- * buildConditionKey('needed', 'a', 'b') // '["needed","a","b"]'
- * ```
- */
-export function buildConditionKey(condition: 'needed', subject: string, object: string): string {
-	return JSON.stringify([condition, subject, object])
-}
-
-/**
- * Builds the fixed needed question with the application's true and false criteria.
- * @param needed - The true and false criteria, such as `NEEDED_CRITERION`
- * @returns The binary question whose instructions remain stable across compaction
- * @example
- * ```ts
- * buildNeededQuestion(NEEDED_CRITERION)
- * ```
- */
-export function buildNeededQuestion(needed: Pick<Criterion, 'yes' | 'no'>): NoulQuestion {
-	return {
-		form: 'noul',
-		instructions: NEEDED_QUESTION,
-		criteria: { true: needed.yes, false: needed.no },
-	}
-}
-
-/**
- * Renders the view with subject and request markers, appending a folded request as evidence.
- *
- * @remarks
- * A message's `images` and `thinking` members are left out, so neither a base64 payload nor
- * reasoning enters the state or the bytes a judgment reuse compares.
- * @param messages - The conversation view in prompt order
- * @param subject - The screened message id marked [A]
- * @param request - The user message marked [B], even when absent from the view
- * @returns The complete state whose bytes determine judgment reuse
- * @example
- * ```ts
- * renderSelectionState([], 'earlier', { id: 'request', role: 'user', content: 'Continue.' })
- * ```
- */
-export function renderSelectionState(
-	messages: readonly Message[],
-	subject: string,
-	request: Message,
-): string {
-	const evidence = messages.some((message) => message.id === request.id)
-		? messages
-		: [...messages, request]
-	return evidence
-		.map((message) => {
-			const markers = `${message.id === subject ? '[A]' : ''}${message.id === request.id ? '[B]' : ''}`
-			const text = Object.fromEntries(
-				Object.entries(message).filter(([key]) => key !== 'images' && key !== 'thinking'),
-			)
-			return `${markers} ${JSON.stringify(text)}`
-		})
-		.join('\n')
-}
-
-/**
- * Derives needed conditions from matching recorded judgments without asking a judge.
- *
- * @remarks
- * The threshold must lie in the interval above 0.5 up to and including 1, and `createSelection`
- * refuses any other value. The helper reads the true side first.
- *
- * @param conversation - The conversation supplying the view and recorded judgments
- * @param request - The user message the selection serves
- * @param options - The judge identity, screen, and application criterion
- * @returns One applicability per distinct screened id present in the view, in screen order
- * @example
- * ```ts
- * inferApplicability(conversation, request, { judge, screen, needed })
- * ```
- */
-export function inferApplicability(
-	conversation: ConversationInterface,
-	request: Message,
-	options: Pick<SelectionOptions, 'judge' | 'screen' | 'needed'>,
-): readonly Applicability[] {
-	const view = conversation.view()
-	const present = new Set(view.map((message) => message.id))
-	const question = buildNeededQuestion(options.needed)
-	return [...new Set(options.screen(conversation, request))]
-		.filter((id) => present.has(id))
-		.map((id) => {
-			const judgment = conversation.judgments.judgment(buildConditionKey('needed', id, request.id))
-			if (
-				judgment === undefined ||
-				!matchesJudgment(
-					judgment,
-					question,
-					[id, request.id],
-					renderSelectionState(view, id, request),
-					options.judge.model,
-				) ||
-				judgment.answer?.form !== 'noul'
-			)
-				return { id }
-			const probability = judgment.answer.noul
-			if (probability >= options.needed.threshold) return { id, needed: true }
-			if (probability <= 1 - options.needed.threshold) return { id, needed: false }
-			return { id }
-		})
-}
-
-/**
- * Filters decisively unneeded subjects while preserving requests, whole exchanges, and complete
- * tool groups.
- *
- * @remarks
- * An exchange is a user message and every message after it up to the next user message. Leading
- * messages form their own exchange. An exchange and a tool group from
- * {@link import('../helpers.js').collectToolGroups}
- * are each kept whole when any member is kept and dropped whole only when every member is
- * dropped. A tool group that spans two exchanges joins them, so keeping one keeps both.
- *
- * @param messages - The conversation view in prompt order
- * @param applicability - The screened subjects and their recorded conditions
- * @param request - The request whose id must be retained when present
- * @returns A subset of the original messages in their original order
- * @example
- * ```ts
- * filterSelectionMessages(conversation.view(), applicability, request)
- * ```
- */
-export function filterSelectionMessages(
-	messages: readonly Message[],
-	applicability: readonly Applicability[],
-	request: Message,
-): readonly Message[] {
-	const dropped = new Set(
-		applicability.filter((entry) => entry.needed === false).map((entry) => entry.id),
-	)
-	dropped.delete(request.id)
-	return collectExchanges(messages).flatMap((exchange) =>
-		exchange.some((message) => !dropped.has(message.id)) ? exchange : [],
-	)
-}
 
 /**
  * Renders a path-addressed text body as a fenced reference block — a `File: <path>` label line
- * over a language-tagged fence, the framing an
- * {@link import('./AgentContext.js').AgentContext}'s active-workspace text-file render emits.
+ * over a language-tagged fence, the framing the
+ * active-workspace text-file render of {@link import('./AgentContext.js').AgentContext} emits.
  *
  * @remarks
  * Produces `` File: <path>\n```<language>\n<content>\n``` `` — the `File:` label line, then a
@@ -188,13 +37,13 @@ export function renderFencedFile(path: string, language: string, content: string
  *
  * @remarks
  * Pure and total. A section with no items renders nothing (`undefined`), so an empty or fully
- * scoped-out manager stays silent — its `open` / `close` never appear without items. `close`
+ * scoped-out manager stays silent — its `open` / `close` appear only when the section has items. `close`
  * is the only optional slot: an unset one (there is no built-in close) drops the
  * trailing line.
  *
  * @typeParam T - The section item being rendered
  * @param open - The section's resolved leading text
- * @param items - The already scope-filtered items
+ * @param members - The already scope-filtered items
  * @param render - Renders one item to its prompt text
  * @param close - The section's resolved trailing text, or `undefined` for none
  * @returns The rendered section, or `undefined` when there are no items
@@ -208,12 +57,12 @@ export function renderFencedFile(path: string, language: string, content: string
  */
 export function renderSection<T>(
 	open: string,
-	items: readonly T[],
-	render: (item: T) => string,
+	members: readonly T[],
+	render: (member: T) => string,
 	close: string | undefined,
 ): string | undefined {
-	if (items.length === 0) return undefined
-	const lines = [open, ...items.map(render)]
+	if (members.length === 0) return undefined
+	const lines = [open, ...members.map(render)]
 	if (close !== undefined) lines.push(close)
 	return lines.join('\n\n')
 }
@@ -228,17 +77,18 @@ export function renderSection<T>(
  * convention).
  *
  * @param message - The message to copy (left unchanged)
- * @param data - The base64 image data to attach
+ * @param payloads - The base64 image data to attach
  * @returns A new message carrying the merged `images`
  *
  * @example
  * ```ts
- * attachImages({ id: '1', role: 'user', content: 'Describe' }, ['<payload>'])
- * // { id: '1', role: 'user', content: 'Describe', images: ['<payload>'] }
+ * // IMAGE_BASE64 stands for the base64 text of one image.
+ * attachImages({ id: '1', role: 'user', content: 'Describe' }, ['IMAGE_BASE64'])
+ * // { id: '1', role: 'user', content: 'Describe', images: ['IMAGE_BASE64'] }
  * ```
  */
-export function attachImages(message: Message, data: readonly string[]): Message {
-	const images = [...(message.images ?? []), ...data]
+export function attachImages(message: Message, payloads: readonly string[]): Message {
+	const images = [...(message.images ?? []), ...payloads]
 	return message.calls === undefined
 		? { id: message.id, role: message.role, content: message.content, images }
 		: {
@@ -262,20 +112,20 @@ export function attachImages(message: Message, data: readonly string[]): Message
  * unchanged too (there is nowhere to attach, and the images already rode the system block).
  *
  * @param conversation - The messages to attach into (left unchanged)
- * @param data - The base64 image data to attach
+ * @param payloads - The base64 image data to attach
  * @returns The conversation with its last user message replaced by the carrying copy
  *
  * @example
  * ```ts
- * attachUserImages([{ id: '1', role: 'user', content: 'Describe' }], ['<payload>'])
- * // [{ id: '1', role: 'user', content: 'Describe', images: ['<payload>'] }]
+ * attachUserImages([{ id: '1', role: 'user', content: 'Describe' }], ['IMAGE_BASE64'])
+ * // [{ id: '1', role: 'user', content: 'Describe', images: ['IMAGE_BASE64'] }]
  * ```
  */
 export function attachUserImages(
 	conversation: readonly Message[],
-	data: readonly string[],
+	payloads: readonly string[],
 ): readonly Message[] {
-	if (data.length === 0) return conversation
+	if (payloads.length === 0) return conversation
 	let target = -1
 	for (let index = conversation.length - 1; index >= 0; index -= 1) {
 		if (conversation[index]?.role === 'user') {
@@ -285,7 +135,7 @@ export function attachUserImages(
 	}
 	if (target === -1) return conversation
 	return conversation.map((message, index) =>
-		index === target ? attachImages(message, data) : message,
+		index === target ? attachImages(message, payloads) : message,
 	)
 }
 
@@ -303,18 +153,18 @@ export function attachUserImages(
  *
  * @example
  * ```ts
- * collectImageData([createFile({ path: 'a.png', content: { base64: '<payload>', mime: 'image/png' } })])
- * // ['<payload>']
+ * collectImageData([createFile({ path: 'a.png', content: { base64: 'IMAGE_BASE64', mime: 'image/png' } })])
+ * // ['IMAGE_BASE64']
  * ```
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {
-	const data: string[] = []
+	const payloads: string[] = []
 	for (const file of files) {
 		if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
-			data.push(file.content.base64)
+			payloads.push(file.content.base64)
 		}
 	}
-	return data
+	return payloads
 }
 
 /**

@@ -6,20 +6,12 @@
 export const DEFAULT_AGENT_LIMIT = 10
 
 /**
- * Names the zone an {@link AuthorityInterface}'s default fallback {@link AuthorityDecision}
- * carries — `'default'`, the classification for a tool call that matched no rule. Paired with
- * the default `allowed: true` fallback, an unmatched call is allowed under this zone, so a
- * rules list of denials acts as a denylist; a caller wanting deny-by-default supplies an
- * `allowed: false` `fallback` of their own (see `AuthorityOptions`).
+ * Names the default zone for an unmatched tool call allowed by an authority.
  */
 export const DEFAULT_AUTHORITY_ZONE = 'default'
 
 /**
- * Estimates the per-message role and framing overhead {@link import('./helpers.js').estimateMessages}
- * adds on top of a message's content estimate — `4` tokens for the fixed wire framing every
- * conversation turn carries (its role tag, its delimiters) that
- * {@link import('./helpers.js').estimateTokens}'s content-only heuristic does not otherwise
- * capture.
+ * Estimates the role and framing overhead added to each message by {@link estimateMessages}.
  */
 export const MESSAGE_TOKEN_OVERHEAD = 4
 

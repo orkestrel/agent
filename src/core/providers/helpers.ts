@@ -1,4 +1,5 @@
 import type {
+	FailureRead,
 	ProviderOptions,
 	ProviderResult,
 	Reading,
@@ -13,6 +14,7 @@ import type { ToolCall } from '@orkestrel/tool'
 import { isTokenUsage } from '@orkestrel/budget'
 import { attempt, boundsOf, isArray, isNumber } from '@orkestrel/contract'
 import { JudgeError } from './errors.js'
+import { MAX_ERROR_BODY_LENGTH } from './constants.js'
 import { sanitizeUsage, sumUsage } from '../helpers.js'
 
 /**
@@ -68,6 +70,72 @@ export async function releaseReader(
 }
 
 /**
+ * Arms signal propagation to a byte reader and returns the controller that removes the listener.
+ *
+ * @param reader - The reader whose pending read an abort releases
+ * @param signal - The optional caller signal
+ * @returns The listener cleanup controller after any already-aborted cancellation settles
+ * @example
+ * ```ts
+ * const reader = new ReadableStream<Uint8Array>().getReader()
+ * const cleanup = await armReaderAbort(reader, new AbortController().signal)
+ * cleanup.abort()
+ * await releaseReader(reader)
+ * ```
+ */
+export async function armReaderAbort(
+	reader: ReadableStreamDefaultReader<Uint8Array>,
+	signal: AbortSignal | undefined,
+): Promise<AbortController> {
+	const cleanup = new AbortController()
+	signal?.addEventListener(
+		'abort',
+		() => {
+			void reader.cancel(signal.reason).catch(() => {
+				// Preserve the caller's outcome when source cancellation rejects.
+			})
+		},
+		{ once: true, signal: cleanup.signal },
+	)
+	if (signal?.aborted) {
+		await reader.cancel(signal.reason).catch(() => {
+			// An already-aborted read retains the same cancellation contract.
+		})
+		cleanup.abort()
+	}
+	return cleanup
+}
+
+/**
+ * Reads a bounded HTTP failure excerpt and preserves an unreadable body's cause.
+ *
+ * @param response - The failed HTTP response
+ * @param prefix - The error taxonomy prefix, including its trailing colon
+ * @param signal - The call's combined caller and deadline signal
+ * @returns The status message with any excerpt or body-read failure
+ * @example
+ * ```ts
+ * await readFailure(new Response('unavailable', { status: 503 }), 'provider error:', new AbortController().signal)
+ * // { message: 'provider error: 503 - unavailable' }
+ * ```
+ */
+export async function readFailure(
+	response: Response,
+	prefix: string,
+	signal: AbortSignal,
+): Promise<FailureRead> {
+	try {
+		const detail =
+			response.body === null
+				? ''
+				: (await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)).text
+		return { message: `${prefix} ${response.status}${detail === '' ? '' : ` - ${detail}`}` }
+	} catch (cause) {
+		return { message: `${prefix} ${response.status} - (error body unavailable)`, cause }
+	}
+}
+
+/**
  * Reads a UTF-8 prefix of a byte stream and cancels its remainder.
  *
  * @remarks
@@ -95,25 +163,12 @@ export async function readText(
 ): Promise<TextRead> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
-	const cleanup = new AbortController()
+	let cleanup: AbortController | undefined
 	let remaining = limit ?? Infinity
 	let text = ''
 	let complete = false
 	try {
-		signal?.addEventListener(
-			'abort',
-			() => {
-				void reader.cancel(signal.reason).catch(() => {
-					// Preserve the decoded prefix when source cancellation rejects.
-				})
-			},
-			{ once: true, signal: cleanup.signal },
-		)
-		if (signal?.aborted) {
-			await reader.cancel(signal.reason).catch(() => {
-				// An already-aborted read still returns its empty prefix.
-			})
-		}
+		cleanup = await armReaderAbort(reader, signal)
 		while (remaining > 0) {
 			if (signal?.aborted) break
 			const step = await reader.read()
@@ -128,7 +183,7 @@ export async function readText(
 		}
 		return { text: text + decoder.decode(), complete }
 	} finally {
-		cleanup.abort()
+		cleanup?.abort()
 		await releaseReader(reader)
 	}
 }
@@ -151,23 +206,10 @@ export async function* readChunks(
 ): AsyncGenerator<string> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
-	const cleanup = new AbortController()
+	let cleanup: AbortController | undefined
 	try {
-		signal?.addEventListener(
-			'abort',
-			() => {
-				void reader.cancel(signal.reason).catch(() => {
-					// Preserve the iteration outcome when source cancellation rejects.
-				})
-			},
-			{ once: true, signal: cleanup.signal },
-		)
-		if (signal?.aborted) {
-			await reader.cancel(signal.reason).catch(() => {
-				// An already-aborted iterator still ends without yielding.
-			})
-			return
-		}
+		cleanup = await armReaderAbort(reader, signal)
+		if (signal?.aborted) return
 		for (;;) {
 			const step = await reader.read()
 			if (signal?.aborted) return
@@ -178,7 +220,7 @@ export async function* readChunks(
 		const tail = decoder.decode()
 		if (tail.length > 0) yield tail
 	} finally {
-		cleanup.abort()
+		cleanup?.abort()
 		await releaseReader(reader)
 	}
 }
@@ -199,14 +241,14 @@ export async function* readChunks(
  *
  * @param answer - The answer whose distribution is read
  * @returns The derived measures
- * @throws JudgeError Thrown with code `PROTOCOL` when a choice or score answer has fewer than 2
- * candidates, because the confidence formulas divide by the candidate count
+ * @throws JudgeError Thrown when a choice or score answer has fewer than 2 candidates
+ * (code `PROTOCOL`), because the confidence formulas divide by the candidate count
  * @example
  * ```ts
  * computeReading({ form: 'choice', probabilities: { billing: 0.88, technical: 0.12, sales: 0 } })
- * // { winner: 'billing', probability: 0.88, confidence: 0.82 } to two decimals
+ * // { winner: 'billing', probability: 0.88, confidence: 0.82 } to 2 decimals
  * computeReading({ form: 'score', probabilities: [0, 0.57, 0.43] })
- * // { winner: '1', probability: 0.57, confidence: 0.355, score: 1.43 } to three decimals
+ * // { winner: '1', probability: 0.57, confidence: 0.355, score: 1.43 } to 3 decimals
  * computeReading({ form: 'noul', noul: 0.5 }) // { winner: 'false', probability: 0.5, confidence: 0 }
  * ```
  */
@@ -309,12 +351,13 @@ export function buildJudgeResult(model: string, results: readonly JudgeResult[])
  * @example
  * ```ts
  * const signal = new AbortController().signal
- * const headers = await readHeaders(() => ({ authorization: 'Bearer KEY' }), signal)
- * headers.get('authorization') // 'Bearer KEY'
+ * // API_KEY stands for the server's bearer key.
+ * const headers = await buildProviderHeaders(() => ({ authorization: 'Bearer API_KEY' }), signal)
+ * headers.get('authorization') // 'Bearer API_KEY'
  * headers.get('content-type') // 'application/json'
  * ```
  */
-export async function readHeaders(
+export async function buildProviderHeaders(
 	hook: ProviderOptions['headers'],
 	signal: AbortSignal,
 ): Promise<Headers> {

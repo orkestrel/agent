@@ -21,6 +21,13 @@ describe('Instruction', () => {
 		expect(instruction.priority).toBe(0)
 	})
 
+	it('exposes an undefined override property when no override was supplied', () => {
+		const instruction = new Instruction({ name: 'tone', content: 'Be concise.' })
+
+		expect(Object.hasOwn(instruction, 'override')).toBe(true)
+		expect(instruction.override).toBeUndefined()
+	})
+
 	it('respects an explicit priority (including 0 and negatives)', () => {
 		expect(new Instruction({ name: 'a', content: 'x', priority: 10 }).priority).toBe(10)
 		expect(new Instruction({ name: 'b', content: 'x', priority: 0 }).priority).toBe(0)

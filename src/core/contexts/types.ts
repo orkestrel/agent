@@ -3,7 +3,7 @@ import type {
 	ConversationManagerInterface,
 	MessageManagerInterface,
 } from '../conversations/index.js'
-import type { JudgeInterface, Message } from '../types.js'
+import type { Message } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { ToolManagerInterface } from '@orkestrel/tool'
@@ -16,15 +16,15 @@ import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
  * @remarks
  * Assembled once from its {@link InstructionInput} (the `id` minted by the storing
  * layer) and never mutated. `name` keys it in an {@link InstructionManagerInterface}
- * (last write wins); `priority` orders the rendered list (higher first), defaulting to
- * `0`. The {@link import('./AgentContext.js').AgentContext} build step renders it through
+ * (last write wins); `priority` orders the rendered list (higher first). Default: `0`.
+ * The {@link import('./AgentContext.js').AgentContext} build step renders it through
  * its manager's `render` (`content`) under the manager's `open` header.
  */
 export interface InstructionInterface {
 	readonly id: string
 	readonly name: string
 	readonly content: string
-	/** Ranks the instruction — higher renders first; defaults to `0`. */
+	/** Ranks the instruction — higher renders first. Default: `0`. */
 	readonly priority: number
 	/**
 	 * Holds a fully-rendered per-item override of this instruction's prompt text — the
@@ -39,12 +39,12 @@ export interface InstructionInterface {
 /**
  * Carries the minimal data to author an {@link InstructionInterface} — the `id` is minted by
  * the {@link InstructionManagerInterface} that stores it, so a caller supplies only
- * `name` / `content` (and an optional `priority`, defaulting to `0`).
+ * `name` / `content` and an optional `priority`. Default: `0`.
  */
 export interface InstructionInput {
 	readonly name: string
 	readonly content: string
-	/** Weights the ordering (higher renders first); defaults to `0` when omitted. */
+	/** Weights the ordering (higher renders first). Default: `0`. */
 	readonly priority?: number
 	/**
 	 * Holds a fully-rendered override of this instruction's prompt text — the most-specific
@@ -98,7 +98,7 @@ export interface InstructionManagerOptions {
 }
 
 /**
- * Registers {@link InstructionInterface}s keyed by `name` — `add` (one or a batch) mints each `id`
+ * Registers {@link InstructionInterface} values keyed by `name` — `add` (one or a batch) mints each `id`
  * and overwrites a same-name instruction, last write wins, while `instructions()` lists them sorted
  * by descending `priority` and stable for ties.
  *
@@ -141,8 +141,8 @@ export interface InstructionManagerInterface {
 	 */
 	render(instruction: InstructionInterface): string
 	/**
-	 * Removes one instruction by name, or a batch — `true` only when every supplied name was
-	 * removed.
+	 * Removes one instruction by name, or a batch. True if every supplied name was removed; false
+	 * otherwise.
 	 */
 	remove(name: string): boolean
 	remove(names: readonly string[]): boolean
@@ -160,7 +160,7 @@ export interface InstructionManagerInterface {
  * `open`, `render`, and `close` are optional and resolved independently (so an override may set only
  * the top, only the per-item rendering, only the bottom, or any mix). A section assembles
  * as `[open, ...items.map(render), close]` with empty / absent slots dropped, the survivors
- * blank-line (`\n\n`) joined — so `open` + `close` together let a developer wrap the whole
+ * blank-line (`\n\n`) joined — so `open` + `close` together let you wrap the whole
  * group (for example `open: '<instructions>'` … `close: '</instructions>'`). `open` is the
  * section's leading text (the header, or a group's opening tag); `render` turns one section
  * item (an {@link InstructionInterface}) into its prompt text; `close` is the trailing text.
@@ -180,7 +180,7 @@ export interface ContextSectionFormat<T> {
 	 */
 	readonly open?: string
 	/** Overrides one item's rendering; omitted ⇒ the next cascade level decides. */
-	readonly render?: (item: T) => string
+	readonly render?: (member: T) => string
 	/**
 	 * Holds text rendered once after the section's items — a group's closing wrapper, for
 	 * example `'</instructions>'`; omitted ⇒ no closing line (there is no built-in close).
@@ -204,16 +204,16 @@ export interface ContextSectionFormat<T> {
  * the system block and the image files attached to the last user message.
  */
 export interface ScopeFilter {
-	/** Lists the allowed instruction `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	/** Lists the allowed instruction names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly instructions?: readonly string[]
 	/**
-	 * Lists the allowed tool `name`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
+	 * Lists the allowed tool names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
 	 * The loop advertises and dispatches only admitted tools, checking scope before authority.
 	 * If no definition is advertised, the reply ends the run without dispatching its calls.
 	 */
 	readonly tools?: readonly string[]
 	/**
-	 * Lists the allowed active-workspace file `path`s (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
+	 * Lists the allowed active-workspace file paths matched against the `path` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
 	 * the filter {@link AgentContextInterface.build} applies to the active workspace's
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the system block, image →
 	 * the last user message).
@@ -256,9 +256,7 @@ export interface Selection {
  * Receives the active conversation, the user message the run serves (passed by the loop, because
  * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
  * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
- * the usage spent, rather than throwing. A handler that recovers from an error returns no `fault`:
- * the stock handler leaves a subject whose judge call failed undecided and sets `fault` only when
- * the judge failed for every subject it asked and no recorded judgment was reused.
+ * the usage spent, rather than throwing. A handler that recovers from an error returns no `fault`.
  *
  * @param conversation - The conversation whose messages the handler selects
  * @param request - The user message captured at run entry
@@ -280,57 +278,6 @@ export type SelectionHandler = (
 ) => Promise<Selection>
 
 /**
- * Returns the message ids the application permits selection to judge.
- *
- * @param conversation - The conversation to screen
- * @param request - The user message the run serves
- * @returns The candidate ids in asking order
- * @example
- * ```ts
- * const screen: ScreenHandler = (conversation) => conversation.view().map((message) => message.id)
- * ```
- */
-export type ScreenHandler = (
-	conversation: ConversationInterface,
-	request: Message,
-) => readonly string[]
-
-/**
- * Carries application criteria and a required probability cutoff.
- *
- * @remarks
- * `yes` describes the true side and `no` the false side. `threshold` must be finite,
- * greater than 0.5, and at most 1. No default is supplied. A probability at or over
- * the cutoff means true, at or under its complement means false, and between means absent.
- */
-export interface Criterion {
-	readonly yes: string
-	readonly no: string
-	readonly threshold: number
-}
-
-/** Carries a screened message's needed condition, absent without a decisive matching answer. */
-export interface Applicability {
-	readonly id: string
-	readonly needed?: boolean
-}
-
-/**
- * Configures the judge, candidate screen, needed criterion, and fresh question limit.
- *
- * @remarks
- * `judge` supplies the model identity and inference. `screen` supplies candidate ids.
- * `needed` supplies the criteria text and required cutoff. `limit` is a nonnegative
- * safe integer; reused judgments consume none of it.
- */
-export interface SelectionOptions {
-	readonly judge: JudgeInterface
-	readonly screen: ScreenHandler
-	readonly needed: Criterion
-	readonly limit: number
-}
-
-/**
  * Carries the data to author a {@link ScopeInterface} — a {@link ScopeFilter} plus the
  * required `name` (a human label; the `id` is minted by the layer that stores it).
  */
@@ -338,8 +285,6 @@ export interface ScopeInput extends ScopeFilter {
 	readonly name: string
 	/** Holds the selection handler that overrides the agent default while this scope is active. */
 	readonly select?: SelectionHandler
-	/** Describes the mode this scope stands for; `build()` never reads it. */
-	readonly description?: string
 }
 
 /**
@@ -359,15 +304,13 @@ export interface ScopeInterface extends ScopeFilter {
 	readonly name: string
 	/** Holds the selection handler that overrides the agent default while this scope is active. */
 	readonly select?: SelectionHandler
-	/** Describes the mode this scope stands for; `build()` never reads it. */
-	readonly description?: string
 	/**
 	 * Composes a tighter child scope — each category is the set intersection of this scope's
-	 * list and `config`'s (an `undefined` side imposing no constraint), returned as a new
+	 * list and the list in `config` (an `undefined` side imposing no constraint), returned as a new
 	 * scope that leaves this one unchanged.
 	 *
 	 * @remarks
-	 * The child keeps this scope's `name`, `description`, and `select`, and mints its own `id`.
+	 * The child keeps this scope's `name` and `select`, and mints its own `id`.
 	 *
 	 * @param config - The narrowing allow-lists (a `name`-less {@link ScopeFilter})
 	 * @returns A new, tighter {@link ScopeInterface} (this one is left unchanged)
@@ -405,7 +348,7 @@ export interface ScopeManagerOptions {
 }
 
 /**
- * Registers reusable {@link ScopeInterface}s keyed by their minted `id` — `create`
+ * Registers reusable {@link ScopeInterface} instances keyed by their minted `id` — `create`
  * mints + stores one (never overwrites), `scopes()` lists them in insertion order.
  *
  * @remarks
@@ -421,7 +364,7 @@ export interface ScopeManagerInterface {
 	readonly emitter: EmitterInterface<ScopeManagerEventMap>
 	readonly count: number
 	/**
-	 * Mints a scope from a {@link ScopeInput} (an `id` plus the per-category allow-lists) and
+	 * Mints a scope from a {@link ScopeInput} (a `name` plus the per-category allow-lists) and
 	 * stores it — always adds, never overwrites.
 	 */
 	create(input: ScopeInput): ScopeInterface
@@ -429,7 +372,7 @@ export interface ScopeManagerInterface {
 	scope(id: string): ScopeInterface | undefined
 	/** Lists every scope, in insertion order. */
 	scopes(): readonly ScopeInterface[]
-	/** Removes one scope by id, or a batch — `true` only when every supplied id was removed. */
+	/** Removes one scope by id, or a batch. True if every supplied id was removed; false otherwise. */
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
 	/** Removes every scope. */
@@ -448,8 +391,8 @@ export interface ScopeManagerInterface {
  * when one is omitted, the context creates a fresh empty one. `tools` supplies the loop's
  * call-dispatch and provider-advertising registry; it never renders into the prompt. `scope` is the
  * initial active filter applied at `build()` time (and at the loop's tool-advertise step); it
- * defaults to `undefined` — no filtering — and can be changed through the context's `apply`
- * method afterwards. `conversations` is the structural {@link ConversationManagerInterface} the
+ * can be changed through the context's `apply` method afterwards. Default: `undefined`, no filtering.
+ * `conversations` is the structural {@link ConversationManagerInterface} the
  * context's message source flows from: `messages` is the manager's active conversation's live tail
  * and `build()` folds that conversation's `view()` (section summaries + live). When omitted, a fresh
  * {@link ConversationManagerInterface} is created and a default conversation is added (so
@@ -462,7 +405,7 @@ export interface AgentContextOptions {
 	readonly system?: string
 	/**
 	 * Holds the loop's pre-built tool registry for provider advertising and call dispatch; an empty one is
-	 * created when omitted. Tools never render into `build()`'s prompt.
+	 * created when omitted. Tools never render into the prompt returned by the `build()` method.
 	 */
 	readonly tools?: ToolManagerInterface
 	/** Reuses a pre-built instruction registry; an empty one is created when omitted. */
@@ -512,8 +455,8 @@ export interface AgentContextOptions {
  * the active workspace's scope-filtered image files' `base64` payload to the last user message. The
  * active workspace is the sole document/image context. Tools are advertised to the provider
  * structurally (through `tools.definitions()`, scope-filtered by the loop), not serialized into
- * the prompt, so they never appear in `build()`'s output. The context managers are observable
- * (their own `emitter`s); the context itself is event-free.
+ * the prompt, so they never appear in the output of the `build()` method. The context managers are observable
+ * (each through its own `emitter` property); the context itself is event-free.
  */
 export interface AgentContextInterface {
 	readonly system: string | undefined
@@ -549,7 +492,7 @@ export interface AgentContextInterface {
 	readonly conversations: ConversationManagerInterface
 	/**
 	 * Holds the loop's tool registry for provider advertising and call dispatch. Tools are structural
-	 * loop machinery and never render into `build()`'s prompt.
+	 * loop machinery and never render into the prompt returned by the `build()` method.
 	 */
 	readonly tools: ToolManagerInterface
 	/** Holds the active scope applied at `build()` time + the loop's tool-advertise step (`undefined` ⇒ no filtering). */

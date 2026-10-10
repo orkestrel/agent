@@ -1,9 +1,8 @@
-import { createRelay, DEFAULT_RELAY_LIMIT } from '@src/core'
+import { createRelay, createThinkSplitter, DEFAULT_RELAY_LIMIT } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { getEventListeners } from 'node:events'
 import {
 	createRelayRequest,
-	createStreamingRelayRequest,
 	RecordedBody,
 	RecordedProvider,
 	createScriptedProvider,
@@ -17,7 +16,7 @@ describe('createRelay', () => {
 			true,
 			new Error('fixture-secret'),
 		)
-		const request = createStreamingRelayRequest(body.stream)
+		const request = createRelayRequest(body.stream)
 		const response = await createRelay({ provider, authorize: () => true })(request)
 		expect(response.status).toBe(400)
 		expect(await response.text()).toBe('')
@@ -40,7 +39,7 @@ describe('createRelay', () => {
 		const provider = new RecordedProvider()
 		const body = new RecordedBody([new TextEncoder().encode('{')], false)
 		const abort = new AbortController()
-		const request = createStreamingRelayRequest(body.stream, abort.signal)
+		const request = createRelayRequest(body.stream, abort.signal)
 		const pending = createRelay({ provider, authorize: () => true })(request)
 		await body.pending
 		abort.abort()
@@ -157,5 +156,17 @@ describe('createRelay', () => {
 		expect(response.status).toBe(200)
 		await response.text()
 		expect(provider.started).toBe(1)
+	})
+})
+
+describe('createThinkSplitter', () => {
+	it('returns a fresh, independent splitter per call (one splitter, one stream)', () => {
+		const first = createThinkSplitter()
+		const second = createThinkSplitter()
+		first.split('<think>private')
+		expect(first.thinking).toBe('private')
+		// The sibling shares no state — its scan starts outside any span.
+		expect(second.split('clean')).toBe('clean')
+		expect(second.thinking).toBe('')
 	})
 })

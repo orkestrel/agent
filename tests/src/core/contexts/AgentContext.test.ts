@@ -33,7 +33,7 @@ import { requireValue } from '@orkestrel/test'
 // files' data attached to the last user message). The active workspace is the SOLE
 // document/image context. Tools are advertised STRUCTURALLY (through definitions()), never
 // serialized into the prompt, so build() must never carry tool content — real
-// behavior, no mocks. The system-only behavior of the original lean context is preserved.
+// behavior, no mocks.
 
 describe('AgentContext — build with a system prompt', () => {
 	it('prepends a system message, then the conversation in order', () => {
@@ -58,7 +58,7 @@ describe('AgentContext — build with a system prompt', () => {
 })
 
 describe('AgentContext — build without a system prompt', () => {
-	it('returns just the conversation in order', () => {
+	it('returns only the conversation in order', () => {
 		const context = new AgentContext()
 		context.messages.add([
 			{ role: 'user', content: 'first' },
@@ -296,7 +296,7 @@ describe('AgentContext — accessors & construction', () => {
 		expect(context.messages).toBe(context.messages)
 	})
 
-	it('surfaces tools structurally via definitions(), reflected in build() never', () => {
+	it('surfaces tools structurally through definitions(), reflected in build() never', () => {
 		const tools = new ToolManager()
 		tools.add(new Tool({ name: 'lookup', parameters: { type: 'object' }, execute: () => 1 }))
 		const context = new AgentContext({ tools })
@@ -351,7 +351,7 @@ describe('AgentContext — context managers', () => {
 
 		const built = context.build()
 
-		// Identical to the original lean behavior: [system, user] and nothing else.
+		// The message shape is [system, user].
 		expect(built).toHaveLength(2)
 		expect(requireValue(built[0])).toMatchObject({ role: 'system', content: 'sys' })
 		expect(requireValue(built[1])).toMatchObject({ role: 'user', content: 'hi' })
@@ -359,7 +359,7 @@ describe('AgentContext — context managers', () => {
 
 	it('folds the instructions into the system block under the prompt', () => {
 		const context = new AgentContext({ system: 'You are concise.' })
-		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.messages.add({ role: 'user', content: 'hi' })
 
 		const built = context.build()
@@ -368,12 +368,7 @@ describe('AgentContext — context managers', () => {
 		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
 		const system = requireValue(built[0])
 		expect(system.role).toBe('system')
-		expect(system.content).toBe(
-			[
-				'You are concise.',
-				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
-			].join('\n\n'),
-		)
+		expect(system.content).toBe('You are concise.\n\n## Instructions\n\nBe terse.')
 		// Order: prompt → instructions.
 		expect(system.content.indexOf('You are concise.')).toBeLessThan(
 			system.content.indexOf('## Instructions'),
@@ -406,7 +401,7 @@ describe('AgentContext — context managers', () => {
 })
 
 // The ACTIVE workspace is the SOLE document/image context, rendered BY CARRIER:
-// `workspaces.active`'s TEXT files fold into a `## Workspace` system section (fenced), its
+// The text files of the active workspace fold into a `## Workspace` system section (fenced), its
 // IMAGE files' base64 data attaches to the last user message. It is ACTIVE-ONLY (never the
 // other workspaces), scope-filtered by `scope.files`, and renders NOTHING when no workspace is
 // active. `context.workspaces` is ALWAYS present and supplied structurally through options
@@ -475,7 +470,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
 	})
 
-	it('renders the workspace section just AFTER the instructions section', () => {
+	it('renders the workspace section AFTER the instructions section', () => {
 		const context = new AgentContext()
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		const workspace = context.workspaces.add()
@@ -532,7 +527,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 	it('renders a TEXT file in the system block AND attaches an IMAGE file from the same active workspace', () => {
 		const context = new AgentContext({ system: 'sys' })
 		// One active workspace holding BOTH a text file (added through write) and an image file (seeded,
-		// since write() only ever mints text files).
+		// because write() only ever mints text files).
 		const image = createFile({ path: 'b.png', content: createBinaryContent('IMGB', 'image/png') })
 		const workspace = context.workspaces.add({ seed: [image] })
 		workspace.write('a.ts', 'const z = 9')
@@ -722,7 +717,7 @@ describe('AgentContext — scope access and application', () => {
 		expect(context.scope).toBeUndefined()
 	})
 
-	it('accepts an initial scope via options', () => {
+	it('accepts an initial scope through options', () => {
 		const scope = new Scope({ name: 's' })
 		const context = new AgentContext({ scope })
 
@@ -787,7 +782,7 @@ describe('AgentContext — scope filtering in build()', () => {
 	})
 })
 
-// The FORMAT CASCADE — build() frames each section as [open, ...render, close], and the
+// The FORMAT CASCADE — the `build()` method frames each section as [open, ...render, close], and the
 // instruction manager resolves each slot MOST-SPECIFIC-FIRST: open = manager-options override >
 // built-in; render = item override > manager-options > built-in; close = manager-options (NO
 // built-in ⇒ no closing line). These pin the precedence at EACH slot/level over the
@@ -885,20 +880,10 @@ describe('AgentContext — format cascade: the close slot (group wrap)', () => {
 
 describe('AgentContext — format cascade: the built-in regression guard', () => {
 	it('build() with no override reproduces the built-in framing byte-for-byte', () => {
-		// The load-bearing regression: no manager overrides + no per-item override ⇒ the built-in
-		// header and the instruction content. Compare build() to the manager's own `open` /
-		// `render` and to the hardcoded built-in strings.
 		const context = new AgentContext({ system: 'You are concise.' })
-		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.messages.add({ role: 'user', content: 'hi' })
 
-		const expected = [
-			'You are concise.',
-			`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
-		].join('\n\n')
-
-		expect(requireValue(context.build()[0]).content).toBe(expected)
-		// And explicitly: it equals the hardcoded built-in strings (no override anywhere).
 		expect(requireValue(context.build()[0]).content).toBe(
 			'You are concise.\n\n## Instructions\n\nBe terse.',
 		)
@@ -923,13 +908,13 @@ describe('AgentContext — format cascade: the built-in regression guard', () =>
 // The CANONICAL build() shape — the exact top-level Message[] is `[system-block,
 // ...conversation]` and NOTHING else: one assembled system message (the prompt + the
 // instructions section + the active workspace's text section, `\n\n`-separated), then the
-// scope-filtered conversation in insertion order. The cascade tests above pin per-section
+// scope-filtered conversation in insertion order. The cascade tests preceding pin per-section
 // formatting; this pins the WHOLE array's structure verbatim so the canonical order +
 // concatenation can't silently drift — real behavior.
 describe('AgentContext — the canonical built array (order + exact concatenation)', () => {
 	it('builds EXACTLY [system-block, ...conversation] — the system content is prompt + instructions + workspace', () => {
 		const context = new AgentContext({ system: 'You are concise.' })
-		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.workspaces.add().write('notes.md', '# Notes')
 		const turns = context.messages.add([
 			{ role: 'user', content: 'one' },
@@ -954,7 +939,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 		expect(requireValue(built[0]).content).toBe(
 			[
 				'You are concise.',
-				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
+				'## Instructions\n\nBe terse.',
 				`${WORKSPACE_SECTION_HEADER}\n\nFile: notes.md\n\`\`\`markdown\n# Notes\n\`\`\``,
 			].join('\n\n'),
 		)
@@ -980,7 +965,7 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 
 // The DEFAULT FORMAT snapshot guard — pins the built-in instructions section's header AND
 // per-item rendering VERBATIM, in isolation, so a silent drift in any default framing fails
-// loudly. (The no-arg regression guard above pins the assembled whole; this pins the piece on
+// loudly. (The no-arg regression guard preceding pins the assembled whole; this pins the piece on
 // its own.) Real behavior, no mocks.
 describe('AgentContext — default format snapshot guard (built-ins verbatim)', () => {
 	it('instructions: `## Instructions` header + bare content, no decoration', () => {
@@ -1012,7 +997,7 @@ describe('AgentContext — default format snapshot guard (built-ins verbatim)', 
 })
 
 // The MESSAGE SOURCE is the `conversations` registry's ACTIVE conversation: `context.messages` IS
-// that conversation's live tail, and build() folds its view() (the per-section summaries + the live
+// that conversation's live tail, and the `build()` method folds its `view()` result (the per-section summaries + the live
 // tail). The context ALWAYS has an active conversation (a default is added at construction when the
 // supplied manager has none), so `messages` is always defined. The scope's instructions still filter
 // the system block; the scope's MESSAGES allow-list is NOT applied (the conversation is
@@ -1047,7 +1032,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 		const conversations = new ConversationManager() // empty — no active yet
 		const context = new AgentContext({ conversations })
 
-		// The context ensured an active conversation on the supplied (empty) registry.
+		// Construction adds an active conversation to the supplied empty registry.
 		expect(context.conversations).toBe(conversations)
 		expect(conversations.count).toBe(1)
 		expect(context.messages).toBe(conversations.active)
@@ -1143,7 +1128,7 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 
 	it('build() through the default conversation is byte-for-byte the prior plain output', () => {
 		const context = new AgentContext({ system: 'You are concise.' })
-		const tone = context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.messages.add([
 			{ role: 'user', content: 'one' },
 			{ role: 'assistant', content: 'two' },
@@ -1153,12 +1138,7 @@ describe('AgentContext — the default-conversation message path is byte-for-byt
 
 		// Identical to the established shape: [system-block, ...conversation].
 		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'assistant'])
-		expect(requireValue(built[0]).content).toBe(
-			[
-				'You are concise.',
-				`${context.instructions.open}\n\n${context.instructions.render(tone)}`,
-			].join('\n\n'),
-		)
+		expect(requireValue(built[0]).content).toBe('You are concise.\n\n## Instructions\n\nBe terse.')
 		expect(built.slice(1).map((message) => message.content)).toEqual(['one', 'two'])
 	})
 })

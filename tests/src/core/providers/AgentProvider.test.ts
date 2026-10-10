@@ -9,7 +9,7 @@ import {
 	isProviderError,
 } from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	createRefusingTransport,
 	createStreamingTransport,
@@ -23,6 +23,12 @@ import {
 } from '../../../setup.js'
 
 describe('AgentProvider — identity, transport, and request composition', () => {
+	it('loads the provider engine before factory modules', async () => {
+		vi.resetModules()
+		const loaded = await import('../../../../src/core/providers/AgentProvider.js')
+		expect(loaded.AgentProvider).toBeTypeOf('function')
+	})
+
 	it('exposes the replay input and defaults to none', () => {
 		expect(new ScriptedWire({ url: 'https://provider.test' }).replay).toBe('none')
 		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'none' }).replay).toBe('none')

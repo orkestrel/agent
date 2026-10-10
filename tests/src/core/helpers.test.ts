@@ -1,4 +1,3 @@
-import type { Message } from '@src/core'
 import {
 	collectExchanges,
 	collectToolGroups,
@@ -14,7 +13,12 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	buildExchangeMessages,
+	buildToolGroupMessages,
 	createToolCall,
+	ALLOW_LIST_MEMBERS,
+	ALLOW_LIST_MATCH_MEMBERS,
+	THINKING_MESSAGES,
 	createTokenUsage,
 	JUDGMENT_INPUT,
 	JUDGMENT_MISMATCHES,
@@ -23,16 +27,8 @@ import {
 } from '../../setup.js'
 
 describe('stripThinking', () => {
-	const messages: readonly Message[] = [
-		{ id: 'u1', role: 'user', content: 'Plan the trip' },
-		{ id: 'a1', role: 'assistant', content: 'Fares found', thinking: 'first reasoning' },
-		{ id: 'u2', role: 'user', content: 'Book it' },
-		{ id: 'a2', role: 'assistant', content: 'Booked', thinking: 'second reasoning' },
-		{ id: 'a3', role: 'assistant', content: 'Receipt sent' },
-	]
-
 	it("drops all thinking under 'none' without writing an undefined member", () => {
-		const stripped = stripThinking(messages, 'none')
+		const stripped = stripThinking(THINKING_MESSAGES, 'none')
 		expect(stripped.map((one) => one.thinking)).toEqual([
 			undefined,
 			undefined,
@@ -42,11 +38,11 @@ describe('stripThinking', () => {
 		])
 		expect('thinking' in (stripped[1] ?? {})).toBe(false)
 		expect(stripped[1]).toEqual({ id: 'a1', role: 'assistant', content: 'Fares found' })
-		expect(messages[1]?.thinking).toBe('first reasoning')
+		expect(THINKING_MESSAGES[1]?.thinking).toBe('first reasoning')
 	})
 
 	it("keeps only the thinking after the last user message under 'turn'", () => {
-		const stripped = stripThinking(messages, 'turn')
+		const stripped = stripThinking(THINKING_MESSAGES, 'turn')
 		expect(stripped.map((one) => one.thinking)).toEqual([
 			undefined,
 			undefined,
@@ -58,7 +54,7 @@ describe('stripThinking', () => {
 	})
 
 	it("keeps all thinking under 'turn' when no user message exists", () => {
-		const open = messages.filter((one) => one.role === 'assistant')
+		const open = THINKING_MESSAGES.filter((one) => one.role === 'assistant')
 		const stripped = stripThinking(open, 'turn')
 		expect(stripped.map((one) => one.thinking)).toEqual([
 			'first reasoning',
@@ -68,15 +64,15 @@ describe('stripThinking', () => {
 	})
 
 	it("returns the same array under 'all'", () => {
-		expect(stripThinking(messages, 'all')).toBe(messages)
+		expect(stripThinking(THINKING_MESSAGES, 'all')).toBe(THINKING_MESSAGES)
 	})
 
 	it('keeps the identity of a message without thinking', () => {
-		const stripped = stripThinking(messages, 'none')
-		expect(stripped[0]).toBe(messages[0])
-		expect(stripped[4]).toBe(messages[4])
-		expect(stripped[1]).not.toBe(messages[1])
-		expect(stripThinking(messages, 'turn')[3]).toBe(messages[3])
+		const stripped = stripThinking(THINKING_MESSAGES, 'none')
+		expect(stripped[0]).toBe(THINKING_MESSAGES[0])
+		expect(stripped[4]).toBe(THINKING_MESSAGES[4])
+		expect(stripped[1]).not.toBe(THINKING_MESSAGES[1])
+		expect(stripThinking(THINKING_MESSAGES, 'turn')[3]).toBe(THINKING_MESSAGES[3])
 	})
 })
 
@@ -93,44 +89,53 @@ describe('filterAllowList', () => {
 		expect(calls).toEqual([hidden, first, second])
 	})
 
-	const items = [{ name: 'a' }, { name: 'b' }, { name: 'c' }] as const
-	const byName = (item: { readonly name: string }): string => item.name
-
 	it('returns every item (unchanged) for an undefined allow-list — no constraint', () => {
-		const filtered = filterAllowList(undefined, items, byName)
+		const filtered = filterAllowList(undefined, ALLOW_LIST_MEMBERS, (member) => member.name)
 
-		expect(filtered).toBe(items)
-		expect(filtered.map(byName)).toEqual(['a', 'b', 'c'])
+		expect(filtered).toBe(ALLOW_LIST_MEMBERS)
+		expect(filtered.map((member) => member.name)).toEqual(['a', 'b', 'c'])
 	})
 
 	it('returns no items for an empty allow-list — [] ⇒ none pass', () => {
-		expect(filterAllowList([], items, byName)).toEqual([])
+		expect(filterAllowList([], ALLOW_LIST_MEMBERS, (member) => member.name)).toEqual([])
 	})
 
 	it('returns only the listed items for a non-empty allow-list', () => {
-		expect(filterAllowList(['a', 'c'], items, byName).map(byName)).toEqual(['a', 'c'])
+		expect(
+			filterAllowList(['a', 'c'], ALLOW_LIST_MEMBERS, (member) => member.name).map(
+				(member) => member.name,
+			),
+		).toEqual(['a', 'c'])
 	})
 
 	it('preserves the items’ original order, not the allow-list order', () => {
-		expect(filterAllowList(['c', 'a'], items, byName).map(byName)).toEqual(['a', 'c'])
+		expect(
+			filterAllowList(['c', 'a'], ALLOW_LIST_MEMBERS, (member) => member.name).map(
+				(member) => member.name,
+			),
+		).toEqual(['a', 'c'])
 	})
 
 	it('ignores allow-list keys that match no item', () => {
-		expect(filterAllowList(['a', 'ghost'], items, byName).map(byName)).toEqual(['a'])
+		expect(
+			filterAllowList(['a', 'ghost'], ALLOW_LIST_MEMBERS, (member) => member.name).map(
+				(member) => member.name,
+			),
+		).toEqual(['a'])
 	})
 
 	it('uses the key extractor to match (not object identity)', () => {
 		// A distinct object with a listed key still passes — membership is by extracted key.
-		const others = [
-			{ name: 'a', extra: 1 },
-			{ name: 'z', extra: 2 },
-		] as const
-		expect(filterAllowList(['a'], others, (one) => one.name).map((one) => one.name)).toEqual(['a'])
+		expect(
+			filterAllowList(['a'], ALLOW_LIST_MATCH_MEMBERS, (member) => member.name).map(
+				(one) => one.name,
+			),
+		).toEqual(['a'])
 	})
 
 	it('returns an empty array (not throwing) when filtering an empty item list', () => {
-		expect(filterAllowList(['a'], [], byName)).toEqual([])
-		expect(filterAllowList(undefined, [], byName)).toEqual([])
+		expect(filterAllowList(['a'], [], () => 'unreachable')).toEqual([])
+		expect(filterAllowList(undefined, [], () => 'unreachable')).toEqual([])
 	})
 })
 
@@ -195,9 +200,7 @@ describe('sanitizeUsage', () => {
 	})
 })
 
-// The pure leaves the agent loop, the context cascade, the conversation view, and a scope's
-// narrow compose from — each extracted from a private method so it can be exercised directly
-// on real values rather than only through the entity that calls it.
+// Direct proofs isolate the pure computations composed by the runtime entities.
 
 describe('joinThinking — the separated reasoning across a run', () => {
 	it('seeds the accumulation with the first reasoning verbatim', () => {
@@ -246,11 +249,12 @@ describe('removeEntries — the folded batch removal', () => {
 	it('returns true only when every key was present, and visits every key regardless', () => {
 		const stored = new Set(['a', 'b'])
 		const visited: string[] = []
-		const remove = (key: string): boolean => {
-			visited.push(key)
-			return stored.delete(key)
-		}
-		expect(removeEntries(['a', 'missing', 'b'], remove)).toBe(false)
+		expect(
+			removeEntries(['a', 'missing', 'b'], (key) => {
+				visited.push(key)
+				return stored.delete(key)
+			}),
+		).toBe(false)
 		expect(visited).toEqual(['a', 'missing', 'b'])
 		expect(stored.size).toBe(0)
 	})
@@ -274,17 +278,7 @@ describe('MESSAGE_ROLES — the one role list', () => {
 
 describe('collectExchanges', () => {
 	it('keeps leading messages separate and joins exchanges spanned by tool groups', () => {
-		const messages: readonly Message[] = [
-			{ id: 'lead', role: 'assistant', content: 'Welcome.' },
-			{ id: 'u1', role: 'user', content: 'Read the order.' },
-			{ id: 'a1', role: 'assistant', content: '', calls: [createToolCall({ id: 'c1' })] },
-			{ id: 'u2', role: 'user', content: 'Read the account.' },
-			{ id: 'a2', role: 'assistant', content: '', calls: [createToolCall({ id: 'c2' })] },
-			{ id: 'r1', role: 'tool', content: 'Order.', call: 'c1' },
-			{ id: 'u3', role: 'user', content: 'Continue.' },
-			{ id: 'r2', role: 'tool', content: 'Account.', call: 'c2' },
-			{ id: 'u4', role: 'user', content: 'Finish.' },
-		]
+		const messages = buildExchangeMessages()
 		expect(
 			collectExchanges(messages).map((exchange) => exchange.map((message) => message.id)),
 		).toEqual([['lead'], ['u1', 'a1', 'u2', 'a2', 'r1', 'u3', 'r2'], ['u4']])
@@ -296,17 +290,7 @@ describe('collectExchanges', () => {
 
 describe('collectToolGroups', () => {
 	it('groups a result with its unique owner, a positional result with its leader, and an orphan run', () => {
-		const messages: readonly Message[] = [
-			{ id: 'U', role: 'user', content: 'Which order is late?' },
-			{ id: 'A1', role: 'assistant', content: '', calls: [createToolCall({ id: 'one' })] },
-			{ id: 'R1', role: 'tool', content: 'positional result' },
-			{ id: 'A2', role: 'assistant', content: '', calls: [createToolCall({ id: 'two' })] },
-			{ id: 'R2', role: 'tool', content: 'second result', call: 'two' },
-			{ id: 'L1', role: 'tool', content: 'late first result', call: 'one' },
-			{ id: 'N', role: 'assistant', content: 'Order LH-81660 is late.' },
-			{ id: 'O1', role: 'tool', content: 'lost result', call: 'missing' },
-			{ id: 'O2', role: 'tool', content: 'other lost result' },
-		]
+		const messages = buildToolGroupMessages()
 
 		expect(collectToolGroups(messages).map((group) => group.map(({ id }) => id))).toEqual([
 			['A1', 'R1', 'L1'],

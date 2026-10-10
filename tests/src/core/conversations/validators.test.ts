@@ -187,6 +187,17 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		// back as absent and hydrate mints a fresh thread (the absent-on-tamper posture).
 		expect(isConversationSnapshot(buildCallsSnapshot([null]))).toBe(false)
 		expect(isConversationSnapshot(buildCallsSnapshot(['x']))).toBe(false)
+		expect(isConversationSnapshot(buildCallsSnapshot([undefined]))).toBe(false)
+		expect(isConversationSnapshot(buildCallsSnapshot([42]))).toBe(false)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 1, name: 'tool', arguments: {} }])),
+		).toBe(false)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: 'q=acme' }])),
+		).toBe(false)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: ['q'] }])),
+		).toBe(false)
 		expect(isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool' }]))).toBe(false)
 		expect(
 			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 123, arguments: {} }])),
@@ -194,11 +205,14 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		expect(
 			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: null }])),
 		).toBe(false)
-		// A well-formed calls[] still passes (the deepening rejects only real tampering).
+		// The valid control distinguishes malformed calls from supported call shapes.
 		expect(
 			isConversationSnapshot(
 				buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }]),
 			),
+		).toBe(true)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: {} }])),
 		).toBe(true)
 	})
 

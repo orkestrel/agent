@@ -17,7 +17,7 @@ import { messageShape, toolCallShape } from '../shapers.js'
  * Describes a provider request's JSON wire projection.
  *
  * @remarks
- * The wire is strictly narrower than ProviderRequest: non-JSON arguments, parameters,
+ * The wire is strictly narrower than `ProviderRequest`: non-JSON arguments, parameters,
  * or schema members are refused. Execution context stays local; the guard refuses
  * extra members, and the parser drops them.
  */
@@ -44,7 +44,7 @@ export const providerRequestShape = objectShape({
  * Describes a provider result's JSON wire projection.
  *
  * @remarks
- * The wire is strictly narrower than ProviderResult: non-JSON call arguments are
+ * The wire is strictly narrower than `ProviderResult`: non-JSON call arguments are
  * refused. Execution context stays local; the guard refuses extra members, and the parser drops them.
  */
 export const providerResultShape = objectShape({
@@ -64,7 +64,7 @@ export const providerResultShape = objectShape({
  * Describes the channel-discriminated JSON relay wire projection.
  *
  * @remarks
- * The wire is strictly narrower than RelayFrame through its result and partial
+ * The wire is strictly narrower than `RelayFrame` through its `result` and `partial`
  * fields: non-JSON arguments are refused. Execution context stays local; the guard
  * refuses extra members, and the parser drops them.
  */

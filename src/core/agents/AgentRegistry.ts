@@ -8,19 +8,18 @@ import type {
 } from './types.js'
 import type { ProviderInterface } from '../providers/index.js'
 import type { ConversationStoreInterface } from '../conversations/index.js'
-import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import { createTokenBudget } from '@orkestrel/budget'
 import { ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
 import { ConversationManager } from '../conversations/index.js'
-import { AgentError } from './errors.js'
+import { requireEntry } from './helpers.js'
 
 /**
  * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named pools of
  * live, non-serializable pieces (providers, tools, authorities, schedulers), throws on a name
- * absent from its pool, and `build`s a seeded, signal-wired {@link Agent} from a job's names and
+ * absent from its pool, and its `build` method returns a seeded, signal-wired {@link Agent} from a job's names and
  * data.
  *
  * @remarks
@@ -68,24 +67,24 @@ export class AgentRegistry implements AgentRegistryInterface {
 	}
 
 	provider(name: string): ProviderInterface {
-		return this.#resolve(this.#providers, 'provider', name)
+		return requireEntry(this.#providers, 'provider', name)
 	}
 
 	tool(name: string): ToolInterface {
-		return this.#resolve(this.#tools, 'tool', name)
+		return requireEntry(this.#tools, 'tool', name)
 	}
 
 	authority(name: string): AuthorityInterface {
-		return this.#resolve(this.#authorities, 'authority', name)
+		return requireEntry(this.#authorities, 'authority', name)
 	}
 
 	scheduler(name: string): SchedulerInterface {
-		return this.#resolve(this.#schedulers, 'scheduler', name)
+		return requireEntry(this.#schedulers, 'scheduler', name)
 	}
 
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface {
 		const provider = this.provider(input.provider)
-		const agent = new Agent(provider, this.#options(input, signal))
+		const agent = new Agent(provider, this.#buildOptions(input, signal))
 		// Seed the conversation onto the rehydrated agent's context — the serializable
 		// MessageInputs become stored messages (each id minted by the manager).
 		for (const message of input.messages) agent.context.messages.add(message)
@@ -100,10 +99,10 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// ConversationManager for this build (a fresh conversation id per build ⇒ no
 	// collisions in the shared store) — omitted when no store is set, so the shape matches a
 	// registry with no `store`.
-	#options(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
-		const budget = this.#budget(input.budget)
+	#buildOptions(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
+		const budget = input.budget === undefined ? undefined : createTokenBudget({ max: input.budget })
 		return {
-			tools: this.#manager(input.tools),
+			tools: this.#buildToolManager(input.tools),
 			...(input.system === undefined ? {} : { system: input.system }),
 			...(input.limit === undefined ? {} : { limit: input.limit }),
 			...(input.timeout === undefined ? {} : { timeout: input.timeout }),
@@ -119,23 +118,9 @@ export class AgentRegistry implements AgentRegistryInterface {
 
 	// A fresh tool registry loaded with the named tools (each resolved — an unknown name
 	// throws). Always a new manager per build, so concurrent jobs never share one.
-	#manager(names: readonly string[] | undefined): ToolManager {
+	#buildToolManager(names: readonly string[] | undefined): ToolManager {
 		const manager = new ToolManager()
 		if (names !== undefined) for (const name of names) manager.add(this.tool(name))
 		return manager
-	}
-
-	// Rebuild a token budget from a job's serializable ceiling — `undefined` when the job
-	// declared none (no bound), else a fresh `createTokenBudget({ max })`.
-	#budget(max: number | undefined): BudgetInterface<TokenUsage> | undefined {
-		return max === undefined ? undefined : createTokenBudget({ max })
-	}
-
-	// Resolve a name against a pool, throwing a coded, loud error on a miss — an unknown name
-	// in a rehydrated job is a programmer error and must not pass.
-	#resolve<T>(pool: ReadonlyMap<string, T>, category: string, name: string): T {
-		const value = pool.get(name)
-		if (value === undefined) throw new AgentError('REGISTRY', `unknown ${category}: ${name}`)
-		return value
 	}
 }

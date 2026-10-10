@@ -1,6 +1,9 @@
-import type { Message, ProviderResult } from '@src/core'
+import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
 import {
+	LedgerError,
+	LEDGER_QUESTIONS,
+	buildRecords,
 	CONVERSATION_RECAP_PREFIX,
 	ConversationManager,
 	createConversation,
@@ -10,6 +13,7 @@ import {
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	JUDGMENT_QUESTION,
 	buildCallsSnapshot,
 	buildConversationSnapshot,
 	chunkWholeDelta,
@@ -51,6 +55,34 @@ import {
 	seedInstructionContext,
 	seedWorkspaceContext,
 	splitTurn,
+	buildLedgerClassification,
+	buildLedgerInput,
+	buildLedgerMessage,
+	buildLedgerReading,
+	checkLedgerProjection,
+	createLedgerDesk,
+	createLedgerRequest,
+	LEDGER_DESK_OWNERS,
+	LEDGER_HANDLE,
+	reverseLedgerInput,
+	buildLedgerLine,
+	replaceLedgerRecord,
+	computeLedgerIdentity,
+	listPlacementKeys,
+	hasEffect,
+	reverseLedgerMembers,
+	reverseLedgerMap,
+	sortLedgerKeys,
+	computeLedgerErrorCode,
+	buildGaugeCall,
+	measureRoom,
+	buildLedgerOptions,
+	buildClassifierOptions,
+	LEDGER_DESK_THRESHOLDS,
+	buildLedgerJudgment,
+	buildLedgerExchange,
+	buildLedgerResponse,
+	createLedgerJudge,
 } from './setup.js'
 
 // setup.test.ts — the proof of `tests/setup.ts`, the host-independent shared test-infrastructure
@@ -809,5 +841,422 @@ describe('CONVERSATION_STORE_ROUND_TRIP_EXPECTATION', () => {
 		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION)).toBe(true)
 		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages)).toBe(true)
 		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail)).toBe(true)
+	})
+})
+
+describe('checkLedgerProjection', () => {
+	it('passes the clean desk build', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		expect(clean.records.map((record) => record.key)).toEqual([
+			'owner:OM-30418',
+			'owner:BW-20931',
+			'rules',
+		])
+		expect(clean.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+		expect(checkLedgerProjection(clean, input)).toEqual([])
+	})
+
+	it('names a stale line that a record kept', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
+			...record,
+			lines: [...record.lines, buildLedgerLine('user-01', 1, 'This week code is MX-4471.')],
+		}))
+		expect(
+			checkLedgerProjection(built, input).some((fault) => fault.startsWith('dead rules')),
+		).toBe(true)
+	})
+
+	it('names a member that a record misplaced', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
+			...record,
+			members: [...record.members, 'user-02'],
+		}))
+		expect(checkLedgerProjection(built, input)).toContain(
+			'placement user-02: placed in [owner:OM-30418, rules], expected [owner:OM-30418]',
+		)
+	})
+
+	it('names a replaced result that a record kept', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'owner:BW-20931', (record) => ({
+			...record,
+			lines: [
+				...record.lines,
+				buildLedgerLine(
+					'tool-01',
+					0,
+					'Order BW-5512 for account BW-20931 (Brightwater Studio): linen set, total $140.00.',
+				),
+			],
+		}))
+		expect(
+			checkLedgerProjection(built, input).some((fault) =>
+				fault.includes('comes from a replaced source tool-01'),
+			),
+		).toBe(true)
+	})
+
+	it('names a handle that a line holds and its source lacks', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'owner:BW-20931', (record) => ({
+			...record,
+			lines: record.lines.map((one, at) =>
+				at === 0 ? { ...one, text: `${one.text} See r8.` } : one,
+			),
+		}))
+		const faults = checkLedgerProjection(built, input)
+		expect(
+			faults.some((fault) => fault.startsWith('handle owner:BW-20931') && fault.includes('r8')),
+		).toBe(true)
+		expect(faults.some((fault) => fault.startsWith('verbatim'))).toBe(true)
+	})
+
+	it('names a line that is no sentence of its source', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
+			...record,
+			lines: record.lines.map((one, at) =>
+				at === 0 ? { ...one, text: 'Refunds need nothing.' } : one,
+			),
+		}))
+		expect(
+			checkLedgerProjection(built, input).some((fault) => fault.startsWith('verbatim rules')),
+		).toBe(true)
+	})
+
+	it('names a sentence that is neither a line nor stale', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
+			...record,
+			lines: record.lines.slice(1),
+		}))
+		expect(
+			checkLedgerProjection(built, input).some((fault) => fault.startsWith('coverage rules')),
+		).toBe(true)
+	})
+
+	it('names a stale list that differs from the amendment pairs', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		expect(
+			checkLedgerProjection({ ...clean, stale: [] }, input).some((fault) =>
+				fault.startsWith('stale:'),
+			),
+		).toBe(true)
+	})
+
+	it('names a build that depends on the order of its collections', () => {
+		const input = createLedgerDesk()
+		const clean = buildRecords(input)
+		const built = { ...clean, records: [...clean.records].reverse() }
+		expect(checkLedgerProjection(built, input).some((fault) => fault.startsWith('order:'))).toBe(
+			true,
+		)
+	})
+
+	it('passes a replaced correction that keeps its stale effect, and names a build that revives the value', () => {
+		const input = createLedgerDesk()
+		const supersessions = buildLedgerInput({
+			...{ system: input.system, exclusions: input.exclusions },
+			owners: LEDGER_DESK_OWNERS,
+			messages: [
+				...input.messages,
+				buildLedgerMessage('user-07', 'user', 'The code rotates again on Friday.'),
+			],
+			readings: input.readings,
+			entities: Object.fromEntries(input.entities),
+			classification: {
+				quiet: [...input.classification.quiet],
+				categories: Object.fromEntries(input.classification.categories),
+				amendments: { 'user-01': ['user-04'] },
+				supersessions: { 'user-04': ['user-07'] },
+			},
+		})
+		const built = buildRecords(supersessions)
+		expect(built.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+		expect(checkLedgerProjection(built, supersessions)).toEqual([])
+		expect(
+			checkLedgerProjection({ ...built, stale: [] }, supersessions).some((fault) =>
+				fault.startsWith('stale:'),
+			),
+		).toBe(true)
+	})
+
+	it('names a replaced result that an empty lookup left live', () => {
+		const input = createLedgerDesk()
+		const empty = buildLedgerInput({
+			system: input.system,
+			owners: LEDGER_DESK_OWNERS,
+			messages: [
+				buildLedgerMessage('tool-a', 'tool', 'Order BW-5512 for account BW-20931: total $10.00.'),
+				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
+			],
+			readings: [
+				buildLedgerReading(
+					'tool-a',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512 for account BW-20931: total $10.00.',
+					{ ids: ['BW-5512'], owners: [] },
+				),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'No record of order BW-5512.',
+				),
+			],
+			entities: { 'tool-a': ['BW-20931'] },
+		})
+		const faithful = buildRecords(empty)
+		expect(faithful.records).toEqual([])
+		expect(faithful.orphans).toEqual([])
+		expect(checkLedgerProjection(faithful, empty)).toEqual([])
+		const kept: LedgerProjection = {
+			records: [
+				{
+					key: 'owner:BW-20931',
+					title: 'Brightwater Studio (account BW-20931)',
+					members: ['tool-a'],
+					lines: [
+						{
+							...buildLedgerLine('tool-a', 0, 'Order BW-5512 for account BW-20931: total $10.00.'),
+							role: 'tool',
+						},
+					],
+				},
+			],
+			stale: [],
+			orphans: [],
+		}
+		const faults = checkLedgerProjection(kept, empty)
+		expect(faults.some((fault) => fault.includes('comes from a replaced source tool-a'))).toBe(true)
+		expect(faults.some((fault) => fault.startsWith('placement tool-a'))).toBe(true)
+	})
+})
+
+describe('ledger builders', () => {
+	it('builds empty collections from no parts', () => {
+		const empty = buildLedgerInput()
+		expect([empty.system, empty.exclusions, empty.messages, empty.readings]).toEqual([
+			'',
+			[],
+			[],
+			[],
+		])
+		expect(empty.owners.size + empty.entities.size).toBe(0)
+		const classification = buildLedgerClassification()
+		expect(
+			classification.quiet.size + classification.categories.size + classification.topics.size,
+		).toBe(0)
+		expect(classification.amendments.size + classification.supersessions.size).toBe(0)
+	})
+
+	it('builds the desk request from the Brightwater Studio owner', () => {
+		const input = createLedgerDesk()
+		expect(createLedgerRequest()).toEqual({
+			owners: ['BW-20931'],
+			topics: ['refunds'],
+		})
+		expect(input.owners.get('BW-20931')).toEqual(['Brightwater Studio'])
+		expect(input.owners.get('OM-30418')).toEqual(['Odile Marlow'])
+	})
+
+	it('reverses every collection of an input and leaves the input as it was', () => {
+		const input = createLedgerDesk()
+		const reversed = reverseLedgerInput(input)
+		expect([...reversed.owners.keys()]).toEqual(['OM-30418', 'BW-20931'])
+		expect([...input.owners.keys()]).toEqual(['BW-20931', 'OM-30418'])
+		expect([...reversed.entities.keys()]).toEqual([...input.entities.keys()].reverse())
+		expect([...reversed.classification.topics.keys()]).toEqual(['user-03', 'user-01'])
+		expect(reversed.exclusions).toEqual(input.exclusions)
+	})
+
+	it('matches a handle and no other token', () => {
+		expect('see m12, r8 and [r8]'.match(LEDGER_HANDLE)).toEqual(['m12', 'r8', 'r8'])
+		expect('BW-5512 and user-01'.match(LEDGER_HANDLE)).toBeNull()
+	})
+})
+
+describe('ledger setup leaves', () => {
+	it('normalizes lookup identity while preserving nested values and tool identity', () => {
+		expect(computeLedgerIdentity('lookup', { id: ' bw-1 ', options: { z: 2, a: 1 } })).toBe(
+			computeLedgerIdentity('lookup', { options: { a: 1, z: 2 }, id: 'BW-1' }),
+		)
+		expect(computeLedgerIdentity('other', { id: 'BW-1' })).not.toBe(
+			computeLedgerIdentity('lookup', { id: 'BW-1' }),
+		)
+		expect(computeLedgerIdentity('lookup', { nested: { id: ' lower ' } })).toContain(' lower ')
+	})
+	it('follows an earlier amendment to its owner and stops cyclic placement', () => {
+		const input = buildLedgerInput({
+			owners: { 'BW-1': ['Brightwater'] },
+			entities: { earlier: ['BW-1'] },
+		})
+		expect([
+			...listPlacementKeys(
+				'later',
+				new Set(['later']),
+				input,
+				new Map([['later', ['earlier']]]),
+				new Map(),
+			),
+		]).toEqual(['owner:BW-1'])
+		expect([
+			...listPlacementKeys(
+				'later',
+				new Set(['later']),
+				input,
+				new Map([['later', ['later']]]),
+				new Map(),
+			),
+		]).toEqual([])
+	})
+	it('keeps a replaced amender effective unless quiet, excluded, or assistant-authored', () => {
+		const input = buildLedgerInput()
+		const roles = new Map([['amender', { role: 'user' }]])
+		expect(hasEffect('amender', input, roles, new Set(), new Set(), new Set(['amender']))).toBe(
+			true,
+		)
+		expect(hasEffect('amender', input, roles, new Set(), new Set(), new Set())).toBe(false)
+		expect(
+			hasEffect('amender', input, roles, new Set(), new Set(['amender']), new Set(['amender'])),
+		).toBe(false)
+		expect(
+			hasEffect(
+				'amender',
+				buildLedgerInput({ classification: { quiet: ['amender'] } }),
+				roles,
+				new Set(),
+				new Set(),
+				new Set(['amender']),
+			),
+		).toBe(false)
+		expect(
+			hasEffect(
+				'amender',
+				input,
+				new Map([['amender', { role: 'assistant' }]]),
+				new Set(),
+				new Set(),
+				new Set(['amender']),
+			),
+		).toBe(false)
+	})
+	it('reverses collections without changing their input and sorts nested record keys', () => {
+		const members = ['first', 'second']
+		expect(reverseLedgerMembers(members)).toEqual(['second', 'first'])
+		expect(members).toEqual(['first', 'second'])
+		expect([
+			...reverseLedgerMap(
+				new Map([
+					['left', members],
+					['right', ['only']],
+				]),
+			),
+		]).toEqual([
+			['right', ['only']],
+			['left', ['second', 'first']],
+		])
+		expect(JSON.stringify(sortLedgerKeys({ z: [{ z: 1, a: 2 }], a: 'first' }))).toBe(
+			'{"a":"first","z":[{"a":2,"z":1}]}',
+		)
+	})
+	it('projects captured errors and builds gauge calls with usage presence intact', () => {
+		expect(computeLedgerErrorCode(() => undefined)).toBeUndefined()
+		expect(
+			computeLedgerErrorCode(() => {
+				throw new LedgerError('GAUGE', 'invalid')
+			}),
+		).toBe('GAUGE')
+		expect(
+			computeLedgerErrorCode(() => {
+				throw new Error('other')
+			}),
+		).toBe('OTHER')
+		expect(buildGaugeCall(20, undefined, 2)).toEqual({ estimate: 20, tools: 2 })
+		expect(buildGaugeCall(20, 0, 2)).toEqual({ estimate: 20, prompt: 0, tools: 2 })
+		expect(measureRoom(['abcd'])).toBe(5)
+	})
+	it('builds fresh ledger and classifier options and preserves explicit overrides', () => {
+		const ledger = buildLedgerOptions({ capacity: 100, topics: [] })
+		expect(ledger.capacity).toBe(100)
+		expect(ledger.topics).toEqual([])
+		expect(ledger.thresholds).toBe(LEDGER_DESK_THRESHOLDS)
+		expect(ledger.judge).not.toBe(buildLedgerOptions().judge)
+		const classifier = buildClassifierOptions({ judge: ledger.judge })
+		expect(classifier.judge).toBe(ledger.judge)
+		expect(classifier.assign(buildLedgerMessage('user', 'user', 'Text.'))).toBeUndefined()
+		expect([...classifier.entities('Text.', false)]).toEqual([])
+		expect(classifier.conversation).not.toBe(buildClassifierOptions().conversation)
+	})
+	it('builds judgment identity and lookup exchanges from configurable inputs', () => {
+		const message = buildLedgerMessage('note', 'user', 'Refund approved.')
+		expect(buildLedgerJudgment(message, { model: 'custom' })).toMatchObject({
+			id: '["category","note"]',
+			sources: ['note'],
+			state: 'user: Refund approved.',
+			model: 'custom',
+			question: LEDGER_QUESTIONS.category,
+		})
+		expect(buildLedgerExchange('Found.', 'lookup-1', { id: 'BW-2' })).toEqual([
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'lookup-1', name: 'lookup', arguments: { id: 'BW-2' } }],
+			},
+			{ role: 'tool', call: 'lookup-1', content: 'Found.' },
+		])
+		expect(buildLedgerLine('note', 1, 'Text.')).toEqual({
+			source: 'note',
+			sentence: 1,
+			text: 'Text.',
+			topics: [],
+			role: 'user',
+		})
+	})
+	it('builds protocol answers from each request and refuses malformed requests', async () => {
+		const response = await buildLedgerResponse(
+			new Request('http://judge.test', {
+				method: 'POST',
+				body: JSON.stringify({ questions: { first: { type: 'noul' } } }),
+			}),
+			(key) => ({ type: 'noul', noul: key === 'first' ? 0.9 : 0 }),
+			{ input_tokens: 2, output_tokens: 1 },
+		)
+		expect(await response.json()).toEqual({
+			model: 'filing',
+			answers: { first: { type: 'noul', noul: 0.9 } },
+			usage: { input_tokens: 2, output_tokens: 1 },
+		})
+		await expect(
+			buildLedgerResponse(new Request('http://judge.test', { method: 'POST', body: '{}' })),
+		).rejects.toThrow('invalid request')
+	})
+	it('records question keys and preserves scripted answers and rejections', async () => {
+		const asked: string[] = []
+		const fault = new Error('offline')
+		const judge = createLedgerJudge(
+			asked,
+			(_request, count) =>
+				count === 1 ? Promise.resolve({ model: 'custom', answers: {} }) : Promise.reject(fault),
+			'custom',
+		)
+		const request = { state: 'Refund.', questions: { first: JUDGMENT_QUESTION } }
+		await expect(judge.ask(request, new AbortController().signal)).resolves.toEqual({
+			model: 'custom',
+			answers: {},
+		})
+		await expect(judge.ask(request, new AbortController().signal)).rejects.toBe(fault)
+		expect(asked).toEqual(['first', 'first'])
 	})
 })

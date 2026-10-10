@@ -114,7 +114,7 @@ describe('Scope — narrow (set-intersection)', () => {
 			name: 'p',
 			instructions: ['i1', 'i2'],
 			files: ['f1', 'f2'],
-			// `tools` omitted ⇒ no parent constraint (the undefined ∩ list case below).
+			// `tools` omitted ⇒ no parent constraint (the undefined ∩ list case following).
 		})
 
 		const child = parent.narrow({
@@ -153,44 +153,46 @@ describe('Scope — narrow (set-intersection)', () => {
 	})
 })
 
-describe('Scope — the selection handler and description travel with the scope', () => {
-	it('carries `select` and `description` when supplied and leaves both undefined when omitted', () => {
+describe('Scope — the selection handler travels with the scope', () => {
+	it('ignores a description outside the scope contract', () => {
+		const input = { name: 'triage', description: 'Ticket review' }
+		const scope = new Scope(input)
+
+		expect(scope).not.toHaveProperty('description')
+		expect(scope.narrow({ tools: [] })).not.toHaveProperty('description')
+	})
+
+	it('carries `select` when supplied and leaves it undefined when omitted', () => {
 		const selection = createRecordingSelection()
 		const scope = createScope({
 			name: 'triage',
 			select: selection.handler,
-			description: 'Answers billing tickets from the ticket thread alone.',
 		})
 
 		expect(scope.select).toBe(selection.handler)
-		expect(scope.description).toBe('Answers billing tickets from the ticket thread alone.')
 		const plain = new Scope({ name: 'plain' })
 		expect(plain.select).toBeUndefined()
-		expect(plain.description).toBeUndefined()
 	})
 
-	it('keeps `name`, `description`, and `select` through `narrow` and re-mints the `id`', () => {
+	it('keeps `name` and `select` through `narrow` and re-mints the `id`', () => {
 		const parent = new Scope({
 			name: 'triage',
 			tools: ['search', 'reply'],
 			select: rejectSelection,
-			description: 'Answers billing tickets from the ticket thread alone.',
 		})
 
 		const child = parent.narrow({ tools: ['reply'] })
 
 		expect(child.name).toBe('triage')
-		expect(child.description).toBe('Answers billing tickets from the ticket thread alone.')
 		expect(child.select).toBe(rejectSelection)
 		expect(child.tools).toEqual(['reply'])
 		expect(child.id).not.toBe(parent.id)
 	})
 
-	it('narrows a scope without a handler or description to a child without either', () => {
+	it('narrows a scope without a handler to a child without one', () => {
 		const child = new Scope({ name: 'plain' }).narrow({ tools: [] })
 
 		expect(child.select).toBeUndefined()
-		expect(child.description).toBeUndefined()
 	})
 
 	it('refuses `select` in the `narrow` argument, which keeps the parent handler', () => {

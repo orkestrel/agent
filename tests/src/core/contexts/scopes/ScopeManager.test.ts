@@ -1,23 +1,14 @@
+import type { ScopeEventName } from '../../../../setup.js'
 import type { ScopeInterface, ScopeManagerEventMap } from '@src/core'
 import { ScopeManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
+import { SCOPE_EVENTS } from '../../../../setup.js'
 
 // ScopeManager is the id-keyed registry of reusable named scopes — real
 // behavior, no mocks. Covers create (minting an id, always adding — never overwriting),
-// scope/scopes lookup + insertion order, remove (single + batch) + clear + count,
-// the create/remove/clear event emissions, and the emit-safety guarantee (a throwing
-// listener can't corrupt a mutation + routes to the emitter's `error` handler, with no
-// recursion) mirroring the Table / InstructionManager emitter convention.
-
-// The ScopeManagerEventMap event names recorded across the emitter tests — fed to
-// `createRecorders` from @orkestrel/test (the per-event wiring lives in the
-// package; this file keeps only the names its scenarios observe). `createRecorders` takes
-// its event map from an explicit type argument: `TMap` appears only inside the generic `on`
-// method of its source parameter, which yields no inference candidate, so both arguments are
-// named at every call site.
-const SCOPE_EVENTS = ['create', 'remove', 'clear'] as const
-type ScopeEventName = (typeof SCOPE_EVENTS)[number]
+// scope/scopes lookup + insertion order, and remove (single + batch) + clear + count.
+// A throwing listener leaves the mutation applied and routes the error to the emitter handler.
 
 describe('ScopeManager — create & lookup', () => {
 	it('starts empty', () => {

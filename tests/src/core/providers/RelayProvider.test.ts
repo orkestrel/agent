@@ -1,9 +1,8 @@
 import type { ProviderRequest, RelayFrame } from '@src/core'
 import { ContractError, parseJSONAs } from '@orkestrel/contract'
-import { requireValue, roundTripJSON } from '@orkestrel/test'
+import { captureError, requireValue, roundTripJSON } from '@orkestrel/test'
 import {
 	createRelayProvider,
-	AgentProvider,
 	providerRequestContract,
 	relayFrameContract,
 	ProviderAbortError,
@@ -23,16 +22,41 @@ import {
 } from '../../../setup.js'
 
 describe('RelayProvider', () => {
-	it('inherits the base replay getter and forwards its configured policy', () => {
+	it('preserves an error-body failure that races the caller abort', async () => {
+		const abort = new AbortController()
+		const cause = new Error('body failed')
+		const transport = new RecordedTransport(
+			() =>
+				new Response(
+					new ReadableStream<Uint8Array>(
+						{
+							pull(controller) {
+								controller.error(cause)
+								abort.abort('stop')
+							},
+						},
+						{ highWaterMark: 0 },
+					),
+					{ status: 503 },
+				),
+		)
+		const provider = createRelayProvider({
+			url: 'http://relay.test',
+			parser: createParser,
+			fetch: transport.fetch,
+		})
+		await expect(provider.generate([], abort.signal)).rejects.toMatchObject({
+			code: 'ABORT',
+			cause: { code: 'HTTP', status: 503, cause },
+		})
+	})
+	it('exposes the configured replay policy and its default', () => {
 		const provider = new RelayProvider({
 			url: 'https://relay.test',
 			parser: createParser,
 			replay: 'turn',
 		})
 		expect(provider.replay).toBe('turn')
-		expect(Object.hasOwn(provider, 'replay')).toBe(false)
-		expect(Object.hasOwn(RelayProvider.prototype, 'replay')).toBe(false)
-		expect(Object.getOwnPropertyDescriptor(AgentProvider.prototype, 'replay')?.get).toBeDefined()
 		expect(new RelayProvider({ url: 'https://relay.test', parser: createParser }).replay).toBe(
 			'none',
 		)
@@ -53,7 +77,7 @@ describe('RelayProvider', () => {
 			await provider.generate(request.messages, new AbortController().signal, request.tools),
 		).toEqual({ content: 'answer' })
 		const sent = await requireValue(transport.requests[0]).text()
-		expect(sent).toBe(JSON.stringify(provider.body(request)))
+		expect(sent).toBe('{"messages":[],"tools":[{"name":"hostile","parameters":{"x":1}}]}')
 		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
 			messages: [],
 			tools: [{ name: 'hostile', parameters: { x: 1 } }],
@@ -79,7 +103,7 @@ describe('RelayProvider', () => {
 			),
 		).toEqual({ content: 'answer' })
 		const sent = await requireValue(transport.requests[0]).text()
-		expect(sent).toBe(JSON.stringify(provider.body(request)))
+		expect(sent).toBe('{"messages":[],"options":{"schema":{"x":1}}}')
 		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
 			messages: [],
 			options: { schema: { x: 1 } },
@@ -106,7 +130,6 @@ describe('RelayProvider', () => {
 			content: 'answer',
 		})
 		const sent = await requireValue(transport.requests[0]).text()
-		expect(sent).toBe(JSON.stringify(provider.body(request)))
 		expect(parseJSONAs(sent, providerRequestContract.is)).toEqual({
 			messages: [
 				{
@@ -120,12 +143,12 @@ describe('RelayProvider', () => {
 	})
 	it('carries the projection failure as the refusal cause', () => {
 		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
-		let refusal: unknown
-		try {
-			provider.body({ messages: [], tools: [{ name: 'invalid', parameters: { value: Infinity } }] })
-		} catch (error) {
-			refusal = error
-		}
+		const refusal = captureError(() =>
+			provider.encode({
+				messages: [],
+				tools: [{ name: 'invalid', parameters: { value: Infinity } }],
+			}),
+		)
 		if (!(refusal instanceof ProviderError)) throw new Error('the projection was not refused')
 		expect(refusal.code).toBe('PROTOCOL')
 		expect(refusal.message).toBe('relay request is not JSON')
@@ -140,7 +163,7 @@ describe('RelayProvider', () => {
 			tools: [{ name: 'valid', parameters }],
 			options: { schema },
 		}
-		const snapshot = provider.body(request)
+		const snapshot = provider.encode(request)
 		if (!providerRequestContract.is(snapshot)) throw new Error('invalid request snapshot')
 		expect(parseJSONAs(JSON.stringify(snapshot), providerRequestContract.is)).toEqual(request)
 		parameters.x = 2
@@ -183,7 +206,7 @@ describe('RelayProvider', () => {
 			tools: [{ name: 'add', description: 'Adds values', parameters: { x: { type: 'number' } } }],
 			options: { think: false, schema: { type: 'object' } },
 		}
-		const wire = provider.body(request)
+		const wire = provider.encode(request)
 		expect(providerRequestContract.is(wire)).toBe(true)
 		expect(parseJSONAs(JSON.stringify(wire), providerRequestContract.is)).toEqual(wire)
 		expect(wire).toEqual({
@@ -205,7 +228,7 @@ describe('RelayProvider', () => {
 			parser: createParser,
 			replay: 'turn',
 		})
-		const wire = provider.body({
+		const wire = provider.encode({
 			messages: [
 				{ id: 'a', role: 'assistant', content: 'answer', thinking: 'weigh the fares' },
 				{ id: 'b', role: 'assistant', content: 'plain' },
@@ -247,13 +270,13 @@ describe('RelayProvider', () => {
 	it('rejects non-JSON parameters and schema', () => {
 		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
 		expect(() =>
-			provider.body({
+			provider.encode({
 				messages: [],
 				tools: [{ name: 'invalid', parameters: { value: Infinity } }],
 			}),
 		).toThrow('relay request is not JSON')
 		expect(() =>
-			provider.body({ messages: [], options: { schema: { value: createParser } } }),
+			provider.encode({ messages: [], options: { schema: { value: createParser } } }),
 		).toThrow('relay request is not JSON')
 	})
 	it('maps validated thinking and content frames and keeps literal thinking tags', async () => {

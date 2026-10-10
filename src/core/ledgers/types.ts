@@ -20,7 +20,7 @@ export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number]
  * Carries the wording of every question the ledger asks its judge.
  *
  * @remarks
- * `category` is the choice question asked about each message the category handler leaves open; its
+ * `category` is the choice question asked about each non-request message the category handler leaves open; its
  * criteria name every {@link LedgerCategory}. `topic` is the instructions of the noul question
  * asked for each desk topic, whose criteria the ledger frames from the topic, as
  * {@link LedgerTopic} states. `amends` and `supersedes` are the noul questions asked about an
@@ -56,7 +56,7 @@ export interface LedgerThreshold {
 }
 
 /**
- * Carries one desk topic: the subject the ledger asks its judge about for every message.
+ * Carries one desk topic: the subject the ledger asks its judge about for statements and, when enabled, requests.
  *
  * @remarks
  * The ledger asks the {@link LedgerQuestion} `topic` instructions with the criteria
@@ -79,7 +79,7 @@ export interface LedgerTopic {
  * tail can take.
  *
  * @remarks
- * `prompt` is a share of the ledger's `capacity`; the fixed tokens of the gauge come out of it
+ * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
  * before the briefing and the tail take the rest. `tail` is a share of what remains for messages.
  * Each share must be finite, greater than 0, and at most 1.
  */
@@ -94,14 +94,14 @@ export interface LedgerShare {
  * @remarks
  * `cue` is the last user message of an answer pass. `results` heads the note that carries what the
  * first pass's lookups and recalls returned. `repeat` is the failure a repeated tool call returns,
- * and the ledger reads a failure with exactly this text as a repeat. `closed` is the failure a
+ * and the ledger reads a failure with exactly this text as a repeat. `closure` is the failure a
  * `recall` call returns after the request's recalls are spent, repeated, or out of room.
  */
 export interface LedgerNote {
 	readonly cue: string
 	readonly results: string
 	readonly repeat: string
-	readonly closed: string
+	readonly closure: string
 }
 
 /**
@@ -109,14 +109,12 @@ export interface LedgerNote {
  *
  * @remarks
  * `limit` caps the `recall` calls one request can make before the tool refuses with the
- * {@link LedgerNote} `closed` text; it must be a nonnegative safe integer. Default: the
- * `DEFAULT_RECALL_LIMIT` constant. `description` replaces the tool description the ledger builds
- * from its topics.
+ * {@link LedgerNote} `closure` text; it must be a nonnegative safe integer. Default: the
+ * `DEFAULT_RECALL_LIMIT` constant.
  * Recall identity is the trimmed `{ topic }` alone; other arguments do not change its identity.
  */
 export interface LedgerRecallOptions {
 	readonly limit?: number
-	readonly description?: string
 }
 
 /**
@@ -211,13 +209,13 @@ export interface LedgerRegistry {
  * Carries the price of a prompt in tokens, measured against the model the ledger serves.
  *
  * @remarks
- * `scale` is the tokens one unit of the `estimateMessages` estimate costs. `fixed` is the tokens
+ * `scale` is the tokens one unit of the `estimateMessages` estimate costs. `overhead` is the tokens
  * every request carries beyond its messages, such as the tool definitions and the chat framing.
- * `scale` must be finite and greater than 0, and `fixed` finite and at least 0.
+ * `scale` must be finite and greater than 0, and `overhead` finite and at least 0.
  */
 export interface LedgerGauge {
 	readonly scale: number
-	readonly fixed: number
+	readonly overhead: number
 }
 
 /**
@@ -228,14 +226,11 @@ export interface LedgerGauge {
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
  * the scope.
  */
-export type LedgerAgentOptions = Pick<
-	AgentOptions,
-	'limit' | 'timeout' | 'budget' | 'signal' | 'on' | 'error'
->
+export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall, notes,
+ * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
  * and agent bounds.
  *
  * @remarks
@@ -243,13 +238,12 @@ export type LedgerAgentOptions = Pick<
  * sentence included; the briefing follows it in the system message. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
- * integer. Without `gauge`, the ledger calibrates before its first pass. `share` and `notes`
- * default leaf by leaf to the `DEFAULT_LEDGER_SHARE` and `LEDGER_NOTES` constants.
+ * integer. Without `gauge`, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
  * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
- * `max(0, (capacity - predict) * share.prompt - fixed) / (1 + LEDGER_SCALE_DRIFT)`.
- * Recall closes when `left - predict < 2 * reserve`.
+ * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
+ * Recall closes when `remainder - predict < 2 * reserve`.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -271,7 +265,6 @@ export interface LedgerOptions {
 	readonly lookups?: readonly LedgerLookup[]
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
-	readonly notes?: Partial<LedgerNote>
 	readonly agent?: LedgerAgentOptions
 }
 
@@ -312,15 +305,15 @@ export interface LedgerInterface {
 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
 	 * answer pass that advertises no tools. A `respond` or `calibrate` call while either is in flight
-	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A failed calibration rejects with
-	 * `LedgerError` code `'GAUGE'`.
+	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
+	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
 	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
 	 * @returns The reply and the passes the request took
-	 * @throws {LedgerError} Thrown when calibration fails (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
@@ -330,7 +323,7 @@ export interface LedgerInterface {
 	 * @remarks
 	 * The ledger sends its system message and its conversation's view to the provider twice, with
 	 * and without the tool definitions. The call without tools prices the messages and the
-	 * difference between the calls is the fixed cost.
+	 * difference between the calls is the overhead cost.
 	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
 	 * with `AgentError` code `'CONCURRENCY'`.
 	 *
@@ -359,15 +352,15 @@ export interface LedgerTokenSet {
  *
  * @remarks
  * `quiet` holds the messages the projection leaves out. `categories` maps each decided message to
- * its category and `topics` to its desk topics. `amended` and `superseded` map an earlier message
+ * its category and `topics` to its desk topics. `amendments` and `supersessions` map an earlier message
  * to the later messages that replace part or all of it, in conversation order.
  */
 export interface LedgerClassification {
 	readonly quiet: ReadonlySet<string>
 	readonly categories: ReadonlyMap<string, LedgerCategory>
 	readonly topics: ReadonlyMap<string, readonly string[]>
-	readonly amended: ReadonlyMap<string, readonly string[]>
-	readonly superseded: ReadonlyMap<string, readonly string[]>
+	readonly amendments: ReadonlyMap<string, readonly string[]>
+	readonly supersessions: ReadonlyMap<string, readonly string[]>
 }
 
 /**
@@ -408,8 +401,8 @@ export interface LedgerRecord {
  *
  * @remarks
  * `source` is the earlier message's id and `sentence` the zero-based index of the sentence. The
- * projection leaves a stale sentence out of the records and the briefing. Recall, answer notes,
- * and the seed tail keep the stored content.
+ * projection leaves a stale sentence out of the records and the briefing. Recall and answer notes
+ * keep the stored content. The seed tail replaces lookup results with status stubs.
  */
 export interface LedgerStaleSentence {
 	readonly source: string
@@ -424,21 +417,21 @@ export interface LedgerStaleSentence {
 export interface LedgerProjection {
 	readonly records: readonly LedgerRecord[]
 	readonly stale: readonly LedgerStaleSentence[]
-	readonly loose: readonly string[]
+	readonly orphans: readonly string[]
 }
 
 /**
  * Carries what a projection reads.
  *
  * @remarks
- * `system` is the system text, whose names never serve as a party. `exclude` lists the message ids
+ * `system` is the system text, whose names never serve as a party. `exclusions` lists the message ids
  * no record places, such as requests and ledger notes. `owners` maps each owner id to its names.
  * `readings` lists the lookup results in conversation order, and `entities` maps a message id to
  * the registry ids its text names.
  */
 export interface LedgerProjectionInput {
 	readonly system: string
-	readonly exclude: readonly string[]
+	readonly exclusions: readonly string[]
 	readonly owners: ReadonlyMap<string, readonly string[]>
 	readonly messages: readonly Message[]
 	readonly readings: readonly LedgerLookupReading[]
@@ -506,7 +499,7 @@ export interface ClassifierInterface {
 	/**
 	 * Asks every filing question the conversation's judgments lack an answer for.
 	 *
-	 * @param requests - The ids of the user messages the ledger serves as requests
+	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
 	 * @returns The judgment keys and usage spent; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
@@ -575,11 +568,11 @@ export interface GaugeCall {
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
- * otherwise; absent completion counts as 0. Without prompt usage, use is `fixed + scale * estimate`.
+ * otherwise; absent completion counts as 0. Without prompt usage, use is `overhead + scale * estimate`.
  * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall framing at the marginal
  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
  * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is
- * `max(0, (left - predict - reserve) / 2 / rate)`; recall closes at `left - predict < 2 * reserve`.
+ * `max(0, (remainder - predict - reserve) / 2 / rate)`; recall closes at `remainder - predict < 2 * reserve`.
  */
 export interface GaugeOptions extends LedgerGauge {
 	readonly capacity: number
@@ -591,16 +584,9 @@ export interface GaugeOptions extends LedgerGauge {
  * Prices prompts in tokens and measures the room a request has left.
  *
  * @remarks
- * `scale` and `fixed` hold the price the gauge read from its last observation.
+ * `scale` and `overhead` hold the price the gauge read from its last observation.
  */
 export interface GaugeInterface extends LedgerGauge {
-	/**
-	 * Returns the tokens the messages cost at the current scale.
-	 *
-	 * @param messages - The messages to price
-	 * @returns The cost in tokens
-	 */
-	measure(messages: readonly Message[]): number
 	/**
 	 * Returns the tokens one more estimate unit adds within a request, fitted over the observed calls.
 	 *
@@ -617,7 +603,7 @@ export interface GaugeInterface extends LedgerGauge {
 	 * @param calls - The calls of the request so far
 	 * @returns The tokens left
 	 */
-	left(calls: readonly GaugeCall[]): number
+	remainder(calls: readonly GaugeCall[]): number
 	/**
 	 * Returns the tokens a reply turn needs after the calls, given the longest reply text written so far.
 	 *
@@ -671,3 +657,9 @@ export type LedgerErrorCode =
 	| 'LOOKUP'
 	/** Reports a supplied gauge outside its bounds, or a calibration call that reports no prompt usage, or a prompt usage of 0 or less. */
 	| 'GAUGE'
+
+/** Carries the lowercase words and non-opening capitalized names of a message. */
+export interface LedgerWordSet {
+	readonly words: ReadonlySet<string>
+	readonly names: ReadonlySet<string>
+}

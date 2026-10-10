@@ -1,4 +1,4 @@
-import type { ProviderInterface, ProviderRequest } from '@src/core'
+import type { ProviderRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
 	createAgent,
@@ -21,7 +21,9 @@ import {
 	drainProvider,
 	FailingProvider,
 	RecordedProvider,
-	type DeltasOf,
+	generateReply,
+	INTEGRATION_USAGE,
+	splitWordDeltas,
 } from '../../setup.js'
 import { collect, requireValue } from '@orkestrel/test'
 
@@ -110,7 +112,7 @@ describe('in-process relay hop', () => {
 				const response = await handler(request)
 				frames.push(
 					...(await response.clone().text())
-						.split('\n')
+						.split(/\r\n|\n/)
 						.filter((line) => line.length > 0)
 						.map((line) => parseJSONAs(line, relayFrameContract.is)),
 				)
@@ -147,7 +149,20 @@ describe('in-process relay hop', () => {
 			'http://relay.test/exact?route=turn',
 		])
 		expect(requests.map((entry) => entry.method)).toEqual(['POST', 'POST'])
-		expect(bodies).toEqual([browser.body(request), browser.body(request)])
+		const expected: ProviderRequest = {
+			messages: [
+				{
+					id: 'identified',
+					role: 'assistant',
+					content: 'before',
+					calls: [{ id: 'c1', name: 'add', arguments: {} }],
+					images: ['image'],
+				},
+			],
+			tools: [{ name: 'add', description: 'Adds numbers', parameters: { type: 'object' } }],
+			options: { think: true, schema: { type: 'object' } },
+		}
+		expect(bodies).toEqual([expected, expected])
 		expect(frames).toEqual([
 			...direct.deltas,
 			{ channel: 'result', result },
@@ -156,11 +171,11 @@ describe('in-process relay hop', () => {
 		])
 		const relayed = requireValue(provider.calls[1])
 		expect({ messages: relayed.messages, tools: relayed.tools, options: relayed.options }).toEqual(
-			browser.body(request),
+			expected,
 		)
 		expect(relayed.messages[0]?.id).toBe('identified')
 	})
-	it('propagates browser cancellation through the request and upstream signals', async () => {
+	it('propagates browser abort through the request and upstream signals', async () => {
 		const provider = createScriptedProvider(
 			[{ result: { content: 'first second third' }, deltas: ['first', ' second', ' third'] }],
 			{ record: true },
@@ -227,33 +242,14 @@ describe('in-process relay hop', () => {
 	})
 })
 
-// PROVIDER-AGNOSTICISM — the runtime depends ONLY on the abstract ProviderInterface, never
-// on Ollama (or any concrete backend). This is the `src/core` scope proof — `integration.test.ts`
-// is the reserved scope filename the mirror rule does not reach, and its scope is the directory
-// it sits in. It drives the FULL Agent loop with the shared scripted provider — no daemon, no `@src/ollama`
-// import at all — proving any conforming provider works with zero core knowledge of it:
-//  • a minimal provider's generate()/stream() drive content + a tool round-trip + summed
-//    usage, and an abort commits a partial;
-//  • two DIFFERENTLY-NAMED providers are drop-in swappable behind identical agent code;
-//  • a manager-options framing reaches the request the provider receives, and an unframed
-//    manager sends the built-ins.
-// The scripted provider is a REAL provider (a real async generator honouring
-// the signal), never a mock of the agent. The deterministic loop mechanics also live in
-// Agent.test.ts; here the framing is the agnosticism CLAIM (a generic provider, not Ollama,
-// satisfies the contract). A `name` distinguishes the two swap providers; `deltasOf` chunks
-// the streamed content.
-
-const USAGE = createTokenUsage()
-
-// Split content into per-word deltas (the first word bare, each later word space-prefixed)
-// — the multi-delta chunking the streaming + swap tests below feed as `deltasOf`.
-const wordDeltas: DeltasOf = (content) =>
-	content.split(' ').map((word, index) => (index === 0 ? word : ` ${word}`))
+// The agent runtime must compose any conforming provider through the abstract contract.
 
 describe('provider-agnosticism — a minimal provider drives the FULL loop', () => {
 	it('generate() returns the provider content + summed usage, not partial', async () => {
 		const agent = createAgent(
-			createScriptedProvider([{ content: 'hello from a fake', usage: USAGE }], { name: 'alpha' }),
+			createScriptedProvider([{ content: 'hello from a fake', usage: INTEGRATION_USAGE }], {
+				name: 'alpha',
+			}),
 		)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -261,14 +257,14 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 
 		expect(result.content).toBe('hello from a fake')
 		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(INTEGRATION_USAGE)
 	})
 
 	it('stream() yields the provider deltas whose join equals the settled content (+ a usage chunk)', async () => {
 		const agent = createAgent(
-			createScriptedProvider([{ content: 'one two three', usage: USAGE }], {
+			createScriptedProvider([{ content: 'one two three', usage: INTEGRATION_USAGE }], {
 				name: 'alpha',
-				deltasOf: wordDeltas,
+				deltasOf: splitWordDeltas,
 			}),
 		)
 		agent.context.messages.add({ role: 'user', content: 'count' })
@@ -285,10 +281,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 	})
 
 	it('runs the agent tool loop in Node and feeds the result into the next provider turn', async () => {
-		// Turn 1: the fake requests `add(2,3)`. The loop dispatches the REAL tool, appends the
-		// tool result message, and re-drives the provider. Turn 2: the fake returns the final
-		// answer. This proves the loop's tool plumbing works through the abstract contract alone
-		// — the fake never knows it's inside an Agent, yet the round-trip completes.
+		// The provider boundary requests a tool and returns the next turn through the same contract.
 		const tools = createToolManager()
 		let executed = 0
 		tools.add(
@@ -303,7 +296,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] },
-				{ content: 'the sum is 5', usage: USAGE },
+				{ content: 'the sum is 5', usage: INTEGRATION_USAGE },
 			],
 			{ name: 'alpha', record: true },
 		)
@@ -314,7 +307,6 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 
-		// The real tool executed exactly once, with the fed-in arguments → 5.
 		expect(executed).toBe(1)
 		const dispatched = chunks.flatMap((chunk) =>
 			chunk.category === 'tool' && chunk.result.success
@@ -326,11 +318,8 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		expect(provider.calls[1]?.messages).toContainEqual(
 			expect.objectContaining({ role: 'tool', content: '5' }),
 		)
-		// The loop fed the result back and the fake's SECOND turn produced the final answer.
 		expect(result.content).toBe('the sum is 5')
 		expect(result.partial).toBe(false)
-		// The conversation now carries the assistant tool-call turn + the tool-result turn — the
-		// loop wrote both back through the abstract contract.
 		const roles = agent.context.messages.messages().map((message) => message.role)
 		expect(roles).toEqual(['user', 'assistant', 'tool', 'assistant'])
 	})
@@ -340,7 +329,10 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		// accumulated deltas — the fake's signal-honouring stream supplies the partial, exactly
 		// like a real provider would.
 		const agent = createAgent(
-			createScriptedProvider([{ content: 'a b c d e' }], { name: 'alpha', deltasOf: wordDeltas }),
+			createScriptedProvider([{ content: 'a b c d e' }], {
+				name: 'alpha',
+				deltasOf: splitWordDeltas,
+			}),
 		)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
@@ -365,21 +357,13 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 
 describe('provider-agnosticism — drop-in swap (the runtime is indifferent to WHICH provider)', () => {
 	it('two DIFFERENTLY-NAMED providers run the SAME agent code with zero changes — each returns its own answer', async () => {
-		// The identical builder runs against either provider — the runtime never branches on the
-		// concrete backend; it only sees the abstract contract. Swapping the provider swaps the
-		// answer with no code change.
-		const run = async (provider: ProviderInterface): Promise<string> => {
-			const agent = createAgent(provider)
-			agent.context.messages.add({ role: 'user', content: 'who are you?' })
-			return (await agent.generate()).content
-		}
-
+		// The runtime depends on the abstract contract when the provider implementation changes.
 		const first = createScriptedProvider([{ content: 'I am alpha' }], { name: 'alpha' })
 		const second = createScriptedProvider([{ content: 'I am beta' }], { name: 'beta' })
 
 		expect(first.name).not.toBe(second.name)
-		expect(await run(first)).toBe('I am alpha')
-		expect(await run(second)).toBe('I am beta')
+		expect(await generateReply(first)).toBe('I am alpha')
+		expect(await generateReply(second)).toBe('I am beta')
 	})
 
 	it('a manager-options format frames the system block the provider receives; an unframed manager sends the built-ins', async () => {
@@ -415,11 +399,9 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 	})
 
 	it('createScriptedProvider (the shared Ollama-free fixture) is itself a conforming provider that drives the loop', async () => {
-		// The shared scripted provider (used across the agent-job tests) is ALSO a
-		// ProviderInterface — driving the loop with it proves the agnosticism claim holds for the
-		// fixture every other suite relies on, not only the bespoke fakes above.
+		// This fixture also drives other suites through the same provider contract.
 		const agent = createAgent(
-			createScriptedProvider([{ content: 'scripted answer', usage: USAGE }]),
+			createScriptedProvider([{ content: 'scripted answer', usage: INTEGRATION_USAGE }]),
 		)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -427,6 +409,6 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 
 		expect(result.content).toBe('scripted answer')
 		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(INTEGRATION_USAGE)
 	})
 })

@@ -12,7 +12,7 @@ import { removeEntries } from '../../helpers.js'
 import { Scope } from './Scope.js'
 
 /**
- * Registers the named filters a richer context reuses — immutable {@link Scope}s keyed by their
+ * Registers the named filters a richer context reuses — immutable {@link Scope} instances keyed by their
  * minted `id`, in insertion order, where `create` always mints and stores rather than overwriting,
  * and an observable `emitter` reports each change.
  *
@@ -46,10 +46,7 @@ export class ScopeManager implements ScopeManagerInterface {
 	readonly #emitter: Emitter<ScopeManagerEventMap>
 
 	constructor(options?: ScopeManagerOptions) {
-		this.#emitter = new Emitter<ScopeManagerEventMap>({
-			...(options?.on === undefined ? {} : { on: options.on }),
-			...(options?.error === undefined ? {} : { error: options.error }),
-		})
+		this.#emitter = new Emitter<ScopeManagerEventMap>(options)
 	}
 
 	get emitter(): EmitterInterface<ScopeManagerEventMap> {

@@ -1,3 +1,4 @@
+import type { InstructionEventName } from '../../../../setup.js'
 import type {
 	ContextSectionFormat,
 	InstructionInterface,
@@ -6,23 +7,14 @@ import type {
 import { InstructionManager, renderSection } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
+import { INSTRUCTION_EVENTS } from '../../../../setup.js'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
 // directives block from — real behavior, no mocks. Covers add (single +
 // batch) minting ids, last-write-wins overwrite by name, instruction/instructions
 // lookup with descending-priority (stable) ordering, format/description build contract,
-// remove (single + batch) + clear + count, the add/remove/clear event emissions, and the
-// emit-safety guarantee (a throwing listener can't corrupt a mutation + routes to the
-// emitter's `error` handler, with no recursion) mirroring Table's emitter convention.
-
-// The InstructionManagerEventMap event names recorded across the emitter tests — fed to
-// `createRecorders` from @orkestrel/test (the per-event wiring lives in the
-// package; this file keeps only the names its scenarios observe). `createRecorders` takes its
-// event map from an explicit type argument: `TMap` appears only inside the generic `on` method
-// of its source parameter, which yields no inference candidate, so both arguments are named at
-// every call site.
-const INSTRUCTION_EVENTS = ['add', 'remove', 'clear'] as const
-type InstructionEventName = (typeof INSTRUCTION_EVENTS)[number]
+// remove (single + batch) + clear + count, and the add/remove/clear event emissions.
+// A throwing listener leaves the mutation applied and routes the error to the emitter handler.
 
 describe('InstructionManager — add & lookup', () => {
 	it('starts empty', () => {

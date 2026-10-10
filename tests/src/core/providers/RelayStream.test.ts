@@ -77,10 +77,10 @@ describe('RelayStream', () => {
 			expect(response.bodyUsed).toBe(false)
 			expect(provider.finished).toBe(false)
 			abort.abort()
-			await Promise.race([provider.closed, waitForDelay(80)])
+			await provider.closed
 			expect(provider.returns).toBe(1)
 			expect(provider.finished).toBe(true)
-			expect(provider.cancelled).toBe(true)
+			expect(provider.aborted).toBe(true)
 			expect(getEventListeners(abort.signal, 'abort')).toEqual([])
 		} finally {
 			await response.body?.cancel()
@@ -215,7 +215,7 @@ describe('RelayStream', () => {
 			expect(provider.active).toBe(1)
 			await reader.cancel()
 			expect(provider.returns).toBe(1)
-			expect(provider.cancelled).toBe(true)
+			expect(provider.aborted).toBe(true)
 			expect(await pending).toEqual({ done: true, value: undefined })
 			gate.resolve()
 			await waitForDelay()

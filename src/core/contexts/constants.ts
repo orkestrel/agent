@@ -1,14 +1,6 @@
-import type { Criterion } from './types.js'
-
-/** Supplies measured needed criteria without choosing the application's threshold. */
-export const NEEDED_CRITERION: Pick<Criterion, 'yes' | 'no'> = Object.freeze({
-	yes: 'A states something the work in B must respect',
-	no: 'A can be left out and the request in B is still done correctly',
-})
-
 /**
- * Names the section header {@link import('./AgentContext.js').AgentContext}'s `build()` renders the
- * active workspace's text files under — `'## Workspace'`, the leading line of the dedicated
+ * Names the section header the `build()` method of {@link import('./AgentContext.js').AgentContext}
+ * renders the active workspace's text files under — `'## Workspace'`, the leading line of the dedicated
  * workspace block in the system message and the carrier-split counterpart to the documents and
  * images section headers.
  *

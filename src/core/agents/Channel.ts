@@ -26,13 +26,13 @@ import type { ChannelInterface } from './types.js'
  * ```
  */
 export class Channel<T> implements ChannelInterface<T> {
-	readonly #buffer: Array<{ value: T }> = []
+	#buffer: ReadonlyArray<{ readonly value: T }> = []
 	#wake: (() => void) | undefined
 	#closed = false
 	#failure: { error: unknown } | undefined
 
 	push(value: T): void {
-		this.#buffer.push({ value })
+		this.#buffer = [...this.#buffer, { value }]
 		this.#signal()
 	}
 
@@ -52,15 +52,18 @@ export class Channel<T> implements ChannelInterface<T> {
 		for (;;) {
 			// Yield everything buffered before checking for end, so a close / fail that
 			// arrives alongside the last chunks still delivers those chunks first.
-			for (let cell = this.#buffer.shift(); cell !== undefined; cell = this.#buffer.shift())
-				yield cell.value
+			while (this.#buffer.length > 0) {
+				const [cell, ...remaining] = this.#buffer
+				this.#buffer = remaining
+				if (cell !== undefined) yield cell.value
+			}
 			if (this.#failure !== undefined) throw this.#failure.error
 			if (this.#closed) return
-			await this.#parked()
+			await this.#park()
 		}
 	}
 
-	// Resolve the parked reader (if any) and clear the slot — a fresh `#parked()` arms
+	// Resolve the parked reader (if any) and clear the slot — a fresh `#park()` arms
 	// the next wait. A `signal` with no parked reader is a no-op (the buffer / flags are
 	// already set, so the next `drain` pass reads them without parking).
 	#signal(): void {
@@ -69,7 +72,7 @@ export class Channel<T> implements ChannelInterface<T> {
 		wake?.()
 	}
 
-	#parked(): Promise<void> {
+	#park(): Promise<void> {
 		return new Promise<void>((resolve) => {
 			this.#wake = resolve
 		})

@@ -21,8 +21,7 @@ import { intersectKeys } from '../helpers.js'
  *   `undefined` means "no constraint", so it acts as the universal set: intersecting
  *   `undefined` with a list yields the list, and `undefined` with `undefined` stays
  *   `undefined`. Narrowing can only tighten, never widen — a key excluded by a parent
- *   can never be re-admitted by a child. The child keeps this scope's `name`, `description`,
- *   and `select` handler.
+ *   can never be re-admitted by a child. The child keeps this scope's `name` and `select` handler.
  *
  * @example
  * ```ts
@@ -41,14 +40,12 @@ export class Scope implements ScopeInterface {
 	readonly tools?: readonly string[]
 	readonly files?: readonly string[]
 	readonly select?: SelectionHandler
-	readonly description?: string
 
 	constructor(input: ScopeInput) {
 		this.name = input.name
 		if (input.select !== undefined) this.select = input.select
-		if (input.description !== undefined) this.description = input.description
 		// Copy each supplied list in (a later mutation of the caller's array can't leak in);
-		// an omitted list stays `undefined` — the "no constraint" sentinel.
+		// an omitted list stays `undefined` — the absence of a constraint.
 		if (input.instructions !== undefined) this.instructions = [...input.instructions]
 		if (input.tools !== undefined) this.tools = [...input.tools]
 		if (input.files !== undefined) this.files = [...input.files]
@@ -60,7 +57,6 @@ export class Scope implements ScopeInterface {
 		const files = intersectKeys(this.files, config.files)
 		return new Scope({
 			name: this.name,
-			...(this.description === undefined ? {} : { description: this.description }),
 			...(this.select === undefined ? {} : { select: this.select }),
 			...(instructions === undefined ? {} : { instructions }),
 			...(tools === undefined ? {} : { tools }),

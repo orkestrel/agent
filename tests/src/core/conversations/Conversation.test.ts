@@ -44,7 +44,6 @@ describe('Conversation — construction & accessors', () => {
 	it('owns its message store directly — add mints + stores, message/messages/count read it back', () => {
 		const conversation = new Conversation()
 
-		// `add` mints the id, stores immutably, and returns the created message.
 		const turn = conversation.add({ role: 'user', content: 'hi' })
 		expect(turn.id.length).toBeGreaterThan(0)
 		expect(turn.role).toBe('user')
@@ -80,7 +79,6 @@ describe('Conversation — construction & accessors', () => {
 		expect(conversation.messages()).toEqual([])
 		conversation.add([{ role: 'user', content: 'c' }])
 
-		// clear empties the live tail.
 		conversation.clear()
 		expect(conversation.count).toBe(0)
 		expect(conversation.messages()).toEqual([])

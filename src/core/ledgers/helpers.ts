@@ -13,27 +13,157 @@ import type {
 	LedgerRegistry,
 	LedgerStaleSentence,
 	LedgerTokenSet,
+	LedgerTopic,
+	LedgerWordSet,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
-import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
+import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
 
 /**
- * Resolves the call that owns a tool message within a collected tool group.
+ * Collects the live message ids placed in records or left without a record.
+ * @param projection - The projected records and unplaced ids
+ * @returns The distinct live message ids
+ * @example
+ * ```ts
+ * collectProjectionIds({ records: [], stale: [], orphans: ['message-1'] }) // Set { 'message-1' }
+ * ```
+ */
+export function collectProjectionIds(projection: LedgerProjection): ReadonlySet<string> {
+	return new Set([...projection.orphans, ...projection.records.flatMap((record) => record.members)])
+}
+
+/**
+ * Scans admitted amendments in breadth-first order without revisiting a message.
+ * @param amendments - The later messages attached to each earlier message
+ * @param start - The first message to visit
+ * @param admit - The predicate that admits a message and its descendants
+ * @returns The admitted message ids in visit order
+ * @example
+ * ```ts
+ * scanAmendments(new Map([['first', ['second']]]), 'first', () => true) // ['first', 'second']
+ * ```
+ */
+export function scanAmendments(
+	amendments: ReadonlyMap<string, readonly string[]>,
+	start: string,
+	admit: (id: string) => boolean,
+): readonly string[] {
+	const queue = [start]
+	const seen = new Set<string>()
+	const admitted: string[] = []
+	for (const id of queue) {
+		if (seen.has(id)) continue
+		seen.add(id)
+		if (!admit(id)) continue
+		admitted.push(id)
+		queue.push(...(amendments.get(id) ?? []))
+	}
+	return admitted
+}
+
+/**
+ * Builds the placeholder assistant recall call used to price recall framing.
+ * @param topic - The recall topic to price
+ * @returns The assistant message carrying the recall call
+ * @example
+ * ```ts
+ * buildRecallMessage('refunds').calls?.[0]?.arguments // { topic: 'refunds' }
+ * ```
+ */
+export function buildRecallMessage(topic: string): Message {
+	return {
+		id: 'call',
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
+	}
+}
+
+/**
+ * Renders topic names as a comma-separated list in their supplied order.
+ * @param topics - The configured desk topics
+ * @returns The topic names joined by a comma and a space
+ * @example
+ * ```ts
+ * renderTopicNames([{ name: 'refunds', criterion: 'Refund amounts' }]) // 'refunds'
+ * ```
+ */
+export function renderTopicNames(topics: readonly LedgerTopic[]): string {
+	return topics.map((topic) => topic.name).join(', ')
+}
+
+/**
+ * Renders an error and its causes, stopping after 4 entries.
+ * @param error - The thrown value to describe
+ * @returns The names and messages joined by a cause separator
+ * @example
+ * ```ts
+ * renderCauseChain(new Error('refused', { cause: 'offline' })) // 'Error: refused <- offline'
+ * ```
+ */
+export function renderCauseChain(error: unknown): string {
+	const parts: string[] = []
+	let current: unknown = error
+	for (let depth = 0; current !== undefined && depth < 4; depth += 1) {
+		parts.push(isError(current) ? `${current.name}: ${current.message}` : String(current))
+		current = isError(current) ? current.cause : undefined
+	}
+	return parts.join(' <- ')
+}
+
+/**
+ * Extracts lowercase words and capitalized names that do not open a sentence.
+ * @param message - The message whose text supplies the words
+ * @returns The distinct words and non-opening names
+ * @example
+ * ```ts
+ * extractWords({ id: 'note', role: 'user', content: 'Ask Odile.' }).names // Set { 'odile' }
+ * ```
+ */
+export function extractWords(message: Message): LedgerWordSet {
+	return {
+		words: new Set(message.content.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []),
+		names: new Set(
+			[...message.content.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
+				.filter((match) => {
+					const before = message.content.slice(0, match.index).trimEnd()
+					return before !== '' && !/[.!?:;]$/.test(before)
+				})
+				.map((match) => match[0].toLowerCase()),
+		),
+	}
+}
+
+/**
+ * Splits a topic part into lowercase words with surrounding punctuation removed.
+ * @param part - The topic part to split
+ * @returns The nonempty normalized words
+ * @example
+ * ```ts
+ * splitWords('Refunds, BW-5512!') // ['refunds', 'bw-5512']
+ * ```
+ */
+export function splitWords(part: string): readonly string[] {
+	return part
+		.split(/\s+/)
+		.map((word) => word.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').toLowerCase())
+		.filter((word) => word !== '')
+}
+
+/**
+ * Finds the call that owns a tool message within a collected tool group.
  * @param group - The assistant leader followed by its tool results
  * @param message - The tool result to pair; distinct leader ids pair by result id when any result has one
  * @returns The call matching the result's call id, or its position when the leader repeats an id or every result lacks an id; undefined when unpaired
  * @example
  * ```ts
- * resolveLedgerCall(group, result)?.arguments
+ * findLedgerCall(group, result)?.arguments
  * ```
  */
-export function resolveLedgerCall(
-	group: readonly Message[],
-	message: Message,
-): ToolCall | undefined {
+export function findLedgerCall(group: readonly Message[], message: Message): ToolCall | undefined {
 	const [leader, ...results] = group
 	const at = results.findIndex((result) => result.id === message.id)
 	if (message.role !== 'tool' || at < 0) return undefined
@@ -140,7 +270,6 @@ export function computeThinking(
  * ```
  */
 export function splitSentences(text: string): readonly string[] {
-	// A decimal point, an id, or an amount never meets the break, which needs a space and then a capital, a digit, or a quote.
 	return text
 		.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"'“])/u)
 		.map((sentence) => sentence.trim())
@@ -210,8 +339,8 @@ export function collectNames(text: string): readonly string[] {
  *
  * @example
  * ```ts
- * identifyLookup('lookup_order', { id: 'bw-5512', opts: { b: 1, a: 2 } }) ===
- * 	identifyLookup('lookup_order', { opts: { a: 2, b: 1 }, id: ' BW-5512' }) // true
+ * identifyLookup('lookup_order', { id: 'bw-5512', opts: { tier: 2, region: 'north' } }) ===
+ * 	identifyLookup('lookup_order', { opts: { region: 'north', tier: 2 }, id: ' BW-5512' }) // true
  * ```
  */
 export function identifyLookup(name: string, args: Readonly<Record<string, unknown>>): string {
@@ -360,19 +489,19 @@ export function matchEntities(
  * @remarks
  * Each line is a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon. A message is live when it is a user message,
  * or a tool message whose reading is the last reading of its call, and the input neither excludes it nor
- * files it quiet or superseded. A reading with an undefined `result` still replaces the earlier
+ * files it quiet or replaced. A reading with an undefined `result` still replaces the earlier
  * reading of the same call, so the earlier result leaves every record.
  *
  * A live message joins the owner records its entities name, directly or through a linked lookup
- * argument. A message that names no owner joins where its earlier side of an amended pair joins,
+ * argument. A message that names no owner joins where its earlier side of an amendment pair joins,
  * or on the rules record when it is filed as a rule or a correction, and is loose otherwise.
  *
  * A sentence an amending message made stale is left out and listed in `stale`. An amending message
- * that is itself superseded keeps that effect, so the old value never revives.
+ * that is itself replaced keeps that effect, so the old value never revives.
  *
  * A sentence that opens with a pronoun takes the party named in the sentence before it. The reading
  * trusts capitals, so a capitalized word that is no person, such as a carrier named mid-sentence,
- * is read as the party. This is a documented limit that the measured series kept: the prefix carries
+ * is read as the party. This is a documented limit: the prefix carries
  * the follow-up facts the records exist for.
  *
  * @param input - The messages, readings, entities, and classification to project
@@ -382,12 +511,12 @@ export function matchEntities(
  * ```ts
  * const projection = buildRecords({
  * 	system: 'You staff the desk.',
- * 	exclude: [],
+ * 	exclusions: [],
  * 	owners: new Map([['BW-20931', ['Brightwater Studio']]]),
  * 	messages: [{ id: 'user-1', role: 'user', content: 'Brightwater Studio asked for a refund.' }],
  * 	readings: [],
  * 	entities: new Map([['user-1', ['BW-20931']]]),
- * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amended: new Map(), superseded: new Map() },
+ * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amendments: new Map(), supersessions: new Map() },
  * })
  * // projection.records[0].title === 'Brightwater Studio (account BW-20931)'
  * ```
@@ -402,7 +531,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const live = collectLive(input)
 	const links = linkOwners(input.readings, input.owners)
 	const amending = new Map<string, readonly string[]>()
-	for (const [earlier, laters] of input.classification.amended) {
+	for (const [earlier, laters] of input.classification.amendments) {
 		for (const later of laters) amending.set(later, [...(amending.get(later) ?? []), earlier])
 	}
 	const stale = collectStale(input, byId, live)
@@ -446,7 +575,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 				(left.record.key < right.record.key ? -1 : left.record.key > right.record.key ? 1 : 0),
 		)
 		.map(({ record }) => record)
-	return { records, stale, loose }
+	return { records, stale, orphans: loose }
 }
 
 /**
@@ -517,7 +646,7 @@ export function renderLedgerRecord(record: Pick<LedgerRecord, 'title' | 'lines'>
  * ```
  */
 export function renderLedgerPinned(record: Pick<LedgerRecord, 'title' | 'lines'>): string {
-	return [`### ${record.title}`, ...record.lines.map((line) => `- ${line.text}`)].join('\n')
+	return `#${renderLedgerRecord(record)}`
 }
 
 /**
@@ -528,7 +657,7 @@ export function renderLedgerPinned(record: Pick<LedgerRecord, 'title' | 'lines'>
  * returned whole, so a model that joins a name and an id recalls each part alone.
  *
  * @param topic - The topic the model asked for
- * @returns The trimmed, non-empty parts when there are at least two; otherwise the topic itself
+ * @returns The trimmed, non-empty parts when there are at least 2; otherwise the topic itself
  *
  * @example
  * ```ts
@@ -636,7 +765,7 @@ export function renderStub(
  * schema, so a pooled fit across tool counts would read the dropped schemas as a falling rate.
  *
  * @param groups - The calls of each request
- * @returns The slope, or undefined when no set holds two calls with a prompt count and an estimate that differ
+ * @returns The slope, or undefined when no set holds 2 calls with a prompt count and an estimate that differ
  *
  * @example
  * ```ts
@@ -670,7 +799,7 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  *
  * @remarks
  * A message is live when it is a user message, or a tool message whose reading is the last reading of its
- * call, and the input neither excludes it nor files it quiet or superseded. A reading replaces any
+ * call, and the input neither excludes it nor files it quiet or replaced. A reading replaces any
  * earlier reading of the same call, an empty one included, so an empty lookup leaves the earlier
  * result out of every record.
  *
@@ -684,7 +813,7 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  */
 export function collectLive(input: LedgerProjectionInput): readonly string[] {
 	const { classification } = input
-	const excluded = new Set(input.exclude)
+	const excluded = new Set(input.exclusions)
 	const position = new Map(input.messages.map((message, at) => [message.id, at]))
 	const readings = input.readings.filter((reading) => position.has(reading.id))
 	const identities = new Map(
@@ -712,7 +841,7 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 			(id) =>
 				!excluded.has(id) &&
 				!classification.quiet.has(id) &&
-				(classification.superseded.get(id) ?? []).length === 0,
+				(classification.supersessions.get(id) ?? []).length === 0,
 		)
 }
 
@@ -721,16 +850,16 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
  *
  * @remarks
  * A message joins the owner records its entities name, directly or through a linked lookup argument.
- * A message that names no owner joins where the earlier side of its amended pair joins, and a
+ * A message that names no owner joins where the earlier side of its amendment pair joins, and a
  * message with no earlier side joins the rules record when it is filed as a rule or a correction.
  * A message that is not live still places, because a correction joins where its earlier side would
  * join.
  *
  * @param input - The owners, entities, and classification to read
  * @param links - The owner of each linked lookup argument, from {@link linkOwners}
- * @param amending - The earlier sides of each message's amended pairs
+ * @param amending - The earlier sides of each message's amendment pairs
  * @param id - The message id
- * @param seen - The ids already visited, which stops a cycle of amended pairs
+ * @param seen - The ids already visited, which stops a cycle of amendment pairs
  * @returns The record keys, empty when the message is loose
  *
  * @example
@@ -789,7 +918,7 @@ export function collectStale(
 	live: readonly string[],
 ): readonly LedgerStaleSentence[] {
 	const { classification } = input
-	const excluded = new Set(input.exclude)
+	const excluded = new Set(input.exclusions)
 	const effective = new Set([
 		...live,
 		...[...byId.values()]
@@ -798,13 +927,13 @@ export function collectStale(
 					message.role !== 'assistant' &&
 					!excluded.has(message.id) &&
 					!classification.quiet.has(message.id) &&
-					(classification.superseded.get(message.id) ?? []).length > 0,
+					(classification.supersessions.get(message.id) ?? []).length > 0,
 			)
 			.map((message) => message.id),
 	])
 	const stale: LedgerStaleSentence[] = []
 	for (const id of live) {
-		const laters = (classification.amended.get(id) ?? [])
+		const laters = (classification.amendments.get(id) ?? [])
 			.filter((later) => effective.has(later))
 			.flatMap((later) => {
 				const message = byId.get(later)

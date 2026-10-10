@@ -7,7 +7,7 @@ import {
 } from '@src/core'
 import { parseJSONAs } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
-import { domainArgument, RELAY_WIRE_FRAMES } from '../../../setup.js'
+import { returnDomain, RELAY_WIRE_FRAMES } from '../../../setup.js'
 
 describe('wire contracts', () => {
 	it('round-trips a request and reports the malformed message path', () => {
@@ -54,11 +54,11 @@ describe('wire contracts', () => {
 		expect(
 			providerRequestContract.is({
 				messages: [],
-				tools: [{ name: 'lookup', parameters: { invoke: domainArgument } }],
+				tools: [{ name: 'lookup', parameters: { invoke: returnDomain } }],
 			}),
 		).toBe(false)
 		expect(
-			providerRequestContract.is({ messages: [], options: { schema: { invoke: domainArgument } } }),
+			providerRequestContract.is({ messages: [], options: { schema: { invoke: returnDomain } } }),
 		).toBe(false)
 	})
 })

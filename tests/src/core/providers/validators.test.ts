@@ -1,8 +1,8 @@
+import { createHostileValues } from '@orkestrel/test'
 import { isSystemOneAnswer, isSystemOneResponse } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
-	throwProxyRead,
 	SYSTEM_ONE_TEV1,
 	SYSTEM_ONE_OBJECT,
 	SYSTEM_ONE_LLAMA,
@@ -68,22 +68,18 @@ describe('System One guards', () => {
 	})
 
 	it('contains hostile reads and refuses arrays with a misleading every method', () => {
-		const revoked = Proxy.revocable({}, {})
-		revoked.revoke()
-		expect(isSystemOneResponse(revoked.proxy)).toBe(false)
-		expect(isSystemOneAnswer(revoked.proxy)).toBe(false)
-		expect(isSystemOneResponse(new Proxy({}, { get: throwProxyRead }))).toBe(false)
-		expect(isSystemOneAnswer(new Proxy({}, { get: throwProxyRead }))).toBe(false)
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(isSystemOneResponse(value), `hostile response ${index}`).toBe(false)
+			expect(isSystemOneAnswer(value), `hostile answer ${index}`).toBe(false)
+			expect(
+				() => isSystemOneAnswer({ type: 'choice', probabilities: value }),
+				`hostile distribution ${index}`,
+			).not.toThrow()
+		}
 		expect(
 			isSystemOneAnswer({
 				type: 'score',
 				probabilities: Object.assign(['invalid'], { every: approveEvery }),
-			}),
-		).toBe(false)
-		expect(
-			isSystemOneAnswer({
-				type: 'choice',
-				probabilities: new Proxy({ bug: 0.5 }, { ownKeys: throwProxyRead }),
 			}),
 		).toBe(false)
 	})

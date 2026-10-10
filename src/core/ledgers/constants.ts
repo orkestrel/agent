@@ -84,7 +84,7 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 	results: '[Desk] What your lookups and recalls returned in this request:',
 	repeat:
 		'You already have this result earlier in this request; give your complete answer now as your final message.',
-	closed:
+	closure:
 		'recall is closed for the rest of this request; give your final answer from what you have',
 })
 

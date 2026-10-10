@@ -1,6 +1,5 @@
 import { createMemoryConversationStore } from '@src/core'
-import { requireValue, roundTripJSON } from '@orkestrel/test'
-import { isToolCall } from '@orkestrel/tool'
+import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildConversationSnapshot,
@@ -27,13 +26,15 @@ import {
 // each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
 // THIS file registers the battery against the memory factory and asserts on what each scenario
 // returns, keeping only its TWIN-SPECIFIC blocks: the JSON driver-swap-parity round-trip and the
-// per-call element guard the snapshot's assistant `calls` rests on. The snapshot, section, and
-// message guards live in tests/src/core/conversations/validators.test.ts, beside their module.
+// tool-message round-trip. The snapshot, section, and message guards live in
+// tests/src/core/conversations/validators.test.ts, beside their module.
 describe('MemoryConversationStore', () => {
 	it('round trips judgment answers, refusals, and recorded times', async () => {
-		const store = createMemoryConversationStore()
-		await store.set(JUDGMENT_SNAPSHOT)
-		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+		const { got } = await exerciseConversationStoreRoundTrip(
+			createMemoryConversationStore,
+			async () => JUDGMENT_SNAPSHOT,
+		)
+		expect(got).toEqual(JUDGMENT_SNAPSHOT)
 	})
 	describe('set → get round-trip (sections + live tail)', () => {
 		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
@@ -125,32 +126,13 @@ describe('MemoryConversationStore — JSON driver-swap parity', () => {
 
 describe('MemoryConversationStore — tool messages with and without call', () => {
 	it('round-trips a tool message naming its call beside one saved without call', async () => {
-		const store = createMemoryConversationStore()
-		await store.set(TOOL_SNAPSHOT)
-		const got = requireValue(await store.get(TOOL_SNAPSHOT.id))
+		const { got } = await exerciseConversationStoreRoundTrip(
+			createMemoryConversationStore,
+			async () => TOOL_SNAPSHOT,
+		)
 		expect(got).toEqual(TOOL_SNAPSHOT)
 		expect(roundTripJSON<unknown>(got)).toEqual(TOOL_SNAPSHOT)
-		expect(got.messages.at(-1)?.call).toBe('call-oslo')
-		expect(got.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
-	})
-})
-
-describe('isToolCall — the per-call guard (the fail-closed element check)', () => {
-	it('accepts the real ToolCall shape (string id / name + a record arguments)', () => {
-		expect(isToolCall({ id: 'c1', name: 'search', arguments: { q: 'acme' } })).toBe(true)
-		expect(isToolCall({ id: 'c1', name: 'search', arguments: {} })).toBe(true)
-	})
-
-	it('rejects hostile shapes without throwing (total guard)', () => {
-		expect(isToolCall(null)).toBe(false)
-		expect(isToolCall(undefined)).toBe(false)
-		expect(isToolCall('x')).toBe(false)
-		expect(isToolCall(42)).toBe(false)
-		expect(isToolCall({ id: 'c1', name: 'search' })).toBe(false) // missing arguments
-		expect(isToolCall({ id: 'c1', name: 123, arguments: {} })).toBe(false) // non-string name
-		expect(isToolCall({ id: 1, name: 'search', arguments: {} })).toBe(false) // non-string id
-		expect(isToolCall({ id: 'c1', name: 'search', arguments: null })).toBe(false) // non-record args
-		expect(isToolCall({ id: 'c1', name: 'search', arguments: 'q=acme' })).toBe(false)
-		expect(isToolCall({ id: 'c1', name: 'search', arguments: ['q'] })).toBe(false)
+		expect(got?.messages.at(-1)?.call).toBe('call-oslo')
+		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
 	})
 })

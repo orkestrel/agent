@@ -24,8 +24,8 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * signal is aborted.
  * Content is preserved verbatim, including literal thinking tags.
  * A refusal reaches the browser as a `ProviderError` instance with the `HTTP` code and status.
- * This is the browser end alone; {@link createRelay} mounts the server end, and
- * {@link createRelayProvider}'s example is the browser half of that pair.
+ * This is the browser end alone; {@link createRelay} mounts the server end.
+ * The example of {@link createRelayProvider} is the browser half of that pair.
  *
  * @example
  * ```ts
@@ -82,7 +82,7 @@ export class RelayProvider extends AgentProvider {
 	 * value outside JSON — carrying that failure as its `cause`, and when the snapshot the
 	 * projection produced is not a valid wire request
 	 */
-	body(request: ProviderRequest): object {
+	encode(request: ProviderRequest): object {
 		let snapshot: unknown
 		try {
 			const projected = {
@@ -136,8 +136,8 @@ export class RelayProvider extends AgentProvider {
 	 *
 	 * @param record - The framed wire record
 	 * @returns A delta contribution or authoritative result
-	 * @throws {ProviderAbortError} Thrown for a remote abort carrying its partial
-	 * @throws {ProviderError} Thrown for a malformed frame or remote provider failure
+	 * @throws {ProviderAbortError} Thrown when the frame's channel is `abort`, carrying its partial result
+	 * @throws {ProviderError} Thrown when the frame fails validation or its channel is `error`
 	 */
 	read(record: Readonly<Record<string, unknown>>): ProviderIncrement {
 		if (!relayFrameContract.is(record)) {

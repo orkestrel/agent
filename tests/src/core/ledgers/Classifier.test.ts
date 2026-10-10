@@ -1,4 +1,3 @@
-import type { JudgeInterface, JudgeRequest, JudgeResult } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { requireValue } from '@orkestrel/test'
@@ -11,12 +10,15 @@ import {
 import { extractTokens, matchEntities } from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
+	buildLedgerMessage,
+	buildClassifierOptions,
+	buildLedgerResponse,
+	createLedgerJudge,
 	RecordedTransport,
 	RecordingJudge,
 	ScriptedJudge,
 	SequentialSystemOneJudge,
 } from '../../../setup.js'
-import { buildLedgerMessage } from '../../../setupLedger.js'
 
 describe('Classifier', () => {
 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
@@ -31,22 +33,20 @@ describe('Classifier', () => {
 			model: 'A',
 			fetch: transport.fetch,
 		})
-		const classifier = new Classifier({
-			conversation,
-			judge: {
-				id: judge.id,
-				name: judge.name,
-				get model() {
-					return model
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge: {
+					id: judge.id,
+					name: judge.name,
+					get model() {
+						return model
+					},
+					ask: judge.ask.bind(judge),
 				},
-				ask: judge.ask.bind(judge),
-			},
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+				topics: [],
+			}),
+		)
 		for (const next of ['A', 'A', 'B', 'B', 'A']) {
 			model = next
 			await classifier.classify(new Set(), new AbortController().signal)
@@ -65,15 +65,13 @@ describe('Classifier', () => {
 			refuse: key,
 			fetch: new RecordedTransport(() => Response.json({ model: 'filing' })).fetch,
 		})
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 		})
@@ -100,31 +98,25 @@ describe('Classifier', () => {
 			},
 		})
 		const transport = new RecordedTransport(async () => {
-			const request: unknown = await requireValue(transport.requests.at(-1)).json()
-			if (!isRecord(request) || !isRecord(request.questions)) throw new Error('invalid request')
-			return Response.json({
-				model: 'filing',
-				answers: Object.fromEntries(
-					Object.entries(request.questions).map(([key, question]) => [
-						key,
-						isRecord(question) && question.type === 'choice'
-							? {
-									type: 'choice',
-									probabilities: {
-										fact: key.includes('m1') ? 1 : 0,
-										rule: 0,
-										correction: key.includes('m2') ? 1 : 0,
-										request: 0,
-										opinion: 0,
-										chatter: key.includes('m3') ? 1 : 0,
-										distractor: 0,
-									},
-								}
-							: { type: 'noul', noul: key.includes('supersedes') ? 0.2 : 0.9 },
-					]),
-				),
-				usage: { input_tokens: 2, output_tokens: 1 },
-			})
+			return buildLedgerResponse(
+				requireValue(transport.requests.at(-1)),
+				(key, question) =>
+					isRecord(question) && question.type === 'choice'
+						? {
+								type: 'choice',
+								probabilities: {
+									fact: key.includes('m1') ? 1 : 0,
+									rule: 0,
+									correction: key.includes('m2') ? 1 : 0,
+									request: 0,
+									opinion: 0,
+									chatter: key.includes('m3') ? 1 : 0,
+									distractor: 0,
+								},
+							}
+						: { type: 'noul', noul: key.includes('supersedes') ? 0.2 : 0.9 },
+				{ input_tokens: 2, output_tokens: 1 },
+			)
 		})
 		const judge = new SequentialSystemOneJudge({
 			url: 'http://judge.test',
@@ -132,18 +124,18 @@ describe('Classifier', () => {
 			batch: false,
 			fetch: transport.fetch,
 		})
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [
-				{ name: 'refunds', criterion: 'Refund amounts' },
-				{ name: 'warehouse', criterion: 'Warehouse work', requested: false },
-			],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: (message) => (message.role === 'tool' ? 'fact' : undefined),
-			entities: (text) => extractTokens(text).ids,
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [
+					{ name: 'refunds', criterion: 'Refund amounts' },
+					{ name: 'warehouse', criterion: 'Warehouse work', requested: false },
+				],
+				assign: (message) => (message.role === 'tool' ? 'fact' : undefined),
+				entities: (text) => extractTokens(text).ids,
+			}),
+		)
 		const result = await classifier.classify(new Set(['m4']), new AbortController().signal)
 		expect(result).toEqual({
 			judgments: [
@@ -211,8 +203,8 @@ describe('Classifier', () => {
 				['m4', ['refunds']],
 				['m5', []],
 			]),
-			amended: new Map([['m1', ['m2']]]),
-			superseded: new Map(),
+			amendments: new Map([['m1', ['m2']]]),
+			supersessions: new Map(),
 		})
 		expect(await classifier.classify(new Set(['m4']), new AbortController().signal)).toEqual({
 			judgments: result.judgments,
@@ -224,24 +216,23 @@ describe('Classifier', () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund rules.' })
 		const judge = new RecordingJudge()
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: {
-				...LEDGER_QUESTIONS,
-				category: {
-					...LEDGER_QUESTIONS.category,
-					criteria: {
-						...Object.fromEntries(Object.entries(LEDGER_QUESTIONS.category.criteria).reverse()),
-						...LEDGER_QUESTIONS.category.criteria,
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				questions: {
+					...LEDGER_QUESTIONS,
+					category: {
+						...LEDGER_QUESTIONS.category,
+						criteria: {
+							...Object.fromEntries(Object.entries(LEDGER_QUESTIONS.category.criteria).reverse()),
+							...LEDGER_QUESTIONS.category.criteria,
+						},
 					},
 				},
-			},
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+				topics: [],
+			}),
+		)
 		const record = conversation.judgments.add({
 			id: JSON.stringify(['category', message.id]),
 			model: judge.model,
@@ -310,21 +301,21 @@ describe('Classifier', () => {
 			},
 		})
 		const judge = new RecordingJudge()
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: (message) =>
-				message.id === 'quiet' ? 'chatter' : message.id === 'call' ? 'fact' : undefined,
-			entities: (text, partial) =>
-				matchEntities(
-					{ ids: new Set(['OM-12']), owners: new Map([['OM-12', ['Odile Marlow']]]) },
-					text,
-					partial,
-				),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+				assign: (message) =>
+					message.id === 'quiet' ? 'chatter' : message.id === 'call' ? 'fact' : undefined,
+				entities: (text, partial) =>
+					matchEntities(
+						{ ids: new Set(['OM-12']), owners: new Map([['OM-12', ['Odile Marlow']]]) },
+						text,
+						partial,
+					),
+			}),
+		)
 		for (const message of conversation.messages()) {
 			conversation.judgments.add({
 				id: JSON.stringify(['category', message.id]),
@@ -357,7 +348,7 @@ describe('Classifier', () => {
 				answer: { form: 'noul', noul: 0.8 },
 			})
 		}
-		expect(classifier.classification().amended.size).toBe(0)
+		expect(classifier.classification().amendments.size).toBe(0)
 		for (const later of ['last', 'later']) {
 			const after = requireValue(conversation.message(later))
 			conversation.judgments.add({
@@ -369,10 +360,10 @@ describe('Classifier', () => {
 				answer: { form: 'noul', noul: 0.8 },
 			})
 		}
-		expect(classifier.classification().amended.get('whole')).toEqual(['later', 'last'])
-		expect(classifier.classification().superseded.get('whole')).toEqual(['later', 'last'])
+		expect(classifier.classification().amendments.get('whole')).toEqual(['later', 'last'])
+		expect(classifier.classification().supersessions.get('whole')).toEqual(['later', 'last'])
 		conversation.remove('later')
-		expect(classifier.classification().superseded.get('whole')).toEqual(['last'])
+		expect(classifier.classification().supersessions.get('whole')).toEqual(['last'])
 	})
 
 	it('holds deterministic failures for their exact spec, retries transient failures, and resets with its lifetime', async () => {
@@ -396,15 +387,13 @@ describe('Classifier', () => {
 			batch: false,
 			fetch: transport.fetch,
 		})
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 		})
@@ -416,15 +405,13 @@ describe('Classifier', () => {
 		expect(await requireValue(transport.requests[2]).json()).toMatchObject({
 			state: `user: ${second.content}`,
 		})
-		const replacement = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+		const replacement = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		await replacement.classify(new Set([second.id]), new AbortController().signal)
 		expect(transport.requests).toHaveLength(4)
 		expect(await requireValue(transport.requests[3]).json()).toMatchObject({
@@ -439,29 +426,7 @@ describe('Classifier', () => {
 		const controller = new AbortController()
 		const transport = new RecordedTransport(async () => {
 			if (transport.requests.length === 2) controller.abort()
-			const request: unknown = await requireValue(transport.requests.at(-1)).json()
-			if (!isRecord(request) || !isRecord(request.questions)) throw new Error('invalid request')
-			return Response.json({
-				model: 'filing',
-				usage: { input_tokens: 50, output_tokens: 1 },
-				answers: Object.fromEntries(
-					Object.keys(request.questions).map((key) => [
-						key,
-						{
-							type: 'choice',
-							probabilities: {
-								fact: 1,
-								rule: 0,
-								correction: 0,
-								request: 0,
-								opinion: 0,
-								chatter: 0,
-								distractor: 0,
-							},
-						},
-					]),
-				),
-			})
+			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
 		const judge = new SequentialSystemOneJudge({
 			url: 'http://judge.test',
@@ -469,15 +434,13 @@ describe('Classifier', () => {
 			batch: false,
 			fetch: transport.fetch,
 		})
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		const result = await classifier.classify(new Set(), controller.signal)
 		expect(result.fault).toBeInstanceOf(JudgeAbortError)
 		expect(result.judgments).toEqual([JSON.stringify(['category', conversation.messages()[0]?.id])])
@@ -495,17 +458,16 @@ describe('Classifier', () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'A statement.' })
 		const fault = new Error('assignment failed')
-		const classifier = new Classifier({
-			conversation,
-			judge: new RecordingJudge(),
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => {
-				throw fault
-			},
-			entities: () => new Set(),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge: new RecordingJudge(),
+				topics: [],
+				assign: () => {
+					throw fault
+				},
+			}),
+		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 			fault,
@@ -522,16 +484,12 @@ describe('Classifier', () => {
 			])
 			const controller = new AbortController()
 			const asked: string[] = []
-			const classifier = new Classifier({
-				conversation,
-				judge: {
-					id: 'partial',
-					name: 'partial',
-					model: 'partial',
-					ask(request: JudgeRequest): Promise<JudgeResult> {
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation,
+					judge: createLedgerJudge(asked, (request, count) => {
 						const key = requireValue(Object.keys(request.questions)[0])
-						asked.push(key)
-						if (asked.length === 1)
+						if (count === 1)
 							return Promise.resolve({
 								model: 'partial',
 								answers: { [key]: { form: 'choice', probabilities: { fact: 1 } } },
@@ -546,14 +504,10 @@ describe('Classifier', () => {
 								usage: { prompt: 40, completion: 1, total: 41 },
 							}),
 						)
-					},
-				},
-				questions: LEDGER_QUESTIONS,
-				topics: [],
-				thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-				assign: () => undefined,
-				entities: () => new Set(),
-			})
+					}),
+					topics: [],
+				}),
+			)
 			const result = await classifier.classify(new Set(), controller.signal)
 			expect(result.fault).toBeInstanceOf(JudgeAbortError)
 			expect(result.judgments).toEqual(
@@ -570,24 +524,18 @@ describe('Classifier', () => {
 		conversation.add({ role: 'user', content: 'First statement.' })
 		conversation.add({ role: 'user', content: 'Second statement.' })
 		const asked: string[] = []
-		const judge: JudgeInterface = {
-			id: 'aborting',
-			name: 'aborting',
-			model: 'aborting-model',
-			ask(request: JudgeRequest): Promise<JudgeResult> {
-				asked.push(...Object.keys(request.questions))
-				return Promise.reject(new JudgeAbortError({ model: 'aborting-model', answers: {} }))
-			},
-		}
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+		const judge = createLedgerJudge(
+			asked,
+			() => Promise.reject(new JudgeAbortError({ model: 'aborting-model', answers: {} })),
+			'aborting-model',
+		)
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 		})
@@ -598,28 +546,23 @@ describe('Classifier', () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'First statement.' })
 		const asked: string[] = []
-		const judge: JudgeInterface = {
-			id: 'wrapping',
-			name: 'wrapping',
-			model: 'wrapping-model',
-			ask(request: JudgeRequest): Promise<JudgeResult> {
-				asked.push(...Object.keys(request.questions))
-				return Promise.reject(
+		const judge = createLedgerJudge(
+			asked,
+			() =>
+				Promise.reject(
 					new Error('judge failed', {
 						cause: new JudgeError('PROTOCOL', DETERMINISTIC_JUDGE_ERROR.source),
 					}),
-				)
-			},
-		}
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: () => undefined,
-			entities: () => new Set(),
-		})
+				),
+			'wrapping-model',
+		)
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+			}),
+		)
 		await classifier.classify(new Set(), new AbortController().signal)
 		await classifier.classify(new Set(), new AbortController().signal)
 		expect(asked).toHaveLength(1)
@@ -630,16 +573,15 @@ describe('Classifier', () => {
 		const tool = conversation.add({ role: 'tool', content: 'Refund AB-12 is 30.' })
 		const noise = conversation.add({ role: 'user', content: 'Weather is fine.' })
 		const judge = new RecordingJudge()
-		const classifier = new Classifier({
-			conversation,
-			judge,
-			questions: LEDGER_QUESTIONS,
-			topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
-			assign: (message) =>
-				message.role === 'tool' ? 'fact' : message.id === noise.id ? 'distractor' : undefined,
-			entities: () => new Set(),
-		})
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
+				assign: (message) =>
+					message.role === 'tool' ? 'fact' : message.id === noise.id ? 'distractor' : undefined,
+			}),
+		)
 		conversation.judgments.add({
 			id: JSON.stringify(['topic', tool.id, 'refunds']),
 			model: judge.model,

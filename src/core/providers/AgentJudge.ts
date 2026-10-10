@@ -2,11 +2,11 @@ import type { AgentJudgeInput, AgentJudgeInterface, ProviderOptions } from './ty
 import type { JudgeQuestion, JudgeRequest, JudgeResult } from '../types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
-import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'
+import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
 import { JudgeError } from './errors.js'
 import { copyJSON } from '../cloners.js'
 import { JudgeAbortError } from '../errors.js'
-import { buildJudgeResult, readHeaders, readText } from './helpers.js'
+import { buildJudgeResult, buildProviderHeaders, readFailure, readText } from './helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**
@@ -14,7 +14,7 @@ import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
  * wire seams.
  *
  * @remarks
- * A subclass fills `name`, `body`, and `read`; the constructor takes the `batch` switch that
+ * A subclass fills `name`, `encode`, and `read`; the constructor takes the `batch` switch that
  * decides whether one call carries every question or each question gets its own call in key
  * order. `ask` validates the request before any call, builds every body before the first call so
  * a wire limit refuses the request before inference, and runs the calls one after another, each
@@ -30,7 +30,7 @@ import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
  * // A wire whose server answers one yes/no question per call as { "yes": 0.93 }.
  * class YesJudge extends AgentJudge {
  * 	readonly name = 'yes'
- * 	body(request: JudgeRequest): object {
+ * 	encode(request: JudgeRequest): object {
  * 		return { model: this.model, state: request.state, questions: request.questions }
  * 	}
  * 	read(value: unknown, request: JudgeRequest): JudgeResult {
@@ -85,7 +85,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 	}
 
 	/** Projects one call's request onto the concrete protocol's wire body. */
-	abstract body(request: JudgeRequest): object
+	abstract encode(request: JudgeRequest): object
 	/** Decodes one call's parsed response body into the answers for that call's questions. */
 	abstract read(value: unknown, request: JudgeRequest): JudgeResult
 
@@ -97,9 +97,9 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 	 * @returns The merged answers, refusals, and usage of every call
 	 * @throws JudgeAbortError Thrown when the caller's signal or a call's deadline fires, carrying
 	 * the merged result of the completed calls
-	 * @throws JudgeError Thrown with code `QUESTION` for an empty question map, a malformed question
-	 * or state, or a wire refusal before any call; with code `HTTP` for a non-OK response; and with
-	 * code `PROTOCOL` for a missing or unparsable response body
+	 * @throws JudgeError Thrown when the question map is empty, a question or the state is malformed,
+	 * or the wire refuses the request before any call (code `QUESTION`); when a response is non-OK
+	 * (code `HTTP`); and when a response body is missing or unparsable (code `PROTOCOL`)
 	 */
 	async ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
 		if (signal.aborted) throw new JudgeAbortError(buildJudgeResult(this.#model, []))
@@ -124,7 +124,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 		const parts: readonly JudgeRequest[] = this.#batch
 			? [owned]
 			: entries.map(([id, question]) => ({ state, questions: { [id]: question } }))
-		const calls = parts.map((part) => ({ request: part, body: JSON.stringify(this.body(part)) }))
+		const calls = parts.map((part) => ({ request: part, body: JSON.stringify(this.encode(part)) }))
 		const results: JudgeResult[] = []
 		for (const call of calls) {
 			results.push(await this.#call(call.request, call.body, signal, results))
@@ -142,7 +142,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 		timeout.start()
 		const combined = AbortSignal.any([timeout.signal, signal])
 		try {
-			const headers = await readHeaders(this.#headers, combined)
+			const headers = await buildProviderHeaders(this.#headers, combined)
 			combined.throwIfAborted()
 			const response = await this.#transport(this.#url + this.#path, {
 				method: 'POST',
@@ -151,25 +151,13 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 				signal: combined,
 			})
 			if (!response.ok) {
-				let detail: string
-				try {
-					detail =
-						response.body === null
-							? ''
-							: (await readText(response.body, MAX_ERROR_BODY_LENGTH, combined)).text
-				} catch (cause) {
-					throw new JudgeError(
-						'HTTP',
-						`judge error: ${response.status} - (error body unavailable)`,
-						{ status: response.status, cause },
-					)
-				}
-				combined.throwIfAborted()
-				throw new JudgeError(
-					'HTTP',
-					`judge error: ${response.status}${detail === '' ? '' : ` - ${detail}`}`,
-					{ status: response.status },
-				)
+				const failure = await readFailure(response, 'judge error:', combined)
+				// Preserve a body-read failure as the cause when it raced the abort.
+				if (!Object.hasOwn(failure, 'cause')) combined.throwIfAborted()
+				throw new JudgeError('HTTP', failure.message, {
+					status: response.status,
+					...(failure.cause === undefined ? {} : { cause: failure.cause }),
+				})
 			}
 			if (response.body === null) {
 				throw new JudgeError('PROTOCOL', 'judge error: no response body')

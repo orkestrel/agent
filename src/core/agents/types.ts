@@ -31,14 +31,14 @@ export type AgentStatus = 'idle' | 'running' | 'done' | 'error'
  *
  * @remarks
  * - `token` — a content delta the provider streamed (the `'content'`
- *   {@link ProviderDelta}s a {@link ProviderInterface}'s `stream` yields), re-surfaced for
+ *   {@link ProviderDelta} values the `stream` method of a {@link ProviderInterface} yields), re-surfaced for
  *   live rendering of the assistant answer.
  * - `think` — a reasoning delta the provider streamed (the `'thinking'`
- *   {@link ProviderDelta}s, the daemon's native `message.thinking` channel), surfaced so a
+ *   values of {@link ProviderDelta}, the daemon's native `message.thinking` channel), surfaced so a
  *   consumer can stream the model's reasoning live into a collapsible; never answer content
  *   (it is never fed into the accumulated `content`).
  * - `tool` — a {@link ToolCall} the loop dispatched paired with its {@link ToolResult},
- *   emitted once the tool ran (so a consumer sees what was called and what came back).
+ *   emitted after the tool runs (so a consumer sees what was called and what came back).
  * - `usage` — one provider call's {@link TokenUsage}, emitted after each turn's
  *   provider response that reported it (folded into the running total + any budget).
  */
@@ -59,7 +59,7 @@ export type AgentChunk =
  * `budget` — in which case `content` is whatever had accumulated when the cancel
  * landed. `partial` is also `true` when the loop exhausted its `limit` while still
  * holding unresolved tool intent (the model requested tools on the very last allowed
- * turn) — a distinct, non-cancel cause covered by {@link RunOutcome.exhausted} (see
+ * turn) — a distinct, non-cancel cause covered by {@link AgentRunResult.exhausted} (see
  * the `exhaust` {@link AgentEventMap} event). It is `false` for a turn that ran to a
  * natural finish (including a `limit: 0` run, which never enters the loop). `usage` is
  * present only when at least one provider call or selection reported usage — an aborted run's `usage`
@@ -92,9 +92,7 @@ export interface AgentResult {
 }
 
 /**
- * Holds the immutable per-run outcome an {@link AgentInterface}'s loop settles on — the value its
- * run returns, assembled from there into the {@link AgentResult} its `stream`'s `result` promise
- * resolves.
+ * Holds the immutable outcome of one agent loop, assembled into the {@link AgentResult} resolved by the stream handle.
  *
  * @remarks
  * Computed inside one run (so concurrent runs never share state) and returned once, when the
@@ -105,9 +103,9 @@ export interface AgentResult {
  * when the loop exhausted its `limit` with unresolved tool intent, and `exhausted` is `true`
  * in that second case specifically (a distinct, non-cancel cause the {@link AgentEventMap}
  * `exhaust` event observes). It is the settled outcome one run returns, before the agent folds
- * it into the {@link AgentResult} its `stream`'s `result` promise resolves.
+ * it into the {@link AgentResult} resolved by the stream handle's `result` promise.
  */
-export interface RunOutcome {
+export interface AgentRunResult {
 	readonly content: string
 	readonly thinking: string | undefined
 	readonly usage: TokenUsage | undefined
@@ -144,9 +142,9 @@ export interface RunOutcome {
  * required index signature.
  */
 export type AgentEventMap = {
-	/** Reports a run beginning — emitted at the top of `stream()` once `status` is `running`. */
+	/** Reports a run beginning — emitted at the top of `stream()` after `status` is `running`. */
 	readonly start: readonly [id: string]
-	/** Reports each `#run` loop iteration beginning — the zero-based turn index. */
+	/** Reports each `#execute` loop iteration beginning — the zero-based turn index. */
 	readonly turn: readonly [index: number]
 	/** Reports a dispatched {@link ToolCall} paired with its {@link ToolResult} (executed or a denial). */
 	readonly tool: readonly [call: ToolCall, result: ToolResult]
@@ -242,9 +240,9 @@ export interface ChannelInterface<T> {
  *
  * @remarks
  * Iterate `events` to consume the live `T` chunks as they arrive; `await result` for
- * the eventual `R` outcome (it resolves once `events` completes). `abort(reason)`
+ * the eventual `R` outcome (it resolves after `events` completes). `abort(reason)`
  * cancels the in-flight operation — for an agent turn the `result` then resolves
- * (with a partial outcome), since a cancel is not an error.
+ * (with a partial outcome), because a cancel is not an error.
  *
  * @typeParam T - The live event type the stream yields
  * @typeParam R - The settled result the operation resolves to
@@ -261,8 +259,7 @@ export interface StreamInterface<T, R> {
 }
 
 /**
- * Names the agent turn's live handle — a {@link StreamInterface} of {@link AgentChunk}s
- * resolving an {@link AgentResult}.
+ * Names the agent turn's live handle carrying {@link AgentChunk} values and resolving an {@link AgentResult}.
  */
 export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
 
@@ -277,17 +274,15 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `system` — an optional system prompt prepended to the turn (seeds the context).
  * - `tools` — an optional pre-built {@link ToolManagerInterface} the loop dispatches
  *   the model's calls through; an empty one is created when omitted.
- * - `limit` — the maximum number of tool-iteration turns before the loop stops
- *   (defaults to `DEFAULT_AGENT_LIMIT`), so a model that keeps requesting tools can't
- *   loop forever.
+ * - `limit` — the maximum number of tool-iteration turns before the loop stops.
+ *   Default: `DEFAULT_AGENT_LIMIT`.
  * - `timeout` — an optional wall-clock deadline (ms) for the whole turn; its signal
  *   folds into the turn's bound, committing a partial result on expiry.
  * - `budget` — an optional token {@link BudgetInterface} cost bound; the loop charges
  *   each provider call's usage and its signal folds into the turn's bound, committing
- *   a partial result once exhausted.
+ *   a partial result after the budget is exhausted.
  * - `scheduler` — an optional {@link SchedulerInterface} that paces the loop —
- *   `yield`ed between turns so the host regains control between expensive provider
- *   calls.
+ *   the loop calls its `yield` method between turns, so the host regains control between expensive provider calls.
  * - `signal` — an optional external `AbortSignal` whose abort cancels the turn (a
  *   partial result).
  * - `conversations` — an optional {@link ConversationManagerInterface} forwarded to the agent's
@@ -299,13 +294,12 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   (its `consumer` is a token estimator, its `max` the context window) and, when the prompt
  *   reaches the window and the active conversation is summarizable, compacts the active
  *   conversation + continues on the rebuilt smaller view — compact-and-continue, distinct from
- *   `budget`'s hard abort. Omitted ⇒ no auto-compaction.
+ *   hard abort of the `budget` object. Omitted ⇒ no auto-compaction.
  * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
- *   (rethrown after the `fault` event, propagating through `#run` to a genuine `error`
+ *   (rethrown after the `fault` event, propagating through `#execute` to a genuine `error`
  *   settle) instead of skipping compaction and continuing over-window. The selection faults (a
  *   thrown handler, a returned `fault`, a conversation changed under the handler) settle the same
- *   way. Defaults to `false` (lenient — the run continues over-window, or on `view()` after a
- *   selection fault).
+ *   way. Default: `false`. The run continues over-window, or on `view()` after a selection fault.
  * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
  *   active scope's `select` overrides it. The loop runs it at run entry and after each automatic
  *   compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
@@ -344,7 +338,7 @@ export interface AgentOptions {
 	 * compaction fold, or a compaction rebuild.
 	 */
 	readonly scope?: ScopeInterface
-	/** Caps the tool-iteration turns before the loop stops; defaults to `DEFAULT_AGENT_LIMIT`. */
+	/** Caps the tool-iteration turns before the loop stops. Default: `DEFAULT_AGENT_LIMIT`. */
 	readonly limit?: number
 	/** Sets a wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
 	readonly timeout?: number
@@ -357,7 +351,7 @@ export interface AgentOptions {
 	/**
 	 * Holds an optional policy gate consulted after scope admits a tool call — a denied call is
 	 * fed back to the model as a denial {@link ToolResult} (a `tool` chunk + a tool
-	 * message) rather than executed (no tool run, no budget cost), so the model sees the
+	 * message) rather than executed (no tool execution), so the model receives the
 	 * denial and can react; an allowed call dispatches normally. Omitted ⇒ every admitted call
 	 * dispatches through the registry.
 	 */
@@ -401,9 +395,7 @@ export interface AgentOptions {
 }
 
 /**
- * Carries the per-run override bag an {@link AgentInterface}'s `generate` / `stream` accepts — each
- * member overrides the matching {@link AgentOptions} value for one run, where `think` and `schema`
- * forward to the provider call and `signal` composes with the constructed one.
+ * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal.
  *
  * @remarks
  * Every member is optional and resolved independently, so an omitted member leaves the
@@ -418,7 +410,7 @@ export interface AgentRunOptions {
 	/**
 	 * Sets the per-run reasoning preference forwarded to the provider's `stream` as
 	 * {@link ProviderStreamOptions.think} — `true` asks the backend to separate reasoning
-	 * (surfaced as `think` {@link AgentChunk}s + the settled `thinking`), `false` suppresses
+	 * (surfaced as `think` values of {@link AgentChunk} + the settled `thinking`), `false` suppresses
 	 * it. Omitted ⇒ the loop sends no reasoning preference and the provider's own default applies.
 	 */
 	readonly think?: boolean
@@ -499,16 +491,16 @@ export interface AgentInterface {
 	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) — and it throws
 	 * synchronously, before any `Promise` is returned. A fire-and-forget
 	 * `agent.generate().catch(...)` therefore will not catch it (the throw happens on the call
-	 * itself, ahead of the `.catch` ever attaching) — `await` the call (inside a `try`/`catch`)
+	 * itself, ahead of the `.catch` ever attaching) — await the call (inside a `try`/`catch`)
 	 * or wrap the call expression itself in `try`/`catch`.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
-	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
+	 * @throws {AgentError} Thrown when a concurrent run shares construction accounting (`code: 'CONCURRENCY'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
-	 * Runs the turn as a live stream — iterate `events` for {@link AgentChunk}s and
+	 * Runs the turn as a live stream — iterate `events` for values of {@link AgentChunk} and
 	 * `await result` for the settled outcome; `result` resolves partial on a cancel and rejects
 	 * on a genuine error.
 	 *
@@ -520,7 +512,7 @@ export interface AgentInterface {
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
-	 * @throws {AgentError} Synchronously, with `code: 'CONCURRENCY'`, for a concurrent run
+	 * @throws {AgentError} Thrown when a concurrent run shares construction accounting (`code: 'CONCURRENCY'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
@@ -546,7 +538,7 @@ export interface AuthorityContext {
 }
 
 /**
- * Holds an {@link AuthorityInterface}'s verdict on one tool call.
+ * Holds the authority verdict on one tool call.
  *
  * @remarks
  * `zone` is a project-defined classification (for example `'default'` / `'sensitive'` /
@@ -582,8 +574,8 @@ export interface AuthorityRule {
  *
  * @remarks
  * `rules` are evaluated in order, first match wins (see {@link AuthorityRule}).
- * `fallback` is the {@link AuthorityDecision} returned when no rule matches; it
- * defaults to `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }` (allow-unmatched — a
+ * `fallback` is the {@link AuthorityDecision} returned when no rule matches.
+ * Default: `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }` (allow-unmatched — a
  * rules list of denials acts as a denylist). Set `fallback` to an `allowed: false`
  * decision to flip the gate to deny-by-default (an allowlist — only matched rules
  * that allow get through).
@@ -622,7 +614,7 @@ export interface AuthorityInterface {
  *
  * @remarks
  * Because every field is JSON-serializable, a job survives a crash through the Queue's
- * `store` + `restore()` (it satisfies a {@link QueueStoreInterface}'s serializable
+ * `store` + `restore()` (it satisfies the serializable
  * `StoredEntry.input` requirement) — the registry rehydrates a live, seeded agent from
  * the names + data on the way back in. `provider` is the only required field (the model
  * to run); `messages` defaults to an empty seed. `tools` lists registry keys whose
@@ -637,7 +629,7 @@ export interface AgentJobInput {
 	readonly messages: readonly MessageInput[]
 	/** Holds an optional system prompt seeding the agent's context. */
 	readonly system?: string
-	/** Names the registry keys of the {@link ToolInterface}s loaded into the agent's tool manager. */
+	/** Names the registry keys of the values of {@link ToolInterface} loaded into the agent's tool manager. */
 	readonly tools?: readonly string[]
 	/** Names the registry key of an optional {@link AuthorityInterface} policy gate. */
 	readonly authority?: string
@@ -651,7 +643,7 @@ export interface AgentJobInput {
 	readonly budget?: number
 	/**
 	 * Lists the sub-agent jobs this job fans out — each a nested {@link AgentJobInput} (so the whole
-	 * tree stays serializable). On a `createAgentRunner`, the handler `controller.spawn`s
+	 * tree stays serializable). On a `createAgentRunner`, the handler calls `controller.spawn` for
 	 * each child through the same bounded queue before running this (parent) job, so the
 	 * children run as sibling sub-agents and their results join the run after the declared
 	 * jobs (in spawn order). Ignored by `createAgentQueue` (a queue has no fan-out).
@@ -660,9 +652,7 @@ export interface AgentJobInput {
 }
 
 /**
- * Resolves an {@link AgentJobInput}'s names to the live, non-serializable pieces and
- * rehydrates a seeded, signal-wired {@link AgentInterface} — the bridge that makes a
- * durable, serializable job runnable.
+ * Resolves the names in an {@link AgentJobInput} to live dependencies and rehydrates a seeded, signal-wired {@link AgentInterface}.
  *
  * @remarks
  * - **Accessors throw on a miss.** `provider` / `tool` / `authority` / `scheduler` look one
@@ -684,7 +674,7 @@ export interface AgentRegistryInterface {
 	 *
 	 * @param name - The provider's registry key
 	 * @returns The live provider
-	 * @throws If no provider is registered under `name`
+	 * @throws {AgentError} Thrown when no provider is registered under `name` (`code: 'REGISTRY'`)
 	 */
 	provider(name: string): ProviderInterface
 	/**
@@ -693,7 +683,7 @@ export interface AgentRegistryInterface {
 	 *
 	 * @param name - The tool's registry key
 	 * @returns The live tool
-	 * @throws If no tool is registered under `name`
+	 * @throws {AgentError} Thrown when no tool is registered under `name` (`code: 'REGISTRY'`)
 	 */
 	tool(name: string): ToolInterface
 	/**
@@ -702,7 +692,7 @@ export interface AgentRegistryInterface {
 	 *
 	 * @param name - The authority's registry key
 	 * @returns The live authority
-	 * @throws If no authority is registered under `name`
+	 * @throws {AgentError} Thrown when no authority is registered under `name` (`code: 'REGISTRY'`)
 	 */
 	authority(name: string): AuthorityInterface
 	/**
@@ -711,7 +701,7 @@ export interface AgentRegistryInterface {
 	 *
 	 * @param name - The scheduler's registry key
 	 * @returns The live scheduler
-	 * @throws If no scheduler is registered under `name`
+	 * @throws {AgentError} Thrown when no scheduler is registered under `name` (`code: 'REGISTRY'`)
 	 */
 	scheduler(name: string): SchedulerInterface
 	/**
@@ -722,15 +712,13 @@ export interface AgentRegistryInterface {
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
-	 * @throws If any referenced name (provider / tools / authority / scheduler) is unknown
+	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`)
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
 }
 
 /**
- * Configures `createAgentRegistry` — the named pools of live, non-serializable pieces an {@link
- * AgentJobInput}'s names resolve against, plus the optional durable `store` every built agent's
- * conversation manager shares.
+ * Configures the named pools of live dependencies used by `createAgentRegistry` and the optional durable store shared by built agents.
  *
  * @remarks
  * `providers` is required (a job always names a provider); `tools` / `authorities` /
@@ -770,7 +758,7 @@ export interface AgentRegistryOptions {
  */
 export interface AgentQueueOptions {
 	readonly registry: AgentRegistryInterface
-	/** If `true`, a partial `AgentResult` resolves as success; if `false` (the default), it throws and retries engage. */
+	/** If `true`, a partial `AgentResult` resolves as success; if `false`, it throws and retries engage. Default: `false`. */
 	readonly partial?: boolean
 	readonly concurrency?: number
 	readonly retries?: number
@@ -787,14 +775,17 @@ export interface AgentQueueOptions {
  * `AgentResult` throws by default so the run's fail-fast engages, `true` resolves it as
  * success). `concurrency` / `retries` / `timeout` pass straight to the backing
  * `RunnerInterface` (see `RunnerOptions`). The runner enables sub-agent fan-out: a
- * parent job's handler can `controller.spawn(childJob)` to launch a child agent job
+ * parent job's handler can call `controller.spawn` with a child job to launch it
  * through the same bounded queue.
  */
 export interface AgentRunnerOptions {
 	readonly registry: AgentRegistryInterface
-	/** If `true`, a partial `AgentResult` resolves as success; if `false` (the default), it throws and fail-fast engages. */
+	/** If `true`, a partial `AgentResult` resolves as success; if `false`, it throws and fail-fast engages. Default: `false`. */
 	readonly partial?: boolean
 	readonly concurrency?: number
 	readonly retries?: number
 	readonly timeout?: number
 }
+
+/** Names the machine-readable agent concurrency and registry failures. */
+export type AgentErrorCode = 'CONCURRENCY' | 'REGISTRY'

@@ -38,7 +38,7 @@ export class RelayStream {
 	constructor(options: RelayStreamOptions) {
 		this.#replay = options.provider.replay ?? 'none'
 		this.#signal = options.signal
-		this.#listener = this.#cancel.bind(this)
+		this.#listener = this.#abort.bind(this)
 		if (this.#signal.aborted) this.#abortProvider()
 		this.#iterator = options.provider.stream(
 			stripThinking(options.request.messages, this.#replay),
@@ -50,7 +50,7 @@ export class RelayStream {
 		this.#response = new Response(
 			new ReadableStream<Uint8Array>({
 				pull: this.#pull.bind(this),
-				cancel: this.#cancel.bind(this),
+				cancel: this.#abort.bind(this),
 			}),
 			{ headers: { 'content-type': RELAY_CONTENT_TYPE, 'cache-control': 'no-store' } },
 		)
@@ -85,7 +85,7 @@ export class RelayStream {
 		}
 	}
 
-	async #cancel(): Promise<void> {
+	async #abort(): Promise<void> {
 		if (this.#settled) return
 		this.#settled = true
 		this.#abortProvider()

@@ -1,7 +1,13 @@
-import type { GaugeCall, LedgerLookupReading } from '../../../../src/core/ledgers/types.js'
+import type { LedgerRecord } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
-import { estimateMessages } from '../../../../src/core/agents/helpers.js'
 import {
+	buildRecallMessage,
+	collectProjectionIds,
+	extractWords,
+	renderCauseChain,
+	renderTopicNames,
+	scanAmendments,
+	splitWords,
 	buildLines,
 	buildRecords,
 	collectLive,
@@ -10,7 +16,7 @@ import {
 	collectStale,
 	computeThinking,
 	resolvePredict,
-	resolveLedgerCall,
+	findLedgerCall,
 	rankLedgerCut,
 	cutListing,
 	extractTokens,
@@ -29,6 +35,9 @@ import {
 } from '../../../../src/core/ledgers/helpers.js'
 import { describe, expect, it } from 'vitest'
 import {
+	buildGaugeCall,
+	measureRoom,
+	LEDGER_EMPTY_FOUND,
 	buildLedgerInput,
 	buildLedgerMessage,
 	buildLedgerReading,
@@ -38,7 +47,98 @@ import {
 	LEDGER_DESK_OWNERS,
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
-} from '../../../setupLedger.js'
+} from '../../../setup.js'
+
+describe('extracted ledger leaves', () => {
+	it('collects placed and orphan ids without duplicates', () => {
+		expect([
+			...collectProjectionIds({
+				records: [{ key: 'rules', title: 'Rules', members: ['same', 'placed'], lines: [] }],
+				stale: [],
+				orphans: ['same', 'orphan'],
+			}),
+		]).toEqual(['same', 'orphan', 'placed'])
+		expect([...collectProjectionIds({ records: [], stale: [], orphans: [] })]).toEqual([])
+	})
+
+	it('walks amendments breadth first, cuts refused branches, and closes cycles', () => {
+		const amendments = new Map([
+			['start', ['left', 'right', 'blocked']],
+			['left', ['shared']],
+			['right', ['shared', 'start']],
+			['blocked', ['hidden']],
+		])
+		expect(scanAmendments(amendments, 'start', (id) => id !== 'blocked')).toEqual([
+			'start',
+			'left',
+			'right',
+			'shared',
+		])
+		expect(scanAmendments(amendments, 'start', () => false)).toEqual([])
+		expect(amendments.get('start')).toEqual(['left', 'right', 'blocked'])
+	})
+
+	it('builds exact recall framing for empty and populated topics', () => {
+		for (const topic of ['', 'refunds'])
+			expect(buildRecallMessage(topic)).toEqual({
+				id: 'call',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
+			})
+	})
+
+	it('renders topic names in order without reading criteria', () => {
+		expect(
+			renderTopicNames([
+				{ name: 'refunds', criterion: 'amounts' },
+				{ name: 'shipping', criterion: 'dates' },
+			]),
+		).toBe('refunds, shipping')
+		expect(renderTopicNames([])).toBe('')
+	})
+
+	it('renders arbitrary causes and bounds cyclic cause chains', () => {
+		expect(renderCauseChain(undefined)).toBe('')
+		expect(renderCauseChain(new Error('refused', { cause: 'offline' }))).toBe(
+			'Error: refused <- offline',
+		)
+		const error = new Error('cycle')
+		error.cause = error
+		expect(renderCauseChain(error)).toBe(
+			'Error: cycle <- Error: cycle <- Error: cycle <- Error: cycle',
+		)
+	})
+
+	it('extracts Unicode words and excludes names at sentence boundaries', () => {
+		const result = extractWords({
+			id: 'note',
+			role: 'user',
+			content: 'Odile met Dana. Ask Élodie; Morgan called AA-10.',
+		})
+		expect([...result.words]).toEqual([
+			'odile',
+			'met',
+			'dana',
+			'ask',
+			'élodie',
+			'morgan',
+			'called',
+			'aa',
+			'10',
+		])
+		expect([...result.names]).toEqual(['dana', 'élodie'])
+		expect(extractWords({ id: 'empty', role: 'user', content: '' })).toEqual({
+			words: new Set(),
+			names: new Set(),
+		})
+	})
+
+	it('normalizes recall words without dropping internal punctuation', () => {
+		expect(splitWords('  “Refunds,” BW-5512! $148.50  ')).toEqual(['refunds', 'bw-5512', '148.50'])
+		expect(splitWords('... $ ')).toEqual([])
+	})
+})
 
 describe('rankLedgerCut', () => {
 	it('ranks name matches before loose sources, off-topic corrections, rules, and on-topic sources', () => {
@@ -51,7 +151,7 @@ describe('rankLedgerCut', () => {
 	})
 })
 
-describe('resolveLedgerCall', () => {
+describe('findLedgerCall', () => {
 	it('pairs repeated call ids by position under their own arguments', () => {
 		const leader: Message = {
 			id: 'leader',
@@ -64,8 +164,8 @@ describe('resolveLedgerCall', () => {
 		}
 		const first: Message = { id: 'r1', role: 'tool', call: 'c1', content: 'Brightwater.' }
 		const second: Message = { id: 'r2', role: 'tool', call: 'c1', content: 'Lighthouse.' }
-		expect(resolveLedgerCall([leader, first, second], first)?.arguments).toEqual({ id: 'BW-5512' })
-		expect(resolveLedgerCall([leader, first, second], second)?.arguments).toEqual({
+		expect(findLedgerCall([leader, first, second], first)?.arguments).toEqual({ id: 'BW-5512' })
+		expect(findLedgerCall([leader, first, second], second)?.arguments).toEqual({
 			id: 'LH-81660',
 		})
 	})
@@ -84,13 +184,13 @@ describe('resolveLedgerCall', () => {
 		const second: Message = { id: 'r2', role: 'tool', content: 'Second.', call: 'c2' }
 		const anonymous: Message = { id: 'r3', role: 'tool', content: 'Anonymous.' }
 		const other: Message = { id: 'r4', role: 'tool', content: 'Other.' }
-		expect(resolveLedgerCall([leader, second, first], first)?.name).toBe('first')
-		expect(resolveLedgerCall([leader, second, first], second)?.name).toBe('second')
-		expect(resolveLedgerCall([leader, second, anonymous], anonymous)).toBeUndefined()
-		expect(resolveLedgerCall([leader, anonymous, other], anonymous)?.name).toBe('first')
-		expect(resolveLedgerCall([leader, anonymous, other], other)?.name).toBe('second')
-		expect(resolveLedgerCall([leader, first], second)).toBeUndefined()
-		expect(resolveLedgerCall([first], first)).toBeUndefined()
+		expect(findLedgerCall([leader, second, first], first)?.name).toBe('first')
+		expect(findLedgerCall([leader, second, first], second)?.name).toBe('second')
+		expect(findLedgerCall([leader, second, anonymous], anonymous)).toBeUndefined()
+		expect(findLedgerCall([leader, anonymous, other], anonymous)?.name).toBe('first')
+		expect(findLedgerCall([leader, anonymous, other], other)?.name).toBe('second')
+		expect(findLedgerCall([leader, first], second)).toBeUndefined()
+		expect(findLedgerCall([first], first)).toBeUndefined()
 	})
 })
 
@@ -139,19 +239,8 @@ describe('resolvePredict', () => {
 })
 
 // Ledger-owned pure helpers on fictional desk fixtures: the sentence and token readings, lookup identity,
-// the registry and entity matching, the record projection with the three fixes (R5a, R2b, R8), the
+// the registry and entity matching, the record projection with correction and replacement handling, the
 // renderers, and the recall leaves (topic split, cut, stub, slope).
-
-const found = { ids: [], owners: [] }
-
-function buildReading(
-	id: string,
-	args: Readonly<Record<string, unknown>>,
-	text: string,
-	empty = false,
-): LedgerLookupReading {
-	return buildLedgerReading(id, 'lookup_order', args, text, empty ? undefined : found)
-}
 
 describe('splitSentences', () => {
 	it('splits at a period, question mark, or exclamation mark before a capital, a digit, or a quote', () => {
@@ -259,12 +348,20 @@ describe('linkOwners', () => {
 	it('links an owner argument to itself and another id to the one owner its text names', () => {
 		const links = linkOwners(
 			[
-				buildReading(
+				buildLedgerReading(
 					'tool-1',
+					'lookup_order',
 					{ id: 'bw-5512' },
 					'Order BW-5512 for account BW-20931 (Brightwater Studio).',
+					LEDGER_EMPTY_FOUND,
 				),
-				buildReading('tool-2', { account: 'OM-30418' }, 'Account OM-30418: Odile Marlow.'),
+				buildLedgerReading(
+					'tool-2',
+					'lookup_order',
+					{ account: 'OM-30418' },
+					'Account OM-30418: Odile Marlow.',
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 			owners,
 		)
@@ -277,8 +374,20 @@ describe('linkOwners', () => {
 	it('leaves an argument unlinked when its text names no owner or several', () => {
 		const links = linkOwners(
 			[
-				buildReading('tool-1', { id: 'BW-5512' }, 'Order BW-5512 has no owner.'),
-				buildReading('tool-2', { id: 'BW-5513' }, 'Order BW-5513 for BW-20931 and OM-30418.'),
+				buildLedgerReading(
+					'tool-1',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512 has no owner.',
+					LEDGER_EMPTY_FOUND,
+				),
+				buildLedgerReading(
+					'tool-2',
+					'lookup_order',
+					{ id: 'BW-5513' },
+					'Order BW-5513 for BW-20931 and OM-30418.',
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 			owners,
 		)
@@ -288,9 +397,26 @@ describe('linkOwners', () => {
 	it('skips an empty reading and lets a later reading overwrite an earlier link', () => {
 		const links = linkOwners(
 			[
-				buildReading('tool-1', { id: 'BW-5512' }, 'Order BW-5512 for BW-20931.'),
-				buildReading('tool-2', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.', true),
-				buildReading('tool-3', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.'),
+				buildLedgerReading(
+					'tool-1',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512 for BW-20931.',
+					LEDGER_EMPTY_FOUND,
+				),
+				buildLedgerReading(
+					'tool-2',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512 for OM-30418.',
+				),
+				buildLedgerReading(
+					'tool-3',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512 for OM-30418.',
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 			owners,
 		)
@@ -299,7 +425,15 @@ describe('linkOwners', () => {
 
 	it('ignores an argument that is no id', () => {
 		const links = linkOwners(
-			[buildReading('tool-1', { id: 'five', n: 5 }, 'Order for BW-20931.')],
+			[
+				buildLedgerReading(
+					'tool-1',
+					'lookup_order',
+					{ id: 'five', n: 5 },
+					'Order for BW-20931.',
+					LEDGER_EMPTY_FOUND,
+				),
+			],
 			owners,
 		)
 		expect(links.size).toBe(0)
@@ -396,7 +530,7 @@ describe('matchEntities', () => {
 })
 
 describe('collectLive', () => {
-	it('lists the user messages and the current lookup results, leaving out the excluded, quiet, and superseded', () => {
+	it('lists the user messages and the current lookup results, leaving out the excluded, quiet, and supersessions', () => {
 		expect(collectLive(createLedgerDesk())).toEqual([
 			'user-01',
 			'user-02',
@@ -414,9 +548,26 @@ describe('collectLive', () => {
 				buildLedgerMessage('tool-c', 'tool', 'Order BW-5513: total $12.00.'),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512' }, 'Order BW-5512: total $10.00.'),
-				buildReading('tool-b', { id: 'bw-5512' }, 'No record of order BW-5512.', true),
-				buildReading('tool-c', { id: 'BW-5513' }, 'Order BW-5513: total $12.00.'),
+				buildLedgerReading(
+					'tool-a',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'Order BW-5512: total $10.00.',
+					LEDGER_EMPTY_FOUND,
+				),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ id: 'bw-5512' },
+					'No record of order BW-5512.',
+				),
+				buildLedgerReading(
+					'tool-c',
+					'lookup_order',
+					{ id: 'BW-5513' },
+					'Order BW-5513: total $12.00.',
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 		})
 		expect(collectLive(input)).toEqual(['tool-c'])
@@ -429,8 +580,8 @@ describe('collectLive', () => {
 				buildLedgerMessage('tool-b', 'tool', 'two'),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512' }, 'one'),
-				buildReading('tool-b', { id: 'BW-5513' }, 'two'),
+				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, 'one', LEDGER_EMPTY_FOUND),
+				buildLedgerReading('tool-b', 'lookup_order', { id: 'BW-5513' }, 'two', LEDGER_EMPTY_FOUND),
 			],
 		})
 		expect(collectLive(input)).toEqual(['tool-a', 'tool-b'])
@@ -443,8 +594,20 @@ describe('collectLive', () => {
 				buildLedgerMessage('tool-b', 'tool', 'two'),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512', opts: { a: 1, b: { c: 2, d: 3 } } }, 'one'),
-				buildReading('tool-b', { opts: { b: { d: 3, c: 2 }, a: 1 }, id: 'BW-5512' }, 'two'),
+				buildLedgerReading(
+					'tool-a',
+					'lookup_order',
+					{ id: 'BW-5512', opts: { a: 1, b: { c: 2, d: 3 } } },
+					'one',
+					LEDGER_EMPTY_FOUND,
+				),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ opts: { b: { d: 3, c: 2 }, a: 1 }, id: 'BW-5512' },
+					'two',
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 		})
 		expect(collectLive(input)).toEqual(['tool-b'])
@@ -478,14 +641,14 @@ describe('placeMember', () => {
 		expect([...placeMember(desk, links, new Map(), 'user-01', new Set())]).toEqual(['rules'])
 	})
 
-	it('joins where the earlier side of an amended pair joins', () => {
+	it('joins where the earlier side of an amendment pair joins', () => {
 		const amending = new Map([['user-04', ['user-03']]])
 		expect([...placeMember(desk, links, amending, 'user-04', new Set())]).toEqual([
 			'owner:BW-20931',
 		])
 	})
 
-	it('stops at a cycle of amended pairs and leaves a message with no category loose', () => {
+	it('stops at a cycle of amendment pairs and leaves a message with no category loose', () => {
 		const cycle = new Map([
 			['user-05', ['user-07']],
 			['user-07', ['user-05']],
@@ -505,7 +668,7 @@ describe('collectStale', () => {
 		])
 	})
 
-	it('keeps a sentence stale after its correction is itself superseded (R2b)', () => {
+	it('keeps a sentence stale after its correction is itself supersessions (R2b)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('user-a', 'user', 'The code is MX-4471. Refunds over $200 need it.'),
@@ -513,8 +676,8 @@ describe('collectStale', () => {
 				buildLedgerMessage('user-c', 'user', 'The code is MX-5000.'),
 			],
 			classification: {
-				amended: { 'user-a': ['user-b'] },
-				superseded: { 'user-b': ['user-c'] },
+				amendments: { 'user-a': ['user-b'] },
+				supersessions: { 'user-b': ['user-c'] },
 			},
 		})
 		const live = collectLive(input)
@@ -532,7 +695,7 @@ describe('collectStale', () => {
 				buildLedgerMessage('user-c', 'user', 'Correction: it is MX-5000, not MX-4486.'),
 			],
 			classification: {
-				amended: { 'user-a': ['user-b'], 'user-b': ['user-c'] },
+				amendments: { 'user-a': ['user-b'], 'user-b': ['user-c'] },
 			},
 		})
 		const stale = collectStale(
@@ -553,11 +716,11 @@ describe('collectStale', () => {
 		]
 		const byMessage = new Map(messages.map((message) => [message.id, message]))
 		const classification = {
-			amended: { 'user-a': ['user-b'] },
-			superseded: { 'user-b': ['user-c'] },
+			amendments: { 'user-a': ['user-b'] },
+			supersessions: { 'user-b': ['user-c'] },
 		}
 		for (const variant of [
-			{ exclude: ['user-b'] },
+			{ exclusions: ['user-b'] },
 			{ classification: { ...classification, quiet: ['user-b'] } },
 		]) {
 			const input = buildLedgerInput({
@@ -705,7 +868,7 @@ describe('buildRecords', () => {
 			],
 		])
 		expect(built.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
-		expect(built.loose).toEqual([])
+		expect(built.orphans).toEqual([])
 		expect(checkLedgerProjection(built, createLedgerDesk())).toEqual([])
 	})
 
@@ -723,7 +886,7 @@ describe('buildRecords', () => {
 			messages: [buildLedgerMessage('user-a', 'user', 'Nothing names an owner here.')],
 		})
 		const built = buildRecords(input)
-		expect(built.loose).toEqual(['user-a'])
+		expect(built.orphans).toEqual(['user-a'])
 		expect(built.records).toEqual([])
 	})
 
@@ -748,14 +911,19 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512' }, text),
-				buildReading('tool-b', { id: 'BW-5512' }, 'No record of order BW-5512.', true),
+				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ id: 'BW-5512' },
+					'No record of order BW-5512.',
+				),
 			],
 			entities: { 'tool-a': ['BW-20931'] },
 		})
 		const built = buildRecords(input)
 		expect(built.records).toEqual([])
-		expect(built.loose).toEqual([])
+		expect(built.orphans).toEqual([])
 		expect(checkLedgerProjection(built, input)).toEqual([])
 	})
 
@@ -768,15 +936,20 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-9999.'),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512' }, text),
-				buildReading('tool-b', { id: 'BW-9999' }, 'No record of order BW-9999.', true),
+				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ id: 'BW-9999' },
+					'No record of order BW-9999.',
+				),
 			],
 			entities: { 'tool-a': ['BW-20931'] },
 		})
 		expect(buildRecords(input).records.map((record) => record.members)).toEqual([['tool-a']])
 	})
 
-	it('keeps the old value stale when the correction is superseded (R2b)', () => {
+	it('keeps the old value stale when the correction is supersessions (R2b)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage(
@@ -789,8 +962,8 @@ describe('buildRecords', () => {
 			],
 			classification: {
 				categories: { 'user-a': 'rule', 'user-b': 'correction' },
-				amended: { 'user-a': ['user-b'] },
-				superseded: { 'user-b': ['user-c'] },
+				amendments: { 'user-a': ['user-b'] },
+				supersessions: { 'user-b': ['user-c'] },
 			},
 		})
 		const built = buildRecords(input)
@@ -810,8 +983,20 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-b', 'tool', text),
 			],
 			readings: [
-				buildReading('tool-a', { id: 'BW-5512', opts: { a: 1, b: 2 } }, text),
-				buildReading('tool-b', { opts: { b: 2, a: 1 }, id: 'BW-5512' }, text),
+				buildLedgerReading(
+					'tool-a',
+					'lookup_order',
+					{ id: 'BW-5512', opts: { a: 1, b: 2 } },
+					text,
+					LEDGER_EMPTY_FOUND,
+				),
+				buildLedgerReading(
+					'tool-b',
+					'lookup_order',
+					{ opts: { b: 2, a: 1 }, id: 'BW-5512' },
+					text,
+					LEDGER_EMPTY_FOUND,
+				),
 			],
 			entities: { 'tool-a': ['BW-20931'], 'tool-b': ['BW-20931'] },
 		})
@@ -861,7 +1046,7 @@ describe('buildRecords', () => {
 		expect(buildRecords(buildLedgerInput())).toEqual({
 			records: [],
 			stale: [],
-			loose: [],
+			orphans: [],
 		})
 	})
 })
@@ -934,7 +1119,9 @@ describe('selectRecords', () => {
 		expect(selectRecords(built, { owners: [], topics: [] }).map((view) => view.key)).toEqual([
 			'rules',
 		])
-		expect(selectRecords({ records: [], stale: [], loose: [] }, createLedgerRequest())).toEqual([])
+		expect(selectRecords({ records: [], stale: [], orphans: [] }, createLedgerRequest())).toEqual(
+			[],
+		)
 	})
 
 	it('returns copies that share no record, line, or list with the projection', () => {
@@ -953,7 +1140,7 @@ describe('selectRecords', () => {
 })
 
 describe('renderLedgerRecord and renderLedgerPinned', () => {
-	const view = {
+	const view: Pick<LedgerRecord, 'title' | 'lines'> = {
 		title: 'Odile Marlow (account OM-30418)',
 		lines: [
 			{
@@ -961,14 +1148,14 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 				source: 'user-a',
 				sentence: 0,
 				topics: [],
-				role: 'user' as const,
+				role: 'user',
 			},
 			{
 				text: 'Dana Whitcombe: She approved it.',
 				source: 'user-a',
 				sentence: 1,
 				topics: [],
-				role: 'user' as const,
+				role: 'user',
 			},
 		],
 	}
@@ -1027,14 +1214,6 @@ describe('splitTopic', () => {
 		expect(splitTopic('refunds,')).toEqual(['refunds,'])
 	})
 })
-
-function measureRoom(kept: readonly string[]): number {
-	return estimateMessages([{ id: 'recall', role: 'tool', content: kept.join('\n') }])
-}
-
-function buildCall(estimate: number, prompt: number | undefined, tools: number): GaugeCall {
-	return prompt === undefined ? { estimate, tools } : { estimate, prompt, tools }
-}
 
 describe('cutListing and matchesCutLine', () => {
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
@@ -1107,16 +1286,18 @@ describe('renderStub', () => {
 describe('fitSlope', () => {
 	it('fits the least-squares slope of prompt over estimate', () => {
 		expect(
-			fitSlope([[buildCall(100, 130, 2), buildCall(200, 260, 2), buildCall(300, 390, 2)]]),
+			fitSlope([
+				[buildGaugeCall(100, 130, 2), buildGaugeCall(200, 260, 2), buildGaugeCall(300, 390, 2)],
+			]),
 		).toBe(1.3)
 	})
 
 	it('fits within each tool count and pools the sets, so a dropped schema reads as no change in rate', () => {
 		const group = [
-			buildCall(100, 100, 0),
-			buildCall(200, 200, 0),
-			buildCall(100, 150, 2),
-			buildCall(300, 350, 2),
+			buildGaugeCall(100, 100, 0),
+			buildGaugeCall(200, 200, 0),
+			buildGaugeCall(100, 150, 2),
+			buildGaugeCall(300, 350, 2),
 		]
 		expect(fitSlope([group])).toBe(1)
 	})
@@ -1124,30 +1305,34 @@ describe('fitSlope', () => {
 	it('pools the sets of every group', () => {
 		expect(
 			fitSlope([
-				[buildCall(100, 100, 1), buildCall(200, 200, 1)],
-				[buildCall(100, 150, 1), buildCall(300, 350, 1)],
+				[buildGaugeCall(100, 100, 1), buildGaugeCall(200, 200, 1)],
+				[buildGaugeCall(100, 150, 1), buildGaugeCall(300, 350, 1)],
 			]),
 		).toBe(1)
 	})
 
 	it('returns undefined when no set holds two usable points that differ', () => {
 		expect(fitSlope([])).toBeUndefined()
-		expect(fitSlope([[buildCall(100, 130, 2)]])).toBeUndefined()
-		expect(fitSlope([[buildCall(100, 130, 2), buildCall(100, 140, 2)]])).toBeUndefined()
-		expect(fitSlope([[buildCall(100, 130, 0), buildCall(200, 260, 2)]])).toBeUndefined()
+		expect(fitSlope([[buildGaugeCall(100, 130, 2)]])).toBeUndefined()
+		expect(fitSlope([[buildGaugeCall(100, 130, 2), buildGaugeCall(100, 140, 2)]])).toBeUndefined()
+		expect(fitSlope([[buildGaugeCall(100, 130, 0), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
 	})
 
 	it('skips a call without a prompt count, with an estimate of zero, or with a prompt that is not finite', () => {
-		expect(fitSlope([[buildCall(100, undefined, 2), buildCall(200, 260, 2)]])).toBeUndefined()
-		expect(fitSlope([[buildCall(0, 50, 2), buildCall(200, 260, 2)]])).toBeUndefined()
-		expect(fitSlope([[buildCall(100, Number.NaN, 2), buildCall(200, 260, 2)]])).toBeUndefined()
+		expect(
+			fitSlope([[buildGaugeCall(100, undefined, 2), buildGaugeCall(200, 260, 2)]]),
+		).toBeUndefined()
+		expect(fitSlope([[buildGaugeCall(0, 50, 2), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
+		expect(
+			fitSlope([[buildGaugeCall(100, Number.NaN, 2), buildGaugeCall(200, 260, 2)]]),
+		).toBeUndefined()
 		expect(
 			fitSlope([
 				[
-					buildCall(100, 130, 2),
-					buildCall(200, 260, 2),
-					buildCall(0, 9, 2),
-					buildCall(50, undefined, 2),
+					buildGaugeCall(100, 130, 2),
+					buildGaugeCall(200, 260, 2),
+					buildGaugeCall(0, 9, 2),
+					buildGaugeCall(50, undefined, 2),
 				],
 			]),
 		).toBe(1.3)

@@ -20,7 +20,7 @@ export type ThinkingReplay = 'none' | 'turn' | 'all'
  * @remarks
  * `calls` is present only on an `assistant` turn that requested tool calls — the
  * `tool_calls` a prior generation produced, replayed back into the next request so
- * the model sees its own decision. A `tool` turn carries the tool's result in
+ * the model receives its own decision. A `tool` turn carries the tool's result in
  * `content` (the textual outcome) and the `id` of the call it answers in `call`.
  * Position stays the join the loop uses: the `tool` turns that follow an `assistant`
  * turn answer its `calls` in order. `call` is the record's reference, and it identifies
@@ -84,10 +84,10 @@ export interface MessageInput {
 /** Carries text or structured JSON the model reads; mirrors the TypeSafe `EntryType` without its null arm. */
 export type JudgeEntry = string | JSONRecord | readonly JSONValue[]
 
-/** Maps each option name the model sees to its description; null keeps an undescribed option in the map. */
+/** Maps each option name the model receives to its description; null keeps an undescribed option in the map. */
 export type ChoiceCriteria = Readonly<Record<string, JudgeEntry | null>>
 
-/** Lists at least two score levels from level 0 upward; null leaves a level undescribed. */
+/** Lists at least 2 score levels from level 0 upward; null leaves a level undescribed. */
 export type ScoreCriteria = readonly [
 	JudgeEntry | null,
 	JudgeEntry | null,
@@ -124,7 +124,7 @@ export interface NoulQuestion {
 /** Names one question by its form, the protocol's type field under the fleet's named discriminant. */
 export type JudgeQuestion = ChoiceQuestion | ScoreQuestion | NoulQuestion
 
-/** Carries one state and the questions asked about it, keyed by caller ids the model never sees; each question is evaluated on its own. */
+/** Carries one state and the questions asked about it, keyed by caller ids the prompt never carries; each question is evaluated on its own. */
 export interface JudgeRequest {
 	readonly state: JudgeEntry
 	readonly questions: Readonly<Record<string, JudgeQuestion>>

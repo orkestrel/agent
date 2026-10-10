@@ -3,44 +3,43 @@ import type { TokenUsage } from '@orkestrel/budget'
 import { isFiniteNumber } from '@orkestrel/contract'
 
 /**
- * Filters a list of items by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
+ * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
  * `undefined` passes everything, `[]` passes nothing, and a non-empty list passes the listed keys
  * alone, order preserved. The pure, total set-membership primitive the context's build step and
  * the agent loop's tool-advertise step apply a scope through.
  *
  * @remarks
- * Three-way by the allow-list's shape, so a `Scope` category cleanly expresses "all /
+ * Varies by the allow-list's shape, so a `Scope` category expresses "all /
  * none / only these":
- * - `undefined` ⇒ no constraint — every item passes (returned unchanged).
+ * - `undefined` ⇒ no constraint — every member passes (returned unchanged).
  * - `[]` (empty) ⇒ none pass (no key is in an empty set).
- * - a non-empty list ⇒ only items whose `key(item)` is in the list pass.
+ * - a non-empty list ⇒ only members whose `key(member)` is in the list pass.
  *
- * Order-preserving (it filters `items` in place order, never reorders) and total — never
- * throws. Keys are matched by a `Set` for O(1) membership, so a large list is cheap.
+ * Preserves the members' order. Keys are matched by a `Set` for membership.
  *
- * @typeParam T - The item type being filtered
+ * @typeParam T - The member type being filtered
  * @param allow - The allow-list of keys (`undefined` ⇒ all, `[]` ⇒ none, else only-listed)
- * @param items - The items to filter (returned unchanged when `allow` is `undefined`)
- * @param key - Extracts the key an item is matched on (for example an instruction's `name`)
- * @returns The items that pass the allow-list, in their original order
+ * @param members - The members to filter (returned unchanged when `allow` is `undefined`)
+ * @param key - Extracts the key a member is matched on (for example an instruction's `name`)
+ * @returns The members that pass the allow-list, in their original order
  *
  * @example
  * ```ts
- * const items = [{ name: 'a' }, { name: 'b' }]
- * filterAllowList(undefined, items, (i) => i.name) // [{ name: 'a' }, { name: 'b' }] (all)
- * filterAllowList([], items, (i) => i.name) // [] (none)
- * filterAllowList(['b'], items, (i) => i.name) // [{ name: 'b' }] (only listed)
+ * const members = [{ name: 'refunds' }, { name: 'billing' }]
+ * filterAllowList(undefined, members, (member) => member.name) // [{ name: 'refunds' }, { name: 'billing' }]
+ * filterAllowList([], members, (member) => member.name) // []
+ * filterAllowList(['billing'], members, (member) => member.name) // [{ name: 'billing' }]
  * ```
  */
 export function filterAllowList<T>(
 	allow: readonly string[] | undefined,
-	items: readonly T[],
-	key: (item: T) => string,
+	members: readonly T[],
+	key: (member: T) => string,
 ): readonly T[] {
-	if (allow === undefined) return items
+	if (allow === undefined) return members
 	if (allow.length === 0) return []
 	const set = new Set(allow)
-	return items.filter((item) => set.has(key(item)))
+	return members.filter((member) => set.has(key(member)))
 }
 
 /**
@@ -116,6 +115,12 @@ export function stripThinking(
  *
  * @param value - The token count to sanitize
  * @returns The floored count, or `0` when the value is non-finite or non-positive
+ * @example
+ * ```ts
+ * sanitizeToken(12.7) // 12
+ * sanitizeToken(-1) // 0
+ * sanitizeToken(Number.NaN) // 0
+ * ```
  */
 export function sanitizeToken(value: number): number {
 	return isFiniteNumber(value) && value > 0 ? Math.floor(value) : 0
@@ -191,9 +196,9 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
  *
  * @example
  * ```ts
- * const stored = new Set(['a', 'b'])
- * removeEntries(['a', 'b'], (key) => stored.delete(key)) // true
- * removeEntries(['a', 'c'], (key) => stored.delete(key)) // false
+ * const stored = new Set(['refunds', 'billing'])
+ * removeEntries(['refunds', 'escalations'], (key) => stored.delete(key)) // false
+ * removeEntries(['billing'], (key) => stored.delete(key)) // true
  * ```
  */
 export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean): boolean {

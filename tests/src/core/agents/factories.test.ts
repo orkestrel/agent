@@ -1,10 +1,11 @@
-import type {
-	AgentJobInput,
-	AgentResult,
-	ProviderDelta,
-	ProviderInterface,
-	ProviderResult,
-} from '@src/core'
+import type { AgentJobInput, AgentResult } from '@src/core'
+import { createRecorder, waitForCondition } from '@orkestrel/test'
+import {
+	JOB_USAGE,
+	PARTIAL_TURNS,
+	AGENT_JOB_SHAPE,
+	createObservedGatedProvider,
+} from '../../../setup.js'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
@@ -19,29 +20,12 @@ import {
 	isAgentJobError,
 	ProviderAbortError,
 } from '@src/core'
-import {
-	arrayShape,
-	integerShape,
-	literalShape,
-	objectShape,
-	optionalShape,
-	stringShape,
-} from '@orkestrel/contract'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
-import {
-	createAgentJob,
-	createScriptedProvider,
-	createTokenUsage,
-	loopTool,
-} from '../../../setup.js'
+import { createAgentJob, createScriptedProvider, createLoopTool } from '../../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
-// The Ollama-free agent factories — plain registry / store / context builders plus
-// createAgent, all needing no daemon. `createOllama` (the live-Ollama
-// factory) is split out to the dedicated `src:ollama` project. createAgent's loop
-// logic is pinned in Agent.test.ts; here we only assert the factory wires a provider
-// into a working AgentInterface that runs one turn to its result.
+// Exercises agent factory wiring and durable job orchestration.
 
 describe('createChannel', () => {
 	it('hands back a working channel — pushed values drain in write order, then close ends it', async () => {
@@ -58,12 +42,9 @@ describe('createChannel', () => {
 		channel.push('first')
 		channel.fail(new Error('broken'))
 
-		const seen: string[] = []
-		const drain = async (): Promise<void> => {
-			for await (const value of channel.drain()) seen.push(value)
-		}
-		await expect(drain()).rejects.toThrow('broken')
-		expect(seen).toEqual(['first'])
+		const iterator = channel.drain()
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 'first' })
+		await expect(iterator.next()).rejects.toThrow('broken')
 	})
 })
 
@@ -81,7 +62,7 @@ describe('createAgent', () => {
 		expect(agent.status).toBe('done')
 	})
 
-	it('a passed instructions manager surfaces via agent.context.instructions (visible in build())', () => {
+	it('a passed instructions manager surfaces through agent.context.instructions (visible in build())', () => {
 		const instructions = createInstructionManager()
 		instructions.add({ name: 'tone', content: 'Be terse.' })
 		const agent = createAgent(createScriptedProvider([{ content: 'ok' }]), { instructions })
@@ -92,7 +73,7 @@ describe('createAgent', () => {
 		expect(built[0]?.content).toContain('Be terse.')
 	})
 
-	it('a passed workspaces manager surfaces via agent.context.workspaces (an added text file appears in build())', () => {
+	it('a passed workspaces manager surfaces through agent.context.workspaces (an added text file appears in build())', () => {
 		const workspaces = createWorkspaceManager()
 		workspaces.add()
 		if (workspaces.active === undefined) throw new Error('expected an active workspace')
@@ -135,55 +116,7 @@ describe('createAgent', () => {
 	})
 })
 
-// -- Agent JOBS: createAgentRegistry / createAgentQueue / createAgentRunner ----
-//
-// The durable, bounded-concurrency agent-job layer COMPOSED over the workers Queue /
-// Runner substrate (no new concurrency engine). A serializable AgentJobInput is
-// rehydrated through the registry into a live Agent; a partial result is a configurable
-// failure (throws by default so retries / fail-fast engage, `partial` opts out);
-// cancellation threads through. All Ollama-free with the scripted provider — the LIVE
-// batch + sub-agent spawn run in the src:ollama project.
-
-// A reusable token-charging usage so a tiny `budget` ceiling can deterministically
-// commit a partial (completion 7 — `createTokenBudget`'s default scope). The completion
-// matches the shared default; the prompt/total differ, so it stays a named local built
-// off `createTokenUsage` with overrides (a specific budget-scenario value, not the shape).
-const JOB_USAGE = createTokenUsage({ prompt: 3, total: 10 })
-
-// A job that loops a tool against a tiny `budget` so the agent commits a PARTIAL after
-// turn 1 — the deterministic way to exercise the partial-as-failure policy. Built off the
-// shared `createAgentJob`, overriding only the scenario fields (the looping tool + the
-// sub-completion budget ceiling).
-function partialJob(provider: string): AgentJobInput {
-	// budget < a turn's completion (7) ? budget fires after turn 1 ? partial
-	return createAgentJob({ provider, tools: ['loop'], budget: 5 })
-}
-
-// The scripted turn a `partialJob` runs: EVERY turn reports usage + a tool call, so the
-// budget always charges on turn 1 and fires before turn 2 — partial regardless of where
-// the (shared, across-attempt) provider's script index sits, so a retry re-runs the SAME
-// partial scenario rather than drifting into a different (finishing) turn.
-const PARTIAL_TURNS = [
-	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
-] as const
-
-// The `loop` tool a `partialJob` references — the shared canonical `loop` tool keyed for
-// the registry's tool pool.
-function loopTools(): Record<string, ReturnType<typeof createTool>> {
-	return { loop: loopTool() }
-}
-
-// A SECOND, independent deterministic route to a partial result — a `budget: 0` ceiling
-// is exhausted from the agent's first `start()`, so the bound's budget signal is already
-// aborted before the provider stream is even entered: the agent commits a partial with
-// EMPTY content WITHOUT touching the provider. Proves the partial-as-failure policy keys
-// off `AgentResult.partial` alone, not off the loop-tool budget mechanism in
-// `partialJob` (which charges usage on turn 1, then fires before turn 2). Because the
-// provider is never entered here, `provider.started` stays 0 on this route — so it is used
-// for the throw/resolve assertions, never to count attempts (that stays on `partialJob`).
-function budgetZeroJob(provider: string): AgentJobInput {
-	return createAgentJob({ provider, budget: 0 })
-}
+// Exercises serializable jobs through real queues and runners.
 
 describe('createAgentRegistry', () => {
 	it('round-trips: build an agent from a serializable job and run it to its result', async () => {
@@ -235,12 +168,19 @@ describe('createAgentQueue', () => {
 
 	it('a partial result THROWS by default (an AgentJobError carrying the partial)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
 		const queue = createAgentQueue({ registry }) // partial defaults to false
-		await expect(queue.enqueue(partialJob('main'))).rejects.toThrow('agent job ended partial')
+		await expect(
+			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+		).rejects.toThrow('agent job ended partial')
 		// The rejection is an AgentJobError; extract its partial (or undefined) UNCONDITIONALLY
 		// first, so every assertion is unconditional (no `expect` inside a narrowing branch).
-		const caught = await queue.enqueue(partialJob('main')).catch((error: unknown) => error)
+		const caught = await queue
+			.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }))
+			.catch((error: unknown) => error)
 		const partial = isAgentJobError(caught) ? caught.partial : undefined
 		expect(isAgentJobError(caught)).toBe(true)
 		expect(partial?.partial).toBe(true)
@@ -249,19 +189,29 @@ describe('createAgentQueue', () => {
 
 	it('a partial result RE-RUNS while retries remain (then rejects)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
-		// retries: 1 ? 2 attempts total; each attempt runs the provider once (turn 1) before
-		// the budget fires ? the provider starts TWICE, proving the partial re-ran.
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
+		// retries: 1 → 2 attempts total; each attempt runs the provider once (turn 1) before
+		// the budget fires → the provider starts TWICE, proving the partial re-ran.
 		const queue = createAgentQueue({ registry, retries: 1 })
-		await expect(queue.enqueue(partialJob('main'))).rejects.toThrow('agent job ended partial')
+		await expect(
+			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+		).rejects.toThrow('agent job ended partial')
 		expect(provider.started).toBe(2)
 	})
 
 	it('`partial: true` RESOLVES a partial as success (never throws)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
 		const queue = createAgentQueue({ registry, partial: true })
-		const result = await queue.enqueue(partialJob('main'))
+		const result = await queue.enqueue(
+			createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }),
+		)
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('a')
 		// No retry — the partial resolved as success on the first attempt.
@@ -270,24 +220,11 @@ describe('createAgentQueue', () => {
 
 	it("threads the queue cancel into the agent — abort() fires the agent's (provider's) signal", async () => {
 		const gate = Promise.withResolvers<void>()
-		let providerSawAbort = false
+		const aborts = createRecorder<[boolean]>()
 		// A provider that parks mid-call so the test can abort the queue while the agent is in
 		// flight, then records whether ITS signal aborted — proving the queue's cancel reached
 		// the agent through the threaded `context.signal` (build(input, context.signal)).
-		const provider: ProviderInterface = {
-			id: 'p',
-			name: 'p',
-			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				providerSawAbort = signal.aborted
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: 'full' }
-			},
-			async generate() {
-				return { content: 'full' }
-			},
-		}
+		const provider = createObservedGatedProvider(gate, aborts.handler)
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const queue = createAgentQueue({ registry })
 		// A queue abort rejects the entry directly (a hard cancel, never retried) — capture it.
@@ -297,9 +234,9 @@ describe('createAgentQueue', () => {
 		gate.resolve()
 		const caught = await settled
 		// The entry rejected (a queue abort), and — the load-bearing part — the agent's provider
-		// saw the abort, so the cancel threaded all the way through build ? agent ? provider.
+		// saw the abort, so the cancel threaded all the way through build → agent → provider.
 		expect(caught).toBeInstanceOf(Error)
-		expect(providerSawAbort).toBe(true)
+		expect(aborts.calls.at(-1)?.[0]).toBe(true)
 	})
 })
 
@@ -308,18 +245,6 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 	// store. The job tree's `children` / open tool-`arguments` are out of scope for the
 	// stored-payload shape here (the queue ignores `children`); the round-tripped job uses
 	// the plain serializable fields.
-	const jobShape = objectShape({
-		provider: stringShape(),
-		messages: arrayShape(
-			objectShape({
-				role: literalShape(['system', 'user', 'assistant', 'tool']),
-				content: stringShape(),
-			}),
-		),
-		system: optionalShape(stringShape()),
-		limit: optionalShape(integerShape({ min: 0 })),
-		budget: optionalShape(integerShape({ min: 0 })),
-	})
 
 	it('an AgentJobInput is JSON-serializable (round-trips through JSON unchanged)', () => {
 		const input: AgentJobInput = {
@@ -334,7 +259,7 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 	})
 
 	it('a memory queue store round-trips a stored agent job', async () => {
-		const store = createMemoryQueueStore(jobShape)
+		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
 		const input: AgentJobInput = { provider: 'main', messages: [{ role: 'user', content: 'hi' }] }
 		await store.save({ id: 'job-1', input, attempts: 0 })
 		const loaded = await store.load()
@@ -345,7 +270,7 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 	it('restore() re-runs an outstanding job — rehydrated through the registry', async () => {
 		const provider = createScriptedProvider([{ content: 'resumed', usage: JOB_USAGE }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
-		const store = createMemoryQueueStore(jobShape)
+		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
 		// Simulate a crash that left one outstanding row in the store.
 		const outstanding: AgentJobInput = {
 			provider: 'main',
@@ -357,9 +282,9 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 		const queue = createAgentQueue({ registry, store })
 		await queue.restore()
 		// Wait for the rehydrated job to run + settle (its row is removed on completion).
-		for (let n = 0; n < 20 && (await store.load()).length > 0; n += 1) await waitForDelay()
+		await waitForCondition('job row drained', async () => (await store.load()).length === 0)
 		expect(provider.started).toBe(1) // the outstanding job actually ran
-		expect(await store.load()).toEqual([]) // the row was removed once it completed
+		expect(await store.load()).toEqual([]) // the row was removed after it completed
 	})
 })
 
@@ -379,12 +304,17 @@ describe('createAgentRunner', () => {
 
 	it('fail-fast: a partial job (throwing by default) rejects the whole run', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
 		const runner = createAgentRunner({ registry })
-		await expect(runner.execute([partialJob('main')])).rejects.toThrow('agent job ended partial')
+		await expect(
+			runner.execute([createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })]),
+		).rejects.toThrow('agent job ended partial')
 	})
 
-	it('a parent job fans out a CHILD sub-agent via controller.spawn — both run', async () => {
+	it('a parent job fans out a CHILD sub-agent through controller.spawn — both run', async () => {
 		// The runner handler spawns each `children` job through the same queue (fire-and-track)
 		// before running the parent. A child's `content` proves the sub-agent genuinely ran.
 		const provider = createScriptedProvider([{ content: 'parent' }, { content: 'child' }])
@@ -405,21 +335,8 @@ describe('createAgentRunner', () => {
 
 	it("threads the runner cancel — abort() rejects the run and fires the agent's signal", async () => {
 		const gate = Promise.withResolvers<void>()
-		let providerSawAbort = false
-		const provider: ProviderInterface = {
-			id: 'p',
-			name: 'p',
-			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				providerSawAbort = signal.aborted
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: 'full' }
-			},
-			async generate() {
-				return { content: 'full' }
-			},
-		}
+		const aborts = createRecorder<[boolean]>()
+		const provider = createObservedGatedProvider(gate, aborts.handler)
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const runner = createAgentRunner({ registry })
 		// A runner abort rejects a running execute (records the abort as the run failure).
@@ -429,9 +346,9 @@ describe('createAgentRunner', () => {
 		gate.resolve()
 		const caught = await settled
 		// The run rejected, and the agent's provider saw the abort — the cancel threaded
-		// through controller.signal ? build ? agent ? provider.
+		// through controller.signal → build → agent → provider.
 		expect(caught).toBeInstanceOf(Error)
-		expect(providerSawAbort).toBe(true)
+		expect(aborts.calls.at(-1)?.[0]).toBe(true)
 	})
 })
 
@@ -484,7 +401,9 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		const provider = createScriptedProvider([{ content: 'unused' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const queue = createAgentQueue({ registry })
-		const caught = await queue.enqueue(budgetZeroJob('main')).catch((error: unknown) => error)
+		const caught = await queue
+			.enqueue(createAgentJob({ provider: 'main', budget: 0 }))
+			.catch((error: unknown) => error)
 		const partial = isAgentJobError(caught) ? caught.partial : undefined
 		expect(isAgentJobError(caught)).toBe(true)
 		expect(partial?.partial).toBe(true)
@@ -498,19 +417,24 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		const provider = createScriptedProvider([{ content: 'unused' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const queue = createAgentQueue({ registry, partial: true })
-		const result = await queue.enqueue(budgetZeroJob('main'))
+		const result = await queue.enqueue(createAgentJob({ provider: 'main', budget: 0 }))
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('')
 		expect(provider.started).toBe(0)
 	})
 
-	it('a partial re-runs for the full retry budget (retries: 2 ? 3 attempts) then rejects', async () => {
+	it('a partial re-runs for the full retry budget (retries: 2 → 3 attempts) then rejects', async () => {
 		// `partialJob` enters the provider each attempt (turn 1 charges usage, the budget
 		// then fires before turn 2), so `provider.started` is the honest attempt counter.
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
 		const queue = createAgentQueue({ registry, retries: 2 })
-		await expect(queue.enqueue(partialJob('main'))).rejects.toThrow('agent job ended partial')
+		await expect(
+			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+		).rejects.toThrow('agent job ended partial')
 		expect(provider.started).toBe(3) // initial attempt + 2 retries
 	})
 
@@ -525,11 +449,13 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		)
 		expect(good.partial).toBe(false)
 		expect(good.content).toBe('fine')
-		await expect(queue.enqueue(budgetZeroJob('main'))).rejects.toThrow('agent job ended partial')
+		await expect(queue.enqueue(createAgentJob({ provider: 'main', budget: 0 }))).rejects.toThrow(
+			'agent job ended partial',
+		)
 	})
 
 	it('a per-attempt TIMEOUT cancel rejects with "attempt timed out" (the substrate fault, NOT an AgentJobError) and retries', async () => {
-		// A slow provider + a tiny per-entry timeout: the deadline fires mid-stream ? the
+		// A slow provider + a tiny per-entry timeout: the deadline fires mid-stream → the
 		// attempt loses the race with the Queue's own deadline fault, so the rejection is the
 		// substrate's `attempt timed out`, not the partial-policy AgentJobError. It still
 		// retries (the timeout is a retryable attempt failure), so the provider starts twice.
@@ -595,7 +521,7 @@ describe('createAgentQueue — lifecycle + batch', () => {
 	})
 
 	it('stop rejects a pending (not-yet-started) job with "queue is stopped"', async () => {
-		// concurrency 1 + a slow first job: the second job is still pending when we stop.
+		// concurrency 1 + a slow first job: the second job is still pending when the runner stops.
 		const provider = createScriptedProvider([{ content: 'ok' }], { delay: 100 })
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const queue = createAgentQueue({ registry, concurrency: 1 })
@@ -642,24 +568,10 @@ describe('createAgentQueue — lifecycle + batch', () => {
 // provider is never run).
 
 describe('createAgentQueue — durability, extended', () => {
-	const jobShape = objectShape({
-		provider: stringShape(),
-		messages: arrayShape(
-			objectShape({
-				role: literalShape(['system', 'user', 'assistant', 'tool']),
-				content: stringShape(),
-			}),
-		),
-		system: optionalShape(stringShape()),
-		tools: optionalShape(arrayShape(stringShape())),
-		limit: optionalShape(integerShape({ min: 0 })),
-		budget: optionalShape(integerShape({ min: 0 })),
-	})
-
 	it('restore() re-runs an outstanding job and produces its REAL result, then removes the row', async () => {
 		const provider = createScriptedProvider([{ content: 'rehydrated-answer', usage: JOB_USAGE }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
-		const store = createMemoryQueueStore(jobShape)
+		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
 		const outstanding: AgentJobInput = {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'resume me' }],
@@ -667,11 +579,11 @@ describe('createAgentQueue — durability, extended', () => {
 		await store.save({ id: 'job-1', input: outstanding, attempts: 0 })
 		// Capture the rehydrated job's settled result by enqueuing through a queue that wraps
 		// the SAME registry — restore re-enqueues internally (no caller promise), so to assert
-		// the produced content we instead enqueue the identical job and compare, then prove
+		// the produced content the test enqueues the identical job and compare, then prove
 		// restore drained the persisted row.
 		const queue = createAgentQueue({ registry, store })
 		await queue.restore()
-		for (let n = 0; n < 50 && (await store.load()).length > 0; n += 1) await waitForDelay()
+		await waitForCondition('job row drained', async () => (await store.load()).length === 0)
 		expect(provider.started).toBe(1) // the persisted job genuinely ran once
 		expect(await store.load()).toEqual([]) // its row was removed on completion
 
@@ -746,13 +658,13 @@ describe('createAgentQueue — durability, extended', () => {
 		// only registered provider is never invoked by the doomed job.
 		const provider = createScriptedProvider([{ content: 'never' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
-		const store = createMemoryQueueStore(jobShape)
+		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
 		const doomed: AgentJobInput = { provider: 'ghost', messages: [{ role: 'user', content: 'x' }] }
 		await store.save({ id: 'job-x', input: doomed, attempts: 0 })
 		const queue = createAgentQueue({ registry, store })
 		await queue.restore()
 		// The terminal failure removes the row; wait for the store to drain.
-		for (let n = 0; n < 50 && (await store.load()).length > 0; n += 1) await waitForDelay()
+		await waitForCondition('job row drained', async () => (await store.load()).length === 0)
 		expect(await store.load()).toEqual([]) // row drained — no infinite re-run loop
 		expect(provider.started).toBe(0) // the registered provider was never run by the doomed job
 	})
@@ -763,7 +675,7 @@ describe('createAgentQueue — durability, extended', () => {
 // The runner shares the SAME `settle`, so `partial` must behave identically to the
 // queue; and the sub-agent fan-out is hardened for the contracts that matter: an empty
 // run, a TRANSITIVE spawn (a child that itself fans out a grandchild), and the
-// no-deadlock guarantee on a single-slot runner (which would hang if the handler
+// single-slot parent and child completion on a single-slot runner (which would hang if the handler
 // inline-awaited its spawn).
 
 describe('createAgentRunner — partial policy + fan-out, extended', () => {
@@ -771,19 +683,24 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		const provider = createScriptedProvider([{ content: 'unused' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const runner = createAgentRunner({ registry, partial: true })
-		const results = await runner.execute([budgetZeroJob('main')])
+		const results = await runner.execute([createAgentJob({ provider: 'main', budget: 0 })])
 		expect(results).toHaveLength(1)
 		expect(results[0]?.partial).toBe(true)
 		expect(results[0]?.content).toBe('')
 	})
 
-	it('a budget-via-tool partial RESOLVES under partial — the run completes, not fail-fast', async () => {
+	it('a budget-through-tool partial RESOLVES under partial — the run completes, not fail-fast', async () => {
 		// Contrast with the existing fail-fast test: with partial the same partial job
 		// resolves, so a one-job run completes with a partial result instead of rejecting.
 		const provider = createScriptedProvider(PARTIAL_TURNS)
-		const registry = createAgentRegistry({ providers: { main: provider }, tools: loopTools() })
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool() },
+		})
 		const runner = createAgentRunner({ registry, partial: true })
-		const results = await runner.execute([partialJob('main')])
+		const results = await runner.execute([
+			createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }),
+		])
 		expect(results).toHaveLength(1)
 		expect(results[0]?.partial).toBe(true)
 		expect(results[0]?.content).toBe('a')
@@ -798,7 +715,7 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		expect(provider.started).toBe(0)
 	})
 
-	it('a TRANSITIVE spawn runs: parent ? child ? grandchild, results ordered declared-then-spawns', async () => {
+	it('a TRANSITIVE spawn runs: parent → child → grandchild, results ordered declared-then-spawns', async () => {
 		// The handler reads `controller.input.children` for EVERY unit it runs (declared OR
 		// spawned), so a child carrying its own `children` fans out a grandchild through the
 		// same bounded queue — three agents genuinely run, ordered parent, child, grandchild.
@@ -841,13 +758,9 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 			messages: [{ role: 'user', content: 'parent' }],
 			children: [{ provider: 'main', messages: [{ role: 'user', content: 'child' }] }],
 		}
-		// Race the run against a generous deadline; a deadlock would never settle the run, so
-		// the sentinel wins. A real run settles well within it (both agents are instantaneous).
-		const ran = await Promise.race([
-			runner.execute([parent]).then((results) => results.map((r) => r.content)),
-			waitForDelay(2000).then(() => 'DEADLOCK'),
-		])
-		expect(ran).toEqual(['parent', 'child'])
+		expect(
+			await runner.execute([parent]).then((results) => results.map((result) => result.content)),
+		).toEqual(['parent', 'child'])
 		expect(provider.started).toBe(2)
 	})
 })

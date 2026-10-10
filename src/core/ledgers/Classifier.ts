@@ -18,7 +18,7 @@ import {
 	LEDGER_CATEGORIES,
 	QUIET_CATEGORIES,
 } from './constants.js'
-import { extractTokens } from './helpers.js'
+import { extractTokens, renderCauseChain } from './helpers.js'
 
 /**
  * Files messages through the conversation's judgment manager and reads their categories and corrections.
@@ -44,7 +44,7 @@ export class Classifier implements ClassifierInterface {
 
 	/**
 	 * Asks the judge every question the filing still lacks, in the measured order.
-	 * @param requests - The ids of the messages that belong to the current request
+	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
 	 * @returns The judgment keys and summed usage; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
@@ -169,7 +169,7 @@ export class Classifier implements ClassifierInterface {
 
 	/**
 	 * Reads the whole filing from the recorded judgments.
-	 * @returns The quiet ids, categories, topics, and the amended and superseded marks
+	 * @returns The quiet ids, categories, topics, and the amendment and supersession marks
 	 */
 	classification(): LedgerClassification {
 		const messages = this.#options.conversation.messages()
@@ -177,8 +177,8 @@ export class Classifier implements ClassifierInterface {
 		const quiet = new Set<string>()
 		const categories = new Map<string, LedgerCategory>()
 		const topics = new Map<string, readonly string[]>()
-		const amended = new Map<string, string[]>()
-		const superseded = new Map<string, string[]>()
+		const amendments = new Map<string, string[]>()
+		const supersessions = new Map<string, string[]>()
 		for (const message of messages) {
 			if (this.quiet(message.id)) quiet.add(message.id)
 			const category = this.category(message.id)
@@ -209,18 +209,18 @@ export class Classifier implements ClassifierInterface {
 				)
 					continue
 			}
-			for (const map of head === 'supersedes' ? [superseded, amended] : [amended]) {
+			for (const map of head === 'supersedes' ? [supersessions, amendments] : [amendments]) {
 				const ids = map.get(earlier) ?? []
 				if (!ids.includes(later)) map.set(earlier, [...ids, later])
 			}
 		}
-		for (const map of [amended, superseded])
+		for (const map of [amendments, supersessions])
 			for (const [id, ids] of map)
 				map.set(
 					id,
 					[...ids].sort((left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0)),
 				)
-		return { quiet, categories, topics, amended, superseded }
+		return { quiet, categories, topics, amendments, supersessions }
 	}
 
 	#renderState(id: string): string {
@@ -310,16 +310,6 @@ export class Classifier implements ClassifierInterface {
 		])
 	}
 
-	#describeError(error: unknown): string {
-		const parts: string[] = []
-		let current: unknown = error
-		for (let depth = 0; current !== undefined && depth < 4; depth += 1) {
-			parts.push(isError(current) ? `${current.name}: ${current.message}` : String(current))
-			current = isError(current) ? current.cause : undefined
-		}
-		return parts.join(' <- ')
-	}
-
 	async #ask(
 		spec: JudgmentInput,
 		signal: AbortSignal,
@@ -354,7 +344,7 @@ export class Classifier implements ClassifierInterface {
 				})
 			if (
 				(isJudgeError(error) && error.code === 'QUESTION') ||
-				DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error))
+				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
 			)
 				this.#failed.add(fingerprint)
 			if (signal.aborted) throw error

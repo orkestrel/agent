@@ -6,14 +6,9 @@ import type {
 } from './types.js'
 import { isInstance } from '@orkestrel/contract'
 
-// A real error type, not a sentinel. `stream` throws a
-// ProviderAbortError when its bound signal aborts mid-flight, carrying the partial
-// result it had assembled so far so the agent loop can recover the streamed content
-// on cancellation. The guard narrows a caught value with `instanceof`.
-
 /**
- * Reports a provider stream cancelled mid-flight by its bound signal — thrown by a
- * {@link ProviderInterface}'s `stream`, carrying the {@link ProviderResult} assembled from
+ * Reports a provider stream cancelled mid-flight by its bound signal — thrown by the
+ * `stream` method of a {@link ProviderInterface}, carrying the {@link ProviderResult} assembled from
  * whatever streamed before the cancel and the machine-readable `code` `'ABORT'`.
  *
  * @remarks
@@ -80,7 +75,7 @@ export class ProviderError extends Error {
 }
 
 /**
- * Narrows a caught value to the provider failure class through instanceof.
+ * Narrows a caught value to the provider failure class through `instanceof`.
  *
  * @param value - The caught value
  * @returns True if the value is a provider failure; false otherwise

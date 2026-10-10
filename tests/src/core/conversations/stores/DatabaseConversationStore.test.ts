@@ -1,10 +1,10 @@
 import { createDatabaseConversationStore } from '@src/core'
-import { createDatabase, createMemoryDriver } from '@orkestrel/database'
-import { rawShape, stringShape } from '@orkestrel/contract'
+import { createMemoryDriver } from '@orkestrel/database'
 import { createDatabaseWorkspaceStore } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import {
 	buildConversationSnapshot,
+	plantConversationRow,
 	exerciseConversationStoreDeleteAbsent,
 	exerciseConversationStoreDeleteThenAbsent,
 	exerciseConversationStoreGetAbsent,
@@ -16,7 +16,7 @@ import {
 	JUDGMENT_SNAPSHOT,
 } from '../../../../setup.js'
 
-// src/core/agents/conversations/stores/DatabaseConversationStore.ts — the durable, driver-pluggable
+// src/core/conversations/stores/DatabaseConversationStore.ts — the durable, driver-pluggable
 // twin of the plain-Map MemoryConversationStore behind the ConversationStoreInterface seam (get /
 // set / delete, async, keyed by a snapshot's own id). It persists the ConversationSnapshot as ONE
 // OPAQUE JSON column over a `databases` table (driver default = createMemoryDriver), narrowing the
@@ -33,22 +33,19 @@ import {
 // driver, and sibling-store non-collision.
 describe('DatabaseConversationStore', () => {
 	it('round trips judgment answers, refusals, and recorded times', async () => {
-		const store = createDatabaseConversationStore(createMemoryDriver())
-		await store.set(JUDGMENT_SNAPSHOT)
-		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+		const { got } = await exerciseConversationStoreRoundTrip(
+			() => createDatabaseConversationStore(createMemoryDriver()),
+			async () => JUDGMENT_SNAPSHOT,
+		)
+		expect(got).toEqual(JUDGMENT_SNAPSHOT)
 	})
 
 	it('refuses a malformed judgments member read from its real table', async () => {
 		const driver = createMemoryDriver()
-		const database = createDatabase({
-			driver,
-			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
-		})
-		await database.table('conversations').set({
+		await plantConversationRow(driver, {
 			id: JUDGMENT_SNAPSHOT.id,
 			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ id: 'broken' }] },
 		})
-		await database.close()
 		expect(await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id)).toBeUndefined()
 	})
 	describe('set → get round-trip (sections + live tail)', () => {
@@ -153,15 +150,11 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 	it('a TAMPERED row (a hostile calls[] element) resolves UNDEFINED from get (fail-closed)', async () => {
 		// Plant a tampered row OUT-OF-BAND over the store's own driver — the same one-table shape
 		// the factory builds — whose snapshot column smuggles a malformed assistant calls[] element
-		// (the shape a real chat template would otherwise render). The deepened isMessage rejects
+		// (the shape a real chat template would otherwise render). The isMessage guard rejects
 		// it at the read boundary, so the store resolves ABSENT: hydrate mints a fresh thread
 		// instead of replaying (or throwing on) the poisoned call.
 		const driver = createMemoryDriver()
-		const database = createDatabase({
-			driver,
-			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
-		})
-		await database.table('conversations').set({
+		await plantConversationRow(driver, {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
@@ -169,15 +162,15 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 				messages: [{ id: 'a1', role: 'assistant', content: '', calls: [null, 'x'] }],
 			},
 		})
-		await database.close()
 		const store = createDatabaseConversationStore(driver)
 		expect(await store.get('poisoned')).toBeUndefined()
 	})
 
 	it('reads back a tool message naming its call beside one saved without call', async () => {
-		const store = createDatabaseConversationStore(createMemoryDriver())
-		await store.set(TOOL_SNAPSHOT)
-		const got = await store.get(TOOL_SNAPSHOT.id)
+		const { got } = await exerciseConversationStoreRoundTrip(
+			() => createDatabaseConversationStore(createMemoryDriver()),
+			async () => TOOL_SNAPSHOT,
+		)
 		expect(got).toEqual(TOOL_SNAPSHOT)
 		expect(got?.messages.at(-1)?.call).toBe('call-oslo')
 		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
@@ -185,11 +178,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 
 	it('a TAMPERED row (a non-string call) resolves UNDEFINED from get (fail-closed)', async () => {
 		const driver = createMemoryDriver()
-		const database = createDatabase({
-			driver,
-			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
-		})
-		await database.table('conversations').set({
+		await plantConversationRow(driver, {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
@@ -197,7 +186,6 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 				messages: [{ id: 't1', role: 'tool', content: 'sunny', call: 7 }],
 			},
 		})
-		await database.close()
 		const store = createDatabaseConversationStore(driver)
 		expect(await store.get('poisoned')).toBeUndefined()
 	})

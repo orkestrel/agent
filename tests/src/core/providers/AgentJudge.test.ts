@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	createRefusingTransport,
 	JUDGE_ENVELOPE,
+	JUDGE_PROTOCOL_CASES,
 	RecordedBody,
 	RecordedHeaders,
 	RecordedTransport,
@@ -318,10 +319,7 @@ describe('AgentJudge — HTTP and protocol failures', () => {
 	})
 
 	it('refuses a null body and an invalid JSON body as protocol failures', async () => {
-		for (const [response, message] of [
-			[() => new Response(null), 'judge error: no response body'],
-			[() => new Response('{"model":'), 'judge error: invalid JSON body'],
-		] satisfies ReadonlyArray<readonly [() => Response, string]>) {
+		for (const [response, message] of JUDGE_PROTOCOL_CASES) {
 			const transport = new RecordedTransport(response)
 			const judge = new ScriptedJudge({
 				url: 'http://judge.test',

@@ -13,10 +13,10 @@ import type {
 import type { Message, ThinkingReplay } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { Timeout } from '@orkestrel/timeout'
-import { DEFAULT_PROVIDER_TIMEOUT, MAX_ERROR_BODY_LENGTH } from './constants.js'
+import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
-import { createThinkSplitter } from './factories.js'
-import { buildProviderResult, readChunks, readHeaders, readText } from './helpers.js'
+import { ThinkSplitter } from './ThinkSplitter.js'
+import { buildProviderResult, readChunks, buildProviderHeaders, readFailure } from './helpers.js'
 import { joinThinking } from '../helpers.js'
 
 /**
@@ -26,7 +26,7 @@ import { joinThinking } from '../helpers.js'
  * Every call owns its parser, splitter, deadline, and accumulation. Success bodies
  * have no size limit. A qwen3 implicit-open reclassification corrects the final
  * content while content deltas already yielded cannot be recalled. A subclass fills
- * `name`, `frame`, `body`, `read`, and `finish`; the constructor takes the `split`
+ * `name`, `frame`, `encode`, `read`, and `finish`; the constructor takes the `split`
  * and `strict` switches to control reasoning separation and settled-result requirements.
  * The `replay` input names which stored thinking the agent and relay send back. Default: `'none'`.
  *
@@ -59,7 +59,7 @@ import { joinThinking } from '../helpers.js'
  * 	frame(): ProviderParserInterface<string> {
  * 		return new TextFrame()
  * 	}
- * 	body(request: ProviderRequest): object {
+ * 	encode(request: ProviderRequest): object {
  * 		return { messages: request.messages }
  * 	}
  * 	read(record: string): ProviderIncrement {
@@ -112,7 +112,7 @@ export abstract class AgentProvider<
 	/** Creates fresh framing state for the call. */
 	abstract frame(): ProviderParserInterface<TRecord>
 	/** Projects a domain request onto the concrete protocol's wire body. */
-	abstract body(request: ProviderRequest): object
+	abstract encode(request: ProviderRequest): object
 	/** Decodes a framed record into a turn increment. */
 	abstract read(record: TRecord): ProviderIncrement
 	/** Returns any records retained at end of input. */
@@ -148,7 +148,8 @@ export abstract class AgentProvider<
 	 * @param options - The per-call generation configuration
 	 * @returns Content and native thinking deltas followed by the settled result
 	 * @throws ProviderAbortError Thrown when the combined cancellation bound fires
-	 * @throws ProviderError Thrown for an HTTP or protocol failure
+	 * @throws ProviderError Thrown when the response is non-OK, the response has no body, a wire record
+	 * is malformed or carries an upstream failure, or a strict stream ends without a settled result
 	 */
 	async *stream(
 		messages: readonly Message[],
@@ -165,7 +166,7 @@ export abstract class AgentProvider<
 		let state: ProviderIncrement = { content: '', thinking: '', tools: [] }
 		try {
 			parser = this.frame()
-			splitter = this.#split ? createThinkSplitter() : undefined
+			splitter = this.#split ? new ThinkSplitter() : undefined
 			const response = await this.#request(
 				{
 					messages,
@@ -263,34 +264,22 @@ export abstract class AgentProvider<
 
 	// Send one request and translate its HTTP failure into the shared provider taxonomy.
 	async #request(request: ProviderRequest, signal: AbortSignal): Promise<Response> {
-		const headers = await readHeaders(this.#headers, signal)
+		const headers = await buildProviderHeaders(this.#headers, signal)
 		signal.throwIfAborted()
 		const response = await this.#transport(this.#url + this.#path, {
 			method: 'POST',
 			headers,
-			body: JSON.stringify(this.body(request)),
+			body: JSON.stringify(this.encode(request)),
 			signal,
 		})
 		if (!response.ok) {
-			let detail: string
-			try {
-				detail =
-					response.body === null
-						? ''
-						: (await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)).text
-			} catch (cause) {
-				throw new ProviderError(
-					'HTTP',
-					`provider error: ${response.status} - (error body unavailable)`,
-					{ status: response.status, cause },
-				)
-			}
-			signal.throwIfAborted()
-			throw new ProviderError(
-				'HTTP',
-				`provider error: ${response.status}${detail === '' ? '' : ` - ${detail}`}`,
-				{ status: response.status },
-			)
+			const failure = await readFailure(response, 'provider error:', signal)
+			// Preserve a body-read failure as the cause when it raced the abort.
+			if (!Object.hasOwn(failure, 'cause')) signal.throwIfAborted()
+			throw new ProviderError('HTTP', failure.message, {
+				status: response.status,
+				...(failure.cause === undefined ? {} : { cause: failure.cause }),
+			})
 		}
 		return response
 	}

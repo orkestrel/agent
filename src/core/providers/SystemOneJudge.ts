@@ -13,6 +13,7 @@ import { JudgeError } from './errors.js'
  * The caller supplies the server origin and model. Every question travels in one request.
  * Server measures are ignored; the response model is preserved.
  * `headers` supplies authentication through the shared judge engine.
+ * The example readings are those of the response Ollama 0.40.0 returned for that request on 2026-10-07.
  *
  * @example Asking a System One server a choice, a noul, and a score
  * ```ts
@@ -50,9 +51,9 @@ import { JudgeError } from './errors.js'
  * )
  * result.model // 'tev1:0.8b' — the model the server named
  * result.usage // { prompt: 975, completion: 4, total: 979 }
- * readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to four decimals
- * readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to four decimals
- * readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to four decimals
+ * readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals
+ * readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals
+ * readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals
  * ```
  */
 export class SystemOneJudge extends AgentJudge {
@@ -69,7 +70,7 @@ export class SystemOneJudge extends AgentJudge {
 	 * @param request - The state and questions keyed by caller id
 	 * @returns The System One request body
 	 */
-	body(request: JudgeRequest): SystemOneRequest {
+	encode(request: JudgeRequest): SystemOneRequest {
 		return {
 			state: request.state,
 			model: this.model,
@@ -88,7 +89,8 @@ export class SystemOneJudge extends AgentJudge {
 	 * @param value - The parsed response body
 	 * @param request - The questions defining the expected answers
 	 * @returns The decoded distributions, model, and available usage
-	 * @throws JudgeError Thrown with code `PROTOCOL` for a malformed envelope or an invalid answer naming its question id
+	 * @throws JudgeError Thrown when the envelope is malformed or an answer is invalid (code `PROTOCOL`);
+	 * the message names the question id of an invalid answer
 	 */
 	read(value: unknown, request: JudgeRequest): JudgeResult {
 		if (!isSystemOneResponse(value)) {

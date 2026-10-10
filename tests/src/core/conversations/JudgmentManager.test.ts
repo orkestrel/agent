@@ -1,18 +1,12 @@
 import type { Judgment, JudgeRequest } from '@src/core'
-import {
-	createConversation,
-	createSystemOneJudge,
-	isJudgeAbortError,
-	JudgmentManager,
-	JudgeAbortError,
-} from '@src/core'
+import { createConversation, isJudgeAbortError, JudgmentManager, JudgeAbortError } from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	JUDGMENT_INPUT,
 	JUDGMENT_RECORD,
 	JUDGMENT_USAGE,
-	RecordedTransport,
+	createRecordedJudge,
 	RecordingJudge,
 	SequentialSystemOneJudge,
 	SYSTEM_ONE_JUDGE_REQUEST,
@@ -62,12 +56,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('asks only unmatched questions, records them, and returns request order without batch usage', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
-		const judge = createSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'tev1:0.8b',
-			fetch: transport.fetch,
-		})
+		const { judge, transport } = createRecordedJudge()
 		const manager = new JudgmentManager()
 		const cached = manager.add({
 			id: 'refund',
@@ -107,12 +96,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('attaches usage when the unmatched sub-request carries one question', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
-		const judge = createSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'tev1:0.8b',
-			fetch: transport.fetch,
-		})
+		const { judge, transport } = createRecordedJudge()
 		const manager = new JudgmentManager()
 		await manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], new AbortController().signal)
 		manager.remove('refund')
@@ -133,12 +117,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('serializes structured state and reuses only the unchanged state and source order', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_OBJECT))
-		const judge = createSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'tev1:0.8b',
-			fetch: transport.fetch,
-		})
+		const { judge, transport } = createRecordedJudge({ response: SYSTEM_ONE_OBJECT })
 		const manager = new JudgmentManager()
 		const first = await manager.resolve(
 			judge,
@@ -161,15 +140,12 @@ describe('JudgmentManager', () => {
 
 	it('records completed partial answers before propagating the original judge abort', async () => {
 		const controller = new AbortController()
-		const transport = new RecordedTransport(() => {
-			if (transport.requests.length === 2) controller.abort()
-			return Response.json(SYSTEM_ONE_TEV1)
-		})
-		const judge = new SequentialSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'tev1:0.8b',
-			batch: false,
-			fetch: transport.fetch,
+		const { judge, transport } = createRecordedJudge({
+			create: (options) => new SequentialSystemOneJudge({ ...options, batch: false }),
+			respond: (recorded) => {
+				if (recorded.requests.length === 2) controller.abort()
+				return Response.json(SYSTEM_ONE_TEV1)
+			},
 		})
 		const manager = new JudgmentManager()
 		const error: unknown = await manager
@@ -209,12 +185,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('owns a proxied request through JSON before comparing or asking', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
-		const judge = createSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'tev1:0.8b',
-			fetch: transport.fetch,
-		})
+		const { judge, transport } = createRecordedJudge()
 		const proxied: JudgeRequest = new Proxy(
 			{
 				state: SYSTEM_ONE_JUDGE_REQUEST.state,

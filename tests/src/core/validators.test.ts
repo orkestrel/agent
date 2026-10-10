@@ -1,6 +1,7 @@
 import { isJudgeEntry, isJudgeQuestion } from '@src/core'
+import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { approveEvery, TEV1_REQUEST, throwProxyRead } from '../../setup.js'
+import { approveEvery, TEV1_REQUEST } from '../../setup.js'
 
 describe('isJudgeEntry — the text or JSON a judge reads', () => {
 	it('accepts a string, a JSON record, a null-prototype record, and a JSON array', () => {
@@ -22,9 +23,14 @@ describe('isJudgeEntry — the text or JSON a judge reads', () => {
 			[Number.NaN],
 			new Date(),
 			cyclic,
-			new Proxy({}, { ownKeys: throwProxyRead }),
 		]) {
 			expect(isJudgeEntry(value)).toBe(false)
+		}
+	})
+
+	it('contains the installed hostile corpus at the entry boundary', () => {
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(() => isJudgeEntry(value), `hostile entry ${index}`).not.toThrow()
 		}
 	})
 })
@@ -78,7 +84,24 @@ describe('isJudgeQuestion — the universal question shape (total)', () => {
 		expect(isJudgeQuestion('choice')).toBe(false)
 		const criteria = Object.assign([new Date(), null], { every: approveEvery })
 		expect(isJudgeQuestion({ form: 'score', criteria })).toBe(false)
-		const hostile = new Proxy({ form: 'noul' }, { get: throwProxyRead })
-		expect(isJudgeQuestion(hostile)).toBe(false)
+	})
+
+	it('contains the installed hostile corpus at question and nested entry boundaries', () => {
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(isJudgeQuestion(value), `hostile question ${index}`).toBe(false)
+			expect(
+				isJudgeQuestion({ form: 'choice', criteria: value }),
+				`hostile choice criteria ${index}`,
+			).toBe(false)
+			// The corpus also contains admitted JSON structures, such as a null-prototype record.
+			expect(
+				() => isJudgeQuestion({ form: 'score', criteria: [null, value] }),
+				`hostile score entry ${index}`,
+			).not.toThrow()
+			expect(
+				() => isJudgeQuestion({ form: 'noul', instructions: value }),
+				`hostile instructions ${index}`,
+			).not.toThrow()
+		}
 	})
 })

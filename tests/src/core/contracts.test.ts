@@ -2,7 +2,7 @@ import type { Message } from '@src/core'
 import { isMessage, messageContract } from '@src/core'
 import { parseJSONAs } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
-import { domainArgument, MESSAGE_WIRE_ROLES } from '../../setup.js'
+import { returnDomain, MESSAGE_WIRE_ROLES } from '../../setup.js'
 
 describe('wire contracts', () => {
 	it('round-trips a message and reports the malformed image path', () => {
@@ -25,7 +25,7 @@ describe('wire contracts', () => {
 			id: '1',
 			role: 'assistant',
 			content: '',
-			calls: [{ id: 'call', name: 'lookup', arguments: { invoke: domainArgument } }],
+			calls: [{ id: 'call', name: 'lookup', arguments: { invoke: returnDomain } }],
 		}
 		expect(isMessage(value)).toBe(true)
 		expect(messageContract.is(value)).toBe(false)

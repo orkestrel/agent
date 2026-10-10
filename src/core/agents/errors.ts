@@ -1,4 +1,4 @@
-import type { AgentResult } from './types.js'
+import type { AgentErrorCode, AgentResult } from './types.js'
 import { isInstance } from '@orkestrel/contract'
 
 // A real error type, not a sentinel. An agent job treats a partial result
@@ -67,13 +67,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports a concurrent run that would corrupt shared per-agent accounting, or a rehydration
- * name absent from its registry pool — thrown synchronously by an {@link AgentInterface}'s
- * `stream()` (and so by `generate()`, which calls it) and by an
- * {@link AgentRegistryInterface}'s accessors, carrying the machine-readable `code`
- * `'CONCURRENCY' | 'REGISTRY'`. Synchronous means a fire-and-forget
- * `agent.generate().catch(…)` never catches it: `await` the call inside `try`/`catch`, or wrap
- * the call expression itself.
+ * Reports a concurrent run sharing construction accounting or a name absent from a registry pool. The `stream` and `generate` methods and registry accessors throw synchronously, before returning a handle or promise. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
  * `'CONCURRENCY'` reports a run already in flight on the same agent, plus a construction-level
@@ -86,9 +80,9 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  */
 export class AgentError extends Error {
 	/** Names the machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent; `'REGISTRY'`: a rehydration name absent from its registry pool. */
-	readonly code: 'CONCURRENCY' | 'REGISTRY'
+	readonly code: AgentErrorCode
 
-	constructor(code: 'CONCURRENCY' | 'REGISTRY', message: string) {
+	constructor(code: AgentErrorCode, message: string) {
 		super(message)
 		this.name = 'AgentError'
 		this.code = code

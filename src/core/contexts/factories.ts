@@ -9,22 +9,7 @@ import type {
 	ScopeInterface,
 	ScopeManagerInterface,
 	ScopeManagerOptions,
-	SelectionHandler,
-	SelectionOptions,
 } from './types.js'
-import type { TokenUsage } from '@orkestrel/budget'
-import { isFiniteNumber } from '@orkestrel/contract'
-import { isJudgeAbortError } from '../errors.js'
-import { matchesJudgment, sumUsage } from '../helpers.js'
-import { SelectionError } from './errors.js'
-import {
-	buildConditionKey,
-	buildNeededQuestion,
-	filterSelectionMessages,
-	inferApplicability,
-	renderSelectionState,
-} from './helpers.js'
-import { parseConditionKey } from './parsers.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { Scope } from './scopes/Scope.js'
@@ -32,133 +17,12 @@ import { ScopeManager } from './scopes/ScopeManager.js'
 import { AgentContext } from './AgentContext.js'
 
 /**
- * Creates a selection handler that judges screened messages and retains uncertain subjects.
- *
- * @remarks
- * Reuses matching judgments without spending usage or the fresh question limit.
- * A judge error for one subject leaves that subject undecided, so it is kept, and the handler
- * asks about the next subject. When the judge failed for every subject asked and no recorded
- * judgment was reused, the handler returns the full view with `fault` set, its cause the first
- * judge error. A cancel returns the full view, the recorded keys, spent usage, and the cancel
- * cause as `fault`. The handler sends nothing until an application invokes or installs it.
- *
- * @param options - The judge, screen, needed criterion, and fresh question limit
- * @returns The application-installed selection handler
- * @throws SelectionError Thrown when the threshold is outside the interval above 0.5 up to and including 1 (code `'THRESHOLD'`) or the limit is not a nonnegative safe integer (code `'LIMIT'`)
- * @example
- * ```ts
- * const select = createSelection({ judge, screen, needed, limit: 12 })
- * ```
- */
-export function createSelection(options: SelectionOptions): SelectionHandler {
-	const { judge, screen, limit } = options
-	const needed = { ...options.needed }
-	if (!isFiniteNumber(needed.threshold) || needed.threshold <= 0.5 || needed.threshold > 1)
-		throw new SelectionError(
-			'THRESHOLD',
-			'selection threshold must be greater than 0.5 and at most 1',
-		)
-	if (!Number.isSafeInteger(limit) || limit < 0)
-		throw new SelectionError('LIMIT', 'selection limit must be a nonnegative safe integer')
-	return async (conversation, request, signal) => {
-		const judgments: string[] = []
-		const errors: unknown[] = []
-		let usage: TokenUsage | undefined
-		let pending: string | undefined
-		try {
-			for (const judgment of conversation.judgments.judgments()) {
-				const key = parseConditionKey(judgment.id)
-				if (key !== undefined && key[2] !== request.id) conversation.judgments.remove(judgment.id)
-			}
-			const view = conversation.view()
-			const present = new Set(view.map((message) => message.id))
-			const subjects = [...new Set(screen(conversation, request))].filter(
-				(id) => id !== request.id && present.has(id),
-			)
-			const question = buildNeededQuestion(needed)
-			let fresh = 0
-			for (const id of subjects) {
-				const key = buildConditionKey('needed', id, request.id)
-				const sources = [id, request.id]
-				const state = renderSelectionState(view, id, request)
-				const recorded = conversation.judgments.judgment(key)
-				if (
-					recorded !== undefined &&
-					matchesJudgment(recorded, question, sources, state, judge.model)
-				) {
-					judgments.push(key)
-					continue
-				}
-				if (fresh >= limit) continue
-				signal.throwIfAborted()
-				pending = key
-				fresh += 1
-				let resolved: Awaited<ReturnType<typeof conversation.judgments.resolve>>
-				try {
-					resolved = await conversation.judgments.resolve(
-						judge,
-						{ state, questions: { [key]: question } },
-						sources,
-						signal,
-					)
-				} catch (cause) {
-					if (signal.aborted || isJudgeAbortError(cause)) throw cause
-					// One subject's error leaves that subject undecided, which keeps it.
-					errors.push(cause)
-					pending = undefined
-					continue
-				}
-				for (const judgment of resolved) {
-					judgments.push(judgment.id)
-					if (judgment.usage !== undefined) usage = sumUsage(usage, judgment.usage)
-				}
-				pending = undefined
-			}
-			signal.throwIfAborted()
-			if (errors.length > 0 && judgments.length === 0)
-				return {
-					messages: view,
-					judgments,
-					...(usage === undefined ? {} : { usage }),
-					fault: new Error('selection failed', { cause: errors[0] }),
-				}
-			const applicability = inferApplicability(conversation, request, {
-				judge,
-				needed,
-				screen: () => subjects,
-			})
-			return {
-				messages: filterSelectionMessages(view, applicability, request),
-				judgments,
-				...(usage === undefined ? {} : { usage }),
-			}
-		} catch (cause) {
-			if (isJudgeAbortError(cause) && cause.partial.usage !== undefined)
-				usage = sumUsage(usage, cause.partial.usage)
-			if (
-				pending !== undefined &&
-				isJudgeAbortError(cause) &&
-				(Object.hasOwn(cause.partial.answers, pending) ||
-					(cause.partial.refusals !== undefined && Object.hasOwn(cause.partial.refusals, pending)))
-			)
-				judgments.push(pending)
-			return {
-				messages: conversation.view(),
-				judgments,
-				...(usage === undefined ? {} : { usage }),
-				fault: new Error('selection failed', { cause }),
-			}
-		}
-	}
-}
-
-/**
  * Creates an instruction — an immutable {@link InstructionInterface} (a named directive)
  * from its `name` / `content` and optional `priority`, the `id` minted at construction.
  *
  * @remarks
- * Only `name` / `content` are required; `priority` orders the instruction in an
- * {@link InstructionManagerInterface}'s rendered list (higher first) and defaults to `0`.
+ * Only `name` / `content` are required; `priority` orders the instruction in the
+ * rendered list of an {@link InstructionManagerInterface} (higher first). Default: `0`.
  * Stored immutable — never mutated after creation.
  *
  * @param input - `name` / `content` (required) and an optional `priority` (see

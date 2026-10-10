@@ -1,6 +1,6 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
-import type { SchedulerInterface } from '@orkestrel/workflow'
-import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { AgentEventName } from '../../../setup.js'
+import type { TokenUsage } from '@orkestrel/budget'
+import type { ProviderResult } from '@src/core'
 import type { ToolCall } from '@orkestrel/tool'
 import type {
 	AgentEventMap,
@@ -8,12 +8,33 @@ import type {
 	AgentStreamInterface,
 	ConversationEventMap,
 	Message,
-	ProviderDelta,
-	ProviderInterface,
 	ProviderIncrement,
-	ProviderResult,
 	Selection,
 } from '@src/core'
+import {
+	createInterleavedThinkingProvider,
+	createPacedProvider,
+	AGENT_USAGE,
+	AGENT_SCRIPT_OPTIONS,
+	AGENT_DEADLINE,
+	AGENT_EVENTS,
+	computeUsageTotal,
+	createEchoProvider,
+	COMPACT_SCRIPT,
+	seedCompactionAgent,
+	createAnswerProvider,
+	requestConversation,
+	createGatedProvider,
+	createAbortingGatedProvider,
+	createThrowingProvider,
+	createConversationEchoProvider,
+	createAbortingResultProvider,
+	createIndependentGatedProvider,
+	createSharedGatedProvider,
+	createSecondTurnFailureProvider,
+	createFailingScheduler,
+} from '../../../setup.js'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
 import { parseJSONAs } from '@orkestrel/contract'
 import { createBudget, createTokenBudget } from '@orkestrel/budget'
@@ -22,11 +43,9 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
-	type createConversation,
 	createConversationManager,
 	createScope,
 	estimateMessages,
-	estimateTokens,
 	isAgentError,
 	isProviderAbortError,
 	ProviderAbortError,
@@ -35,7 +54,7 @@ import {
 } from '@src/core'
 import {
 	abandonSelection,
-	addTool,
+	createAddTool,
 	AUTHORITY_STATES,
 	createRecordingScheduler,
 	createRecordingSelection,
@@ -43,11 +62,9 @@ import {
 	createSeededToolManager,
 	createStubSummarizer,
 	createToolCall,
-	createTokenUsage,
-	loopTool,
+	createLoopTool,
 	RECORDED_REQUEST,
 	rejectSelection,
-	type ScriptedProviderOptions,
 	type ScriptedTurn,
 	seedFramedAgent,
 	SELECTION_FAULT_CASES,
@@ -65,17 +82,7 @@ import {
 	waitForDelay,
 } from '@orkestrel/test'
 
-// Deterministic loop tests for the Agent. The real provider is exercised LIVE in the
-// src:ollama project (tests/src/ollama/integration.test.ts); here the shared scripted
-// `createScriptedProvider` returns pre-canned ProviderResults in sequence so the LOOP
-// itself — tool iteration, the chunk stream, generate↔stream parity, the iteration cap,
-// abort / budget bounds, scheduler pacing, status — is pinned without a daemon. Every loop
-// test opts the provider into `record: true` (to assert, through `provider.calls`, the
-// messages / tools the loop sent) and `exhaust: 'throw'` (so a loop that over-ran its
-// script fails loudly rather than silently repeating the last turn). The only providers
-// that stay LOCAL are the genuine per-scenario BEHAVIOUR fixtures — a stream that parks
-// on a `Promise.withResolvers<void>()` or throws mid-stream to drive the abort / error / concurrency /
-// cancel paths — which are scenario behaviour, not replayable data.
+// Exercises agent orchestration through scripted provider responses and real managers.
 
 it('commits a partial agent result when final usage aborts the caller', async () => {
 	const provider = createScriptedProvider(
@@ -93,65 +100,14 @@ it('commits a partial agent result when final usage aborts the caller', async ()
 	expect(provider.calls).toHaveLength(1)
 })
 
-const USAGE = createTokenUsage()
-
 // This file's uniform options for the shared scripted provider: every loop test records the
 // messages / tools each call saw (asserted through `provider.calls`) and treats over-running the
 // script as a loud failure (`exhaust: 'throw'`) rather than the default silent last-turn
 // repeat — so a loop that had to stop (a cap / budget / cancel) but didn't is caught.
-const SCRIPT_OPTIONS: ScriptedProviderOptions = { name: 'script', record: true, exhaust: 'throw' }
 
 // The real per-turn deadline every timeout test arms, in milliseconds. Real host timers
 // throughout — no test here replaces the clock — so the period is short enough that a test can
 // wait several of them out and the timeout tests together still cost a fraction of a second.
-const DEADLINE = 25
-
-/** A real, hand-rolled {@link BudgetInterface} over {@link TokenUsage} that RECORDS every
- * `consume()` call verbatim (the shared recorder pattern) instead of extracting a single
- * numeric field like `createTokenBudget` — so a test can sum the recorded field-by-field
- * charges to prove the loop's mid-stream + reconcile charging never double-counts or
- * loses spend. A genuine `BudgetInterface` (its own `AbortController`, its own tally),
- * never a mock of one. */
-interface RecordingBudgetInterface extends BudgetInterface<TokenUsage> {
-	readonly consumes: readonly TokenUsage[]
-}
-function createRecordingBudget(max: number): RecordingBudgetInterface {
-	const consumes: TokenUsage[] = []
-	let consumed = 0
-	let controller = new AbortController()
-	return {
-		id: 'recording-budget',
-		get signal() {
-			return controller.signal
-		},
-		max,
-		get consumed() {
-			return consumed
-		},
-		get remaining() {
-			return max - consumed
-		},
-		get exhausted() {
-			return consumed >= max
-		},
-		start() {
-			if (!controller.signal.aborted) return
-			controller = new AbortController()
-		},
-		consume(value: TokenUsage) {
-			consumes.push(value)
-			consumed += value.total
-			if (consumed >= max && !controller.signal.aborted) controller.abort()
-		},
-		clear() {
-			consumed = 0
-			controller = new AbortController()
-		},
-		get consumes() {
-			return consumes
-		},
-	}
-}
 
 describe('Agent — thinking replay', () => {
 	it('resolves replay at construction for every call and context estimate', async () => {
@@ -166,7 +122,7 @@ describe('Agent — thinking replay', () => {
 		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
 		conversations.add()
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const agent = createAgent(
 			{
 				id: provider.id,
@@ -198,10 +154,10 @@ describe('Agent — thinking replay', () => {
 				{ content: '', thinking: '', tools: [createToolCall({ id: 'second' })] },
 				{ content: 'done', thinking: '' },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		expect(provider.replay).toBeUndefined()
@@ -240,7 +196,7 @@ describe('Agent — thinking replay', () => {
 				]),
 			})
 			const tools = createToolManager()
-			tools.add(addTool())
+			tools.add(createAddTool())
 			const agent = createAgent(provider, { tools })
 			agent.context.messages.add({ role: 'user', content: 'go' })
 			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
@@ -316,7 +272,7 @@ describe('Agent — thinking replay', () => {
 					]),
 				})
 				const tools = createToolManager()
-				tools.add(addTool())
+				tools.add(createAddTool())
 				const agent = createAgent(provider, { tools })
 				agent.context.messages.add({ role: 'user', content: 'go' })
 				await agent.generate()
@@ -365,14 +321,12 @@ describe('Agent — thinking replay', () => {
 				]),
 			})
 			const tools = createToolManager()
-			tools.add(addTool())
+			tools.add(createAddTool())
 			const agent = createAgent(provider, { tools, conversations, window })
 			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
 			expect(conversation.sections).toHaveLength(replay === 'none' ? 0 : 1)
-			const sent = requireValue(
-				parseJSONAs(await requireValue(transport.requests[1]).text(), providerRequestContract.is),
-			)
-			expect(window.consumed).toBe(estimateMessages(sent.messages))
+			// These charges independently include framing, tool-call JSON, and permitted thinking.
+			expect(window.consumed).toBe(replay === 'none' ? 37 : 2039)
 			expect(window.exhausted).toBe(replay === 'all')
 		}
 	})
@@ -381,15 +335,15 @@ describe('Agent — thinking replay', () => {
 describe('Agent — single turn', () => {
 	it('generate returns the content of a no-tools turn', async () => {
 		const provider = createScriptedProvider(
-			[{ result: { content: 'hello', usage: USAGE } }],
-			SCRIPT_OPTIONS,
+			[{ result: { content: 'hello', usage: AGENT_USAGE } }],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.content).toBe('hello')
 		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(AGENT_USAGE)
 	})
 
 	it('joins provider thinking onto the result; omitted when no call surfaced any (H4)', async () => {
@@ -407,7 +361,7 @@ describe('Agent — single turn', () => {
 				},
 				{ content: 'done', thinking: 'final thoughts' },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -419,7 +373,7 @@ describe('Agent — single turn', () => {
 			agent.context.messages.messages().some((message) => message.content.includes('thoughts')),
 		).toBe(false)
 		// And a run with NO thinking omits the optional entirely.
-		const plain = createScriptedProvider([{ content: 'plain' }], SCRIPT_OPTIONS)
+		const plain = createScriptedProvider([{ content: 'plain' }], AGENT_SCRIPT_OPTIONS)
 		const second = createAgent(plain)
 		second.context.messages.add({ role: 'user', content: 'hi' })
 		const settled = await second.generate()
@@ -427,19 +381,7 @@ describe('Agent — single turn', () => {
 	})
 
 	it('surfaces streamed thinking deltas as think chunks without adding them to content', async () => {
-		const provider: ProviderInterface = {
-			id: 'thinking',
-			name: 'thinking',
-			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { channel: 'thinking', text: 'plan ' }
-				yield { channel: 'content', text: 'answer' }
-				yield { channel: 'thinking', text: 'check' }
-				return { content: 'answer', thinking: 'plan check' }
-			},
-			async generate() {
-				return { content: 'answer', thinking: 'plan check' }
-			},
-		}
+		const provider = createInterleavedThinkingProvider()
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -455,7 +397,7 @@ describe('Agent — single turn', () => {
 	})
 
 	it('forwards the per-run think option to the provider stream', async () => {
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await agent.generate({ think: false })
@@ -465,7 +407,7 @@ describe('Agent — single turn', () => {
 	it('prepends the system prompt and advertises tools structurally', async () => {
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => null }))
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, { system: 'be brief', tools })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await agent.generate()
@@ -483,7 +425,7 @@ describe('Agent — the provider request matches the recorded request', () => {
 		// RECORDED_REQUEST is a recorded value, never derived from the source under test, so a change
 		// to context assembly that moves one prompt byte fails here. The minted message ids differ on
 		// every run, so they are checked for presence and compared no further.
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		await seedFramedAgent(provider).generate()
 
 		const sent = requireValue(provider.calls[0]).messages
@@ -501,7 +443,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			createTool({ name: 'alpha', execute: () => 1 }),
 			createTool({ name: 'beta', execute: () => 2 }),
 		])
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -519,7 +461,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			createTool({ name: 'alpha', execute: () => 1 }),
 			createTool({ name: 'beta', execute: () => 2 }),
 		])
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		// Only `alpha` is in scope; `beta` is scoped out.
 		const agent = createAgent(provider, {
 			tools,
@@ -537,7 +479,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 	it('advertises NO tools (undefined) when the scope is an empty tool list', async () => {
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'alpha', execute: () => 1 }))
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			tools,
 			scope: new Scope({ name: 'no-tools', tools: [] }),
@@ -573,7 +515,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const calls = [createToolCall({ name: 'secret' }), createToolCall({ name: 'safe' })]
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: calls } }, { result: { content: 'final' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -636,7 +578,10 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			createToolCall({ id: 'save-1', name: 'save' }),
 			createToolCall({ id: 'save-2', name: 'save' }),
 		]
-		const provider = createScriptedProvider([{ content: 'answer', tools: calls }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[{ content: 'answer', tools: calls }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const agent = createAgent(provider, {
 			tools,
 			limit: 1,
@@ -693,7 +638,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				},
 				{ content: 'done' },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, on: { deny: denied.handler } })
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
@@ -710,7 +655,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const calls = [createToolCall({ name: 'alpha' }), createToolCall({ name: 'beta' })]
 		const provider = createScriptedProvider(
 			[{ content: '', tools: calls }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const events = createRecorder<AgentEventMap['tool']>()
 		const agent = createAgent(provider, { tools, on: { tool: events.handler } })
@@ -753,7 +698,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const provider = createScriptedProvider(
 			[{ content: '', tools: [call] }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -789,10 +734,10 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const calls = [createToolCall({ id: 'save', name: 'save' })]
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: calls, usage: USAGE },
+				{ content: '', tools: calls, usage: AGENT_USAGE },
 				{ content: 'answer', tools: [createToolCall({ id: 'dropped', name: 'save' })] },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -811,7 +756,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 				},
 			}),
 		])
-		expect(await agent.generate()).toEqual({ content: 'answer', partial: false, usage: USAGE })
+		expect(await agent.generate()).toEqual({
+			content: 'answer',
+			partial: false,
+			usage: AGENT_USAGE,
+		})
 		expect(executed.count).toBe(1)
 		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['save'])
 		expect(provider.calls[1]?.tools).toBeUndefined()
@@ -833,7 +782,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		]
 		const provider = createScriptedProvider(
 			[{ content: '', tools: calls }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -876,7 +825,7 @@ describe('Agent — tool iteration', () => {
 		]
 		const provider = createScriptedProvider(
 			[{ content: '', tools: calls }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'weather in Paris and Oslo' })
@@ -902,7 +851,7 @@ describe('Agent — tool iteration', () => {
 		tools.add(createTool({ name: 'read', execute: () => content }))
 		const provider = createScriptedProvider(
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'read the notes' })
@@ -918,7 +867,7 @@ describe('Agent — tool iteration', () => {
 		tools.add(createTool({ name: 'read', execute: () => '' }))
 		const provider = createScriptedProvider(
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'read the empty file' })
@@ -934,7 +883,7 @@ describe('Agent — tool iteration', () => {
 		tools.add(createTool({ name: 'read', execute: () => ({ text: 'first\n"second"', count: 2 }) }))
 		const provider = createScriptedProvider(
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'read the record' })
@@ -951,9 +900,9 @@ describe('Agent — tool iteration', () => {
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] } },
-				{ result: { content: 'the answer is 5', usage: USAGE } },
+				{ result: { content: 'the answer is 5', usage: AGENT_USAGE } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
@@ -984,7 +933,7 @@ describe('Agent — tool iteration', () => {
 				{ result: { content: '', tools: [{ id: 'c1', name: 'boom', arguments: {} }] } },
 				{ result: { content: 'recovered' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1013,7 +962,7 @@ describe('Agent — authority gate', () => {
 				{ result: { content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] } },
 				{ result: { content: 'done' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		// No `authority` option → the gate is a straight pass-through.
 		const agent = createAgent(provider, { tools })
@@ -1043,7 +992,7 @@ describe('Agent — authority gate', () => {
 				{ result: { content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] } },
 				{ result: { content: 'sum is 5' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		// A rule that matches `add` and allows it (allowed defaults to true).
 		const authority = createAuthority({
@@ -1082,7 +1031,7 @@ describe('Agent — authority gate', () => {
 				{ result: { content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] } },
 				{ result: { content: 'understood, blocked' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
 			rules: [
@@ -1120,10 +1069,10 @@ describe('Agent — authority gate', () => {
 
 	it('a denied call with no reason feeds back a generic denial', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'ok' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		// A deny rule with NO reason → the generic 'denied by authority' message.
 		const authority = createAuthority({
@@ -1177,7 +1126,7 @@ describe('Agent — authority gate', () => {
 				},
 				{ result: { content: 'final' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
 			rules: [
@@ -1244,7 +1193,7 @@ describe('Agent — authority gate', () => {
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
 			rules: [{ match: () => true, zone: 'restricted', allowed: false, reason: 'all blocked' }],
@@ -1275,13 +1224,13 @@ describe('Agent — authority gate', () => {
 describe('Agent — generate ↔ stream parity', () => {
 	it('generate result deep-equals draining the stream of the same script', async () => {
 		const script: readonly ScriptedTurn[] = [
-			{ result: { content: 'one', usage: USAGE }, deltas: ['on', 'e'] },
+			{ result: { content: 'one', usage: AGENT_USAGE }, deltas: ['on', 'e'] },
 		]
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS))
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS))
 		a.context.messages.add({ role: 'user', content: 'hi' })
 		const generated = await a.generate()
 
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS))
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS))
 		b.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = b.stream()
 		await collect(stream.events)
@@ -1295,19 +1244,19 @@ describe('Agent — generate ↔ stream parity', () => {
 	it('parity under multi-turn tool iteration (content + summed usage agree)', async () => {
 		const script: readonly ScriptedTurn[] = [
 			{
-				result: { content: '', tools: [createToolCall()], usage: USAGE },
+				result: { content: '', tools: [createToolCall()], usage: AGENT_USAGE },
 				deltas: [],
 			},
-			{ result: { content: 'sum 5', usage: USAGE }, deltas: ['sum', ' 5'] },
+			{ result: { content: 'sum 5', usage: AGENT_USAGE }, deltas: ['sum', ' 5'] },
 		]
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
 			limit: 5,
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const generated = await a.generate()
 
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
 			limit: 5,
 		})
@@ -1325,21 +1274,17 @@ describe('Agent — generate ↔ stream parity', () => {
 			{ result: { content: '', tools: [createToolCall()] }, deltas: [] },
 			{ result: { content: 'blocked' } },
 		]
-		const makeAuthority = () =>
-			createAuthority({
-				rules: [{ match: () => true, zone: 'r', allowed: false, reason: 'no' }],
-			})
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
-			authority: makeAuthority(),
+			authority: createAuthority({ rules: [{ match: () => true, zone: 'deny', allowed: false }] }),
 			limit: 5,
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const generated = await a.generate()
 
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
-			authority: makeAuthority(),
+			authority: createAuthority({ rules: [{ match: () => true, zone: 'deny', allowed: false }] }),
 			limit: 5,
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
@@ -1353,19 +1298,23 @@ describe('Agent — generate ↔ stream parity', () => {
 	it('parity under a budget bound (both commit the same partial)', async () => {
 		const script: readonly ScriptedTurn[] = [
 			{
-				result: { content: 'a', tools: [createToolCall({ id: 'c', name: 'loop' })], usage: USAGE },
+				result: {
+					content: 'a',
+					tools: [createToolCall({ id: 'c', name: 'loop' })],
+					usage: AGENT_USAGE,
+				},
 			},
 			{ result: { content: 'b' } },
 		]
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
-			tools: createSeededToolManager([loopTool()]),
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
+			tools: createSeededToolManager([createLoopTool()]),
 			budget: createTokenBudget({ max: 12, scope: 'total' }),
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const generated = await a.generate()
 
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
-			tools: createSeededToolManager([loopTool()]),
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
+			tools: createSeededToolManager([createLoopTool()]),
 			budget: createTokenBudget({ max: 12, scope: 'total' }),
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
@@ -1381,7 +1330,7 @@ describe('Agent — generate ↔ stream parity', () => {
 		const script: readonly ScriptedTurn[] = [{ result: { content: 'never' } }]
 		const controllerA = new AbortController()
 		controllerA.abort()
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			signal: controllerA.signal,
 		})
 		a.context.messages.add({ role: 'user', content: 'hi' })
@@ -1389,7 +1338,7 @@ describe('Agent — generate ↔ stream parity', () => {
 
 		const controllerB = new AbortController()
 		controllerB.abort()
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			signal: controllerB.signal,
 		})
 		b.context.messages.add({ role: 'user', content: 'hi' })
@@ -1404,20 +1353,20 @@ describe('Agent — generate ↔ stream parity', () => {
 describe('Agent — chunk sequence', () => {
 	it('yields token(s) → usage → tool → token(s) → usage in order', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[
 				{
 					result: {
 						content: 'calling',
 						tools: [createToolCall()],
-						usage: USAGE,
+						usage: AGENT_USAGE,
 					},
 					deltas: ['call', 'ing'],
 				},
-				{ result: { content: 'final', usage: USAGE }, deltas: ['fin', 'al'] },
+				{ result: { content: 'final', usage: AGENT_USAGE }, deltas: ['fin', 'al'] },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1444,13 +1393,13 @@ describe('Agent — chunk sequence', () => {
 describe('Agent — iteration cap', () => {
 	it('stops at limit when the model always requests a tool (no infinite loop)', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		// Every turn returns a tool call — only `limit` reached stops it.
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 3 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1467,18 +1416,7 @@ describe('Agent — abort', () => {
 		for (const thinking of ['', 'unfinished plan']) {
 			const abort = new AbortController()
 			const failure = new ProviderAbortError({ content: 'x', thinking })
-			const provider: ProviderInterface = {
-				id: 'empty-thinking',
-				name: 'empty-thinking',
-				async *stream() {
-					yield { channel: 'content', text: 'x' }
-					abort.abort()
-					throw failure
-				},
-				async generate() {
-					throw failure
-				},
-			}
+			const provider = createAbortingResultProvider(abort, failure)
 			const agent = createAgent(provider, { signal: abort.signal })
 			agent.context.messages.add({ role: 'user', content: 'hi' })
 			const result = await agent.generate()
@@ -1492,7 +1430,10 @@ describe('Agent — abort', () => {
 	})
 
 	it('a pre-aborted external signal commits a partial without calling the provider', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const controller = new AbortController()
 		controller.abort()
 		const agent = createAgent(provider, { signal: controller.signal })
@@ -1507,19 +1448,7 @@ describe('Agent — abort', () => {
 		const gate = Promise.withResolvers<void>()
 		// A provider whose stream yields one delta, then waits on a gate before the next —
 		// giving the test a window to call abort() mid-stream.
-		const provider: ProviderInterface = {
-			id: 's',
-			name: 's',
-			async *stream(_messages, signal) {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: 'partfull' }
-			},
-			async generate() {
-				return { content: 'partfull' }
-			},
-		}
+		const provider = createAbortingGatedProvider(gate)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -1539,18 +1468,7 @@ describe('Agent — abort', () => {
 		// NOT aborted — a genuine provider failure must propagate (the run rejects, status
 		// → error), distinct from the abort path that commits a partial. The reachable
 		// `yield` keeps it a real generator; the throw after it is reachable too.
-		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'partial' }
-			throw new Error('boom')
-		}
-		const provider: ProviderInterface = {
-			id: 'e',
-			name: 'e',
-			stream: failingStream,
-			async generate() {
-				throw new Error('boom')
-			},
-		}
+		const provider = createThrowingProvider('boom', 'partial')
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await expect(agent.generate()).rejects.toThrow('boom')
@@ -1559,7 +1477,7 @@ describe('Agent — abort', () => {
 })
 
 describe('Agent — budget bound', () => {
-	it('stops and commits partial once the token budget is exhausted', async () => {
+	it('stops and commits partial after the token budget is exhausted', async () => {
 		const budget = createTokenBudget({ max: 10, scope: 'total' })
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'loop', execute: () => 'x' }))
@@ -1571,19 +1489,19 @@ describe('Agent — budget bound', () => {
 					result: {
 						content: 'a',
 						tools: [createToolCall({ id: 'c', name: 'loop' })],
-						usage: USAGE,
+						usage: AGENT_USAGE,
 					},
 				},
 				{
 					result: {
 						content: 'b',
 						tools: [createToolCall({ id: 'c', name: 'loop' })],
-						usage: USAGE,
+						usage: AGENT_USAGE,
 					},
 				},
 				{ result: { content: 'c' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1598,14 +1516,14 @@ describe('Agent — scheduler pacing', () => {
 	it('yields between turns, not after the last', async () => {
 		const scheduler = createRecordingScheduler()
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: '', tools: [createToolCall()] } },
 				{ result: { content: '', tools: [createToolCall({ id: 'c2' })] } },
 				{ result: { content: 'done' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, scheduler })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1618,7 +1536,7 @@ describe('Agent — scheduler pacing', () => {
 
 describe('Agent — status', () => {
 	it('transitions idle → running → done', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		expect(agent.status).toBe('idle')
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -1631,23 +1549,22 @@ describe('Agent — status', () => {
 })
 
 describe('Agent — deadline cleanup', () => {
-	// A normal completion must disarm the per-turn deadline — the timeout `Timeout` is
-	// `start()`ed when the run begins, so a turn that finishes naturally has to `clear()`
-	// it in a `finally`, never leaving the host `setTimeout` armed. What makes the leak
+	// A normal completion must disarm the per-turn deadline in a finally block.
+	// What makes a leaked deadline
 	// OBSERVABLE is what an armed deadline does when it expires: it aborts the composed run
 	// signal — the very signal the provider was handed and recorded on its call. So arm a
 	// real short deadline, let the run finish naturally, then wait several periods of real
 	// time. A cleared deadline never fires and that recorded signal stays unaborted; a
 	// leaked one fires during the wait and aborts it.
 	it('clears the per-turn deadline on a successful generate (it never fires afterwards)', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { timeout: DEADLINE })
+		const provider = createScriptedProvider([{ result: { content: 'hi' } }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { timeout: AGENT_DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.content).toBe('hi')
 		expect(result.partial).toBe(false)
 		// Well past the deadline — an uncleared one has long since expired by now.
-		await waitForDelay(DEADLINE * 3)
+		await waitForDelay(AGENT_DEADLINE * 3)
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.signal.aborted).toBe(false)
 		// And the settled result is untouched by the elapsed period.
@@ -1655,41 +1572,34 @@ describe('Agent — deadline cleanup', () => {
 	})
 })
 
-// The DRIVE mechanism behind the stream handle: `result` must settle from an EAGER pump
-// that runs regardless of whether `events` is consumed — never from a lazy `finally` that
-// only executes once a consumer pulls `events`. These pin that contract deterministically
-// (scripted provider, no live model): awaiting `result` WITHOUT draining `events` must
-// resolve (the exact hang the old lazy-settle had), an early `break` must settle a
-// non-misleading partial + cancel the run, and a provider throw must reject `result` even
-// when `events` is never touched — all with the deadline timer cleared on every path.
+// The result settles without requiring the caller to drain events.
 describe('Agent — stream drive (result settles independently of events)', () => {
 	it('settles result without draining events (the no-drain hang repro)', async () => {
 		const script: readonly ScriptedTurn[] = [
-			{ result: { content: 'hello', usage: USAGE }, deltas: ['hel', 'lo'] },
+			{ result: { content: 'hello', usage: AGENT_USAGE }, deltas: ['hel', 'lo'] },
 		]
 		// The assembled content a FULLY-DRAINED stream produces — what no-drain must match.
-		const drainAgent = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS))
+		const drainAgent = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS))
 		drainAgent.context.messages.add({ role: 'user', content: 'hi' })
 		const drainStream = drainAgent.stream()
 		await collect(drainStream.events)
 		const drained = await drainStream.result
 
-		const agent = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS))
+		const agent = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS))
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
-		// Await `result` and NEVER touch `stream.events`. Against the old lazy-settle this
-		// hangs forever (status stuck 'running'); the eager pump must resolve it promptly.
+		// The result must settle while events remain undrained.
 		const result = await stream.result
 		expect(result.content).toBe('hello')
 		expect(result.content).toBe(drained.content)
 		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(AGENT_USAGE)
 		expect(agent.status).toBe('done')
 	})
 
 	it('clears the deadline when result is awaited without draining events', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { timeout: DEADLINE })
+		const provider = createScriptedProvider([{ result: { content: 'hi' } }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { timeout: AGENT_DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		// Without draining `events`, the deadline's `clear()` must still run — it lives in the
@@ -1698,18 +1608,18 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		expect(result.content).toBe('hi')
 		// Same observable as the successful-generate case: wait several real periods, and a
 		// deadline that was never cleared expires and aborts the recorded run signal.
-		await waitForDelay(DEADLINE * 3)
+		await waitForDelay(AGENT_DEADLINE * 3)
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.signal.aborted).toBe(false)
 	})
 
 	it('breaking out of events early settles a partial, cancels the run, and leaks no timer', async () => {
-		// The early break aborts the run signal deliberately, so — unlike the two cases above —
+		// The early break aborts the run signal deliberately, so — unlike the two cases preceding —
 		// "did the deadline fire?" is invisible on that signal. The remaining observable is the
 		// host's own live resource list: a deadline left armed IS a pending `Timeout` on the
 		// event loop, which is the leak this test names. Read the host's count before and after
-		// and require no net gain. The deadline below is far longer than the run, so a leaked
-		// one is guaranteed still pending at the second reading.
+		// and require no net gain. The deadline following is far longer than the run, so a leaked
+		// one is intended to remain pending at the second reading.
 		const before = process.getActiveResourcesInfo().filter((one) => one === 'Timeout').length
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => null }))
@@ -1720,7 +1630,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 				result: { content: '', tools: [{ id: 'c', name: 'noop', arguments: {} }] },
 				deltas: ['a', 'b', 'c'],
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, timeout: 5_000 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -1745,18 +1655,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 	it('rejects result on a genuine provider error without draining events', async () => {
 		// A provider that throws (signal NOT aborted) — a genuine failure must reject `result`
 		// even when `events` is never pulled, and leave status 'error'.
-		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'partial' }
-			throw new Error('boom')
-		}
-		const provider: ProviderInterface = {
-			id: 'e',
-			name: 'e',
-			stream: failingStream,
-			async generate() {
-				throw new Error('boom')
-			},
-		}
+		const provider = createThrowingProvider('boom', 'partial')
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -1766,37 +1665,16 @@ describe('Agent — stream drive (result settles independently of events)', () =
 	})
 
 	it('an abandoned throwing handle (events undrained, result unawaited) leaks no unhandledRejection', async () => {
-		// A provider that throws (signal NOT aborted) — a genuine failure. The pump rejects the
-		// PUBLIC `result` (`settled.promise`) in its `finally` without re-throwing, so the pump
-		// promise itself resolves; the rejection lives solely on `settled.promise`. If nothing
-		// guards it, a handle whose owner touches NEITHER `events` NOR `result` leaves that
-		// rejection unhandled → Node fires a process-level unhandledRejection. The fix guards
-		// `settled.promise` with a no-op `.catch`, marking it handled (the warning is suppressed)
-		// while every separate `await result` consumer still rejects (`.catch` returns a derived
-		// promise, it does not consume the original's rejection).
-		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'partial' }
-			throw new Error('boom')
-		}
-		const provider: ProviderInterface = {
-			id: 'e',
-			name: 'e',
-			stream: failingStream,
-			async generate() {
-				throw new Error('boom')
-			},
-		}
+		// Abandoned handles must mark their result rejection handled without changing what await observes.
+		const provider = createThrowingProvider('boom', 'partial')
 		// Record process-level unhandledRejections for the duration of this test only; the
 		// `finally` removes the listener so it can never leak into a sibling test.
-		const rejections: unknown[] = []
-		const onUnhandled = (reason: unknown): void => {
-			rejections.push(reason)
-		}
-		process.on('unhandledRejection', onUnhandled)
+		const rejections = createRecorder<[unknown, Promise<unknown>]>()
+		process.on('unhandledRejection', rejections.handler)
 		try {
 			const agent = createAgent(provider)
 			agent.context.messages.add({ role: 'user', content: 'hi' })
-			// Touch NEITHER `s.events` NOR `s.result` — an abandoned handle.
+			// Leave both the events and result untouched to exercise an abandoned handle.
 			const s = agent.stream()
 			expect(s).toBeDefined()
 			// Advance the event loop enough for the pump to run and reject `settled.promise`, so a
@@ -1805,10 +1683,10 @@ describe('Agent — stream drive (result settles independently of events)', () =
 			await waitForDelay()
 			await waitForDelay()
 			// The guard on `settled.promise` marked the rejection handled — none leaked.
-			expect(rejections).toEqual([])
+			expect(rejections.calls).toEqual([])
 			expect(agent.status).toBe('error')
 		} finally {
-			process.off('unhandledRejection', onUnhandled)
+			process.off('unhandledRejection', rejections.handler)
 		}
 	})
 })
@@ -1822,24 +1700,12 @@ describe('Agent — stream drive (result settles independently of events)', () =
 // drained), FIFO under backpressure (a slow consumer still sees every chunk in order),
 // and a fail surfacing as a throw out of the iterator.
 
-describe('Agent — channel internals (via stream.events)', () => {
+describe('Agent — channel internals (through stream.events)', () => {
 	it('delivers a chunk pushed between two pulls — no lost wakeup', async () => {
 		// A provider whose deltas arrive one macrotask apart, so the consumer's pull parks
 		// on an empty buffer and a later push must wake it (the resolver-swap path). If a
 		// wakeup were lost the second pull would hang and `collect` would never finish.
-		const provider: ProviderInterface = {
-			id: 'w',
-			name: 'w',
-			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { channel: 'content', text: 'a' }
-				await waitForDelay() // consumer drains 'a', then parks on the empty buffer
-				yield { channel: 'content', text: 'b' }
-				return { content: 'ab' }
-			},
-			async generate() {
-				return { content: 'ab' }
-			},
-		}
+		const provider = createPacedProvider()
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -1852,11 +1718,16 @@ describe('Agent — channel internals (via stream.events)', () => {
 
 	it('drains every chunk pushed alongside the close — no truncation', async () => {
 		// A whole turn's many deltas plus its usage are pushed by the pump before it
-		// `close()`s; draining must yield ALL of them (the drain loop empties the buffer
+		// calls the `close()` method; draining must yield ALL of them (the drain loop empties the buffer
 		// fully before honouring the close), with the final usage last.
 		const provider = createScriptedProvider(
-			[{ result: { content: 'abcdef', usage: USAGE }, deltas: ['a', 'b', 'c', 'd', 'e', 'f'] }],
-			SCRIPT_OPTIONS,
+			[
+				{
+					result: { content: 'abcdef', usage: AGENT_USAGE },
+					deltas: ['a', 'b', 'c', 'd', 'e', 'f'],
+				},
+			],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -1875,7 +1746,7 @@ describe('Agent — channel internals (via stream.events)', () => {
 		const deltas = Array.from({ length: 50 }, (_unused, index) => `t${index}`)
 		const provider = createScriptedProvider(
 			[{ result: { content: deltas.join('') }, deltas }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -1891,22 +1762,11 @@ describe('Agent — channel internals (via stream.events)', () => {
 	})
 
 	it('a failed channel surfaces the error out of the iterator (drain throws)', async () => {
-		// A genuine provider throw (signal NOT aborted) `fail`s the channel; iterating
+		// A genuine provider throw calls the channel's `fail` method; iterating
 		// `events` must THROW that same error out of the drain — the consumer sees it, not
 		// a silent close. (The `result` rejection is covered elsewhere; here it is the
 		// iterator throw that is under test.)
-		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'partial' }
-			throw new Error('channel-fail')
-		}
-		const provider: ProviderInterface = {
-			id: 'cf',
-			name: 'cf',
-			stream: failingStream,
-			async generate() {
-				throw new Error('channel-fail')
-			},
-		}
+		const provider = createThrowingProvider('channel-fail', 'partial')
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -1919,37 +1779,10 @@ describe('Agent — channel internals (via stream.events)', () => {
 
 // ── Re-entrancy / reuse (the contract: each run is a fresh, independent run) ──
 //
-// `generate` / `stream` are reusable and may overlap. The per-run state (outcome /
-// channel / settled / the run's abort handle) is created fresh per call, so two runs
-// never clobber each other's RESULT. These pin that: a second run on the same agent
-// produces its own independent outcome; concurrent runs each settle on their own;
-// and — the load-bearing fix — `agent.abort()` cancels EVERY in-flight run while a
-// handle's own `stream.abort()` cancels exactly the run it belongs to (never a sibling
-// a later `stream()` would have clobbered under a single shared field).
-
-// A two-turn-then-done provider keyed off a per-call counter, so each fresh run starts
-// its own turn sequence (no shared external index that a second run would exhaust).
-function reusableProvider(): ProviderInterface {
-	return {
-		id: 'reuse',
-		name: 'reuse',
-		async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
-			// Echo the last user message's content into the answer, so two runs with
-			// different conversations produce distinguishable results.
-			const last = messages.at(-1)
-			yield { channel: 'content', text: 'ok:' }
-			return { content: `ok:${last?.content ?? ''}`, usage: USAGE }
-		},
-		async generate(messages) {
-			const last = messages.at(-1)
-			return { content: `ok:${last?.content ?? ''}`, usage: USAGE }
-		},
-	}
-}
-
+// Each overlapping run owns its result and abort signal.
 describe('Agent — re-entrancy / reuse', () => {
 	it('generate() twice runs two independent turns (status returns to done each time)', async () => {
-		const agent = createAgent(reusableProvider())
+		const agent = createAgent(createEchoProvider())
 		agent.context.messages.add({ role: 'user', content: 'first' })
 		const r1 = await agent.generate()
 		expect(r1.content).toBe('ok:first')
@@ -1967,49 +1800,23 @@ describe('Agent — re-entrancy / reuse', () => {
 		// Distinct conversations on two agents (one shared context can't represent two
 		// independent conversations) — the point is each run's OWN result settles, with no
 		// cross-talk through shared instance fields.
-		const a = createAgent(reusableProvider())
+		const a = createAgent(createEchoProvider())
 		a.context.messages.add({ role: 'user', content: 'A' })
-		const b = createAgent(reusableProvider())
+		const b = createAgent(createEchoProvider())
 		b.context.messages.add({ role: 'user', content: 'B' })
 		const sa = a.stream()
 		const sb = b.stream()
-		const [ra, rb] = await Promise.all([
-			(async () => {
-				await collect(sa.events)
-				return sa.result
-			})(),
-			(async () => {
-				await collect(sb.events)
-				return sb.result
-			})(),
-		])
+		const [ra, rb] = await Promise.all([sa.result, sb.result])
 		expect(ra.content).toBe('ok:A')
 		expect(rb.content).toBe('ok:B')
 	})
 
-	it('agent.abort() cancels EVERY in-flight run (not just the most recent)', async () => {
+	it('agent.abort() cancels EVERY in-flight run (not only the most recent)', async () => {
 		// Two overlapping runs on ONE agent. Each parks on its own gate mid-stream; a single
-		// `agent.abort()` must commit BOTH partial — the regression being that a shared
-		// single abort field made `abort()` fire only the latest run, leaving the earlier
-		// one to run to a full (non-partial) finish.
+		// Calling `agent.abort()` must commit both runs partial.
 		const g1 = Promise.withResolvers<void>()
 		const g2 = Promise.withResolvers<void>()
-		let started = 0
-		const provider: ProviderInterface = {
-			id: 'm',
-			name: 'm',
-			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				started += 1
-				const gate = started === 1 ? g1 : g2
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: 'full' }
-			},
-			async generate() {
-				return { content: 'full' }
-			},
-		}
+		const provider = createSharedGatedProvider(g1, g2)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const s1 = agent.stream()
@@ -2029,28 +1836,10 @@ describe('Agent — re-entrancy / reuse', () => {
 	})
 
 	it('stream.abort() cancels only its OWN run, never a sibling started later', async () => {
-		// s1.abort() must cancel run 1 — even though a later stream() (run 2) exists. The
-		// regression being that the returned abort fired a shared field (overwritten by run
-		// 2), so s1.abort() cancelled run 2 and left run 1 running to a full finish.
+		// Calling `s1.abort()` must abort the first run while the second remains independent.
 		const g1 = Promise.withResolvers<void>()
 		const g2 = Promise.withResolvers<void>()
-		let started = 0
-		const provider: ProviderInterface = {
-			id: 'own',
-			name: 'own',
-			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				started += 1
-				const me = started
-				const gate = me === 1 ? g1 : g2
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: `full-${me}` }
-			},
-			async generate() {
-				return { content: 'full' }
-			},
-		}
+		const provider = createIndependentGatedProvider(g1, g2)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const s1 = agent.stream()
@@ -2070,7 +1859,7 @@ describe('Agent — re-entrancy / reuse', () => {
 	})
 
 	it('generate() then stream() reuse the agent cleanly back to back', async () => {
-		const agent = createAgent(reusableProvider())
+		const agent = createAgent(createEchoProvider())
 		agent.context.messages.add({ role: 'user', content: 'gen' })
 		const generated = await agent.generate()
 		expect(generated.content).toBe('ok:gen')
@@ -2110,7 +1899,7 @@ describe('Agent — cancellation timing matrix', () => {
 			const call = createToolCall({ name: 'identity' })
 			const provider = createScriptedProvider(
 				[{ result: { content: '', tools: [call] } }, { result: { content: 'done' } }],
-				SCRIPT_OPTIONS,
+				AGENT_SCRIPT_OPTIONS,
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -2132,14 +1921,18 @@ describe('Agent — cancellation timing matrix', () => {
 			const executed = createRecorder<[]>()
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'wait', execute: executed.handler }))
-			const budget = createTokenBudget({ max: USAGE.total, scope: 'total' })
+			const budget = createTokenBudget({ max: AGENT_USAGE.total, scope: 'total' })
 			const provider = createScriptedProvider(
 				[
 					{
-						result: { content: 'working', tools: [createToolCall({ name: 'wait' })], usage: USAGE },
+						result: {
+							content: 'working',
+							tools: [createToolCall({ name: 'wait' })],
+							usage: AGENT_USAGE,
+						},
 					},
 				],
-				SCRIPT_OPTIONS,
+				AGENT_SCRIPT_OPTIONS,
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -2168,10 +1961,14 @@ describe('Agent — cancellation timing matrix', () => {
 			const provider = createScriptedProvider(
 				[
 					{
-						result: { content: 'working', tools: [createToolCall({ name: 'wait' })], usage: USAGE },
+						result: {
+							content: 'working',
+							tools: [createToolCall({ name: 'wait' })],
+							usage: AGENT_USAGE,
+						},
 					},
 				],
-				SCRIPT_OPTIONS,
+				AGENT_SCRIPT_OPTIONS,
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -2203,7 +2000,7 @@ describe('Agent — cancellation timing matrix', () => {
 		const allowed = createToolCall({ id: 'allowed', name: 'allowed' })
 		const provider = createScriptedProvider(
 			[{ result: { content: 'working', tools: [denial, allowed] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
 			rules: [
@@ -2248,7 +2045,7 @@ describe('Agent — cancellation timing matrix', () => {
 		)
 		const provider = createScriptedProvider(
 			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		const stream = agent.stream()
@@ -2281,16 +2078,20 @@ describe('Agent — cancellation timing matrix', () => {
 		)
 		const provider = createScriptedProvider(
 			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, authority: createAuthority(), timeout: DEADLINE })
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority(),
+			timeout: AGENT_DEADLINE,
+		})
 		const stream = agent.stream()
 		try {
 			await waitForCondition(
 				'the deadline observer records the aborted tool handler',
 				() => observed.count === 1,
 				{
-					budget: DEADLINE * 6,
+					budget: AGENT_DEADLINE * 6,
 				},
 			)
 			expect(observed.calls).toEqual([[true]])
@@ -2320,7 +2121,7 @@ describe('Agent — cancellation timing matrix', () => {
 		)
 		const provider = createScriptedProvider(
 			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, on: { finish: finished.handler } })
 		const stream = agent.stream()
@@ -2371,7 +2172,7 @@ describe('Agent — cancellation timing matrix', () => {
 				},
 				{ result: { content: 'never reached' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2390,19 +2191,19 @@ describe('Agent — cancellation timing matrix', () => {
 	})
 
 	it('abort during the between-turns scheduler.yield resolves partial (real scheduler rejects on abort)', async () => {
-		// THE REGRESSION: the real `scheduler.yield({ signal })` REJECTS a pending yield when
+		// The failure condition: the real `scheduler.yield({ signal })` REJECTS a pending yield when
 		// the signal aborts. That rejection is thrown out of the inter-turn pacing point —
 		// it must be treated as a cancel (resolve partial), NOT propagated as a genuine error
 		// (which would reject the result). An always-tool provider keeps the loop yielding
 		// between turns; the abort lands while parked in the real yield.
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		const scheduler = createScheduler() // the REAL scheduler — yield rejects on abort
 		const provider = createScriptedProvider(
 			Array.from({ length: 6 }, () => ({
 				result: { content: 'turn', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, scheduler, limit: 6 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2432,12 +2233,12 @@ describe('Agent — cancellation timing matrix', () => {
 					result: {
 						content: 'a',
 						tools: [createToolCall({ id: 'c', name: 'loop' })],
-						usage: USAGE,
+						usage: AGENT_USAGE,
 					},
 				},
 				{ result: { content: 'b' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2458,8 +2259,8 @@ describe('Agent — cancellation timing matrix', () => {
 			createTool({
 				name: 'slow',
 				execute: async () => {
-					// A handler far longer than the deadline armed below.
-					await waitForDelay(DEADLINE * 6)
+					// A handler far longer than the deadline armed following.
+					await waitForDelay(AGENT_DEADLINE * 6)
 					return 'done'
 				},
 			}),
@@ -2472,9 +2273,9 @@ describe('Agent — cancellation timing matrix', () => {
 				},
 				{ result: { content: 'never' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, timeout: DEADLINE })
+		const agent = createAgent(provider, { tools, timeout: AGENT_DEADLINE })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -2490,8 +2291,8 @@ describe('Agent — cancellation timing matrix', () => {
 
 	it('abort AFTER the run finished is a harmless no-op', async () => {
 		const provider = createScriptedProvider(
-			[{ result: { content: 'done', usage: USAGE } }],
-			SCRIPT_OPTIONS,
+			[{ result: { content: 'done', usage: AGENT_USAGE } }],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -2526,7 +2327,7 @@ describe('Agent — limit boundary', () => {
 		// call. So exactly one provider call happens and there is no follow-up turn.
 		const provider = createScriptedProvider(
 			[{ result: { content: 'one', tools: [createToolCall()] } }, { result: { content: 'two' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 1 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2547,8 +2348,8 @@ describe('Agent — limit boundary', () => {
 
 	it('limit:1 with a no-tools turn finishes naturally (not partial)', async () => {
 		const provider = createScriptedProvider(
-			[{ result: { content: 'final', usage: USAGE } }],
-			SCRIPT_OPTIONS,
+			[{ result: { content: 'final', usage: AGENT_USAGE } }],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { limit: 1 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2561,13 +2362,13 @@ describe('Agent — limit boundary', () => {
 
 	it('the default limit is DEFAULT_AGENT_LIMIT (10) tool iterations', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		// 20 always-tool turns available, but no explicit limit → the default cap stops it.
 		const provider = createScriptedProvider(
 			Array.from({ length: 20 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2585,22 +2386,9 @@ describe('Agent — provider failure modes', () => {
 	it('a stream that throws BEFORE the first yield rejects with status error', async () => {
 		// Throws on the FIRST `.next()`, before any delta is produced — the provider failing at
 		// the very start of the turn. The trailing `yield` keeps it a real generator (and stays
-		// reachable to the linter, since the throw is gated on a runtime flag), but the throw
+		// reachable to the linter, because the throw is gated on a runtime flag), but the throw
 		// fires first so no token ever streams.
-		const failBeforeYield = true
-		async function* throwsImmediately(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			if (failBeforeYield) throw new Error('pre-yield')
-			yield { channel: 'content', text: '' }
-			return { content: '' }
-		}
-		const provider: ProviderInterface = {
-			id: 'p',
-			name: 'p',
-			stream: throwsImmediately,
-			async generate() {
-				throw new Error('pre-yield')
-			},
-		}
+		const provider = createThrowingProvider('pre-yield', undefined)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await expect(agent.generate()).rejects.toThrow('pre-yield')
@@ -2608,7 +2396,7 @@ describe('Agent — provider failure modes', () => {
 	})
 
 	it('a turn with no content, no tools, and no usage settles empty (not partial)', async () => {
-		const provider = createScriptedProvider([{ result: { content: '' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: '' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
@@ -2619,17 +2407,17 @@ describe('Agent — provider failure modes', () => {
 
 	it('sums usage across turns where only some report it', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		// Turn 1 reports usage, turn 2 (tool follow-up) reports none, turn 3 reports usage.
 		const provider = createScriptedProvider(
 			[
 				{
-					result: { content: '', tools: [createToolCall()], usage: USAGE },
+					result: { content: '', tools: [createToolCall()], usage: AGENT_USAGE },
 				},
 				{ result: { content: '', tools: [createToolCall({ id: 'c2' })] } }, // no usage
-				{ result: { content: 'final', usage: USAGE } },
+				{ result: { content: 'final', usage: AGENT_USAGE } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2644,7 +2432,7 @@ describe('Agent — provider failure modes', () => {
 		// still returns its assembled content.
 		const provider = createScriptedProvider(
 			[{ result: { content: 'ab' }, deltas: ['a', '', 'b'] }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -2664,23 +2452,8 @@ describe('Agent — provider failure modes', () => {
 		// error, an `error` event), and the turn-1 tool results already landed in the conversation
 		// must survive the rejection (the loop never unwinds them).
 		const tools = createToolManager()
-		tools.add(addTool())
-		let calls = 0
-		const provider: ProviderInterface = {
-			id: 'fault',
-			name: 'fault',
-			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-				calls += 1
-				if (calls === 1) {
-					yield { channel: 'content', text: '' }
-					return { content: '', tools: [createToolCall()] }
-				}
-				throw new Error('turn 2 boom')
-			},
-			async generate() {
-				throw new Error('turn 2 boom')
-			},
-		}
+		tools.add(createAddTool())
+		const provider = createSecondTurnFailureProvider()
 		const agent = createAgent(provider, { tools, limit: 5 })
 		const events = createRecorders<AgentEventMap, 'error' | 'finish'>(agent.emitter, [
 			'error',
@@ -2708,20 +2481,15 @@ describe('Agent — scheduler edge cases', () => {
 		// A buggy scheduler that throws on yield while the signal is NOT aborted — a genuine
 		// infrastructure fault, distinct from an abort-driven rejection. It must propagate
 		// (reject the result, status error), NOT be swallowed as a cancel.
-		const faulty: SchedulerInterface = {
-			async yield() {
-				throw new Error('scheduler fault')
-			},
-			async delay() {},
-		}
+		const faulty = createFailingScheduler()
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } },
 				{ result: { content: 'unreached' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, scheduler: faulty, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2732,10 +2500,10 @@ describe('Agent — scheduler edge cases', () => {
 
 	it('with no scheduler the inter-turn yield is skipped cleanly (the ?. path)', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'done' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		// No scheduler option → `this.#scheduler?.yield(...)` is a no-op; multi-turn still works.
 		const agent = createAgent(provider, { tools })
@@ -2779,7 +2547,7 @@ describe('Agent — authority deeper', () => {
 				{ result: { content: '', tools: [createToolCall()] } },
 				{ result: { content: 'recovered from denial' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2810,10 +2578,8 @@ describe('Agent — authority deeper', () => {
 		expect(second?.messages.at(-1)?.content).toBe('denied: policy crashed')
 	})
 
-	// The fail-closed denial's reason goes through `@orkestrel/workflow`'s `errorToMessage`, which
-	// normalizes an unknown throw to a NON-EMPTY message. So an `Error` whose `message` is empty no
-	// longer renders the reasonless `'denied: '` a model cannot act on, and a hostile throw whose
-	// stringification fails still yields readable text instead of escaping the gate.
+	// The error normalizer must provide a nonempty denial reason for an empty error message
+	// and contain a throw whose stringification fails.
 	it('an empty Error message still yields a readable fail-closed denial', async () => {
 		const authority = createAuthority({
 			rules: [
@@ -2827,7 +2593,7 @@ describe('Agent — authority deeper', () => {
 		})
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'after' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const denials = createRecorder<readonly [call: ToolCall, reason: string | undefined]>()
 		const agent = createAgent(provider, {
@@ -2872,7 +2638,7 @@ describe('Agent — authority deeper', () => {
 		})
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'after' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const denials = createRecorder<readonly [call: ToolCall, reason: string | undefined]>()
 		const agent = createAgent(provider, {
@@ -2913,11 +2679,15 @@ describe('Agent — authority deeper', () => {
 		const provider = createScriptedProvider(
 			[
 				{
-					result: { content: 'a', tools: [{ id: 'c1', name: 'del', arguments: {} }], usage: USAGE },
+					result: {
+						content: 'a',
+						tools: [{ id: 'c1', name: 'del', arguments: {} }],
+						usage: AGENT_USAGE,
+					},
 				},
 				{ result: { content: 'b' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -2973,7 +2743,7 @@ describe('Agent — authority deeper', () => {
 				},
 				{ result: { content: 'final' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -3000,7 +2770,7 @@ describe('Agent — authority deeper', () => {
 		).toBe(true)
 	})
 
-	it('an authority denying on call.arguments content (not just name) is honoured by the loop', async () => {
+	it('an authority denying on call.arguments content (not only name) is honoured by the loop', async () => {
 		// Deny `transfer` only when amount > 100 — proving the loop hands the matcher the full
 		// call (name AND arguments), and the small transfer executes while the large is denied.
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
@@ -3037,7 +2807,7 @@ describe('Agent — authority deeper', () => {
 				},
 				{ result: { content: 'done' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -3072,18 +2842,7 @@ describe('Agent — authority deeper', () => {
 
 describe('Agent — status transitions and getters', () => {
 	it('transitions idle → running → error on a genuine provider failure', async () => {
-		async function* failing(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'x' }
-			throw new Error('boom')
-		}
-		const provider: ProviderInterface = {
-			id: 'e',
-			name: 'e',
-			stream: failing,
-			async generate() {
-				throw new Error('boom')
-			},
-		}
+		const provider = createThrowingProvider('boom', 'x')
 		const agent = createAgent(provider)
 		expect(agent.status).toBe('idle')
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -3094,7 +2853,7 @@ describe('Agent — status transitions and getters', () => {
 	})
 
 	it('exposes a stable id and the live context getter', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'hi' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'hi' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, { system: 'sys' })
 		// id is a stable non-empty string across reads.
 		expect(typeof agent.id).toBe('string')
@@ -3165,13 +2924,13 @@ describe('Agent — status transitions and getters', () => {
 // loop itself does NOT consume the guard — it distinguishes a cancel from a genuine
 // error through the bound signal's `aborted` flag (see the loop's `#provide` catch), so the
 // guard is a CONSUMER-facing recovery helper. These pin the class + guard here (in a
-// behavioral file) since `errors.ts` is structure-exempt from its own test mirror.
+// behavioral file) because `errors.ts` is structure-exempt from its own test mirror.
 describe('ProviderAbortError + isProviderAbortError', () => {
 	it('carries a fixed name/message and the partial result verbatim', () => {
 		const partial: ProviderResult = {
 			content: 'half',
 			tools: [{ id: 'c1', name: 'add', arguments: { a: 1 } }],
-			usage: USAGE,
+			usage: AGENT_USAGE,
 		}
 		const error = new ProviderAbortError(partial)
 		expect(error).toBeInstanceOf(Error)
@@ -3181,7 +2940,7 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 		expect(error.partial).toBe(partial)
 		expect(error.partial.content).toBe('half')
 		expect(error.partial.tools).toEqual([{ id: 'c1', name: 'add', arguments: { a: 1 } }])
-		expect(error.partial.usage).toEqual(USAGE)
+		expect(error.partial.usage).toEqual(AGENT_USAGE)
 	})
 
 	it('accepts a minimal partial (empty content, no tools/usage)', () => {
@@ -3219,12 +2978,12 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 // (`AgentEventMap`) carrying lifecycle + usage/tool/deny moments for fire-and-forget
 // observers — NOT per-token (there is no `token` event; deltas stay the stream's job).
 // Every event is emitted directly; the emitter isolates a listener throw (it can never
-// escape into the 3×hardened settle-once / wake-park loop) and routes it to the emitter's
+// escape into the settle and wakeup settle-once / wake-park loop) and routes it to the emitter's
 // own `error` handler (the `error` option). These pin: each event fires at the right
 // moment with the right payload; the `on?` option wires initial listeners; a cancelled
-// run emits `abort` THEN `finish` (the partial); the load-bearing emit-safety guarantee
+// run emits `abort` THEN `finish` (the partial); the load-bearing listener-error isolation
 // (a throwing observer cannot corrupt the run, yet the error handler fires); and that
-// `generate()` and `stream()` drive the SAME events (they share `#run`).
+// `generate()` and `stream()` drive the SAME events (they share `#execute`).
 
 // The AgentEventMap event names recorded across the emitter tests — fed to `createRecorders`
 // from @orkestrel/test (the per-event wiring lives in the package; this file
@@ -3233,24 +2992,12 @@ describe('ProviderAbortError + isProviderAbortError', () => {
 // event map from an explicit type argument: `TMap` appears only inside the generic `on` method
 // of its source parameter, which yields no inference candidate, so both arguments are named at
 // every call site.
-const AGENT_EVENTS = [
-	'start',
-	'turn',
-	'tool',
-	'usage',
-	'deny',
-	'finish',
-	'error',
-	'abort',
-	'fault',
-] as const
-type AgentEventName = (typeof AGENT_EVENTS)[number]
 
 describe('Agent — emitter (push observation surface)', () => {
 	it('a no-tools run fires start → turn → usage → finish with the right payloads', async () => {
 		const provider = createScriptedProvider(
-			[{ result: { content: 'hello', usage: USAGE } }],
-			SCRIPT_OPTIONS,
+			[{ result: { content: 'hello', usage: AGENT_USAGE } }],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider)
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3259,9 +3006,13 @@ describe('Agent — emitter (push observation surface)', () => {
 		// `start` once, carrying the agent id; one `turn` (index 0); usage once; finish once.
 		expect(events.start.calls).toEqual([[agent.id]])
 		expect(events.turn.calls).toEqual([[0]])
-		expect(events.usage.calls).toEqual([[USAGE]])
+		expect(events.usage.calls).toEqual([[AGENT_USAGE]])
 		expect(events.finish.calls).toEqual([[result]])
-		expect(events.finish.calls[0]?.[0]).toEqual({ content: 'hello', usage: USAGE, partial: false })
+		expect(events.finish.calls[0]?.[0]).toEqual({
+			content: 'hello',
+			usage: AGENT_USAGE,
+			partial: false,
+		})
 		// A clean no-tools, non-cancel run fires neither `tool` / `deny` / `error` / `abort`.
 		expect(events.tool.count).toBe(0)
 		expect(events.deny.count).toBe(0)
@@ -3271,13 +3022,13 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('fires one turn event per iteration (count === turns run)', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		// Always-tool script capped at 3 → exactly 3 iterations.
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 3 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3290,19 +3041,19 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('a tool run fires tool + usage with the dispatched call/result and summed usage', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[
 				{
 					result: {
 						content: '',
 						tools: [{ id: 'c1', name: 'add', arguments: { a: 2 } }],
-						usage: USAGE,
+						usage: AGENT_USAGE,
 					},
 				},
-				{ result: { content: 'sum 5', usage: USAGE } },
+				{ result: { content: 'sum 5', usage: AGENT_USAGE } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 5 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3343,7 +3094,7 @@ describe('Agent — emitter (push observation surface)', () => {
 				{ result: { content: '', tools: [{ id: 'd1', name: 'del', arguments: { id: 'x' } }] } },
 				{ result: { content: 'understood' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3367,7 +3118,7 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('a fail-closed (throwing) authority fires deny with the thrown reason', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const authority = createAuthority({
 			rules: [
 				{
@@ -3383,7 +3134,7 @@ describe('Agent — emitter (push observation surface)', () => {
 				{ result: { content: '', tools: [createToolCall()] } },
 				{ result: { content: 'recovered' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, authority })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3396,18 +3147,7 @@ describe('Agent — emitter (push observation surface)', () => {
 	})
 
 	it('fires error (not finish) on a genuine provider failure', async () => {
-		async function* failingStream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'partial' }
-			throw new Error('boom')
-		}
-		const provider: ProviderInterface = {
-			id: 'e',
-			name: 'e',
-			stream: failingStream,
-			async generate() {
-				throw new Error('boom')
-			},
-		}
+		const provider = createThrowingProvider('boom', 'partial')
 		const agent = createAgent(provider)
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -3425,19 +3165,7 @@ describe('Agent — emitter (push observation surface)', () => {
 	it('a cancelled run fires abort THEN finish (the partial) — the documented semantics', async () => {
 		const gate = Promise.withResolvers<void>()
 		// A provider that streams one delta then parks on a gate, giving a window to abort.
-		const provider: ProviderInterface = {
-			id: 's',
-			name: 's',
-			async *stream(_messages, signal) {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-				return { content: 'partfull' }
-			},
-			async generate() {
-				return { content: 'partfull' }
-			},
-		}
+		const provider = createAbortingGatedProvider(gate)
 		// Record the ORDER abort vs finish fire in, to prove abort precedes finish.
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -3468,7 +3196,10 @@ describe('Agent — emitter (push observation surface)', () => {
 	it('a pre-aborted external signal fires abort + finish (empty partial), never error', async () => {
 		const controller = new AbortController()
 		controller.abort('preempted')
-		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const agent = createAgent(provider, { signal: controller.signal })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -3485,12 +3216,12 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('a cap-bounded finish fires finish only (a cap is NOT a cancel — no abort)', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		const provider = createScriptedProvider(
 			Array.from({ length: 10 }, () => ({
 				result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] },
 			})),
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { tools, limit: 3 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
@@ -3508,7 +3239,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		const startRec = createRecorder<[id: string]>()
 		// Pass listeners through the reserved `on` option — they must fire without a later .on().
 		const agent = createAgent(
-			createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS),
+			createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS),
 			{
 				on: { start: startRec.handler, finish: finishRec.handler },
 			},
@@ -3521,13 +3252,13 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('EMIT SAFETY: a throwing tool listener cannot corrupt the run, and routes to the error handler', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[
-				{ result: { content: '', tools: [createToolCall()], usage: USAGE } },
-				{ result: { content: 'final answer', usage: USAGE } },
+				{ result: { content: '', tools: [createToolCall()], usage: AGENT_USAGE } },
+				{ result: { content: 'final answer', usage: AGENT_USAGE } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const agent = createAgent(provider, { tools, limit: 5, error: errors.handler })
@@ -3540,7 +3271,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		// THE LOAD-BEARING ASSERTION: the run is UNCORRUPTED — it settled the correct final
-		// content + summed usage despite the throwing listener (the throw never escaped `#run`).
+		// content + summed usage despite the throwing listener (the throw never escaped `#execute`).
 		expect(result).toEqual({
 			content: 'final answer',
 			usage: { prompt: 10, completion: 14, total: 24 },
@@ -3559,10 +3290,10 @@ describe('Agent — emitter (push observation surface)', () => {
 
 	it('EMIT SAFETY: a throwing error handler neither escapes nor recurses', async () => {
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'done' } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		// Count how many times the error handler is INVOKED — it must be exactly once
 		// (no recursion) even though it itself throws.
@@ -3593,13 +3324,13 @@ describe('Agent — emitter (push observation surface)', () => {
 	it('generate() and stream() drive the SAME events for the same script (parity)', async () => {
 		const script: readonly ScriptedTurn[] = [
 			{
-				result: { content: '', tools: [createToolCall()], usage: USAGE },
+				result: { content: '', tools: [createToolCall()], usage: AGENT_USAGE },
 				deltas: [],
 			},
-			{ result: { content: 'sum 5', usage: USAGE }, deltas: ['sum', ' 5'] },
+			{ result: { content: 'sum 5', usage: AGENT_USAGE }, deltas: ['sum', ' 5'] },
 		]
 		// generate() path.
-		const a = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
 			limit: 5,
 		})
@@ -3607,7 +3338,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const ra = await a.generate()
 		// stream() path — same script, fully drained.
-		const b = createAgent(createScriptedProvider(script, SCRIPT_OPTIONS), {
+		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
 			limit: 5,
 		})
@@ -3616,7 +3347,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		const stream = b.stream()
 		await collect(stream.events)
 		const rb = await stream.result
-		// Same settled result, and the SAME push events fired (both share `#run`).
+		// Same settled result, and the SAME push events fired (both share `#execute`).
 		expect(rb).toEqual(ra)
 		expect(eb.turn.calls).toEqual(ea.turn.calls)
 		expect(eb.usage.count).toBe(ea.usage.count)
@@ -3634,80 +3365,18 @@ describe('Agent — emitter (push observation surface)', () => {
 
 // ── Automatic compaction (the context `window` budget) ───────────────────────
 //
-// A SOFT, opt-in context budget that compacts the injected conversation BETWEEN turns
-// (compact-and-continue), distinct from the cost `budget`'s HARD abort. The trigger is a
-// CONTEXT `Budget` whose `consume` is a token estimator (the exported `estimateMessages`) and
-// whose `max` is the context window. The model is ABSOLUTE: each turn the loop `clear()`s the
-// budget then `consume`s the WORKING `messages` array — the EXACT next prompt (the conversation's
-// `view()` + this turn's appended assistant + tool messages, with no system block here since the
-// agent has no system / instructions / documents / images) — so `window.consumed` is the current
-// FULL prompt's estimated footprint and `exhausted` means the prompt has reached the window `max`.
-// On `exhausted` the loop `compact()`s + REBUILDS `messages` from the (smaller) compacted `view()`;
-// no post-compact `clear()` — the NEXT turn's clear()+consume re-measures the shrunken prompt.
-// Deterministic here (the scripted provider drives multiple tool-iteration turns within one
-// generate(); a `createStubSummarizer` folds the tail into `recap of <n>`; `estimateMessages` is
-// the per-message `ceil(content.length / 4)` sum so the crossing is exact). The same behavior is
-// proven LIVE through a real model + real-model summarizer in tests/src/ollama/context.test.ts.
-//
-// The shared multi-turn script: two tool-call turns then a final answer, so the loop genuinely
-// iterates (two between-turns budget checks) and ends on a real answer. Each tool-call turn
-// appends a 40-char assistant message (`ceil(40/4)` = 10 tok — only `content` is summed) + the
-// `JSON.stringify(5)` = '5' tool result (`ceil(1/4)` = 1 tok). The seed user turn 'go' is 1 tok.
-const COMPACT_SCRIPT: readonly ScriptedTurn[] = [
-	{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
-	{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
-	{ result: { content: 'the answer is 42' } },
-]
-
-// Build an agent over the COMPACT_SCRIPT with an injected conversation registry (a stub summarizer
-// + keep: 0 — a fold collapses the whole live tail into one `recap of <n>` section) whose active
-// conversation IS the agent's message source, plus the canonical `add` tool, seeded with one user
-// turn (routed to the active conversation's live tail). The context `window` budget (when given) is
-// threaded straight through; `undefined` ⇒ no auto-compaction. Returns the agent + the active
-// conversation so a test can drive generate() and inspect sections / events. NB no `system` ⇒
-// build() prepends NO leading system message, so the working `messages` the budget measures is
-// exactly the conversation view + the turn's appends.
-function compactionAgent(window: ReturnType<typeof createBudget<readonly Message[]>> | undefined): {
-	readonly agent: ReturnType<typeof createAgent>
-	readonly conversation: ReturnType<typeof createConversation>
-	readonly provider: ReturnType<typeof createScriptedProvider>
-} {
-	const conversations = createConversationManager({
-		summarize: createStubSummarizer().summarize,
-		keep: 0,
-	})
-	const conversation = conversations.add() // auto-activates — the agent's message source
-	const tools = createToolManager()
-	tools.add(addTool())
-	const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
-	// The registry is injected through the AGENT (forwarded to its context), so
-	// `agent.context.messages` IS the active conversation's live tail — seed the user turn there.
-	const agent = createAgent(provider, {
-		conversations,
-		tools,
-		...(window === undefined ? {} : { window }),
-		limit: 5,
-	})
-	agent.context.messages.add({ role: 'user', content: 'go' })
-	return { agent, conversation, provider }
-}
-
-// A fresh context budget over the real `estimateMessages` estimator (no behavior-mock) — the
-// pluggable `consumer` an agent's `window` carries.
-const contextBudget = (max: number): ReturnType<typeof createBudget<readonly Message[]>> =>
-	createBudget({ max, consumer: estimateMessages })
-
+// The context budget measures the working prompt and triggers compaction at its ceiling.
 describe('Agent — automatic compaction (context window budget)', () => {
 	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
-		// An earlier exchange sits before the run's request 'go', and the window sits one token above
+		// An earlier exchange sits before the run's request 'go', and the window sits one token preceding
 		// the opening prompt, so the pre-first-turn check holds and turn 1's appends cross it:
-		//  • Turn 1 sees `[earlier, reply, go]` (3 msgs) and appends asst(40x) + tool("5") → EXHAUSTED
+		//  • Turn 1 sees `[earlier, reply, go]` (3 messages) and appends asst(40x) + tool("5") → EXHAUSTED
 		//    → compact() (keep 0) folds the 2 messages before the request into `recap of 2`; the
-		//    working array rebuilds to `[<recap of 2>, go, 40x, "5"]` (4 msgs).
+		//    working array rebuilds to `[<recap of 2>, go, 40x, "5"]` (4 messages).
 		//  • Turn 2 appends asst(40y) + tool("5") → still over the window → compact() has nothing
 		//    before the request to fold, so it returns `undefined` and the run latches futile.
 		//  • Turn 3 (no tools) answers 'the answer is 42'.
-		// So compaction fires EXACTLY once; without it turn 2 would see 5 msgs. Record the
+		// So compaction fires EXACTLY once; without it turn 2 would see 5 messages. Record the
 		// conversation's own `compact` event (the observability surface — NO added Agent event).
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
@@ -3720,12 +3389,15 @@ describe('Agent — automatic compaction (context window budget)', () => {
 			{ role: 'user', content: 'go' },
 		])
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(estimateMessages(conversation.view()) + 1),
+			window: createBudget({
+				max: estimateMessages(conversation.view()) + 1,
+				consumer: estimateMessages,
+			}),
 			limit: 5,
 		})
 		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
@@ -3761,8 +3433,8 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// produces the same answer. With NO compaction the working array only grows, so the LAST
 		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x(+calls), "5",
 		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
-		const window = contextBudget(10_000)
-		const { agent, conversation } = compactionAgent(window)
+		const window = createBudget({ max: 10_000, consumer: estimateMessages })
+		const { agent, conversation } = seedCompactionAgent(window)
 		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
 			'compact',
 		])
@@ -3774,11 +3446,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		// The budget was re-measured each turn against the ABSOLUTE prompt and never crossed the
-		// ceiling. Its final value is turn 2's FULL prompt. `estimateMessages` now adds
-		// MESSAGE_TOKEN_OVERHEAD (4) per message PLUS a JSON-stringified `calls` estimate for each
-		// tool-call-bearing assistant turn (both COMPACT_SCRIPT assistant turns carry one tool call
-		// each), so the assistant messages below reproduce that shape exactly rather than the
-		// content-only reconstruction the old estimator tolerated.
+		// ceiling. Its final value is turn 2's full prompt, including message overhead and tool calls.
 		const turn2Prompt: readonly Message[] = [
 			{ id: 'u', role: 'user', content: 'go' },
 			{ id: 'a1', role: 'assistant', content: 'x'.repeat(40), calls: [createToolCall()] },
@@ -3801,7 +3469,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// The trigger block is skipped entirely, so the conversation is NEVER folded — and the run
 		// produces the identical final answer the windowed run produced. This is the byte-for-byte
 		// additive proof: omitting `window` leaves the loop exactly as the cost-budget-only path.
-		const { agent, conversation } = compactionAgent(undefined)
+		const { agent, conversation } = seedCompactionAgent(undefined)
 		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
 			'compact',
 		])
@@ -3820,10 +3488,10 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// skipped: the multi-turn loop runs exactly as the no-window path and ends correctly — and the
 		// budget is never consumed. This preserves the shipped behavior (a conversation that can't fold
 		// is never auto-compacted, and the loop never throws the SUMMARIZER error).
-		const window = contextBudget(1)
+		const window = createBudget({ max: 1, consumer: estimateMessages })
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, { tools, window, limit: 5 })
 		expect(agent.context.conversations.active?.summarizable).toBe(false)
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -3841,7 +3509,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 
 // ── Automatic compaction — production hardening ──────────────────────────────
 //
-// Beyond the between-turns trigger above, the production path adds: a PRE-FIRST-TURN check (a
+// Beyond the between-turns preceding trigger, the production path adds: a PRE-FIRST-TURN check (a
 // resumed / long conversation whose INITIAL prompt already exceeds the window compacts BEFORE the
 // first provider call, not only after a tool turn); a NON-FATAL summarizer failure (a thrown auto
 // `compact()` does NOT crash the run — it is caught, surfaced as a `fault` event, and the run
@@ -3849,22 +3517,16 @@ describe('Agent — automatic compaction (context window budget)', () => {
 // window latches a per-run flag that STOPS auto-compacting for the rest of the run — no per-turn
 // churn — letting the over-window prompt proceed to the provider). All deterministic (scripted
 // provider + the real `estimateMessages`), all PURELY ADDITIVE atop the prior loop. The `window`
-// budget reuses the same `contextBudget` / estimator as the block above.
+// budget reuses the same `contextBudget` / estimator as the block preceding.
 describe('Agent — automatic compaction (production hardening)', () => {
 	// A no-tools provider that ALWAYS finishes its turn with a fixed answer regardless of the prompt
 	// content (so a run is exactly ONE provider turn) — the cleanest driver for the PRE-FIRST-TURN
 	// check (the only compaction point when there is no tool iteration). `record: true` so a test can
 	// read what the single provider call actually saw.
-	const answerProvider = (): ReturnType<typeof createScriptedProvider> =>
-		createScriptedProvider([{ result: { content: 'final answer' } }], {
-			name: 'answer',
-			record: true,
-			exhaust: 'repeat',
-		})
 
 	it('PRE-FIRST-TURN: a conversation whose INITIAL prompt already exceeds the window compacts before the first provider call', async () => {
 		// Seed the conversation's live tail with ONE big earlier user message (200 chars ⇒
-		// ceil(200/4) = 50 tok) and the short request BEFORE the run. With a window max of 20 and NO
+		// ceil(200/4) = 50 tokens) and the short request BEFORE the run. With a window max of 20 and NO
 		// system prompt, the build()'d initial prompt already exceeds the window — so the loop's
 		// PRE-FIRST-TURN `#trim` fires `compact()` (keep 0 folds the message before the request into
 		// `recap of 1`) and rebuilds BEFORE turn 0. The single provider call must therefore see the
@@ -3878,10 +3540,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const seed = 'q'.repeat(200)
 		conversation.add({ role: 'user', content: seed })
 		conversation.add({ role: 'user', content: 'hi' })
-		const provider = answerProvider()
+		const provider = createAnswerProvider()
 		const agent = createAgent(provider, {
 			conversations,
-			window: contextBudget(20),
+			window: createBudget({ max: 20, consumer: estimateMessages }),
 			limit: 5,
 		})
 
@@ -3912,8 +3574,12 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		})
 		const conversation = conversations.add() // auto-activates — the agent's message source
 		conversation.add({ role: 'user', content: 'hi' })
-		const provider = answerProvider()
-		const agent = createAgent(provider, { conversations, window: contextBudget(10_000), limit: 5 })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, {
+			conversations,
+			window: createBudget({ max: 10_000, consumer: estimateMessages }),
+			limit: 5,
+		})
 
 		const result = await agent.generate()
 
@@ -3943,12 +3609,12 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			{ role: 'assistant', content: 'Earlier answer.' },
 		])
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(12),
+			window: createBudget({ max: 12, consumer: estimateMessages }),
 			limit: 5,
 		})
 		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
@@ -3985,7 +3651,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
 		const conversation = conversations.add() // auto-activates — the agent's message source
 		const tools = createToolManager()
-		tools.add(addTool())
+		tools.add(createAddTool())
 		// Each tool turn appends a big assistant message so the absolute prompt stays over the window
 		// on every between-turns check (the futile guard must hold across BOTH tool turns).
 		const script: readonly ScriptedTurn[] = [
@@ -3993,11 +3659,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			{ result: { content: 'y'.repeat(80), tools: [createToolCall({ id: 'c2' })] } },
 			{ result: { content: 'done' } },
 		]
-		const provider = createScriptedProvider(script, SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(script, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(12),
+			window: createBudget({ max: 12, consumer: estimateMessages }),
 			limit: 5,
 		})
 		const events = createRecorders<AgentEventMap, 'fault' | 'finish'>(agent.emitter, [
@@ -4033,13 +3699,16 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			{ role: 'user', content: 'go' },
 		])
 		// The opening prompt fits the window, so only the post-dispatch check can reach it.
-		const window = contextBudget(estimateMessages(conversation.view()) + 1)
+		const window = createBudget({
+			max: estimateMessages(conversation.view()) + 1,
+			consumer: estimateMessages,
+		})
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] } },
 				{ result: { content: 'Done.' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const tools = createToolManager()
 		const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
@@ -4098,44 +3767,21 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 	// Drive one "request" on `agent` against the conversation `id` in the agent's registry — the exact
 	// per-request switch the app performs: resolve-or-create the thread, make it active, append the user
 	// turn, run to completion.
-	const request = async (
-		agent: ReturnType<typeof createAgent>,
-		manager: ReturnType<typeof createConversationManager>,
-		id: string,
-		content: string,
-	): Promise<AgentResult> => {
-		if (manager.conversation(id) === undefined) manager.add({ id })
-		manager.switch(id)
-		agent.context.messages.add({ role: 'user', content })
-		return agent.generate()
-	}
 
 	it('accumulates independent histories across switched conversations (no cross-talk)', async () => {
 		// No window (no compaction) — a no-tools provider that echoes the LAST user turn, so each
 		// conversation's answers are distinguishable. One agent serves an interleaved A / B / A / B
 		// sequence; each conversation's live tail must hold ONLY its own user turns + their answers.
-		const provider: ProviderInterface = {
-			id: 'echo',
-			name: 'echo',
-			async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
-				const last = messages.at(-1)
-				yield { channel: 'content', text: 'ok' }
-				return { content: `answer:${last?.content ?? ''}` }
-			},
-			async generate(messages) {
-				const last = messages.at(-1)
-				return { content: `answer:${last?.content ?? ''}` }
-			},
-		}
+		const provider = createConversationEchoProvider()
 		// The manager is the agent's OWN registry (its message source). The context adds a default
 		// conversation when the supplied registry is empty, so the agent's registry IS this `manager`.
 		const manager = createConversationManager()
 		const agent = createAgent(provider, { conversations: manager })
 
-		const a1 = await request(agent, manager, 'A', 'a-one')
-		const b1 = await request(agent, manager, 'B', 'b-one')
-		const a2 = await request(agent, manager, 'A', 'a-two')
-		const b2 = await request(agent, manager, 'B', 'b-two')
+		const a1 = await requestConversation(agent, manager, 'A', 'a-one')
+		const b1 = await requestConversation(agent, manager, 'B', 'b-one')
+		const a2 = await requestConversation(agent, manager, 'A', 'a-two')
+		const b2 = await requestConversation(agent, manager, 'B', 'b-two')
 
 		// Each request answered against ITS OWN conversation's latest user turn.
 		expect(a1.content).toBe('answer:a-one')
@@ -4164,7 +3810,7 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 	it('compacts each conversation INDEPENDENTLY — one thread’s sections never leak into another', async () => {
 		// One agent WITH a small window + a ConversationManager (keep 0). A no-tools provider that
 		// always finishes, so each request is a single turn whose PRE-FIRST-TURN `#trim` compacts the
-		// conversation once its accumulated history exceeds the window. Two requests per thread: the
+		// conversation after its accumulated history exceeds the window. Two requests per thread: the
 		// 2nd request's pre-first-turn check folds that thread's own accumulated tail into ITS OWN
 		// section (retaining ITS OWN originals). The window resets per run (run-entry `clear()`), so the
 		// two threads compact on their own schedules with no shared state.
@@ -4177,26 +3823,26 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		})
 		// A window small enough that a 2nd-request prompt (prior user "alpha-1"/"bravo-1" + 'ok' answer
 		// + new user turn — three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
-		// old thresholds under the new estimator) exceeds it, but a 1st-request prompt (one short user
-		// turn: content ~2 tok + 4 overhead = ~6) does not (max 10). The manager (with its summarizer)
+		// 10-token ceiling) exceeds it, but a 1st-request prompt (one short user
+		// turn: content ~2 tokens + 4 overhead = ~6) does not (max 10). The manager (with its summarizer)
 		// is the agent's OWN registry, so each thread is summarizable.
 		const agent = createAgent(provider, {
 			conversations: manager,
-			window: contextBudget(10),
+			window: createBudget({ max: 10, consumer: estimateMessages }),
 			limit: 5,
 		})
 
 		// Round 1 — each thread's first request: a single short user turn, under the window ⇒ no fold.
-		await request(agent, manager, 'A', 'alpha-1')
-		await request(agent, manager, 'B', 'bravo-1')
+		await requestConversation(agent, manager, 'A', 'alpha-1')
+		await requestConversation(agent, manager, 'B', 'bravo-1')
 		expect(manager.conversation('A')?.sections.length).toBe(0)
 		expect(manager.conversation('B')?.sections.length).toBe(0)
 
 		// Round 2 — each thread now has [user, 'ok'] accumulated; the new user turn (added before
 		// generate) pushes the prompt over the window, so the pre-first-turn `#trim` folds THAT thread's
 		// earlier exchange into one section and keeps the second request live.
-		await request(agent, manager, 'A', 'alpha-2')
-		await request(agent, manager, 'B', 'bravo-2')
+		await requestConversation(agent, manager, 'A', 'alpha-2')
+		await requestConversation(agent, manager, 'B', 'bravo-2')
 
 		const a = manager.conversation('A')
 		const b = manager.conversation('B')
@@ -4236,7 +3882,7 @@ describe('Agent — limit exhaustion', () => {
 		// so a single scripted turn can serve as many calls as the loop makes).
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
-			{ ...SCRIPT_OPTIONS, exhaust: 'repeat' },
+			{ ...AGENT_SCRIPT_OPTIONS, exhaust: 'repeat' },
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -4259,13 +3905,13 @@ describe('Agent — limit exhaustion', () => {
 
 	it('a natural final answer on the very last allowed turn stays non-partial (no exhaust)', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } },
 				{ result: { content: 'done' } },
 			],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -4281,7 +3927,10 @@ describe('Agent — limit exhaustion', () => {
 	})
 
 	it('limit: 0 resolves immediately, non-partial, no exhaust, no provider call', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			limit: 0,
@@ -4313,7 +3962,7 @@ describe('Agent — limit exhaustion', () => {
 		)
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -4344,7 +3993,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		const deltas = Array.from({ length: 10 }, () => 'abcde')
 		const provider = createScriptedProvider(
 			[{ result: { content: deltas.join('') }, deltas }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -4357,7 +4006,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		expect(order).toEqual(['abort', 'finish'])
 		// The cancel landed before all 10 deltas streamed -- the provider genuinely saw its
 		// bound signal aborted mid-stream (a scripted provider throws ProviderAbortError only
-		// once `signal.aborted` is observed between deltas).
+		// after `signal.aborted` is observed between deltas).
 		expect(result.content.length).toBeLessThan(deltas.join('').length)
 	})
 
@@ -4365,22 +4014,27 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		const usage: TokenUsage = { prompt: 20, completion: 30, total: 50 }
 		const provider = createScriptedProvider(
 			[{ result: { content: 'hello world', usage }, deltas: ['hello ', 'world'] }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
-		const budget = createRecordingBudget(1_000_000) // generous -- never trips
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
+			},
+		}) // generous -- never trips
 		const agent = createAgent(provider, { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.partial).toBe(false)
 		expect(result.usage).toEqual(usage) // the REPORTED usage is unaffected by budget metering
-		const sum = (field: keyof TokenUsage): number =>
-			budget.consumes.reduce((total, one) => total + one[field], 0)
-		expect(sum('prompt')).toBe(usage.prompt)
-		expect(sum('completion')).toBe(usage.completion)
-		expect(sum('total')).toBe(usage.total)
+		expect(computeUsageTotal(budgetRecorder.calls, 'prompt')).toBe(usage.prompt)
+		expect(computeUsageTotal(budgetRecorder.calls, 'completion')).toBe(usage.completion)
+		expect(computeUsageTotal(budgetRecorder.calls, 'total')).toBe(usage.total)
 		// At least one mid-stream charge happened (the content deltas were estimated as they
 		// streamed) AND the reconcile happened (more than one consume call for the one turn).
-		expect(budget.consumes.length).toBeGreaterThan(1)
+		expect(budgetRecorder.calls.map(([value]) => value).length).toBeGreaterThan(1)
 	})
 
 	// A cancel mid-stream is not the only place usage can surface: a provider that OBSERVED
@@ -4390,19 +4044,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 	it('a cancel mid-stream carrying partial usage folds it into the settled result.usage', async () => {
 		const gate = Promise.withResolvers<void>()
 		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
-		const provider: ProviderInterface = {
-			id: 's',
-			name: 's',
-			async *stream(_messages, signal) {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
-				return { content: 'partfull' }
-			},
-			async generate() {
-				return { content: 'partfull' }
-			},
-		}
+		const provider = createAbortingGatedProvider(gate, abortUsage)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -4420,20 +4062,15 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 	it('a cancel mid-stream reconciles the budget to the reported partial usage (no double-charge, no loss)', async () => {
 		const gate = Promise.withResolvers<void>()
 		const abortUsage: TokenUsage = { prompt: 5, completion: 3, total: 8 }
-		const provider: ProviderInterface = {
-			id: 's',
-			name: 's',
-			async *stream(_messages, signal) {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) throw new ProviderAbortError({ content: 'part', usage: abortUsage })
-				return { content: 'partfull' }
+		const provider = createAbortingGatedProvider(gate, abortUsage)
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
 			},
-			async generate() {
-				return { content: 'partfull' }
-			},
-		}
-		const budget = createRecordingBudget(1_000_000) // generous -- never trips
+		}) // generous -- never trips
 		const agent = createAgent(provider, { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -4446,12 +4083,10 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		expect(result.partial).toBe(true)
 		expect(result.usage).toEqual(abortUsage)
 		// Mid-stream estimate(s) + the abort-path residual reconcile net to EXACTLY the reported
-		// partial usage -- the same invariant the normal-path reconcile test proves above.
-		const sum = (field: keyof TokenUsage): number =>
-			budget.consumes.reduce((total, one) => total + one[field], 0)
-		expect(sum('prompt')).toBe(abortUsage.prompt)
-		expect(sum('completion')).toBe(abortUsage.completion)
-		expect(sum('total')).toBe(abortUsage.total)
+		// partial usage -- the same invariant the normal-path reconcile test proves preceding.
+		expect(computeUsageTotal(budgetRecorder.calls, 'prompt')).toBe(abortUsage.prompt)
+		expect(computeUsageTotal(budgetRecorder.calls, 'completion')).toBe(abortUsage.completion)
+		expect(computeUsageTotal(budgetRecorder.calls, 'total')).toBe(abortUsage.total)
 	})
 })
 
@@ -4461,10 +4096,10 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 describe('Agent — per-run overrides', () => {
 	it('a per-run limit overrides the constructed limit', async () => {
 		const tools = createToolManager()
-		tools.add(loopTool())
+		tools.add(createLoopTool())
 		const provider = createScriptedProvider(
 			[{ result: { content: '', tools: [createToolCall({ id: 'c', name: 'loop' })] } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const order: string[] = []
 		const agent = createAgent(provider, {
@@ -4483,7 +4118,10 @@ describe('Agent — per-run overrides', () => {
 		// The constructed signal is already aborted; the per-run signal stays quiet.
 		const constructionController = new AbortController()
 		constructionController.abort()
-		const providerA = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const providerA = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const agentA = createAgent(providerA, { signal: constructionController.signal })
 		agentA.context.messages.add({ role: 'user', content: 'hi' })
 		const quietRunSignal = new AbortController().signal
@@ -4492,7 +4130,10 @@ describe('Agent — per-run overrides', () => {
 		expect(providerA.calls).toHaveLength(0)
 
 		// The per-run signal aborts; the constructed signal stays quiet.
-		const providerB = createScriptedProvider([{ result: { content: 'never' } }], SCRIPT_OPTIONS)
+		const providerB = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const agentB = createAgent(providerB) // no constructed signal
 		agentB.context.messages.add({ role: 'user', content: 'hi' })
 		const runController = new AbortController()
@@ -4504,7 +4145,7 @@ describe('Agent — per-run overrides', () => {
 
 	it('a per-run timeout commits a partial when it elapses', async () => {
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], {
-			...SCRIPT_OPTIONS,
+			...AGENT_SCRIPT_OPTIONS,
 			delay: 50,
 		})
 		const agent = createAgent(provider)
@@ -4515,15 +4156,32 @@ describe('Agent — per-run overrides', () => {
 
 	it('a per-run budget is the one charged -- the constructed budget stays untouched', async () => {
 		const usage: TokenUsage = { prompt: 5, completion: 5, total: 10 }
-		const provider = createScriptedProvider([{ result: { content: 'ok', usage } }], SCRIPT_OPTIONS)
-		const constructionBudget = createRecordingBudget(1_000_000)
-		const runBudget = createRecordingBudget(1_000_000)
+		const provider = createScriptedProvider(
+			[{ result: { content: 'ok', usage } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const constructionBudgetRecorder = createRecorder<[TokenUsage]>()
+		const constructionBudget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				constructionBudgetRecorder.handler(value)
+				return value.total
+			},
+		})
+		const runBudgetRecorder = createRecorder<[TokenUsage]>()
+		const runBudget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				runBudgetRecorder.handler(value)
+				return value.total
+			},
+		})
 		const agent = createAgent(provider, { budget: constructionBudget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate({ budget: runBudget })
 		expect(result.partial).toBe(false)
-		expect(constructionBudget.consumes).toEqual([])
-		expect(runBudget.consumes.length).toBeGreaterThan(0)
+		expect(constructionBudgetRecorder.calls.map(([value]) => value)).toEqual([])
+		expect(runBudgetRecorder.calls.map(([value]) => value).length).toBeGreaterThan(0)
 	})
 })
 
@@ -4532,7 +4190,7 @@ describe('Agent — per-run overrides', () => {
 // least one of `think` / `schema` is present -- preserving the prior think-only behavior).
 describe('Agent — per-run schema', () => {
 	it('forwards a per-run schema alone', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
@@ -4541,7 +4199,7 @@ describe('Agent — per-run schema', () => {
 	})
 
 	it('forwards think AND schema together when both are set', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
@@ -4550,7 +4208,7 @@ describe('Agent — per-run schema', () => {
 	})
 
 	it('omits the options object entirely when neither think nor schema is set (preserved behavior)', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await agent.generate()
@@ -4567,22 +4225,12 @@ describe('Agent — per-run schema', () => {
 describe('Agent — concurrency guard (construction window/budget)', () => {
 	// A provider whose stream yields one delta then parks on a shared gate, so a test can hold a run
 	// "in flight" (its `#runs` handle already added) across a synchronous second `stream()` call.
-	const gatedProvider = (gate: PromiseWithResolvers<void>): ProviderInterface => ({
-		id: 'gated',
-		name: 'gated',
-		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			yield { channel: 'content', text: 'part' }
-			await gate.promise
-			return { content: 'full' }
-		},
-		async generate() {
-			return { content: 'full' }
-		},
-	})
 
 	it('a construction `window` -- starting a 2nd run while the 1st is in flight throws AgentError(CONCURRENCY); the 1st still completes', async () => {
 		const gate = Promise.withResolvers<void>()
-		const agent = createAgent(gatedProvider(gate), { window: contextBudget(1_000_000) })
+		const agent = createAgent(createGatedProvider(gate), {
+			window: createBudget({ max: 1_000_000, consumer: estimateMessages }),
+		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		const run1 = agent.stream()
@@ -4605,7 +4253,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 	it('a construction `budget` with NO per-run override on the 2nd call throws AgentError(CONCURRENCY)', async () => {
 		const gate = Promise.withResolvers<void>()
 		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
-		const agent = createAgent(gatedProvider(gate), { budget })
+		const agent = createAgent(createGatedProvider(gate), { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		const run1 = agent.stream()
@@ -4626,7 +4274,7 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 
 	it('a construction `budget` with a per-run `budget` override and NO window -- both concurrent runs settle', async () => {
 		const gate = Promise.withResolvers<void>()
-		const agent = createAgent(gatedProvider(gate), {
+		const agent = createAgent(createGatedProvider(gate), {
 			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -4649,11 +4297,18 @@ describe('Agent — concurrency guard (construction window/budget)', () => {
 	})
 
 	it('a construction `budget` -- sequential (awaited) runs never overlap, so both settle and the budget accumulates', async () => {
-		const budget = createRecordingBudget(1_000_000)
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
+			},
+		})
 		const usage: TokenUsage = { prompt: 1, completion: 1, total: 2 }
 		const provider = createScriptedProvider(
 			[{ result: { content: 'first', usage } }, { result: { content: 'second', usage } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -4688,12 +4343,12 @@ describe('Agent — strict compaction', () => {
 			{ role: 'assistant', content: 'Earlier answer.' },
 		])
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(12),
+			window: createBudget({ max: 12, consumer: estimateMessages }),
 			limit: 5,
 			strict: true,
 		})
@@ -4722,25 +4377,19 @@ describe('Agent — strict compaction', () => {
 describe('Agent — abort usage sanitize', () => {
 	it('sanitizes a provider abort partial usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
 		const gate = Promise.withResolvers<void>()
-		const budget = createRecordingBudget(1_000_000)
-		const provider: ProviderInterface = {
-			id: 'dirty',
-			name: 'dirty',
-			async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-				yield { channel: 'content', text: 'part' }
-				await gate.promise
-				if (signal.aborted) {
-					throw new ProviderAbortError({
-						content: 'part',
-						usage: { prompt: -5, completion: Number.NaN, total: 12.7 },
-					})
-				}
-				return { content: 'full' }
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
 			},
-			async generate() {
-				return { content: 'full' }
-			},
-		}
+		})
+		const provider = createAbortingGatedProvider(gate, {
+			prompt: -5,
+			completion: Number.NaN,
+			total: 12.7,
+		})
 		const agent = createAgent(provider, { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
@@ -4758,10 +4407,9 @@ describe('Agent — abort usage sanitize', () => {
 		expect(result.usage).toEqual({ prompt: 0, completion: 0, total: 12 })
 		// The budget was charged the SANITIZED residual, never the raw negative/NaN/fractional values
 		// (`toEqual` on each `consume()` call rules out any NaN / negative field ever reaching it).
-		const midStream = estimateTokens('part')
-		expect(budget.consumes).toEqual([
-			{ prompt: 0, completion: midStream, total: midStream },
-			{ prompt: 0, completion: 0, total: 12 - midStream },
+		expect(budgetRecorder.calls.map(([value]) => value)).toEqual([
+			{ prompt: 0, completion: 1, total: 1 },
+			{ prompt: 0, completion: 0, total: 11 },
 		])
 		expect(budget.consumed).toBe(12)
 	})
@@ -4775,10 +4423,17 @@ describe('Agent — abort usage sanitize', () => {
 // never trips exhaustion).
 describe('Agent — normal usage sanitize', () => {
 	it('sanitizes a provider normal-turn usage (negative/NaN/fractional) before charging the budget and reporting it', async () => {
-		const budget = createRecordingBudget(1_000_000)
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 1_000_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
+			},
+		})
 		const provider = createScriptedProvider(
 			[{ content: 'full', usage: { prompt: -5, completion: Number.NaN, total: 12.7 } }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, { budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -4791,10 +4446,9 @@ describe('Agent — normal usage sanitize', () => {
 		// The budget was charged the SANITIZED residual, never the raw negative/NaN/fractional
 		// values (`toEqual` on each `consume()` call rules out any NaN / negative field ever
 		// reaching it), and the consumes sum to the sanitized total (never NaN/negative).
-		const midStream = estimateTokens('full')
-		expect(budget.consumes).toEqual([
-			{ prompt: 0, completion: midStream, total: midStream },
-			{ prompt: 0, completion: 0, total: 12 - midStream },
+		expect(budgetRecorder.calls.map(([value]) => value)).toEqual([
+			{ prompt: 0, completion: 1, total: 1 },
+			{ prompt: 0, completion: 0, total: 11 },
 		])
 		expect(budget.consumed).toBe(12)
 	})
@@ -4803,7 +4457,7 @@ describe('Agent — normal usage sanitize', () => {
 describe('Agent — a selection handler shapes the prompt and never the tools', () => {
 	it('sends the system block plus the selected subset and hands the handler the request and the run signal', async () => {
 		const selection = createRecordingSelection({ keep: (message) => message.role === 'user' })
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			system: 'You triage billing tickets.',
 			select: selection.handler,
@@ -4845,7 +4499,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 				])
 				const provider = createScriptedProvider(
 					[{ content: '', tools: [createToolCall({ name: 'lookup' })] }, { content: 'done' }],
-					SCRIPT_OPTIONS,
+					AGENT_SCRIPT_OPTIONS,
 				)
 				const agent = createAgent(provider, {
 					tools,
@@ -4894,7 +4548,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 				const calls = [createToolCall({ name: 'secret' }), createToolCall({ name: 'safe' })]
 				const provider = createScriptedProvider(
 					[{ result: { content: '', tools: calls } }, { result: { content: 'final' } }],
-					SCRIPT_OPTIONS,
+					AGENT_SCRIPT_OPTIONS,
 				)
 				const agent = createAgent(provider, {
 					tools,
@@ -4933,7 +4587,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 		const calls = [createToolCall({ id: 'refund-1', name: 'refund' })]
 		const provider = createScriptedProvider(
 			[{ content: 'Refunds need a manager.', tools: calls }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -4961,7 +4615,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 		const calls = [createToolCall({ id: 'refund-1', name: 'refund' })]
 		const provider = createScriptedProvider(
 			[{ content: 'Refunds need a manager.', tools: calls }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			tools,
@@ -4982,7 +4636,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	it('selects nothing when the conversation ends without a user message', async () => {
 		const selection = createRecordingSelection({ keep: () => false })
 		const selected = createRecorder<AgentEventMap['select']>()
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			select: selection.handler,
 			on: { select: selected.handler },
@@ -5008,7 +4662,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		const selection = createRecordingSelection()
 		const order: string[] = []
 		const selected = createRecorder<AgentEventMap['select']>()
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			select: selection.handler,
 			on: {
@@ -5030,7 +4684,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	it('sends a system message ending in the briefing and emits the selection unchanged', async () => {
 		const selected = createRecorder<AgentEventMap['select']>()
 		const briefing = 'Plan: refund invoice 42.'
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			system: 'Be brief.',
 			select: async (conversation) => ({ messages: conversation.view(), judgments: [], briefing }),
@@ -5060,12 +4714,15 @@ describe('Agent — the select event follows each select-site build', () => {
 		])
 		const request = conversation.add({ role: 'user', content: 'go' })
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(estimateMessages(conversation.view()) + 1),
+			window: createBudget({
+				max: estimateMessages(conversation.view()) + 1,
+				consumer: estimateMessages,
+			}),
 			limit: 5,
 			select: selection.handler,
 			on: { select: selected.handler },
@@ -5095,10 +4752,10 @@ describe('Agent — the select event follows each select-site build', () => {
 			{ role: 'user', content: 'q'.repeat(200) },
 			{ role: 'user', content: 'hi' },
 		])
-		const provider = createScriptedProvider([{ content: 'final answer' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'final answer' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
-			window: contextBudget(20),
+			window: createBudget({ max: 20, consumer: estimateMessages }),
 			limit: 5,
 			select: selection.handler,
 			on: {
@@ -5119,7 +4776,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	it('fires none and calls no provider when the run aborts during selection', async () => {
 		const selected = createRecorder<AgentEventMap['select']>()
 		const faults = createRecorder<AgentEventMap['fault']>()
-		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			select: async (conversation, _request, signal) => {
 				await waitForAbort(signal)
@@ -5142,7 +4799,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	})
 
 	it('commits partial when selection is cancelled on a run with a zero iteration limit', async () => {
-		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 		const selected = createRecorder<AgentEventMap['select']>()
 		const agent = createAgent(provider, {
 			limit: 0,
@@ -5166,7 +4823,7 @@ describe('Agent — the select event follows each select-site build', () => {
 describe('Agent — a selection fault follows the compaction fault rules', () => {
 	it('commits partial with no fault when the handler throws after the run aborts', async () => {
 		const faults = createRecorder<AgentEventMap['fault']>()
-		const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			select: async (_conversation, _request, signal) => {
 				await waitForAbort(signal)
@@ -5188,7 +4845,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 	it('emits fault for a thrown handler and sends view() without a select event', async () => {
 		const faults = createRecorder<AgentEventMap['fault']>()
 		const selected = createRecorder<AgentEventMap['select']>()
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			system: 'You triage billing tickets.',
 			select: rejectSelection,
@@ -5216,7 +4873,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 	it('builds from a returned fault, emits fault then select, and folds its usage into the result', async () => {
 		const order: string[] = []
 		const selected = createRecorder<AgentEventMap['select']>()
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			select: abandonSelection,
 			on: {
@@ -5244,9 +4901,16 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 	})
 
 	it('charges a returned fault usage before fault fires', async () => {
-		const budget = createRecordingBudget(10_000)
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 10_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
+			},
+		})
 		const consumed = createRecorder<[consumed: number]>()
-		const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			budget,
 			select: abandonSelection,
@@ -5257,7 +4921,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 		await agent.generate()
 
 		expect(consumed.calls).toEqual([[SELECTION_USAGE.total]])
-		expect(budget.consumes[0]).toEqual(SELECTION_USAGE)
+		expect(budgetRecorder.calls.map(([value]) => value)[0]).toEqual(SELECTION_USAGE)
 	})
 
 	it.each(SELECTION_FAULT_CASES)(
@@ -5267,7 +4931,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 			const errors = createRecorder<AgentEventMap['error']>()
 			const finished = createRecorder<AgentEventMap['finish']>()
 			const selected = createRecorder<AgentEventMap['select']>()
-			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 			const agent = createAgent(provider, {
 				select,
 				strict: true,
@@ -5300,7 +4964,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 			const selected = createRecorder<AgentEventMap['select']>()
 			const errors = createRecorder<AgentEventMap['error']>()
 			const faults = createRecorder<AgentEventMap['fault']>()
-			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 			const agent = createAgent(provider, {
 				select,
 				strict: true,
@@ -5336,7 +5000,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 			const selected = createRecorder<AgentEventMap['select']>()
 			const errors = createRecorder<AgentEventMap['error']>()
 			const faults = createRecorder<AgentEventMap['fault']>()
-			const provider = createScriptedProvider([{ content: 'never sent' }], SCRIPT_OPTIONS)
+			const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
 			const agent = createAgent(provider, {
 				select,
 				strict: false,
@@ -5368,11 +5032,18 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 
 describe('Agent — selection usage reaches the budget and the result, never a usage chunk', () => {
 	it('charges the judge usage in full and sums it with the provider usage', async () => {
-		const budget = createRecordingBudget(10_000)
+		const budgetRecorder = createRecorder<[TokenUsage]>()
+		const budget = createBudget<TokenUsage>({
+			max: 10_000,
+			consumer: (value) => {
+				budgetRecorder.handler(value)
+				return value.total
+			},
+		})
 		const usages = createRecorder<AgentEventMap['usage']>()
 		const provider = createScriptedProvider(
-			[{ result: { content: 'done', usage: USAGE } }],
-			SCRIPT_OPTIONS,
+			[{ result: { content: 'done', usage: AGENT_USAGE } }],
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			budget,
@@ -5386,12 +5057,12 @@ describe('Agent — selection usage reaches the budget and the result, never a u
 		const result = await run.result
 
 		expect(chunks.filter((chunk) => chunk.category === 'usage')).toEqual([
-			{ category: 'usage', usage: USAGE },
+			{ category: 'usage', usage: AGENT_USAGE },
 		])
 		expect(chunks.filter((chunk) => chunk.category === 'usage')).toHaveLength(provider.calls.length)
-		expect(usages.calls).toEqual([[USAGE]])
+		expect(usages.calls).toEqual([[AGENT_USAGE]])
 		expect(result.usage).toEqual({ prompt: 35, completion: 9, total: 44 })
-		expect(budget.consumes[0]).toEqual(SELECTION_USAGE)
+		expect(budgetRecorder.calls.map(([value]) => value)[0]).toEqual(SELECTION_USAGE)
 		expect(budget.consumed).toBe(44)
 	})
 })
@@ -5413,12 +5084,15 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 			{ role: 'user', content: 'go' },
 		])
 		const tools = createToolManager()
-		tools.add(addTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, SCRIPT_OPTIONS)
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: contextBudget(estimateMessages(history.view()) + 1),
+			window: createBudget({
+				max: estimateMessages(history.view()) + 1,
+				consumer: estimateMessages,
+			}),
 			limit: 5,
 			select: async (conversation, request, signal) => {
 				await gate.promise
@@ -5445,7 +5119,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 		const mode = createRecordingSelection()
 		const provider = createScriptedProvider(
 			[{ content: 'first' }, { content: 'second' }, { content: 'third' }],
-			SCRIPT_OPTIONS,
+			AGENT_SCRIPT_OPTIONS,
 		)
 		const agent = createAgent(provider, {
 			select: fallback.handler,
@@ -5474,7 +5148,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 		const passThrough = createRecordingSelection()
 		const bodies = await Promise.all(
 			[false, true].map(async (selecting) => {
-				const provider = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+				const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 				const agent = createAgent(provider, {
 					system: 'You triage billing tickets.',
 					scope: createScope({
@@ -5501,7 +5175,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 
 	it('sends the recorded request through a pass-through mode handler', async () => {
 		const passThrough = createRecordingSelection()
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = seedFramedAgent(provider)
 		agent.context.apply(
 			createScope({
@@ -5521,10 +5195,10 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 
 describe('Agent — with no handler in either home the loop adds no await', () => {
 	it('reaches the provider before stream() returns, and waits for a handler when one is set', async () => {
-		const plain = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const plain = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(plain, { scope: createScope({ name: 'review', tools: [] }) })
 		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
-		const selecting = createScriptedProvider([{ content: 'done' }], SCRIPT_OPTIONS)
+		const selecting = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const selected = createAgent(selecting, { select: createRecordingSelection().handler })
 		selected.context.messages.add({ role: 'user', content: 'Invoice 42.' })
 

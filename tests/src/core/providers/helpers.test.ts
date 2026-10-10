@@ -1,6 +1,9 @@
 import type { JudgeAnswer, JudgeQuestion } from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
+	armReaderAbort,
+	readFailure,
+	MAX_ERROR_BODY_LENGTH,
 	buildJudgeResult,
 	buildProviderResult,
 	computeReading,
@@ -9,7 +12,7 @@ import {
 	isSystemOneAnswer,
 	questionToSystemOne,
 	isJudgeError,
-	readHeaders,
+	buildProviderHeaders,
 	releaseReader,
 	readText,
 	readChunks,
@@ -81,7 +84,7 @@ describe('readText — bounded decoded text', () => {
 		expect(body.bytes).toBe(4)
 		expect(body.cancelled).toBe(true)
 	})
-	it('measures BOM-prefixed completion from bytes despite identical decoded text', async () => {
+	it('measures byte-order mark (BOM)-prefixed completion from bytes despite identical decoded text', async () => {
 		const complete = new RecordedBody([new TextEncoder().encode('{"messages":[]}')])
 		const overflow = new RecordedBody([new TextEncoder().encode('\uFEFF{"messages":[]}  ')])
 		expect(await readText(complete.stream, 18)).toEqual({ text: '{"messages":[]}', complete: true })
@@ -396,16 +399,16 @@ describe('buildJudgeResult — the merge of a judge request’s calls', () => {
 	})
 })
 
-describe('readHeaders — request headers inside the cancellation bound', () => {
+describe('buildProviderHeaders — request headers inside the cancellation bound', () => {
 	it('returns the JSON content type alone without a hook', async () => {
-		const headers = await readHeaders(undefined, new AbortController().signal)
+		const headers = await buildProviderHeaders(undefined, new AbortController().signal)
 		expect([...headers]).toEqual([['content-type', 'application/json']])
 	})
 
 	it('passes the signal to the hook and sets its entries over the content type', async () => {
 		const hook = new RecordedHeaders({ authorization: 'Bearer KEY', 'Content-Type': 'text/plain' })
 		const signal = new AbortController().signal
-		const headers = await readHeaders(hook.headers.bind(hook), signal)
+		const headers = await buildProviderHeaders(hook.headers.bind(hook), signal)
 		expect(hook.signals).toEqual([signal])
 		expect(headers.get('authorization')).toBe('Bearer KEY')
 		expect(headers.get('content-type')).toBe('text/plain')
@@ -417,7 +420,7 @@ describe('readHeaders — request headers inside the cancellation bound', () => 
 		const abort = new AbortController()
 		const reason = new Error('cancelled')
 		abort.abort(reason)
-		await expect(readHeaders(hook.headers.bind(hook), abort.signal)).rejects.toBe(reason)
+		await expect(buildProviderHeaders(hook.headers.bind(hook), abort.signal)).rejects.toBe(reason)
 		expect(hook.signals).toEqual([])
 	})
 
@@ -425,7 +428,7 @@ describe('readHeaders — request headers inside the cancellation bound', () => 
 		const hook = new RecordedHeaders(new Promise(() => {}))
 		const abort = new AbortController()
 		const reason = new Error('cancelled')
-		const headers = readHeaders(hook.headers.bind(hook), abort.signal)
+		const headers = buildProviderHeaders(hook.headers.bind(hook), abort.signal)
 		await hook.entered
 		expect(getEventListeners(abort.signal, 'abort')).toHaveLength(1)
 		abort.abort(reason)
@@ -436,9 +439,9 @@ describe('readHeaders — request headers inside the cancellation bound', () => 
 	it('rethrows a throwing hook unchanged', async () => {
 		const error = new Error('token unavailable')
 		const hook = new RecordedHeaders(error)
-		await expect(readHeaders(hook.headers.bind(hook), new AbortController().signal)).rejects.toBe(
-			error,
-		)
+		await expect(
+			buildProviderHeaders(hook.headers.bind(hook), new AbortController().signal),
+		).rejects.toBe(error)
 	})
 })
 
@@ -633,24 +636,121 @@ describe('System One helpers', () => {
 
 describe('releaseReader — the cancel-and-release sequence', () => {
 	it('cancels the source and frees the lock', async () => {
-		let cancelled = false
-		const stream = new ReadableStream<Uint8Array>({
-			cancel: () => {
-				cancelled = true
-			},
-		})
-		await releaseReader(stream.getReader())
-		expect(cancelled).toBe(true)
-		expect(stream.locked).toBe(false)
+		const body = new RecordedBody([], false)
+		await releaseReader(body.stream.getReader())
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
 	})
 
 	it('frees the lock and resolves when the source refuses cancellation', async () => {
-		const stream = new ReadableStream<Uint8Array>({
-			cancel: () => {
-				throw new Error('refused')
-			},
+		const body = new RecordedBody([], false, undefined, new Error('refused'))
+		await releaseReader(body.stream.getReader())
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+})
+
+describe('armReaderAbort', () => {
+	it('propagates an already-aborted reason and contains a cancellation rejection', async () => {
+		const body = new RecordedBody([], false, undefined, new Error('refused'))
+		const reader = body.stream.getReader()
+		const abort = new AbortController()
+		const reason = new Error('aborted')
+		abort.abort(reason)
+		const cleanup = await armReaderAbort(reader, abort.signal)
+		try {
+			expect(body.cancelled).toBe(true)
+			expect(body.reason).toBe(reason)
+			expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+		} finally {
+			cleanup.abort()
+			await releaseReader(reader)
+		}
+	})
+	it('releases a pending read when the caller aborts', async () => {
+		const body = new RecordedBody([], false)
+		const reader = body.stream.getReader()
+		const abort = new AbortController()
+		const cleanup = await armReaderAbort(reader, abort.signal)
+		try {
+			const pending = reader.read()
+			await body.pending
+			abort.abort('stop')
+			expect(await pending).toEqual({ done: true, value: undefined })
+			expect(body.reason).toBe('stop')
+		} finally {
+			cleanup.abort()
+			await releaseReader(reader)
+		}
+	})
+	it('removes its listener without aborting the reader', async () => {
+		const body = new RecordedBody([], false)
+		const reader = body.stream.getReader()
+		const abort = new AbortController()
+		const cleanup = await armReaderAbort(reader, abort.signal)
+		try {
+			expect(getEventListeners(abort.signal, 'abort')).toHaveLength(1)
+			cleanup.abort()
+			abort.abort()
+			expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+			expect(body.cancelled).toBe(false)
+		} finally {
+			cleanup.abort()
+			await releaseReader(reader)
+		}
+	})
+	it('accepts an absent signal without cancelling the reader', async () => {
+		const body = new RecordedBody([], false)
+		const reader = body.stream.getReader()
+		const cleanup = await armReaderAbort(reader, undefined)
+		try {
+			expect(body.cancelled).toBe(false)
+		} finally {
+			cleanup.abort()
+			await releaseReader(reader)
+		}
+	})
+})
+
+describe('readFailure', () => {
+	it('reads the bounded excerpt and releases the unread remainder', async () => {
+		const body = new RecordedBody(
+			[new TextEncoder().encode('x'.repeat(MAX_ERROR_BODY_LENGTH + 1))],
+			false,
+		)
+		const response = new Response(body.stream, { status: 503 })
+		expect(await readFailure(response, 'provider error:', new AbortController().signal)).toEqual({
+			message: `provider error: 503 - ${'x'.repeat(MAX_ERROR_BODY_LENGTH)}`,
 		})
-		await releaseReader(stream.getReader())
-		expect(stream.locked).toBe(false)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+	it('omits the separator for empty and null bodies', async () => {
+		expect(
+			await readFailure(
+				new Response('', { status: 500 }),
+				'judge error:',
+				new AbortController().signal,
+			),
+		).toEqual({ message: 'judge error: 500' })
+		expect(
+			await readFailure(
+				new Response(null, { status: 500 }),
+				'judge error:',
+				new AbortController().signal,
+			),
+		).toEqual({ message: 'judge error: 500' })
+	})
+	it('retains an unreadable body failure by identity', async () => {
+		const cause = new Error('body failed')
+		const body = new RecordedBody([], true, cause)
+		const failure = await readFailure(
+			new Response(body.stream, { status: 502 }),
+			'judge error:',
+			new AbortController().signal,
+		)
+		expect(failure.message).toBe('judge error: 502 - (error body unavailable)')
+		expect(failure.cause).toBe(cause)
+		expect(body.stream.locked).toBe(false)
 	})
 })

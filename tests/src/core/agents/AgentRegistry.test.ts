@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import type { AgentJobInput } from '@src/core'
+import { describe, expect, it } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -9,18 +9,18 @@ import {
 	isAgentError,
 } from '@src/core'
 import {
-	addTool,
+	createAddTool,
 	createRecordingScheduler,
 	createScriptedProvider,
 	createTokenUsage,
-	loopTool,
+	createLoopTool,
 } from '../../../setup.js'
 
 // AgentRegistry.test.ts — the MIRROR of src/core/agents/AgentRegistry.ts. Pins the
 // registry's own contract (Ollama-free, a scripted provider): the accessors resolve a
 // registered name and THROW a clear error on an unknown one; `build` rehydrates a seeded,
 // signal-wired agent from a serializable AgentJobInput — messages seeded, system / limit
-// / timeout / budget / authority / scheduler wired (asserted behaviourally, since they're
+// / timeout / budget / authority / scheduler wired (asserted behaviourally, because they're
 // `#private` on Agent), the cancel threaded; a `budget` number becomes a token budget;
 // `tools` names resolve into the agent's manager. The job descriptor IS serializable.
 
@@ -29,7 +29,7 @@ const USAGE = createTokenUsage()
 describe('AgentRegistry — accessors', () => {
 	it('resolves a registered provider / tool / authority / scheduler by name', () => {
 		const provider = createScriptedProvider([{ content: 'ok' }])
-		const tool = addTool()
+		const tool = createAddTool()
 		const authority = createAuthority()
 		const scheduler = createScheduler()
 		const registry = createAgentRegistry({
@@ -101,7 +101,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		const registry = createAgentRegistry({
 			providers: { main: provider },
 			tools: {
-				add: addTool(),
+				add: createAddTool(),
 				now: createTool({ name: 'now', execute: () => 1 }),
 			},
 		})
@@ -153,7 +153,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		])
 		const registry = createAgentRegistry({
 			providers: { main: provider },
-			tools: { loop: loopTool() },
+			tools: { loop: createLoopTool() },
 		})
 		const agent = registry.build({
 			provider: 'main',
@@ -174,7 +174,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		])
 		const registry = createAgentRegistry({
 			providers: { main: provider },
-			tools: { loop: loopTool() },
+			tools: { loop: createLoopTool() },
 		})
 		const agent = registry.build({
 			provider: 'main',
@@ -199,7 +199,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		])
 		const registry = createAgentRegistry({
 			providers: { main: provider },
-			tools: { loop: loopTool() },
+			tools: { loop: createLoopTool() },
 			schedulers: { pacer: scheduler },
 		})
 		const agent = registry.build({
@@ -265,7 +265,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 	})
 
 	it('throws when a job names an unknown scheduler (loud failure, never a silent skip)', () => {
-		// Same loud-failure guarantee for the scheduler kind — a post-crash job naming a
+		// A missing scheduler throws on build — a post-crash job naming a
 		// pacer not in the registry must crash at build rather than run unpaced.
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
@@ -328,7 +328,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 	it('leaves the agent with no tools when `tools` is absent or empty (count === 0)', () => {
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-			tools: { add: addTool() },
+			tools: { add: createAddTool() },
 		})
 		// Absent → empty manager.
 		const absent = registry.build({ provider: 'main', messages: [] })
@@ -341,7 +341,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 	it('dedups duplicate tool names in `input.tools` (one manager entry, last write wins)', () => {
 		// A job listing the same tool name twice must not produce two entries — the manager
 		// is keyed by tool.name, so a re-add overwrites. Pin the count + the single definition.
-		const add = addTool()
+		const add = createAddTool()
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
 			tools: { add },
@@ -364,7 +364,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 		])
 		const registry = createAgentRegistry({
 			providers: { main: provider },
-			tools: { loop: loopTool() },
+			tools: { loop: createLoopTool() },
 		})
 		const agent = registry.build({
 			provider: 'main',
@@ -475,7 +475,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 	it('produces independent agents — distinct ids and separate contexts that do not bleed', () => {
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-			tools: { add: addTool() },
+			tools: { add: createAddTool() },
 		})
 		const input: AgentJobInput = {
 			provider: 'main',
@@ -505,7 +505,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		const input: AgentJobInput = { provider: 'main', messages, tools }
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-			tools: { add: addTool() },
+			tools: { add: createAddTool() },
 		})
 		registry.build(input)
 		registry.build(input)
@@ -520,7 +520,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		// Mutating the source records AFTER construction must not change what the registry
 		// resolves — the constructor copies entries into private Maps.
 		const provider = createScriptedProvider([{ content: 'ok' }])
-		const add = addTool()
+		const add = createAddTool()
 		const providers: Record<string, typeof provider> = { main: provider }
 		const tools: Record<string, typeof add> = { add }
 		const registry = createAgentRegistry({ providers, tools })
@@ -554,7 +554,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 })
 
 describe('AgentRegistry — conversation store seam', () => {
-	it('threads a store-backed conversation manager into every built agent — save persists, retrievable via store.get', async () => {
+	it('threads a store-backed conversation manager into every built agent — save persists, retrievable through store.get', async () => {
 		const store = createMemoryConversationStore()
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },

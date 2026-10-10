@@ -66,7 +66,7 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   always reflects the current managers / messages / scope / active workspace; it never mutates a
  *   manager or the stored messages.
  * - **The active workspace, rendered by carrier — the sole document/image context.**
- *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface}s scope-filtered by `scope.files`,
+ *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
  *   then split: text files fold into a dedicated `## Workspace` system section (fenced reference
  *   blocks — placed right after the instructions section), and image files' `base64` payload attaches
  *   to the last user message. Active-only — never the other registered workspaces; with no active
@@ -74,7 +74,7 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   `WorkspaceManager` stays file-focused).
  * - **Tools are structural, not in the prompt.** The registry is advertised to the provider
  *   through `tools.definitions()` (scope-filtered by the loop), never serialized into the
- *   message array — so `build()`'s output carries no tool content, scoped or not.
+ *   message array — so the output of the `build()` method carries no tool content, scoped or not.
  * - **Event-free context; observable managers.** The context itself owns no Emitter; the
  *   context managers each carry their own (the push observation surface).
  *
@@ -141,11 +141,11 @@ export class AgentContext implements AgentContextInterface {
 	// registry has no active conversation. Computed on every read (never captured), so
 	// `context.messages` always points at the current active conversation (the same reference — no
 	// duplication) and follows a `conversations.switch(id)`. The active `Conversation` satisfies the
-	// message-verb contract directly, so this stays a `MessageManagerInterface`. The `??
-	// this.#ensure()` fallback re-seats a default if a caller's supplied manager was emptied (for
+	// message-verb contract directly, so this stays a `MessageManagerInterface`. The
+	// `#ensureConversation()` method re-seats a default if a caller's supplied manager was emptied (for
 	// example `clear()`), so the getter is total — never undefined.
 	get messages(): MessageManagerInterface {
-		return this.#conversations.active ?? this.#ensure()
+		return this.#ensureConversation()
 	}
 
 	get conversations(): ConversationManagerInterface {
@@ -168,16 +168,12 @@ export class AgentContext implements AgentContextInterface {
 		// Returning `undefined` synchronously keeps the loop's default path free of an `await`.
 		const handler = this.#scope?.select ?? this.#select
 		if (handler === undefined) return undefined
-		return this.#check(handler, this.#conversations.active ?? this.#ensure(), request, signal)
+		return this.#check(handler, this.#ensureConversation(), request, signal)
 	}
 
 	build(selection?: Selection): readonly Message[] {
 		const scope = this.#scope
-		// 1–2. Assemble the system block parts: the prompt, then each scoped manager's
-		// section (its `open` + each item's rendering + any `close`) when it has any scoped-in
-		// items. Tools are not folded in — they reach the provider structurally. The manager
-		// resolves every slot of the format cascade, so this reads its `open`, `render`, and
-		// `close` as given.
+		// Tools reach the provider structurally. Each manager resolves its format cascade.
 		const parts: string[] = []
 		// Configured by `=== undefined`, not falsiness — an explicitly supplied '' (or a
 		// whitespace-only) system is opted in and prepended verbatim; a truthiness check would drop it.
@@ -194,46 +190,33 @@ export class AgentContext implements AgentContextInterface {
 			this.#instructions.close,
 		)
 		if (instructed !== undefined) parts.push(instructed)
-		// The active workspace's files, rendered by carrier — the sole document/image context.
-		// Filter `active.files()` by `scope.files`, then split: text files fold into the
-		// `## Workspace` system section (fenced reference blocks, the `renderFencedFile` framing — placed
-		// right after the instructions section, grouping the in-prompt text content), image files'
-		// `base64` payload attaches to the last user message (collected below, fed to
-		// `attachUserImages`). `build()` owns this render — a `Workspace` / `WorkspaceManager` stays
-		// file-focused (no `open` / `format` getters). No active workspace ⇒ nothing renders
-		// (active-only).
+		// The active workspace is the sole document/image context. `build()` owns this render
+		// because a `Workspace` / `WorkspaceManager` stays file-focused.
 		const files = filterAllowList(
 			scope?.files,
 			this.#workspaces.active?.files() ?? [],
 			(one) => one.path,
 		)
-		const workspaceTexts = files.filter((file) => isText(file.content))
-		// The text files have no format-cascade level of their own (they are not a manager) — the
-		// header is the fixed `WORKSPACE_SECTION_HEADER` and each item renders through `renderFencedFile`
-		// off its own text arm (`{ text, language }`), narrowed by `isText` (a total guard, never an
-		// assertion; the preceding pre-filter means the defensive arm is never reached). An empty set
-		// contributes nothing (`renderSection` returns `undefined`).
+		const workspaceTexts = files.flatMap((file) =>
+			isText(file.content)
+				? [{ path: file.path, language: file.content.language, text: file.content.text }]
+				: [],
+		)
 		const documented = renderSection(
 			WORKSPACE_SECTION_HEADER,
 			workspaceTexts,
-			(file) =>
-				isText(file.content)
-					? renderFencedFile(file.path, file.content.language, file.content.text)
-					: renderFencedFile(file.path, 'text', ''),
+			(file) => renderFencedFile(file.path, file.language, file.text),
 			undefined,
 		)
 		if (documented !== undefined) parts.push(documented)
 
-		// 4. The conversation. The active conversation's `view()` is authoritative (the per-section
+		// The active conversation's `view()` is authoritative (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
 		// tools / workspace files). The active conversation is always present (the constructor adds
-		// one), with `#ensure()` as a total fallback if a caller emptied its supplied registry.
-		const conversation =
-			selection?.messages ?? (this.#conversations.active ?? this.#ensure()).view()
-		// 5. Attach the active workspace's scoped-in image files' `base64` payload to the last user
-		// message (a vision provider reads images off a user turn) — the active workspace is the
-		// sole image source. Skipped when there is none. (Applies to the conversation's view too.)
+		// one), with `#ensureConversation()` as a total fallback if a caller emptied its supplied registry.
+		const conversation = selection?.messages ?? this.#ensureConversation().view()
+		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
 
 		// A faulted selection's messages are `view()`, so the plan its briefing rested on is void.
@@ -246,7 +229,6 @@ export class AgentContext implements AgentContextInterface {
 			parts.push(selection.briefing)
 		}
 
-		// 3. Prepend one assembled system message only when some part exists.
 		if (parts.length === 0) return tail
 		const system: Message = {
 			id: crypto.randomUUID(),
@@ -286,13 +268,10 @@ export class AgentContext implements AgentContextInterface {
 		}
 	}
 
-	// The total fallback that keeps `messages` / `build()` defined even if a caller's supplied
-	// conversation registry was emptied after construction (for example `conversations.clear()`): `add()` a
-	// default (auto-activating it when the registry is empty) and return it. Returns the
-	// `ConversationInterface` (which satisfies `MessageManagerInterface` structurally for the
-	// `messages` getter and carries `view()` for `build()`). Normally never reached — the constructor
-	// already seeds an active conversation.
-	#ensure(): ConversationInterface {
+	// A supplied registry can be emptied after construction. Re-seat a default so the message
+	// source stays defined, preferring the active conversation an add observer may have selected.
+	#ensureConversation(): ConversationInterface {
+		if (this.#conversations.active !== undefined) return this.#conversations.active
 		const conversation = this.#conversations.add()
 		return this.#conversations.active ?? conversation
 	}

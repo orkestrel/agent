@@ -4,11 +4,11 @@ import type {
 	AgentJobInput,
 	AgentRegistryInterface,
 	AgentResult,
-	RunOutcome,
+	AgentRunResult,
 } from './types.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
-import type { QueueContext } from '@orkestrel/queue'
+import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import type { ControllerInterface } from '@orkestrel/workflow'
 import {
@@ -20,7 +20,7 @@ import {
 	parseJSONValue,
 } from '@orkestrel/contract'
 import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
-import { AgentJobError } from './errors.js'
+import { AgentError, AgentJobError } from './errors.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
@@ -89,8 +89,7 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
  * context-budget estimator).
  *
  * @remarks
- * Approximates `ceil(length / 4)` (≈ four characters per token — the rough average for
- * English text), so the same input always yields the same estimate (no model round-trip).
+ * Approximates `ceil(length / 4)` (4 characters per token), so the same input always yields the same estimate (no model round-trip).
  * Empty text is `0`. This is a planning heuristic for reasoning about how much a turn's
  * messages cost the next request, not an exact tokenizer count — it never calls a provider,
  * so the agent layer stays provider-agnostic and synchronous where it can be.
@@ -114,11 +113,10 @@ export function estimateTokens(text: string): number {
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, a thinking estimate, and
  * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The default
  * `consumer` estimator for an agent's context budget (the
- * {@link import('./types.js').AgentOptions} `window`), total and never throwing, and a
- * deliberate provider-agnostic approximation rather than an exact tokenizer count.
+ * {@link import('./types.js').AgentOptions} `window`), a provider-independent approximation for conforming messages rather than an exact tokenizer count.
  *
  * @remarks
- * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` char
+ * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` character
  * heuristic) plus {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (a fixed per-message
  * role/framing overhead) plus, when present, {@link estimateTokens} over its JSON-stringified
  * `calls` plus, when present, {@link estimateTokens} over its `thinking` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
@@ -126,8 +124,8 @@ export function estimateTokens(text: string): number {
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
  * turn's new messages through; a caller wanting a sharper count supplies its own `consumer` to
- * `createBudget` instead. Total — never throws: a `calls` `JSON.stringify` that throws (a
- * circular `ToolCall.arguments`) is caught and replaced with a conservative fixed contribution of
+ * `createBudget` instead. A `calls` `JSON.stringify` that throws (a
+ * circular `ToolCall.arguments`) is caught and replaced with a fixed contribution of
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
  * instead of estimating the (unreachable) serialized length.
  *
@@ -146,8 +144,8 @@ export function estimateMessages(messages: readonly Message[]): number {
 		let calls = 0
 		if (message.calls?.length) {
 			// `JSON.stringify` over `ToolCall.arguments` can throw (a circular reference) even
-			// though this function promises never to throw — so the serialization is wrapped; a
-			// throw falls back to a conservative fixed contribution (the same per-message overhead
+			// for a typed message — so the serialization is wrapped; a
+			// throw falls back to a fixed contribution (the same per-message overhead
 			// scale) instead of an unreachable serialized-length estimate.
 			try {
 				calls = estimateTokens(JSON.stringify(message.calls))
@@ -204,6 +202,11 @@ export async function settleAgentJob(
  * @param input - The serializable agent job
  * @param context - The queue attempt whose signal bounds the agent
  * @returns The settled agent result
+ *
+ * @example
+ * ```ts
+ * const result = await handleAgentQueueJob(registry, false, input, context)
+ * ```
  */
 export function handleAgentQueueJob(
 	registry: AgentRegistryInterface,
@@ -227,6 +230,11 @@ export function handleAgentQueueJob(
  * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
  * @param controller - The runner controller for this parent job
  * @returns The settled parent agent result
+ *
+ * @example
+ * ```ts
+ * const result = await handleAgentRunnerJob(registry, false, controller)
+ * ```
  */
 export function handleAgentRunnerJob(
 	registry: AgentRegistryInterface,
@@ -239,7 +247,7 @@ export function handleAgentRunnerJob(
 }
 
 /**
- * Assembles the settled {@link AgentResult} from a run's {@link RunOutcome} — `thinking` and
+ * Assembles the settled {@link AgentResult} from a run's {@link AgentRunResult} — `thinking` and
  * `usage` are carried only when the run surfaced them, and the loop-internal `exhausted` flag is
  * left out.
  *
@@ -258,7 +266,7 @@ export function handleAgentRunnerJob(
  * // { content: 'hi', partial: false }
  * ```
  */
-export function assembleResult(outcome: RunOutcome): AgentResult {
+export function assembleResult(outcome: AgentRunResult): AgentResult {
 	const result: { content: string; thinking?: string; usage?: TokenUsage; partial: boolean } = {
 		content: outcome.content,
 		partial: outcome.partial,
@@ -327,4 +335,42 @@ export function chargeUsage(
 		completion: Math.max(0, usage.completion - charged),
 		total: Math.max(0, usage.total - charged),
 	})
+}
+
+/**
+ * Returns a registered value or throws when its name is absent.
+ * @param pool - The named values
+ * @param category - The registry category named in an error
+ * @param name - The requested key
+ * @returns The registered value
+ * @throws {AgentError} Thrown when the name is absent, with code REGISTRY.
+ * @example
+ * ```ts
+ * requireEntry(new Map([['main', provider]]), 'provider', 'main') // provider
+ * ```
+ */
+export function requireEntry<T>(pool: ReadonlyMap<string, T>, category: string, name: string): T {
+	const value = pool.get(name)
+	if (value === undefined) throw new AgentError('REGISTRY', `unknown ${category}: ${name}`)
+	return value
+}
+
+/**
+ * Extracts the present concurrency, retry, and deadline options for an agent job queue.
+ * @param options - The queue options to project
+ * @returns The present queue options, omitting absent keys
+ * @example
+ * ```ts
+ * extractQueueOptions({ concurrency: 2 }) // { concurrency: 2 }
+ * ```
+ */
+export function extractQueueOptions(
+	options: Pick<QueueOptions<AgentJobInput, AgentResult>, 'concurrency' | 'retries' | 'timeout'>,
+): Pick<QueueOptions<AgentJobInput, AgentResult>, 'concurrency' | 'retries' | 'timeout'> {
+	const { concurrency, retries, timeout } = options
+	return {
+		...(concurrency === undefined ? {} : { concurrency }),
+		...(retries === undefined ? {} : { retries }),
+		...(timeout === undefined ? {} : { timeout }),
+	}
 }

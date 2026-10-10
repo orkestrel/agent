@@ -1,3 +1,4 @@
+import { collectPaced } from '../../../setup.js'
 import { describe, expect, it } from 'vitest'
 import { Channel } from '@src/core'
 import { collect, waitForDelay } from '@orkestrel/test'
@@ -81,7 +82,7 @@ describe('Channel — buffer-before-close (no truncation)', () => {
 		expect(next.done).toBe(true)
 	})
 
-	it('flushes a value buffered just before close even when drained late', async () => {
+	it('flushes a value buffered before close even when drained late', async () => {
 		const channel = new Channel<string>()
 		channel.push('a')
 		channel.close()
@@ -104,13 +105,10 @@ describe('Channel — fail', () => {
 		channel.push(1)
 		channel.push(2)
 		channel.fail(new Error('late'))
-		const seen: number[] = []
-		// Buffered chunks come out first; the failure surfaces only after the buffer drains.
-		const drain = (async () => {
-			for await (const value of channel.drain()) seen.push(value)
-		})()
-		await expect(drain).rejects.toThrow('late')
-		expect(seen).toEqual([1, 2])
+		const iterator = channel.drain()
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 2 })
+		await expect(iterator.next()).rejects.toThrow('late')
 	})
 
 	it('keeps the FIRST failure — a later fail cannot override it', async () => {
@@ -143,34 +141,21 @@ describe('Channel — FIFO / backpressure', () => {
 	it('delivers every chunk in order to a slow consumer awaiting between pulls', async () => {
 		const channel = new Channel<number>()
 		const inputs = [10, 20, 30, 40]
-		const seen: number[] = []
 		// The consumer awaits a delay between each pull while the producer pushes ahead;
 		// every chunk must still arrive exactly once, in order (no drop, no reorder).
-		const consumer = (async () => {
-			for await (const value of channel.drain()) {
-				seen.push(value)
-				await waitForDelay(5)
-			}
-		})()
+		const consumer = collectPaced(channel, 5)
 		for (const value of inputs) {
 			channel.push(value)
 			await waitForDelay(2)
 		}
 		channel.close()
-		await consumer
+		const seen = await consumer
 		expect(seen).toEqual(inputs)
 	})
 
 	it('interleaves pushes arriving during slow consumption without loss', async () => {
 		const channel = new Channel<number>()
-		const seen: number[] = []
-		const consumer = (async () => {
-			for await (const value of channel.drain()) {
-				seen.push(value)
-				// Pause long enough that more pushes land mid-consumption (into the buffer).
-				await waitForDelay(15)
-			}
-		})()
+		const consumer = collectPaced(channel, 15)
 		channel.push(1)
 		await waitForDelay(5)
 		channel.push(2)
@@ -178,7 +163,7 @@ describe('Channel — FIFO / backpressure', () => {
 		await waitForDelay(5)
 		channel.push(4)
 		channel.close()
-		await consumer
+		const seen = await consumer
 		expect(seen).toEqual([1, 2, 3, 4])
 	})
 })

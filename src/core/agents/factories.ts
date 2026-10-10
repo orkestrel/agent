@@ -20,7 +20,7 @@ import { Agent } from './Agent.js'
 import { Channel } from './Channel.js'
 import { Authority } from './Authority.js'
 import { AgentRegistry } from './AgentRegistry.js'
-import { handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
+import { extractQueueOptions, handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
 
 /**
  * Creates an agent loop — an {@link AgentInterface} composing a
@@ -34,7 +34,7 @@ import { handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
  * `signal` + `timeout` + `budget` (through `AbortSignal.any`) — any trip (or `abort()`)
  * commits a partial result (the stream's `result` resolves on a cancel, rejects only
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
- * iteration is capped at `limit` (default `DEFAULT_AGENT_LIMIT`). Tools are advertised
+ * iteration is capped at `limit`. Default: `DEFAULT_AGENT_LIMIT`. Tools are advertised
  * structurally through `context.tools.definitions()`. Two observation surfaces: the
  * {@link AgentChunk} stream (pull — per-token content) and a typed `emitter` (push —
  * lifecycle + `usage` / `tool` / `deny` for fire-and-forget observers).
@@ -106,11 +106,11 @@ export function createChannel<T>(): ChannelInterface<T> {
  * @remarks
  * `rules` are evaluated in order — the first whose `match` is true decides (a matched
  * rule allows unless its `allowed` is explicitly `false`). When no rule matches, the
- * `fallback` decides; it defaults to `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }`
+ * `fallback` decides. Default: `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }`
  * (allow-unmatched — a rules list of denials acts as a denylist). Pass an
  * `allowed: false` `fallback` to flip the gate to deny-by-default (an allowlist). Wire
  * the result into `createAgent` through `AgentOptions.authority`: a denied call is fed back
- * to the model as a denial `ToolResult` (not executed, no budget cost), so the model
+ * to the model as a denial `ToolResult` (not executed), so the model
  * can react. Synchronous — `evaluate` returns the verdict directly.
  *
  * @param options - Optional `rules` (ordered) and `fallback` (see {@link AuthorityOptions})
@@ -132,10 +132,7 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
 }
 
 /**
- * Creates an agent registry — an {@link AgentRegistryInterface} holding the named pools of
- * live, non-serializable pieces (providers, tools, authorities, schedulers) that a
- * serializable {@link AgentJobInput}'s names resolve against, and `build`ing a seeded,
- * signal-wired {@link AgentInterface} from a job.
+ * Creates a registry of live providers, tools, authorities, and schedulers whose `build` method returns a seeded, signal-wired {@link AgentInterface} from a serializable job.
  *
  * @remarks
  * `providers` is required; `tools` / `authorities` / `schedulers` are optional pools.
@@ -170,7 +167,7 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 
 /**
  * Creates a durable, bounded-concurrency agent-job queue — a {@link QueueInterface} over
- * serializable {@link AgentJobInput}s that composes `createQueue`: each job is rehydrated
+ * serializable values of {@link AgentJobInput} that composes `createQueue`: each job is rehydrated
  * through the `registry` into a live {@link AgentInterface}, run to its {@link AgentResult},
  * and subjected to the partial-as-configurable-failure policy.
  *
@@ -209,11 +206,9 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 export function createAgentQueue(
 	options: AgentQueueOptions,
 ): QueueInterface<AgentJobInput, AgentResult> {
-	const { registry, partial = false, concurrency, retries, timeout, store } = options
+	const { registry, partial = false, store } = options
 	return createQueue<AgentJobInput, AgentResult>({
-		...(concurrency === undefined ? {} : { concurrency }),
-		...(retries === undefined ? {} : { retries }),
-		...(timeout === undefined ? {} : { timeout }),
+		...extractQueueOptions(options),
 		...(store === undefined ? {} : { store }),
 		handler: handleAgentQueueJob.bind(undefined, registry, partial),
 	})
@@ -221,9 +216,9 @@ export function createAgentQueue(
 
 /**
  * Creates an agent-job runner — a {@link RunnerInterface} over serializable
- * {@link AgentJobInput}s that composes `createRunner` (one-shot, ordered, fail-fast), each unit
+ * values of {@link AgentJobInput} that composes `createRunner` (one-shot, ordered, fail-fast), each unit
  * rehydrated through the `registry` and subjected to the partial policy. The runner also carries
- * sub-agent fan-out: a parent job's handler can `controller.spawn(childJob)`.
+ * sub-agent fan-out: a parent job's handler can call `controller.spawn` with a child job.
  *
  * @remarks
  * - **Composes the substrate (no new engine).** Bounded `concurrency`, `retries`, the
@@ -232,7 +227,7 @@ export function createAgentQueue(
  * - **Sub-agent fan-out.** Each unit's handler receives a `ControllerInterface` whose
  *   `spawn(childJob)` launches a child agent job through the same bounded queue (the
  *   child's result joins the run after the declared units, in spawn order). On a bounded
- *   runner, fan out and return — do not inline-`await` a spawn from within the handler (a
+ *   runner, fan out and return — do not await a spawn inline from within the handler (a
  *   slot-holding handler awaiting its own spawn can deadlock; see `ControllerInterface`).
  * - **Partial policy + cancellation.** Same as `createAgentQueue`: a partial result
  *   throws by default (the run's fail-fast engages), `partial: true` resolves it; the
@@ -249,20 +244,18 @@ export function createAgentQueue(
  *
  * const registry = createAgentRegistry({ providers: { main: provider } })
  * const runner = createAgentRunner({ registry, concurrency: 2 })
- * // Run two jobs; the first fans out a child sub-agent then returns.
+ * // Run one job that fans out a child; results hold the parent, then the spawn.
  * const child = { provider: 'main', messages: [{ role: 'user', content: 'child' }] }
- * const parent = { provider: 'main', messages: [{ role: 'user', content: 'parent' }] }
- * const results = await runner.execute([parent, child]) // declared first, then any spawns
+ * const parent = { provider: 'main', messages: [{ role: 'user', content: 'parent' }], children: [child] }
+ * const results = await runner.execute([parent]) // declared first, then any spawns
  * ```
  */
 export function createAgentRunner(
 	options: AgentRunnerOptions,
 ): RunnerInterface<AgentJobInput, AgentResult> {
-	const { registry, partial = false, concurrency, retries, timeout } = options
+	const { registry, partial = false } = options
 	return createRunner<AgentJobInput, AgentResult>({
-		...(concurrency === undefined ? {} : { concurrency }),
-		...(retries === undefined ? {} : { retries }),
-		...(timeout === undefined ? {} : { timeout }),
+		...extractQueueOptions(options),
 		handler: handleAgentRunnerJob.bind(undefined, registry, partial),
 	})
 }
