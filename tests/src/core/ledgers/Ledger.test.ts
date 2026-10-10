@@ -2071,7 +2071,7 @@ describe('Ledger', () => {
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(`${correction.content}\n${source.content}`)
-		expect(provider.calls[0]?.messages[0]?.content).not.toContain('[amendments by')
+		expect(provider.calls[0]?.messages[0]?.content).not.toContain('[amended by')
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(source, {
 				answer: { form: 'choice', probabilities: { rule: 1 } },
