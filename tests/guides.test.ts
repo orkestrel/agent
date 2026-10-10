@@ -3,14 +3,11 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
-	AgentEventMap,
 	JudgeAnswer,
 	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
 	LedgerLookup,
-	LedgerThreshold,
-	LedgerTopic,
 	Message,
 	MessageInput,
 	ProviderIncrement,
@@ -20,10 +17,8 @@ import type {
 	ProviderRequest,
 	ProviderResult,
 	ScopeInterface,
-	ScreenHandler,
 	Selection,
 	SelectionHandler,
-	ThinkingReplay,
 } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
 import { GuideCommand } from '@orkestrel/guide/server'
@@ -59,9 +54,11 @@ await new GuideCommand({
 	reader: readInventory,
 	runner: createVitest,
 }).execute(async ({ files, report, rows }) => {
-	const { isFiniteNumber, isRecord, isString, parseJSON } = await import('@orkestrel/contract')
+	const { isFiniteNumber, isRecord, isString, parseJSON, parseJSONAs } =
+		await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
-	const { captureError, requireValue, waitForCondition } = await import('@orkestrel/test')
+	const { captureError, createRecorder, requireValue, waitForCondition } =
+		await import('@orkestrel/test')
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
@@ -86,7 +83,6 @@ await new GuideCommand({
 		createRelay,
 		createRelayProvider,
 		createScope,
-		createSelection,
 		createSystemOneJudge,
 		DEFAULT_LEDGER_SHARE,
 		estimateMessages,
@@ -101,25 +97,52 @@ await new GuideCommand({
 		LEDGER_QUESTIONS,
 		LEDGER_SCALE_DRIFT,
 		MAX_ERROR_BODY_LENGTH,
-		NEEDED_CRITERION,
 		ProviderAbortError,
 		ProviderError,
 		providerRequestContract,
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
 		RelayStream,
-		renderStub,
 		sanitizeToken,
 		stripThinking,
 		SYSTEM_ONE_PATH,
 		SystemOneJudge,
 	} = barrel
 	const {
-		answerNeededRequest,
-		createParser,
+		RELAY_INVALID_RECORDS,
+		createLedgerJudge,
+		LEDGER_OVERHEAD_CASES,
+		LEDGER_THINKING_CASES,
+		LEDGER_REFUND_AMOUNTS,
+		THINKING_REPLAY_CASES,
+		LEDGER_RECORDED_THINKING,
+		RELAY_REPLAY_CASES,
+		GUIDE_CLASSIFIER_READINGS,
+		GUIDE_REPLAY_READINGS,
+		GUIDE_REPLAY_CLAIMS,
+		SYSTEM_ONE_USAGE_CASES,
+		SYSTEM_ONE_MODEL_CASES,
+		buildLedgerTailScenario,
+		LEDGER_FAILURE_MESSAGES,
+		createPhraseJudge,
+		LEDGER_REFUNDS_TOPIC,
+		LEDGER_ORDER_LOOKUP,
+		fileLedgerCorrection,
+		planLedgerDelivery,
+		LEDGER_BRIEFING_MARKERS,
+		briefLedgerDesk,
+		LEDGER_AMENDED_RULE,
+		LEDGER_AMENDED_STATEMENT,
+		LEDGER_AMENDED_CORRECTION,
+		LEDGER_AMENDED_READING,
+		serveAmendedDesk,
+		classifyLedgerCorrection,
+		exerciseThinkingReplay,
+		createBoundedRelay,
+		buildLedgerInput,
+		buildGuideLedgerOptions,
 		createRecordingSelection,
 		createScriptedProvider,
-		createStockSelectionFixture,
 		createStubSummarizer,
 		createToolCall,
 		JUDGE_ENVELOPE,
@@ -130,7 +153,6 @@ await new GuideCommand({
 		ScriptedJudge,
 		SYSTEM_ONE_ERRORS,
 		SYSTEM_ONE_JUDGE_REQUEST,
-		SYSTEM_ONE_LLAMA,
 		SYSTEM_ONE_MICA,
 		SYSTEM_ONE_TEV1,
 		SYSTEM_ONE_TEV1_REQUEST,
@@ -139,8 +161,10 @@ await new GuideCommand({
 		TEV1_CHOICE,
 		TEV1_REQUEST,
 		TEV1_SCORE,
+		LEDGER_DESK_THRESHOLDS,
 	} = await import('./setup.js')
-	const { describe, expect, expectTypeOf, it } = await import('vitest')
+	const { createFixtureServer } = await import('./setupServer.js')
+	const { describe, expect, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
 	// an `it` body because `AgentProvider` is only in scope after the dynamic barrel import.
@@ -163,7 +187,7 @@ await new GuideCommand({
 		frame(): ProviderParserInterface<string> {
 			return new TextFrame()
 		}
-		body(request: ProviderRequest): object {
+		encode(request: ProviderRequest): object {
 			return { messages: request.messages }
 		}
 		read(record: string): ProviderIncrement {
@@ -181,7 +205,7 @@ await new GuideCommand({
 		frame(): ProviderParserInterface<string> {
 			return new TextFrame()
 		}
-		body(request: ProviderRequest): object {
+		encode(request: ProviderRequest): object {
 			return { messages: request.messages }
 		}
 		read(record: string): ProviderIncrement {
@@ -191,12 +215,31 @@ await new GuideCommand({
 			return []
 		}
 	}
-	// The judge-wire fence, transcribed and declared here for the same reason: `AgentJudge` is only
-	// in scope after the dynamic barrel import.
+	// The browser relay fence uses this same strict record framing.
+	class RelayFrameParser implements ProviderParserInterface {
+		#pending = ''
+		parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
+			this.#pending += chunk
+			const lines = this.#pending.split(/\r\n|\n/)
+			this.#pending = lines.pop() ?? ''
+			const records: Array<Readonly<Record<string, unknown>>> = []
+			for (const line of lines) {
+				if (line.trim().length === 0) continue
+				const record = parseJSONAs(line, isRecord)
+				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+				records.push(record)
+			}
+			return records
+		}
+		clear(): void {
+			this.#pending = ''
+		}
+	}
+
 	// A wire whose server answers one yes/no question per call as { "yes": 0.93 }.
 	class YesJudge extends AgentJudge {
 		readonly name = 'yes'
-		body(request: JudgeRequest): object {
+		encode(request: JudgeRequest): object {
 			return { model: this.model, state: request.state, questions: request.questions }
 		}
 		read(value: unknown, request: JudgeRequest): JudgeResult {
@@ -348,7 +391,7 @@ await new GuideCommand({
 					},
 					{ content: 'answer', tools: [{ id: 'dropped', name: 'search', arguments: {} }] },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -382,7 +425,7 @@ await new GuideCommand({
 					{ content: 'Three records are stale.' },
 					{ content: 'Deleted.' },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -418,8 +461,8 @@ await new GuideCommand({
 			const tools = createToolManager()
 			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
 			const provider = createScriptedProvider([{ content: 'Nothing is stale.' }], {
-				record: true,
-				exhaust: 'throw',
+				recorded: true,
+				repeat: false,
 			})
 			const agent = createAgent(provider, { tools })
 			agent.context.instructions.add({ name: 'safety', content: 'Refuse unsafe requests.' })
@@ -452,7 +495,7 @@ await new GuideCommand({
 					{ content: 'x'.repeat(400), tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
 					{ content: 'Three records are stale.' },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, {
 				tools,
@@ -502,7 +545,7 @@ await new GuideCommand({
 		it('selects through the agent default and a mode’s override as the selection fence claims', async () => {
 			const provider = createScriptedProvider(
 				[{ content: 'Which line is wrong?' }, { content: 'Refunded.' }],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			// The agent default keeps the user turns; the focus mode keeps the request alone.
 			const userTurns: SelectionHandler = async (conversation) => ({
@@ -558,20 +601,17 @@ await new GuideCommand({
 		})
 
 		it('resolves the judgments fence’s question once over a started listener and reuses the record', async () => {
-			const posted: unknown[] = []
-			const dispatcher = createDispatcher({
-				routes: [
-					{
-						method: 'POST',
-						path: SYSTEM_ONE_PATH,
-						handler: async (request) => {
-							posted.push(JSON.parse(await request.text()))
-							return Response.json(SYSTEM_ONE_TEV1)
-						},
+			const posted = createRecorder<readonly [unknown]>()
+			const server = createFixtureServer([
+				{
+					method: 'POST',
+					path: SYSTEM_ONE_PATH,
+					handler: async (request) => {
+						posted.handler(await request.json())
+						return Response.json(SYSTEM_ONE_TEV1)
 					},
-				],
-			})
-			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+				},
+			])
 			const port = await server.start()
 			try {
 				// The fence declares the signal and names a local Ollama origin; the transcription supplies
@@ -602,7 +642,7 @@ await new GuideCommand({
 				expect(asked?.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
 				const [reused] = await conversation.judgments.resolve(judge, request, [ticket.id], signal)
 				expect(reused?.time).toBe(asked?.time)
-				expect(posted).toHaveLength(1)
+				expect(posted.count).toBe(1)
 				expect(conversation.snapshot().judgments).toHaveLength(1)
 			} finally {
 				await server.stop()
@@ -621,220 +661,6 @@ await new GuideCommand({
 				'reused?.time === asked?.time // true — the matching record answers without a call',
 			)
 			expect(guideText).toContain('conversation.snapshot().judgments?.length // 1')
-		})
-
-		it('drops only the decisive no through the stock selection fence over a started listener', async () => {
-			const conversation = createConversation()
-			const [standing, , printer, header, last] = conversation.add([
-				{ role: 'user', content: 'Use only local files; do not access the internet.' },
-				{ role: 'assistant', content: 'The export will read the local SQLite database.' },
-				{ role: 'user', content: 'The office printer needs paper.' },
-				{ role: 'user', content: 'Include a header row in exports.' },
-				{ role: 'user', content: 'Export the active accounts from the local database.' },
-			])
-			const request = requireValue(last, 'Missing message: request')
-			// Each subject's yes probability is a value of the recorded envelope: the refund noul, the
-			// billing option, and the middle severity level, read at the transcription's cutoff.
-			const probabilities = {
-				[requireValue(standing, 'Missing message: standing').id]:
-					SYSTEM_ONE_TEV1.answers.refund.noul,
-				[requireValue(printer, 'Missing message: printer').id]:
-					SYSTEM_ONE_TEV1.answers.label.probabilities.billing,
-				[requireValue(header, 'Missing message: header').id]:
-					SYSTEM_ONE_TEV1.answers.severity.probabilities['1'],
-			}
-			const posted: unknown[] = []
-			const dispatcher = createDispatcher({
-				routes: [
-					{
-						method: 'POST',
-						path: SYSTEM_ONE_PATH,
-						handler: async (incoming) => {
-							const body: unknown = JSON.parse(await incoming.text())
-							posted.push(body)
-							return Response.json(answerNeededRequest(body, probabilities))
-						},
-					},
-				],
-			})
-			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
-			const port = await server.start()
-			try {
-				// The fence declares the cutoff, the limit, and the signal; the transcription supplies them.
-				const threshold = 0.95
-				const limit = 8
-				const signal = new AbortController().signal
-				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
-				// The application's cheap pass: only user turns are candidates.
-				const screen: ScreenHandler = (source) =>
-					source
-						.view()
-						.filter((message) => message.role === 'user')
-						.map((message) => message.id)
-				const select = createSelection({
-					judge,
-					screen,
-					needed: { ...NEEDED_CRITERION, threshold },
-					limit,
-				})
-
-				const selection = await select(conversation, request, signal)
-				expect(selection.messages.map((message) => message.content)).toEqual([
-					'Use only local files; do not access the internet.',
-					'The export will read the local SQLite database.',
-					'Include a header row in exports.',
-					'Export the active accounts from the local database.',
-				])
-				expect(selection.judgments).toHaveLength(3)
-				expect(selection).not.toHaveProperty('fault')
-				expect(posted).toHaveLength(3)
-			} finally {
-				await server.stop()
-			}
-		})
-
-		it('keeps the push surface on the Agent, the managers, and each conversation (the observation clause)', () => {
-			const conversations = createConversationManager()
-			const context = barrel.createAgentContext({ conversations })
-			const provider = new TextProvider({ url: 'https://text.test' })
-
-			expect(['emitter' in context, 'emitter' in conversations, 'emitter' in provider]).toEqual([
-				false,
-				false,
-				false,
-			])
-			expect([
-				'emitter' in context.instructions,
-				'emitter' in barrel.createScopeManager(),
-				'emitter' in requireValue(conversations.active, 'Missing conversation'),
-				'emitter' in createAgent(provider),
-			]).toEqual([true, true, true, true])
-			expectTypeOf<keyof AgentEventMap>().toEqualTypeOf<
-				| 'start'
-				| 'turn'
-				| 'tool'
-				| 'usage'
-				| 'deny'
-				| 'finish'
-				| 'error'
-				| 'abort'
-				| 'exhaust'
-				| 'fault'
-				| 'select'
-			>()
-		})
-
-		it('records and reads a judgment as the judgment-recording fence shows', () => {
-			const conversation = createConversation()
-			const complaint = conversation.add({
-				role: 'user',
-				content: 'I was charged twice for one order.',
-			})
-
-			conversation.judgments.add({
-				id: 'refund',
-				question: { form: 'noul', instructions: 'Is a refund owed?' },
-				answer: { form: 'noul', noul: 0.9 },
-				model: 'tev1:0.8b',
-				sources: [complaint.id],
-				state: complaint.content,
-			})
-
-			const refund = requireValue(conversation.judgments.judgment('refund'), 'Missing judgment')
-			const recorded = conversation.judgments.judgments()
-			const snapshot = conversation.snapshot()
-			expect(refund).toMatchObject({ id: 'refund', sources: [complaint.id], model: 'tev1:0.8b' })
-			expect(Number.isSafeInteger(refund.time)).toBe(true)
-			expect(recorded).toEqual([refund])
-			expect(snapshot.judgments).toEqual([refund])
-			expect(createConversation({ snapshot }).judgments.judgments()).toEqual([refund])
-		})
-
-		it('carries the stock selection fence lines the transcription copies', () => {
-			expect(guideText).toContain(
-				"declare const threshold: number // the application's cutoff: above 0.5 and at most 1",
-			)
-			expect(guideText).toContain(
-				'const select = createSelection({ judge, screen, needed: { ...NEEDED_CRITERION, threshold }, limit })',
-			)
-			expect(guideText).toContain('const selection = await select(conversation, request, signal)')
-			expect(guideText).toContain(
-				'selection.judgments.length // 3 — one recorded judgment per screened subject',
-			)
-			expect(guideText).toContain(
-				'// ] — the judge answered no for the printer note alone; the header row stays uncertain and is kept',
-			)
-		})
-
-		it('keeps an exchange whole when any member is kept (the stock selection exchange rule)', () => {
-			const request: Message = { id: 'request', role: 'user', content: 'Escalate ESC-2219.' }
-			const messages: readonly Message[] = [
-				{ id: 'earlier', role: 'user', content: 'Tell the depot the pallet ships Friday.' },
-				{ id: 'send', role: 'assistant', content: '', calls: [createToolCall({ id: 'reply' })] },
-				{ id: 'sent', role: 'tool', content: 'sent', call: 'reply' },
-				{ id: 'aside', role: 'user', content: 'The office printer needs paper.' },
-				request,
-			]
-			const kept = barrel.filterSelectionMessages(
-				messages,
-				[
-					{ id: 'earlier', needed: false },
-					{ id: 'aside', needed: false },
-				],
-				request,
-			)
-
-			expect(kept.map(({ id }) => id)).toEqual(['earlier', 'send', 'sent', 'request'])
-			expect(guideText).toContain(
-				'A user message and every message after it up to the next user message form one exchange, which is kept whole when any member is kept and dropped only when every member is dropped',
-			)
-		})
-
-		it('keeps the messages before the first user message as one exchange (the stock selection exchange rule)', () => {
-			const request: Message = { id: 'request', role: 'user', content: 'Escalate ESC-2219.' }
-			const messages: readonly Message[] = [
-				{ id: 'greeting', role: 'assistant', content: 'Welcome to the Larkspur desk.' },
-				{ id: 'hours', role: 'assistant', content: 'The desk closes at 18:00 today.' },
-				request,
-			]
-			const keep = (dropped: readonly string[]) =>
-				barrel
-					.filterSelectionMessages(
-						messages,
-						dropped.map((id) => ({ id, needed: false })),
-						request,
-					)
-					.map(({ id }) => id)
-
-			expect(keep(['greeting'])).toEqual(['greeting', 'hours', 'request'])
-			expect(keep(['greeting', 'hours'])).toEqual(['request'])
-			expect(guideText).toContain(
-				'The messages before the first user message form their own exchange.',
-			)
-		})
-
-		it('leaves a failed subject undecided and faults only when every subject fails (the judge error rule)', async () => {
-			const signal = new AbortController().signal
-			const partial = createStockSelectionFixture(0.9, {
-				failure: { at: 2, cause: new Error('judge unavailable') },
-			})
-			const kept = await partial.select(partial.conversation, partial.request, signal)
-			const cause = new Error('judge unavailable')
-			const failing = createStockSelectionFixture(0.9, {
-				respond: () => {
-					throw cause
-				},
-			})
-			const failed = await failing.select(failing.conversation, failing.request, signal)
-
-			expect(kept).not.toHaveProperty('fault')
-			expect(kept.messages.map(({ id }) => id)).toContain('acceptance')
-			expect(failed.fault?.cause).toBe(cause)
-			expect(failed.messages).toEqual(failing.conversation.view())
-			expect(failed.judgments).toEqual([])
-			expect(guideText).toContain(
-				'A judge error for one subject leaves that subject undecided, so it is kept, and the handler asks about the next subject.',
-			)
 		})
 
 		it('folds neither the newest user message nor half a call group (the compaction boundary rule)', async () => {
@@ -893,43 +719,43 @@ await new GuideCommand({
 			)
 		})
 
-		it('regenerates the rollup only when the rollup option is true (the compaction fence)', async () => {
+		it('folds the first exchange with one summarizer call (the compaction fence)', async () => {
 			// The fence's summarizer calls a provider; the transcription digests through the stub.
-			const silent = createStubSummarizer()
-			const plain = createConversation({ summarize: silent.summarize, keep: 2 })
-			const counted = createStubSummarizer()
-			const rolled = createConversation({ summarize: counted.summarize, keep: 2, rollup: true })
-			for (const conversation of [plain, rolled]) {
-				conversation.add([
-					{ role: 'user', content: 'My name is Ada.' },
-					{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-					{ role: 'user', content: 'Book a table for two at 19:00.' },
-					{ role: 'assistant', content: 'Booked for two at 19:00.' },
-					{ role: 'user', content: 'What did I say my name was?' },
-				])
-			}
-			const sections = [await plain.compact(), await rolled.compact()]
+			const stub = createStubSummarizer()
+			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
+			conversation.add([
+				{ role: 'user', content: 'My name is Ada.' },
+				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+				{ role: 'user', content: 'Book a table for two at 19:00.' },
+				{ role: 'assistant', content: 'Booked for two at 19:00.' },
+				{ role: 'user', content: 'What did I say my name was?' },
+			])
 
-			expect(sections.map((section) => section?.messages.length)).toEqual([2, 2])
-			expect(rolled.view().map(({ content }) => content)).toEqual([
+			const section = await conversation.compact()
+			const original = section && conversation.rehydrate(section.id)
+
+			expect(section?.messages.map(({ content }) => content)).toEqual([
+				'My name is Ada.',
+				'Nice to meet you, Ada.',
+			])
+			expect(conversation.view().map(({ content }) => content)).toEqual([
 				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
 				'Book a table for two at 19:00.',
 				'Booked for two at 19:00.',
 				'What did I say my name was?',
 			])
-			expect(silent.calls).toHaveLength(1)
-			expect(plain.summary).toBeUndefined()
-			expect(counted.calls).toHaveLength(2)
-			expect(rolled.summary).toBe('recap of 1')
+			expect(conversation.search('ada').map(({ content }) => content)).toEqual([
+				'My name is Ada.',
+				'Nice to meet you, Ada.',
+			])
+			expect(original).toEqual(section?.messages)
+			expect(stub.calls).toHaveLength(1)
 			expect(guideText).toContain(
 				'const section = await conversation.compact() // folds the first exchange → a summarized section',
 			)
-			expect(guideText).toContain(
-				'With `rollup: true`, each compaction also regenerates the conversation rollup `summary`, a summary of every section summary, through a further summarizer call. Without it, no summarizer call is spent on a rollup and `summary` keeps its value: `undefined`, or the summary a restored snapshot carried.',
-			)
 		})
 
-		it('folds nothing after a cancel and folds on the next run (the no-fold-after-cancel bullet)', async () => {
+		it('folds nothing after an abort and folds on the next invocation (the no-fold-after-cancel bullet)', async () => {
 			const stub = createStubSummarizer()
 			const conversations = createConversationManager({ summarize: stub.summarize })
 			const conversation = conversations.add()
@@ -945,7 +771,7 @@ await new GuideCommand({
 						{ content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] },
 						{ content: 'Done.' },
 					],
-					{ record: true, exhaust: 'throw' },
+					{ recorded: true, repeat: false },
 				),
 				{
 					conversations,
@@ -992,7 +818,7 @@ await new GuideCommand({
 					{ content: 'Closed.' },
 					{ content: 'Quoted.' },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
@@ -1001,12 +827,11 @@ await new GuideCommand({
 			// Plain data, as a JSON file holds it; the data names a policy because a file carries no function.
 			const MODES: ReadonlyArray<{
 				readonly name: string
-				readonly description: string
 				readonly tools: readonly string[]
 				readonly policy: string
 			}> = [
-				{ name: 'triage', description: 'Sort the ticket.', tools: ['lookup'], policy: 'recent' },
-				{ name: 'verbatim', description: 'Quote the thread unchanged.', tools: [], policy: 'none' },
+				{ name: 'triage', tools: ['lookup'], policy: 'recent' },
+				{ name: 'verbatim', tools: [], policy: 'none' },
 			]
 			const POLICIES: Readonly<Record<string, SelectionHandler>> = {
 				recent: recent.handler,
@@ -1063,9 +888,7 @@ await new GuideCommand({
 		})
 
 		it('carries the modes fence lines the transcription copies', () => {
-			expect(guideText).toContain(
-				"{ name: 'triage', description: 'Sort the ticket.', tools: ['lookup'], policy: 'recent' },",
-			)
+			expect(guideText).toContain("{ name: 'triage', tools: ['lookup'], policy: 'recent' },")
 			expect(guideText).toContain(
 				'none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),',
 			)
@@ -1105,7 +928,7 @@ await new GuideCommand({
 					{ content: 'Second run answered.' },
 					{ content: 'First run answered.' },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, { tools })
 			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
@@ -1139,7 +962,7 @@ await new GuideCommand({
 						tools: [{ id: 'refund-1', name: 'refund', arguments: {} }],
 					},
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
@@ -1160,104 +983,11 @@ await new GuideCommand({
 			)
 		})
 
-		it('reads the select receipt beside the active mode’s description as the judge pattern fence claims', async () => {
-			const posted: unknown[] = []
-			const probabilities: Record<string, number> = {}
-			const dispatcher = createDispatcher({
-				routes: [
-					{
-						method: 'POST',
-						path: SYSTEM_ONE_PATH,
-						handler: async (incoming) => {
-							const body: unknown = JSON.parse(await incoming.text())
-							posted.push(body)
-							return Response.json(answerNeededRequest(body, probabilities))
-						},
-					},
-				],
-			})
-			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
-			const port = await server.start()
-			try {
-				const provider = createScriptedProvider([{ content: 'Exported.' }], {
-					record: true,
-					exhaust: 'throw',
-				})
-				// The fence declares the cutoff and the limit; the transcription supplies them.
-				const threshold = 0.95
-				const limit = 8
-				const shown: Array<readonly [string | undefined, number, number]> = []
-				const judge = createSystemOneJudge({ url: `http://127.0.0.1:${port}`, model: 'tev1:0.8b' })
-				const screen: ScreenHandler = (conversation) =>
-					conversation
-						.view()
-						.filter((message) => message.role === 'user')
-						.map((message) => message.id)
-				const agent = createAgent(provider, {
-					select: createSelection({
-						judge,
-						screen,
-						needed: { ...NEEDED_CRITERION, threshold },
-						limit,
-					}),
-				})
-				agent.context.apply(
-					createScope({ name: 'reply', description: 'Answer from the ticket thread.' }),
-				)
-				agent.emitter.on('select', (selection) =>
-					shown.push([
-						agent.context.scope?.description,
-						selection.messages.length,
-						selection.judgments.length,
-					]),
-				)
-				const receipts: Selection[] = []
-				agent.emitter.on('select', (selection) => receipts.push(selection))
-				const [standing, printer] = agent.context.messages.add([
-					{ role: 'user', content: 'Use only local files; do not access the internet.' },
-					{ role: 'user', content: 'The office printer needs paper.' },
-					{ role: 'user', content: 'Export the active accounts from the local database.' },
-				])
-				probabilities[requireValue(standing, 'Missing message: standing').id] =
-					SYSTEM_ONE_TEV1.answers.refund.noul
-				probabilities[requireValue(printer, 'Missing message: printer').id] =
-					SYSTEM_ONE_TEV1.answers.label.probabilities.billing
-				const result = await agent.generate()
-
-				expect(shown).toEqual([['Answer from the ticket thread.', 2, 2]])
-				// The receipt's keys name records in the active conversation's store, and its usage, the
-				// recorded usage once per question, is folded into the run's result beside the provider's.
-				const receipt = requireValue(receipts[0], 'Missing receipt')
-				const store = requireValue(agent.context.conversations.active, 'Missing conversation')
-				expect(receipt.judgments.map((key) => store.judgments.judgment(key)?.id)).toEqual(
-					receipt.judgments,
-				)
-				expect(receipt.usage).toEqual({ prompt: 1950, completion: 8, total: 1958 })
-				expect(result.usage).toEqual(receipt.usage)
-				expect(provider.calls[0]?.messages.map(({ content }) => content)).toEqual([
-					'Use only local files; do not access the internet.',
-					'Export the active accounts from the local database.',
-				])
-				expect(posted).toHaveLength(2)
-			} finally {
-				await server.stop()
-			}
-			expect(guideText).toContain(
-				"await agent.generate() // show('Answer from the ticket thread.', 2, 2) — the printer note is dropped",
-			)
-		})
-
 		it('serves two requests and pins the looked-up owner as the ledger pattern fence claims', async () => {
 			// The fence declares the cutoffs; the transcription supplies them.
-			const thresholds: LedgerThreshold = {
-				category: 0.7,
-				topic: 0.8,
-				amends: 0.8,
-				supersedes: 0.8,
-				correction: 0.3,
-			}
+			const thresholds = LEDGER_DESK_THRESHOLDS
 			// The fence claims what the second prompt leaves out, so the provider keeps each prompt it receives.
-			const prompts: Array<readonly Message[]> = []
+			const prompts = createRecorder<readonly [readonly Message[]]>()
 			const replies: ProviderResult[] = [
 				{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
 				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
@@ -1273,7 +1003,7 @@ await new GuideCommand({
 				name: 'scripted',
 				generate: async () => replies.shift() ?? { content: '' },
 				async *stream(messages) {
-					prompts.push([...messages])
+					prompts.handler([...messages])
 					const reply = replies.shift() ?? { content: '' }
 					if (reply.content !== '') yield { channel: 'content', text: reply.content }
 					return reply
@@ -1328,7 +1058,7 @@ await new GuideCommand({
 			const first = await ledger.respond('Can Brightwater Studio get a refund on order BW-5512?')
 			const second = await ledger.respond('Does the Brightwater Studio refund need a manager?')
 
-			expect(gauge.fixed).toBe(120)
+			expect(gauge.overhead).toBe(120)
 			expect(first.content).toBe('Order BW-5512 qualifies for a $148.50 refund.')
 			expect(first.passes).toHaveLength(1)
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
@@ -1339,16 +1069,19 @@ await new GuideCommand({
 			expect(replies).toEqual([])
 			// The second prompt is the system text and its briefing, the seed tail, and the request: the
 			// first request and its reply never reach it.
-			expect(prompts).toHaveLength(3)
+			expect(prompts.count).toBe(3)
 			expect(
-				requireValue(prompts[2], 'Missing prompt').map(({ role, content }) => [role, content]),
+				requireValue(prompts.calls[2]?.[0], 'Missing prompt').map(({ role, content }) => [
+					role,
+					content,
+				]),
 			).toEqual([
 				['system', `${system}\n\n${briefings[1]}`],
 				['user', 'Refunds over $100 need a manager.'],
 				['user', 'Does the Brightwater Studio refund need a manager?'],
 			])
 			expect(guideText).toContain(
-				'gauge.fixed // 120 — what advertising the tools adds to a prompt',
+				'gauge.overhead // 120 — what advertising the tools adds to a prompt',
 			)
 			expect(guideText).toContain(
 				"first.content // 'Order BW-5512 qualifies for a $148.50 refund.'",
@@ -1362,97 +1095,9 @@ await new GuideCommand({
 			)
 		})
 
-		// No unit test under `tests/src/core/ledgers` isolates these claims of the ledger section, so
-		// each scenario files by phrase: the claim, not a model, decides what the judge answers.
-		function createPhraseJudge(
-			rules: readonly string[],
-			amenders: readonly string[] = [],
-		): JudgeInterface {
-			return {
-				id: 'scripted',
-				name: 'scripted',
-				model: 'scripted',
-				ask: async (request) => {
-					const state = isString(request.state) ? request.state : ''
-					const answers: Record<string, JudgeAnswer> = {}
-					for (const [id, question] of Object.entries(request.questions)) {
-						answers[id] =
-							question.form === 'choice'
-								? {
-										form: 'choice',
-										probabilities: rules.some((rule) => state.includes(rule))
-											? { rule: 1 }
-											: state.includes('Correction')
-												? { correction: 1 }
-												: { fact: 1 },
-									}
-								: {
-										form: 'noul',
-										noul:
-											(id.startsWith('["topic"') && state.toLowerCase().includes('refund')) ||
-											(id.startsWith('["amends"') &&
-												amenders.some((amender) => state.includes(amender)))
-												? 0.9
-												: 0.1,
-									}
-					}
-					return { model: 'scripted', answers }
-				},
-			}
-		}
-		const deskThresholds: LedgerThreshold = {
-			category: 0.7,
-			topic: 0.8,
-			amends: 0.8,
-			supersedes: 0.8,
-			correction: 0.3,
-		}
-		const refundsTopic: LedgerTopic = { name: 'refunds', criterion: 'refund amounts and approvals' }
-		const orderLookup: LedgerLookup = {
-			tool: {
-				name: 'lookup_order',
-				description: 'Read an order by its id.',
-				parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-				execute: (args) =>
-					`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
-			},
-			read: (args) => ({
-				ids: [String(args.id)],
-				owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
-			}),
-		}
-
 		it('asks the amends question about an earlier message that shares only a desk topic, as the filing claims', async () => {
-			const fileCorrection = async (topics: readonly LedgerTopic[]) => {
-				const conversation = createConversation()
-				const earlier = conversation.add({
-					role: 'user',
-					content: 'Refunds over $100 need a manager.',
-				})
-				const later = conversation.add({
-					role: 'user',
-					content: 'Correction: refunds need a manager over $250.',
-				})
-				const classifier = new Classifier({
-					conversation,
-					judge: createPhraseJudge(['Refunds over']),
-					questions: LEDGER_QUESTIONS,
-					topics,
-					thresholds: deskThresholds,
-					assign: () => undefined,
-					entities: () => new Set(),
-				})
-				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-				return {
-					pairs: filed.judgments.filter(
-						(key) => key.startsWith('["amends"') || key.startsWith('["supersedes"'),
-					),
-					amends: JSON.stringify(['amends', earlier.id, later.id]),
-				}
-			}
-
-			const shared = await fileCorrection([refundsTopic])
-			const unshared = await fileCorrection([])
+			const shared = await fileLedgerCorrection([LEDGER_REFUNDS_TOPIC])
+			const unshared = await fileLedgerCorrection([])
 
 			// The amends answer of 0.1 stays under its cutoff, so no supersedes question follows.
 			expect(shared.pairs).toEqual([shared.amends])
@@ -1462,20 +1107,19 @@ await new GuideCommand({
 			)
 		})
 
-		it('fits the tail inside the tail share of the prompt budget less the fixed cost, as the plan claims', async () => {
+		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {
 			const capacity = 600
 			const tails = new Map<number, number>()
-			for (const fixed of [0, 200]) {
-				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity,
-					gauge: { scale: 1, fixed },
-				})
+			for (const overhead of LEDGER_OVERHEAD_CASES) {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity,
+						gauge: { scale: 1, overhead },
+					}),
+				)
 				ledger.conversation.add(
 					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
 						role: 'user',
@@ -1483,11 +1127,8 @@ await new GuideCommand({
 					})),
 				)
 				await ledger.respond('Review the desk.')
-				tails.set(fixed, estimateMessages(requireValue(provider.calls[0]).messages.slice(1)))
+				tails.set(overhead, estimateMessages(requireValue(provider.calls[0]).messages.slice(1)))
 			}
-			const room = (fixed: number) =>
-				(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - fixed)) /
-				(1 + LEDGER_SCALE_DRIFT)
 			const exchange = estimateMessages([
 				{
 					id: 'delivery',
@@ -1497,95 +1138,77 @@ await new GuideCommand({
 			])
 
 			// A tail within one seed exchange of its room shows the room, not the history, ends it.
-			for (const [fixed, tail] of tails) {
-				expect(tail).toBeLessThanOrEqual(room(fixed))
-				expect(tail).toBeGreaterThan(room(fixed) - exchange)
+			for (const [overhead, tail] of tails) {
+				const room =
+					(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - overhead)) /
+					(1 + LEDGER_SCALE_DRIFT)
+				expect(tail).toBeLessThanOrEqual(room)
+				expect(tail).toBeGreaterThan(room - exchange)
 			}
-			expect(requireValue(tails.get(0))).toBeGreaterThan(room(200))
+			expect(requireValue(tails.get(0))).toBeGreaterThan(
+				(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - 200)) /
+					(1 + LEDGER_SCALE_DRIFT),
+			)
 			expect(guideText).toContain(
-				'the `capacity` option less the `predict` option, times the `prompt` share, less the fixed cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
 			)
 		})
 
 		it('budgets a ledger at W + P with predict P like one at W without thinking (the thinking budget)', async () => {
 			const window = 600
 			const cap = 400
-			const plan = async (capacity: number, predict?: number) => {
-				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity,
-					...(predict === undefined ? {} : { predict }),
-					gauge: { scale: 1, fixed: 0 },
-				})
-				ledger.conversation.add(
-					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
-						role: 'user',
-						content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
-					})),
-				)
-				await ledger.respond('Review the desk.')
-				return requireValue(provider.calls[0], 'Missing first call').messages.map(
-					({ role, content }) => [role, content],
-				)
-			}
 
 			// The plan half: the reserved cap leaves the prompt exactly the window's budget, while the
 			// same capacity without the cap plans a longer prompt.
-			const reserved = await plan(window + cap, cap)
-			expect(reserved).toEqual(await plan(window))
-			expect((await plan(window + cap)).length).toBeGreaterThan(reserved.length)
+			const reserved = await planLedgerDelivery(window + cap, cap)
+			expect(reserved).toEqual(await planLedgerDelivery(window))
+			expect((await planLedgerDelivery(window + cap)).length).toBeGreaterThan(reserved.length)
 
 			// The gauge half: under replay 'none', a call's thinking leaves the measured use, so the room
 			// and the close rule read what a call without thinking leaves at the window.
 			const thinking = new Gauge({
 				scale: 1.25,
-				fixed: 120,
+				overhead: 120,
 				capacity: 32_768 + 4_096,
 				predict: 4_096,
 			})
-			const plain = new Gauge({ scale: 1.25, fixed: 120, capacity: 32_768 })
+			const plain = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768 })
 			const carried = new Gauge({
 				scale: 1.25,
-				fixed: 120,
+				overhead: 120,
 				capacity: 32_768 + 4_096,
 				predict: 4_096,
 				replay: 'turn',
 			})
 			const thought = [{ estimate: 400, prompt: 640, completion: 330, thinking: 300, tools: 2 }]
 			const bare = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
-			expect(thinking.left(thought) - 4_096).toBe(plain.left(bare))
+			expect(thinking.remainder(thought) - 4_096).toBe(plain.remainder(bare))
 			expect(thinking.room(thought, '')).toBe(plain.room(bare, ''))
 			thinking.observe(thought, thought[0])
 			plain.observe(bare, bare[0])
 			expect(thinking.reserve(thought, '')).toBe(plain.reserve(bare, ''))
 			// Under replay 'turn' the next request carries the thinking, so the gauge counts it.
-			expect(carried.left(thought) - 4_096).toBe(plain.left(bare) - 300)
+			expect(carried.remainder(thought) - 4_096).toBe(plain.remainder(bare) - 300)
 			expect(guideText).toContain(
 				"With replay `'none'`, a ledger at a `capacity` of `W + P` with a `predict` of `P`, where `W` is a context window and `P` a generation cap, budgets like a ledger at `W` without thinking.",
 			)
 		})
 
 		it('selects first-pass thinking and always disables answer-pass thinking (the thinking budget)', async () => {
-			for (const think of [true, false, undefined]) {
+			for (const think of LEDGER_THINKING_CASES) {
 				const provider = createScriptedProvider(
 					[{ content: '' }, { content: 'Refunds over $100 need a manager.' }],
-					{ record: true },
+					{ recorded: true },
 				)
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity: 32_768,
-					gauge: { scale: 1, fixed: 0 },
-					...(think === undefined ? {} : { think }),
-				})
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity: 32_768,
+						gauge: { scale: 1, overhead: 0 },
+						...(think === undefined ? {} : { think }),
+					}),
+				)
 				const result = await ledger.respond('Does a $148.50 refund need a manager?')
 				expect(result.passes).toHaveLength(2)
 				expect(provider.calls.map(({ options }) => options)).toEqual([
@@ -1600,55 +1223,12 @@ await new GuideCommand({
 		})
 
 		it('drops off-topic rules, then outside sources, then on-topic rules, then owner lines, as the plan claims', async () => {
-			const markers = [
-				'Keep the loading dock at warehouse 42 clear.',
-				'The Northgate courier brings refund forms on 2026-10-12.',
-				'Refunds over $100 need a manager.',
-				'Refund due $148.50.',
-				'Order BW-5512 for account BW-20931: Brightwater Studio.',
-			]
-			const brief = async (capacity: number) => {
-				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge(['Keep the loading', 'Refunds over']),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity,
-					gauge: { scale: 1, fixed: 0 },
-					share: { prompt: 1, tail: 0.05 },
-					lookups: [orderLookup],
-				})
-				ledger.conversation.add([
-					{ role: 'user', content: 'Keep the loading dock at warehouse 42 clear.' },
-					{ role: 'user', content: 'Refunds over $100 need a manager.' },
-					{ role: 'user', content: 'The Northgate courier brings refund forms on 2026-10-12.' },
-					{
-						role: 'assistant',
-						content: '',
-						calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-					},
-					{
-						role: 'tool',
-						call: 'seed',
-						content: 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.',
-					},
-				])
-				await ledger.respond('Does the Brightwater Studio refund need a manager?')
-				const system = requireValue(
-					provider.calls[0]?.messages[0],
-					'Missing system message',
-				).content
-				return markers.filter((marker) => system.includes(marker))
-			}
-
 			// Each capacity sits inside the band where exactly one more step of the order has run.
-			expect(await brief(200)).toEqual(markers)
-			expect(await brief(95)).toEqual(markers.slice(1))
-			expect(await brief(82)).toEqual(markers.slice(2))
-			expect(await brief(68)).toEqual(markers.slice(3))
-			expect(await brief(59)).toEqual(markers.slice(4))
+			expect(await briefLedgerDesk(200)).toEqual(LEDGER_BRIEFING_MARKERS)
+			expect(await briefLedgerDesk(95)).toEqual(LEDGER_BRIEFING_MARKERS.slice(1))
+			expect(await briefLedgerDesk(82)).toEqual(LEDGER_BRIEFING_MARKERS.slice(2))
+			expect(await briefLedgerDesk(68)).toEqual(LEDGER_BRIEFING_MARKERS.slice(3))
+			expect(await briefLedgerDesk(59)).toEqual(LEDGER_BRIEFING_MARKERS.slice(4))
 			expect(guideText).toContain(
 				"the ledger drops the rules off the request's topics, then the sources outside the selected records, then the rules on its topics, then the owner lines",
 			)
@@ -1668,18 +1248,17 @@ await new GuideCommand({
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [orderLookup],
-			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [LEDGER_ORDER_LOOKUP],
+				}),
+			)
 			const result = 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
 
 			await ledger.respond('Look up order BW-5512.')
@@ -1696,55 +1275,9 @@ await new GuideCommand({
 			)
 		})
 
-		// A seed rule whose code sentence a later correction amends through the owner they share, a seed
-		// assistant statement, and a seed lookup, served to one request that recalls a desk topic and an
-		// owner and then ends without text.
-		const amendedRule = 'Refunds for Brightwater Studio need a manager. Use code AA-10.'
-		const amendedStatement = 'Refund forms go to the Northgate desk.'
-		const amendedCorrection = 'Correction: Brightwater Studio uses code AA-12 in place of AA-10.'
-		const amendedReading =
-			'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
-		async function serveAmendedDesk(): Promise<ReadonlyArray<readonly Message[]>> {
-			const provider = createScriptedProvider(
-				[
-					{ content: '', tools: [{ id: 'desk', name: 'recall', arguments: { topic: 'refunds' } }] },
-					{
-						content: '',
-						tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Brightwater' } }],
-					},
-					{ content: '' },
-					{ content: 'Use code AA-12.' },
-				],
-				{ record: true },
-			)
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge(['Refunds for'], ['uses code AA-12']),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [orderLookup],
-			})
-			ledger.conversation.add([
-				{
-					role: 'assistant',
-					content: '',
-					calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-				},
-				{ role: 'tool', call: 'seed', content: amendedReading },
-				{ role: 'user', content: amendedRule },
-				{ role: 'assistant', content: amendedStatement },
-				{ role: 'user', content: amendedCorrection },
-			])
-			const result = await ledger.respond('Review the Brightwater Studio refund.')
-			expect(result.passes).toHaveLength(2)
-			return provider.calls.map(({ messages }) => messages)
-		}
-
 		it('drops a stale sentence from the briefing alone and keeps it in recall, the answer note, and the seed tail, as the records claim', async () => {
-			const prompts = await serveAmendedDesk()
+			const { result, prompts } = await serveAmendedDesk()
+			expect(result.passes).toHaveLength(2)
 			const first = requireValue(prompts[0], 'Missing first prompt')
 
 			expect(requireValue(first[0], 'Missing system message').content).toContain(
@@ -1754,38 +1287,41 @@ await new GuideCommand({
 				expect(requireValue(prompt[0], 'Missing system message').content).not.toContain(
 					'Use code AA-10.',
 				)
-			expect(first.map(({ content }) => content)).toContain(amendedRule)
+			expect(first.map(({ content }) => content)).toContain(LEDGER_AMENDED_RULE)
 			expect(
 				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
 					?.content,
-			).toContain(amendedRule)
+			).toContain(LEDGER_AMENDED_RULE)
 			expect(
 				requireValue(prompts[3], 'Missing answer pass').find(({ content }) =>
 					content.startsWith(LEDGER_NOTES.results),
 				)?.content,
-			).toContain(amendedRule)
+			).toContain(LEDGER_AMENDED_RULE)
 			expect(guideText).toContain(
 				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool, the answer note, and the seed tail keep the stored content of each message they carry, stale sentences included.',
 			)
 		})
 
 		it('lists recall matches newest first, each source followed by the amenders the topic does not match, as the `recall` tool claims', async () => {
-			const prompts = await serveAmendedDesk()
+			const { result, prompts } = await serveAmendedDesk()
+			expect(result.passes).toHaveLength(2)
 
 			// The correction is newer than the statement but names no refund, so it follows its source.
 			expect(
 				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
 					?.content,
-			).toBe([amendedStatement, amendedRule, amendedCorrection].join('\n'))
+			).toBe([LEDGER_AMENDED_STATEMENT, LEDGER_AMENDED_RULE, LEDGER_AMENDED_CORRECTION].join('\n'))
 			// The correction names Brightwater Studio, so the owner topic matches it: it lists first as its own
 			// newer item, and the rule it amends follows without it.
 			expect(
 				requireValue(prompts[2], 'Missing owner recall').findLast(({ role }) => role === 'tool')
 					?.content,
 			).toBe(
-				[amendedCorrection, amendedRule, `lookup_order {"id":"BW-5512"}: ${amendedReading}`].join(
-					'\n',
-				),
+				[
+					LEDGER_AMENDED_CORRECTION,
+					LEDGER_AMENDED_RULE,
+					`lookup_order {"id":"BW-5512"}: ${LEDGER_AMENDED_READING}`,
+				].join('\n'),
 			)
 			expect(guideText).toContain(
 				"It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a desk topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
@@ -1793,7 +1329,8 @@ await new GuideCommand({
 		})
 
 		it('writes what the pass returned into the answer note without call text, as the answer pass claims', async () => {
-			const prompts = await serveAmendedDesk()
+			const { result, prompts } = await serveAmendedDesk()
+			expect(result.passes).toHaveLength(2)
 
 			expect(
 				requireValue(prompts[3], 'Missing answer pass').find(({ content }) =>
@@ -1802,10 +1339,10 @@ await new GuideCommand({
 			).toBe(
 				[
 					LEDGER_NOTES.results,
-					amendedStatement,
-					amendedRule,
-					amendedCorrection,
-					amendedReading,
+					LEDGER_AMENDED_STATEMENT,
+					LEDGER_AMENDED_RULE,
+					LEDGER_AMENDED_CORRECTION,
+					LEDGER_AMENDED_READING,
 				].join('\n'),
 			)
 			expect(guideText).toContain(
@@ -1822,18 +1359,17 @@ await new GuideCommand({
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 350,
-				gauge: { scale: 1, fixed: 0 },
-				share: { prompt: 0.2, tail: 0.1 },
-			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity: 350,
+					gauge: { scale: 1, overhead: 0 },
+					share: { prompt: 0.2, tail: 0.1 },
+				}),
+			)
 			const seeds = Array.from(
 				{ length: 20 },
 				(_unused, at) => `Refund ${at} reached the Northgate desk with a completed receipt.`,
@@ -1860,18 +1396,17 @@ await new GuideCommand({
 
 		it('adds no answer note when the pass returned nothing, only the cue note, as the answer pass claims', async () => {
 			const provider = createScriptedProvider([{ content: '' }, { content: 'Done.' }], {
-				record: true,
+				recorded: true,
 			})
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [orderLookup],
-			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [LEDGER_ORDER_LOOKUP],
+				}),
+			)
 
 			const result = await ledger.respond('Does a $148.50 refund need a manager?')
 
@@ -1892,7 +1427,7 @@ await new GuideCommand({
 					{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
 					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
@@ -1910,7 +1445,7 @@ await new GuideCommand({
 					},
 					stream: (...args) => provider.stream(...args),
 				},
-				{
+				buildGuideLedgerOptions({
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -1918,27 +1453,23 @@ await new GuideCommand({
 							return phrases.ask(request, signal)
 						},
 					},
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
 					capacity: 32_768,
-					gauge: { scale: 1, fixed: 0 },
-				},
+					gauge: { scale: 1, overhead: 0 },
+				}),
 			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.respond('Does a $148.50 refund need a manager?')
 			const asked = asks
-			const faults: unknown[] = []
-			const selections: Selection[] = []
-			ledger.agent.emitter.on('fault', (error) => faults.push(error))
-			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const faults = createRecorder<readonly [unknown]>()
+			const selections = createRecorder<readonly [Selection]>()
+			ledger.agent.emitter.on('fault', faults.handler)
+			ledger.agent.emitter.on('select', selections.handler)
 
 			// The newest message is the reply, so the run has no request to select for.
 			const replied = ledger.conversation.view()
 			await ledger.agent.generate()
-			expect(selections).toEqual([])
-			expect(faults).toEqual([])
+			expect(selections.calls).toEqual([])
+			expect(faults.calls.flat()).toEqual([])
 			expect(
 				requireValue(provider.calls[1], 'Missing reply run')
 					.messages.slice(1)
@@ -1948,10 +1479,10 @@ await new GuideCommand({
 			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
 			const asking = ledger.conversation.view()
 			await ledger.agent.generate()
-			const direct = requireValue(selections[0], 'Missing direct selection')
+			const direct = requireValue(selections.calls[0]?.[0], 'Missing direct selection')
 			expect(isLedgerError(direct.fault)).toBe(true)
 			expect(direct.fault).toMatchObject({ code: 'REQUEST' })
-			expect(faults).toEqual([direct.fault])
+			expect(faults.calls.flat()).toEqual([direct.fault])
 			expect(direct.briefing).toBeUndefined()
 			expect(
 				requireValue(provider.calls[2], 'Missing direct run')
@@ -1969,10 +1500,10 @@ await new GuideCommand({
 			await ledger.agent.generate({ signal: abort.signal })
 			release.resolve()
 			await measuring
-			const measured = requireValue(selections[1], 'Missing calibration-time selection')
+			const measured = requireValue(selections.calls[1]?.[0], 'Missing calibration-time selection')
 			expect(isLedgerError(measured.fault)).toBe(true)
 			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
-			expect(faults).toEqual([direct.fault, measured.fault])
+			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
 			expect(asks).toBe(asked)
 			expect(guideText).toContain(
 				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
@@ -1983,7 +1514,7 @@ await new GuideCommand({
 		})
 
 		it('faults a direct run during calibration after the answer pass rejected, as calibration admits no run', async () => {
-			const provider = createScriptedProvider([{ content: '' }], { exhaust: 'throw' })
+			const provider = createScriptedProvider([{ content: '' }], { repeat: false })
 			const calibration = createScriptedProvider([
 				{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
 				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
@@ -2001,30 +1532,26 @@ await new GuideCommand({
 					},
 					stream: (...args) => provider.stream(...args),
 				},
-				{
+				buildGuideLedgerOptions({
 					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
 					capacity: 32_768,
-					gauge: { scale: 1, fixed: 0 },
-				},
+					gauge: { scale: 1, overhead: 0 },
+				}),
 			)
 			const response = await ledger.respond('Review the desk.')
 			expect(response.passes.map((pass) => pass.partial)).toEqual([false, true])
 			expect(provider.started).toBe(2)
 			expect(ledger.conversation.view().at(-1)?.content).toBe(LEDGER_NOTES.cue)
-			const selections: Selection[] = []
-			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const selections = createRecorder<readonly [Selection]>()
+			ledger.agent.emitter.on('select', selections.handler)
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
 			try {
 				const abort = new AbortController()
 				ledger.agent.emitter.once('select', () => abort.abort())
 				await ledger.agent.generate({ signal: abort.signal })
-				expect(selections).toHaveLength(1)
-				expect(selections[0]?.fault).toMatchObject({ code: 'REQUEST' })
+				expect(selections.calls).toHaveLength(1)
+				expect(selections.calls[0]?.[0]?.fault).toMatchObject({ code: 'REQUEST' })
 			} finally {
 				release.resolve()
 				await measuring
@@ -2035,41 +1562,22 @@ await new GuideCommand({
 		})
 
 		it('fits a short-id lookup at the tail boundary when its shown stub is longer, as the plan claims', async () => {
-			const request: Message = { id: 'request', role: 'user', content: 'Check BW-5512.' }
-			const seed: readonly Message[] = [
-				{ id: 'seed', role: 'user', content: 'Read the order.' },
-				{
-					id: 'leader',
-					role: 'assistant',
-					content: '',
-					calls: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-				},
-			]
-			const hidden: Message = {
-				id: 'result',
-				role: 'tool',
-				call: 'c1',
-				content: renderStub('lookup_order', { id: 'BW-5512' }, 'hidden'),
-			}
-			const shown: Message = {
-				...hidden,
-				content: renderStub('lookup_order', { id: 'BW-5512' }, 'shown'),
-			}
+			const { request, seed, boundaries } = buildLedgerTailScenario()
+			const [hidden, shown] = boundaries
 			expect(estimateMessages([shown])).toBeGreaterThan(estimateMessages([hidden]))
-			for (const boundary of [hidden, shown]) {
+			for (const boundary of boundaries) {
 				const allowance = estimateMessages([...seed, boundary, request]) + 0.25
-				const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity: 4096,
-					gauge: { scale: 1, fixed: 0 },
-					share: { prompt: 0.7, tail: (allowance * 1.06) / (4096 * 0.7) },
-					lookups: [orderLookup],
-				})
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity: 4096,
+						gauge: { scale: 1, overhead: 0 },
+						share: { prompt: 0.7, tail: (allowance * 1.06) / (4096 * 0.7) },
+						lookups: [LEDGER_ORDER_LOOKUP],
+					}),
+				)
 				ledger.conversation.add([
 					...seed,
 					{ ...hidden, content: 'Order BW-5512 belongs to Brightwater Studio.' },
@@ -2088,7 +1596,7 @@ await new GuideCommand({
 		})
 
 		it('plans a direct run started while the active request is the newest message as that request, as the concurrent-run limit states', async () => {
-			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
 			const ledger = createLedger(
@@ -2102,19 +1610,15 @@ await new GuideCommand({
 						return yield* provider.stream(...args)
 					},
 				},
-				{
+				buildGuideLedgerOptions({
 					judge: createPhraseJudge(['Refunds over']),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
 					capacity: 32_768,
-					gauge: { scale: 1, fixed: 0 },
-				},
+					gauge: { scale: 1, overhead: 0 },
+				}),
 			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
-			const selections: Selection[] = []
-			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+			const selections = createRecorder<readonly [Selection]>()
+			ledger.agent.emitter.on('select', selections.handler)
 			const responding = ledger.respond('Does a $148.50 refund need a manager?')
 			await entered.promise
 			const abort = new AbortController()
@@ -2123,8 +1627,8 @@ await new GuideCommand({
 			release.resolve()
 			await responding
 
-			const [owned, concurrent] = selections
-			expect(selections).toHaveLength(2)
+			const [owned, concurrent] = selections.calls.map(([selection]) => selection)
+			expect(selections.calls).toHaveLength(2)
 			expect(requireValue(concurrent, 'Missing concurrent selection').fault).toBeUndefined()
 			expect(requireValue(concurrent, 'Missing concurrent selection').briefing).toBe(
 				requireValue(owned, 'Missing owned selection').briefing,
@@ -2141,42 +1645,39 @@ await new GuideCommand({
 		})
 
 		it('holds a refused question and the logprob failure and asks any other failure again, as the filing claims', async () => {
-			const refused = 'Refunds over $100 need a manager.'
-			const garbled = 'Keep the loading dock at warehouse 42 clear.'
-			const transient = 'The Northgate courier arrives on Tuesday.'
+			const [refused, garbled, transient] = LEDGER_FAILURE_MESSAGES
 			const asks = new Map<string, number>()
 			const phrases = createPhraseJudge([])
-			const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
-				judge: {
-					...phrases,
-					ask: async (request, signal) => {
-						const state = isString(request.state) ? request.state : ''
-						for (const text of [refused, garbled, transient])
-							if (state.includes(text)) asks.set(text, (asks.get(text) ?? 0) + 1)
-						if (state.includes(refused))
-							throw new JudgeError('QUESTION', 'judge error: refused before inference')
-						if (state.includes(garbled))
-							throw new Error('judge error: invalid or duplicate top logprob token')
-						if (state.includes(transient)) throw new Error('judge error: connection reset')
-						return phrases.ask(request, signal)
+			const ledger = createLedger(
+				createScriptedProvider([{ content: 'Done.' }]),
+				buildGuideLedgerOptions({
+					judge: {
+						...phrases,
+						ask: async (request, signal) => {
+							const state = isString(request.state) ? request.state : ''
+							for (const text of LEDGER_FAILURE_MESSAGES)
+								if (state.includes(text)) asks.set(text, (asks.get(text) ?? 0) + 1)
+							if (state.includes(refused))
+								throw new JudgeError('QUESTION', 'judge error: refused before inference')
+							if (state.includes(garbled))
+								throw new Error('judge error: invalid or duplicate top logprob token')
+							if (state.includes(transient)) throw new Error('judge error: connection reset')
+							return phrases.ask(request, signal)
+						},
 					},
-				},
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-			})
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+				}),
+			)
 			ledger.conversation.add(
-				[refused, garbled, transient].map((content): MessageInput => ({ role: 'user', content })),
+				LEDGER_FAILURE_MESSAGES.map((content): MessageInput => ({ role: 'user', content })),
 			)
 
 			await ledger.respond('Review the desk.')
 			const first = new Map(asks)
 			await ledger.respond('Review the desk again.')
 
-			for (const text of [refused, garbled, transient]) expect(first.get(text)).toBeGreaterThan(0)
+			for (const text of LEDGER_FAILURE_MESSAGES) expect(first.get(text)).toBeGreaterThan(0)
 			expect(asks.get(refused)).toBe(first.get(refused))
 			expect(asks.get(garbled)).toBe(first.get(garbled))
 			expect(asks.get(transient)).toBe(2 * requireValue(first.get(transient)))
@@ -2186,69 +1687,24 @@ await new GuideCommand({
 		})
 
 		it('marks an amends pair only on a shared id or number and a supersedes pair whatever they share, as the filing claims', async () => {
-			const mark = async (correction: string, supersedes: number) => {
-				const conversation = createConversation()
-				const earlier = conversation.add({
-					role: 'user',
-					content: 'Refunds over $100 need a manager.',
-				})
-				conversation.add({ role: 'user', content: correction })
-				const classifier = new Classifier({
-					conversation,
-					judge: {
-						id: 'scripted',
-						name: 'scripted',
-						model: 'scripted',
-						ask: async (request) => {
-							const state = isString(request.state) ? request.state : ''
-							const answers: Record<string, JudgeAnswer> = {}
-							for (const [id, question] of Object.entries(request.questions))
-								answers[id] =
-									question.form === 'choice'
-										? {
-												form: 'choice',
-												probabilities: state.includes('Correction')
-													? { correction: 1 }
-													: { rule: 1 },
-											}
-										: {
-												form: 'noul',
-												noul: id.startsWith('["supersedes"')
-													? supersedes
-													: id.startsWith('["amends"') ||
-														  (id.startsWith('["topic"') && state.toLowerCase().includes('refund'))
-														? 0.9
-														: 0.1,
-											}
-							return { model: 'scripted', answers }
-						},
-					},
-					questions: LEDGER_QUESTIONS,
-					topics: [refundsTopic],
-					thresholds: deskThresholds,
-					assign: () => undefined,
-					entities: () => new Set(),
-				})
-				await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-				const filing = classifier.classification()
-				return {
-					amended: filing.amended.has(earlier.id),
-					superseded: filing.superseded.has(earlier.id),
-				}
-			}
-
 			// Each amends answer of 0.9 reaches its cutoff; only the shared number marks the pair.
-			expect(await mark('Correction: refunds need a manager over $250.', 0.1)).toEqual({
-				amended: false,
-				superseded: false,
+			expect(
+				await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.1),
+			).toEqual({
+				amendments: false,
+				supersessions: false,
 			})
-			expect(await mark('Correction: refunds over $100 need two managers.', 0.1)).toEqual({
-				amended: true,
-				superseded: false,
+			expect(
+				await classifyLedgerCorrection('Correction: refunds over $100 need two managers.', 0.1),
+			).toEqual({
+				amendments: true,
+				supersessions: false,
 			})
-			expect(await mark('Correction: refunds need a manager over $250.', 0.9)).toEqual({
-				amended: true,
-				superseded: true,
+			expect(
+				await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.9),
+			).toEqual({
+				amendments: true,
+				supersessions: true,
 			})
 			expect(guideText).toContain(
 				'an `amends` answer at its cutoff marks a pair amended only when the two messages share an id or a number, and a `supersedes` answer at its cutoff marks the pair superseded and amended whatever they share.',
@@ -2262,21 +1718,7 @@ await new GuideCommand({
 				content: 'The lead on BW-5512 is Dana Whitcombe. She approved the refund.',
 			}
 			const lines = barrel.buildLines(
-				{
-					system: '',
-					exclude: [],
-					owners: new Map(),
-					messages: [message],
-					readings: [],
-					entities: new Map(),
-					classification: {
-						quiet: new Set(),
-						categories: new Map(),
-						topics: new Map(),
-						amended: new Map(),
-						superseded: new Map(),
-					},
-				},
+				buildLedgerInput({ messages: [message] }),
 				new Map([[message.id, message]]),
 				message.id,
 				new Set(),
@@ -2310,35 +1752,34 @@ await new GuideCommand({
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
-			const executed: unknown[] = []
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [
-					{
-						...orderLookup,
-						tool: {
-							...orderLookup.tool,
-							execute: (args, context) => {
-								executed.push(args.id)
-								return orderLookup.tool.execute(args, context)
+			const executed = createRecorder<readonly [unknown]>()
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								execute: (args, context) => {
+									executed.handler(args.id)
+									return LEDGER_ORDER_LOOKUP.tool.execute(args, context)
+								},
 							},
 						},
-					},
-				],
-			})
+					],
+				}),
+			)
 
 			const first = await ledger.respond('Look up order BW-5512.')
 			await ledger.respond('Review the Brightwater Studio refund.')
 
-			expect(executed).toEqual(['bw-5512', 'BW-5512'])
+			expect(executed.calls).toEqual([['bw-5512'], ['BW-5512']])
 			expect(first.passes).toHaveLength(2)
 			expect(barrel.identifyLookup('lookup_order', { id: 'bw-5512' })).toBe(
 				barrel.identifyLookup('lookup_order', { id: 'BW-5512' }),
@@ -2367,18 +1808,22 @@ await new GuideCommand({
 					},
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [{ ...orderLookup, tool: { ...orderLookup.tool, execute: () => reading } }],
-			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: { ...LEDGER_ORDER_LOOKUP.tool, execute: () => reading },
+						},
+					],
+				}),
+			)
 
 			const result = await ledger.respond(request)
 
@@ -2411,18 +1856,22 @@ await new GuideCommand({
 					{ content: '' },
 					{ content: 'Done.' },
 				],
-				{ record: true },
+				{ recorded: true },
 			)
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge([]),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [{ ...orderLookup, tool: { ...orderLookup.tool, execute: () => reading } }],
-			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					capacity,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: { ...LEDGER_ORDER_LOOKUP.tool, execute: () => reading },
+						},
+					],
+				}),
+			)
 
 			const result = await ledger.respond('Review order BW-5512.')
 			ledger.conversation.add({ role: 'user', content: 'Does the refund need a manager?' })
@@ -2432,24 +1881,30 @@ await new GuideCommand({
 			const turn = requireValue(provider.calls[1], 'Missing second call of the pass').messages
 			const answer = requireValue(provider.calls[2], 'Missing answer pass').messages
 			const direct = requireValue(provider.calls[3], 'Missing faulted run').messages
-			const narrated = (message: Message) => message.content === narration
-			const noted = (message: Message) => message.content.startsWith(LEDGER_NOTES.results)
 			expect(result.passes).toHaveLength(2)
-			expect(turn.filter(narrated)).toHaveLength(1)
+			expect(turn.filter((message) => message.content === narration)).toHaveLength(1)
 			expect(estimateMessages(turn.filter((message) => message.role !== 'tool'))).toBeGreaterThan(
 				budget,
 			)
 			expect(
-				estimateMessages(turn.filter((message) => message.role !== 'tool' && !narrated(message))),
+				estimateMessages(
+					turn.filter((message) => message.role !== 'tool' && message.content !== narration),
+				),
 			).toBeLessThanOrEqual(budget)
-			expect(answer.some((message) => message.role === 'tool' || narrated(message))).toBe(false)
-			expect(answer.filter(noted).map(({ content }) => content)).toEqual([
-				`${LEDGER_NOTES.results}\n${reading}`,
-			])
+			expect(
+				answer.some((message) => message.role === 'tool' || message.content === narration),
+			).toBe(false)
+			expect(
+				answer
+					.filter((message) => message.content.startsWith(LEDGER_NOTES.results))
+					.map(({ content }) => content),
+			).toEqual([`${LEDGER_NOTES.results}\n${reading}`])
 			expect(estimateMessages(answer)).toBeGreaterThan(budget)
-			expect(estimateMessages(answer.filter((message) => !noted(message)))).toBeLessThanOrEqual(
-				budget,
-			)
+			expect(
+				estimateMessages(
+					answer.filter((message) => !message.content.startsWith(LEDGER_NOTES.results)),
+				),
+			).toBeLessThanOrEqual(budget)
 			expect(direct.slice(1).map(({ role, content }) => [role, content])).toEqual(
 				view.map(({ role, content }) => [role, content]),
 			)
@@ -2461,16 +1916,15 @@ await new GuideCommand({
 
 		it('tails only the seed and briefs a message added after the first request, as the seed-tail limit claims', async () => {
 			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
-			const provider = createScriptedProvider([{ content: 'Done.' }], { record: true })
-			const ledger = createLedger(provider, {
-				judge: createPhraseJudge(['Refunds over']),
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-			})
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge(['Refunds over']),
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+				}),
+			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.respond('Review the desk.')
 			ledger.conversation.add({ role: 'user', content: later })
@@ -2505,46 +1959,45 @@ await new GuideCommand({
 			])
 			let filing: 'failing' | 'chatter' = 'failing'
 			const phrases = createPhraseJudge(['Refunds over'])
-			const ledger = createLedger(provider, {
-				judge: {
-					...phrases,
-					ask: async (request, signal) => {
-						const state = isString(request.state) ? request.state : ''
-						const choice = Object.values(request.questions).some(
-							(question) => question.form === 'choice',
-						)
-						if (choice && state.includes(caller)) {
-							if (filing === 'failing') throw new Error('judge error: connection reset')
-							return {
-								model: 'scripted',
-								answers: Object.fromEntries(
-									Object.keys(request.questions).map((id): [string, JudgeAnswer] => [
-										id,
-										{ form: 'choice', probabilities: { chatter: 1 } },
-									]),
-								),
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: {
+						...phrases,
+						ask: async (request, signal) => {
+							const state = isString(request.state) ? request.state : ''
+							const choice = Object.values(request.questions).some(
+								(question) => question.form === 'choice',
+							)
+							if (choice && state.includes(caller)) {
+								if (filing === 'failing') throw new Error('judge error: connection reset')
+								return {
+									model: 'scripted',
+									answers: Object.fromEntries(
+										Object.keys(request.questions).map((id): [string, JudgeAnswer] => [
+											id,
+											{ form: 'choice', probabilities: { chatter: 1 } },
+										]),
+									),
+								}
 							}
-						}
-						return phrases.ask(request, signal)
-					},
-				},
-				system: 'Serve the desk.',
-				topics: [refundsTopic],
-				questions: LEDGER_QUESTIONS,
-				thresholds: deskThresholds,
-				capacity: 32_768,
-				gauge: { scale: 1, fixed: 0 },
-				lookups: [
-					{
-						...orderLookup,
-						tool: {
-							...orderLookup.tool,
-							execute: (args) =>
-								`Order BW-5512 for account BW-20931: Brightwater Studio. Refund due ${args.id === 'BW-5512' ? '$148.50' : '$90.00'}.`,
+							return phrases.ask(request, signal)
 						},
 					},
-				],
-			})
+					capacity: 32_768,
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								execute: (args) =>
+									`Order BW-5512 for account BW-20931: Brightwater Studio. Refund due ${args.id === 'BW-5512' ? '$148.50' : '$90.00'}.`,
+							},
+						},
+					],
+				}),
+			)
 			const briefings: string[] = []
 			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing ?? ''))
 			ledger.conversation.add([
@@ -2555,7 +2008,7 @@ await new GuideCommand({
 			await ledger.respond('Look up order BW-5512.')
 			await ledger.respond('Look up order bw-5512 again for Brightwater Studio.')
 			filing = 'chatter'
-			for (const amount of [120, 135, 150])
+			for (const amount of LEDGER_REFUND_AMOUNTS)
 				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
 			const [, second, ...later] = briefings
@@ -2575,11 +2028,9 @@ await new GuideCommand({
 
 		it('files one rule and prices one request as the classifier and gauge fence claims', async () => {
 			// The fence declares the judge, the cutoffs, and the signal; the transcription supplies them.
-			const judge: JudgeInterface = {
-				id: 'scripted',
-				name: 'scripted',
-				model: 'scripted',
-				ask: async (request) => {
+			const judge = createLedgerJudge(
+				[],
+				async (request) => {
 					const answers: Record<string, JudgeAnswer> = {}
 					for (const [id, question] of Object.entries(request.questions)) {
 						answers[id] =
@@ -2589,14 +2040,9 @@ await new GuideCommand({
 					}
 					return { model: 'scripted', answers }
 				},
-			}
-			const thresholds: LedgerThreshold = {
-				category: 0.7,
-				topic: 0.8,
-				amends: 0.8,
-				supersedes: 0.8,
-				correction: 0.3,
-			}
+				'scripted',
+			)
+			const thresholds = LEDGER_DESK_THRESHOLDS
 			const signal = AbortSignal.timeout(30_000)
 
 			const conversation = createConversation()
@@ -2619,32 +2065,17 @@ await new GuideCommand({
 			expect(classifier.topics(rule.id)).toEqual(new Set(['refunds']))
 			expect(classifier.classification().categories.get(rule.id)).toBe('rule')
 
-			const gauge = new Gauge({ scale: 1.25, fixed: 120, capacity: 32_768 })
+			const gauge = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768 })
 			const calls = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
 			expect(estimateMessages([rule])).toBe(13)
-			expect(gauge.measure([rule])).toBe(136.25)
 			expect(gauge.rate(calls)).toBe(1.25)
-			expect(gauge.left(calls)).toBe(32_098)
+			expect(gauge.remainder(calls)).toBe(32_098)
 			expect(gauge.reserve(calls, '')).toBe(36.25)
 			expect(gauge.room(calls, '')).toBeCloseTo(12_824.7, 9)
 			gauge.observe(calls)
 			expect(gauge.scale).toBe(1.3)
 			// A fence comment that drifts from the value asserted earlier fails here, because each line must appear verbatim.
-			for (const line of [
-				'filed.judgments.length // 2 — the category question and the refunds topic question',
-				"classifier.category(rule.id) // 'rule'",
-				'classifier.decisive(rule.id) // true',
-				'classifier.quiet(rule.id) // false',
-				"classifier.topics(rule.id) // Set { 'refunds' }",
-				"classifier.classification().categories.get(rule.id) // 'rule'",
-				'gauge.measure([rule]) // 136.25 — the fixed 120 plus 1.25 for each of 13 estimate units',
-				'gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed',
-				"gauge.left(calls) // 32098 — the capacity less the last call's prompt and completion",
-				"gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate",
-				"gauge.room(calls, '') // 12824.7 — half of what is left beyond the reserve, in estimate units",
-				"gauge.scale // 1.3 — the first call's prompt less the fixed cost, over its estimate",
-			])
-				expect(guideText).toContain(line)
+			for (const line of GUIDE_CLASSIFIER_READINGS) expect(guideText).toContain(line)
 		})
 
 		it('empties the live tail and leaves the compacted sections (the conversation `clear` row)', async () => {
@@ -2669,7 +2100,7 @@ await new GuideCommand({
 
 		it('folds a reference block written to the active workspace into the next build (the provenance pattern)', () => {
 			// The fence passes `summarize: undefined` as a placeholder; the transcription omits the key.
-			const conversations = createConversationManager({ rollup: true })
+			const conversations = createConversationManager()
 			conversations.add({ id: 'auth' })
 			const b = conversations.add({ id: 'planning' })
 			// The fence starts from a thread that already holds turns; the transcription seeds them.
@@ -2698,8 +2129,8 @@ await new GuideCommand({
 
 		it('renders the switched workspace in the next build as the workspace-switch fence claims', async () => {
 			const provider = createScriptedProvider([{ content: 'Port 8123.' }], {
-				record: true,
-				exhaust: 'throw',
+				recorded: true,
+				repeat: false,
 			})
 			const agent = createAgent(provider)
 			const project = agent.context.workspaces.add()
@@ -2734,7 +2165,7 @@ await new GuideCommand({
 					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
 					{ content: 'Ticket 7 is open.' },
 				],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, {
 				system: 'You triage tickets.',
@@ -2777,93 +2208,22 @@ await new GuideCommand({
 			},
 			{ id: '5', role: 'tool', call: 'call-1', content: 'Refunded $148.50.' },
 		]
-		const keptThinking = (messages: readonly Message[]) =>
-			messages.filter((message) => 'thinking' in message).map(({ id }) => id)
 
 		it('keeps only the thinking each policy allows, as the replay fence claims', () => {
 			const none = stripThinking(replayMessages, 'none')
 			const turn = stripThinking(replayMessages, 'turn')
 
 			expect(none.filter((message) => 'thinking' in message).length).toBe(0)
-			expect(keptThinking(turn)).toEqual(['4'])
-			expect(keptThinking(replayMessages)).toEqual(['2', '4'])
-			for (const line of [
-				"content: 'Yes, within 30 days.',",
-				"thinking: 'The window is 30 days.',",
-				"calls: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],",
-				"thinking: 'Refund through the order tool.',",
-				"none.filter((message) => 'thinking' in message).length // 0 — no thinking goes back",
-				"turn.filter((message) => 'thinking' in message).map(({ id }) => id) // ['4'] — the turn in progress",
-			])
-				expect(guideText).toContain(line)
+			expect(turn.filter((message) => 'thinking' in message).map(({ id }) => id)).toEqual(['4'])
+			expect(replayMessages.filter((message) => 'thinking' in message).map(({ id }) => id)).toEqual(
+				['2', '4'],
+			)
+			for (const line of GUIDE_REPLAY_READINGS) expect(guideText).toContain(line)
 		})
 
 		it('records each call’s thinking and sends back what the replay policy keeps at every call and estimate (the replay section)', async () => {
-			const run = async (replay: ThinkingReplay | undefined) => {
-				const sent: Array<readonly Message[]> = []
-				const measured: Array<readonly Message[]> = []
-				const replies: ProviderResult[] = [
-					{
-						content: '',
-						thinking: 'Refund through the order tool.',
-						tools: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],
-					},
-					{ content: 'Refunded $148.50.', thinking: 'Report the amount.' },
-				]
-				const provider: ProviderInterface = {
-					id: 'scripted',
-					name: 'scripted',
-					...(replay === undefined ? {} : { replay }),
-					generate: async () => replies.shift() ?? { content: '' },
-					async *stream(messages) {
-						sent.push([...messages])
-						const reply = replies.shift() ?? { content: '' }
-						if (reply.content !== '') yield { channel: 'content', text: reply.content }
-						return reply
-					},
-				}
-				const tools = createToolManager()
-				tools.add(createTool({ name: 'refund_order', execute: () => 'Refunded $148.50.' }))
-				const conversations = createConversationManager({
-					summarize: createStubSummarizer().summarize,
-				})
-				conversations.add()
-				const agent = createAgent(provider, {
-					tools,
-					conversations,
-					window: createBudget({
-						max: 1_000_000,
-						consumer: (messages: readonly Message[]) => {
-							measured.push([...messages])
-							return estimateMessages(messages)
-						},
-					}),
-				})
-				agent.context.messages.add([
-					{ role: 'user', content: 'Is order BW-5512 refundable?' },
-					{
-						role: 'assistant',
-						content: 'Yes, within 30 days.',
-						thinking: 'The window is 30 days.',
-					},
-					{ role: 'user', content: 'Refund it.' },
-				])
-				const result = await agent.generate()
-				const thinking = (messages: readonly Message[]) =>
-					messages.flatMap((message) => (message.thinking === undefined ? [] : [message.thinking]))
-				return {
-					result,
-					recorded: thinking(agent.context.messages.messages()),
-					sent: sent.map(thinking),
-					measured,
-					wire: sent,
-				}
-			}
-
-			for (const replay of [undefined, 'none', 'turn', 'all'] satisfies ReadonlyArray<
-				ThinkingReplay | undefined
-			>) {
-				const outcome = await run(replay)
+			for (const replay of THINKING_REPLAY_CASES) {
+				const outcome = await exerciseThinkingReplay(replay)
 				// Every policy records both calls' thinking and joins it into the result.
 				expect(outcome.recorded).toEqual([
 					'The window is 30 days.',
@@ -2888,17 +2248,12 @@ await new GuideCommand({
 							: [[], []],
 				)
 			}
-			for (const sentence of [
-				"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
-				"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
-				'It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.',
-			])
-				expect(guideText).toContain(sentence)
+			for (const sentence of GUIDE_REPLAY_CLAIMS) expect(guideText).toContain(sentence)
 		})
 
 		it('reads recorded thinking under none replay to measure what a ledger call left (the replay section)', async () => {
 			const recalled: string[] = []
-			for (const thinking of [undefined, 'a'.repeat(800)]) {
+			for (const thinking of LEDGER_RECORDED_THINKING) {
 				const provider = createScriptedProvider(
 					[
 						{
@@ -2909,18 +2264,17 @@ await new GuideCommand({
 						},
 						{ content: 'Done.' },
 					],
-					{ record: true, replay: 'none' },
+					{ recorded: true, replay: 'none' },
 				)
-				const ledger = createLedger(provider, {
-					judge: createPhraseJudge([]),
-					system: 'Serve the desk.',
-					topics: [refundsTopic],
-					questions: LEDGER_QUESTIONS,
-					thresholds: deskThresholds,
-					capacity: 4096,
-					predict: 1024,
-					gauge: { scale: 1, fixed: 0 },
-				})
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity: 4096,
+						predict: 1024,
+						gauge: { scale: 1, overhead: 0 },
+					}),
+				)
 				await ledger.respond('Review.')
 				expect(provider.calls).toHaveLength(2)
 				expect(
@@ -2933,7 +2287,7 @@ await new GuideCommand({
 				)
 			}
 			expect(recalled).toEqual([
-				barrel.LEDGER_NOTES.closed,
+				barrel.LEDGER_NOTES.closure,
 				'nothing on "absent"; recall an owner name, an id, or one of refunds',
 			])
 			expect(guideText).toContain(
@@ -2942,31 +2296,25 @@ await new GuideCommand({
 		})
 
 		it('strips a relayed request again by the upstream policy, keeping what both policies keep (the replay section)', async () => {
-			const received: Array<readonly Message[]> = []
+			const received = createRecorder<readonly [readonly Message[]]>()
 			// The browser agent has already applied its relay provider's 'turn' policy.
 			const request = { messages: stripThinking(replayMessages, 'turn') }
-			const upstreams: readonly ThinkingReplay[] = ['all', 'turn', 'none']
-			for (const replay of upstreams) {
-				const upstream: ProviderInterface = {
-					id: 'upstream',
-					name: 'upstream',
-					replay,
-					generate: async () => ({ content: 'Done.' }),
-					async *stream(messages) {
-						received.push([...messages])
-						yield { channel: 'content', text: 'Done.' }
-						return { content: 'Done.' }
-					},
-				}
+			for (const replay of RELAY_REPLAY_CASES) {
+				const upstream = createScriptedProvider([{ content: 'Done.' }], { replay, recorded: true })
 				const stream = new RelayStream({
 					provider: upstream,
 					request,
 					signal: AbortSignal.timeout(30_000),
 				})
 				await stream.response.text()
+				received.handler(requireValue(upstream.calls[0]).messages)
 			}
 
-			expect(received.map(keptThinking)).toEqual([['4'], ['4'], []])
+			expect(
+				received.calls.map(([messages]) =>
+					messages.filter((message) => 'thinking' in message).map(({ id }) => id),
+				),
+			).toEqual([['4'], ['4'], []])
 			expect(guideText).toContain(
 				'so the upstream call carries only the thinking that both policies keep',
 			)
@@ -3053,7 +2401,7 @@ await new GuideCommand({
 		it('observes cancellation inside the handler as the tool cancellation fence claims', async () => {
 			const provider = createScriptedProvider(
 				[{ content: 'working', tools: [{ id: 'wait-1', name: 'wait', arguments: {} }] }],
-				{ record: true, exhaust: 'throw' },
+				{ recorded: true, repeat: false },
 			)
 			const entered = Promise.withResolvers<void>()
 			const cancelled = Promise.withResolvers<boolean>()
@@ -3127,8 +2475,7 @@ await new GuideCommand({
 			thread.remove(message.id)
 			thread.clear()
 
-			// `summary?` and `judgments?` are absent until the first compaction and the first judgment, so
-			// an uncompacted, unjudged conversation's snapshot carries `id` / `sections` / `messages` alone.
+			// An unjudged conversation's snapshot carries id, sections, and messages alone.
 			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages'])
 		})
 
@@ -3319,7 +2666,7 @@ await new GuideCommand({
 				// and that status, and it leaves the upstream provider unentered.
 				const refused = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
-					parser: createParser,
+					parser: () => new RelayFrameParser(),
 					headers: () => ({ authorization: 'Bearer wrong' }),
 				}).generate(messages, createAbort().signal)
 				await expect(refused).rejects.toBeInstanceOf(ProviderError)
@@ -3334,7 +2681,7 @@ await new GuideCommand({
 				// the same script driven directly in this process answers what the relayed call answers.
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
-					parser: createParser,
+					parser: () => new RelayFrameParser(),
 					headers: () => ({ authorization: `Bearer ${bearer}` }),
 				})
 				const relayed = await browser.generate(messages, createAbort().signal)
@@ -3372,7 +2719,7 @@ await new GuideCommand({
 				const abort = createAbort()
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
-					parser: createParser,
+					parser: () => new RelayFrameParser(),
 					headers: () => ({ authorization: `Bearer ${bearer}` }),
 				})
 				const stream = browser.stream(messages, abort.signal)
@@ -3389,7 +2736,7 @@ await new GuideCommand({
 					'the relay returned the upstream iterator',
 					() => upstream.returns === 1,
 				)
-				expect(upstream.cancelled).toBe(true)
+				expect(upstream.aborted).toBe(true)
 			} finally {
 				gate.resolve()
 				const closing = performance.now()
@@ -3419,7 +2766,7 @@ await new GuideCommand({
 			const sent: Array<string | null> = []
 			const browser = createRelayProvider({
 				url: 'https://app.example/relay',
-				parser: createParser,
+				parser: () => new RelayFrameParser(),
 				headers: () => ({ authorization: `Bearer ${bearer}` }),
 				fetch: (input, init) => {
 					sent.push(new Request(input, init).headers.get('authorization'))
@@ -3444,29 +2791,56 @@ await new GuideCommand({
 		})
 
 		it('refuses a relay body at its byte limit and admits one below it', async () => {
-			const upstream = createScriptedProvider([{ content: 'admitted' }], { record: true })
-			const browserOf = (limit: number) =>
-				createRelayProvider({
-					url: 'https://app.example/relay',
-					parser: createParser,
-					fetch: (input, init) =>
-						createRelay({ provider: upstream, authorize: () => true, limit })(
-							new Request(input, init),
-						),
-				})
+			const upstream = createScriptedProvider([{ content: 'admitted' }], { recorded: true })
 			const exact = new TextEncoder().encode(
-				JSON.stringify(browserOf(1).body({ messages: [] })),
+				JSON.stringify(createBoundedRelay(upstream, 1).encode({ messages: [] })),
 			).byteLength
-			const refused = browserOf(exact).generate([], new AbortController().signal)
+			const refused = createBoundedRelay(upstream, exact).generate([], new AbortController().signal)
 
 			// `limit` refuses a body AT the limit, not merely above it: a body that fills the budget
 			// without reporting end of input is indistinguishable from one that exceeds it.
 			await expect(refused).rejects.toMatchObject({ code: 'HTTP', status: 413 })
 			expect(upstream.started).toBe(0)
-			expect(await browserOf(exact + 1).generate([], new AbortController().signal)).toEqual({
+			expect(
+				await createBoundedRelay(upstream, exact + 1).generate([], new AbortController().signal),
+			).toEqual({
 				content: 'admitted',
 			})
 			expect(upstream.started).toBe(1)
+		})
+
+		it('frames fragmented relay records and refuses malformed records with the documented parser', async () => {
+			const parser = new RelayFrameParser()
+			expect(parser.parse('{"channel":"content",')).toEqual([])
+			expect(parser.parse('"text":"hello"}\r')).toEqual([])
+			expect(parser.parse('\n\n')).toEqual([{ channel: 'content', text: 'hello' }])
+			parser.parse('{"unfinished":')
+			parser.clear()
+			expect(parser.parse('{"valid":true}\n')).toEqual([{ valid: true }])
+			for (const body of RELAY_INVALID_RECORDS) {
+				const transport = new RecordedTransport(() => new Response(body))
+				const provider = createRelayProvider({
+					url: 'https://relay.test',
+					parser: () => new RelayFrameParser(),
+					fetch: transport.fetch,
+				})
+				await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+					code: 'PROTOCOL',
+				})
+				expect(transport.requests).toHaveLength(1)
+			}
+			const source = requireValue(files['tests/guides.test.ts']).replaceAll('\r\n', '\n')
+			const start = source.indexOf('\tclass RelayFrameParser implements')
+			const end = source.indexOf('\n\t}\n', start) + '\n\t}'.length
+			expect(start).toBeGreaterThan(0)
+			expect(end).toBeGreaterThan(start)
+			expect(guideText).toContain(
+				source
+					.slice(start, end)
+					.split(/\r\n|\n/)
+					.map((line) => line.slice(1))
+					.join('\n'),
+			)
 		})
 
 		it('carries the relay fence lines the transcription copies', () => {
@@ -3487,7 +2861,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
 			expect(guideText).toContain("url: 'https://app.example/relay',")
-			expect(guideText).toContain('parser: createNDJSONParser,')
+			expect(guideText).toContain('parser: () => new RelayFrameParser(),')
 		})
 
 		it('answers the wire-contract fence’s guard and projection readings', () => {
@@ -3542,20 +2916,17 @@ await new GuideCommand({
 		})
 
 		it('asks the System One fence’s three questions over a started listener and reads the published measures', async () => {
-			const posted: unknown[] = []
-			const dispatcher = createDispatcher({
-				routes: [
-					{
-						method: 'POST',
-						path: SYSTEM_ONE_PATH,
-						handler: async (request) => {
-							posted.push(JSON.parse(await request.text()))
-							return Response.json(SYSTEM_ONE_TEV1)
-						},
+			const posted = createRecorder<readonly [unknown]>()
+			const server = createFixtureServer([
+				{
+					method: 'POST',
+					path: SYSTEM_ONE_PATH,
+					handler: async (request) => {
+						posted.handler(await request.json())
+						return Response.json(SYSTEM_ONE_TEV1)
 					},
-				],
-			})
-			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+				},
+			])
 			const port = await server.start()
 			try {
 				// The fence names a local Ollama origin; the transcription names the fixture listener
@@ -3601,7 +2972,7 @@ await new GuideCommand({
 
 				// One POST to the origin plus SYSTEM_ONE_PATH carried every question, and its body is the
 				// exact request Ollama accepted: `form` written as `type`, the undescribed option kept null.
-				expect(posted).toEqual([SYSTEM_ONE_TEV1_REQUEST])
+				expect(posted.calls).toEqual([[SYSTEM_ONE_TEV1_REQUEST]])
 				expect(result.model).toBe('tev1:0.8b')
 				expect(result.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
 				expect(result).not.toHaveProperty('refusals')
@@ -3828,9 +3199,9 @@ await new GuideCommand({
 			expect(isJudgeEntry(null)).toBe(false)
 
 			const judge = new SystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
-			expect(judge.body(SYSTEM_ONE_JUDGE_REQUEST)).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+			expect(judge.encode(SYSTEM_ONE_JUDGE_REQUEST)).toEqual(SYSTEM_ONE_TEV1_REQUEST)
 			expect(
-				judge.body({ state: 'Ticket 4182', questions: { refund: { form: 'noul' } } }),
+				judge.encode({ state: 'Ticket 4182', questions: { refund: { form: 'noul' } } }),
 			).toStrictEqual({
 				state: 'Ticket 4182',
 				model: 'tev1:0.8b',
@@ -3992,7 +3363,7 @@ await new GuideCommand({
 				model: 'tev1:0.8b',
 				fetch: new RecordedTransport(() => new Response(JUDGE_ENVELOPE)).fetch,
 				answers: TEV1_ANSWERS,
-				readAbort: reading,
+				abort: reading,
 			})
 			const late: unknown = await decoding
 				.ask(TEV1_REQUEST, reading.signal)
@@ -4088,7 +3459,7 @@ await new GuideCommand({
 				SYSTEM_ONE_TEV1.answers.severity.score,
 			)
 			const results = await Promise.all(
-				[SYSTEM_ONE_TEV1, SYSTEM_ONE_LLAMA, SYSTEM_ONE_MICA].map((body) =>
+				SYSTEM_ONE_MODEL_CASES.map((body) =>
 					new SystemOneJudge({
 						url: 'http://localhost:11434',
 						model: 'tev1:0.8b',
@@ -4124,15 +3495,8 @@ await new GuideCommand({
 		})
 
 		it('reports the model a System One response named and complete usage alone (the response-model clause)', async () => {
-			const bodies = [
-				{ ...SYSTEM_ONE_TEV1, model: 'gateway/tev1:0.8b' },
-				{ answers: SYSTEM_ONE_TEV1.answers, usage: SYSTEM_ONE_TEV1.usage },
-				{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: 975, output_tokens: null } },
-				{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: -1, output_tokens: 4 } },
-				{ model: 'tev1:0.8b', answers: SYSTEM_ONE_TEV1.answers },
-			]
 			const results = await Promise.all(
-				bodies.map((body) =>
+				SYSTEM_ONE_USAGE_CASES.map((body) =>
 					new SystemOneJudge({
 						url: 'http://localhost:11434',
 						model: 'jev-latest',
@@ -4155,7 +3519,7 @@ await new GuideCommand({
 			for (const result of results.slice(2)) expect(result).not.toHaveProperty('usage')
 		})
 
-		it('cancels a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
+		it('aborts a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
 			const caller = new AbortController()
 			const hook = new RecordedHeaders({ authorization: 'Bearer fixture-key' })
 			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))

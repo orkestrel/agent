@@ -1,3 +1,19 @@
+import { buildLedgerTailScenario } from './setup.js'
+import {
+	createPhraseJudge,
+	LEDGER_REFUNDS_TOPIC,
+	LEDGER_ORDER_LOOKUP,
+	fileLedgerCorrection,
+	planLedgerDelivery,
+	LEDGER_BRIEFING_MARKERS,
+	briefLedgerDesk,
+	serveAmendedDesk,
+	classifyLedgerCorrection,
+	exerciseThinkingReplay,
+	collectMessageThinking,
+	createBoundedRelay,
+	buildGuideLedgerOptions,
+} from './setup.js'
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { Channel, createAgent, ProviderAbortError } from '@src/core'
@@ -1622,5 +1638,153 @@ describe('ledger setup leaves', () => {
 		})
 		await expect(judge.ask(request, new AbortController().signal)).rejects.toBe(fault)
 		expect(asked).toEqual(['first', 'first'])
+	})
+})
+
+describe('guide scenario fixtures', () => {
+	it('files phrase categories and retains distinct topic and amendment probabilities', async () => {
+		const judge = createPhraseJudge(['Standing rule'], ['Updated code'])
+		const request = {
+			state: 'Standing rule: refunds. Updated code.',
+			questions: {
+				category: {
+					form: 'choice',
+					criteria: { rule: 'rule', fact: 'fact', correction: 'correction' },
+				},
+				'["topic"]': { form: 'noul' },
+				'["amends"]': { form: 'noul' },
+				'["supersedes"]': { form: 'noul' },
+			},
+		} as const
+		const result = await judge.ask(request, new AbortController().signal)
+		expect(result.answers).toEqual({
+			category: { form: 'choice', probabilities: { rule: 1 } },
+			'["topic"]': { form: 'noul', noul: 0.9 },
+			'["amends"]': { form: 'noul', noul: 0.9 },
+			'["supersedes"]': { form: 'noul', noul: 0.1 },
+		})
+		expect(
+			(
+				await judge.ask(
+					{ ...request, state: 'Correction: delivery date.' },
+					new AbortController().signal,
+				)
+			).answers.category,
+		).toEqual({ form: 'choice', probabilities: { correction: 1 } })
+		expect(
+			(await judge.ask({ ...request, state: 'Delivery date.' }, new AbortController().signal))
+				.answers.category,
+		).toEqual({ form: 'choice', probabilities: { fact: 1 } })
+	})
+	it('builds independent configurable desk options without adding a lookup', () => {
+		const first = buildGuideLedgerOptions()
+		const second = buildGuideLedgerOptions()
+		expect(first.judge).not.toBe(second.judge)
+		expect(first).toMatchObject({
+			capacity: 32768,
+			system: 'Serve the desk.',
+			topics: [LEDGER_REFUNDS_TOPIC],
+			lookups: [],
+			gauge: { scale: 1, overhead: 0 },
+		})
+		expect(
+			buildGuideLedgerOptions({ capacity: 700, lookups: [LEDGER_ORDER_LOOKUP], topics: [] }),
+		).toMatchObject({ capacity: 700, lookups: [LEDGER_ORDER_LOOKUP], topics: [] })
+	})
+	it('returns asked pair identities for the supplied topic inventory', async () => {
+		const shared = await fileLedgerCorrection([LEDGER_REFUNDS_TOPIC])
+		expect(shared.pairs).toEqual([shared.amends])
+		expect((await fileLedgerCorrection([])).pairs).toEqual([])
+	})
+	it('returns prompt snapshots with a reserved generation cap', async () => {
+		expect(await planLedgerDelivery(1000, 400)).toEqual(await planLedgerDelivery(600))
+		expect((await planLedgerDelivery(1000)).length).toBeGreaterThan(
+			(await planLedgerDelivery(600)).length,
+		)
+	})
+	it('returns the retained desk fragments at the supplied capacity', async () => {
+		expect(await briefLedgerDesk(200)).toEqual(LEDGER_BRIEFING_MARKERS)
+		expect(await briefLedgerDesk(59)).toEqual(LEDGER_BRIEFING_MARKERS.slice(4))
+	})
+	it('returns an amended desk result and its actual recorded prompts', async () => {
+		const served = await serveAmendedDesk()
+		expect(served.result.passes).toHaveLength(2)
+		expect(served.result.content).toBe('Use code AA-12.')
+		expect(served.prompts).toHaveLength(4)
+		expect(served.prompts[0]?.[0]?.content).toContain(
+			'Refunds for Brightwater Studio need a manager.',
+		)
+	})
+	it('preserves distinct amendment and supersession inputs', async () => {
+		expect(
+			await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.1),
+		).toEqual({ amendments: false, supersessions: false })
+		expect(
+			await classifyLedgerCorrection('Correction: refunds over $100 need two managers.', 0.1),
+		).toEqual({ amendments: true, supersessions: false })
+		expect(
+			await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.9),
+		).toEqual({ amendments: true, supersessions: true })
+	})
+	it('returns independently recorded thinking and budget-consumer prompts', async () => {
+		const outcome = await exerciseThinkingReplay('turn')
+		expect(outcome.sent).toEqual([[], ['Refund through the order tool.']])
+		expect(outcome.recorded).toEqual([
+			'The window is 30 days.',
+			'Refund through the order tool.',
+			'Report the amount.',
+		])
+		expect(outcome.measured).toEqual(outcome.wire)
+		expect(outcome.result.content).toBe('Refunded $148.50.')
+		expect((await exerciseThinkingReplay(undefined)).sent).toEqual([[], []])
+	})
+	it('collects present reasoning strings in order without altering messages', () => {
+		const reasoning = [
+			{ id: 'a', role: 'assistant', content: '', thinking: 'first' },
+			{ id: 'b', role: 'user', content: 'next' },
+			{ id: 'c', role: 'assistant', content: '', thinking: '' },
+		] as const
+		expect(collectMessageThinking(reasoning)).toEqual(['first', ''])
+		expect(collectMessageThinking([])).toEqual([])
+		expect(reasoning[0].thinking).toBe('first')
+	})
+	it('passes the configured body boundary through the real relay handler', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }])
+		await expect(
+			createBoundedRelay(upstream, 1).generate([], new AbortController().signal),
+		).rejects.toMatchObject({ code: 'HTTP', status: 413 })
+		expect(upstream.started).toBe(0)
+		await expect(
+			createBoundedRelay(upstream, 65536).generate([], new AbortController().signal),
+		).resolves.toEqual({ content: 'admitted' })
+		expect(upstream.started).toBe(1)
+	})
+})
+
+describe('buildLedgerTailScenario', () => {
+	it('builds fresh paired stubs with the same tool-call identity and distinct contents', () => {
+		const first = buildLedgerTailScenario()
+		const second = buildLedgerTailScenario()
+		expect(first.request).toEqual({ id: 'request', role: 'user', content: 'Check BW-5512.' })
+		expect(first.seed[1]?.calls).toEqual([
+			{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } },
+		])
+		expect(first.boundaries).toEqual([
+			{
+				id: 'result',
+				role: 'tool',
+				call: 'c1',
+				content: 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
+			},
+			{
+				id: 'result',
+				role: 'tool',
+				call: 'c1',
+				content: 'lookup_order {"id":"BW-5512"}: result shown under Pinned in the system message',
+			},
+		])
+		expect(second).toEqual(first)
+		expect(second.seed).not.toBe(first.seed)
+		expect(second.boundaries[0]).not.toBe(first.boundaries[0])
 	})
 })

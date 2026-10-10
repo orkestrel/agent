@@ -1,4 +1,6 @@
-import type { createBudget } from '@orkestrel/budget'
+import type { LedgerLookup, LedgerTopic, LedgerResult, RelayProvider } from '@src/core'
+import { Classifier, createLedger, createRelay, createRelayProvider, renderStub } from '@src/core'
+import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentResult,
 	AgentRegistryInterface,
@@ -3687,3 +3689,502 @@ export function buildLedgerExchange(
 		{ role: 'tool', call: id, content },
 	]
 }
+
+/**
+ * Creates a phrase-driven judge for deterministic ledger scenarios.
+ * @param rules - Text fragments filed as rules
+ * @param amenders - Text fragments that approve amendment questions
+ * @returns A scripted judge preserving category, topic, and amendment outcomes
+ */
+export function createPhraseJudge(
+	rules: readonly string[],
+	amenders: readonly string[] = [],
+): JudgeInterface {
+	return {
+		id: 'scripted',
+		name: 'scripted',
+		model: 'scripted',
+		ask: async (request) => {
+			const state = isString(request.state) ? request.state : ''
+			const answers: Record<string, JudgeAnswer> = {}
+			for (const [id, question] of Object.entries(request.questions)) {
+				answers[id] =
+					question.form === 'choice'
+						? {
+								form: 'choice',
+								probabilities: rules.some((rule) => state.includes(rule))
+									? { rule: 1 }
+									: state.includes('Correction')
+										? { correction: 1 }
+										: { fact: 1 },
+							}
+						: {
+								form: 'noul',
+								noul:
+									(id.startsWith('["topic"') && state.toLowerCase().includes('refund')) ||
+									(id.startsWith('["amends"') &&
+										amenders.some((amender) => state.includes(amender)))
+										? 0.9
+										: 0.1,
+							}
+			}
+			return { model: 'scripted', answers }
+		},
+	}
+}
+
+/** Supplies the refund topic used by ledger guide scenarios. */
+export const LEDGER_REFUNDS_TOPIC: LedgerTopic = Object.freeze({
+	name: 'refunds',
+	criterion: 'refund amounts and approvals',
+})
+/** Supplies a fictional order lookup and its owner projection. */
+export const LEDGER_ORDER_LOOKUP: LedgerLookup = Object.freeze<LedgerLookup>({
+	tool: {
+		name: 'lookup_order',
+		description: 'Read an order by its id.',
+		parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+		execute: (args) =>
+			`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
+	},
+	read: (args) => ({
+		ids: [String(args.id)],
+		owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+	}),
+})
+
+/**
+ * Files a correction with the supplied topic inventory.
+ * @param topics - The desk topics shared by the messages
+ * @returns The asked pair keys and the expected amendment identity
+ */
+export async function fileLedgerCorrection(
+	topics: readonly LedgerTopic[],
+): Promise<{ readonly pairs: readonly string[]; readonly amends: string }> {
+	const conversation = createConversation()
+	const earlier = conversation.add({
+		role: 'user',
+		content: 'Refunds over $100 need a manager.',
+	})
+	const later = conversation.add({
+		role: 'user',
+		content: 'Correction: refunds need a manager over $250.',
+	})
+	const classifier = new Classifier({
+		conversation,
+		judge: createPhraseJudge(['Refunds over']),
+		questions: LEDGER_QUESTIONS,
+		topics,
+		thresholds: LEDGER_DESK_THRESHOLDS,
+		assign: () => undefined,
+		entities: () => new Set(),
+	})
+	const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+	return {
+		pairs: filed.judgments.filter(
+			(key) => key.startsWith('["amends"') || key.startsWith('["supersedes"'),
+		),
+		amends: JSON.stringify(['amends', earlier.id, later.id]),
+	}
+}
+/**
+ * Plans a ledger prompt from a fixed delivery history.
+ * @param capacity - The context capacity
+ * @param predict - The optional generation cap
+ * @returns The roles and content sent to the provider
+ */
+export async function planLedgerDelivery(
+	capacity: number,
+	predict?: number,
+): Promise<ReadonlyArray<readonly string[]>> {
+	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+	const ledger = createLedger(
+		provider,
+		buildGuideLedgerOptions({
+			judge: createPhraseJudge([]),
+			capacity,
+			...(predict === undefined ? {} : { predict }),
+			gauge: { scale: 1, overhead: 0 },
+		}),
+	)
+	ledger.conversation.add(
+		Array.from({ length: 40 }, (_unused, at): MessageInput => ({
+			role: 'user',
+			content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+		})),
+	)
+	await ledger.respond('Review the desk.')
+	return requireValue(provider.calls[0], 'Missing first call').messages.map(({ role, content }) => [
+		role,
+		content,
+	])
+}
+/** Lists briefing fragments in their removal order. */
+export const LEDGER_BRIEFING_MARKERS = Object.freeze([
+	'Keep the loading dock at warehouse 42 clear.',
+	'The Northgate courier brings refund forms on 2026-10-12.',
+	'Refunds over $100 need a manager.',
+	'Refund due $148.50.',
+	'Order BW-5512 for account BW-20931: Brightwater Studio.',
+])
+
+/**
+ * Builds a desk briefing at a supplied capacity.
+ * @param capacity - The context capacity
+ * @returns The retained briefing fragments in removal order
+ */
+export async function briefLedgerDesk(capacity: number): Promise<readonly string[]> {
+	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+	const ledger = createLedger(
+		provider,
+		buildGuideLedgerOptions({
+			judge: createPhraseJudge(['Keep the loading', 'Refunds over']),
+			capacity,
+			gauge: { scale: 1, overhead: 0 },
+			share: { prompt: 1, tail: 0.05 },
+			lookups: [LEDGER_ORDER_LOOKUP],
+		}),
+	)
+	ledger.conversation.add([
+		{ role: 'user', content: 'Keep the loading dock at warehouse 42 clear.' },
+		{ role: 'user', content: 'Refunds over $100 need a manager.' },
+		{ role: 'user', content: 'The Northgate courier brings refund forms on 2026-10-12.' },
+		{
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+		},
+		{
+			role: 'tool',
+			call: 'seed',
+			content: 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.',
+		},
+	])
+	await ledger.respond('Does the Brightwater Studio refund need a manager?')
+	const system = requireValue(provider.calls[0]?.messages[0], 'Missing system message').content
+	return LEDGER_BRIEFING_MARKERS.filter((marker) => system.includes(marker))
+}
+/** Supplies the original amended rule. */
+export const LEDGER_AMENDED_RULE = 'Refunds for Brightwater Studio need a manager. Use code AA-10.'
+/** Supplies the original desk statement. */
+export const LEDGER_AMENDED_STATEMENT = 'Refund forms go to the Northgate desk.'
+/** Supplies the later correction. */
+export const LEDGER_AMENDED_CORRECTION =
+	'Correction: Brightwater Studio uses code AA-12 in place of AA-10.'
+/** Supplies the seeded order lookup text. */
+export const LEDGER_AMENDED_READING =
+	'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
+/**
+ * Serves a request that recalls a desk topic and its amended owner record.
+ * @returns The pass result and each recorded provider prompt
+ */
+export async function serveAmendedDesk(): Promise<{
+	readonly result: LedgerResult
+	readonly prompts: ReadonlyArray<readonly Message[]>
+}> {
+	const provider = createScriptedProvider(
+		[
+			{ content: '', tools: [{ id: 'desk', name: 'recall', arguments: { topic: 'refunds' } }] },
+			{
+				content: '',
+				tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Brightwater' } }],
+			},
+			{ content: '' },
+			{ content: 'Use code AA-12.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildGuideLedgerOptions({
+			judge: createPhraseJudge(['Refunds for'], ['uses code AA-12']),
+			capacity: 32_768,
+			gauge: { scale: 1, overhead: 0 },
+			lookups: [LEDGER_ORDER_LOOKUP],
+		}),
+	)
+	ledger.conversation.add([
+		{
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+		},
+		{ role: 'tool', call: 'seed', content: LEDGER_AMENDED_READING },
+		{ role: 'user', content: LEDGER_AMENDED_RULE },
+		{ role: 'assistant', content: LEDGER_AMENDED_STATEMENT },
+		{ role: 'user', content: LEDGER_AMENDED_CORRECTION },
+	])
+	const result = await ledger.respond('Review the Brightwater Studio refund.')
+	return { result, prompts: provider.calls.map(({ messages }) => messages) }
+}
+
+/**
+ * Files an amendment with a supplied supersession probability.
+ * @param correction - The later message text
+ * @param supersedes - The scripted supersession probability
+ * @returns Whether the earlier message is amended and superseded
+ */
+export async function classifyLedgerCorrection(
+	correction: string,
+	supersedes: number,
+): Promise<{ readonly amendments: boolean; readonly supersessions: boolean }> {
+	const conversation = createConversation()
+	const earlier = conversation.add({
+		role: 'user',
+		content: 'Refunds over $100 need a manager.',
+	})
+	conversation.add({ role: 'user', content: correction })
+	const classifier = new Classifier({
+		conversation,
+		judge: createLedgerJudge(
+			[],
+			async (request) => {
+				const state = isString(request.state) ? request.state : ''
+				const answers: Record<string, JudgeAnswer> = {}
+				for (const [id, question] of Object.entries(request.questions))
+					answers[id] =
+						question.form === 'choice'
+							? {
+									form: 'choice',
+									probabilities: state.includes('Correction') ? { correction: 1 } : { rule: 1 },
+								}
+							: {
+									form: 'noul',
+									noul: id.startsWith('["supersedes"')
+										? supersedes
+										: id.startsWith('["amends"') ||
+											  (id.startsWith('["topic"') && state.toLowerCase().includes('refund'))
+											? 0.9
+											: 0.1,
+								}
+				return { model: 'scripted', answers }
+			},
+			'scripted',
+		),
+		questions: LEDGER_QUESTIONS,
+		topics: [LEDGER_REFUNDS_TOPIC],
+		thresholds: LEDGER_DESK_THRESHOLDS,
+		assign: () => undefined,
+		entities: () => new Set(),
+	})
+	await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+	const filing = classifier.classification()
+	return {
+		amendments: filing.amendments.has(earlier.id),
+		supersessions: filing.supersessions.has(earlier.id),
+	}
+}
+/**
+ * Executes a tool turn under a thinking replay policy.
+ * @param replay - The provider replay policy; omission uses the agent default
+ * @returns The result, retained thinking, measured prompts, and transmitted prompts
+ */
+export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined): Promise<{
+	readonly result: AgentResult
+	readonly recorded: readonly string[]
+	readonly sent: ReadonlyArray<readonly string[]>
+	readonly measured: ReadonlyArray<readonly Message[]>
+	readonly wire: ReadonlyArray<readonly Message[]>
+}> {
+	const measured = createRecorder<readonly [readonly Message[]]>()
+	const replies: ProviderResult[] = [
+		{
+			content: '',
+			thinking: 'Refund through the order tool.',
+			tools: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],
+		},
+		{ content: 'Refunded $148.50.', thinking: 'Report the amount.' },
+	]
+	const provider = createScriptedProvider(replies, {
+		recorded: true,
+		repeat: false,
+		...(replay === undefined ? {} : { replay }),
+	})
+	const tools = createToolManager()
+	tools.add(createTool({ name: 'refund_order', execute: () => 'Refunded $148.50.' }))
+	const conversations = createConversationManager({
+		summarize: createStubSummarizer().summarize,
+	})
+	conversations.add()
+	const agent = createAgent(provider, {
+		tools,
+		conversations,
+		window: createBudget({
+			max: 1_000_000,
+			consumer: (messages: readonly Message[]) => {
+				measured.handler([...messages])
+				return estimateMessages(messages)
+			},
+		}),
+	})
+	agent.context.messages.add([
+		{ role: 'user', content: 'Is order BW-5512 refundable?' },
+		{
+			role: 'assistant',
+			content: 'Yes, within 30 days.',
+			thinking: 'The window is 30 days.',
+		},
+		{ role: 'user', content: 'Refund it.' },
+	])
+	const result = await agent.generate()
+	return {
+		result,
+		recorded: collectMessageThinking(agent.context.messages.messages()),
+		sent: provider.calls.map(({ messages }) => collectMessageThinking(messages)),
+		measured: measured.calls.map(([messages]) => messages),
+		wire: provider.calls.map(({ messages }) => messages),
+	}
+}
+/**
+ * Collects the reasoning stored in messages in conversation order.
+ * @param messages - The messages to read
+ * @returns Every present reasoning string
+ */
+export function collectMessageThinking(messages: readonly Message[]): readonly string[] {
+	return messages.flatMap((message) => (message.thinking === undefined ? [] : [message.thinking]))
+}
+
+/**
+ * Creates a relay provider connected to a real byte-limited handler.
+ * @param upstream - The provider the handler drives
+ * @param limit - The request body byte limit
+ * @returns The provider driving the handler through Fetch objects
+ */
+export function createBoundedRelay(upstream: ProviderInterface, limit: number): RelayProvider {
+	return createRelayProvider({
+		url: 'https://app.example/relay',
+		parser: createParser,
+		fetch: (input, init) =>
+			createRelay({ provider: upstream, authorize: () => true, limit })(new Request(input, init)),
+	})
+}
+/**
+ * Builds options for the guide desk with no lookups unless supplied.
+ * @param overrides - The scenario-specific options
+ * @returns Fresh ledger options using the shared desk topic and thresholds
+ */
+export function buildGuideLedgerOptions(overrides: Partial<LedgerOptions> = {}): LedgerOptions {
+	return buildLedgerOptions({
+		judge: createPhraseJudge([]),
+		topics: [LEDGER_REFUNDS_TOPIC],
+		capacity: 32_768,
+		lookups: [],
+		...overrides,
+	})
+}
+
+/** Supplies invalid complete relay records for the documented strict parser. */
+export const RELAY_INVALID_RECORDS = Object.freeze(['invalid\n', '[]\n', 'null\n'])
+
+/** Supplies the ledger overhead cases scenario inputs. */
+export const LEDGER_OVERHEAD_CASES = Object.freeze([0, 200])
+
+/** Supplies the ledger thinking cases scenario inputs. */
+export const LEDGER_THINKING_CASES = Object.freeze([true, false, undefined])
+
+/** Supplies the ledger refund amounts scenario inputs. */
+export const LEDGER_REFUND_AMOUNTS = Object.freeze([120, 135, 150])
+
+/** Supplies the thinking replay cases scenario inputs. */
+export const THINKING_REPLAY_CASES: ReadonlyArray<ThinkingReplay | undefined> = Object.freeze([
+	undefined,
+	'none',
+	'turn',
+	'all',
+])
+
+/** Supplies the ledger recorded thinking scenario inputs. */
+export const LEDGER_RECORDED_THINKING = Object.freeze([undefined, 'a'.repeat(800)])
+
+/** Supplies the relay replay cases scenario inputs. */
+export const RELAY_REPLAY_CASES: readonly ThinkingReplay[] = Object.freeze(['all', 'turn', 'none'])
+
+/** Supplies the guide classifier readings scenario inputs. */
+export const GUIDE_CLASSIFIER_READINGS = Object.freeze([
+	'filed.judgments.length // 2 — the category question and the refunds topic question',
+	"classifier.category(rule.id) // 'rule'",
+	'classifier.decisive(rule.id) // true',
+	'classifier.quiet(rule.id) // false',
+	"classifier.topics(rule.id) // Set { 'refunds' }",
+	"classifier.classification().categories.get(rule.id) // 'rule'",
+	'gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed',
+	"gauge.remainder(calls) // 32098 — the capacity less the last call's prompt and completion",
+	"gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate",
+	"gauge.room(calls, '') // 12824.7 — half of what is left beyond the reserve, in estimate units",
+	"gauge.scale // 1.3 — the first call's prompt less the overhead cost, over its estimate",
+])
+
+/** Supplies the guide replay readings scenario inputs. */
+export const GUIDE_REPLAY_READINGS = Object.freeze([
+	"content: 'Yes, within 30 days.',",
+	"thinking: 'The window is 30 days.',",
+	"calls: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],",
+	"thinking: 'Refund through the order tool.',",
+	"none.filter((message) => 'thinking' in message).length // 0 — no thinking goes back",
+	"turn.filter((message) => 'thinking' in message).map(({ id }) => id) // ['4'] — the turn in progress",
+])
+
+/** Supplies the guide replay claims scenario inputs. */
+export const GUIDE_REPLAY_CLAIMS = Object.freeze([
+	"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
+	"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
+	'It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.',
+])
+
+/** Supplies complete and incomplete System One model and usage envelopes. */
+export const SYSTEM_ONE_USAGE_CASES = Object.freeze([
+	{ ...SYSTEM_ONE_TEV1, model: 'gateway/tev1:0.8b' },
+	{ answers: SYSTEM_ONE_TEV1.answers, usage: SYSTEM_ONE_TEV1.usage },
+	{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: 975, output_tokens: null } },
+	{ ...SYSTEM_ONE_TEV1, usage: { input_tokens: -1, output_tokens: 4 } },
+	{ model: 'tev1:0.8b', answers: SYSTEM_ONE_TEV1.answers },
+])
+
+/** Supplies the system one model cases scenario inputs. */
+export const SYSTEM_ONE_MODEL_CASES = Object.freeze([
+	SYSTEM_ONE_TEV1,
+	SYSTEM_ONE_LLAMA,
+	SYSTEM_ONE_MICA,
+])
+
+/** Carries the independent lookup stubs that straddle the tail allowance. */
+export interface LedgerTailScenario {
+	readonly request: Message
+	readonly seed: readonly Message[]
+	readonly boundaries: readonly [Message, Message]
+}
+
+/**
+ * Builds fresh hidden and shown lookup stubs with their request and seed call.
+ * @returns The scenario's messages and ordered stub variants
+ */
+export function buildLedgerTailScenario(): LedgerTailScenario {
+	const request: Message = { id: 'request', role: 'user', content: 'Check BW-5512.' }
+	const seed: readonly Message[] = [
+		{ id: 'seed', role: 'user', content: 'Read the order.' },
+		{
+			id: 'leader',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+		},
+	]
+	const hidden: Message = {
+		id: 'result',
+		role: 'tool',
+		call: 'c1',
+		content: renderStub('lookup_order', { id: 'BW-5512' }, 'hidden'),
+	}
+	const shown: Message = {
+		...hidden,
+		content: renderStub('lookup_order', { id: 'BW-5512' }, 'shown'),
+	}
+	return { request, seed, boundaries: [hidden, shown] }
+}
+
+/** Supplies the messages for refused, deterministic, and transient judge failures. */
+export const LEDGER_FAILURE_MESSAGES: readonly [string, string, string] = Object.freeze([
+	'Refunds over $100 need a manager.',
+	'Keep the loading dock at warehouse 42 clear.',
+	'The Northgate courier arrives on Tuesday.',
+])
