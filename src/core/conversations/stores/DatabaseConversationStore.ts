@@ -21,9 +21,9 @@ import { isConversationSnapshot } from '../validators.js'
  * IndexedDB backend swaps in without touching the
  * {@link import('../ConversationManager.js').ConversationManager} or the
  * {@link import('../Conversation.js').Conversation} — the same seam as
- * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. The
- * driver defaults to memory ({@link import('../factories.js').createDatabaseConversationStore}
- * passes `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
+ * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. Default driver: memory
+ * ({@link import('../factories.js').createDatabaseConversationStore} passes
+ * `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.
  *
  * The {@link ConversationSnapshot} is stored as one opaque JSON column — the table is a row of

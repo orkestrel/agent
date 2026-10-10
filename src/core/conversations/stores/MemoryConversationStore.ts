@@ -2,7 +2,7 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../types.
 
 /**
  * Implements the {@link ConversationStoreInterface} in memory — a process-lifetime `Map` of
- * {@link ConversationSnapshot}s keyed by conversation id, the default store
+ * {@link ConversationSnapshot} records keyed by conversation id, the default store
  * {@link import('../factories.js').createMemoryConversationStore} builds and the default
  * backing for `open` / `save`. The exact twin of
  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.
@@ -54,13 +54,12 @@ export class MemoryConversationStore implements ConversationStoreInterface {
 
 	/**
 	 * Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param —
-	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
+	 * mirroring the `set` method of {@link import('@orkestrel/workspace').WorkspaceStoreInterface}).
 	 *
 	 * @param snapshot - The snapshot to store (keyed by its `id`)
 	 * @returns A promise that resolves after the snapshot is stored
 	 */
 	set(snapshot: ConversationSnapshot): Promise<void> {
-		// Insert / replace under the snapshot's own id (no separate id param).
 		this.#snapshots.set(snapshot.id, snapshot)
 		return Promise.resolve()
 	}
@@ -72,7 +71,7 @@ export class MemoryConversationStore implements ConversationStoreInterface {
 	 * @returns A promise that resolves after the snapshot is dropped
 	 */
 	delete(id: string): Promise<void> {
-		// Drop by id; `Map.delete` of an absent id is already a no-op (no throw).
+		// `Map.delete` of an absent id is a no-op, so no presence check is needed.
 		this.#snapshots.delete(id)
 		return Promise.resolve()
 	}

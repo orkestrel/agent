@@ -3,7 +3,9 @@ import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
+	buildCallsSnapshot,
 	buildConversationSnapshot,
+	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	TOOL_SNAPSHOT,
 	JUDGMENT_RECORD,
 	JUDGMENT_SNAPSHOT,
@@ -63,14 +65,6 @@ describe('isJudgment and snapshot carriage', () => {
 // through a guard rather than an assertion. Real data throughout — `buildConversationSnapshot`
 // produces a genuine compacted conversation, no mocks.
 
-// A snapshot valid in every field EXCEPT the planted `calls` value, so a rejection isolates the
-// deepened per-call check rather than some sibling field.
-const withCalls = (calls: unknown): unknown => ({
-	id: 'c',
-	sections: [],
-	messages: [{ id: 'a1', role: 'assistant', content: '', calls }],
-})
-
 describe('isSection — the per-section shape guard (total + defensive)', () => {
 	it('accepts the real Section shape, including an empty retained list', () => {
 		expect(
@@ -99,18 +93,41 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 			false,
 		)
 	})
+
+	it('rejects a sparse messages array, as the snapshot guard rejects one', () => {
+		const sparse: unknown[] = []
+		sparse.length = 1
+		expect(isSection({ id: 's', summary: 'recap', messages: sparse })).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', sections: [], messages: sparse })).toBe(false)
+	})
+
+	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
+		const hostile = {
+			id: 's',
+			summary: 'recap',
+			get messages(): never {
+				throw new Error('unreadable')
+			},
+		}
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		expect(isSection(hostile)).toBe(false)
+		expect(isSection(revoked.proxy)).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', sections: [hostile], messages: [] })).toBe(false)
+	})
 })
 
 describe('isConversationSnapshot — the read-boundary guard (total + defensive)', () => {
-	it('accepts a real snapshot (sections + tail + summary)', async () => {
+	it('accepts a real snapshot (sections + tail)', async () => {
 		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
 		// An empty-sections + empty-tail snapshot is still valid (a fresh conversation, no summary).
 		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(true)
 		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
-		// An optional rollup `summary` (present) is accepted.
-		expect(isConversationSnapshot({ id: 'c', summary: 'rollup', sections: [], messages: [] })).toBe(
-			true,
-		)
+	})
+
+	it('admits the conversation summary a 0.0.29 snapshot carries, as an unknown member', () => {
+		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
+		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(true)
 	})
 
 	it('rejects malformed input without throwing (total guard)', () => {
@@ -122,8 +139,6 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		// Missing / wrong-typed `id`.
 		expect(isConversationSnapshot({ sections: [], messages: [] })).toBe(false)
 		expect(isConversationSnapshot({ id: 1, sections: [], messages: [] })).toBe(false)
-		// A non-string `summary` when present.
-		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(false)
 		// `sections` / `messages` not arrays.
 		expect(isConversationSnapshot({ id: 'c', sections: 'nope', messages: [] })).toBe(false)
 		expect(isConversationSnapshot({ id: 'c', sections: [], messages: { a: 1 } })).toBe(false)
@@ -149,16 +164,20 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		// A null / bare-string element, a missing-arguments call, a non-string name, and a
 		// non-record arguments are each rejected WITHOUT throwing — the poisoned row reads
 		// back as absent and hydrate mints a fresh thread (the absent-on-tamper posture).
-		expect(isConversationSnapshot(withCalls([null]))).toBe(false)
-		expect(isConversationSnapshot(withCalls(['x']))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool' }]))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 123, arguments: {} }]))).toBe(false)
-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: null }]))).toBe(
-			false,
-		)
+		expect(isConversationSnapshot(buildCallsSnapshot([null]))).toBe(false)
+		expect(isConversationSnapshot(buildCallsSnapshot(['x']))).toBe(false)
+		expect(isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool' }]))).toBe(false)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 123, arguments: {} }])),
+		).toBe(false)
+		expect(
+			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: null }])),
+		).toBe(false)
 		// A well-formed calls[] still passes (the deepening rejects only real tampering).
 		expect(
-			isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }])),
+			isConversationSnapshot(
+				buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }]),
+			),
 		).toBe(true)
 	})
 

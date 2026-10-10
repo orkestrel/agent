@@ -8,8 +8,7 @@ import type {
 } from '../types.js'
 import { isArray, isRecord } from '@orkestrel/contract'
 import { ConversationError } from './errors.js'
-import { buildJudgments } from './helpers.js'
-import { isJudgment } from './validators.js'
+import { buildJudgments, requireJudgment } from './helpers.js'
 import { copyJSON } from '../cloners.js'
 import { JudgeAbortError, isJudgeAbortError } from '../errors.js'
 import { matchesJudgment, removeEntries } from '../helpers.js'
@@ -40,7 +39,7 @@ export class JudgmentManager implements JudgmentManagerInterface {
 	 */
 	constructor(judgments: readonly Judgment[] = []) {
 		for (const judgment of judgments) {
-			const owned = this.#own(copyJSON(judgment))
+			const owned = requireJudgment(copyJSON(judgment))
 			this.#judgments.set(owned.id, owned)
 		}
 	}
@@ -111,16 +110,16 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		}
 		if (pending.length > 0) {
 			if (signal.aborted) throw new JudgeAbortError({ model: judge.model, answers: {} })
-			const sub: JudgeRequest = { state, questions: Object.fromEntries(pending) }
+			const unmatched: JudgeRequest = { state, questions: Object.fromEntries(pending) }
 			try {
-				const result = await judge.ask(sub, signal)
+				const result = await judge.ask(unmatched, signal)
 				for (const judgment of this.add(
-					buildJudgments(sub, result, origins, rendered, judge.model),
+					buildJudgments(unmatched, result, origins, rendered, judge.model),
 				))
 					resolved.set(judgment.id, judgment)
 			} catch (error) {
 				if (isJudgeAbortError(error))
-					this.add(buildJudgments(sub, error.partial, origins, rendered, judge.model))
+					this.add(buildJudgments(unmatched, error.partial, origins, rendered, judge.model))
 				throw error
 			}
 		}
@@ -132,20 +131,8 @@ export class JudgmentManager implements JudgmentManagerInterface {
 
 	#store(input: JudgmentInput): Judgment {
 		const copy = copyJSON(input)
-		const judgment = this.#own(isRecord(copy) ? { ...copy, time: Date.now() } : copy)
+		const judgment = requireJudgment(isRecord(copy) ? { ...copy, time: Date.now() } : copy)
 		this.#judgments.set(judgment.id, judgment)
 		return structuredClone(judgment)
-	}
-
-	// A stored record is the JSON copy of its input, so a proxied record is accepted and the stored
-	// value is exactly what a snapshot can carry.
-	#own(copy: unknown): Judgment {
-		if (!isJudgment(copy)) {
-			throw new ConversationError(
-				'JUDGMENT',
-				'conversation error: a judgment must be a JSON record',
-			)
-		}
-		return copy
 	}
 }

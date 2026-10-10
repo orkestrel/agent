@@ -1,21 +1,15 @@
 import { isInstance } from '@orkestrel/contract'
 
-// A real error type, not a sentinel. A `ConversationInterface.compact()` is a
-// programmer error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
-// the messages with — so it throws this, carrying a machine-readable `code` ('SUMMARIZER')
-// so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
-// caught value with `instanceof`, mirroring the provider and agent errors.
-
 /**
  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with, a
- * `sections` cap below `1`, or a judgment or judge request that JSON cannot carry — thrown by a
- * {@link ConversationInterface}'s `compact()`, its construction, or its judgment store, carrying
- * the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
+ * `sections` cap below `1`, or a judgment or judge request that JSON cannot carry — thrown by the
+ * `compact()` method of a {@link ConversationInterface}, its construction, or its judgment store,
+ * carrying the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
  *
  * @remarks
- * Compaction requires a summarizer (it digests the folded slice into a section summary and,
- * with the `rollup` option, regenerates the rollup); a conversation created without one can still store + `view()` its
- * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
+ * Compaction requires a summarizer (it digests the folded slice into a section summary); a
+ * conversation created without one can still store + `view()` its live tail, but a `compact()`
+ * is a programmer error and throws this with `'SUMMARIZER'`.
  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
  * {@link import('./types.js').ConversationManagerOptions} /
  * {@link import('./types.js').CompactOptions}) must be `>= 1` — a sub-1 cap is a programmer

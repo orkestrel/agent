@@ -1,4 +1,4 @@
-import type { ConversationEventMap, Message } from '@src/core'
+import type { ConversationEventMap } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -8,22 +8,21 @@ import {
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer, createToolCall } from '../../../setup.js'
+import {
+	createStubSummarizer,
+	createToolCall,
+	renderRecap,
+	SUMMARIZED_CONVERSATION_SNAPSHOT,
+} from '../../../setup.js'
 import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@orkestrel/test'
 
-// The framed recap content a section's summary renders as in view() — the lean RECAP label
-// prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
-// assert against the ONE source of truth (the exported constant), not a duplicated literal.
-const recap = (summary: string): string => `${CONVERSATION_RECAP_PREFIX}${summary}`
-
-// Conversation OWNS its live message tail DIRECTLY (the flat store verbs folded in, like a
-// Workspace owns its files) — a live tail plus compacted, summarized sections + an opt-in
-// rollup + the `summarizable` flag, with rehydrate / search over the retained originals, driven by
-// a provider-agnostic summarizer seam — real behavior, a data-stub summarizer, NOT a
-// behavior-mock; the LIVE model is exercised in tests/src/ollama).
-// `compact()` folds the older live messages into a section (its summary from the seam),
-// regenerates an opted-in rollup (a second seam call), and emits `summary` then `compact`; view() =
-// section summaries ++ the live tail; rehydrate/search read the retained originals.
+// Conversation OWNS its live message tail DIRECTLY (like a Workspace owns its files) — a live tail
+// plus compacted, summarized sections + the `summarizable` flag, with rehydrate / search over the
+// retained originals, driven by a provider-agnostic summarizer seam — real behavior, a data-stub
+// summarizer, NOT a behavior-mock.
+// `compact()` folds the older live messages into a section (its summary from the seam) and emits
+// `compact`; view() = section summaries ++ the live tail; rehydrate/search read the retained
+// originals.
 
 describe('Conversation — construction & accessors', () => {
 	it('mints an id when none is supplied, and accepts an explicit one', () => {
@@ -34,11 +33,10 @@ describe('Conversation — construction & accessors', () => {
 		expect(explicit.id).toBe('fixed')
 	})
 
-	it('starts with no sections, an undefined rollup, and an empty live tail', () => {
+	it('starts with no sections and an empty live tail', () => {
 		const conversation = new Conversation()
 
 		expect(conversation.sections).toEqual([])
-		expect(conversation.summary).toBeUndefined()
 		expect(conversation.count).toBe(0)
 		expect(conversation.view()).toEqual([])
 	})
@@ -167,12 +165,12 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
 		expect(section?.messages[1]?.thinking).toBe('private plan')
 	})
 
-	it('folds every message before the newest user message into ONE section, sets the rollup, emits', async () => {
+	it('folds every message before the newest user message into ONE section and emits compact', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
+		const conversation = new Conversation({ summarize: stub.summarize })
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse' | 'rehydrate'>(
 			conversation.emitter,
-			['compact', 'summary', 'rehydrate'],
+			['compact', 'collapse', 'rehydrate'],
 		)
 		conversation.add([
 			{ role: 'user', content: 'a' },
@@ -189,38 +187,35 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
 		// The newest user message stays live.
 		expect(conversation.messages().map((message) => message.content)).toEqual(['c'])
 		// view() is the section's FRAMED recap message (the lean RECAP-label prefix + the summary),
-		// keyed by the section id, role assistant, then the live tail. The raw `summary` and the rollup
-		// stay UNframed — the label is a view()-only presentation concern.
+		// keyed by the section id, role assistant, then the live tail. The raw `summary` stays
+		// UNframed — the label is a view()-only presentation concern.
 		const view = conversation.view()
 		expect(view).toHaveLength(2)
-		expect(view[0]?.content).toBe(recap('recap of 2'))
+		expect(view[0]?.content).toBe(renderRecap('recap of 2'))
 		expect(view[0]?.role).toBe('assistant')
 		expect(view[0]?.id).toBe(section?.id)
 		expect(view[1]?.content).toBe('c')
-		// The rollup is the summary-of-summaries over the one section (one summary ⇒ 'recap of 1').
-		expect(conversation.summary).toBe('recap of 1')
 		expect(conversation.sections).toHaveLength(1)
-		// Both events fired (summary + compact); the section is carried on `compact`.
-		expect(events.summary.calls).toEqual([['recap of 1']])
-		expect(events.compact.count).toBe(1)
-		expect(events.compact.calls[0]?.[0]).toBe(section)
+		// Only `compact` fired, carrying the section.
+		expect(events.compact.calls).toEqual([[section]])
+		expect(events.collapse.count).toBe(0)
 		expect(events.rehydrate.count).toBe(0)
 	})
 
-	it('makes TWO summarizer calls per compaction with rollup (the section digest + the rollup)', async () => {
+	it('makes ONE summarizer call per compaction, over the folded slice', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
+		const conversation = new Conversation({ summarize: stub.summarize })
 		conversation.add([
-			{ role: 'assistant', content: 'a' },
-			{ role: 'assistant', content: 'b' },
+			{ role: 'user', content: 'Is the depot open on Friday?' },
+			{ role: 'assistant', content: 'The depot is open on Friday.' },
+			{ role: 'user', content: 'Which order is late?' },
 		])
 
-		await conversation.compact()
+		const section = await conversation.compact()
 
-		// Call 1: the folded slice (2 messages). Call 2: the rollup over all section summaries (1).
-		expect(stub.calls).toHaveLength(2)
-		expect(stub.calls[0]).toHaveLength(2)
-		expect(stub.calls[1]).toHaveLength(1)
+		expect(stub.calls).toEqual([section?.messages])
+		expect('summary' in conversation).toBe(false)
+		expect('summary' in conversation.snapshot()).toBe(false)
 	})
 })
 
@@ -245,7 +240,7 @@ describe('Conversation — compact({ keep }) retains a recent tail', () => {
 		])
 		// view() = [framed section recap, ...the retained live tail verbatim (NOT framed)].
 		expect(conversation.view().map((message) => message.content)).toEqual([
-			recap('recap of 2'),
+			renderRecap('recap of 2'),
 			'recent-1',
 			'recent-2',
 		])
@@ -288,9 +283,9 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 	it('returns undefined and emits nothing when count <= keep', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
 			conversation.emitter,
-			['compact', 'summary'],
+			['compact', 'collapse'],
 		)
 		conversation.add([
 			{ role: 'user', content: 'a' },
@@ -300,12 +295,11 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 		const section = await conversation.compact({ keep: 5 })
 
 		expect(section).toBeUndefined()
-		// No fold ⇒ no summarizer call, no events, the live tail intact, no rollup.
+		// No fold ⇒ no summarizer call, no events, the live tail intact.
 		expect(stub.calls).toHaveLength(0)
 		expect(events.compact.count).toBe(0)
-		expect(events.summary.count).toBe(0)
+		expect(events.collapse.count).toBe(0)
 		expect(conversation.count).toBe(2)
-		expect(conversation.summary).toBeUndefined()
 	})
 
 	it('returns undefined for an empty conversation (keep 0)', async () => {
@@ -497,7 +491,7 @@ describe('Conversation — summarizable reflects whether a summarizer was suppli
 	it('is true with a summarizer (compact can fold) and false without (manual compact throws)', () => {
 		// `summarizable` is the clean signal the agent loop gates AUTO-compaction on: a conversation
 		// with no summarizer is never auto-compacted (so the auto path never throws the SUMMARIZER
-		// error). A manual compact() is still gated — proven by the throw test above.
+		// error). A manual compact() is still gated — proven by the preceding throw test.
 		const withSeam = new Conversation({ summarize: createStubSummarizer().summarize })
 		const without = new Conversation()
 
@@ -521,7 +515,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 		const section = await conversation.compact()
 		const id = section?.id ?? ''
 
-		const pulled = conversation.rehydrate(id)
+		const pulled = requireValue(conversation.rehydrate(id))
 
 		// The full originals come back (by id + content) — compaction retained them.
 		expect(pulled.map((message) => message.content)).toEqual(['remember me', 'and me'])
@@ -531,14 +525,14 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 		expect(conversation.count).toBe(1)
 	})
 
-	it('returns [] for an unknown section id (still emits rehydrate)', async () => {
+	it('returns undefined for an unknown section id (still emits rehydrate)', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
 			'rehydrate',
 		])
 
-		expect(conversation.rehydrate('nope')).toEqual([])
+		expect(conversation.rehydrate('nope')).toBeUndefined()
 		expect(events.rehydrate.calls).toEqual([['nope']])
 	})
 })
@@ -551,7 +545,7 @@ describe('Conversation — search(query) over sections + live (case-insensitive)
 			{ role: 'user', content: 'The quick brown FOX' },
 			{ role: 'assistant', content: 'a lazy dog' },
 		])
-		// Fold the two above into a section, then add a fresh live message.
+		// Fold the two preceding messages into a section, then add a fresh live message.
 		await conversation.compact()
 		conversation.add({ role: 'user', content: 'another fox sighting' })
 
@@ -582,18 +576,17 @@ describe('Conversation — search(query) over sections + live (case-insensitive)
 	})
 })
 
-describe('Conversation — multiple compactions accumulate sections + regenerate the rollup', () => {
-	it('appends a new section each compaction and refreshes the rollup over ALL sections', async () => {
+describe('Conversation — multiple compactions accumulate sections', () => {
+	it('appends a section each compaction, oldest first', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
+		const conversation = new Conversation({ summarize: stub.summarize })
 
-		// First fold: one message → section 1; rollup over 1 section.
+		// First fold: one message → section 1.
 		conversation.add({ role: 'assistant', content: 'first batch' })
 		const first = await conversation.compact()
 		expect(conversation.sections).toHaveLength(1)
-		expect(conversation.summary).toBe('recap of 1')
 
-		// Second fold: two messages → section 2; rollup over 2 sections.
+		// Second fold: two messages → section 2.
 		conversation.add([
 			{ role: 'assistant', content: 'second' },
 			{ role: 'assistant', content: 'batch' },
@@ -603,90 +596,36 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
 		expect(conversation.sections).toHaveLength(2)
 		expect(conversation.sections.map((one) => one.id)).toEqual([first?.id, second?.id])
 		expect(second?.summary).toBe('recap of 2')
-		// The rollup is regenerated over BOTH section summaries (2) ⇒ 'recap of 2'.
-		expect(conversation.summary).toBe('recap of 2')
+		expect(stub.calls.map((call) => call.length)).toEqual([1, 2])
 		// view() now carries BOTH section recap messages (each framed), no live tail left.
 		expect(conversation.view().map((message) => message.content)).toEqual([
-			recap('recap of 1'),
-			recap('recap of 2'),
+			renderRecap('recap of 1'),
+			renderRecap('recap of 2'),
 		])
 	})
 })
 
-describe('Conversation — the rollup is opt-in', () => {
-	it('spends no summarizer call on a rollup by default and leaves summary undefined', async () => {
-		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize })
-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
-			conversation.emitter,
-			['compact', 'summary'],
-		)
-		conversation.add([
-			{ role: 'user', content: 'Is the depot open on Friday?' },
-			{ role: 'assistant', content: 'The depot is open on Friday.' },
-			{ role: 'user', content: 'Which order is late?' },
-		])
-
-		const section = await conversation.compact()
-
-		expect(stub.calls).toEqual([section?.messages])
-		expect(conversation.summary).toBeUndefined()
-		expect(events.summary.count).toBe(0)
-		expect(events.compact.calls).toEqual([[section]])
-		expect('summary' in conversation.snapshot()).toBe(false)
-	})
-
-	it('regenerates the rollup with a second summarizer call when rollup is true', async () => {
-		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
-		const events = createRecorders<ConversationEventMap, 'summary'>(conversation.emitter, [
-			'summary',
-		])
-		conversation.add([
-			{ role: 'user', content: 'Is the depot open on Friday?' },
-			{ role: 'assistant', content: 'The depot is open on Friday.' },
-			{ role: 'user', content: 'Which order is late?' },
-		])
-
-		await conversation.compact()
-
-		expect(stub.calls.map((call) => call.length)).toEqual([2, 1])
-		expect(conversation.summary).toBe('recap of 1')
-		expect(events.summary.calls).toEqual([['recap of 1']])
-	})
-
-	it('merges an overflow without a rollup call when rollup is false', async () => {
-		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, sections: 1 })
-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
-		await conversation.compact()
-		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
-
-		await conversation.compact()
-
-		// The first fold, the second fold, then the merge over the two section summaries.
-		expect(stub.calls.map((call) => call.length)).toEqual([1, 1, 2])
-		expect(conversation.sections).toHaveLength(1)
-		expect(conversation.summary).toBeUndefined()
-	})
-
-	it('carries a restored rollup through a compaction and a snapshot when rollup is false', async () => {
+describe('Conversation — a 0.0.29 snapshot hydrates without its conversation summary', () => {
+	it('restores the sections and the tail, and neither a compaction nor a snapshot carries the summary', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({
 			summarize: stub.summarize,
-			snapshot: { id: 'desk', summary: 'Ada prefers email.', sections: [], messages: [] },
+			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+		})
+
+		expect(conversation.snapshot()).toEqual({
+			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
+			sections: SUMMARIZED_CONVERSATION_SNAPSHOT.sections,
+			messages: SUMMARIZED_CONVERSATION_SNAPSHOT.messages,
 		})
 		conversation.add([
-			{ role: 'user', content: 'Is the depot open on Friday?' },
-			{ role: 'assistant', content: 'The depot is open on Friday.' },
-			{ role: 'user', content: 'Which order is late?' },
+			{ role: 'assistant', content: 'Order LH-81660 is late.' },
+			{ role: 'user', content: 'Who carries it?' },
 		])
-
 		await conversation.compact()
 
-		expect(stub.calls).toHaveLength(1)
-		expect(conversation.summary).toBe('Ada prefers email.')
-		expect(conversation.snapshot().summary).toBe('Ada prefers email.')
+		expect(stub.calls.map((call) => call.length)).toEqual([2])
+		expect('summary' in conversation.snapshot()).toBe(false)
 	})
 })
 
@@ -696,7 +635,6 @@ describe('Conversation — observation is side-effect-free', () => {
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const conversation = new Conversation({
 			summarize: stub.summarize,
-			rollup: true,
 			error: errors.handler,
 			on: {
 				compact() {
@@ -708,11 +646,10 @@ describe('Conversation — observation is side-effect-free', () => {
 
 		const section = await conversation.compact()
 
-		// The listener threw, but the compaction completed (the section + rollup landed) and the
-		// throw was routed to the emitter's error handler, never escaping.
+		// The listener threw, but the compaction completed (the section landed) and the throw was
+		// routed to the error handler of the emitter, never escaping.
 		expect(section).toBeDefined()
 		expect(conversation.sections).toHaveLength(1)
-		expect(conversation.summary).toBe('recap of 1')
 		// (error, event) order.
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('compact')
@@ -749,7 +686,7 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 		// The section folds to a FRAMED recap (prefix + summary), role assistant; the live tail
 		// message is carried through UNTOUCHED (never gets the recap label).
 		expect(view).toHaveLength(2)
-		expect(view[0]?.content).toBe(recap('recap of 1'))
+		expect(view[0]?.content).toBe(renderRecap('recap of 1'))
 		expect(view[0]?.content.startsWith(CONVERSATION_RECAP_PREFIX)).toBe(true)
 		expect(view[1]?.content).toBe('live tail')
 		expect(view[1]?.content.includes(CONVERSATION_RECAP_PREFIX)).toBe(false)
@@ -786,19 +723,15 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 })
 
 describe('Conversation — reference() renders a provenance-labeled cross-conversation block (D1)', () => {
-	it('includes the provenance label, the rollup summary, and ONLY the supplied excerpts', async () => {
+	it('includes the provenance label and ONLY the supplied excerpts, with no summary line', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({
-			id: 'planning',
-			summarize: stub.summarize,
-			rollup: true,
-		})
+		const conversation = new Conversation({ id: 'planning', summarize: stub.summarize })
 		const all = conversation.add([
 			{ role: 'user', content: 'the API endpoint is /v2/sync' },
 			{ role: 'assistant', content: 'noted, /v2/sync it is' },
 			{ role: 'user', content: 'also the weather is nice' },
 		])
-		await conversation.compact() // sets the rollup `summary` (= 'recap of 1' over one section)
+		await conversation.compact()
 
 		// Cherry-pick ONE relevant message (as search() would surface), NOT the whole history.
 		const picked = conversation.search('endpoint')
@@ -807,15 +740,15 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 
 		// Provenance marker names the source + states it is NOT part of this conversation.
 		expect(block).toContain('[Reference — conversation "planning" — NOT part of this conversation]')
-		// The rollup summary line is present (summary defaults to true, and one exists).
-		expect(block).toContain('Summary: recap of 1')
+		// A compacted conversation renders no summary line.
+		expect(block).not.toContain('Summary:')
 		// ONLY the cherry-picked excerpt appears — rendered `- role: content`.
 		expect(block).toContain('Relevant messages:')
 		expect(block).toContain('- user: the API endpoint is /v2/sync')
 		// The OTHER messages are NOT dumped into the block (cherry-pick, never the whole history).
 		expect(block).not.toContain('also the weather is nice')
 		expect(block).not.toContain('noted, /v2/sync it is')
-		// Sanity: the picked message really was one of the conversation's own messages.
+		// The picked message really was one of the conversation's own messages.
 		expect(all.map((message) => message.content)).toContain(picked[0]?.content)
 	})
 
@@ -827,35 +760,16 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 		)
 	})
 
-	it('omits the Summary line when there is no rollup (no compaction yet)', () => {
+	it('renders the marker alone when no excerpts are supplied', () => {
 		const conversation = new Conversation({ id: 'fresh' })
 		conversation.add({ role: 'user', content: 'hi' })
 
-		const block = conversation.reference()
-
-		// No compaction ⇒ summary is undefined ⇒ no `Summary:` line; and no excerpts supplied ⇒ no
-		// `Relevant messages:` block. The marker still renders cleanly on its own.
-		expect(block).toBe('[Reference — conversation "fresh" — NOT part of this conversation]')
+		expect(conversation.reference()).toBe(
+			'[Reference — conversation "fresh" — NOT part of this conversation]',
+		)
 	})
 
-	it('excludes the summary when summary:false even if a rollup exists', async () => {
-		const stub = createStubSummarizer()
-		const conversation = new Conversation({
-			id: 'planning',
-			summarize: stub.summarize,
-			rollup: true,
-		})
-		conversation.add({ role: 'assistant', content: 'decided on Postgres' })
-		await conversation.compact()
-		expect(conversation.summary).toBeDefined()
-
-		const block = conversation.reference({ summary: false })
-
-		expect(block).not.toContain('Summary:')
-		expect(block).toBe('[Reference — conversation "planning" — NOT part of this conversation]')
-	})
-
-	it('renders excerpts with no summary line when summary-less but messages are supplied', () => {
+	it('renders each supplied excerpt as role: content under the marker', () => {
 		const conversation = new Conversation({ id: 'chat' })
 		const messages = conversation.add([
 			{ role: 'user', content: 'one' },
@@ -871,15 +785,10 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 	})
 })
 
-describe('Conversation — snapshot() serializes id + summary + sections + live tail (C-c)', () => {
-	it('snapshot() captures id, sections, the live tail, and the rollup summary', async () => {
+describe('Conversation — snapshot() serializes id + sections + live tail (C-c)', () => {
+	it('snapshot() captures id, sections, and the live tail, and carries no summary member', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({
-			id: 'snap',
-			summarize: stub.summarize,
-			rollup: true,
-			keep: 1,
-		})
+		const conversation = new Conversation({ id: 'snap', summarize: stub.summarize, keep: 1 })
 		conversation.add([
 			{ role: 'user', content: 'first' },
 			{ role: 'assistant', content: 'second' },
@@ -889,19 +798,17 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 
 		const snapshot = conversation.snapshot()
 		expect(snapshot.id).toBe('snap')
-		expect(snapshot.summary).toBe(conversation.summary) // the regenerated rollup
+		expect('summary' in snapshot).toBe(false)
 		expect(snapshot.sections).toEqual(conversation.sections)
 		expect(snapshot.messages).toEqual(conversation.messages()) // the live tail
 		expect(snapshot.messages.map((one) => one.content)).toEqual(['third'])
 	})
 
-	it('snapshot() OMITS summary before any compaction (undefined rollup, present-when-set)', () => {
+	it('snapshot() before any compaction holds no sections and the live tail', () => {
 		const conversation = new Conversation({ id: 'fresh' })
 		conversation.add({ role: 'user', content: 'hi' })
 
 		const snapshot = conversation.snapshot()
-		// The rollup is undefined until the first compaction — the key is OMITTED (not present-but-undefined).
-		expect('summary' in snapshot).toBe(false)
 		expect(snapshot.sections).toEqual([])
 		expect(snapshot.messages.map((one) => one.content)).toEqual(['hi'])
 	})
@@ -920,7 +827,6 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 		// The declared option is the ONE seam every caller reaches — there is no positional form.
 		const restored = createConversation({ snapshot, summarize: stub.summarize, keep: 1 })
 		expect(restored.id).toBe('stored') // the snapshot IS the identity
-		expect(restored.summary).toBe(source.summary)
 		expect(restored.sections).toEqual(source.sections)
 		expect(restored.messages()).toEqual(source.messages())
 		// A re-snapshot of the restored conversation equals the original (a faithful round-trip).
@@ -964,12 +870,11 @@ describe('Conversation — snapshot() serializes id + summary + sections + live 
 
 describe('Conversation — sections cap', () => {
 	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
-		const zero = (): Conversation => new Conversation({ sections: 0 })
-		const negative = (): Conversation => new Conversation({ sections: -1 })
-
-		expect(zero).toThrow(ConversationError)
-		expect(negative).toThrow(ConversationError)
-		expect(zero).toThrow(expect.objectContaining({ code: 'SECTIONS' }))
+		expect(() => new Conversation({ sections: 0 })).toThrow(ConversationError)
+		expect(() => new Conversation({ sections: -1 })).toThrow(ConversationError)
+		expect(() => new Conversation({ sections: 0 })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
 	})
 
 	it('accepts a fractional cap >= 1 (only the >= 1 bound is validated)', () => {
@@ -1077,6 +982,20 @@ describe('Conversation — sections cap', () => {
 		expect(conversation.sections).toHaveLength(1)
 	})
 
+	it('merges an overflow with one further summarizer call over the folded section summaries', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 1 })
+		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
+
+		await conversation.compact()
+
+		// The first fold, the second fold, then the merge over the two section summaries.
+		expect(stub.calls.map((call) => call.length)).toEqual([1, 1, 2])
+		expect(conversation.sections).toHaveLength(1)
+	})
+
 	it('DEFAULT unset sections: repeated compacts grow the sections list unbounded (regression guard)', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
@@ -1089,24 +1008,26 @@ describe('Conversation — sections cap', () => {
 		expect(conversation.sections).toHaveLength(4)
 	})
 
-	// Cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
-	// (and its splice) is skipped — sections transiently sit at `cap + 1`, no loss — but the
-	// rollup regeneration still runs over the CURRENT (unmerged) sections so it is never left
-	// stale, and the error propagates (a manual `compact()` always surfaces a summarizer
-	// failure). The section fold + rollup calls both succeed; only the merge call (identified by
-	// call count) throws.
-	it('regenerates a fresh rollup over the unmerged sections when the overflow merge throws, then propagates the error', async () => {
+	// Cap-collapse resilience: when the `summarize` call of the OVERFLOW MERGE throws, the merge
+	// is skipped — sections transiently sit at `cap + 1`, no loss — and the error propagates (a
+	// manual `compact()` always surfaces a summarizer failure) before `compact` is emitted. One
+	// summarizer call per round without overflow, so rounds 1 and 2 are calls 1 and 2; round 3
+	// folds at call 3 and merges at call 4, the only call that throws.
+	it('keeps the unmerged sections and propagates the error when the overflow merge throws', async () => {
 		const boom = new Error('merge summarizer boom')
 		let calls = 0
-		// Calls per compact() round without overflow: 1 (fold) + 1 (rollup) = 2 — so rounds 1 and 2
-		// consume calls 1-2 and 3-4. Round 3 overflows the cap of 2: its fold is call 5, its
-		// overflow MERGE is call 6 (before the rollup) — make only that merge call throw.
-		const summarize = async (messages: readonly Message[]): Promise<string> => {
-			calls += 1
-			if (calls === 6) throw boom
-			return `recap of ${messages.length}`
-		}
-		const conversation = new Conversation({ summarize, sections: 2, rollup: true })
+		const conversation = new Conversation({
+			summarize: async (messages) => {
+				calls += 1
+				if (calls === 4) throw boom
+				return `recap of ${messages.length}`
+			},
+			sections: 2,
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
 
 		conversation.add({ role: 'assistant', content: 'round-1' })
 		await conversation.compact()
@@ -1116,15 +1037,15 @@ describe('Conversation — sections cap', () => {
 
 		// Round 3 overflows the cap — the merge call throws.
 		conversation.add({ role: 'assistant', content: 'round-3' })
-		const rollupBeforeAttempt = conversation.summary
 		await expect(conversation.compact()).rejects.toBe(boom)
 
-		// No splice, no loss: 3 sections remain (transiently over the cap of 2), unmerged.
-		expect(conversation.sections).toHaveLength(3)
-		// The rollup is FRESH — regenerated over the current (unmerged) 3 sections, so it
-		// differs from whatever it was before this failed attempt (never left stale).
-		expect(conversation.summary).not.toBe(rollupBeforeAttempt)
-		expect(conversation.summary).toBe('recap of 3')
+		// No merge, no loss: 3 sections remain (transiently over the cap of 2), unmerged, and the
+		// failed round emitted neither `collapse` nor `compact`.
+		expect(
+			conversation.sections.map((one) => one.messages.map((message) => message.content)),
+		).toEqual([['round-1'], ['round-2'], ['round-3']])
+		expect(events.compact.count).toBe(2)
+		expect(events.collapse.count).toBe(0)
 
 		// A subsequent successful compact() restores the cap.
 		conversation.add({ role: 'assistant', content: 'round-4' })
@@ -1198,13 +1119,13 @@ describe('Conversation — hydrating through the snapshot option (C-c)', () => {
 			summarize: createStubSummarizer().summarize,
 			snapshot: source.snapshot(),
 		})
-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse' | 'rehydrate'>(
 			restored.emitter,
-			['compact', 'summary', 'rehydrate'],
+			['compact', 'collapse', 'rehydrate'],
 		)
 		// No event fires merely from construction — the recorder saw nothing post-hydrate.
 		expect(events.compact.count).toBe(0)
-		expect(events.summary.count).toBe(0)
+		expect(events.collapse.count).toBe(0)
 		expect(events.rehydrate.count).toBe(0)
 	})
 })

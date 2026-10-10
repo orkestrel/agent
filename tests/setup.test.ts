@@ -1,9 +1,16 @@
 import type { Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { ConversationManager, createConversation, isProviderAbortError } from '@src/core'
+import {
+	CONVERSATION_RECAP_PREFIX,
+	ConversationManager,
+	createConversation,
+	isConversationSnapshot,
+	isProviderAbortError,
+} from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	buildCallsSnapshot,
 	buildConversationSnapshot,
 	chunkWholeDelta,
 	compactSeedTurns,
@@ -33,6 +40,7 @@ import {
 	RecordedTransport,
 	recordGlobalTransport,
 	rejectTransportOnAbort,
+	renderRecap,
 	resolveSectionOpen,
 	resolveSectionRender,
 	returnDomain,
@@ -339,8 +347,8 @@ describe('createStubSummarizer', () => {
 		// The digest names the slice's own length, so two different slices digest differently —
 		// the property a compaction test leans on when it reads a section summary back.
 		expect(digests).toEqual(['recap of 2', 'recap of 1'])
-		// The recorder holds each digested slice in order, so a test can prove the TWO
-		// summarizer calls one compaction makes.
+		// The recorder holds each digested slice in order, so a test can prove the summarizer
+		// calls one compaction makes.
 		expect(stub.calls).toEqual([pair, single])
 	})
 })
@@ -373,12 +381,12 @@ describe('buildConversationSnapshot', () => {
 		// and the live tail still carries the kept turn.
 		expect(section.messages.length).toBeGreaterThan(1)
 		expect(snapshot.messages).toHaveLength(1)
-		// The section and the rollup match the declared literals, not a formula the module folded with.
+		// The section matches the declared literals, not a formula the module folded with.
 		expect(section.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary)
 		expect(section.messages.map((message) => message.content)).toEqual(
 			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
 		)
-		expect(snapshot.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.rollupSummary)
+		expect('summary' in snapshot).toBe(false)
 		// The folded originals never linger in the live tail.
 		const live = snapshot.messages.map((message) => message.id)
 		expect(section.messages.some((message) => live.includes(message.id))).toBe(false)
@@ -395,8 +403,8 @@ describe('buildConversationSnapshot', () => {
 // stopped returning a real result, or returned one a conforming store cannot satisfy, reddens this
 // file. The store twins keep their own registration and their own twin-specific blocks.
 describe('conversation-store contract scenarios run against a conforming store', () => {
-	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
-		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+	describe('set → get round-trip (sections + live tail)', () => {
+		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
 			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
 				createFixtureStore,
 				buildConversationSnapshot,
@@ -412,7 +420,6 @@ describe('conversation-store contract scenarios run against a conforming store',
 			expect(got?.messages.map((message) => message.content)).toEqual(
 				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
 			)
-			expect(got?.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.rollupSummary)
 		})
 	})
 
@@ -587,7 +594,7 @@ describe('resolveSectionOpen / resolveSectionRender', () => {
 })
 
 describe('seedConversation', () => {
-	it('registers a conversation carrying a compacted section, a live tail, and a rollup', async () => {
+	it('registers a conversation carrying a compacted section and a live tail', async () => {
 		const manager = new ConversationManager({
 			summarize: createStubSummarizer().summarize,
 			keep: 1,
@@ -602,7 +609,26 @@ describe('seedConversation', () => {
 			'second',
 		])
 		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
-		expect(conversation.summary).toBeDefined()
+	})
+})
+
+describe('buildCallsSnapshot', () => {
+	it('plants the calls value on the one live assistant message of an otherwise valid snapshot', () => {
+		const calls = [{ id: 'c1', name: 'search', arguments: { q: 'acme' } }]
+		expect(buildCallsSnapshot(calls)).toEqual({
+			id: 'c',
+			sections: [],
+			messages: [{ id: 'a1', role: 'assistant', content: '', calls }],
+		})
+		expect(isConversationSnapshot(buildCallsSnapshot(calls))).toBe(true)
+		expect(isConversationSnapshot(buildCallsSnapshot([null]))).toBe(false)
+	})
+})
+
+describe('renderRecap', () => {
+	it('prefixes the summary with the exported recap prefix', () => {
+		expect(renderRecap('recap of 2')).toBe('[Summary of earlier messages] recap of 2')
+		expect(renderRecap('')).toBe(CONVERSATION_RECAP_PREFIX)
 	})
 })
 

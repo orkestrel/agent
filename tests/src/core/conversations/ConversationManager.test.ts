@@ -1,11 +1,21 @@
 import {
 	Conversation,
 	ConversationManager,
+	createDatabaseConversationStore,
 	createMemoryConversationStore,
 	isConversationError,
+	isConversationSnapshot,
 } from '@src/core'
+import { rawShape, stringShape } from '@orkestrel/contract'
+import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { createStubSummarizer, seedConversation } from '../../../setup.js'
+import {
+	createStubSummarizer,
+	renderRecap,
+	seedConversation,
+	SUMMARIZED_CONVERSATION_SNAPSHOT,
+} from '../../../setup.js'
 
 // ConversationManager is the id-keyed registry over the conversation layer WITH an active pointer — an
 // insertion-ordered store keyed by id (add / conversation / conversations / count / remove(id|ids[])
@@ -303,44 +313,6 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 	})
 })
 
-describe('ConversationManager — the default rollup flows in, and per-add overrides win', () => {
-	it('creates conversations that generate no rollup when neither the manager nor the add asks', async () => {
-		const stub = createStubSummarizer()
-		const manager = new ConversationManager({ summarize: stub.summarize })
-		const conversation = manager.add()
-
-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
-		await conversation.compact()
-
-		expect(stub.calls).toHaveLength(1)
-		expect(conversation.summary).toBeUndefined()
-	})
-
-	it("created conversations inherit the manager's default rollup", async () => {
-		const stub = createStubSummarizer()
-		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
-		const conversation = manager.add()
-
-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
-		await conversation.compact()
-
-		expect(stub.calls).toHaveLength(2)
-		expect(conversation.summary).toBe('recap of 1')
-	})
-
-	it('a per-add rollup OVERRIDES the manager default', async () => {
-		const stub = createStubSummarizer()
-		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
-		const conversation = manager.add({ rollup: false })
-
-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
-		await conversation.compact()
-
-		expect(stub.calls).toHaveLength(1)
-		expect(conversation.summary).toBeUndefined()
-	})
-})
-
 describe('ConversationManager — created conversations are independent', () => {
 	it('each conversation has its own live tail + sections', async () => {
 		const stub = createStubSummarizer()
@@ -371,7 +343,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		expect(manager.active).toBe(b) // activated
 	})
 
-	it('open(id) HYDRATES from the store on a registry miss (sections + tail + summary restored)', async () => {
+	it('open(id) HYDRATES from the store on a registry miss (sections + tail restored)', async () => {
 		const store = createMemoryConversationStore()
 		// Persist a conversation through one manager, with keep: 1 so BOTH a section and a live tail exist.
 		const source = new ConversationManager({ summarize: createStubSummarizer().summarize, keep: 1 })
@@ -398,7 +370,6 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		expect(opened.id).toBe('persisted')
 		expect(opened.snapshot()).toEqual(original.snapshot())
 		expect(opened.sections).toHaveLength(1)
-		expect(opened.summary).toBe(original.summary)
 		expect(opened.messages().map((one) => one.content)).toEqual(['third'])
 		// It is registered AND activated, and a fresh-built conversation (not the original instance).
 		expect(manager.conversation('persisted')).toBe(opened)
@@ -537,5 +508,34 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		const store = createMemoryConversationStore()
 		const manager = new ConversationManager({ store })
 		expect(await manager.save('missing')).toBe(false)
+	})
+})
+
+describe('ConversationManager — open reads a 0.0.29 snapshot without its conversation summary', () => {
+	it('narrows the persisted row, hydrates sections and tail, and drops the summary from the next snapshot', async () => {
+		const driver = createMemoryDriver()
+		const database = createDatabase({
+			driver,
+			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+		})
+		await database.table('conversations').set({
+			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
+			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+		})
+		await database.close()
+		const manager = new ConversationManager({
+			summarize: createStubSummarizer().summarize,
+			store: createDatabaseConversationStore(driver),
+		})
+
+		const opened = requireValue(await manager.open(SUMMARIZED_CONVERSATION_SNAPSHOT.id))
+
+		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
+		expect(manager.active).toBe(opened)
+		expect('summary' in opened.snapshot()).toBe(false)
+		expect(opened.view().map((message) => message.content)).toEqual([
+			renderRecap('recap of 2'),
+			'Which order is late?',
+		])
 	})
 })

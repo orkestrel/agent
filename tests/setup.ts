@@ -45,6 +45,7 @@ import {
 	AgentContext,
 	AgentJudge,
 	AgentProvider,
+	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createConversation,
 	createSelection,
@@ -104,6 +105,54 @@ export const JUDGMENT_SNAPSHOT: ConversationSnapshot = Object.freeze({
 		},
 	],
 })
+
+/** Describes a snapshot in the 0.0.29 shape, which carries the conversation summary 0.0.30 no longer writes. */
+export interface SummarizedConversationSnapshot extends ConversationSnapshot {
+	readonly summary: string
+}
+
+/**
+ * Supplies a snapshot in the 0.0.29 shape: one compacted section, a live tail, and the
+ * conversation `summary` member that 0.0.30 reads past.
+ */
+export const SUMMARIZED_CONVERSATION_SNAPSHOT: SummarizedConversationSnapshot =
+	Object.freeze<SummarizedConversationSnapshot>({
+		id: 'published',
+		summary: 'recap of 2',
+		sections: [
+			{
+				id: 'section-depot',
+				summary: 'recap of 2',
+				messages: [
+					{ id: 'user-depot', role: 'user', content: 'Is the depot open on Friday?' },
+					{ id: 'assistant-depot', role: 'assistant', content: 'The depot is open on Friday.' },
+				],
+			},
+		],
+		messages: [{ id: 'user-order', role: 'user', content: 'Which order is late?' }],
+	})
+
+/**
+ * Builds a snapshot that is valid in every member except the planted assistant `calls` value, so
+ * a guard rejection isolates the per-call check rather than a sibling member.
+ *
+ * @param calls - The value planted as the `calls` member of the one live assistant message
+ * @returns The snapshot candidate, typed `unknown` because `calls` can be anything
+ */
+export function buildCallsSnapshot(calls: unknown): unknown {
+	return { id: 'c', sections: [], messages: [{ id: 'a1', role: 'assistant', content: '', calls }] }
+}
+
+/**
+ * Renders the content `view()` gives the recap message of a section with `summary`, built from
+ * the exported prefix rather than a retyped literal.
+ *
+ * @param summary - The section summary the recap frames
+ * @returns The framed recap text
+ */
+export function renderRecap(summary: string): string {
+	return `${CONVERSATION_RECAP_PREFIX}${summary}`
+}
 
 /** Lists independently malformed judgment members for storage guard tests. */
 export const INVALID_JUDGMENTS: readonly unknown[] = Object.freeze([
@@ -930,10 +979,10 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
 /**
  * Creates a deterministic stub {@link ConversationSummaryHandler} for the conversation-layer tests
  * — a REAL `(messages) => Promise<string>` that digests the slice into `recap of <n>` (the
- * folded count), so a `compact()` produces a predictable section summary and the rollup is a
- * predictable summary-of-summaries (a data stub, not a behavior mock). Counts its calls so a
- * test can prove the summarizer calls per compaction (the section digest, plus the rollup
- * regeneration when the `rollup` option is `true`).
+ * folded count), so a `compact()` produces a predictable section summary and a `sections` cap
+ * merge a predictable merged summary (a data stub, not a behavior mock). Counts its calls so a
+ * test can prove the summarizer calls per compaction (the section digest, plus the merge when a
+ * cap overflows).
  *
  * @returns The summarizer plus a live `calls` recorder of every digested message-slice
  */
@@ -1154,16 +1203,16 @@ export async function compactSeedTurns(conversation: ConversationInterface): Pro
 
 /**
  * Builds a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
- * added, then a genuine `compact()` folds the oldest two into one summarized section + regenerates
- * the opted-in rollup `summary`, with the last message kept live (`keep: 1`). So the snapshot is
- * NON-VACUOUS in BOTH the compacted sections AND the live tail (and carries a rollup summary). The
+ * added, then a genuine `compact()` folds the oldest two into one summarized section, with the
+ * last message kept live (`keep: 1`). So the snapshot is NON-VACUOUS in BOTH the compacted
+ * sections AND the live tail. The
  * shared store-test fixture both `{Memory,Database}ConversationStore` twins drive (one
  * builder, not a per-file copy). The deterministic, provider-free summarizer is folded INSIDE
  * (digesting the slice into `recap(<contents>)` — NOT {@link createStubSummarizer}, whose `recap of
- * <n>` digest text differs), so a `compact()` produces a predictable section + rollup.
+ * <n>` digest text differs), so a `compact()` produces a predictable section.
  *
  * @param id - The conversation id (and snapshot key); defaults to `'chat'`
- * @returns The settled conversation's snapshot (sections + live tail + rollup summary)
+ * @returns The settled conversation's snapshot (sections + live tail)
  */
 export async function buildConversationSnapshot(id = 'chat'): Promise<ConversationSnapshot> {
 	const conversation = createConversation({
@@ -1172,7 +1221,6 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
 			return `recap(${messages.map((message) => message.content).join('|')})`
 		},
 		keep: 1,
-		rollup: true,
 	})
 	await compactSeedTurns(conversation)
 	return conversation.snapshot()
@@ -1184,7 +1232,6 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
  */
 export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
 	id: 'weather',
-	summary: 'Paris is sunny',
 	sections: [
 		{
 			id: 'section-paris',
@@ -1248,12 +1295,11 @@ export interface ConversationStoreRoundTripExpectation {
 	readonly sectionSummary: string
 	readonly sectionMessages: readonly string[]
 	readonly liveTail: readonly string[]
-	readonly rollupSummary: string
 }
 
 /**
  * Holds the literal values `buildConversationSnapshot()`'s round trip must reproduce — the fold's section
- * summary + retained messages, the live tail, and the rollup summary. Shared so both twin suites (and
+ * summary + retained messages, and the live tail. Shared so both twin suites (and
  * `setup.test.ts`'s own proof) assert the SAME literals rather than each retyping them.
  */
 export const CONVERSATION_STORE_ROUND_TRIP_EXPECTATION: ConversationStoreRoundTripExpectation =
@@ -1261,13 +1307,12 @@ export const CONVERSATION_STORE_ROUND_TRIP_EXPECTATION: ConversationStoreRoundTr
 		sectionSummary: 'recap(first|second)',
 		sectionMessages: Object.freeze(['first', 'second']),
 		liveTail: Object.freeze(['third']),
-		rollupSummary: 'recap(recap(first|second))',
 	})
 
 /**
  * Drives the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
  * {@link buildConversationSnapshot} snapshot, then get it back. Returns what was stored and what came
- * back, sections + live tail + rollup summary intact, so the caller's `it` block asserts the equality
+ * back, sections + live tail intact, so the caller's `it` block asserts the equality
  * (and the literals in {@link CONVERSATION_STORE_ROUND_TRIP_EXPECTATION}) itself.
  *
  * @param create - Builds a fresh, empty store (the twin's own factory)
@@ -1605,9 +1650,9 @@ export function resolveSectionRender(options?: SectionRenderOptions): string {
 }
 
 /**
- * Registers a conversation on a {@link ConversationManagerInterface} and compacts it with the
- * `rollup` option, so the registered conversation carries a real compacted section, a live tail,
- * and a rollup summary — a durable `save` / `open` round trip over it is then NON-VACUOUS in every field.
+ * Registers a conversation on a {@link ConversationManagerInterface} and compacts it, so the
+ * registered conversation carries a real compacted section and a live tail — a durable `save` /
+ * `open` round trip over it is then NON-VACUOUS in every field.
  *
  * @param manager - The manager to register the conversation on (it supplies the summarizer and `keep`)
  * @param id - The conversation id to register
@@ -1616,7 +1661,7 @@ export async function seedConversation(
 	manager: ConversationManagerInterface,
 	id: string,
 ): Promise<void> {
-	await compactSeedTurns(manager.add({ id, rollup: true }))
+	await compactSeedTurns(manager.add({ id }))
 }
 
 /** Holds signals recorded by a transport that rejects every request. */

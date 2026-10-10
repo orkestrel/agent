@@ -16,22 +16,22 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
 
 /**
  * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
- * message store it owns directly, with compaction into summarized sections, an opt-in
- * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
- * provider-agnostic {@link ConversationSummaryHandler} seam.
+ * message store it owns directly, with compaction into summarized sections, on-demand
+ * `rehydrate`, and substring `search`, driven by a provider-agnostic
+ * {@link ConversationSummaryHandler} seam.
  *
  * @remarks
  * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
  * (each section as a summary message, then the live tail). `compact()` folds the older live
- * messages into a summarized {@link Section}, whole exchanges at a time, and regenerates the
- * rollup when `rollup` is `true` — it requires a `summarize` (omitted ⇒ `compact()` throws a
- * `ConversationError`); `keep` retains a recent tail (default `DEFAULT_CONVERSATION_KEEP` —
- * fold up to the newest user message). `rehydrate(id)` / `search(query)` read the retained
- * originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
+ * messages into a summarized {@link Section}, whole exchanges at a time — it requires a
+ * `summarize` (without one `compact()` throws a `ConversationError`); `keep` retains a recent
+ * tail (Default: `DEFAULT_CONVERSATION_KEEP`, which folds up to the newest user message).
+ * `rehydrate(id)` / `search(query)` read the retained originals. Observable (`emitter` —
+ * `compact` / `collapse` / `rehydrate`), wired
  * through the reserved `on` option; the emitter isolates a listener throw and routes it to
  * its `error` handler (the `error` option), so it can never corrupt a compaction.
  *
- * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `rollup` (see {@link ConversationOptions})
+ * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `sections` (see {@link ConversationOptions})
  * @returns A working {@link ConversationInterface}
  *
  * @example Conversations & compaction
@@ -54,8 +54,7 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
  * 				AbortSignal.timeout(30_000),
  * 			)
  * 		).content,
- * 	keep: 2, // retain at least the two most recent messages verbatim on each compaction
- * 	rollup: true, // also regenerate the rollup summary on each compaction
+ * 	keep: 2, // retain at least the 2 most recent messages verbatim on each compaction
  * })
  * conversation.add([
  * 	{ role: 'user', content: 'My name is Ada.' },
@@ -67,7 +66,6 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
  *
  * const section = await conversation.compact() // folds the first exchange → a summarized section
  * conversation.view() // [<section summary message>, ...the retained recent exchanges] — the model input
- * conversation.summary // the regenerated rollup (a summary-of-summaries over all sections)
  * conversation.search('ada') // case-insensitive across sections' originals + the live tail
  * section && conversation.rehydrate(section.id) // the section's full original messages (a pure read)
  * ```
@@ -78,7 +76,7 @@ export function createConversation(options?: ConversationOptions): ConversationI
 
 /**
  * Creates a conversation registry — a {@link ConversationManagerInterface} holding
- * {@link ConversationInterface}s keyed by their `id`, in insertion order, with an active pointer:
+ * {@link ConversationInterface} instances keyed by their `id`, in insertion order, with an active pointer:
  * the id-keyed store over the conversation layer plus the `active` / `switch` seam the context
  * renders. `add` auto-activates the first conversation and flows the registry's default
  * `summarize` / `keep` into every conversation it creates.
@@ -116,7 +114,7 @@ export function createConversationManager(
 
 /**
  * Creates the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
- * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot}s keyed by conversation
+ * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot} records keyed by conversation
  * id, the default backing for the durable {@link ConversationManagerInterface.open} /
  * {@link ConversationManagerInterface.save} seam. The exact twin of
  * {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
@@ -151,8 +149,8 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
 }
 
 /**
- * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface}, defaulting to
- * `createMemoryDriver()` — the durable, driver-pluggable backing for the conversation persistence
+ * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
+ * driver-pluggable backing for the conversation persistence
  * seam, holding each snapshot as one opaque JSON column and standing as the opt-in twin of
  * {@link createMemoryConversationStore}. The exact twin of
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore}.
@@ -164,13 +162,13 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore} stores its snapshot. The
  * snapshot is already a complete, self-contained, pure-JSON payload, so storing it whole is lossless
  * and keeps the row type flat (the column reads back as `unknown`, narrowed on `get` by
- * {@link import('./validators.js').isConversationSnapshot}). The `driver` defaults to
+ * {@link import('./validators.js').isConversationSnapshot}). Default driver:
  * {@link createMemoryDriver}, so the store also works in memory out of the box; pass a server
  * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
  * the durability is the driver's job, the store engine is shared. It swaps in behind
  * {@link ConversationStoreInterface} without touching the manager or the conversation.
  *
- * @param driver - The storage backend the snapshots persist to (defaults to {@link createMemoryDriver})
+ * @param driver - The storage backend the snapshots persist to. Default: {@link createMemoryDriver}
  * @returns A {@link ConversationStoreInterface} over the driver
  *
  * @example

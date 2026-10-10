@@ -12,7 +12,7 @@ import { Conversation } from './Conversation.js'
 import { removeEntries } from '../helpers.js'
 
 /**
- * Registers {@link Conversation}s keyed by `id`, in insertion order, with an active pointer —
+ * Registers {@link Conversation} instances keyed by `id`, in insertion order, with an active pointer —
  * the id-keyed store over the conversation layer, the `active` / `switch` seam the
  * {@link import('../contexts/index.js').AgentContext} renders, and the durable `open` / `save`
  * store seam. Event-free (a registry, like
@@ -22,7 +22,7 @@ import { removeEntries } from '../helpers.js'
  * @remarks
  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`
  *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`), flowing the
- *   manager's default `#summarize` / `#keep` / `#rollup` in unless the `input` overrides them, and stores
+ *   default `#summarize` / `#keep` of the manager in unless the `input` overrides them, and stores
  *   it (an already-present `id` overwrites — last write wins). `count` is the map size,
  *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the agent's message source the
@@ -30,7 +30,7 @@ import { removeEntries } from '../helpers.js'
  *   with conversations always has one active). A subsequent `add` leaves `active` unchanged.
  *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown `id`
  *   returns `undefined` and leaves `active` unchanged (the lenient lookup style — never throws,
- *   no new error code).
+ *   no added error code).
  * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id was
  *   removed; removing the active conversation sets `active` to `undefined`. `clear` empties the registry
  *   and sets `active` to `undefined`.
@@ -59,8 +59,6 @@ export class ConversationManager implements ConversationManagerInterface {
 	readonly #keep: number
 	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.
 	readonly #sections: number | undefined
-	// The default `rollup` switch flowed into every conversation `add` creates (overridable).
-	readonly #rollup: boolean
 	// The optional durable store backing `open` / `save`; `undefined` ⇒ registry-only (both lenient).
 	readonly #store: ConversationStoreInterface | undefined
 
@@ -68,7 +66,6 @@ export class ConversationManager implements ConversationManagerInterface {
 		this.#summarize = options?.summarize
 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
 		this.#sections = options?.sections
-		this.#rollup = options?.rollup ?? false
 		this.#store = options?.store
 	}
 
@@ -89,11 +86,8 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	add(input?: ConversationInput): ConversationInterface {
-		// The manager's defaults flow in unless the input overrides them — so a conversation
-		// created through the manager inherits its summarizer / keep / rollup by default. An optional
-		// `snapshot` hydrates the conversation through the declared `ConversationOptions.snapshot`
-		// seam — its `id` / `summary` / `sections` / live tail restored, the live summarize / keep
-		// re-supplied alongside it in the same options object.
+		// An optional `snapshot` hydrates through the declared `ConversationOptions.snapshot` seam,
+		// so the live summarize / keep ride beside it in the same options object.
 		const sections = input?.sections ?? this.#sections
 		const summarize = input?.summarize ?? this.#summarize
 		const conversation = new Conversation({
@@ -102,7 +96,6 @@ export class ConversationManager implements ConversationManagerInterface {
 			...(summarize === undefined ? {} : { summarize }),
 			keep: input?.keep ?? this.#keep,
 			...(sections === undefined ? {} : { sections }),
-			rollup: input?.rollup ?? this.#rollup,
 			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
 		})
 		this.#conversations.set(conversation.id, conversation)
@@ -120,19 +113,15 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	async open(id: string): Promise<ConversationInterface | undefined> {
-		// Already registered ⇒ activate it (no store hit) — the registry is the live source.
 		const existing = this.#conversations.get(id)
 		if (existing !== undefined) {
 			this.#active = id
 			return existing
 		}
-		// No store ⇒ a registry miss resolves nothing (lenient, like `switch`/`conversation`).
 		if (this.#store === undefined) return undefined
-		// Store hit ⇒ rehydrate through the `snapshot` option (it restores id / summary /
-		// sections / live tail) by reusing `add`, which registers + auto-activates a fresh
-		// Conversation (flowing the manager's default summarize / keep in); a miss ⇒ undefined.
 		const snapshot = await this.#store.get(id)
 		if (snapshot === undefined) return undefined
+		// Reuse `add` so the default summarize / keep of the manager flow into the rehydrated conversation.
 		const conversation = this.add({ snapshot })
 		// Re-point `active` explicitly: `add` only auto-activates the first conversation, so an open
 		// into a non-empty registry must still make the rehydrated one active.
@@ -141,18 +130,14 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	async save(id: string): Promise<boolean> {
-		// Lenient: persist only when a store is set and the id is registered; otherwise a no-op.
 		const conversation = this.#conversations.get(id)
 		if (this.#store === undefined || conversation === undefined) return false
 		await this.#store.set(conversation.snapshot())
 		return true
 	}
 
-	// The array overload comes first, so a list resolves to the batch form (an `id` is a string,
-	// never an array, so the two never overlap — but the project declares the array overload
-	// first by convention).
-	remove(ids: readonly string[]): boolean
 	remove(id: string): boolean
+	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
 		if (isArray(ids)) {
 			// Each present id still clears `active` when it was the active conversation.
