@@ -102,18 +102,39 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 	})
 
 	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
-		const hostile = {
-			id: 's',
-			summary: 'recap',
-			get messages(): never {
-				throw new Error('unreadable')
-			},
-		}
+		let sectionReads = 0
+		let snapshotReads = 0
 		const revoked = Proxy.revocable({}, {})
 		revoked.revoke()
-		expect(isSection(hostile)).toBe(false)
+		expect(
+			isSection({
+				id: 's',
+				summary: 'recap',
+				get messages(): never {
+					sectionReads += 1
+					throw new Error('unreadable')
+				},
+			}),
+		).toBe(false)
+		expect(sectionReads).toBe(1)
 		expect(isSection(revoked.proxy)).toBe(false)
-		expect(isConversationSnapshot({ id: 'c', sections: [hostile], messages: [] })).toBe(false)
+		expect(
+			isConversationSnapshot({
+				id: 'c',
+				sections: [
+					{
+						id: 's',
+						summary: 'recap',
+						get messages(): never {
+							snapshotReads += 1
+							throw new Error('unreadable')
+						},
+					},
+				],
+				messages: [],
+			}),
+		).toBe(false)
+		expect(snapshotReads).toBe(1)
 	})
 })
 

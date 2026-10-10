@@ -293,9 +293,9 @@ export interface ConversationReferenceOptions {
  *   error from the auto path). A manual `compact()` still throws without a summarizer — only the
  *   auto path is guarded.
  * - **`rehydrate(id)` / `search(query)` — read the retained originals.** `rehydrate` returns
- *   the full original messages of a section (`undefined` for an unknown id) and emits
- *   `rehydrate` — a pure read (the caller decides whether to re-add them; `rehydrate` never
- *   reinserts). `search` is a case-insensitive substring scan of `content` across all messages
+ *   the full original messages of a known section and emits its `id` through `rehydrate`, even
+ *   when the list is empty. An unknown id returns `undefined` without an event. The read never
+ *   reinserts messages. `search` is a case-insensitive substring scan of `content` across all messages
  *   (the originals of every section + the live tail).
  * - **`reference(options?)` — pull this conversation into another with provenance.** A pure
  *   string render (no model call) of a self-labeled, fenced cross-conversation block of
@@ -391,12 +391,13 @@ export interface ConversationInterface {
 	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
 	 * @returns The folded {@link Section}, or `undefined` when nothing folded
 	 * @throws ConversationError Thrown when no summarizer was supplied, or when the effective
-	 * sections cap is below `1`
+	 * sections cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`)
 	 */
 	compact(options?: CompactOptions): Promise<Section | undefined>
 	/**
-	 * Returns the full original messages of a section — a pure read that emits `rehydrate` and
-	 * never reinserts.
+	 * Returns the full original messages of a known section and emits its `id` through `rehydrate`,
+	 * including an empty list; returns `undefined` without an event for an unknown `id`.
+	 * Never reinserts messages.
 	 *
 	 * @param id - The {@link Section} `id` to pull back
 	 * @returns The retained original messages of the section, or `undefined` when no section has `id`

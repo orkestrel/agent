@@ -525,15 +525,43 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 		expect(conversation.count).toBe(1)
 	})
 
-	it('returns undefined for an unknown section id (still emits rehydrate)', async () => {
+	it('returns undefined for an unknown section id without an event or a state change', async () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
 			'rehydrate',
 		])
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+		await conversation.compact()
+		const snapshot = conversation.snapshot()
+		expect(snapshot.sections).toHaveLength(1)
+		expect(snapshot.messages).toHaveLength(1)
 
 		expect(conversation.rehydrate('nope')).toBeUndefined()
-		expect(events.rehydrate.calls).toEqual([['nope']])
+		expect(conversation.snapshot()).toEqual(snapshot)
+		expect(events.rehydrate.count).toBe(0)
+	})
+
+	it('returns an empty retained list and emits the known section id', () => {
+		const conversation = new Conversation({
+			snapshot: {
+				id: 'restored',
+				sections: [{ id: 'empty', summary: 'No retained messages.', messages: [] }],
+				messages: [],
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
+			'rehydrate',
+		])
+		const snapshot = conversation.snapshot()
+
+		expect(conversation.rehydrate('empty')).toEqual([])
+		expect(events.rehydrate.calls).toEqual([['empty']])
+		expect(conversation.snapshot()).toEqual(snapshot)
 	})
 })
 
@@ -869,6 +897,35 @@ describe('Conversation — snapshot() serializes id + sections + live tail (C-c)
 })
 
 describe('Conversation — sections cap', () => {
+	it('throws ConversationError code SECTIONS for a NaN constructor cap', () => {
+		expect(() => new Conversation({ sections: Number.NaN })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
+	})
+
+	it('rejects a NaN per-compact cap before summarizing, changing state, or emitting events', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+		const snapshot = conversation.snapshot()
+
+		await expect(conversation.compact({ sections: Number.NaN })).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SECTIONS',
+		)
+		expect(conversation.snapshot()).toEqual(snapshot)
+		expect(stub.calls).toHaveLength(0)
+		expect(events.compact.count).toBe(0)
+		expect(events.collapse.count).toBe(0)
+	})
+
 	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
 		expect(() => new Conversation({ sections: 0 })).toThrow(ConversationError)
 		expect(() => new Conversation({ sections: -1 })).toThrow(ConversationError)

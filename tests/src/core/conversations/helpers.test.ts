@@ -105,14 +105,17 @@ describe('requireJudgment', () => {
 })
 
 describe('requireSectionsCap', () => {
-	it('returns undefined, a cap of 1, and a fractional cap above 1 unchanged', () => {
+	it('returns undefined, a cap of 1, a fractional cap above 1, and positive infinity unchanged', () => {
 		expect(requireSectionsCap(undefined)).toBeUndefined()
 		expect(requireSectionsCap(1)).toBe(1)
 		expect(requireSectionsCap(1.5)).toBe(1.5)
+		expect(requireSectionsCap(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY)
 	})
 
-	it('passes NaN, which compares false against the bound', () => {
-		expect(requireSectionsCap(Number.NaN)).toBeNaN()
+	it('throws the SECTIONS code for NaN', () => {
+		expect(() => requireSectionsCap(Number.NaN)).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
 	})
 
 	it('throws the SECTIONS code below 1, at zero of either sign, and for negative infinity', () => {

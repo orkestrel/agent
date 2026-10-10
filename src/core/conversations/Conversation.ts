@@ -46,8 +46,8 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
  *   `#summarize` was supplied.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns the full original messages of a
- *   section (`undefined` for an unknown id) and emits `rehydrate` — a pure read (the caller
- *   decides whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
+ *   known section and emits its `id` through `rehydrate`, even when the list is empty. An unknown
+ *   id returns `undefined` without an event. The read never reinserts messages. `search` is a case-insensitive
  *   substring scan of `content` across all messages (the originals of every section + the live
  *   tail).
  * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries
@@ -226,9 +226,10 @@ export class Conversation implements ConversationInterface {
 
 	rehydrate(id: string): readonly Message[] | undefined {
 		const section = this.#sections.find((one) => one.id === id)
+		if (section === undefined) return undefined
 		// Emitted after resolving, because a read has no mutation for a listener to perturb.
 		this.#emitter.emit('rehydrate', id)
-		return section?.messages
+		return section.messages
 	}
 
 	search(query: string): readonly Message[] {

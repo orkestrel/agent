@@ -126,12 +126,12 @@ export function requireJudgment(value: unknown): Judgment {
  * Returns a `sections` cap after checking its lower bound, or throws a coded error.
  *
  * @remarks
- * Only the `>= 1` bound is checked, so a fractional cap passes, and `NaN` passes because it
- * compares false against `1`; a `NaN` cap never triggers a merge.
+ * A supplied cap must satisfy `>= 1`; fractional caps and positive infinity pass, and `NaN`
+ * is refused. An absent cap leaves the sections list unbounded.
  *
  * @param cap - The cap to check, or `undefined` for no cap
  * @returns The cap unchanged, or `undefined` when none was supplied
- * @throws ConversationError Thrown when the cap is below `1` (code `'SECTIONS'`)
+ * @throws ConversationError Thrown when the cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`)
  *
  * @example
  * ```ts
@@ -141,7 +141,7 @@ export function requireJudgment(value: unknown): Judgment {
  * ```
  */
 export function requireSectionsCap(cap: number | undefined): number | undefined {
-	if (cap !== undefined && cap < 1) {
+	if (cap !== undefined && !(cap >= 1)) {
 		throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
 	}
 	return cap
