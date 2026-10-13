@@ -16,6 +16,12 @@ export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */
 	readonly code: LedgerErrorCode
 
+	/**
+	 * Records the failure condition and its description.
+	 *
+	 * @param code - The machine-readable condition, exposed as `error.code`
+	 * @param message - The human-readable description of the failure
+	 */
 	constructor(code: LedgerErrorCode, message: string) {
 		super(message)
 		this.name = 'LedgerError'

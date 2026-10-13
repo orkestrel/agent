@@ -721,6 +721,25 @@ await new GuideCommand({
 			>()
 		})
 
+		it('mints, lists, and drops scopes as the removal fence shows', () => {
+			const added: string[] = []
+			const scopes = barrel.createScopeManager({
+				on: {
+					add: (scope) => {
+						added.push(scope.name)
+					},
+				},
+			})
+			const scope = scopes.add({ name: 'read-only' })
+
+			expect(scopes.scopes()).toEqual([scope])
+			expect(added).toEqual(['read-only'])
+			expect(scopes.remove(scope.id)).toBe(true)
+			scopes.clear()
+			expect(scopes.count).toBe(0)
+			expect(guideText).toContain("const scope = scopes.add({ name: 'read-only' })")
+		})
+
 		it('records and reads a judgment as the judgment-recording fence shows', () => {
 			const conversation = createConversation()
 			const complaint = conversation.add({

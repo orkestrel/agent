@@ -1,4 +1,5 @@
-import { isJudgeEntry, isJudgeQuestion } from '@src/core'
+import { isJudgeEntry, isJudgeQuestion, isNonNegativeSafeInteger } from '@src/core'
+import { isNonNegativeInteger } from '@orkestrel/contract'
 import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { approveEvery, TEV1_REQUEST } from '../../setup.js'
@@ -102,6 +103,41 @@ describe('isJudgeQuestion — the universal question shape (total)', () => {
 				() => isJudgeQuestion({ form: 'noul', instructions: value }),
 				`hostile instructions ${index}`,
 			).not.toThrow()
+		}
+	})
+})
+
+describe('isNonNegativeSafeInteger — the count and limit guard', () => {
+	it('accepts zero, negative zero, and the largest safe integer', () => {
+		expect(isNonNegativeSafeInteger(0)).toBe(true)
+		expect(isNonNegativeSafeInteger(-0)).toBe(true)
+		expect(isNonNegativeSafeInteger(12)).toBe(true)
+		expect(isNonNegativeSafeInteger(2 ** 53 - 1)).toBe(true)
+	})
+
+	it('rejects an unsafe integer, a non-finite number, a fraction, a negative, and a numeric string', () => {
+		expect(isNonNegativeSafeInteger(2 ** 53)).toBe(false)
+		expect(isNonNegativeSafeInteger(Number.NaN)).toBe(false)
+		expect(isNonNegativeSafeInteger(Number.POSITIVE_INFINITY)).toBe(false)
+		expect(isNonNegativeSafeInteger(1.5)).toBe(false)
+		expect(isNonNegativeSafeInteger(-1)).toBe(false)
+		expect(isNonNegativeSafeInteger('1')).toBe(false)
+	})
+
+	it('differs from the contract guard at negative zero and at 2 ** 53 alone', () => {
+		expect(isNonNegativeSafeInteger(-0)).toBe(true)
+		expect(isNonNegativeInteger(-0)).toBe(false)
+		expect(isNonNegativeSafeInteger(2 ** 53)).toBe(false)
+		expect(isNonNegativeInteger(2 ** 53)).toBe(true)
+		for (const value of [0, 2 ** 53 - 1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1, '1']) {
+			const message = `agreement at ${String(value)}`
+			expect(isNonNegativeSafeInteger(value), message).toBe(isNonNegativeInteger(value))
+		}
+	})
+
+	it('contains the installed hostile corpus', () => {
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(() => isNonNegativeSafeInteger(value), `hostile value ${index}`).not.toThrow()
 		}
 	})
 })

@@ -1,13 +1,13 @@
 import { collectPaced } from '../../../setup.js'
 import { describe, expect, it } from 'vitest'
 import { Channel } from '@src/core'
-import { collect, waitForDelay } from '@orkestrel/test'
+import { collect, createRecorder, waitForCondition, waitForDelay } from '@orkestrel/test'
 
 // These tests pin the SUBTLE write/read decoupling the Agent relies on indirectly: a
-// producer (`push` / `close` / `fail`) and a consumer (`drain`) interleave through the
-// resolver-swap park without dropping, truncating, or re-ordering a chunk — including the
-// lost-wakeup case, where a push must wake a consumer already parked on an empty buffer.
-// Real async iteration, no mocks.
+// producer (`push` / `close` / `fail`) and its consumers (`drain`) interleave through the
+// park without dropping, truncating, duplicating, or re-ordering a chunk — including the
+// lost-wakeup case, where a push must wake a consumer already parked on an empty buffer, and
+// the concurrent case, where an end must wake every parked consumer. Real async iteration.
 
 describe('Channel — lost-wakeup (park then push)', () => {
 	it('delivers a value pushed while a consumer is parked', async () => {
@@ -126,6 +126,66 @@ describe('Channel — fail', () => {
 		// A close after a fail does not turn the channel into a clean end — drain still throws.
 		channel.close()
 		await expect(collect(channel.drain())).rejects.toBe(error)
+	})
+
+	it('rejects a reader parked on an empty buffer', async () => {
+		const channel = new Channel<number>()
+		const error = new Error('parked')
+		const drained = collect(channel.drain())
+		await waitForDelay()
+		channel.fail(error)
+		await expect(drained).rejects.toBe(error)
+	})
+})
+
+describe('Channel — concurrent readers', () => {
+	it('ends every reader on close and hands each value to exactly one of them', async () => {
+		const channel = new Channel<number>()
+		const ended = createRecorder<[readonly number[]]>()
+		// Both readers park on the empty buffer before the first push.
+		void collect(channel.drain()).then(ended.handler)
+		void collect(channel.drain()).then(ended.handler)
+		await waitForDelay()
+		channel.push(1)
+		channel.push(2)
+		channel.close()
+		await waitForCondition('both concurrent readers end', () => ended.count === 2)
+		const delivered = ended.calls.flatMap(([values]) => values)
+		expect(delivered.toSorted((left, right) => left - right)).toEqual([1, 2])
+	})
+
+	it('rejects every parked reader on fail', async () => {
+		const channel = new Channel<number>()
+		const error = new Error('shared')
+		const rejected = createRecorder<[unknown]>()
+		void collect(channel.drain()).catch(rejected.handler)
+		void collect(channel.drain()).catch(rejected.handler)
+		await waitForDelay()
+		channel.fail(error)
+		await waitForCondition('both parked readers reject', () => rejected.count === 2)
+		expect(rejected.calls).toEqual([[error], [error]])
+	})
+})
+
+describe('Channel — push after end', () => {
+	it('buffers a push after close for the next drain, which yields it and ends', async () => {
+		const channel = new Channel<number>()
+		channel.push(1)
+		channel.close()
+		expect(await collect(channel.drain())).toEqual([1])
+		// A reader that already ended does not see the late value; a fresh drain does.
+		channel.push(2)
+		expect(await collect(channel.drain())).toEqual([2])
+	})
+
+	it('buffers a push after fail for the next drain, which yields it and then throws', async () => {
+		const channel = new Channel<number>()
+		const error = new Error('ended')
+		channel.fail(error)
+		channel.push(3)
+		const iterator = channel.drain()
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 3 })
+		await expect(iterator.next()).rejects.toBe(error)
 	})
 })
 

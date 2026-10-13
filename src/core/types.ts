@@ -202,3 +202,16 @@ export interface JudgmentInput {
 	readonly state: string
 	readonly usage?: TokenUsage
 }
+
+/**
+ * Carries the optional cause and context an error class with a machine-readable `code` takes at
+ * construction.
+ *
+ * @remarks
+ * `cause` holds the underlying failure. `context` holds the values that locate the failure, such
+ * as the category and name of a missing entry.
+ */
+export interface CodedErrorOptions {
+	readonly cause?: unknown
+	readonly context?: Readonly<Record<string, unknown>>
+}

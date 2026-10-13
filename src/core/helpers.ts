@@ -1,6 +1,6 @@
 import type { JudgeQuestion, Judgment, Message, ThinkingReplay } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { isFiniteNumber } from '@orkestrel/contract'
+import { attempt, isFiniteNumber } from '@orkestrel/contract'
 
 /**
  * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
@@ -110,7 +110,7 @@ export function stripThinking(
 }
 
 /**
- * Sanitizes one reported token count into a safe non-negative integer — a non-finite or
+ * Sanitizes one reported token count into a non-negative integer — a non-finite or
  * non-positive value becomes `0`, and a positive fractional value floors down.
  *
  * @param value - The token count to sanitize
@@ -127,7 +127,7 @@ export function sanitizeToken(value: number): number {
 }
 
 /**
- * Sanitizes a {@link TokenUsage} into safe, non-negative integers — the guard an agent's
+ * Sanitizes a {@link TokenUsage} into non-negative integers — the guard an agent's
  * abort-usage path applies to a provider's partial usage before it is charged against a
  * budget or folded into the run total.
  *
@@ -137,7 +137,7 @@ export function sanitizeToken(value: number): number {
  * non-negative integer part. No upper cap is applied. Total — never throws.
  *
  * @param usage - The token usage to sanitize (for example a provider's abort-partial usage)
- * @returns A new {@link TokenUsage} with every field a safe non-negative integer
+ * @returns A new {@link TokenUsage} with every field a non-negative integer
  *
  * @example
  * ```ts
@@ -252,6 +252,26 @@ export function collectExchanges(messages: readonly Message[]): ReadonlyArray<re
 }
 
 /**
+ * Checks whether a message carries at least one tool call.
+ *
+ * @remarks
+ * Pure and total. An absent `calls` member and an empty list both return false, so a tool-free
+ * assistant turn and a turn whose provider reported an empty call list read alike.
+ *
+ * @param message - The message to inspect; only its `calls` member is read
+ * @returns True if `calls` holds at least one call; false otherwise
+ * @example
+ * ```ts
+ * hasCalls({ calls: [{ id: 'order', name: 'lookup', arguments: {} }] }) // true
+ * hasCalls({ calls: [] }) // false
+ * hasCalls({}) // false
+ * ```
+ */
+export function hasCalls(message: Pick<Message, 'calls'>): boolean {
+	return (message.calls?.length ?? 0) > 0
+}
+
+/**
  * Collects each assistant message that carries calls together with the tool messages that answer
  * it, then each run of tool messages that no assistant message owns.
  *
@@ -276,9 +296,9 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 	const groups = new Map<Message, Message[]>()
 	const calls = new Map<string, Message[]>()
 	for (const message of messages) {
-		if (message.role !== 'assistant' || !message.calls?.length) continue
+		if (message.role !== 'assistant' || !hasCalls(message)) continue
 		groups.set(message, [message])
-		for (const call of message.calls) {
+		for (const call of message.calls ?? []) {
 			const owners = calls.get(call.id) ?? []
 			owners.push(message)
 			calls.set(call.id, owners)
@@ -308,6 +328,30 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 		}
 	}
 	return [...groups.values(), ...orphans]
+}
+
+/**
+ * Renders a value as the JSON text `JSON.stringify` produces, or `undefined` when JSON cannot
+ * carry the value.
+ *
+ * @remarks
+ * Pure and total. Where `JSON.stringify` returns text, the result is the same text, property order
+ * included; `canonicalStringify` from `@orkestrel/contract` sorts keys instead. A value
+ * `JSON.stringify` throws on, such as a `BigInt` or a cycle, and a value it renders as nothing,
+ * such as `undefined`, a function, or a symbol, return `undefined`.
+ *
+ * @param value - The value to render
+ * @returns The JSON text, or `undefined` when the value has no JSON text
+ * @example
+ * ```ts
+ * renderJSON({ order: 'LH-81660', late: true }) // '{"order":"LH-81660","late":true}'
+ * renderJSON(10n) // undefined
+ * renderJSON(undefined) // undefined
+ * ```
+ */
+export function renderJSON(value: unknown): string | undefined {
+	const outcome = attempt((): string | undefined => JSON.stringify(value))
+	return outcome.success ? outcome.value : undefined
 }
 
 /**

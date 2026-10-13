@@ -1,9 +1,10 @@
-import { Instruction } from '@src/core'
+import { Instruction, InstructionManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
 
 // Instruction is the immutable named directive an InstructionManager renders by
 // descending priority — real behavior, no mocks. Covers id minting,
-// verbatim name/content, the priority default (0) + explicit value, distinct ids, and
+// verbatim name/content, the priority default (0) + explicit value, the override the render
+// cascade prefers (including the empty-string boundary), distinct ids, and
 // immutability (a stored instruction reflects its input, not mutated afterwards).
 
 describe('Instruction', () => {
@@ -21,11 +22,29 @@ describe('Instruction', () => {
 		expect(instruction.priority).toBe(0)
 	})
 
-	it('exposes an undefined override property when no override was supplied', () => {
+	it('leaves override undefined when none was supplied, so the render cascade decides', () => {
 		const instruction = new Instruction({ name: 'tone', content: 'Be concise.' })
 
-		expect(Object.hasOwn(instruction, 'override')).toBe(true)
 		expect(instruction.override).toBeUndefined()
+		expect(new InstructionManager().render(instruction)).toBe('Be concise.')
+	})
+
+	it('carries a supplied override, which the render cascade prefers to the content', () => {
+		const instruction = new Instruction({
+			name: 'tone',
+			content: 'Be concise.',
+			override: 'Answer in one sentence.',
+		})
+
+		expect(instruction.override).toBe('Answer in one sentence.')
+		expect(new InstructionManager().render(instruction)).toBe('Answer in one sentence.')
+	})
+
+	it('keeps an empty-string override, which renders as empty text rather than the content', () => {
+		const instruction = new Instruction({ name: 'tone', content: 'Be concise.', override: '' })
+
+		expect(instruction.override).toBe('')
+		expect(new InstructionManager().render(instruction)).toBe('')
 	})
 
 	it('respects an explicit priority (including 0 and negatives)', () => {

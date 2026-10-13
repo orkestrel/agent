@@ -3,6 +3,7 @@ import {
 	arrayOf,
 	attempt,
 	isArray,
+	isFiniteNumber,
 	isJSONValue,
 	isRecord,
 	isString,
@@ -72,4 +73,27 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 		return optionalOf(isJudgeEntry)(criteria.true) && optionalOf(isJudgeEntry)(criteria.false)
 	})
 	return checked.success && checked.value
+}
+
+/**
+ * Checks whether a value is a non-negative safe integer, `-0` included.
+ *
+ * @remarks
+ * Total: a non-number, `NaN`, an infinity, a fraction, a negative number, and an integer past
+ * `Number.MAX_SAFE_INTEGER` return false. It differs from `isNonNegativeInteger` in
+ * `@orkestrel/contract` at two values: that guard rejects `-0` and admits an unsafe integer such
+ * as `2 ** 53`, while this guard admits `-0` and rejects `2 ** 53`.
+ *
+ * @param value - The unknown count or limit candidate
+ * @returns True if the value is a safe integer at or above zero; false otherwise
+ * @example
+ * ```ts
+ * isNonNegativeSafeInteger(0) // true
+ * isNonNegativeSafeInteger(-0) // true
+ * isNonNegativeSafeInteger(2 ** 53) // false
+ * isNonNegativeSafeInteger(1.5) // false
+ * ```
+ */
+export function isNonNegativeSafeInteger(value: unknown): value is number {
+	return isFiniteNumber(value) && Number.isSafeInteger(value) && value >= 0
 }

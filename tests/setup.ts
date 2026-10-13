@@ -2978,7 +2978,7 @@ export const INSTRUCTION_EVENTS = Object.freeze(['add', 'remove', 'clear'] as co
 export type InstructionEventName = (typeof INSTRUCTION_EVENTS)[number]
 
 /** Lists the scope manager events recorded by its tests. */
-export const SCOPE_EVENTS = Object.freeze(['create', 'remove', 'clear'] as const)
+export const SCOPE_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
 
 /** Names a scope manager event recorded by its tests. */
 export type ScopeEventName = (typeof SCOPE_EVENTS)[number]

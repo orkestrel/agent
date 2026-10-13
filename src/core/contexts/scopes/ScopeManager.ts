@@ -13,20 +13,20 @@ import { Scope } from './Scope.js'
 
 /**
  * Registers the named filters a richer context reuses — immutable {@link Scope} instances keyed by their
- * minted `id`, in insertion order, where `create` always mints and stores rather than overwriting,
+ * minted `id`, in insertion order, where `add` always mints and stores rather than overwriting,
  * and an observable `emitter` reports each change.
  *
  * @remarks
  * - **Registry.** Scopes live in an insertion-ordered `Map` keyed by their minted `id`;
- *   `create` mints a {@link Scope} from a {@link ScopeInput} (an `id` plus the three
+ *   `add` mints a {@link Scope} from a {@link ScopeInput} (an `id` plus the three
  *   allow-lists), stores it, and returns it. `count` is the map size, `scope(id)` looks
  *   one up, and `scopes()` lists them in insertion order. (Unlike the name-keyed
  *   instruction registry, a scope's key is its minted `id`, so two scopes may share a
- *   `name`; `create` therefore always adds — it never overwrites.)
+ *   `name`; `add` therefore never overwrites.)
  * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id
  *   was removed; `clear` empties the registry.
  * - **Observable.** The owned {@link emitter} ({@link ScopeManagerEventMap}) carries
- *   `create` (the created scope) / `remove` (the id) / `clear`. Every event is emitted
+ *   `add` (the added scope) / `remove` (the id) / `clear`. Every event is emitted
  *   directly, strictly after the map mutation completes; the emitter isolates a listener
  *   throw and routes it to its `error` handler (the `error` option), so a buggy observer can
  *   never corrupt a mutation.
@@ -34,7 +34,7 @@ import { Scope } from './Scope.js'
  * @example
  * ```ts
  * const manager = new ScopeManager()
- * const reader = manager.create({ name: 'reader', tools: ['search', 'read'] })
+ * const reader = manager.add({ name: 'reader', tools: ['search', 'read'] })
  * manager.scope(reader.id) // the same scope
  * manager.count // 1
  * ```
@@ -57,12 +57,12 @@ export class ScopeManager implements ScopeManagerInterface {
 		return this.#scopes.size
 	}
 
-	create(input: ScopeInput): ScopeInterface {
+	add(input: ScopeInput): ScopeInterface {
 		const scope = new Scope(input)
 		this.#scopes.set(scope.id, scope)
-		// Observe the created scope — after the map set, so a swallowed listener throw can't
+		// Observe the added scope — after the map set, so a swallowed listener throw can't
 		// perturb the store the caller is about to use.
-		this.#emitter.emit('create', scope)
+		this.#emitter.emit('add', scope)
 		return scope
 	}
 

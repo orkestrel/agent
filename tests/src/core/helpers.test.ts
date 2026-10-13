@@ -1,16 +1,20 @@
+import type { Message } from '@src/core'
 import {
 	collectExchanges,
 	collectToolGroups,
 	filterAllowList,
+	hasCalls,
 	joinThinking,
 	matchesJudgment,
 	stripThinking,
 	MESSAGE_ROLES,
 	removeEntries,
+	renderJSON,
 	sanitizeToken,
 	sanitizeUsage,
 	sumUsage,
 } from '@src/core'
+import { canonicalStringify } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
 import {
 	buildExchangeMessages,
@@ -303,6 +307,57 @@ describe('collectToolGroups', () => {
 		expect(collectToolGroups([{ id: 'U', role: 'user', content: 'Which order is late?' }])).toEqual(
 			[],
 		)
+	})
+})
+
+describe('hasCalls', () => {
+	it('reports a message with at least one call', () => {
+		const lookup: Message = {
+			id: 'lookup',
+			role: 'assistant',
+			content: '',
+			calls: [createToolCall()],
+		}
+		expect(hasCalls({ calls: [createToolCall()] })).toBe(true)
+		expect(hasCalls(lookup)).toBe(true)
+	})
+
+	it('refuses an absent and an empty call list', () => {
+		const question: Message = { id: 'U', role: 'user', content: 'Which order is late?' }
+		expect(hasCalls({})).toBe(false)
+		expect(hasCalls({ calls: [] })).toBe(false)
+		expect(hasCalls(question)).toBe(false)
+	})
+})
+
+describe('renderJSON', () => {
+	it('returns the bytes JSON.stringify returns, property order included', () => {
+		const value = { order: 'LH-81660', items: [{ sku: 'B-2', count: 2 }, null], late: true }
+		expect(renderJSON(value)).toBe(
+			'{"order":"LH-81660","items":[{"sku":"B-2","count":2},null],"late":true}',
+		)
+		expect(renderJSON(value)).toBe(JSON.stringify(value))
+		expect(renderJSON({ zone: 'east', account: 4182 })).toBe('{"zone":"east","account":4182}')
+		expect(renderJSON('refund')).toBe('"refund"')
+		expect(renderJSON(Number.NaN)).toBe('null')
+	})
+
+	it('differs from the canonical encoding on unsorted keys', () => {
+		const value = { zone: 'east', account: 4182 }
+		expect(canonicalStringify(value)).toBe('{"account":4182,"zone":"east"}')
+		expect(renderJSON(value)).not.toBe(canonicalStringify(value))
+	})
+
+	it('returns undefined for a BigInt, a cycle, and a value with no JSON text', () => {
+		const cyclic: Record<string, unknown> = { order: 'LH-81660' }
+		cyclic.self = cyclic
+		expect(() => JSON.stringify(10n)).toThrow(TypeError)
+		expect(() => JSON.stringify(cyclic)).toThrow(TypeError)
+		expect(renderJSON(10n)).toBeUndefined()
+		expect(renderJSON({ total: 10n })).toBeUndefined()
+		expect(renderJSON(cyclic)).toBeUndefined()
+		expect(renderJSON(undefined)).toBeUndefined()
+		expect(renderJSON(() => 'refund')).toBeUndefined()
 	})
 })
 

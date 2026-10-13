@@ -153,7 +153,7 @@ describe('Gauge.rate', () => {
 	})
 })
 
-describe('Gauge.left', () => {
+describe('Gauge.remainder', () => {
 	it('counts the whole completion when thinking is replayed within a turn or across turns', () => {
 		for (const replay of ['turn', 'all'] as const) {
 			const retained = new Gauge({ scale: 1, overhead: 0, capacity: 1000, replay })

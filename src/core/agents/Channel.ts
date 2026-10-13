@@ -8,10 +8,11 @@ import type { ChannelInterface } from './types.js'
  * its `events` are drained.
  *
  * @remarks
- * The standard resolver-swap: a waiting `drain` parks on `#wake` (a void resolver);
- * `push` / `close` / `fail` enqueue/flag, then fire `#wake` so the parked reader wakes,
- * re-reads the buffer, and either yields the next chunk, returns (on `close`), or throws
- * (on `fail`). Event-free, no `!` / `as` / `any`.
+ * A waiting `drain` parks its void resolver in `#waiting`; `push` / `close` / `fail`
+ * enqueue/flag, then fire and clear every parked resolver, so each parked reader wakes,
+ * re-reads the shared buffer, and either takes the next chunk, returns (on `close`), throws
+ * (on `fail`), or parks again when another reader took the chunk first. Taking a chunk is
+ * synchronous, so each value reaches exactly one reader.
  *
  * @example
  * ```ts
@@ -27,7 +28,7 @@ import type { ChannelInterface } from './types.js'
  */
 export class Channel<T> implements ChannelInterface<T> {
 	#buffer: ReadonlyArray<{ readonly value: T }> = []
-	#wake: (() => void) | undefined
+	#waiting: ReadonlyArray<() => void> = []
 	#closed = false
 	#failure: { error: unknown } | undefined
 
@@ -63,18 +64,19 @@ export class Channel<T> implements ChannelInterface<T> {
 		}
 	}
 
-	// Resolve the parked reader (if any) and clear the slot — a fresh `#park()` arms
-	// the next wait. A `signal` with no parked reader is a no-op (the buffer / flags are
-	// already set, so the next `drain` pass reads them without parking).
+	// Wake every parked reader, not one: with concurrent readers, a single woken reader would
+	// leave the rest parked past a `close` / `fail`. The list is cleared before firing, so a
+	// reader that re-parks arms the next wait. A `signal` with no parked reader is a no-op (the
+	// buffer / flags are already set, so the next `drain` pass reads them without parking).
 	#signal(): void {
-		const wake = this.#wake
-		this.#wake = undefined
-		wake?.()
+		const waiting = this.#waiting
+		this.#waiting = []
+		for (const wake of waiting) wake()
 	}
 
 	#park(): Promise<void> {
 		return new Promise<void>((resolve) => {
-			this.#wake = resolve
+			this.#waiting = [...this.#waiting, resolve]
 		})
 	}
 }

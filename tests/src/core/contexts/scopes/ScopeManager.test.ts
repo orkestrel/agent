@@ -6,11 +6,11 @@ import { createRecorder, createRecorders } from '@orkestrel/test'
 import { SCOPE_EVENTS } from '../../../../setup.js'
 
 // ScopeManager is the id-keyed registry of reusable named scopes — real
-// behavior, no mocks. Covers create (minting an id, always adding — never overwriting),
+// behavior, no mocks. Covers add (minting an id, never overwriting),
 // scope/scopes lookup + insertion order, and remove (single + batch) + clear + count.
 // A throwing listener leaves the mutation applied and routes the error to the emitter handler.
 
-describe('ScopeManager — create & lookup', () => {
+describe('ScopeManager — add & lookup', () => {
 	it('starts empty', () => {
 		const manager = new ScopeManager()
 
@@ -18,9 +18,9 @@ describe('ScopeManager — create & lookup', () => {
 		expect(manager.scopes()).toEqual([])
 	})
 
-	it('creates a scope with a minted id and the supplied lists', () => {
+	it('adds a scope with a minted id and the supplied lists', () => {
 		const manager = new ScopeManager()
-		const scope = manager.create({ name: 'reader', tools: ['search'] })
+		const scope = manager.add({ name: 'reader', tools: ['search'] })
 
 		expect(scope.id.length).toBeGreaterThan(0)
 		expect(scope.name).toBe('reader')
@@ -37,8 +37,8 @@ describe('ScopeManager — create & lookup', () => {
 
 	it('always adds — two scopes sharing a name coexist (never overwrites)', () => {
 		const manager = new ScopeManager()
-		const first = manager.create({ name: 'dupe', tools: ['a'] })
-		const second = manager.create({ name: 'dupe', tools: ['b'] })
+		const first = manager.add({ name: 'dupe', tools: ['a'] })
+		const second = manager.add({ name: 'dupe', tools: ['b'] })
 
 		expect(manager.count).toBe(2)
 		expect(first.id).not.toBe(second.id)
@@ -48,9 +48,9 @@ describe('ScopeManager — create & lookup', () => {
 
 	it('lists scopes in insertion order', () => {
 		const manager = new ScopeManager()
-		const a = manager.create({ name: 'a' })
-		const b = manager.create({ name: 'b' })
-		const c = manager.create({ name: 'c' })
+		const a = manager.add({ name: 'a' })
+		const b = manager.add({ name: 'b' })
+		const c = manager.add({ name: 'c' })
 
 		expect(manager.scopes()).toEqual([a, b, c])
 	})
@@ -59,7 +59,7 @@ describe('ScopeManager — create & lookup', () => {
 describe('ScopeManager — remove & clear', () => {
 	it('removes one by id and reports presence', () => {
 		const manager = new ScopeManager()
-		const scope = manager.create({ name: 'gone' })
+		const scope = manager.add({ name: 'gone' })
 
 		expect(manager.remove(scope.id)).toBe(true)
 		expect(manager.remove(scope.id)).toBe(false)
@@ -68,24 +68,24 @@ describe('ScopeManager — remove & clear', () => {
 
 	it('removes a batch and returns true only when every supplied id was removed', () => {
 		const manager = new ScopeManager()
-		const a = manager.create({ name: 'a' })
-		const b = manager.create({ name: 'b' })
-		manager.create({ name: 'c' })
+		const a = manager.add({ name: 'a' })
+		const b = manager.add({ name: 'b' })
+		manager.add({ name: 'c' })
 
 		// A partly applied batch is distinguishable from a fully applied one.
 		expect(manager.remove([a.id, 'missing', b.id])).toBe(false)
 		expect(manager.count).toBe(1)
 		expect(manager.remove(['nope', 'gone'])).toBe(false)
 
-		const c = manager.create({ name: 'c2' })
-		const d = manager.create({ name: 'd' })
+		const c = manager.add({ name: 'c2' })
+		const d = manager.add({ name: 'd' })
 		expect(manager.remove([c.id, d.id])).toBe(true)
 	})
 
 	it('clears every scope', () => {
 		const manager = new ScopeManager()
-		manager.create({ name: 'a' })
-		manager.create({ name: 'b' })
+		manager.add({ name: 'a' })
+		manager.add({ name: 'b' })
 
 		manager.clear()
 
@@ -95,21 +95,21 @@ describe('ScopeManager — remove & clear', () => {
 })
 
 describe('ScopeManager — emitter (the push observation surface)', () => {
-	it('fires create on each created scope, in order', () => {
+	it('fires add on each added scope, in order', () => {
 		const manager = new ScopeManager()
 		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
 			manager.emitter,
 			SCOPE_EVENTS,
 		)
-		const one = manager.create({ name: 'a' })
-		const two = manager.create({ name: 'b' })
+		const one = manager.add({ name: 'a' })
+		const two = manager.add({ name: 'b' })
 
-		expect(events.create.calls).toEqual([[one], [two]])
+		expect(events.add.calls).toEqual([[one], [two]])
 	})
 
 	it('fires remove on a real removal; a miss emits nothing', () => {
 		const manager = new ScopeManager()
-		const scope = manager.create({ name: 'a' })
+		const scope = manager.add({ name: 'a' })
 		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
 			manager.emitter,
 			SCOPE_EVENTS,
@@ -122,8 +122,8 @@ describe('ScopeManager — emitter (the push observation surface)', () => {
 
 	it('fires one remove per actually-removed id on a batch', () => {
 		const manager = new ScopeManager()
-		const a = manager.create({ name: 'a' })
-		const b = manager.create({ name: 'b' })
+		const a = manager.add({ name: 'a' })
+		const b = manager.add({ name: 'b' })
 		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
 			manager.emitter,
 			SCOPE_EVENTS,
@@ -135,7 +135,7 @@ describe('ScopeManager — emitter (the push observation surface)', () => {
 
 	it('fires clear when emptied', () => {
 		const manager = new ScopeManager()
-		manager.create({ name: 'a' })
+		manager.add({ name: 'a' })
 		const events = createRecorders<ScopeManagerEventMap, ScopeEventName>(
 			manager.emitter,
 			SCOPE_EVENTS,
@@ -146,29 +146,29 @@ describe('ScopeManager — emitter (the push observation surface)', () => {
 	})
 
 	it('wires initial listeners through the reserved on option', () => {
-		const create = createRecorder<[scope: ScopeInterface]>()
-		const manager = new ScopeManager({ on: { create: create.handler } })
-		manager.create({ name: 'a' })
+		const added = createRecorder<[scope: ScopeInterface]>()
+		const manager = new ScopeManager({ on: { add: added.handler } })
+		manager.add({ name: 'a' })
 
-		expect(create.count).toBe(1)
-		expect(create.calls[0]?.[0]?.name).toBe('a')
+		expect(added.count).toBe(1)
+		expect(added.calls[0]?.[0]?.name).toBe('a')
 	})
 
-	it('EMIT SAFETY: a throwing create listener cannot corrupt the registry, and routes to the error handler', () => {
+	it('EMIT SAFETY: a throwing add listener cannot corrupt the registry, and routes to the error handler', () => {
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const manager = new ScopeManager({ error: errors.handler })
-		manager.emitter.on('create', () => {
-			throw new Error('create observer blew up')
+		manager.emitter.on('add', () => {
+			throw new Error('add observer blew up')
 		})
 
-		const scope = manager.create({ name: 'a' })
+		const scope = manager.add({ name: 'a' })
 		// THE LOAD-BEARING ASSERTION: the scope landed despite the throwing observer.
 		expect(manager.scope(scope.id)).toBe(scope)
 		expect(manager.count).toBe(1)
 		// The error handler received (error, event) — note the arg order.
-		expect(errors.calls).toEqual([[expect.any(Error), 'create']])
-		// A subsequent create still works after the throw.
-		manager.create({ name: 'b' })
+		expect(errors.calls).toEqual([[expect.any(Error), 'add']])
+		// A subsequent add still works after the throw.
+		manager.add({ name: 'b' })
 		expect(manager.count).toBe(2)
 	})
 
@@ -180,15 +180,15 @@ describe('ScopeManager — emitter (the push observation surface)', () => {
 				throw new Error('error handler blew up too')
 			},
 		})
-		manager.emitter.on('create', () => {
-			throw new Error('create listener blew up')
+		manager.emitter.on('add', () => {
+			throw new Error('add listener blew up')
 		})
 
-		// The create STILL lands — neither throw escaped.
-		const scope = manager.create({ name: 'a' })
+		// The add STILL lands — neither throw escaped.
+		const scope = manager.add({ name: 'a' })
 		expect(manager.scope(scope.id)).toBe(scope)
 		// Fired exactly once (its own throw was swallowed, not re-entered — no recursion).
 		expect(errors.count).toBe(1)
-		expect(errors.calls[0]?.[1]).toBe('create')
+		expect(errors.calls[0]?.[1]).toBe('add')
 	})
 })

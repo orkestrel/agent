@@ -9,10 +9,13 @@ import { isBinary } from '@orkestrel/workspace'
  *
  * @remarks
  * Produces `` File: <path>\n```<language>\n<content>\n``` `` — the `File:` label line, then a
- * fenced code block tagged with `language`, the `content` verbatim inside. Pure string assembly,
- * total — never throws. The one fenced-file format string for the whole module — `AgentContext.build()`
- * frames an active workspace's text files with it (each carries its own `language` on its
- * {@link import('@orkestrel/workspace').FileContent} text arm).
+ * fenced code block tagged with `language`, the `content` verbatim inside. The fence is one
+ * backtick longer than the longest backtick run in `content`, and never shorter than three (the
+ * CommonMark rule), so file text holding a triple backtick cannot close the block early and
+ * land outside it; content with no run of three or more keeps the three-backtick fence. Pure
+ * string assembly, total — never throws. The one fenced-file format string for the whole
+ * module — `AgentContext.build()` frames an active workspace's text files with it (each carries
+ * its own `language` on its {@link import('@orkestrel/workspace').FileContent} text arm).
  *
  * @param path - The file path shown on the `File:` label line
  * @param language - The fenced-code language tag (for example `'typescript'`)
@@ -28,7 +31,10 @@ import { isBinary } from '@orkestrel/workspace'
  * ```
  */
 export function renderFencedFile(path: string, language: string, content: string): string {
-	return `File: ${path}\n\`\`\`${language}\n${content}\n\`\`\``
+	const runs = content.match(/`+/g) ?? []
+	const longest = runs.reduce((most, run) => Math.max(most, run.length), 0)
+	const fence = '`'.repeat(Math.max(3, longest + 1))
+	return `File: ${path}\n${fence}${language}\n${content}\n${fence}`
 }
 
 /**
@@ -37,16 +43,17 @@ export function renderFencedFile(path: string, language: string, content: string
  *
  * @remarks
  * Pure and total. A section with no items renders nothing (`undefined`), so an empty or fully
- * scoped-out manager stays silent — its `open` / `close` appear only when the section has items. `close`
- * is the only optional slot: an unset one (there is no built-in close) drops the
- * trailing line.
+ * scoped-out manager stays silent — its `open` / `close` appear only when the section has items.
+ * An empty or absent slot is dropped before the join, so an `open: ''`, a `close: ''`, an unset
+ * `close` (there is no built-in close), and an item rendered to `''` each add no blank line; a
+ * section whose every slot is empty renders nothing (`undefined`).
  *
  * @typeParam T - The section item being rendered
  * @param open - The section's resolved leading text
  * @param members - The already scope-filtered items
  * @param render - Renders one item to its prompt text
  * @param close - The section's resolved trailing text, or `undefined` for none
- * @returns The rendered section, or `undefined` when there are no items
+ * @returns The rendered section, or `undefined` when there are no items or every slot is empty
  *
  * @example
  * ```ts
@@ -62,19 +69,20 @@ export function renderSection<T>(
 	close: string | undefined,
 ): string | undefined {
 	if (members.length === 0) return undefined
-	const lines = [open, ...members.map(render)]
-	if (close !== undefined) lines.push(close)
-	return lines.join('\n\n')
+	const lines = [open, ...members.map(render), close].flatMap((line) =>
+		line === undefined || line === '' ? [] : [line],
+	)
+	return lines.length === 0 ? undefined : lines.join('\n\n')
 }
 
 /**
  * Copies a message with image data merged onto its `images` — the message's own images first,
- * then the attached data, carrying `calls` only when present and never mutating the original.
+ * then the attached data, keeping every other field and never mutating the original.
  *
  * @remarks
- * Pure and total: the original message is never mutated. `calls` is carried only when the
- * source message has one (kept omitted otherwise, mirroring the store's present-when-given
- * convention).
+ * Pure and total: the original message is never mutated. Every other field the source message
+ * carries (`calls`, `call`, `thinking`) is kept as given, and an absent one stays absent,
+ * mirroring the store's present-when-given convention.
  *
  * @param message - The message to copy (left unchanged)
  * @param payloads - The base64 image data to attach
@@ -88,16 +96,7 @@ export function renderSection<T>(
  * ```
  */
 export function attachImages(message: Message, payloads: readonly string[]): Message {
-	const images = [...(message.images ?? []), ...payloads]
-	return message.calls === undefined
-		? { id: message.id, role: message.role, content: message.content, images }
-		: {
-				id: message.id,
-				role: message.role,
-				content: message.content,
-				calls: message.calls,
-				images,
-			}
+	return { ...message, images: [...(message.images ?? []), ...payloads] }
 }
 
 /**

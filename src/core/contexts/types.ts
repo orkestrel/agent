@@ -128,21 +128,39 @@ export interface InstructionManagerInterface {
 	/**
 	 * Adds one {@link InstructionInput}, or a batch — mints each `id`; adding an instruction whose
 	 * name is already stored overwrites it, last write wins.
+	 *
+	 * @param input - One {@link InstructionInput}, or a batch
+	 * @returns The stored instruction, or the stored batch in input order
 	 */
 	add(input: InstructionInput): InstructionInterface
 	add(inputs: readonly InstructionInput[]): readonly InstructionInterface[]
-	/** Looks up one instruction by name (`undefined` when absent). */
+	/**
+	 * Looks up one instruction by name (`undefined` when absent).
+	 *
+	 * @param name - The instruction name to look up
+	 * @returns The stored instruction, or `undefined` when absent
+	 */
 	instruction(name: string): InstructionInterface | undefined
-	/** Lists every instruction, sorted by descending `priority` (stable for equal priorities). */
+	/**
+	 * Lists every instruction, sorted by descending `priority` (stable for equal priorities).
+	 *
+	 * @returns Every stored instruction, highest `priority` first
+	 */
 	instructions(): readonly InstructionInterface[]
 	/**
 	 * Renders one instruction for the prompt — its `override`, else the manager-options
 	 * `render`, else its `content`.
+	 *
+	 * @param instruction - The instruction to render
+	 * @returns The instruction's prompt text, `''` when its `override` is `''`
 	 */
 	render(instruction: InstructionInterface): string
 	/**
 	 * Removes one instruction by name, or a batch. True if every supplied name was removed; false
 	 * otherwise.
+	 *
+	 * @param name - One instruction name, or a batch
+	 * @returns True if every supplied name was present and removed; false otherwise
 	 */
 	remove(name: string): boolean
 	remove(names: readonly string[]): boolean
@@ -320,17 +338,17 @@ export interface ScopeInterface extends ScopeFilter {
 
 /**
  * Maps the push observation surface of a {@link ScopeManagerInterface} — analogous to
- * {@link InstructionManagerEventMap}, but keyed by the minted `id` and carrying `create`
- * (a scope always mints, never overwrites) rather than `add`.
+ * {@link InstructionManagerEventMap}, but keyed by the minted `id`, so `add` never reports a
+ * replaced scope.
  *
  * @remarks
- * `create` carries the created {@link ScopeInterface}; `remove` carries the removed
+ * `add` carries the added {@link ScopeInterface}; `remove` carries the removed
  * scope's `id`; `clear` is a pure signal. The emitter isolates a listener throw and routes
  * it to its `error` handler. A `type` alias so it satisfies `EventMap` structurally.
  */
 export type ScopeManagerEventMap = {
-	/** Reports a scope created — the created scope. */
-	readonly create: readonly [scope: ScopeInterface]
+	/** Reports a scope added — the added scope. */
+	readonly add: readonly [scope: ScopeInterface]
 	/** Reports a scope removed — its `id`. */
 	readonly remove: readonly [id: string]
 	/** Reports every scope removed. */
@@ -348,16 +366,16 @@ export interface ScopeManagerOptions {
 }
 
 /**
- * Registers reusable {@link ScopeInterface} instances keyed by their minted `id` — `create`
+ * Registers reusable {@link ScopeInterface} instances keyed by their minted `id` — `add`
  * mints + stores one (never overwrites), `scopes()` lists them in insertion order.
  *
  * @remarks
- * - **Registry.** `create(input)` mints a scope (an `id` + the per-category allow-lists) and
+ * - **Registry.** `add(input)` mints a scope (an `id` + the per-category allow-lists) and
  *   stores it; `count` is how many are stored. `scope(id)` looks one up; `scopes()` lists
  *   them in insertion order. (Keyed by minted `id`, not `name`, so two scopes may share a
- *   `name` and `create` always adds.)
+ *   `name` and `add` never overwrites.)
  * - **Observable.** The owned `emitter` ({@link ScopeManagerEventMap}) carries
- *   `create` / `remove` / `clear` for fire-and-forget observers; the emitter isolates a
+ *   `add` / `remove` / `clear` for fire-and-forget observers; the emitter isolates a
  *   listener throw and routes it to its `error` handler (the `error` option).
  */
 export interface ScopeManagerInterface {
@@ -366,13 +384,30 @@ export interface ScopeManagerInterface {
 	/**
 	 * Mints a scope from a {@link ScopeInput} (a `name` plus the per-category allow-lists) and
 	 * stores it — always adds, never overwrites.
+	 *
+	 * @param input - The scope's `name`, allow-lists, and optional `select` handler
+	 * @returns The stored scope, carrying its minted `id`
 	 */
-	create(input: ScopeInput): ScopeInterface
-	/** Looks up one scope by id (`undefined` when absent). */
+	add(input: ScopeInput): ScopeInterface
+	/**
+	 * Looks up one scope by id (`undefined` when absent).
+	 *
+	 * @param id - The minted scope id to look up
+	 * @returns The stored scope, or `undefined` when absent
+	 */
 	scope(id: string): ScopeInterface | undefined
-	/** Lists every scope, in insertion order. */
+	/**
+	 * Lists every scope, in insertion order.
+	 *
+	 * @returns Every stored scope, in insertion order
+	 */
 	scopes(): readonly ScopeInterface[]
-	/** Removes one scope by id, or a batch. True if every supplied id was removed; false otherwise. */
+	/**
+	 * Removes one scope by id, or a batch. True if every supplied id was removed; false otherwise.
+	 *
+	 * @param id - One scope id, or a batch
+	 * @returns True if every supplied id was present and removed; false otherwise
+	 */
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
 	/** Removes every scope. */
@@ -554,8 +589,9 @@ export interface AgentContextInterface {
 	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
 	 * carrier: text files ({@link import('@orkestrel/workspace').isText}) render into a dedicated
 	 * `## Workspace` section in the system block — each a fenced
-	 * `` File: <path>\n```<language>\n<text>\n``` `` block — placed immediately after the instructions
-	 * section; binary files whose MIME starts with `image/` have their `base64` payload
+	 * `` File: <path>\n```<language>\n<text>\n``` `` block whose fence is one backtick longer than
+	 * the longest backtick run in the text, and never shorter than three — placed immediately after
+	 * the instructions section; binary files whose MIME starts with `image/` have their `base64` payload
 	 * attached to the last user message (a vision provider reads images off a user turn).
 	 * Active-only — never the other registered workspaces; with no active workspace nothing is
 	 * rendered for workspaces.

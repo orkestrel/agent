@@ -229,6 +229,12 @@ export interface ChannelInterface<T> {
 	/**
 	 * Reads the values back live, in write order — returning on `close` and throwing on `fail`.
 	 *
+	 * @remarks
+	 * Concurrent readers share one buffer: each value goes to exactly one reader, and `close` or
+	 * `fail` ends every reader, parked or not, after the buffer empties. A `push` after `close` or
+	 * `fail` is buffered rather than refused, so a reader still draining or a later `drain` yields
+	 * it before reporting the end.
+	 *
 	 * @returns A generator yielding each pushed value, returning on `close` and throwing on `fail`
 	 */
 	drain(): AsyncGenerator<T, void>

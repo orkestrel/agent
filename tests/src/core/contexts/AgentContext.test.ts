@@ -201,7 +201,6 @@ describe('AgentContext — system boundary', () => {
 
 		expect(built).toHaveLength(1)
 		expect(requireValue(built[0]).role).toBe('user')
-		expect(requireValue(built[0]).content).not.toBeUndefined()
 	})
 })
 
@@ -627,12 +626,18 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		expect(built.at(-1)?.images).toBeUndefined()
 	})
 
-	it('narrow() intersects the files allow-list (a parent-excluded file never returns)', () => {
+	it('a narrowed scope filters by the intersected files list (a parent-excluded file never renders)', () => {
+		const context = seedWorkspaceContext()
 		const parent = new Scope({ name: 'p', files: ['keep.txt', 'drop.txt'] })
-		const child = parent.narrow({ files: ['drop.txt', 'other.txt'] })
+		// Only 'drop.txt' is in both lists; 'keep.png' was never in the parent.
+		context.apply(parent.narrow({ files: ['drop.txt', 'keep.png'] }))
 
-		// Intersection: only 'drop.txt' is in BOTH (other.txt was never in the parent).
-		expect(child.files).toEqual(['drop.txt'])
+		const built = context.build()
+		const block = requireValue(built[0]).content
+
+		expect(block).toContain('DROPPED FILE')
+		expect(block).not.toContain('KEPT FILE')
+		expect(built.at(-1)?.images).toBeUndefined()
 	})
 })
 
@@ -1041,6 +1046,47 @@ describe('AgentContext — the active conversation as the message source', () =>
 		expect(context.messages.count).toBe(0)
 	})
 
+	it('messages re-seats a default conversation after the supplied registry is cleared', () => {
+		const conversations = new ConversationManager()
+		const context = new AgentContext({ conversations })
+		const seated = context.messages
+		conversations.clear()
+
+		expect(conversations.active).toBeUndefined()
+		const reseated = context.messages
+
+		expect(reseated).not.toBe(seated)
+		expect(reseated).toBe(conversations.active)
+		expect(conversations.count).toBe(1)
+	})
+
+	it('build() re-seats a default conversation after the supplied registry is cleared', () => {
+		const conversations = new ConversationManager()
+		const context = new AgentContext({ conversations, system: 'sys' })
+		context.messages.add({ role: 'user', content: 'before the clear' })
+		conversations.clear()
+
+		const built = context.build()
+
+		expect(built.map((message) => message.content)).toEqual(['sys'])
+		expect(conversations.active).toBeDefined()
+		expect(conversations.count).toBe(1)
+	})
+
+	it('select() hands the handler a re-seated default conversation after the supplied registry is cleared', async () => {
+		const selection = createRecordingSelection()
+		const conversations = new ConversationManager()
+		const context = new AgentContext({ conversations, select: selection.handler })
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		conversations.clear()
+		const signal = new AbortController().signal
+
+		await context.select(request, signal)
+
+		expect(conversations.active).toBeDefined()
+		expect(selection.calls).toEqual([[conversations.active, request, signal]])
+	})
+
 	it('build() folds the active conversation view() — the live tail before any compaction', () => {
 		const context = new AgentContext({ system: 'sys' })
 		// Appending through context.messages writes to the active conversation's live tail.
@@ -1284,6 +1330,44 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		expect(selected.fault).toBeInstanceOf(Error)
 		expect(selected.fault?.message).toBe(
 			`conversation ${conversation.id} changed during selection: 1 messages before, 2 after`,
+		)
+	})
+
+	it('wraps the handler fault as the cause of the view-change fault', async () => {
+		const gaveUp = new Error('the judge gave up')
+		const context = new AgentContext({
+			select: async (conversation) => {
+				const view = conversation.view()
+				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
+				return { messages: view, judgments: [], fault: gaveUp }
+			},
+		})
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+
+		const selected = requireValue(await context.select(request, new AbortController().signal))
+
+		expect(selected.fault).not.toBe(gaveUp)
+		expect(selected.fault?.message).toContain('changed during selection')
+		expect(selected.fault?.cause).toBe(gaveUp)
+	})
+
+	it('faults a changed view that keeps the same length but replaces a message', async () => {
+		const context = new AgentContext({
+			select: async (conversation, request) => {
+				const view = conversation.view()
+				conversation.remove(request.id)
+				conversation.add({ role: 'user', content: 'Invoice 43.' })
+				return { messages: view, judgments: [] }
+			},
+		})
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const conversation = requireValue(context.conversations.active)
+
+		const selected = requireValue(await context.select(request, new AbortController().signal))
+
+		expect(selected.messages.map((message) => message.content)).toEqual(['Invoice 43.'])
+		expect(selected.fault?.message).toBe(
+			`conversation ${conversation.id} changed during selection: 1 messages before, 1 after`,
 		)
 	})
 
