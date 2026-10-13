@@ -2,9 +2,9 @@ import type { ThinkSplitterInterface } from './types.js'
 import { THINK_CLOSE, THINK_OPEN } from './constants.js'
 
 /**
- * Feeds raw content deltas through a tiny stream-stateful state machine that routes everything
- * inside a `<think>…</think>` span to `thinking` and returns everything outside it as clean
- * content, so a provider yields the answer alone and surfaces the reasoning as
+ * Separates `<think>…</think>` spans from raw content deltas with per-stream state: text inside a
+ * span accumulates on `thinking`, and text outside it returns as clean content, so a provider
+ * yields the answer alone and surfaces the reasoning as
  * {@link import('./types.js').ProviderResult.thinking}. A tag split across deltas is held until
  * disambiguated, `flush()` settles the stream end, and one splitter serves one stream.
  *

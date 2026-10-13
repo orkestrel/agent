@@ -1,10 +1,13 @@
+import type { ConversationErrorCode } from './types.js'
+import type { CodedErrorOptions } from '../types.js'
 import { isInstance } from '@orkestrel/contract'
 
 /**
  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with, a
- * `sections` cap below `1`, or a judgment or judge request that JSON cannot carry — thrown by the
- * `compact()` method of a {@link ConversationInterface}, its construction, or its judgment store,
- * carrying the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
+ * `sections` cap below `1`, a `keep` that is not a nonnegative safe integer, or a judgment or
+ * judge request that JSON cannot carry — thrown by the `compact()` method of a
+ * {@link ConversationInterface}, its construction, or its judgment store, carrying the
+ * machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP'`.
  *
  * @remarks
  * Compaction requires a summarizer (it digests the folded slice into a section summary); a
@@ -13,19 +16,31 @@ import { isInstance } from '@orkestrel/contract'
  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
  * {@link import('./types.js').ConversationManagerOptions} /
  * {@link import('./types.js').CompactOptions}) must be `>= 1` — a sub-1 cap is a programmer
- * error and throws this with `'SECTIONS'`. A judgment record or a judge request that JSON cannot
- * carry, or whose copy fails its guard, is a programmer error and throws this with `'JUDGMENT'`.
- * Narrow a caught value with
- * {@link isConversationError} and branch on `error.code`.
+ * error and throws this with `'SECTIONS'`. A `keep` on the same options must be a nonnegative
+ * safe integer — any other value is a programmer error and throws this with `'KEEP'`. A judgment
+ * record or a judge request that JSON cannot carry, or whose copy fails its guard, is a
+ * programmer error and throws this with `'JUDGMENT'`, its `context` naming the `question` id
+ * where one exists. Narrow a caught value with {@link isConversationError} and branch on
+ * `error.code`.
  */
 export class ConversationError extends Error {
-	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap; `'JUDGMENT'`: a judgment or judge request that is not JSON. */
-	readonly code: 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer. */
+	readonly code: ConversationErrorCode
+	/** Holds the values that locate the failure, such as the `question` id of a malformed question, or `undefined` when none were supplied. */
+	readonly context: Readonly<Record<string, unknown>> | undefined
 
-	constructor(code: 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT', message: string) {
-		super(message)
+	/**
+	 * Creates the error with its code, message, and optional cause and context.
+	 *
+	 * @param code - The machine-readable {@link ConversationErrorCode}
+	 * @param message - The human-readable description
+	 * @param options - The optional {@link CodedErrorOptions}; `cause` reaches `Error.cause` only when present
+	 */
+	constructor(code: ConversationErrorCode, message: string, options?: CodedErrorOptions) {
+		super(message, options?.cause === undefined ? undefined : { cause: options.cause })
 		this.name = 'ConversationError'
 		this.code = code
+		this.context = options?.context
 	}
 }
 

@@ -3,6 +3,7 @@ import type { JudgeRequest, JudgeResult, Judgment, JudgmentInput, Message } from
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
 import { isJudgment } from './validators.js'
+import { isNonNegativeSafeInteger } from '../validators.js'
 
 /**
  * Builds records for answered or refused request keys, attaching usage only for a single question.
@@ -145,4 +146,71 @@ export function requireSectionsCap(cap: number | undefined): number | undefined 
 		throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
 	}
 	return cap
+}
+
+/**
+ * Returns a retained-tail size after checking it is a nonnegative safe integer, or throws a coded
+ * error.
+ *
+ * @remarks
+ * The check is {@link import('../validators.js').isNonNegativeSafeInteger}, so `0` and `-0`
+ * pass while `NaN`, a fraction, a negative, and either infinity are refused. The error's `context`
+ * carries the refused value as `keep`.
+ *
+ * @param keep - The retained-tail size to check
+ * @returns The size unchanged
+ * @throws ConversationError Thrown when `keep` is not a nonnegative safe integer (code `'KEEP'`)
+ *
+ * @example
+ * ```ts
+ * requireKeep(2) // 2
+ * requireKeep(1.5) // throws ConversationError ('KEEP')
+ * ```
+ */
+export function requireKeep(keep: number): number {
+	if (!isNonNegativeSafeInteger(keep)) {
+		throw new ConversationError('KEEP', 'a keep must be a nonnegative safe integer', {
+			context: { keep },
+		})
+	}
+	return keep
+}
+
+/**
+ * Settles with a promise, or rejects with the reason of a signal that aborts first, so a caller
+ * is released at once even when the work behind the promise ignores the signal.
+ *
+ * @remarks
+ * An absent signal returns `promise` itself. An already-aborted signal rejects with its reason
+ * without waiting. The abort listener is removed as soon as `promise` settles. A rejection of
+ * `promise` after the abort is handled here and never surfaces as unhandled.
+ *
+ * @param promise - The work to wait for
+ * @param signal - The cancellation signal, or `undefined` for none
+ * @returns A promise that settles as `promise` does, or rejects with `signal.reason` on abort
+ *
+ * @example
+ * ```ts
+ * const controller = new AbortController()
+ * const raced = raceSignal(new Promise<string>(() => {}), controller.signal)
+ * controller.abort(new Error('stop'))
+ * await raced // rejects with the Error 'stop'
+ * ```
+ */
+export function raceSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+	if (signal === undefined) return promise
+	return new Promise<T>((resolve, reject) => {
+		// Aborting `settled` removes the abort listener once the promise settles.
+		const settled = new AbortController()
+		if (signal.aborted) reject(signal.reason)
+		else {
+			signal.addEventListener('abort', () => reject(signal.reason), {
+				once: true,
+				signal: settled.signal,
+			})
+		}
+		// Settling an already-rejected race is a no-op, and this handler is what keeps a late
+		// rejection of `promise` from surfacing as unhandled.
+		void promise.then(resolve, reject).finally(() => settled.abort())
+	})
 }

@@ -475,6 +475,70 @@ describe('AgentJudge — cancellation and partial results', () => {
 		expect(error).toHaveProperty('cause.name', 'AbortError')
 	}, 250)
 
+	it('cuts a stalled success body at the deadline and reports an abort with no cause', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('{"model":')], false)
+		const transport = new RecordedTransport(() => new Response(body.stream))
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'm',
+			fetch: transport.fetch,
+			answers: TEV1_ANSWERS,
+			timeout: 15,
+		})
+		const error: unknown = await judge
+			.ask(TEV1_REQUEST, new AbortController().signal)
+			.catch((failure: unknown) => failure)
+		expect(error).toBeInstanceOf(JudgeAbortError)
+		expect(error).not.toHaveProperty('cause')
+		expect(error).toMatchObject({ partial: { model: 'm', answers: {} } })
+		expect(body.count).toBe(1)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+		expect(requireValue(transport.signals[0]).aborted).toBe(true)
+		expect(judge.values).toEqual([])
+	}, 250)
+
+	it('surfaces an error-body read that races the caller abort as an abort keeping the read failure', async () => {
+		const abort = new AbortController()
+		const cause = new Error('body failed')
+		const transport = new RecordedTransport(
+			() =>
+				new Response(
+					new ReadableStream<Uint8Array>(
+						{
+							pull(controller) {
+								controller.error(cause)
+								abort.abort(new Error('caller stopped'))
+							},
+						},
+						{ highWaterMark: 0 },
+					),
+					{ status: 503 },
+				),
+		)
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'm',
+			fetch: transport.fetch,
+		})
+		const error: unknown = await judge
+			.ask(TEV1_REQUEST, abort.signal)
+			.catch((failure: unknown) => failure)
+		expect(isJudgeAbortError(error)).toBe(true)
+		expect(error).toMatchObject({
+			code: 'ABORT',
+			partial: { model: 'm', answers: {} },
+			cause: {
+				name: 'JudgeError',
+				code: 'HTTP',
+				status: 503,
+				message: 'judge error: 503 - (error body unavailable)',
+				cause,
+			},
+		})
+		expect(transport.requests).toHaveLength(1)
+	})
+
 	it('cancels an unresolved header hook through the caller signal', async () => {
 		const transport = createRefusingTransport()
 		const hook = new RecordedHeaders(new Promise(() => {}))

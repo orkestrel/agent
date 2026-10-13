@@ -8,6 +8,16 @@ import type {
 } from '../types.js'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 
+/**
+ * Names the machine-readable condition a {@link import('./errors.js').ConversationError} reports.
+ *
+ * @remarks
+ * `'SUMMARIZER'`: a `compact()` with no summarizer. `'SECTIONS'`: a `sections` cap below `1`.
+ * `'JUDGMENT'`: a judgment or judge request that JSON cannot carry, or whose copy fails its guard.
+ * `'KEEP'`: a `keep` that is not a nonnegative safe integer.
+ */
+export type ConversationErrorCode = 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP'
+
 /** Stores judgments by caller key and resolves requests by reusing matching records. */
 export interface JudgmentManagerInterface {
 	readonly count: number
@@ -124,10 +134,19 @@ export interface MessageManagerInterface {
  * The core conversation layer treats it as an opaque async function — it never reads which
  * backend produced the digest, keeping `core` free of any provider coupling.
  *
+ * `signal` is the {@link CompactOptions.signal} of the `compact()` call the fold serves, or
+ * `undefined` when that call supplied none. A summarizer should stop its work when it aborts. One
+ * that ignores it still cannot hold the caller: `compact()` races the summarizer against the
+ * signal, rejects with the abort reason, and discards a digest that arrives later.
+ *
  * @param messages - The folded messages to digest into a summary
+ * @param signal - The cancellation signal of the `compact()` call, or `undefined` when it supplied none
  * @returns The summary text (the model-written digest of those messages)
  */
-export type ConversationSummaryHandler = (messages: readonly Message[]) => Promise<string>
+export type ConversationSummaryHandler = (
+	messages: readonly Message[],
+	signal?: AbortSignal,
+) => Promise<string>
 
 /**
  * Holds a slice of folded messages digested into a summary — the unit of compaction a
@@ -184,8 +203,9 @@ export type ConversationEventMap = {
  * {@link ConversationSummaryHandler} compaction needs — without it `compact()` throws a
  * {@link import('./errors.js').ConversationError} (a conversation can still store + view a
  * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
- * retains verbatim (folding only the older ones). Default:
- * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
+ * retains verbatim (folding only the older ones); it must be a nonnegative safe integer, else
+ * construction throws a {@link import('./errors.js').ConversationError} with code `'KEEP'`.
+ * Default: {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
  * folds every exchange before the newest user message into one section). `sections` is an
  * optional cap on the compacted `sections` list — when set (`>= 1`), a `compact()` that would
  * leave more than `sections` entries folds the oldest overflow into one merged section,
@@ -225,13 +245,19 @@ export interface ConversationOptions {
  * `DEFAULT_CONVERSATION_KEEP`). `sections` overrides the configured `sections` cap of the
  * conversation for this compaction only — after the folded section is appended, an overflow past
  * `sections` folds the oldest sections into one merged section. Default: the cap of the
- * conversation (or no cap).
+ * conversation (or no cap). `keep` must be a nonnegative safe integer; any other value throws a
+ * {@link import('./errors.js').ConversationError} with code `'KEEP'`. `signal` cancels this
+ * compaction: an already-aborted signal rejects with its reason before the summarizer is called,
+ * the signal is passed to the {@link ConversationSummaryHandler}, and an abort while the
+ * summarizer runs rejects with the reason at once and commits nothing. Default: no signal.
  */
 export interface CompactOptions {
 	/** Overrides the retained-tail size for this compaction. Default: the `keep` of the conversation. */
 	readonly keep?: number
 	/** Overrides the `sections` cap for this compaction. Default: the cap of the conversation (or no cap). */
 	readonly sections?: number
+	/** Cancels this compaction and is passed to the summarizer. Default: no signal. */
+	readonly signal?: AbortSignal
 }
 
 /**
@@ -389,10 +415,24 @@ export interface ConversationInterface {
 	 * emitted, and the error propagates; the next successful `compact()` merges the section count
 	 * back to `cap`.
 	 *
-	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
-	 * @returns The folded {@link Section}, or `undefined` when nothing folded
-	 * @throws ConversationError Thrown when no summarizer was supplied, or when the effective
-	 * sections cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`)
+	 * Calls run one at a time: a call made while another is in flight waits for it, then computes
+	 * its own fold from the live tail it finds. A fold commits only when every folded message is
+	 * still the same live entry after the summarizer settles, and a merge commits only when the
+	 * folded sections are still the oldest; otherwise the call resolves `undefined` and emits
+	 * nothing, so a `remove` or `clear` during the summarizer leaves no section.
+	 *
+	 * `options.signal` cancels the call. An already-aborted signal rejects with its reason before
+	 * the summarizer is called. An abort while waiting for an earlier call or while the summarizer
+	 * runs rejects with the reason at once, even when the summarizer ignores the signal, and the
+	 * call commits nothing afterwards; a fold committed before an aborted merge stays, as when the
+	 * merge throws.
+	 *
+	 * @param options - Optional {@link CompactOptions} (`keep`, `sections`, `signal`)
+	 * @returns The folded {@link Section}, or `undefined` when nothing folded or the folded
+	 * messages or sections changed while the summarizer ran
+	 * @throws ConversationError Thrown when no summarizer was supplied (code `'SUMMARIZER'`), when the
+	 * effective sections cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`), or when
+	 * the effective `keep` is not a nonnegative safe integer (code `'KEEP'`)
 	 */
 	compact(options?: CompactOptions): Promise<Section | undefined>
 	/**
@@ -570,7 +610,9 @@ export interface ConversationSnapshotRow {
  * default {@link ConversationSummaryHandler} of the manager for this conversation. Default: the
  * manager default. `keep` overrides the default retained-tail size of the manager. `sections`
  * overrides the default `sections` cap of the manager. `on` is the reserved listener key
- * (initial {@link ConversationEventMap} listeners). `snapshot` is the construction-time hydration
+ * (initial {@link ConversationEventMap} listeners). `error` is the listener-error handler of the
+ * conversation's emitter, so a throwing `on` listener reports there. Default: the emitter's own
+ * handler. `snapshot` is the construction-time hydration
  * seam — a {@link ConversationSnapshot} whose `id` / `sections` / live tail are restored into the
  * conversation (the live `summarize` / `keep` / `on` re-supplied alongside it), the conversation
  * analogue of the `seed` option of {@link import('@orkestrel/workspace').WorkspaceOptions},
@@ -588,6 +630,8 @@ export interface ConversationInput {
 	/** Overrides the default `sections` cap of the manager for this conversation. */
 	readonly sections?: number
 	readonly on?: EmitterHooks<ConversationEventMap>
+	/** Holds the listener-error handler of the conversation's emitter — a listener throw routes here, not to a domain event. */
+	readonly error?: EmitterErrorHandler
 	/** Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot}. */
 	readonly snapshot?: ConversationSnapshot
 }
@@ -601,7 +645,8 @@ export interface ConversationInput {
  * `summarize` is the default summarizer flowed into every conversation the manager creates
  * (a per-`add` {@link ConversationInput.summarize} overrides it); a conversation created
  * with neither cannot `compact` (it throws a `ConversationError`). `keep` is the default
- * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it). Default:
+ * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it); it must be a
+ * nonnegative safe integer, else construction throws a `ConversationError` with code `'KEEP'`. Default:
  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
  * on the compacted `sections` list of a created conversation (a per-`add`
  * {@link ConversationInput.sections} overrides it). Default: no cap.
@@ -701,7 +746,11 @@ export interface ConversationManagerInterface {
 	 *   into a fresh {@link ConversationInterface} through the `snapshot` option
 	 *   (`add({ snapshot, ... })`, flowing the default `summarize` / `keep` of the manager in),
 	 *   which registers and activates it, and it is returned.
-	 * - Else (no store, or a store miss) ⇒ `undefined` (lenient — no throw).
+	 * - A conversation registered under `id` while the store read was pending wins: it is
+	 *   activated and returned, and the stored snapshot is discarded. So a concurrent `add({ id })`
+	 *   keeps its turns, and concurrent `open(id)` calls return the one registered instance.
+	 * - Else (no store, a store miss, or a stored snapshot whose `id` is not `id`) ⇒ `undefined`
+	 *   (lenient — no throw).
 	 *
 	 * @param id - The conversation id to open
 	 * @returns The activated {@link ConversationInterface}, or `undefined` when neither registered nor stored

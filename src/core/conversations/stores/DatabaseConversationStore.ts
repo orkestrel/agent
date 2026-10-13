@@ -36,7 +36,8 @@ import { isConversationSnapshot } from '../validators.js'
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
  *   a {@link ConversationSnapshot} ({@link import('../validators.js').isConversationSnapshot} — the
- *   total guard for an untrusted storage read), or `undefined` if none is stored.
+ *   total guard for an untrusted storage read), or `undefined` if none is stored, the blob is
+ *   malformed, or the blob's own `id` is not the requested one.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
  * Unlike a session store there is no idle-TTL / eviction — a persisted conversation lives until an
@@ -71,22 +72,46 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 		this.#table = table
 	}
 
-	/** Resolves the persisted snapshot for `id`, narrowing the opaque JSON column back to a `ConversationSnapshot`. */
+	/**
+	 * Resolves the persisted snapshot for `id`, narrowing the opaque JSON column back to a
+	 * `ConversationSnapshot`.
+	 *
+	 * @remarks
+	 * The column is an untrusted storage read, so a blob that fails
+	 * {@link import('../validators.js').isConversationSnapshot}, or whose own `id` is not `id`,
+	 * resolves `undefined` rather than a conversation under the wrong key.
+	 *
+	 * @param id - The conversation id to resolve (the row key)
+	 * @returns The persisted snapshot, or `undefined` when no row is stored, the blob is malformed,
+	 * or the blob names another id
+	 */
 	async get(id: string): Promise<ConversationSnapshot | undefined> {
 		const row = await this.#table.get(id)
 		if (row === undefined) return undefined
 		// The snapshot crosses back as an untrusted storage read (a structured clone / a JSON row),
 		// so narrow the opaque JSON column with the total boundary guard rather than a cast;
 		// a malformed blob resolves `undefined`, never a broken conversation.
-		return isConversationSnapshot(row.snapshot) ? row.snapshot : undefined
+		const snapshot = row.snapshot
+		return isConversationSnapshot(snapshot) && snapshot.id === id ? snapshot : undefined
 	}
 
-	/** Inserts or replaces under the snapshot's own `id` (no separate id param) — the row is `{ id, snapshot }`. */
+	/**
+	 * Inserts or replaces under the snapshot's own `id` (no separate id param) — the row is
+	 * `{ id, snapshot }`.
+	 *
+	 * @param snapshot - The snapshot to store, keyed by its `id`
+	 * @returns A promise that resolves once the row is written
+	 */
 	async set(snapshot: ConversationSnapshot): Promise<void> {
 		await this.#table.set({ id: snapshot.id, snapshot })
 	}
 
-	/** Drops a snapshot by id; an absent id is a no-op (no throw). */
+	/**
+	 * Drops a snapshot by id; an absent id is a no-op (no throw).
+	 *
+	 * @param id - The conversation id to drop
+	 * @returns A promise that resolves once the row is gone
+	 */
 	async delete(id: string): Promise<void> {
 		await this.#table.remove(id)
 	}

@@ -12,7 +12,9 @@ import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildLedgerMessage,
 	buildClassifierOptions,
+	buildLedgerPairJudgment,
 	buildLedgerResponse,
+	buildLedgerTopicJudgment,
 	createLedgerJudge,
 	RecordedTransport,
 	RecordingJudge,
@@ -337,28 +339,15 @@ describe('Classifier', () => {
 			'["amends","whole","later"]',
 			'["amends","call","later"]',
 		])
+		const whole = requireValue(conversation.message('whole'))
 		for (const later of ['last', 'later']) {
 			const after = requireValue(conversation.message(later))
-			conversation.judgments.add({
-				id: JSON.stringify(['amends', 'whole', later]),
-				model: judge.model,
-				sources: ['whole', later],
-				state: `Earlier message: user: Odile Marlow called.\nLater message: user: ${after.content}`,
-				question: LEDGER_QUESTIONS.amends,
-				answer: { form: 'noul', noul: 0.8 },
-			})
+			conversation.judgments.add(buildLedgerPairJudgment('amends', whole, after, 0.8))
 		}
 		expect(classifier.classification().amendments.size).toBe(0)
 		for (const later of ['last', 'later']) {
 			const after = requireValue(conversation.message(later))
-			conversation.judgments.add({
-				id: JSON.stringify(['supersedes', 'whole', later]),
-				model: judge.model,
-				sources: ['whole', later],
-				state: `Earlier message: user: Odile Marlow called.\nLater message: user: ${after.content}`,
-				question: LEDGER_QUESTIONS.supersedes,
-				answer: { form: 'noul', noul: 0.8 },
-			})
+			conversation.judgments.add(buildLedgerPairJudgment('supersedes', whole, after, 0.8))
 		}
 		expect(classifier.classification().amendments.get('whole')).toEqual(['later', 'last'])
 		expect(classifier.classification().supersessions.get('whole')).toEqual(['later', 'last'])
@@ -474,6 +463,45 @@ describe('Classifier', () => {
 		})
 	})
 
+	it('wraps a non-Error handler throw in an Error that carries its text', async () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'A statement.' })
+		const refusal: unknown = 'assignment refused'
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge: new RecordingJudge(),
+				topics: [],
+				assign: () => {
+					throw refusal
+				},
+			}),
+		)
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(result.judgments).toEqual([])
+		expect(result.fault).toBeInstanceOf(Error)
+		expect(result.fault?.message).toBe('assignment refused')
+	})
+
+	it('files nothing and asks nothing for an empty conversation', async () => {
+		const judge = new RecordingJudge()
+		const classifier = new Classifier(
+			buildClassifierOptions({ conversation: createConversation(), judge }),
+		)
+		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
+			judgments: [],
+		})
+		expect(judge.requests).toEqual([])
+		expect(classifier.classification()).toEqual({
+			quiet: new Set(),
+			categories: new Map(),
+			topics: new Map(),
+			amendments: new Map(),
+			supersessions: new Map(),
+		})
+		expect(classifier.decisive('missing')).toBe(false)
+	})
+
 	it('folds an aborted judge partial into completed usage and answered or refused keys', async () => {
 		for (const refused of [false, true]) {
 			const conversation = createConversation()
@@ -572,31 +600,17 @@ describe('Classifier', () => {
 		const conversation = createConversation()
 		const tool = conversation.add({ role: 'tool', content: 'Refund AB-12 is 30.' })
 		const noise = conversation.add({ role: 'user', content: 'Weather is fine.' })
-		const judge = new RecordingJudge()
+		const refunds = { name: 'refunds', criterion: 'Refund amounts' }
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
-				judge,
-				topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
+				judge: new RecordingJudge(),
+				topics: [refunds],
 				assign: (message) =>
 					message.role === 'tool' ? 'fact' : message.id === noise.id ? 'distractor' : undefined,
 			}),
 		)
-		conversation.judgments.add({
-			id: JSON.stringify(['topic', tool.id, 'refunds']),
-			model: judge.model,
-			sources: [tool.id],
-			state: 'tool: Refund AB-12 is 30.',
-			question: {
-				form: 'noul',
-				instructions: LEDGER_QUESTIONS.topic,
-				criteria: {
-					true: 'The message concerns refunds: Refund amounts',
-					false: 'The message does not concern refunds',
-				},
-			},
-			answer: { form: 'noul', noul: 0.9 },
-		})
+		conversation.judgments.add(buildLedgerTopicJudgment(tool, refunds, 0.9))
 		expect(classifier.classification().topics.get(tool.id)).toEqual(['refunds'])
 		expect(classifier.quiet(noise.id)).toBe(true)
 	})

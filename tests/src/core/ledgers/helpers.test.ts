@@ -25,11 +25,14 @@ import {
 	linkOwners,
 	matchEntities,
 	matchesCutLine,
+	normalizeArgument,
 	placeMember,
 	renderLedgerPinned,
 	renderLedgerRecord,
+	renderLookupCall,
 	renderStub,
 	selectRecords,
+	splitResultLines,
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
@@ -339,6 +342,71 @@ describe('identifyLookup', () => {
 
 	it('names a call with no arguments', () => {
 		expect(identifyLookup('lookup_order', {})).toBe('lookup_order {}')
+	})
+})
+
+describe('normalizeArgument', () => {
+	it('trims and uppercases an argument', () => {
+		expect(normalizeArgument(' bw-5512 ')).toBe('BW-5512')
+		expect(normalizeArgument('\tOM-30418\n')).toBe('OM-30418')
+		expect(normalizeArgument('')).toBe('')
+	})
+
+	it('gives identity and owner linking one spelling of an argument', () => {
+		const owners = new Map(Object.entries(LEDGER_DESK_OWNERS))
+		const spelled = ' bw-20931 '
+		const links = linkOwners(
+			[
+				buildLedgerReading(
+					'tool-1',
+					'lookup_customer',
+					{ account: spelled },
+					'Account BW-20931',
+					LEDGER_EMPTY_FOUND,
+				),
+			],
+			owners,
+		)
+		expect([...links]).toEqual([['BW-20931', 'BW-20931']])
+		expect(identifyLookup('lookup_customer', { account: spelled })).toBe(
+			'lookup_customer {"account":"BW-20931"}',
+		)
+	})
+})
+
+describe('splitResultLines', () => {
+	it('splits at a line feed with or without a carriage return before it', () => {
+		expect(splitResultLines('Account BW-20931.\r\nRefund is $148.50.\nDone.')).toEqual([
+			'Account BW-20931.',
+			'Refund is $148.50.',
+			'Done.',
+		])
+	})
+
+	it('keeps empty lines, a lone carriage return, and one empty line for an empty text', () => {
+		expect(splitResultLines('One.\n\nTwo.\rStill two.\n')).toEqual([
+			'One.',
+			'',
+			'Two.\rStill two.',
+			'',
+		])
+		expect(splitResultLines('')).toEqual([''])
+	})
+})
+
+describe('renderLookupCall', () => {
+	it('renders the tool name and the arguments in the order JSON writes them', () => {
+		expect(renderLookupCall('lookup_order', { id: 'BW-5512', opts: { b: 2, a: 1 } })).toBe(
+			'lookup_order {"id":"BW-5512","opts":{"b":2,"a":1}}',
+		)
+		expect(renderLookupCall('lookup_order', {})).toBe('lookup_order {}')
+	})
+
+	it('renders the bare tool name for a BigInt or a cycle', () => {
+		const cyclic: Record<string, unknown> = {}
+		cyclic.self = cyclic
+		expect(renderLookupCall('lookup_order', { count: 1n })).toBe('lookup_order')
+		expect(renderLookupCall('lookup_order', cyclic)).toBe('lookup_order')
 	})
 })
 
@@ -656,6 +724,48 @@ describe('placeMember', () => {
 		expect(placeMember(desk, links, cycle, 'user-05', new Set()).size).toBe(0)
 		expect(placeMember(desk, links, new Map(), 'user-05', new Set()).size).toBe(0)
 	})
+
+	it('settles a placement whose walk pruned nothing and leaves a cycle-pruned one unsettled', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('user-a', 'user', 'Standing rule: refunds need code MX-4471.'),
+				buildLedgerMessage('user-b', 'user', 'Code MX-4486 replaces MX-4471.'),
+				buildLedgerMessage('user-c', 'user', 'Code MX-5000 replaces MX-4486.'),
+			],
+			classification: { categories: { 'user-a': 'rule' } },
+		})
+		const chain = new Map([
+			['user-b', ['user-a']],
+			['user-c', ['user-b']],
+		])
+		const settled = new Map<string, ReadonlySet<string>>()
+		expect([...placeMember(input, new Map(), chain, 'user-c', new Set(), settled)]).toEqual([
+			'rules',
+		])
+		expect([...settled.keys()].toSorted()).toEqual(['user-a', 'user-b', 'user-c'])
+		const cycle = new Map([
+			['user-a', ['user-b']],
+			['user-b', ['user-a']],
+		])
+		const pruned = new Map<string, ReadonlySet<string>>()
+		expect([...placeMember(input, new Map(), cycle, 'user-a', new Set(), pruned)]).toEqual([])
+		expect([...pruned.keys()]).toEqual([])
+		expect([...placeMember(input, new Map(), cycle, 'user-b', new Set(), pruned)]).toEqual([
+			'rules',
+		])
+	})
+
+	it('returns a placement the settled map already holds', () => {
+		const input = buildLedgerInput({
+			messages: [buildLedgerMessage('user-a', 'user', 'Standing rule: refunds need a code.')],
+			classification: { categories: { 'user-a': 'rule' } },
+		})
+		const settled = new Map<string, ReadonlySet<string>>([['user-a', new Set(['owner:OM-30418'])]])
+		expect([...placeMember(input, new Map(), new Map(), 'user-a', new Set(), settled)]).toEqual([
+			'owner:OM-30418',
+		])
+		expect([...placeMember(input, new Map(), new Map(), 'user-a', new Set())]).toEqual(['rules'])
+	})
 })
 
 describe('collectStale', () => {
@@ -730,6 +840,23 @@ describe('collectStale', () => {
 			})
 			expect(collectStale(input, byMessage, collectLive(input))).toEqual([])
 		}
+		const assistant = [
+			buildLedgerMessage('user-a', 'user', 'The code is MX-4471.'),
+			buildLedgerMessage('user-b', 'assistant', 'The code is MX-4486, not MX-4471.'),
+			buildLedgerMessage('user-c', 'user', 'Ignore that.'),
+		]
+		const spoken = buildLedgerInput({ messages: assistant, classification })
+		expect(
+			collectStale(
+				spoken,
+				new Map(assistant.map((message) => [message.id, message])),
+				collectLive(spoken),
+			),
+		).toEqual([])
+		const control = buildLedgerInput({ messages, classification })
+		expect(collectStale(control, byMessage, collectLive(control))).toEqual([
+			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'] },
+		])
 	})
 })
 
@@ -902,6 +1029,18 @@ describe('buildRecords', () => {
 		])
 	})
 
+	it('orders owner records that share a first member by key whatever the entity order', () => {
+		const input = buildLedgerInput({
+			owners: LEDGER_DESK_OWNERS,
+			messages: [buildLedgerMessage('user-a', 'user', 'Both owners share order BW-5512.')],
+			entities: { 'user-a': ['OM-30418', 'BW-20931'] },
+		})
+		expect(buildRecords(input).records.map((record) => record.key)).toEqual([
+			'owner:BW-20931',
+			'owner:OM-30418',
+		])
+	})
+
 	it('takes a lookup result out of every record when an empty reading replaces it (R5a)', () => {
 		const text = 'Order BW-5512 for account BW-20931 (Brightwater Studio): total $10.00.'
 		const input = buildLedgerInput({
@@ -1040,6 +1179,22 @@ describe('buildRecords', () => {
 		const first = buildRecords(input)
 		expect(input).toEqual(snapshot)
 		expect(buildRecords(input)).toEqual(first)
+	})
+
+	it('places a dense chain of corrections that each amend every earlier one on the rules record', () => {
+		const ids = Array.from({ length: 24 }, (_unused, at) => `user-${String(at).padStart(2, '0')}`)
+		const input = buildLedgerInput({
+			messages: ids.map((id, at) =>
+				buildLedgerMessage(id, 'user', `Correction ${at} of the code.`),
+			),
+			classification: {
+				categories: { 'user-00': 'rule' },
+				amendments: Object.fromEntries(ids.map((id, at) => [id, ids.slice(at + 1)])),
+			},
+		})
+		const built = buildRecords(input)
+		expect(built.records.map((record) => [record.key, record.members])).toEqual([['rules', ids]])
+		expect(built.orphans).toEqual([])
 	})
 
 	it('projects nothing from an empty input', () => {
@@ -1274,6 +1429,15 @@ describe('renderStub', () => {
 		expect(renderStub('lookup_order', { id: '  ', n: 4 }, 'hidden')).toBe(
 			'lookup_order {"id":"  ","n":4}: result not shown; call recall with its id',
 		)
+	})
+
+	it('renders the bare tool name for arguments JSON cannot carry', () => {
+		const cyclic: Record<string, unknown> = { id: 'BW-5512' }
+		cyclic.self = cyclic
+		expect(renderStub('lookup_order', { id: 'BW-5512', count: 1n }, 'hidden')).toBe(
+			'lookup_order: result not shown; call recall with BW-5512',
+		)
+		expect(renderStub('lookup_order', cyclic, 'failed')).toBe('lookup_order: failed')
 	})
 
 	it('writes no handle', () => {

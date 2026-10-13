@@ -16,10 +16,12 @@ import {
 	releaseReader,
 	readText,
 	readChunks,
+	requestToRelay,
 } from '@src/core'
 import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	createToolCall,
 	RecordedBody,
 	RecordedHeaders,
 	TEV1_CHOICE,
@@ -721,6 +723,7 @@ describe('readFailure', () => {
 		const response = new Response(body.stream, { status: 503 })
 		expect(await readFailure(response, 'provider error:', new AbortController().signal)).toEqual({
 			message: `provider error: 503 - ${'x'.repeat(MAX_ERROR_BODY_LENGTH)}`,
+			status: 503,
 		})
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
@@ -732,14 +735,14 @@ describe('readFailure', () => {
 				'judge error:',
 				new AbortController().signal,
 			),
-		).toEqual({ message: 'judge error: 500' })
+		).toEqual({ message: 'judge error: 500', status: 500 })
 		expect(
 			await readFailure(
 				new Response(null, { status: 500 }),
 				'judge error:',
 				new AbortController().signal,
 			),
-		).toEqual({ message: 'judge error: 500' })
+		).toEqual({ message: 'judge error: 500', status: 500 })
 	})
 	it('retains an unreadable body failure by identity', async () => {
 		const cause = new Error('body failed')
@@ -749,8 +752,127 @@ describe('readFailure', () => {
 			'judge error:',
 			new AbortController().signal,
 		)
-		expect(failure.message).toBe('judge error: 502 - (error body unavailable)')
+		expect(failure).toEqual({
+			message: 'judge error: 502 - (error body unavailable)',
+			status: 502,
+			cause,
+		})
 		expect(failure.cause).toBe(cause)
 		expect(body.stream.locked).toBe(false)
+	})
+	it('throws the signal reason when the excerpt is read after the abort', async () => {
+		const reason = new Error('caller stopped')
+		const body = new RecordedBody([new TextEncoder().encode('unavailable')])
+		const failure = readFailure(
+			new Response(body.stream, { status: 503 }),
+			'provider error:',
+			AbortSignal.abort(reason),
+		)
+		await expect(failure).rejects.toBe(reason)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+	it('returns a body-read failure that races the abort as the cause', async () => {
+		const abort = new AbortController()
+		const cause = new Error('body failed')
+		const stream = new ReadableStream<Uint8Array>(
+			{
+				pull(controller) {
+					controller.error(cause)
+					abort.abort(new Error('caller stopped'))
+				},
+			},
+			{ highWaterMark: 0 },
+		)
+		const failure = await readFailure(
+			new Response(stream, { status: 503 }),
+			'judge error:',
+			abort.signal,
+		)
+		expect(abort.signal.aborted).toBe(true)
+		expect(failure).toEqual({
+			message: 'judge error: 503 - (error body unavailable)',
+			status: 503,
+			cause,
+		})
+		expect(failure.cause).toBe(cause)
+	})
+})
+
+describe('requestToRelay — the relay wire projection', () => {
+	it('keeps every declared member and drops a call’s execution context', () => {
+		const call = {
+			...createToolCall({ arguments: { order: 'BW-5512' } }),
+			context: { signal: new AbortController().signal, caller: { subject: 'local-only' } },
+		}
+		const parameters = { type: 'object' }
+		const schema = { type: 'object' }
+		const projected = requestToRelay({
+			messages: [
+				{ id: 'ask', role: 'user', content: 'Track BW-5512', images: ['parcel.png'] },
+				{
+					id: 'plan',
+					role: 'assistant',
+					content: '',
+					thinking: 'look up the order',
+					calls: [call],
+				},
+				{ id: 'answer', role: 'tool', content: 'shipped', call: 'c1' },
+			],
+			tools: [{ name: 'track', description: 'Tracks an order', parameters }],
+			options: { think: true, schema },
+		})
+		expect(projected).toEqual({
+			messages: [
+				{ id: 'ask', role: 'user', content: 'Track BW-5512', images: ['parcel.png'] },
+				{
+					id: 'plan',
+					role: 'assistant',
+					content: '',
+					thinking: 'look up the order',
+					calls: [{ id: 'c1', name: 'add', arguments: { order: 'BW-5512' } }],
+				},
+				{ id: 'answer', role: 'tool', content: 'shipped', call: 'c1' },
+			],
+			tools: [{ name: 'track', description: 'Tracks an order', parameters: { type: 'object' } }],
+			options: { think: true, schema: { type: 'object' } },
+		})
+		expect(projected.messages[1]?.calls?.[0]).not.toHaveProperty('context')
+		expect(projected.tools?.[0]?.parameters).toBe(parameters)
+		expect(projected.options?.schema).toBe(schema)
+	})
+	it('drops undeclared members and leaves absent optionals absent', () => {
+		const request = {
+			messages: [{ id: 'ask', role: 'user', content: 'hello', extra: 'local' }],
+			tools: [{ name: 'track', extra: 'local' }],
+			options: { think: false, extra: 'local' },
+			extra: 'local',
+		} as const
+		const projected = requestToRelay(request)
+		expect(JSON.stringify(projected)).toBe(
+			'{"messages":[{"id":"ask","role":"user","content":"hello"}],"tools":[{"name":"track"}],"options":{"think":false}}',
+		)
+		expect(JSON.stringify(requestToRelay({ messages: [], options: {} }))).toBe(
+			'{"messages":[],"options":{}}',
+		)
+		expect(Object.keys(requestToRelay({ messages: [] }))).toEqual(['messages'])
+	})
+	it('propagates a throwing getter’s failure', () => {
+		const failure = new Error('hostile read')
+		expect(
+			captureError(() =>
+				requestToRelay({
+					messages: [
+						{
+							id: 'ask',
+							role: 'user',
+							get content(): string {
+								throw failure
+							},
+						},
+					],
+				}),
+			),
+		).toBe(failure)
 	})
 })

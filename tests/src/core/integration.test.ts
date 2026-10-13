@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
 	createAgent,
 	createInstructionManager,
-	createRelay,
-	createRelayProvider,
 	ProviderAbortError,
 	ProviderError,
 	providerRequestContract,
@@ -14,14 +12,13 @@ import {
 import { parseJSONAs } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
-	createParser,
+	createRelayHop,
 	createScriptedProvider,
 	createTokenUsage,
 	createToolCall,
 	drainProvider,
 	FailingProvider,
 	RecordedProvider,
-	generateReply,
 	INTEGRATION_USAGE,
 	splitWordDeltas,
 } from '../../setup.js'
@@ -30,15 +27,10 @@ import { collect, requireValue } from '@orkestrel/test'
 describe('in-process relay hop', () => {
 	it('carries a 401 refusal through the browser without entering stream', async () => {
 		const provider = new RecordedProvider()
-		const handler = createRelay({
+		const browser = createRelayHop({
 			provider,
 			authorize: (request) => request.headers.get('authorization') === 'Bearer accepted',
-		})
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
 			headers: () => ({ authorization: 'Bearer refused' }),
-			fetch: (input, init) => handler(new Request(input, init)),
 		})
 		const result = browser.generate([], new AbortController().signal)
 		await expect(result).rejects.toBeInstanceOf(ProviderError)
@@ -51,12 +43,7 @@ describe('in-process relay hop', () => {
 	})
 	it('carries a 413 refusal through the browser without entering stream', async () => {
 		const provider = new RecordedProvider()
-		const handler = createRelay({ provider, authorize: () => true, limit: 1 })
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
-			fetch: (input, init) => handler(new Request(input, init)),
-		})
+		const browser = createRelayHop({ provider, limit: 1 })
 		const result = browser.generate([], new AbortController().signal)
 		await expect(result).rejects.toBeInstanceOf(ProviderError)
 		await expect(result).rejects.toMatchObject({
@@ -68,11 +55,9 @@ describe('in-process relay hop', () => {
 	})
 	it('carries a 400 refusal through the browser without entering stream', async () => {
 		const provider = new RecordedProvider()
-		const handler = createRelay({ provider, authorize: () => true })
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
-			fetch: (input, init) => handler(new Request(input, { ...init, body: '{"messages":null}' })),
+		const browser = createRelayHop({
+			provider,
+			request: (input, init) => new Request(input, { ...init, body: '{"messages":null}' }),
 		})
 		const result = browser.generate([], new AbortController().signal)
 		await expect(result).rejects.toBeInstanceOf(ProviderError)
@@ -94,29 +79,27 @@ describe('in-process relay hop', () => {
 			[{ result, deltas: ['<think>literal</think>', ' answer'], thoughts: ['rea', 'son'] }],
 			{ recorded: true },
 		)
-		const handler = createRelay({
-			provider,
-			authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
-		})
 		const requests: Request[] = []
 		const bodies: unknown[] = []
 		const frames: unknown[] = []
-		const browser = createRelayProvider({
+		const browser = createRelayHop({
+			provider,
 			url: 'http://relay.test/exact?route=turn',
-			parser: createParser,
+			authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
 			headers: () => ({ authorization: 'Bearer fixture' }),
-			fetch: async (input, init) => {
+			request: async (input, init) => {
 				const request = new Request(input, init)
 				requests.push(request)
 				bodies.push(parseJSONAs(await request.clone().text(), providerRequestContract.is))
-				const response = await handler(request)
+				return request
+			},
+			response: async (response) => {
 				frames.push(
 					...(await response.clone().text())
 						.split(/\r\n|\n/)
 						.filter((line) => line.length > 0)
 						.map((line) => parseJSONAs(line, relayFrameContract.is)),
 				)
-				return response
 			},
 		})
 		const request: ProviderRequest = {
@@ -180,15 +163,13 @@ describe('in-process relay hop', () => {
 			[{ result: { content: 'first second third' }, deltas: ['first', ' second', ' third'] }],
 			{ recorded: true },
 		)
-		const handler = createRelay({ provider, authorize: () => true })
 		const requests: Request[] = []
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
-			fetch: (input, init) => {
+		const browser = createRelayHop({
+			provider,
+			request: (input, init) => {
 				const request = new Request(input, init)
 				requests.push(request)
-				return handler(request)
+				return request
 			},
 		})
 		const abort = new AbortController()
@@ -211,12 +192,7 @@ describe('in-process relay hop', () => {
 			usage: createTokenUsage(),
 		}
 		const provider = new FailingProvider({ content: 'partial' }, new ProviderAbortError(partial))
-		const handler = createRelay({ provider, authorize: () => true })
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
-			fetch: (input, init) => handler(new Request(input, init)),
-		})
+		const browser = createRelayHop({ provider })
 		const signal = new AbortController().signal
 		const stream = browser.stream([], signal)
 		expect(await stream.next()).toEqual({
@@ -228,12 +204,7 @@ describe('in-process relay hop', () => {
 	})
 	it('translates a secret upstream failure to the fixed public provider error', async () => {
 		const provider = new FailingProvider({ content: '' }, new Error('sk-secret'))
-		const handler = createRelay({ provider, authorize: () => true })
-		const browser = createRelayProvider({
-			url: 'http://relay.test/',
-			parser: createParser,
-			fetch: (input, init) => handler(new Request(input, init)),
-		})
+		const browser = createRelayHop({ provider })
 		await expect(browser.generate([], new AbortController().signal)).rejects.toMatchObject({
 			name: 'ProviderError',
 			code: 'PROVIDER',
@@ -356,16 +327,6 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 })
 
 describe('provider-agnosticism — drop-in swap (the runtime is indifferent to WHICH provider)', () => {
-	it('two DIFFERENTLY-NAMED providers run the SAME agent code with zero changes — each returns its own answer', async () => {
-		// The runtime depends on the abstract contract when the provider implementation changes.
-		const first = createScriptedProvider([{ content: 'I am alpha' }], { name: 'alpha' })
-		const second = createScriptedProvider([{ content: 'I am beta' }], { name: 'beta' })
-
-		expect(first.name).not.toBe(second.name)
-		expect(await generateReply(first)).toBe('I am alpha')
-		expect(await generateReply(second)).toBe('I am beta')
-	})
-
 	it('a manager-options format frames the system block the provider receives; an unframed manager sends the built-ins', async () => {
 		// A model's framing preference reaches the request through the instructions manager the
 		// agent receives, so one provider type sends XML framing from one agent and the built-in
@@ -396,19 +357,5 @@ describe('provider-agnosticism — drop-in swap (the runtime is indifferent to W
 		expect(requireValue(requireValue(plain.calls[0]).messages[0]).content).toBe(
 			'## Instructions\n\nBe terse.',
 		)
-	})
-
-	it('createScriptedProvider (the shared Ollama-free fixture) is itself a conforming provider that drives the loop', async () => {
-		// This fixture also drives other suites through the same provider contract.
-		const agent = createAgent(
-			createScriptedProvider([{ content: 'scripted answer', usage: INTEGRATION_USAGE }]),
-		)
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('scripted answer')
-		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(INTEGRATION_USAGE)
 	})
 })

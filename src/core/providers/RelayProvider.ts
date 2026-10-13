@@ -7,6 +7,7 @@ import type {
 import { cloneJSONValue } from '@orkestrel/contract'
 import { AgentProvider } from './AgentProvider.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
+import { requestToRelay } from './helpers.js'
 import { providerRequestContract, relayFrameContract } from './contracts.js'
 
 /**
@@ -85,43 +86,7 @@ export class RelayProvider extends AgentProvider {
 	encode(request: ProviderRequest): object {
 		let snapshot: unknown
 		try {
-			const projected = {
-				messages: request.messages.map((message) => ({
-					id: message.id,
-					role: message.role,
-					content: message.content,
-					...(message.calls === undefined
-						? {}
-						: {
-								calls: message.calls.map((call) => ({
-									id: call.id,
-									name: call.name,
-									arguments: call.arguments,
-								})),
-							}),
-					...(message.call === undefined ? {} : { call: message.call }),
-					...(message.images === undefined ? {} : { images: message.images }),
-					...(message.thinking === undefined ? {} : { thinking: message.thinking }),
-				})),
-				...(request.tools === undefined
-					? {}
-					: {
-							tools: request.tools.map((tool) => ({
-								name: tool.name,
-								...(tool.description === undefined ? {} : { description: tool.description }),
-								...(tool.parameters === undefined ? {} : { parameters: tool.parameters }),
-							})),
-						}),
-				...(request.options === undefined
-					? {}
-					: {
-							options: {
-								...(request.options.think === undefined ? {} : { think: request.options.think }),
-								...(request.options.schema === undefined ? {} : { schema: request.options.schema }),
-							},
-						}),
-			}
-			snapshot = cloneJSONValue(projected)
+			snapshot = cloneJSONValue(requestToRelay(request))
 		} catch (cause) {
 			throw new ProviderError('PROTOCOL', 'relay request is not JSON', { cause })
 		}

@@ -1,9 +1,10 @@
 import { createDatabaseConversationStore } from '@src/core'
 import { createMemoryDriver } from '@orkestrel/database'
-import { createDatabaseWorkspaceStore } from '@orkestrel/workspace'
+import { createDatabaseWorkspaceStore, createWorkspace } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import {
 	buildConversationSnapshot,
+	JUDGMENT_RECORD,
 	plantConversationRow,
 	exerciseConversationStoreDeleteAbsent,
 	exerciseConversationStoreDeleteThenAbsent,
@@ -190,17 +191,47 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		expect(await store.get('poisoned')).toBeUndefined()
 	})
 
-	it('a conversation store and a workspace store over their own drivers do not collide', async () => {
-		// Defensive: the conversation store builds its own `conversations` table; a sibling workspace
-		// store (its own `workspaces` table) over a SEPARATE driver coexists — the two seams are
-		// independent (no shared table name, no cross-read).
-		const conversationStore = createDatabaseConversationStore(createMemoryDriver())
-		const workspaceStore = createDatabaseWorkspaceStore(createMemoryDriver())
-		const snapshot = await buildConversationSnapshot('only-conversation')
+	it('a conversation store and a workspace store over ONE driver keep one id apart', async () => {
+		// Both stores share the driver and write the same key, so a shared table name or a shared
+		// key space would make one read back the other's snapshot (or nothing). A memory driver
+		// serves the schema of the database that opened it last, and keeps every table's rows
+		// across opens, so each step opens a fresh store over the shared driver.
+		const driver = createMemoryDriver()
+		const conversation = await buildConversationSnapshot('shared')
+		const workspace = createWorkspace({ id: 'shared' }).snapshot()
 
-		await conversationStore.set(snapshot)
-		// The workspace store never saw this id — its own table is empty for it.
-		expect(await workspaceStore.get('only-conversation')).toBeUndefined()
-		expect(await conversationStore.get('only-conversation')).toEqual(snapshot)
+		await createDatabaseConversationStore(driver).set(conversation)
+		await createDatabaseWorkspaceStore(driver).set(workspace)
+
+		expect(await createDatabaseConversationStore(driver).get('shared')).toEqual(conversation)
+		expect(await createDatabaseWorkspaceStore(driver).get('shared')).toEqual(workspace)
+		await createDatabaseConversationStore(driver).delete('shared')
+		expect(await createDatabaseConversationStore(driver).get('shared')).toBeUndefined()
+		expect(await createDatabaseWorkspaceStore(driver).get('shared')).toEqual(workspace)
 	})
+
+	it('a row whose snapshot names another id resolves UNDEFINED from get', async () => {
+		const driver = createMemoryDriver()
+		const snapshot = await buildConversationSnapshot('b')
+		await plantConversationRow(driver, { id: 'a', snapshot })
+		const store = createDatabaseConversationStore(driver)
+
+		expect(await store.get('a')).toBeUndefined()
+		expect(await store.get('b')).toBeUndefined()
+	})
+
+	it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+		'a judgment time of %s resolves UNDEFINED from get, so no hydration throws',
+		async (time) => {
+			const driver = createMemoryDriver()
+			await plantConversationRow(driver, {
+				id: JUDGMENT_SNAPSHOT.id,
+				snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time }] },
+			})
+
+			expect(
+				await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id),
+			).toBeUndefined()
+		},
+	)
 })

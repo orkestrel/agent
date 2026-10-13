@@ -66,6 +66,58 @@ describe('RelayStream', () => {
 		)
 	})
 
+	it('keeps only the current turn’s thinking under the upstream turn replay policy', async () => {
+		const transport = new RecordedTransport(() => new Response('c:answer'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			replay: 'turn',
+		})
+		const relay = new RelayStream({
+			provider,
+			request: {
+				messages: [
+					{ id: 'earlier', role: 'assistant', content: 'booked', thinking: 'compare fares' },
+					{ id: 'ask', role: 'user', content: 'and the hotel?' },
+					{ id: 'current', role: 'assistant', content: 'checking', thinking: 'search hotels' },
+				],
+			},
+			signal: new AbortController().signal,
+		})
+		expect(await relay.response.text()).toContain('answer')
+		expect(await requireValue(transport.requests[0]).text()).toBe(
+			'{"messages":[{"id":"earlier","role":"assistant","content":"booked"},' +
+				'{"id":"ask","role":"user","content":"and the hotel?"},' +
+				'{"id":"current","role":"assistant","content":"checking","thinking":"search hotels"}]}',
+		)
+	})
+
+	it('keeps every received thinking under the upstream all replay policy', async () => {
+		const transport = new RecordedTransport(() => new Response('c:answer'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			replay: 'all',
+		})
+		const relay = new RelayStream({
+			provider,
+			request: {
+				messages: [
+					{ id: 'earlier', role: 'assistant', content: 'booked', thinking: 'compare fares' },
+					{ id: 'ask', role: 'user', content: 'and the hotel?' },
+					{ id: 'current', role: 'assistant', content: 'checking', thinking: 'search hotels' },
+				],
+			},
+			signal: new AbortController().signal,
+		})
+		expect(await relay.response.text()).toContain('answer')
+		expect(await requireValue(transport.requests[0]).text()).toBe(
+			'{"messages":[{"id":"earlier","role":"assistant","content":"booked","thinking":"compare fares"},' +
+				'{"id":"ask","role":"user","content":"and the hotel?"},' +
+				'{"id":"current","role":"assistant","content":"checking","thinking":"search hotels"}]}',
+		)
+	})
+
 	it('returns and finalizes the generator on inbound abort with a queued unread frame', async () => {
 		const provider = new RecordedProvider()
 		const abort = new AbortController()

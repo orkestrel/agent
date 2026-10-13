@@ -304,17 +304,20 @@ export interface LedgerInterface {
 	 * @remarks
 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
-	 * answer pass that advertises no tools. A `respond` or `calibrate` call while either is in flight
+	 * answer pass that advertises no tools. A rejected first pass counts as unfinished; when the
+	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
 	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
+	 * Every rejection leaves the ledger free for a later call.
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
 	 * @returns The reply and the passes the request took
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
 	/**
@@ -584,7 +587,7 @@ export interface GaugeOptions extends LedgerGauge {
  * Prices prompts in tokens and measures the room a request has left.
  *
  * @remarks
- * `scale` and `overhead` hold the price the gauge read from its last observation.
+ * `scale` holds the price from the last observation; `overhead` holds the construction price.
  */
 export interface GaugeInterface extends LedgerGauge {
 	/**

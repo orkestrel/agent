@@ -1,4 +1,5 @@
 import type {
+	ProviderInterface,
 	RelayHandler,
 	RelayOptions,
 	RelayProviderOptions,
@@ -98,7 +99,8 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * is the server half this one pairs with.
  *
  * @param options - The endpoint, parser factory, and HTTP call configuration
- * @returns The concrete relay provider
+ * @returns The relay provider behind the shared provider interface; construct
+ * {@link RelayProvider} directly to reach its wire seams
  * @example Reaching the relay from the browser
  * ```ts
  * import type { ProviderInterface, ProviderParserInterface } from '@orkestrel/agent'
@@ -138,7 +140,7 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's
  * ```
  */
-export function createRelayProvider(options: RelayProviderOptions): RelayProvider {
+export function createRelayProvider(options: RelayProviderOptions): ProviderInterface {
 	return new RelayProvider(options)
 }
 

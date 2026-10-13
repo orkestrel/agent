@@ -4,7 +4,7 @@ import { isTokenUsage } from '@orkestrel/budget'
 import {
 	arrayOf,
 	attempt,
-	isNumber,
+	isFiniteNumber,
 	isRecord,
 	isString,
 	optionalOf,
@@ -52,7 +52,10 @@ export function isMessage(value: unknown): value is Message {
  *
  * @remarks
  * Malformed members and unreadable inputs return false. Answer fields follow the root judge
- * value types; this storage guard does not impose a wire's probability or candidate limits.
+ * value types; this storage guard does not impose a wire's probability or candidate limits. The
+ * `time`, `noul`, and probability numbers must be finite, because a stored record is owned through
+ * JSON, which turns `NaN` and the infinities into `null`; so every record this guard accepts
+ * hydrates through a `JudgmentManager`.
  *
  * @param value - The unknown stored record
  * @returns True if the record satisfies the judgment contract; false otherwise
@@ -74,7 +77,7 @@ export function isJudgment(value: unknown): value is Judgment {
 					model: isString,
 					sources: arrayOf(isString),
 					state: isString,
-					time: isNumber,
+					time: isFiniteNumber,
 					usage: optionalOf(isTokenUsage),
 				},
 				['usage'],
@@ -83,12 +86,12 @@ export function isJudgment(value: unknown): value is Judgment {
 			return false
 		if (answer === undefined) return objectOf({ missing: arrayOf(isString) })(refusal)
 		if (refusal !== undefined || !isRecord(answer)) return false
-		if (answer.form === 'noul') return isNumber(answer.noul)
-		if (answer.form === 'score') return arrayOf(isNumber)(answer.probabilities)
+		if (answer.form === 'noul') return isFiniteNumber(answer.noul)
+		if (answer.form === 'score') return arrayOf(isFiniteNumber)(answer.probabilities)
 		return (
 			answer.form === 'choice' &&
 			isRecord(answer.probabilities) &&
-			Object.values(answer.probabilities).every(isNumber)
+			Object.values(answer.probabilities).every(isFiniteNumber)
 		)
 	})
 	return checked.success && checked.value

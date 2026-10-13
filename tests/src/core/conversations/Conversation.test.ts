@@ -1,4 +1,4 @@
-import type { ConversationEventMap } from '@src/core'
+import type { ConversationEventMap, Message } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -14,7 +14,14 @@ import {
 	renderRecap,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 } from '../../../setup.js'
-import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@orkestrel/test'
+import {
+	createRecorder,
+	createRecorders,
+	requireValue,
+	roundTripJSON,
+	waitForCondition,
+	waitForDelay,
+} from '@orkestrel/test'
 
 // Conversation OWNS its live message tail DIRECTLY (like a Workspace owns its files) — a live tail
 // plus compacted, summarized sections + the `summarizable` flag, with rehydrate / search over the
@@ -1186,7 +1193,7 @@ describe('Conversation — hydrating through the snapshot option (C-c)', () => {
 		expect(restored.sections).toHaveLength(2) // the restored section + the new fold
 	})
 
-	it('hydrating is SILENT — it emits no events (nothing was edited)', async () => {
+	it('hydrating is SILENT — hooks subscribed at construction see no event until a later edit', async () => {
 		const source = new Conversation({
 			id: 's',
 			summarize: createStubSummarizer().summarize,
@@ -1196,19 +1203,332 @@ describe('Conversation — hydrating through the snapshot option (C-c)', () => {
 			{ role: 'user', content: 'a' },
 			{ role: 'user', content: 'b' },
 		])
-		await source.compact()
+		const folded = requireValue(await source.compact())
 
+		// The recorders subscribe through `on`, so they are attached before the snapshot restores
+		// and would see any event construction emitted.
+		const compacted = createRecorder<ConversationEventMap['compact']>()
+		const collapsed = createRecorder<ConversationEventMap['collapse']>()
+		const rehydrated = createRecorder<ConversationEventMap['rehydrate']>()
 		const restored = new Conversation({
 			summarize: createStubSummarizer().summarize,
+			sections: 1,
 			snapshot: source.snapshot(),
+			on: {
+				compact: compacted.handler,
+				collapse: collapsed.handler,
+				rehydrate: rehydrated.handler,
+			},
 		})
-		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse' | 'rehydrate'>(
-			restored.emitter,
-			['compact', 'collapse', 'rehydrate'],
+		expect(compacted.count).toBe(0)
+		expect(collapsed.count).toBe(0)
+		expect(rehydrated.count).toBe(0)
+
+		// The same hooks see each event once the conversation is edited or read.
+		restored.rehydrate(folded.id)
+		restored.add({ role: 'user', content: 'c' })
+		await restored.compact()
+		expect(compacted.count).toBe(1)
+		expect(collapsed.count).toBe(1)
+		expect(rehydrated.calls).toEqual([[folded.id]])
+	})
+})
+
+describe('Conversation — concurrent compact() calls and edits during the summarizer', () => {
+	it('serializes two concurrent compacts, so the second recomputes and folds nothing', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		const first = conversation.compact()
+		const second = conversation.compact()
+		await waitForCondition('the first summarizer call', () => calls.count === 1)
+		gate.resolve('recap')
+		const [section, none] = await Promise.all([first, second])
+
+		expect(section?.messages.map(({ content }) => content)).toEqual([
+			'Remember the depot hours.',
+			'The depot opens at dawn.',
+		])
+		expect(none).toBeUndefined()
+		expect(calls.count).toBe(1)
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['Which order is late?'])
+	})
+
+	it('runs a queued compact after the first commits, over the tail it then finds', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		conversation.add([
+			{ role: 'user', content: 'First request.' },
+			{ role: 'assistant', content: 'First answer.' },
+			{ role: 'user', content: 'Second request.' },
+		])
+
+		const first = conversation.compact()
+		await waitForCondition('the first summarizer call', () => calls.count === 1)
+		const second = conversation.compact()
+		conversation.add([
+			{ role: 'assistant', content: 'Second answer.' },
+			{ role: 'user', content: 'Third request.' },
+		])
+		await waitForDelay()
+		expect(calls.count).toBe(1)
+		gate.resolve('recap')
+		await first
+		const later = requireValue(await second)
+
+		expect(later.messages.map(({ content }) => content)).toEqual([
+			'Second request.',
+			'Second answer.',
+		])
+		expect(conversation.sections).toHaveLength(2)
+	})
+
+	it('resolves undefined and leaves no section when remove(id) drops a folded message mid-summary', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
 		)
-		// No event fires merely from construction — the recorder saw nothing post-hydrate.
+		const [dropped] = conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		const pending = conversation.compact()
+		await waitForCondition('the summarizer call', () => calls.count === 1)
+		expect(conversation.remove(requireValue(dropped).id)).toBe(true)
+		gate.resolve('recap')
+
+		expect(await pending).toBeUndefined()
+		expect(conversation.sections).toEqual([])
+		expect(conversation.messages().map(({ content }) => content)).toEqual([
+			'The depot opens at dawn.',
+			'Which order is late?',
+		])
 		expect(events.compact.count).toBe(0)
 		expect(events.collapse.count).toBe(0)
-		expect(events.rehydrate.count).toBe(0)
+	})
+
+	it('resolves undefined and leaves no section when clear() empties the tail mid-summary', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		const pending = conversation.compact()
+		await waitForCondition('the summarizer call', () => calls.count === 1)
+		conversation.clear()
+		gate.resolve('recap')
+
+		expect(await pending).toBeUndefined()
+		expect(conversation.sections).toEqual([])
+		expect(conversation.count).toBe(0)
+		expect(events.compact.count).toBe(0)
+	})
+})
+
+describe('Conversation — compact() cancellation through CompactOptions.signal', () => {
+	it('rejects an already-aborted signal with its reason before calling the summarizer', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add({ role: 'assistant', content: 'a' })
+		const reason = new Error('cancelled')
+
+		await expect(conversation.compact({ signal: AbortSignal.abort(reason) })).rejects.toBe(reason)
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.count).toBe(1)
+	})
+
+	it('passes the signal to the summarizer', async () => {
+		const signals = createRecorder<readonly [AbortSignal | undefined]>()
+		const conversation = new Conversation({
+			async summarize(messages, signal) {
+				signals.handler(signal)
+				return `recap of ${messages.length}`
+			},
+		})
+		const controller = new AbortController()
+		conversation.add({ role: 'assistant', content: 'a' })
+		await conversation.compact({ signal: controller.signal })
+		conversation.add({ role: 'assistant', content: 'b' })
+		await conversation.compact()
+
+		expect(signals.calls).toEqual([[controller.signal], [undefined]])
+	})
+
+	it('rejects promptly when aborted during a summarizer that ignores the signal, commits nothing, and a later compact works', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+
+		const pending = conversation.compact({ signal: controller.signal })
+		await waitForCondition('the summarizer call', () => calls.count === 1)
+		controller.abort(reason)
+		await expect(pending).rejects.toBe(reason)
+		expect(conversation.sections).toEqual([])
+		expect(conversation.count).toBe(3)
+
+		// A later compact does not wait for the abandoned summarizer.
+		const later = conversation.compact()
+		await waitForCondition('the later summarizer call', () => calls.count === 2)
+		gate.resolve('recap')
+		expect(requireValue(await later).messages).toHaveLength(2)
+		// The abandoned call's late digest committed nothing beside the later fold.
+		await waitForDelay()
+		expect(conversation.sections).toHaveLength(1)
+		expect(events.compact.count).toBe(1)
+	})
+
+	it('handles a summarizer rejection that lands after the abort', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		conversation.add({ role: 'assistant', content: 'a' })
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+
+		const pending = conversation.compact({ signal: controller.signal })
+		await waitForCondition('the summarizer call', () => calls.count === 1)
+		controller.abort(reason)
+		await expect(pending).rejects.toBe(reason)
+		// Vitest fails the run on an unhandled rejection, so this late reject must be handled.
+		gate.reject(new Error('late summarizer failure'))
+		await waitForDelay()
+
+		expect(conversation.sections).toEqual([])
+		expect(conversation.count).toBe(1)
+	})
+
+	it('rejects a call aborted while queued, and still holds the next call behind the fold in flight', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		conversation.add([
+			{ role: 'user', content: 'First request.' },
+			{ role: 'assistant', content: 'First answer.' },
+			{ role: 'user', content: 'Second request.' },
+		])
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+
+		const first = conversation.compact()
+		await waitForCondition('the first summarizer call', () => calls.count === 1)
+		const queued = conversation.compact({ signal: controller.signal })
+		controller.abort(reason)
+		await expect(queued).rejects.toBe(reason)
+		conversation.add([
+			{ role: 'assistant', content: 'Second answer.' },
+			{ role: 'user', content: 'Third request.' },
+		])
+		const third = conversation.compact()
+		await waitForDelay()
+		expect(calls.count).toBe(1)
+
+		gate.resolve('recap')
+		await first
+		await third
+		expect(calls.count).toBe(2)
+		expect(conversation.sections).toHaveLength(2)
+	})
+})
+
+describe('Conversation — keep must be a nonnegative safe integer', () => {
+	it.each([Number.NaN, -1, 1.5, Number.POSITIVE_INFINITY])(
+		'refuses keep %s at construction and per compact with the KEEP code, never summarizing',
+		async (keep) => {
+			expect(() => new Conversation({ keep })).toThrow(expect.objectContaining({ code: 'KEEP' }))
+			const stub = createStubSummarizer()
+			const conversation = new Conversation({ summarize: stub.summarize })
+			conversation.add([
+				{ role: 'user', content: 'Remember the depot hours.' },
+				{ role: 'assistant', content: 'The depot opens at dawn.' },
+				{ role: 'user', content: 'Which order is late?' },
+			])
+
+			await expect(conversation.compact({ keep })).rejects.toSatisfy(
+				(error: unknown) =>
+					isConversationError(error) &&
+					error.code === 'KEEP' &&
+					Object.is(error.context?.keep, keep),
+			)
+			expect(stub.calls).toHaveLength(0)
+			expect(conversation.sections).toEqual([])
+			expect(conversation.count).toBe(3)
+		},
+	)
+
+	it('accepts zero and a positive integer keep', async () => {
+		const stub = createStubSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, keep: 0 })
+		conversation.add([
+			{ role: 'user', content: 'a' },
+			{ role: 'user', content: 'b' },
+		])
+
+		expect(await conversation.compact({ keep: 1 })).toBeDefined()
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['b'])
 	})
 })

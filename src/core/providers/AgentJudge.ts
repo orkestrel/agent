@@ -151,13 +151,8 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 				signal: combined,
 			})
 			if (!response.ok) {
-				const failure = await readFailure(response, 'judge error:', combined)
-				// Preserve a body-read failure as the cause when it raced the abort.
-				if (!Object.hasOwn(failure, 'cause')) combined.throwIfAborted()
-				throw new JudgeError('HTTP', failure.message, {
-					status: response.status,
-					...(failure.cause === undefined ? {} : { cause: failure.cause }),
-				})
+				const { message, ...options } = await readFailure(response, 'judge error:', combined)
+				throw new JudgeError('HTTP', message, options)
 			}
 			if (response.body === null) {
 				throw new JudgeError('PROTOCOL', 'judge error: no response body')
@@ -171,7 +166,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 			return result
 		} catch (error) {
 			if (combined.aborted) {
-				// A throw that raced the cancel is the call's real failure, so it rides as the cause.
+				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.
 				throw new JudgeAbortError(
 					buildJudgeResult(this.#model, completed),
 					error === combined.reason ? undefined : { cause: error },

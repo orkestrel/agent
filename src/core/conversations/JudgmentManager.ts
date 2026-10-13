@@ -98,7 +98,9 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		for (const [id, raw] of entries) {
 			const question = copyJSON(raw)
 			if (!isJudgeQuestion(question)) {
-				throw new ConversationError('JUDGMENT', `conversation error: question ${id} is malformed`)
+				throw new ConversationError('JUDGMENT', `conversation error: question ${id} is malformed`, {
+					context: { question: id },
+				})
 			}
 			const judgment = this.#judgments.get(id)
 			if (

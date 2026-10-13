@@ -31,10 +31,12 @@ import { createConversationManager } from '../conversations/factories.js'
 import {
 	collectExchanges,
 	collectToolGroups,
+	hasCalls,
 	joinThinking,
 	stripThinking,
 	sumUsage,
 } from '../helpers.js'
+import { isNonNegativeSafeInteger } from '../validators.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
 import {
@@ -69,8 +71,10 @@ import {
 	matchesCutLine,
 	renderLedgerPinned,
 	renderLedgerRecord,
+	renderLookupCall,
 	renderStub,
 	selectRecords,
+	splitResultLines,
 	splitTopic,
 	splitSentences,
 } from './helpers.js'
@@ -132,7 +136,7 @@ export class Ledger implements LedgerInterface {
 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
 		this.#predict = resolvePredict(options.predict, options.capacity)
 		for (const value of [options.recall?.limit, options.agent?.limit]) {
-			if (value !== undefined && (!Number.isSafeInteger(value) || value < 0))
+			if (value !== undefined && !isNonNegativeSafeInteger(value))
 				throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
 		}
 		const topics = new Set<string>()
@@ -284,19 +288,21 @@ export class Ledger implements LedgerInterface {
 	}
 
 	/**
-	 * Appends a request and serves it, recovering an unfinished first pass with one answer pass.
+	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
 	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
+	 * When the answer pass rejects, `respond` rejects with that error. Every rejection leaves the ledger free for a later call.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass and the usage of every pass
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
 	async respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
 		if (this.#active) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
-		this.#active = true
 		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
 		const caller = abort.signal
+		this.#active = true
 		try {
 			if (this.#gauge === undefined) await this.#measureGauge(caller)
 			this.#request = this.#conversation.add({ role: 'user', content })
@@ -309,7 +315,14 @@ export class Ledger implements LedgerInterface {
 			this.#closed = false
 			this.#answered.clear()
 			this.#recalled.clear()
-			const first = await this.#generatePass(caller, this.#options.think)
+			// The answer pass recovers a rejected first pass; the agent's error event carries its cause.
+			const first = await this.#generatePass(caller, this.#options.think).catch(
+				(): AgentResult => ({
+					content: '',
+					partial: true,
+					...(this.#usage === undefined ? {} : { usage: this.#usage }),
+				}),
+			)
 			const passes = [first]
 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
 				const digest = this.#buildDigest()
@@ -329,7 +342,7 @@ export class Ledger implements LedgerInterface {
 							return {
 								...selection,
 								messages: selection.messages.filter(
-									(message) => message.role !== 'tool' && (message.calls?.length ?? 0) === 0,
+									(message) => message.role !== 'tool' && !hasCalls(message),
 								),
 							}
 						},
@@ -409,15 +422,7 @@ export class Ledger implements LedgerInterface {
 		this.#selected = undefined
 		this.#boundary = this.#conversation.messages().length
 		this.#usage = undefined
-		try {
-			return await this.#agent.generate({ signal, ...(think === undefined ? {} : { think }) })
-		} catch {
-			return {
-				content: '',
-				partial: true,
-				...(this.#usage === undefined ? {} : { usage: this.#usage }),
-			}
-		}
+		return await this.#agent.generate({ signal, ...(think === undefined ? {} : { think }) })
 	}
 
 	#flush(): void {
@@ -439,7 +444,7 @@ export class Ledger implements LedgerInterface {
 			return this.#results.get(message.id)?.success === false ? 'chatter' : 'fact'
 		}
 		if (message.role !== 'assistant') return undefined
-		if ((message.calls?.length ?? 0) > 0) return 'chatter'
+		if (hasCalls(message)) return 'chatter'
 		const messages = this.#conversation.messages()
 		const first = messages.findIndex((one) => this.#requests.has(one.id))
 		return first >= 0 && messages.findIndex((one) => one.id === message.id) > first
@@ -540,7 +545,7 @@ export class Ledger implements LedgerInterface {
 		const reading = this.#readLookups().find((one) => one.id === id)
 		return reading === undefined
 			? text
-			: `${reading.name} ${JSON.stringify(reading.arguments)}: ${text}`
+			: `${renderLookupCall(reading.name, reading.arguments)}: ${text}`
 	}
 
 	#collectAfter(): readonly Message[] {
@@ -550,9 +555,7 @@ export class Ledger implements LedgerInterface {
 			.slice(start + 1)
 			.filter(
 				(message) =>
-					message.role !== 'assistant' ||
-					(message.calls?.length ?? 0) > 0 ||
-					message.content.trim() !== '',
+					message.role !== 'assistant' || hasCalls(message) || message.content.trim() !== '',
 			)
 	}
 
@@ -634,7 +637,7 @@ export class Ledger implements LedgerInterface {
 					)
 						held.add(id)
 		const texts = input.messages
-			.filter((message) => (message.calls?.length ?? 0) === 0)
+			.filter((message) => !hasCalls(message))
 			.map((message) => ({
 				message,
 				...extractWords(message),
@@ -853,7 +856,7 @@ export class Ledger implements LedgerInterface {
 					(message.role !== 'tool' || results.has(message.id)) &&
 					!(
 						message.role === 'assistant' &&
-						(message.calls?.length ?? 0) > 0 &&
+						hasCalls(message) &&
 						(calls.get(message.id)?.length ?? 0) === 0 &&
 						message.content === ''
 					),
@@ -1033,7 +1036,7 @@ export class Ledger implements LedgerInterface {
 			const onTopic =
 				(message.role === 'tool'
 					? reading?.result !== undefined
-					: (message.calls?.length ?? 0) === 0 && !this.#classifier.quiet(message.id)) &&
+					: !hasCalls(message) && !this.#classifier.quiet(message.id)) &&
 				[...matched].some((match) => topics.has(match))
 			const worded =
 				(message.role === 'tool' ? reading !== undefined : message.role === 'user') &&
@@ -1054,10 +1057,10 @@ export class Ledger implements LedgerInterface {
 				const text =
 					lookup === undefined
 						? source.content
-						: `${lookup.name} ${JSON.stringify(lookup.arguments)}: ${source.content}`
+						: `${renderLookupCall(lookup.name, lookup.arguments)}: ${source.content}`
 				texts.push(text)
 				if (lookup !== undefined)
-					recalled.set(text.split(/\r\n|\n/)[0] ?? '', source.content.split(/\r\n|\n/)[0] ?? '')
+					recalled.set(splitResultLines(text)[0] ?? '', splitResultLines(source.content)[0] ?? '')
 			}
 			if (texts.length > 0) listed.push(texts.join('\n'))
 		}
@@ -1076,7 +1079,7 @@ export class Ledger implements LedgerInterface {
 			const listing = result.name === 'recall'
 			if (listing && /^nothing on /.test(message.content)) continue
 			const recalled = listing ? this.#recalled.get(message.content) : undefined
-			for (const line of message.content.split(/\r\n|\n/)) {
+			for (const line of splitResultLines(message.content)) {
 				if (listing && matchesCutLine(line)) continue
 				const text = recalled?.get(line) ?? line
 				if (!lines.includes(text)) lines.push(text)

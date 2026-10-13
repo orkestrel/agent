@@ -19,6 +19,8 @@ import type {
 import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
+import { renderJSON } from '../helpers.js'
+import { isNonNegativeSafeInteger } from '../validators.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
 
@@ -211,7 +213,7 @@ export function rankLedgerCut(
  */
 export function resolvePredict(predict: number | undefined, capacity: number): number {
 	const resolved = predict ?? 0
-	if (!Number.isSafeInteger(resolved) || resolved < 0 || resolved >= capacity)
+	if (!isNonNegativeSafeInteger(resolved) || resolved >= capacity)
 		throw new LedgerError(
 			'CAPACITY',
 			'predict must be a nonnegative safe integer less than capacity',
@@ -243,12 +245,7 @@ export function computeThinking(
 ): number {
 	const thinking = message.thinking?.length ?? 0
 	if (thinking === 0) return 0
-	let calls = 0
-	try {
-		calls = message.calls === undefined ? 0 : JSON.stringify(message.calls).length
-	} catch {
-		// Non-JSON arguments still belong to the domain call contract.
-	}
+	const calls = message.calls === undefined ? 0 : (renderJSON(message.calls)?.length ?? 0)
 	const generated = thinking + message.content.length + calls
 	return Math.min(completion, Math.round(completion * (thinking / generated)))
 }
@@ -325,11 +322,71 @@ export function collectNames(text: string): readonly string[] {
 }
 
 /**
+ * Normalizes a lookup argument string to the spelling that lookup identity and owner linking compare.
+ *
+ * @remarks
+ * {@link identifyLookup} and {@link linkOwners} read an argument through this one form, so a reading
+ * a later lookup replaces and the owner link of its argument agree on the spelling.
+ *
+ * @param value - The string argument a lookup call carried
+ * @returns The argument trimmed and uppercased
+ *
+ * @example
+ * ```ts
+ * normalizeArgument(' bw-5512 ') // 'BW-5512'
+ * ```
+ */
+export function normalizeArgument(value: string): string {
+	return value.trim().toUpperCase()
+}
+
+/**
+ * Splits a tool result into its lines at each line feed, with or without a carriage return before it.
+ *
+ * @remarks
+ * The recall listing keys each recalled line by its first line, and the answer note reads a result
+ * line by line, so both read lines through this one split.
+ *
+ * @param text - The tool result text
+ * @returns The lines in order, an empty line included; one empty line for an empty text
+ *
+ * @example
+ * ```ts
+ * splitResultLines('Account BW-20931.\r\nRefund is $148.50.') // ['Account BW-20931.', 'Refund is $148.50.']
+ * ```
+ */
+export function splitResultLines(text: string): readonly string[] {
+	return text.split(/\r\n|\n/)
+}
+
+/**
+ * Renders a lookup call as its tool name and its JSON arguments.
+ *
+ * @remarks
+ * The arguments keep the text `JSON.stringify` writes, key order included. Arguments JSON cannot
+ * carry, such as a `BigInt` or a cycle, render the bare tool name instead of throwing.
+ *
+ * @param name - The lookup tool name
+ * @param args - The arguments the call carried
+ * @returns The tool name, a space, and the JSON arguments; the bare tool name when JSON cannot carry them
+ *
+ * @example
+ * ```ts
+ * renderLookupCall('lookup_order', { id: 'BW-5512' }) // 'lookup_order {"id":"BW-5512"}'
+ * renderLookupCall('lookup_order', { count: 1n }) // 'lookup_order'
+ * ```
+ */
+export function renderLookupCall(name: string, args: Readonly<Record<string, unknown>>): string {
+	const rendered = renderJSON(args)
+	return rendered === undefined ? name : `${name} ${rendered}`
+}
+
+/**
  * Identifies a lookup reading for projection by its tool name and normalized arguments.
  *
  * @remarks
  * Two calls share an identity whatever the key order of their arguments at any depth. A top-level
- * string argument is trimmed and uppercased first, so `"lh-1 "` and `"LH-1"` name one call.
+ * string argument passes through {@link normalizeArgument} first, so `"lh-1 "` and `"LH-1"` name one call.
  * The ledger's repeat stop instead compares the tool name and canonical arguments without this
  * string normalization, so those argument spellings remain distinct within a request.
  *
@@ -347,7 +404,7 @@ export function identifyLookup(name: string, args: Readonly<Record<string, unkno
 	const normalized = Object.fromEntries(
 		Object.entries(args).map(([key, value]) => [
 			key,
-			isString(value) ? value.trim().toUpperCase() : value,
+			isString(value) ? normalizeArgument(value) : value,
 		]),
 	)
 	return `${name} ${canonicalStringify(normalized) ?? ''}`
@@ -384,7 +441,7 @@ export function linkOwners(
 		const [only] = named
 		const subjects = Object.values(reading.arguments)
 			.filter(isString)
-			.map((value) => value.trim().toUpperCase())
+			.map((value) => normalizeArgument(value))
 			.filter((subject) => extractTokens(subject).ids.has(subject))
 		for (const subject of subjects) {
 			if (owners.has(subject)) links.set(subject, subject)
@@ -540,8 +597,9 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const system = collectNames(input.system)
 	const members = new Map<string, string[]>()
 	const orphans: string[] = []
+	const settled = new Map<string, ReadonlySet<string>>()
 	for (const id of live) {
-		const keys = placeMember(input, links, amending, id, new Set())
+		const keys = placeMember(input, links, amending, id, new Set(), settled)
 		if (keys.size === 0) orphans.push(id)
 		for (const key of keys) members.set(key, [...(members.get(key) ?? []), id])
 	}
@@ -733,7 +791,7 @@ export function matchesCutLine(line: string): boolean {
  * Renders the tail stub of a lookup result from an earlier request.
  *
  * @param name - The lookup tool name
- * @param args - The arguments the call carried
+ * @param args - The arguments the call carried; arguments JSON cannot carry leave the call as its bare tool name, per {@link renderLookupCall}
  * @param state - What became of the result: `failed`, `empty`, `shown` in the briefing, or `hidden` from it
  * @returns The stub text, which carries the call and its state
  *
@@ -748,7 +806,7 @@ export function renderStub(
 	args: Readonly<Record<string, unknown>>,
 	state: LedgerLookupState,
 ): string {
-	const head = `${name} ${JSON.stringify(args)}`
+	const head = renderLookupCall(name, args)
 	if (state === 'failed') return `${head}: failed`
 	if (state === 'empty') return `${head}: no record`
 	if (state === 'shown') return `${head}: result shown under Pinned in the system message`
@@ -855,11 +913,20 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
  * A message that is not live still places, because a correction joins where its earlier side would
  * join.
  *
+ * With `settled`, the walk returns a placement the map holds without walking again, and records each
+ * placement whose walk, its nested walks included, excluded no earlier side through `seen`. Such a
+ * walk reaches no cycle. While every `seen` holds only the path that reached the message, as
+ * {@link buildRecords} passes it, that path never holds a message the recorded walk reached, so a
+ * fresh walk returns the same keys in the same order. A placement a cycle cut stays unrecorded,
+ * because its keys depend on the path that reached it. Sharing one map across the members of one
+ * input bounds a dense amendment graph to one walk per message.
+ *
  * @param input - The owners, entities, and classification to read
  * @param links - The owner of each linked lookup argument, from {@link linkOwners}
  * @param amending - The earlier sides of each message's amendment pairs
  * @param id - The message id
  * @param seen - The ids already visited, which stops a cycle of amendment pairs
+ * @param settled - The placements already walked for the same `input`, `links`, and `amending`; the walk adds to it. Default: no map, so every call walks
  * @returns The record keys, empty when the message is an orphan
  *
  * @example
@@ -873,23 +940,32 @@ export function placeMember(
 	amending: ReadonlyMap<string, readonly string[]>,
 	id: string,
 	seen: ReadonlySet<string>,
+	settled?: Map<string, ReadonlySet<string>>,
 ): ReadonlySet<string> {
+	const known = settled?.get(id)
+	if (known !== undefined) return known
 	const keys = new Set<string>()
 	for (const entity of input.entities.get(id) ?? []) {
 		const owner = input.owners.has(entity) ? entity : links.get(entity)
 		if (owner !== undefined) keys.add(`${LEDGER_OWNER_PREFIX}${owner}`)
 	}
-	if (keys.size > 0) return keys
-	const earlier = (amending.get(id) ?? []).filter((side) => side !== id && !seen.has(side))
-	if (earlier.length > 0) {
-		for (const side of earlier) {
-			for (const key of placeMember(input, links, amending, side, new Set([...seen, id])))
-				keys.add(key)
-		}
-		return keys
+	const owned = keys.size > 0
+	const sides = owned ? [] : (amending.get(id) ?? []).filter((side) => side !== id)
+	const earlier = sides.filter((side) => !seen.has(side))
+	for (const side of earlier) {
+		for (const key of placeMember(input, links, amending, side, new Set([...seen, id]), settled))
+			keys.add(key)
 	}
-	const category = input.classification.categories.get(id)
-	if (category !== undefined && PLACED_CATEGORIES.includes(category)) keys.add(LEDGER_RULES_KEY)
+	if (!owned && earlier.length === 0) {
+		const category = input.classification.categories.get(id)
+		if (category !== undefined && PLACED_CATEGORIES.includes(category)) keys.add(LEDGER_RULES_KEY)
+	}
+	if (
+		settled !== undefined &&
+		earlier.length === sides.length &&
+		earlier.every((side) => settled.has(side))
+	)
+		settled.set(id, keys)
 	return keys
 }
 

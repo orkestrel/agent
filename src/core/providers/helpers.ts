@@ -1,6 +1,7 @@
 import type {
 	FailureRead,
 	ProviderOptions,
+	ProviderRequest,
 	ProviderResult,
 	Reading,
 	SystemOneAnswer,
@@ -109,14 +110,22 @@ export async function armReaderAbort(
 /**
  * Reads a bounded HTTP failure excerpt and preserves an unreadable body's cause.
  *
+ * @remarks
+ * Both HTTP engines, the provider and the judge, translate a non-OK response here and throw
+ * their own coded error from the result. When the excerpt is read and `signal` has aborted, the
+ * abort is the call's outcome, so the signal's reason is thrown. When the body read fails, the
+ * failure is returned as `cause` whether or not `signal` has aborted, so a read that raced the
+ * abort stays recorded on the error the caller throws.
+ *
  * @param response - The failed HTTP response
  * @param prefix - The error taxonomy prefix, including its trailing colon
  * @param signal - The call's combined caller and deadline signal
- * @returns The status message with any excerpt or body-read failure
+ * @returns The status message with any excerpt, the response status, and any body-read failure
+ * @throws Thrown when the excerpt is read after `signal` aborts, with the signal's reason
  * @example
  * ```ts
  * await readFailure(new Response('unavailable', { status: 503 }), 'provider error:', new AbortController().signal)
- * // { message: 'provider error: 503 - unavailable' }
+ * // { message: 'provider error: 503 - unavailable', status: 503 }
  * ```
  */
 export async function readFailure(
@@ -124,15 +133,22 @@ export async function readFailure(
 	prefix: string,
 	signal: AbortSignal,
 ): Promise<FailureRead> {
+	const status = response.status
+	let detail: string
 	try {
-		const detail =
+		detail =
 			response.body === null
 				? ''
 				: (await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)).text
-		return { message: `${prefix} ${response.status}${detail === '' ? '' : ` - ${detail}`}` }
 	} catch (cause) {
-		return { message: `${prefix} ${response.status} - (error body unavailable)`, cause }
+		return {
+			message: `${prefix} ${status} - (error body unavailable)`,
+			status,
+			...(cause === undefined ? {} : { cause }),
+		}
 	}
+	signal.throwIfAborted()
+	return { message: `${prefix} ${status}${detail === '' ? '' : ` - ${detail}`}`, status }
 }
 
 /**
@@ -379,6 +395,67 @@ export async function buildProviderHeaders(
 		return headers
 	} finally {
 		cleanup.abort()
+	}
+}
+
+/**
+ * Projects a provider request onto the declared members the relay wire carries.
+ *
+ * @remarks
+ * Each message keeps `id`, `role`, `content`, and any `calls`, `call`, `images`, and `thinking`;
+ * each call keeps only `id`, `name`, and `arguments`, so a local execution context never reaches
+ * the wire. Each tool keeps `name` and any `description` and `parameters`, and the options keep
+ * any `think` and `schema`. An absent member stays absent. The projection shares every nested
+ * value with the input rather than copying it, so the caller snapshots and validates the result;
+ * a throwing getter propagates its failure.
+ *
+ * @param request - The domain conversation and call configuration
+ * @returns The request with only the members the relay wire declares
+ * @example
+ * ```ts
+ * requestToRelay({
+ * 	messages: [{ id: 'turn-1', role: 'user', content: 'Track BW-5512' }],
+ * 	options: { think: false },
+ * })
+ * // { messages: [{ id: 'turn-1', role: 'user', content: 'Track BW-5512' }], options: { think: false } }
+ * ```
+ */
+export function requestToRelay(request: ProviderRequest): ProviderRequest {
+	return {
+		messages: request.messages.map((message) => ({
+			id: message.id,
+			role: message.role,
+			content: message.content,
+			...(message.calls === undefined
+				? {}
+				: {
+						calls: message.calls.map((call) => ({
+							id: call.id,
+							name: call.name,
+							arguments: call.arguments,
+						})),
+					}),
+			...(message.call === undefined ? {} : { call: message.call }),
+			...(message.images === undefined ? {} : { images: message.images }),
+			...(message.thinking === undefined ? {} : { thinking: message.thinking }),
+		})),
+		...(request.tools === undefined
+			? {}
+			: {
+					tools: request.tools.map((tool) => ({
+						name: tool.name,
+						...(tool.description === undefined ? {} : { description: tool.description }),
+						...(tool.parameters === undefined ? {} : { parameters: tool.parameters }),
+					})),
+				}),
+		...(request.options === undefined
+			? {}
+			: {
+					options: {
+						...(request.options.think === undefined ? {} : { think: request.options.think }),
+						...(request.options.schema === undefined ? {} : { schema: request.options.schema }),
+					},
+				}),
 	}
 }
 

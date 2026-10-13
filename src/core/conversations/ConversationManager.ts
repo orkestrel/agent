@@ -9,6 +9,7 @@ import type {
 import { isArray } from '@orkestrel/contract'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { Conversation } from './Conversation.js'
+import { requireKeep } from './helpers.js'
 import { removeEntries } from '../helpers.js'
 
 /**
@@ -64,7 +65,7 @@ export class ConversationManager implements ConversationManagerInterface {
 
 	constructor(options?: ConversationManagerOptions) {
 		this.#summarize = options?.summarize
-		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
 		this.#sections = options?.sections
 		this.#store = options?.store
 	}
@@ -93,6 +94,7 @@ export class ConversationManager implements ConversationManagerInterface {
 		const conversation = new Conversation({
 			...(input?.id === undefined ? {} : { id: input.id }),
 			...(input?.on === undefined ? {} : { on: input.on }),
+			...(input?.error === undefined ? {} : { error: input.error }),
 			...(summarize === undefined ? {} : { summarize }),
 			keep: input?.keep ?? this.#keep,
 			...(sections === undefined ? {} : { sections }),
@@ -120,7 +122,16 @@ export class ConversationManager implements ConversationManagerInterface {
 		}
 		if (this.#store === undefined) return undefined
 		const snapshot = await this.#store.get(id)
-		if (snapshot === undefined) return undefined
+		// A conversation registered while the read was pending is live state; the stored snapshot
+		// is older, so it must not overwrite it.
+		const registered = this.#conversations.get(id)
+		if (registered !== undefined) {
+			this.#active = id
+			return registered
+		}
+		// A store answering with another conversation's snapshot would register and activate the
+		// wrong id, so only a snapshot of `id` hydrates.
+		if (snapshot === undefined || snapshot.id !== id) return undefined
 		// Reuse `add` so the default summarize / keep of the manager flow into the rehydrated conversation.
 		const conversation = this.add({ snapshot })
 		// Re-point `active` explicitly: `add` only auto-activates the first conversation, so an open

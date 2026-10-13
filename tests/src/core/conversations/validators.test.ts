@@ -1,4 +1,10 @@
-import { isConversationSnapshot, isJudgment, isMessage, isSection } from '@src/core'
+import {
+	isConversationSnapshot,
+	isJudgment,
+	isMessage,
+	isSection,
+	JudgmentManager,
+} from '@src/core'
 import { roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
@@ -35,6 +41,32 @@ describe('isJudgment and snapshot carriage', () => {
 			expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: [record] })).toBe(false)
 		},
 	)
+	it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+		'refuses a %s time, noul, or probability, so every accepted record hydrates',
+		(value) => {
+			const records = [
+				{ ...JUDGMENT_RECORD, time: value },
+				{ ...JUDGMENT_RECORD, answer: { form: 'noul', noul: value } },
+				{ ...JUDGMENT_RECORD, answer: { ...TEV1_SCORE, probabilities: [value, 0.5] } },
+				{ ...JUDGMENT_RECORD, answer: { ...TEV1_CHOICE, probabilities: { billing: value } } },
+			]
+			for (const record of records) {
+				expect(isJudgment(record)).toBe(false)
+				expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: [record] })).toBe(false)
+			}
+			// The finite twins pass the guard and hydrate through the judgment store.
+			const finite = [
+				JUDGMENT_RECORD,
+				{ ...JUDGMENT_RECORD, answer: TEV1_SCORE },
+				{ ...JUDGMENT_RECORD, answer: TEV1_CHOICE },
+			]
+			for (const record of finite) {
+				expect(isJudgment(record)).toBe(true)
+				expect(new JudgmentManager([record]).judgments()).toEqual([record])
+			}
+		},
+	)
+
 	it('contains unreadable fields and cyclic questions at the storage boundary', () => {
 		const hostile = new Proxy(JUDGMENT_RECORD, {
 			get() {

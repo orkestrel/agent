@@ -16,7 +16,13 @@ import { Emitter } from '@orkestrel/emitter'
 import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
-import { buildRecapMessage, buildSummaryMessage, requireSectionsCap } from './helpers.js'
+import {
+	buildRecapMessage,
+	buildSummaryMessage,
+	raceSignal,
+	requireKeep,
+	requireSectionsCap,
+} from './helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
 /**
@@ -44,7 +50,9 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   exchanges. A cut inside an assistant call group, which only a group spanning two exchanges
  *   allows, moves before the group, so a tool result never stays live without its call. Returns
  *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
- *   `#summarize` was supplied.
+ *   `#summarize` was supplied. Calls run one at a time, a fold commits only when its messages are
+ *   still the live entries after the summarizer settles, and `options.signal` rejects the call
+ *   with its reason at once and commits nothing after the abort.
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns the full original messages of a
  *   known section and emits its `id` through `rehydrate`, even when the list is empty. An unknown
  *   id returns `undefined` without an event. The read never reinserts messages. `search` is a case-insensitive
@@ -87,6 +95,9 @@ export class Conversation implements ConversationInterface {
 	// immutable messages keyed by their minted id.
 	readonly #messages = new Map<string, Message>()
 	readonly #judgments: JudgmentManager
+	// The lock `compact()` queues behind — settled only after every earlier call settled, and
+	// `undefined` while no call is in flight.
+	#pending: Promise<unknown> | undefined
 
 	constructor(options?: ConversationOptions) {
 		// A summarizer is a function and is never serialized, so it comes from options beside the
@@ -96,7 +107,7 @@ export class Conversation implements ConversationInterface {
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>(options)
 		this.#summarize = options?.summarize
-		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
 		this.#cap = requireSectionsCap(options?.sections)
 		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
 		if (snapshot !== undefined) {
@@ -178,48 +189,20 @@ export class Conversation implements ConversationInterface {
 			)
 		}
 		const cap = requireSectionsCap(options?.sections ?? this.#cap)
-		const keep = options?.keep ?? this.#keep
-		const live = [...this.#messages.values()]
-		// The newest user message is the request a run serves, so it and its turns stay live.
-		const newest = live.findLastIndex((message) => message.role === 'user')
-		const first = live.findIndex((message) => message.role === 'user')
-		let fold = Math.min(
-			keep <= 0 ? live.length : live.length - keep,
-			newest === -1 ? live.length : newest,
-		)
-		let start = 0
-		for (const exchange of collectExchanges(live)) {
-			const end = start + exchange.length
-			if (start < fold && fold < end) fold = start
-			start = end
-		}
-		// Retain the leading context until the first user exchange can fold with it.
-		if (first >= 0 && fold <= first) fold = 0
-		if (fold <= 0) return undefined
-		const slice = live.slice(0, fold)
-		const summary = await summarize(stripThinking(slice, 'none'))
-		const section: Section = {
-			id: crypto.randomUUID(),
-			summary,
-			messages: slice,
-		}
-		for (const message of slice) this.#messages.delete(message.id)
-		this.#sections = [...this.#sections, section]
-		// Preserve the original sections if the merge fails by replacing them only after summarizing.
-		if (cap !== undefined && this.#sections.length > cap) {
-			const overflow = this.#sections.length - cap + 1
-			const folded = this.#sections.slice(0, overflow)
-			const merged: Section = {
-				id: crypto.randomUUID(),
-				summary: await summarize(folded.map((one) => buildSummaryMessage(one))),
-				messages: folded.flatMap((one) => one.messages),
-			}
-			this.#sections = [merged, ...this.#sections.slice(overflow)]
-			this.#emitter.emit('collapse', merged)
-		}
-		// Observe the section last, so a swallowed listener throw can't perturb the fold.
-		this.#emitter.emit('compact', section)
-		return section
+		const keep = requireKeep(options?.keep ?? this.#keep)
+		const signal = options?.signal
+		signal?.throwIfAborted()
+		// Queue behind every earlier call. The lock settles only after the earlier lock and this
+		// call both settle, so an aborted waiter never releases a later call ahead of a fold still
+		// in flight.
+		const previous = this.#pending
+		const fold = this.#fold(previous, summarize, cap, keep, signal)
+		const pending = Promise.allSettled([previous, fold])
+		this.#pending = pending
+		void pending.then(() => {
+			if (this.#pending === pending) this.#pending = undefined
+		})
+		return fold
 	}
 
 	rehydrate(id: string): readonly Message[] | undefined {
@@ -263,6 +246,76 @@ export class Conversation implements ConversationInterface {
 			messages: this.messages(),
 			...(this.#judgments.count === 0 ? {} : { judgments: this.#judgments.judgments() }),
 		}
+	}
+
+	// One serialized fold: wait for the earlier call, read the live tail, summarize, then commit
+	// only what is unchanged. Every await is raced against the signal and followed by a check, so
+	// an abort commits nothing after it.
+	async #fold(
+		previous: Promise<unknown> | undefined,
+		summarize: ConversationSummaryHandler,
+		cap: number | undefined,
+		keep: number,
+		signal: AbortSignal | undefined,
+	): Promise<Section | undefined> {
+		if (previous !== undefined) await raceSignal(previous, signal)
+		signal?.throwIfAborted()
+		const live = [...this.#messages.values()]
+		// The newest user message is the request a run serves, so it and its turns stay live.
+		const newest = live.findLastIndex((message) => message.role === 'user')
+		const first = live.findIndex((message) => message.role === 'user')
+		let fold = Math.min(
+			keep <= 0 ? live.length : live.length - keep,
+			newest === -1 ? live.length : newest,
+		)
+		let start = 0
+		for (const exchange of collectExchanges(live)) {
+			const end = start + exchange.length
+			if (start < fold && fold < end) fold = start
+			start = end
+		}
+		// Retain the leading context until the first user exchange can fold with it.
+		if (first >= 0 && fold <= first) fold = 0
+		if (fold <= 0) return undefined
+		const slice = live.slice(0, fold)
+		const summary = await raceSignal(summarize(stripThinking(slice, 'none'), signal), signal)
+		signal?.throwIfAborted()
+		// A `remove` or `clear` while the summarizer ran changed what this fold covers, so commit
+		// nothing rather than fold messages the caller dropped back into a section.
+		if (!slice.every((message) => this.#messages.get(message.id) === message)) return undefined
+		const section: Section = {
+			id: crypto.randomUUID(),
+			summary,
+			messages: slice,
+		}
+		for (const message of slice) this.#messages.delete(message.id)
+		this.#sections = [...this.#sections, section]
+		// Preserve the original sections if the merge fails by replacing them only after summarizing.
+		if (cap !== undefined && this.#sections.length > cap) {
+			const overflow = this.#sections.length - cap + 1
+			const folded = this.#sections.slice(0, overflow)
+			const digest = await raceSignal(
+				summarize(
+					folded.map((one) => buildSummaryMessage(one)),
+					signal,
+				),
+				signal,
+			)
+			signal?.throwIfAborted()
+			// Only a fold changes `#sections`, and folds run one at a time, so the head holds here;
+			// the check keeps a merge from ever replacing sections it did not summarize.
+			if (!folded.every((one, index) => this.#sections[index] === one)) return undefined
+			const merged: Section = {
+				id: crypto.randomUUID(),
+				summary: digest,
+				messages: folded.flatMap((one) => one.messages),
+			}
+			this.#sections = [merged, ...this.#sections.slice(overflow)]
+			this.#emitter.emit('collapse', merged)
+		}
+		// Observe the section last, so a swallowed listener throw can't perturb the fold.
+		this.#emitter.emit('compact', section)
+		return section
 	}
 
 	// Spread each optional only when present, so an absent optional is never stored as `undefined`.

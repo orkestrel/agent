@@ -1,7 +1,6 @@
 import type { LedgerOptions, MessageInput, Selection, ThinkingReplay } from '@src/core'
 import {
 	LEDGER_NOTES,
-	LEDGER_QUESTIONS,
 	Ledger,
 	createLedger,
 	createScope,
@@ -13,14 +12,19 @@ import { createTool } from '@orkestrel/tool'
 import { requireValue } from '@orkestrel/test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+	buildDeliverySeed,
 	buildLedgerOptions,
 	buildLedgerResponse,
 	buildLedgerJudgment,
 	buildLedgerExchange,
+	buildLedgerPairJudgment,
+	buildLedgerTopicJudgment,
+	buildUncalibratedOptions,
 	LEDGER_HANDLE,
 	RecordedTransport,
 	RecordingJudge,
 	SequentialSystemOneJudge,
+	createForeignSignal,
 	createScriptedProvider,
 } from '../../../setup.js'
 
@@ -240,7 +244,7 @@ describe('Ledger', () => {
 				],
 				{ recorded: true, replay },
 			)
-			const { gauge: _gauge, ...uncalibrated } = options
+			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, uncalibrated)
 			ledger.conversation.add([
 				{ role: 'user', content: 'Seed.' },
@@ -404,21 +408,9 @@ describe('Ledger', () => {
 		})
 		ledger.conversation.add({ role: 'tool', call: 'seed', content: 'No record' })
 		for (const message of [older, source, quiet, called]) {
-			ledger.conversation.judgments.add({
-				id: JSON.stringify(['topic', message.id, 'refunds']),
-				question: {
-					form: 'noul',
-					instructions: LEDGER_QUESTIONS.topic,
-					criteria: {
-						true: 'The message concerns refunds: Refund amounts',
-						false: 'The message does not concern refunds',
-					},
-				},
-				sources: [message.id],
-				state: `assistant: ${message.content}`,
-				model: judge.model,
-				answer: { form: 'noul', noul: 1 },
-			})
+			ledger.conversation.judgments.add(
+				buildLedgerTopicJudgment(message, requireValue(options.topics[0]), 1),
+			)
 		}
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(quiet, {
@@ -430,14 +422,7 @@ describe('Ledger', () => {
 			[source, second],
 			[first, last],
 		] as const) {
-			ledger.conversation.judgments.add({
-				id: JSON.stringify(['amends', earlier.id, later.id]),
-				question: LEDGER_QUESTIONS.amends,
-				sources: [earlier.id, later.id],
-				state: `Earlier message: ${earlier.role}: ${earlier.content}\nLater message: user: ${later.content}`,
-				model: judge.model,
-				answer: { form: 'noul', noul: 1 },
-			})
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
 		}
 		await ledger.respond('First request.')
 		await ledger.respond('Second request about refunds.')
@@ -669,7 +654,7 @@ describe('Ledger', () => {
 			],
 			{ recorded: true, replay: 'none' },
 		)
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		const ledger = createLedger(provider, uncalibrated)
 		ledger.conversation.add([
 			{ role: 'user', content: 'Seed.' },
@@ -724,7 +709,7 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		const ledger = createLedger(
 			{
 				id: provider.id,
@@ -761,7 +746,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects invalid generation caps with CAPACITY even before calibration', () => {
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		for (const predict of [
 			-1,
 			0.5,
@@ -930,12 +915,7 @@ describe('Ledger', () => {
 				capacity: thinking === undefined ? 3072 : 4096,
 				...(thinking === undefined ? {} : { predict: 1024 }),
 			})
-			ledger.conversation.add(
-				Array.from({ length: 20 }, (_unused, at): MessageInput => ({
-					role: 'user',
-					content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
-				})),
-			)
+			ledger.conversation.add(buildDeliverySeed(20))
 			await ledger.respond('Review.')
 			const recalled = requireValue(
 				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
@@ -1015,15 +995,10 @@ describe('Ledger', () => {
 				],
 				{ recorded: true },
 			)
-			const { gauge: _gauge, ...uncalibrated } = options
+			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, { ...uncalibrated, predict })
 			await ledger.calibrate(new AbortController().signal)
-			ledger.conversation.add(
-				Array.from({ length: 20 }, (_unused, at): MessageInput => ({
-					role: 'user',
-					content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
-				})),
-			)
+			ledger.conversation.add(buildDeliverySeed(20))
 			await ledger.respond('Review.')
 			const recalled = requireValue(
 				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
@@ -1051,7 +1026,7 @@ describe('Ledger', () => {
 				],
 				{ recorded: true, replay },
 			)
-			const { gauge: _gauge, ...uncalibrated } = options
+			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, { ...uncalibrated, predict: 1024 })
 			await ledger.respond('Review.')
 			expect(
@@ -1083,7 +1058,7 @@ describe('Ledger', () => {
 				],
 				{ recorded: true },
 			)
-			const { gauge: _gauge, ...uncalibrated } = options
+			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, {
 				...(calibrated ? uncalibrated : options),
 				predict: 1024,
@@ -1313,6 +1288,82 @@ describe('Ledger', () => {
 		expect(slow.calls[1]?.tools).toBeUndefined()
 	})
 
+	it('rejects with the answer pass error when both passes reject and admits a later request', async () => {
+		const fault = new Error('provider unreachable')
+		let failing = true
+		const provider = createScriptedProvider([{ content: 'Recovered.' }], {
+			recorded: true,
+			chunk: (content) => {
+				if (failing) throw fault
+				return [content]
+			},
+		})
+		const ledger = createLedger(provider, options)
+		await expect(ledger.respond('Check the account.')).rejects.toBe(fault)
+		expect(provider.calls).toHaveLength(2)
+		expect(provider.calls[1]?.tools).toBeUndefined()
+		expect(ledger.agent.context.scope).toBeUndefined()
+		failing = false
+		expect((await ledger.respond('Check again.')).content).toBe('Recovered.')
+	})
+
+	it('rejects a signal that is not a native AbortSignal without locking the ledger', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, options)
+		await expect(ledger.respond('First.', createForeignSignal())).rejects.toThrow(/AbortSignal/)
+		expect(ledger.conversation.count).toBe(0)
+		expect(provider.calls).toHaveLength(0)
+		expect((await ledger.respond('Second.')).content).toBe('Done.')
+	})
+
+	it('renders a seeded lookup whose arguments JSON cannot carry under its bare tool name', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, options)
+		ledger.conversation.add([
+			{ role: 'user', content: 'Brightwater Studio called.' },
+			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.', 'seed', {
+				id: 'BW-20931',
+				count: 1n,
+			}),
+		])
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		await ledger.respond('Check Brightwater Studio.')
+		expect(selections[0]?.fault).toBeUndefined()
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.find((message) => message.call === 'seed')?.content).toBe(
+			'lookup: result shown under Pinned in the system message',
+		)
+		expect(sent[0]?.content).toContain('- Account BW-20931: Brightwater Studio.')
+	})
+
+	it('closes recall on the first call at a zero recall limit', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, { ...options, recall: { limit: 0 } })
+		ledger.conversation.add({ role: 'user', content: 'Refunds over $200 need a manager.' })
+		await ledger.respond('Check the desk.')
+		expect(
+			ledger.conversation
+				.messages()
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([LEDGER_NOTES.closure])
+	})
+
+	it('makes no provider call at a zero agent turn limit', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, { ...options, agent: { limit: 0 } })
+		const result = await ledger.respond('Check the desk.')
+		expect(provider.calls).toHaveLength(0)
+		expect(result.content).toBe('')
+	})
+
 	it('skips the answer pass after caller abort and refuses concurrency before appending', async () => {
 		const caller = new AbortController()
 		const provider = createScriptedProvider([{ content: 'Delayed.' }], {
@@ -1344,7 +1395,7 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		const ledger = createLedger(provider, uncalibrated)
 		expect(ledger.gauge).toBeUndefined()
 		await ledger.respond('Check the desk.')
@@ -1362,7 +1413,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects calibration without usage', async () => {
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		const ledger = createLedger(createScriptedProvider([{ content: '' }]), uncalibrated)
 		await expect(ledger.calibrate(new AbortController().signal)).rejects.toMatchObject({
 			code: 'GAUGE',
@@ -1372,7 +1423,7 @@ describe('Ledger', () => {
 
 	it('validates constructor options without relying on the factory', () => {
 		const provider = createScriptedProvider([])
-		const { gauge: _gauge, ...bare } = options
+		const bare = buildUncalibratedOptions(options)
 		expect(() => new Ledger(provider, { ...bare, capacity: -1 })).toThrow(
 			expect.objectContaining({ code: 'CAPACITY' }),
 		)
@@ -1479,7 +1530,7 @@ describe('Ledger', () => {
 	})
 
 	it('refuses nonpositive priced usage and recovers the next respond after GAUGE', async () => {
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		for (const prompt of [0, -1]) {
 			const provider = createScriptedProvider([
 				{ content: '', usage: { prompt, completion: 1, total: prompt + 1 } },
@@ -1497,7 +1548,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects calibration with the abort reason and refuses calibration during respond', async () => {
-		const { gauge: _gauge, ...uncalibrated } = options
+		const uncalibrated = buildUncalibratedOptions(options)
 		const reason = new Error('caller stopped calibration')
 		for (const responding of [false, true]) {
 			const ledger = createLedger(createScriptedProvider([{ content: '' }]), uncalibrated)
@@ -1862,46 +1913,13 @@ describe('Ledger', () => {
 					},
 				}),
 			)
-			ledger.conversation.judgments.add({
-				id: JSON.stringify(['topic', message.id, 'refunds']),
-				question: {
-					form: 'noul',
-					instructions: LEDGER_QUESTIONS.topic,
-					criteria: {
-						true: 'The message concerns refunds: Refund amounts',
-						false: 'The message does not concern refunds',
-					},
-				},
-				sources: [message.id],
-				state: `user: ${message.content}`,
-				model: judge.model,
-				answer: { form: 'noul', noul: 1 },
-			})
+			ledger.conversation.judgments.add(
+				buildLedgerTopicJudgment(message, requireValue(options.topics[0]), 1),
+			)
 		}
-		ledger.conversation.judgments.add({
-			id: JSON.stringify(['amends', old.id, correction.id]),
-			question: LEDGER_QUESTIONS.amends,
-			sources: [old.id, correction.id],
-			state: `Earlier message: user: ${old.content}\nLater message: user: ${correction.content}`,
-			model: judge.model,
-			answer: { form: 'noul', noul: 1 },
-		})
-		ledger.conversation.judgments.add({
-			id: JSON.stringify(['supersedes', old.id, correction.id]),
-			question: LEDGER_QUESTIONS.supersedes,
-			sources: [old.id, correction.id],
-			state: `Earlier message: user: ${old.content}\nLater message: user: ${correction.content}`,
-			model: judge.model,
-			answer: { form: 'noul', noul: 0 },
-		})
-		ledger.conversation.judgments.add({
-			id: JSON.stringify(['supersedes', retired.id, correction.id]),
-			question: LEDGER_QUESTIONS.supersedes,
-			sources: [retired.id, correction.id],
-			state: `Earlier message: user: ${retired.content}\nLater message: user: ${correction.content}`,
-			model: judge.model,
-			answer: { form: 'noul', noul: 1 },
-		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', old, correction, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', old, correction, 0))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', retired, correction, 1))
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(
@@ -2053,14 +2071,14 @@ describe('Ledger', () => {
 		)
 		for (const earlier of [source, retired]) {
 			for (const head of ['amends', 'supersedes'] as const)
-				ledger.conversation.judgments.add({
-					id: JSON.stringify([head, earlier.id, correction.id]),
-					question: LEDGER_QUESTIONS[head],
-					sources: [earlier.id, correction.id],
-					state: `Earlier message: user: ${earlier.content}\nLater message: user: ${correction.content}`,
-					model: judge.model,
-					answer: { form: 'noul', noul: head === 'amends' || earlier === retired ? 1 : 0 },
-				})
+				ledger.conversation.judgments.add(
+					buildLedgerPairJudgment(
+						head,
+						earlier,
+						correction,
+						head === 'amends' || earlier === retired ? 1 : 0,
+					),
+				)
 		}
 		await ledger.respond('Check Mira receipt.')
 		const expected = `For Mira, keep the receipt.\n${correction.content}`
@@ -2116,14 +2134,9 @@ describe('Ledger', () => {
 			}),
 		)
 		for (const head of ['amends', 'supersedes'] as const)
-			ledger.conversation.judgments.add({
-				id: JSON.stringify([head, rule.id, amendment.id]),
-				question: LEDGER_QUESTIONS[head],
-				sources: [rule.id, amendment.id],
-				state: `Earlier message: user: ${rule.content}\nLater message: user: ${amendment.content}`,
-				model: judge.model,
-				answer: { form: 'noul', noul: head === 'amends' ? 1 : 0 },
-			})
+			ledger.conversation.judgments.add(
+				buildLedgerPairJudgment(head, rule, amendment, head === 'amends' ? 1 : 0),
+			)
 		await ledger.respond('Greet the desk.')
 		const selections: Selection[] = []
 		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
@@ -2208,14 +2221,7 @@ describe('Ledger', () => {
 			role: 'user',
 			content: 'Replace instruction 42 with 43.',
 		})
-		ledger.conversation.judgments.add({
-			id: JSON.stringify(['supersedes', old.id, correction.id]),
-			question: LEDGER_QUESTIONS.supersedes,
-			sources: [old.id, correction.id],
-			state: `Earlier message: user: ${old.content}\nLater message: user: ${correction.content}`,
-			model: judge.model,
-			answer: { form: 'noul', noul: 1 },
-		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', old, correction, 1))
 		await ledger.respond('Request.')
 		expect(provider.calls[0]?.messages.find((message) => message.id === old.id)?.content).toBe(
 			old.content,
@@ -2349,12 +2355,7 @@ describe('Ledger', () => {
 			capacity: 350,
 			share: { prompt: 0.2, tail: 0.1 },
 		})
-		ledger.conversation.add(
-			Array.from({ length: 20 }, (_unused, at): MessageInput => ({
-				role: 'user',
-				content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
-			})),
-		)
+		ledger.conversation.add(buildDeliverySeed(20))
 		await ledger.respond('Review the desk.')
 		const recalled = requireValue(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,

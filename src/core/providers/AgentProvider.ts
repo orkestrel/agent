@@ -206,7 +206,7 @@ export abstract class AgentProvider<
 			if (combined.aborted) {
 				splitter?.flush()
 				const partial = this.#assemble(splitter, state)
-				// A throw that raced the cancel is the call's real failure, so it rides as the cause.
+				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.
 				throw new ProviderAbortError(
 					partial,
 					error === combined.reason ? undefined : { cause: error },
@@ -273,13 +273,8 @@ export abstract class AgentProvider<
 			signal,
 		})
 		if (!response.ok) {
-			const failure = await readFailure(response, 'provider error:', signal)
-			// Preserve a body-read failure as the cause when it raced the abort.
-			if (!Object.hasOwn(failure, 'cause')) signal.throwIfAborted()
-			throw new ProviderError('HTTP', failure.message, {
-				status: response.status,
-				...(failure.cause === undefined ? {} : { cause: failure.cause }),
-			})
+			const { message, ...options } = await readFailure(response, 'provider error:', signal)
+			throw new ProviderError('HTTP', message, options)
 		}
 		return response
 	}

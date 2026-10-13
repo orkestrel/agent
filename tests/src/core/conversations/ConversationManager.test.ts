@@ -1,3 +1,4 @@
+import type { ConversationEventMap, ConversationStoreInterface } from '@src/core'
 import {
 	Conversation,
 	ConversationManager,
@@ -7,11 +8,13 @@ import {
 	isConversationSnapshot,
 } from '@src/core'
 import { createMemoryDriver } from '@orkestrel/database'
-import { requireValue } from '@orkestrel/test'
+import { createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	compactSeedTurns,
 	createStubSummarizer,
+	JUDGMENT_RECORD,
+	JUDGMENT_SNAPSHOT,
 	plantConversationRow,
 	renderRecap,
 	seedConversation,
@@ -68,6 +71,57 @@ describe('ConversationManager — add / accessors / count', () => {
 
 		expect(manager.conversations()).toEqual([a, b, c])
 	})
+
+	it('add({ on, snapshot }) restores the snapshot silently and wires the hooks into the conversation', async () => {
+		const compacted = createRecorder<ConversationEventMap['compact']>()
+		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize })
+
+		const conversation = manager.add({
+			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+			on: { compact: compacted.handler },
+		})
+
+		expect(conversation.id).toBe(SUMMARIZED_CONVERSATION_SNAPSHOT.id)
+		expect(conversation.sections).toEqual(SUMMARIZED_CONVERSATION_SNAPSHOT.sections)
+		expect(conversation.messages()).toEqual(SUMMARIZED_CONVERSATION_SNAPSHOT.messages)
+		expect(manager.conversation(conversation.id)).toBe(conversation)
+		expect(compacted.count).toBe(0)
+		conversation.add({ role: 'user', content: 'Who carries it?' })
+		const section = await conversation.compact()
+		expect(compacted.calls).toEqual([[section]])
+	})
+
+	it('add({ error }) routes a throwing compact listener to the supplied handler', async () => {
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
+		const boom = new Error('observer boom')
+		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize })
+		const conversation = manager.add({
+			error: errors.handler,
+			on: {
+				compact() {
+					throw boom
+				},
+			},
+		})
+		conversation.add({ role: 'assistant', content: 'a' })
+
+		expect(await conversation.compact()).toBeDefined()
+		expect(errors.calls).toEqual([[boom, 'compact']])
+	})
+
+	it.each([Number.NaN, -1, 1.5, Number.POSITIVE_INFINITY])(
+		'refuses keep %s as a manager default and as a per-add override with the KEEP code',
+		(keep) => {
+			expect(() => new ConversationManager({ keep })).toThrow(
+				expect.objectContaining({ code: 'KEEP' }),
+			)
+			const manager = new ConversationManager()
+			expect(() => manager.add({ id: 'refused', keep })).toThrow(
+				expect.objectContaining({ code: 'KEEP' }),
+			)
+			expect(manager.count).toBe(0)
+		},
+	)
 
 	it('a re-add of the same id OVERWRITES (last write wins)', () => {
 		const manager = new ConversationManager()
@@ -332,16 +386,99 @@ describe('ConversationManager — created conversations are independent', () => 
 
 describe('ConversationManager — durable open / save (the optional store seam)', () => {
 	it('open(id) activates an ALREADY-registered conversation WITHOUT a store hit', async () => {
-		// A registry hit short-circuits — no store needed, the live conversation is returned + activated.
-		const store = createMemoryConversationStore()
+		// The store holds a different 'b', and records every read, so a store-first open would show.
+		const memory = createMemoryConversationStore()
+		await memory.set({
+			id: 'b',
+			sections: [],
+			messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
+		})
+		const reads = createRecorder<readonly [id: string]>()
+		const store: ConversationStoreInterface = {
+			get(id) {
+				reads.handler(id)
+				return memory.get(id)
+			},
+			set: (snapshot) => memory.set(snapshot),
+			delete: (id) => memory.delete(id),
+		}
 		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize, store })
 		manager.add({ id: 'a' }) // auto-active
 		const b = manager.add({ id: 'b' })
+		b.add({ role: 'user', content: 'live turn' })
 
 		const opened = await manager.open('b')
 
 		expect(opened).toBe(b) // the SAME live instance
 		expect(manager.active).toBe(b) // activated
+		expect(b.messages().map(({ content }) => content)).toEqual(['live turn'])
+		expect(reads.count).toBe(0)
+	})
+
+	it('open(id) keeps a conversation added under that id while the store read was pending', async () => {
+		const store = createMemoryConversationStore()
+		await store.set({
+			id: 'a',
+			sections: [],
+			messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
+		})
+		const manager = new ConversationManager({ store })
+		manager.add({ id: 'other' })
+
+		const opening = manager.open('a')
+		const live = manager.add({ id: 'a' })
+		live.add({ role: 'user', content: 'live turn' })
+		const opened = await opening
+
+		expect(opened).toBe(live)
+		expect(manager.conversation('a')).toBe(live)
+		expect(manager.active).toBe(live)
+		expect(live.messages().map(({ content }) => content)).toEqual(['live turn'])
+	})
+
+	it('two concurrent open(id) calls return the one registered instance', async () => {
+		const store = createMemoryConversationStore()
+		await store.set({ id: 'a', sections: [], messages: [] })
+		const manager = new ConversationManager({ store })
+
+		const [first, second] = await Promise.all([manager.open('a'), manager.open('a')])
+
+		expect(first).toBeDefined()
+		expect(second).toBe(first)
+		expect(manager.conversation('a')).toBe(first)
+		expect(manager.count).toBe(1)
+	})
+
+	it('open(id) resolves undefined for a stored snapshot that names another id', async () => {
+		const foreign: ConversationStoreInterface = {
+			get: async () => ({
+				id: 'b',
+				sections: [],
+				messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
+			}),
+			set: async () => undefined,
+			delete: async () => undefined,
+		}
+		const manager = new ConversationManager({ store: foreign })
+		const b = manager.add({ id: 'b' })
+
+		expect(await manager.open('a')).toBeUndefined()
+		expect(manager.conversation('b')).toBe(b)
+		expect(manager.conversation('a')).toBeUndefined()
+		expect(manager.active).toBe(b)
+		expect(b.count).toBe(0)
+	})
+
+	it('open(id) resolves undefined for a stored judgment that is not finite', async () => {
+		const driver = createMemoryDriver()
+		await plantConversationRow(driver, {
+			id: JUDGMENT_SNAPSHOT.id,
+			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }] },
+		})
+		const manager = new ConversationManager({ store: createDatabaseConversationStore(driver) })
+
+		await expect(manager.open(JUDGMENT_SNAPSHOT.id)).resolves.toBeUndefined()
+		expect(manager.count).toBe(0)
 	})
 
 	it('open(id) HYDRATES from the store on a registry miss (sections + tail restored)', async () => {

@@ -3,10 +3,9 @@ import type {
 	LedgerTopic,
 	LedgerResult,
 	RelayOptions,
-	RelayProvider,
 	RelayProviderOptions,
 } from '@src/core'
-import { Classifier, createLedger, createRelay, createRelayProvider, renderStub } from '@src/core'
+import { Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentResult,
@@ -4205,7 +4204,7 @@ export function createRelayHop(options: RelayHopOptions): RelayProvider {
 		authorize: options.authorize ?? (() => true),
 		...(options.limit === undefined ? {} : { limit: options.limit }),
 	})
-	return createRelayProvider({
+	return new RelayProvider({
 		url: options.url ?? 'http://relay.test/',
 		parser: createParser,
 		...(options.headers === undefined ? {} : { headers: options.headers }),

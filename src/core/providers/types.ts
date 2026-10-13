@@ -39,8 +39,8 @@ export interface ProviderResult {
 
 /**
  * Represents one streamed delta the `stream` method of a {@link ProviderInterface} yields — a unit tagged by
- * the channel it belongs to, so the agent loop can re-surface answer content and live reasoning
- * separately as it pumps.
+ * the channel it belongs to, so the agent loop can forward answer content and live reasoning
+ * separately as each delta arrives.
  *
  * @remarks
  * The discriminant `channel` names the axis that varies: a
@@ -151,7 +151,7 @@ export interface ProviderInterface {
  * - **Stateful across deltas.** A tag may arrive split across wire chunks (`'<thi'`
  *   ending one delta, `'nk>'` opening the next) — `split` holds any ambiguous tail
  *   back until the next delta (or `flush`) disambiguates it, so a partial tag is
- *   never leaked as content and never mis-eaten as thinking.
+ *   neither returned as content nor routed to thinking.
  * - **`split(delta)`** feeds one raw content delta and returns the clean content to
  *   surface for it (possibly `''` — for example mid-think). Text inside a
  *   `<think>…</think>` span accumulates on `thinking`; multiple spans accumulate in
@@ -182,8 +182,8 @@ export interface ThinkSplitterInterface {
 	readonly thinking: string
 	/**
 	 * Feeds one raw delta and returns the clean, non-think content to surface for it (possibly
-	 * `''`) — a tag split across deltas is held until disambiguated, never leaked as content
-	 * and never mis-eaten as thinking.
+	 * `''`) — a tag split across deltas is held until disambiguated, so it is neither returned
+	 * as content nor routed to thinking.
 	 */
 	split(delta: string): string
 	/**
@@ -326,9 +326,17 @@ export interface RelayProviderOptions extends ProviderOptions {
 	readonly parser: () => ProviderParserInterface
 }
 
-/** Carries an HTTP failure message and the underlying body-read cause when available. */
+/**
+ * Carries an HTTP failure message, the response status, and the underlying body-read cause when
+ * available.
+ *
+ * @remarks
+ * The members spread past `message` form the options of a coded HTTP error: `status` is the
+ * response status, and `cause` is present only when the error body could not be read.
+ */
 export interface FailureRead {
 	readonly message: string
+	readonly status: number
 	readonly cause?: unknown
 }
 

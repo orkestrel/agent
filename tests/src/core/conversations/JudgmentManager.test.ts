@@ -1,9 +1,17 @@
+import type { JSONRecord } from '@orkestrel/contract'
 import type { Judgment, JudgeRequest } from '@src/core'
-import { createConversation, isJudgeAbortError, JudgmentManager, JudgeAbortError } from '@src/core'
+import {
+	createConversation,
+	isConversationError,
+	isJudgeAbortError,
+	JudgmentManager,
+	JudgeAbortError,
+} from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	JUDGMENT_INPUT,
+	JUDGMENT_QUESTION,
 	JUDGMENT_RECORD,
 	JUDGMENT_USAGE,
 	createRecordedJudge,
@@ -180,6 +188,108 @@ describe('JudgmentManager', () => {
 		await expect(
 			manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], AbortSignal.abort()),
 		).rejects.toBeInstanceOf(JudgeAbortError)
+		expect(judge.requests).toHaveLength(0)
+		expect(manager.count).toBe(0)
+	})
+
+	it('refuses a state JSON cannot carry with the JUDGMENT code before asking', async () => {
+		const judge = new RecordingJudge()
+		const manager = new JudgmentManager()
+		const state: JSONRecord = new Proxy(
+			{},
+			{
+				ownKeys() {
+					throw new Error('unreadable')
+				},
+			},
+		)
+
+		await expect(
+			manager.resolve(
+				judge,
+				{ state, questions: { refund: JUDGMENT_QUESTION } },
+				[],
+				new AbortController().signal,
+			),
+		).rejects.toSatisfy(
+			(error: unknown) =>
+				isConversationError(error) && error.code === 'JUDGMENT' && error.context === undefined,
+		)
+		expect(judge.requests).toHaveLength(0)
+		expect(manager.count).toBe(0)
+	})
+
+	it('refuses a malformed question with the JUDGMENT code naming the question, before asking', async () => {
+		const judge = new RecordingJudge()
+		const manager = new JudgmentManager()
+
+		await expect(
+			manager.resolve(
+				judge,
+				{
+					state: 'Charged twice',
+					questions: {
+						refund: JUDGMENT_QUESTION,
+						label: { form: 'choice', criteria: { billing: null } },
+					},
+				},
+				[],
+				new AbortController().signal,
+			),
+		).rejects.toSatisfy(
+			(error: unknown) =>
+				isConversationError(error) &&
+				error.code === 'JUDGMENT' &&
+				error.context?.question === 'label',
+		)
+		expect(judge.requests).toHaveLength(0)
+		expect(manager.count).toBe(0)
+	})
+
+	it('propagates a judge failure that is not an abort and records nothing', async () => {
+		const { judge, transport } = createRecordedJudge({
+			respond: () => new Response('unavailable', { status: 503 }),
+		})
+		const manager = new JudgmentManager()
+
+		const error: unknown = await manager
+			.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, ['a'], new AbortController().signal)
+			.catch((cause: unknown) => cause)
+
+		expect(error).toBeInstanceOf(Error)
+		expect(isJudgeAbortError(error)).toBe(false)
+		expect(transport.requests).toHaveLength(1)
+		expect(manager.count).toBe(0)
+	})
+
+	it('returns every cached record under an aborted signal without asking', async () => {
+		const judge = new RecordingJudge()
+		const manager = new JudgmentManager()
+		const cached = manager.add({ ...JUDGMENT_INPUT, model: judge.model, sources: ['a'] })
+
+		const records = await manager.resolve(
+			judge,
+			{ state: JUDGMENT_INPUT.state, questions: { refund: JUDGMENT_QUESTION } },
+			['a'],
+			AbortSignal.abort(),
+		)
+
+		expect(records).toEqual([cached])
+		expect(judge.requests).toHaveLength(0)
+	})
+
+	it('returns no records for an empty question set without asking', async () => {
+		const judge = new RecordingJudge()
+		const manager = new JudgmentManager()
+
+		expect(
+			await manager.resolve(
+				judge,
+				{ state: 'Charged twice', questions: {} },
+				[],
+				new AbortController().signal,
+			),
+		).toEqual([])
 		expect(judge.requests).toHaveLength(0)
 		expect(manager.count).toBe(0)
 	})

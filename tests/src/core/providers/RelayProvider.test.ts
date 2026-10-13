@@ -1,4 +1,4 @@
-import type { ProviderRequest, RelayFrame } from '@src/core'
+import type { ProviderInterface, ProviderRequest, RelayFrame } from '@src/core'
 import { ContractError, parseJSONAs } from '@orkestrel/contract'
 import { captureError, requireValue, roundTripJSON } from '@orkestrel/test'
 import {
@@ -141,8 +141,41 @@ describe('RelayProvider', () => {
 			],
 		})
 	})
+	it('returns the factory provider behind the shared provider interface', async () => {
+		expectTypeOf(createRelayProvider).returns.toEqualTypeOf<ProviderInterface>()
+		const provider = createRelayProvider({
+			url: 'http://relay.test/',
+			parser: createParser,
+			fetch: createStreamingTransport([RELAY_RESULT_FRAME]),
+		})
+		expect(provider.name).toBe('relay')
+		expect(provider.replay).toBe('none')
+		expect(await provider.generate([], new AbortController().signal)).toEqual({
+			content: 'answer',
+		})
+	})
+	it('refuses a request whose getter throws and carries the read failure as the cause', () => {
+		const failure = new Error('hostile read')
+		const refusal = captureError(() =>
+			new RelayProvider({ url: 'http://relay.test/', parser: createParser }).encode({
+				messages: [
+					{
+						id: 'ask',
+						role: 'user',
+						get content(): string {
+							throw failure
+						},
+					},
+				],
+			}),
+		)
+		if (!(refusal instanceof ProviderError)) throw new Error('the projection was not refused')
+		expect(refusal.code).toBe('PROTOCOL')
+		expect(refusal.message).toBe('relay request is not JSON')
+		expect(refusal.cause).toBe(failure)
+	})
 	it('carries the projection failure as the refusal cause', () => {
-		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
 		const refusal = captureError(() =>
 			provider.encode({
 				messages: [],
@@ -155,7 +188,7 @@ describe('RelayProvider', () => {
 		expect(refusal.cause).toBeInstanceOf(ContractError)
 	})
 	it('owns a valid request snapshot without changing its JSON values', () => {
-		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
 		const parameters = { x: 1 }
 		const schema = { type: 'object' }
 		const request: ProviderRequest = {
@@ -179,7 +212,7 @@ describe('RelayProvider', () => {
 			readonly channel: 'error'
 			readonly message: string
 		}>()
-		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
 		const frame = { channel: 'error', code: 'PROVIDER', message: 'unavailable' }
 		expect(relayFrameContract.is(frame)).toBe(false)
 		expect(() => provider.read(frame)).toThrow('invalid relay frame')
@@ -268,7 +301,7 @@ describe('RelayProvider', () => {
 		expect(transport.signals).toEqual([])
 	})
 	it('rejects non-JSON parameters and schema', () => {
-		const provider = createRelayProvider({ url: 'http://relay.test/', parser: createParser })
+		const provider = new RelayProvider({ url: 'http://relay.test/', parser: createParser })
 		expect(() =>
 			provider.encode({
 				messages: [],
@@ -315,7 +348,7 @@ describe('RelayProvider', () => {
 		expect(signal.aborted).toBe(false)
 	})
 	it('refuses malformed frames and missing terminal results', async () => {
-		const provider = createRelayProvider({
+		const provider = new RelayProvider({
 			url: 'http://relay.test/',
 			parser: createParser,
 			fetch: createStreamingTransport(['{"channel":"content","text":"prefix"}\n']),
@@ -329,7 +362,7 @@ describe('RelayProvider', () => {
 		})
 	})
 	it('recovers a fragmented unterminated final result with fresh framing per call', async () => {
-		const provider = createRelayProvider({
+		const provider = new RelayProvider({
 			url: 'http://relay.test/',
 			parser: createParser,
 			fetch: createStreamingTransport(['{"channel":"res', 'ult","result":{"content":"answer"}}']),
