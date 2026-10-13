@@ -129,9 +129,15 @@ describe('isNonNegativeSafeInteger — the count and limit guard', () => {
 		expect(isNonNegativeInteger(-0)).toBe(false)
 		expect(isNonNegativeSafeInteger(2 ** 53)).toBe(false)
 		expect(isNonNegativeInteger(2 ** 53)).toBe(true)
-		const disagreements = [0, 2 ** 53 - 1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1, '1'].filter(
-			(value) => isNonNegativeSafeInteger(value) !== isNonNegativeInteger(value),
-		)
+		const disagreements = [
+			0,
+			2 ** 53 - 1,
+			Number.NaN,
+			Number.POSITIVE_INFINITY,
+			1.5,
+			-1,
+			'1',
+		].filter((value) => isNonNegativeSafeInteger(value) !== isNonNegativeInteger(value))
 		expect(disagreements).toEqual([])
 	})
 
