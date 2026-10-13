@@ -135,7 +135,7 @@ export interface MessageManagerInterface {
  * backend produced the digest, keeping `core` free of any provider coupling.
  *
  * `signal` is the {@link CompactOptions.signal} of the `compact()` call the fold serves, or
- * `undefined` when that call supplied none. A summarizer should stop its work when it aborts. One
+ * `undefined` when that call supplied none. A summarizer must stop its work when it aborts. One
  * that ignores it still cannot hold the caller: `compact()` races the summarizer against the
  * signal, rejects with the abort reason, and discards a digest that arrives later.
  *

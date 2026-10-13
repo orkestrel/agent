@@ -2185,7 +2185,7 @@ describe('Agent — cancellation timing matrix', () => {
 		)
 		const agent = createAgent(provider, { tools, scheduler, limit: 6 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
-		// The `turn` event for index 1 fires just before the inter-turn yield, so the abort it
+		// The `turn` event for index 1 fires immediately before the inter-turn yield, so the abort it
 		// issues reaches the real scheduler as an already-aborted signal, after turn 1 completed.
 		agent.emitter.on('turn', (turn) => {
 			if (turn === 1) agent.abort('the operator stopped the run')

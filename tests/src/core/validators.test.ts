@@ -129,10 +129,10 @@ describe('isNonNegativeSafeInteger — the count and limit guard', () => {
 		expect(isNonNegativeInteger(-0)).toBe(false)
 		expect(isNonNegativeSafeInteger(2 ** 53)).toBe(false)
 		expect(isNonNegativeInteger(2 ** 53)).toBe(true)
-		for (const value of [0, 2 ** 53 - 1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1, '1']) {
-			const message = `agreement at ${String(value)}`
-			expect(isNonNegativeSafeInteger(value), message).toBe(isNonNegativeInteger(value))
-		}
+		const disagreements = [0, 2 ** 53 - 1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1, '1'].filter(
+			(value) => isNonNegativeSafeInteger(value) !== isNonNegativeInteger(value),
+		)
+		expect(disagreements).toEqual([])
 	})
 
 	it('contains the installed hostile corpus', () => {
