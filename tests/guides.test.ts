@@ -857,7 +857,7 @@ await new GuideCommand({
 			expect(calls.count).toBe(1)
 			expect(conversation.sections).toEqual([])
 			expect(guideText).toContain(
-				'Calls to `compact()` run one at a time: a call made while another is in flight waits for it, then folds from the live tail it finds. A fold commits only when every folded message is still the same live entry after the summarizer settles, so a `remove` or `clear` during the summarizer makes `compact()` resolve `undefined` and leaves no section.',
+				'Calls to `compact()` run one at a time: a call made while another is in flight waits for it, then folds from the live tail it finds. A fold commits only when every folded message is still the same live entry after the summarizer settles, so a `remove` or `clear` during the initial summarizer makes `compact()` resolve `undefined` and leaves no section.',
 			)
 		})
 
@@ -886,7 +886,7 @@ await new GuideCommand({
 			gate.resolve('late recap')
 			expect(conversation.sections).toEqual([])
 			expect(guideText).toContain(
-				"Pass `CompactOptions.signal` to cancel a fold: the summarizer receives the signal as its second argument, and an abort rejects `compact()` with the signal's reason at once, even when the summarizer ignores the signal, and commits nothing.",
+				"Pass `CompactOptions.signal` to cancel a fold: the summarizer receives the signal as its second argument, and an abort rejects `compact()` with the signal's reason at once, even when the summarizer ignores the signal, and commits nothing after the abort; a fold committed before an aborted overflow merge stays.",
 			)
 		})
 

@@ -389,10 +389,11 @@ export function renderLookupCall(name: string, args: Readonly<Record<string, unk
  * string argument passes through {@link normalizeArgument} first, so `"lh-1 "` and `"LH-1"` name one call.
  * The ledger's repeat stop instead compares the tool name and canonical arguments without this
  * string normalization, so those argument spellings remain distinct within a request.
+ * An uncanonicalizable call has no identity and neither replaces nor is replaced by another reading.
  *
  * @param name - The tool name
  * @param args - The arguments the call carried
- * @returns The identity: the name, a space, and the canonical arguments
+ * @returns The name, a space, and the canonical arguments, or `undefined` when uncanonicalizable
  *
  * @example
  * ```ts
@@ -400,14 +401,18 @@ export function renderLookupCall(name: string, args: Readonly<Record<string, unk
  * 	identifyLookup('lookup_order', { opts: { region: 'north', tier: 2 }, id: ' BW-5512' }) // true
  * ```
  */
-export function identifyLookup(name: string, args: Readonly<Record<string, unknown>>): string {
+export function identifyLookup(
+	name: string,
+	args: Readonly<Record<string, unknown>>,
+): string | undefined {
 	const normalized = Object.fromEntries(
 		Object.entries(args).map(([key, value]) => [
 			key,
 			isString(value) ? normalizeArgument(value) : value,
 		]),
 	)
-	return `${name} ${canonicalStringify(normalized) ?? ''}`
+	const canonical = canonicalStringify(normalized)
+	return canonical === undefined ? undefined : `${name} ${canonical}`
 }
 
 /**
@@ -859,7 +864,8 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  * A message is live when it is a user message, or a tool message whose reading is the last reading of its
  * call, and the input neither excludes it nor files it quiet or replaced. A reading replaces any
  * earlier reading of the same call, an empty one included, so an empty lookup leaves the earlier
- * result out of every record.
+ * result out of every record. A reading with no canonical identity stays live as its own source
+ * and participates in no replacement.
  *
  * @param input - The messages, readings, and classification to read
  * @returns The live message ids
@@ -884,6 +890,7 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 					reading.result !== undefined &&
 					!readings.some(
 						(later) =>
+							identities.get(reading.id) !== undefined &&
 							(position.get(later.id) ?? -1) > (position.get(reading.id) ?? -1) &&
 							identities.get(later.id) === identities.get(reading.id),
 					),

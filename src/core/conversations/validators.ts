@@ -9,6 +9,7 @@ import {
 	isString,
 	optionalOf,
 	objectOf,
+	recordOf,
 } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 import { MESSAGE_ROLES } from '../constants.js'
@@ -51,11 +52,11 @@ export function isMessage(value: unknown): value is Message {
  * Checks whether a stored judgment carries a valid question and exactly one answer or refusal.
  *
  * @remarks
- * Malformed members and unreadable inputs return false. Answer fields follow the root judge
- * value types; this storage guard does not impose a wire's probability or candidate limits. The
- * `time`, `noul`, and probability numbers must be finite, because a stored record is owned through
- * JSON, which turns `NaN` and the infinities into `null`; so every record this guard accepts
- * hydrates through a `JudgmentManager`.
+ * Unknown members, malformed members, and unreadable inputs return false. Answer fields follow
+ * the root judge value types; this storage guard does not impose a wire's probability or
+ * candidate limits. The `time`, `noul`, and probability numbers must be finite, because a stored
+ * record is owned through JSON, which turns `NaN` and the infinities into `null`; so every record
+ * this guard accepts hydrates through a `JudgmentManager`.
  *
  * @param value - The unknown stored record
  * @returns True if the record satisfies the judgment contract; false otherwise
@@ -70,7 +71,7 @@ export function isJudgment(value: unknown): value is Judgment {
 		if (!isRecord(value)) return false
 		const { answer, refusal } = value
 		if (
-			!objectOf(
+			!recordOf(
 				{
 					id: isString,
 					question: isJudgeQuestion,
@@ -79,6 +80,7 @@ export function isJudgment(value: unknown): value is Judgment {
 					state: isString,
 					time: isFiniteNumber,
 					usage: optionalOf(isTokenUsage),
+					...(answer === undefined ? { refusal: isRecord } : { answer: isRecord }),
 				},
 				['usage'],
 			)(value)

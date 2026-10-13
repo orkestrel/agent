@@ -249,7 +249,8 @@ export interface ConversationOptions {
  * {@link import('./errors.js').ConversationError} with code `'KEEP'`. `signal` cancels this
  * compaction: an already-aborted signal rejects with its reason before the summarizer is called,
  * the signal is passed to the {@link ConversationSummaryHandler}, and an abort while the
- * summarizer runs rejects with the reason at once and commits nothing. Default: no signal.
+ * summarizer runs rejects with the reason at once and commits nothing after the abort. A fold
+ * committed before an aborted overflow merge stays. Default: no signal.
  */
 export interface CompactOptions {
 	/** Overrides the retained-tail size for this compaction. Default: the `keep` of the conversation. */
@@ -759,12 +760,12 @@ export interface ConversationManagerInterface {
 	/**
 	 * Persists a registered conversation's {@link ConversationInterface.snapshot} to the optional
 	 * {@link ConversationStoreInterface} (`store`) — `true` when persisted, `false` when there is
-	 * no store or the id is unknown, and never throwing.
+	 * no store or the id is unknown; a store failure propagates.
 	 *
 	 * @remarks
 	 * Lenient: when a `store` is set and `id` is registered, `store.set(conversation.snapshot())` is
 	 * awaited and `true` is returned; otherwise (no store, or an unknown id) it is a no-op returning
-	 * `false` — never a throw, consistent with the lenient `switch`.
+	 * `false`. A failure from `store.set` propagates.
 	 *
 	 * @param id - The id of the registered conversation to persist
 	 * @returns True if the snapshot was persisted; false otherwise (no store, or an unknown id)

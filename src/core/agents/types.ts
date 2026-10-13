@@ -234,6 +234,8 @@ export interface ChannelInterface<T> {
 	 * `fail` ends every reader, parked or not, after the buffer empties. A `push` after `close` or
 	 * `fail` is buffered rather than refused, so a reader still draining or a later `drain` yields
 	 * it before reporting the end.
+	 * A `return()` issued while a read is parked waits for the next `push`, `close`, or `fail`.
+	 * The parked read takes a pushed value before that `return()` settles.
 	 *
 	 * @returns A generator yielding each pushed value, returning on `close` and throwing on `fail`
 	 */

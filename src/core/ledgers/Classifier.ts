@@ -9,8 +9,9 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
+import { errorToMessage } from '@orkestrel/workflow'
 import { isJudgeAbortError } from '../errors.js'
-import { matchesJudgment, sumUsage } from '../helpers.js'
+import { matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
 import {
 	DECISIVE_CATEGORIES,
@@ -90,7 +91,7 @@ export class Classifier implements ClassifierInterface {
 				}
 			}
 		} catch (error) {
-			fault = isError(error) ? error : new Error(String(error))
+			fault = isError(error) ? error : new Error(errorToMessage(error))
 		}
 		let usage: TokenUsage | undefined
 		for (const result of results)
@@ -300,10 +301,12 @@ export class Classifier implements ClassifierInterface {
 	}
 
 	#collectNear(message: Message): ReadonlySet<string> {
-		const text =
+		const argumentsText =
 			message.calls === undefined
-				? message.content
-				: `${message.content} ${JSON.stringify(message.calls.map((call) => call.arguments))}`
+				? undefined
+				: renderJSON(message.calls.map((call) => call.arguments))
+		const text =
+			argumentsText === undefined ? message.content : `${message.content} ${argumentsText}`
 		return new Set([
 			...this.#options.entities(text, false),
 			...(this.#options.assign(message) === undefined ? this.topics(message.id) : []),

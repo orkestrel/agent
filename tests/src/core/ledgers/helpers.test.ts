@@ -975,6 +975,27 @@ describe('buildLines', () => {
 })
 
 describe('buildRecords', () => {
+	it('retains successful readings whose bigint arguments have no lookup identity', () => {
+		const text = 'Account BW-20931 (Brightwater Studio): balance $10.00.'
+		const input = buildLedgerInput({
+			owners: LEDGER_DESK_OWNERS,
+			messages: [
+				buildLedgerMessage('tool-a', 'tool', text),
+				buildLedgerMessage('tool-b', 'tool', text),
+			],
+			readings: [
+				buildLedgerReading('tool-a', 'lookup', { key: 1n }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerReading('tool-b', 'lookup', { key: 2n }, text, LEDGER_EMPTY_FOUND),
+			],
+			entities: { 'tool-a': ['BW-20931'], 'tool-b': ['BW-20931'] },
+		})
+		expect(buildRecords(input).records.map((record) => record.members)).toEqual([
+			['tool-a', 'tool-b'],
+		])
+		expect(identifyLookup('lookup', { key: 1n })).toBeUndefined()
+		expect(identifyLookup('lookup', { key: 2n })).toBeUndefined()
+	})
+
 	it('projects the desk scenario into owner records ordered by first member, then the rules record', () => {
 		const built = buildRecords(createLedgerDesk())
 		expect(built.records.map((record) => [record.key, record.title, record.members])).toEqual([

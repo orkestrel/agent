@@ -13,6 +13,8 @@ import type { ChannelInterface } from './types.js'
  * re-reads the shared buffer, and either takes the next chunk, returns (on `close`), throws
  * (on `fail`), or parks again when another reader took the chunk first. Taking a chunk is
  * synchronous, so each value reaches exactly one reader.
+ * A `return()` issued while a read is parked waits for the next `push`, `close`, or `fail`.
+ * The parked read takes a pushed value before that `return()` settles.
  *
  * @example
  * ```ts

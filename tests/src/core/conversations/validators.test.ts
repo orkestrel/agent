@@ -23,6 +23,21 @@ import {
 } from '../../../setup.js'
 
 describe('isJudgment and snapshot carriage', () => {
+	it('refuses unknown judgment members even when JSON can render them', () => {
+		expect(isJudgment({ ...JUDGMENT_RECORD, extra: 1n })).toBe(false)
+		expect(isJudgment({ ...JUDGMENT_RECORD, extra: 1 })).toBe(false)
+		expect(
+			isConversationSnapshot({
+				...JUDGMENT_SNAPSHOT,
+				judgments: [{ ...JUDGMENT_RECORD, extra: 1n }],
+			}),
+		).toBe(false)
+		for (const record of JUDGMENT_SNAPSHOT.judgments ?? []) {
+			expect(isJudgment(record)).toBe(true)
+			expect(new JudgmentManager([record]).judgments()).toEqual([record])
+		}
+	})
+
 	it('accepts answers, refusals, usage, and snapshots with or without judgments', () => {
 		expect(isJudgment(JUDGMENT_RECORD)).toBe(true)
 		expect(isJudgment({ ...JUDGMENT_RECORD, usage: JUDGMENT_USAGE })).toBe(true)

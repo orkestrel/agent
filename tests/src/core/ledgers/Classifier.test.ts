@@ -11,6 +11,7 @@ import { extractTokens, matchEntities } from '../../../../src/core/ledgers/helpe
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildLedgerMessage,
+	buildLedgerJudgment,
 	buildClassifierOptions,
 	buildLedgerPairJudgment,
 	buildLedgerResponse,
@@ -23,6 +24,65 @@ import {
 } from '../../../setup.js'
 
 describe('Classifier', () => {
+	it('returns completed judgments when an assign throw cannot be converted to a string', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const transport: RecordedTransport = new RecordedTransport(() =>
+			buildLedgerResponse(requireValue(transport.requests.at(-1))),
+		)
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge: new SequentialSystemOneJudge({
+					url: 'http://judge.test',
+					model: 'filing',
+					fetch: transport.fetch,
+				}),
+				assign: () => {
+					if (conversation.judgments.count > 0) throw Object.create(null)
+					return undefined
+				},
+			}),
+		)
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(result.fault).toBeInstanceOf(Error)
+		expect(result.fault?.message.length).toBeGreaterThan(0)
+		expect(result.judgments).toEqual([JSON.stringify(['category', message.id])])
+		expect(result.usage).toEqual({ prompt: 50, completion: 1, total: 51 })
+		expect(conversation.judgments.count).toBe(1)
+	})
+
+	it('pairs a correction with assistant calls carrying bigint or JSON arguments', async () => {
+		for (const key of [1n, 1]) {
+			const conversation = createConversation()
+			const earlier = conversation.add({
+				role: 'assistant',
+				content: 'Refund AB-12 is 20.',
+				calls: [{ id: 'lookup', name: 'lookup', arguments: { key } }],
+			})
+			const later = conversation.add({ role: 'user', content: 'Refund AB-12 is 30, not 20.' })
+			conversation.judgments.add(
+				buildLedgerJudgment(later, {
+					answer: { form: 'choice', probabilities: { correction: 1 } },
+				}),
+			)
+			const judge = new RecordingJudge()
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation,
+					judge,
+					assign: (message) => (message.role === 'assistant' ? 'fact' : undefined),
+					entities: (text) => extractTokens(text).ids,
+				}),
+			)
+			const result = await classifier.classify(new Set(), new AbortController().signal)
+			expect(result.fault).toBeUndefined()
+			expect(judge.requests.map((request) => Object.keys(request.questions))).toEqual([
+				[JSON.stringify(['amends', earlier.id, later.id])],
+			])
+		}
+	})
+
 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
