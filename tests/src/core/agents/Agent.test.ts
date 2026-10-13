@@ -2656,10 +2656,7 @@ describe('Agent — authority deeper', () => {
 		const allowRec = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const denyRec = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
-		tools.add([
-			createRecordedTool('safe', allowRec),
-			createRecordedTool('danger', denyRec, 'boom'),
-		])
+		tools.add([createRecordedTool('safe', allowRec), createRecordedTool('danger', denyRec, 'boom')])
 		const authority = createAuthority({
 			rules: [{ match: (c) => c.call.name === 'danger', zone: 'r', allowed: false, reason: 'no' }],
 		})

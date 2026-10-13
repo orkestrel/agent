@@ -74,7 +74,10 @@ describe('judgment helpers', () => {
 	it('reads only own answer and refusal keys, so a question id named after a prototype member stays unanswered', () => {
 		expect(
 			buildJudgments(
-				{ state: 'state', questions: { constructor: JUDGMENT_QUESTION, toString: JUDGMENT_QUESTION } },
+				{
+					state: 'state',
+					questions: { constructor: JUDGMENT_QUESTION, toString: JUDGMENT_QUESTION },
+				},
 				{ model: 'reported', answers: {}, refusals: {} },
 				[],
 				'state',

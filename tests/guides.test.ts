@@ -1727,7 +1727,7 @@ await new GuideCommand({
 			expect(provider.started).toBe(2)
 			expect(ledger.conversation.view().at(-1)?.content).toBe(LEDGER_NOTES.cue)
 			expect(guideText).toContain(
-				'A rejected first pass counts as unfinished. When the answer pass rejects as well, the `respond` method rejects with that pass\'s error, and the ledger stays free for a later request.',
+				"A rejected first pass counts as unfinished. When the answer pass rejects as well, the `respond` method rejects with that pass's error, and the ledger stays free for a later request.",
 			)
 			const selections = createRecorder<readonly [Selection]>()
 			ledger.agent.emitter.on('select', selections.handler)

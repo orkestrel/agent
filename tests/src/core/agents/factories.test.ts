@@ -269,7 +269,6 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 		expect(loaded).toHaveLength(1)
 		expect(loaded[0]).toEqual({ id: 'job-1', input, attempts: 0 })
 	})
-
 })
 
 describe('createAgentRunner', () => {
