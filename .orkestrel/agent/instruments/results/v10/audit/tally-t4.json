@@ -1,0 +1,561 @@
+{
+ "runs": {
+  "t2-compaction-v1": {
+   "scorer": 4,
+   "falsePass": 2,
+   "ambiguousPass": 0,
+   "misread": 1,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 3,
+   "high": 3
+  },
+  "f4-records-v1": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "t2-control-v1": {
+   "scorer": 5,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 4
+  },
+  "f4-compaction-v1": {
+   "scorer": 6,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 4,
+   "high": 6
+  },
+  "f4-control-v1": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 7
+  },
+  "t2w-compaction-v1": {
+   "scorer": 6,
+   "falsePass": 3,
+   "ambiguousPass": 0,
+   "misread": 1,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 4
+  },
+  "f4-records-v2": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 8
+  },
+  "f4-control-v2": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 8
+  },
+  "t2w-control-v1": {
+   "scorer": 5,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 3,
+   "high": 4
+  },
+  "t2-records-v1": {
+   "scorer": 6,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "t2w-records-v1": {
+   "scorer": 6,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 6
+  },
+  "t2a-records-v1": {
+   "scorer": 7,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 7
+  },
+  "t2a-records-v2": {
+   "scorer": 9,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "t2a-records-v3": {
+   "scorer": 6,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 6
+  },
+  "t2w-control-v2": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "t2w-control-v3": {
+   "scorer": 5,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 4,
+   "high": 6
+  },
+  "t2w-control-v4": {
+   "scorer": 5,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 5
+  },
+  "t2a-records-v4": {
+   "scorer": 8,
+   "falsePass": 2,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 6,
+   "high": 7
+  },
+  "f4-records-v3": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "f4-control-v3": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 5,
+   "high": 7
+  },
+  "f4-records-v4": {
+   "scorer": 9,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "f4-control-v4": {
+   "scorer": 9,
+   "falsePass": 2,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 7
+  },
+  "t2a-control-v4": {
+   "scorer": 5,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 5
+  },
+  "t2a-control-v1": {
+   "scorer": 5,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 4
+  },
+  "t2a-control-v3": {
+   "scorer": 5,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "t2a-control-v2": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "f4-records-v7": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 8,
+   "high": 9
+  },
+  "f4-control-v6": {
+   "scorer": 9,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 9,
+   "high": 9
+  },
+  "f4-control-v7": {
+   "scorer": 6,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 5,
+   "high": 7
+  },
+  "f4-records-v5": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 7
+  },
+  "f4-control-v5": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 7,
+   "high": 8
+  },
+  "f4-records-v6": {
+   "scorer": 9,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "f4-records-v8": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "f4-control-v8": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 8
+  },
+  "t4-control-v1": {
+   "scorer": 9,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 9
+  },
+  "t4-records-v2": {
+   "scorer": 9,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "t4-control-v2": {
+   "scorer": 9,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 9,
+   "high": 9
+  },
+  "t4-records-v1": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "t4-control-v3": {
+   "scorer": 9,
+   "falsePass": 0,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 9
+  },
+  "t4-records-v3": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 1,
+   "rows": 10,
+   "low": 8,
+   "high": 9
+  },
+  "t4-records-v4": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 2,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 8
+  },
+  "t4-control-v4": {
+   "scorer": 10,
+   "falsePass": 3,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 7
+  }
+ },
+ "bands": [
+  {
+   "left": "t4-records",
+   "right": "f4-records",
+   "range": "1-4",
+   "end": "low",
+   "d": [
+    0,
+    2,
+    0,
+    0
+   ],
+   "mean": 0.5,
+   "bound": -0.5,
+   "clears": false
+  },
+  {
+   "left": "t4-records",
+   "right": "f4-records",
+   "range": "1-4",
+   "end": "high",
+   "d": [
+    0,
+    0,
+    1,
+    0
+   ],
+   "mean": 0.25,
+   "bound": -0.25,
+   "clears": false
+  },
+  {
+   "left": "t4-records",
+   "right": "f4-records",
+   "range": "1-4",
+   "end": "across",
+   "d": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "mean": 0,
+   "bound": 0,
+   "clears": false
+  },
+  {
+   "left": "t4-control",
+   "right": "f4-control",
+   "range": "1-4",
+   "end": "low",
+   "d": [
+    3,
+    2,
+    2,
+    1
+   ],
+   "mean": 2,
+   "bound": 1.183503419072274,
+   "clears": true
+  },
+  {
+   "left": "t4-control",
+   "right": "f4-control",
+   "range": "1-4",
+   "end": "high",
+   "d": [
+    2,
+    1,
+    2,
+    0
+   ],
+   "mean": 1.25,
+   "bound": 0.2925728922436619,
+   "clears": true
+  },
+  {
+   "left": "t4-control",
+   "right": "f4-control",
+   "range": "1-4",
+   "end": "across",
+   "d": [
+    1,
+    1,
+    0,
+    -1
+   ],
+   "mean": 0.25,
+   "bound": -0.7074271077563381,
+   "clears": false
+  },
+  {
+   "left": "t4-records",
+   "right": "t4-control",
+   "range": "1-4",
+   "end": "low",
+   "d": [
+    0,
+    -1,
+    1,
+    2
+   ],
+   "mean": 0.5,
+   "bound": -0.7909944487358056,
+   "clears": false
+  },
+  {
+   "left": "t4-records",
+   "right": "t4-control",
+   "range": "1-4",
+   "end": "high",
+   "d": [
+    -1,
+    -1,
+    0,
+    1
+   ],
+   "mean": -0.25,
+   "bound": -1.207427107756338,
+   "clears": false
+  },
+  {
+   "left": "t4-records",
+   "right": "t4-control",
+   "range": "1-4",
+   "end": "across",
+   "d": [
+    -1,
+    -1,
+    -1,
+    1
+   ],
+   "mean": -0.5,
+   "bound": -1.5,
+   "clears": false
+  }
+ ]
+}

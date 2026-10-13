@@ -1,0 +1,1617 @@
+{
+	"id": "endurance-development-v 1",
+	"system": "You operate Harbour Forms support. Complete each requested work product in one continuous history. Use external evidence and actual lookup receipts; preserve unresolved obligations; repair earlier work when evidence changes. Separate draft, authorization, initiation, and completion. Never invent posted payments, dispatched messages, delivered goods, technical acceptance, or fulfilled obligations. Read-only tools are lookup_order(id) and lookup_customer(account).",
+	"topics": [
+		{
+			"name": "Alba Kent",
+			"criterion": "Work and evidence for Alba Kent, DV-5201, DV-8401."
+		},
+		{
+			"name": "Minh Sato",
+			"criterion": "Work and evidence for Minh Sato, DV-5202, DV-8402."
+		},
+		{
+			"name": "Rhea Calder",
+			"criterion": "Work and evidence for Rhea Calder, DV-5203, DV-8403."
+		},
+		{
+			"name": "Yusuf Marin",
+			"criterion": "Work and evidence for Yusuf Marin, DV-5204, DV-8404."
+		},
+		{
+			"name": "Nessa Cole",
+			"criterion": "Work and evidence for Nessa Cole, DV-5205, DV-8405."
+		},
+		{
+			"name": "Pavel Birch",
+			"criterion": "Work and evidence for Pavel Birch, DV-5206, DV-8406."
+		},
+		{
+			"name": "Ines Brook",
+			"criterion": "Work and evidence for Ines Brook, DV-5207, DV-8407."
+		},
+		{
+			"name": "Otto Wynn",
+			"criterion": "Work and evidence for Otto Wynn, DV-5208, DV-8408."
+		}
+	],
+	"days": [
+		{
+			"date": "2032-04-02",
+			"from": 1
+		},
+		{
+			"date": "2032-04-03",
+			"from": 3
+		},
+		{
+			"date": "2032-04-04",
+			"from": 5
+		},
+		{
+			"date": "2032-04-05",
+			"from": 7
+		},
+		{
+			"date": "2032-04-06",
+			"from": 9
+		},
+		{
+			"date": "2032-04-07",
+			"from": 11
+		},
+		{
+			"date": "2032-04-08",
+			"from": 13
+		},
+		{
+			"date": "2032-04-09",
+			"from": 15
+		},
+		{
+			"date": "2032-04-10",
+			"from": 17
+		},
+		{
+			"date": "2032-04-11",
+			"from": 18
+		},
+		{
+			"date": "2032-04-12",
+			"from": 19
+		},
+		{
+			"date": "2032-04-13",
+			"from": 20
+		},
+		{
+			"date": "2032-04-14",
+			"from": 21
+		},
+		{
+			"date": "2032-04-15",
+			"from": 22
+		},
+		{
+			"date": "2032-04-16",
+			"from": 23
+		},
+		{
+			"date": "2032-04-17",
+			"from": 24
+		},
+		{
+			"date": "2032-04-18",
+			"from": 25
+		},
+		{
+			"date": "2032-04-19",
+			"from": 26
+		},
+		{
+			"date": "2032-04-20",
+			"from": 27
+		},
+		{
+			"date": "2032-04-21",
+			"from": 28
+		},
+		{
+			"date": "2032-04-22",
+			"from": 29
+		},
+		{
+			"date": "2032-04-23",
+			"from": 30
+		},
+		{
+			"date": "2032-04-24",
+			"from": 31
+		},
+		{
+			"date": "2032-04-25",
+			"from": 32
+		},
+		{
+			"date": "2032-04-26",
+			"from": 33
+		},
+		{
+			"date": "2032-04-27",
+			"from": 34
+		},
+		{
+			"date": "2032-04-28",
+			"from": 35
+		},
+		{
+			"date": "2032-04-29",
+			"from": 36
+		},
+		{
+			"date": "2032-04-30",
+			"from": 37
+		},
+		{
+			"date": "2032-05-01",
+			"from": 38
+		},
+		{
+			"date": "2032-05-02",
+			"from": 39
+		},
+		{
+			"date": "2032-05-03",
+			"from": 40
+		}
+	],
+	"seed": [
+		{
+			"id": "dv-desk",
+			"shift": 0,
+			"date": "2032-04-01",
+			"role": "user",
+			"content": "Harbour Forms service desk. Maintain continuous work across the scheduled shifts. Every completion needs the relevant external receipt; a draft is work prepared, never an external action. Amounts are USD and money rounds to cents. In Alba Kent's pallet-pool matter, preserve the period-end statement obligation through shift 32 even if deposit transactions finish earlier. Payment, physical custody, technical acceptance, and document delivery are independent states. Read-only lookup_order and lookup_customer show only versions released at the current source boundary. No communication or payment tool exists in this study."
+		},
+		{
+			"id": "dv-opening-0",
+			"shift": 1,
+			"date": "2032-04-02",
+			"role": "user",
+			"content": "Harbour Forms supplies reusable transport pallets to Alba Kent at Hillcross stoneworks. This is a pallet-pool account, not a rental of powered equipment. Each pallet carries a $28 deposit, and a monthly handling charge is separate. The opening collection has eleven pallets, deposit $308, and a $44 handling charge, all settled and tax exempt. Customer-signed dispatch sheet HP-401 lists pallet identities A through K. Returning a pallet releases only its own deposit after the depot scans its identity. Cracks must be assessed against dispatch photographs. The purchaser can dispute a deduction, and depot staff cannot convert a disputed pallet deposit into handling revenue. Alba needs a period-end statement by shift  32 that follows each partial return without losing deposits still in circulation.\n\nPallet identity procedure HP-402: Record an individual identifier, depot arrival receipt, condition finding, and deposit decision for each returned pallet. A carrier may collect several pallets under one docket, but that docket cannot prove which identities reached the depot. If the driver count and signed docket disagree, ask depot staff to reconcile them against scans. Never create an extra deposit release from the larger unverified count. Keep an accepted pre-existing damage finding linked to the dispatch photograph so a later cropped inspection image cannot reopen the same charge without different evidence. Treasury instructions must name the active bank mandate and the specific unreleased deposits; separate approval from a posted bank payment. Alba alone chooses a refund route, and verified mandate changes supersede archived bank details. The closing statement must identify all eleven pallets, the deposit releases already posted, deposits still held, and the separate handling charge. Sending the statement needs its own evidence. When deposits are complete but statement delivery is missing, retain the document obligation through shift 32 instead of calling the whole account finished."
+		},
+		{
+			"id": "dv-source-1",
+			"shift": 1,
+			"date": "2032-04-02",
+			"role": "user",
+			"content": "2032-04-02; external case correspondence for Alba Kent, DV-8401. Alba reports that pallets A through D were collected by a subcontractor, while E through K remain loaded with stone. The subcontractor supplied collection docket HK-61, but the depot has not scanned the four identities. Depot clerk Salma initially entered five pallets from the driver's spoken count; Alba says the signed docket lists four. The collection scan must resolve that discrepancy before money moves. A fifth pallet cannot be refunded merely because the clerk wrote it in a draft entry. The handling charge is earned for this period and is not refunded on a partial return. Alba authorizes a bank refund of confirmed released deposits, not an account credit. The account bank mandate is valid, but a support worksheet is not a payment request sent to treasury."
+		},
+		{
+			"id": "dv-opening-1",
+			"shift": 2,
+			"date": "2032-04-03",
+			"role": "user",
+			"content": "Minh Sato runs Brookvale laboratory and purchased calibration of three reference weights rather than replacement hardware. The service price is $72 per weight, plus an $18 insured return charge; the tax-exempt invoice totals $234 and is settled. The weights are tagged BW-7, BW-8, BW-9. Their accreditation scope requires mass readings at 20 degrees Celsius with traceability to reference R-601. A signed certificate is required for each tag. A report in draft form cannot release a weight back into accredited use. Minh can coordinate transport, while quality manager Arlo Penn alone can accept a corrected certificate set. Preserve the exact tag-to-certificate mapping; a correct numerical reading attached to the wrong tag is not acceptable service completion.\n\nCalibration custody procedure BC-420: Each weight retains its physical tag throughout receipt, testing, dispatch, and delivery. A certificate number belongs to one tag and cannot be reassigned to fill a gap in another weight's records. A corrected certificate must name the superseded document and retain the signed traceability reference, test condition, and authorized quality signature. Withdrawn PDFs remain historical evidence of the correction but are unavailable for accredited release. A customer can accept split transport without waiving certificate requirements. A stable test result without a signature remains incomplete certification, and a signed certificate without a receiver scan does not prove delivery. Arlo is the acceptance owner for the final tag-mapped set; Minh can coordinate transport but cannot replace that signoff. The archive index must preserve valid and inactive versions so staff opening cached PDFs can distinguish them. When a physical weight is correct and only its document has a transcription error, obtain quality direction before arranging a needless return. The paid service terms survive correction unless finance expressly changes them."
+		},
+		{
+			"id": "dv-source-2",
+			"shift": 2,
+			"date": "2032-04-03",
+			"role": "user",
+			"content": "2032-04-03; external case correspondence for Minh Sato, DV-8402. Technician worksheet CW-402 lists completed readings for BW-7 and BW-8 and an unstable reading for BW-9. The courier booking is not yet made. Minh asks whether two stable weights can be sent back while the third remains under test. Arlo requires signed certificates before either stable weight is released to accredited use. The service desk can quote a partial-return option but needs Minh's transport consent because it adds a second insured parcel. Harbour Forms will absorb the extra $18 return charge if the split avoids delaying the laboratory. No additional customer charge is authorized. The worksheet carries a technician's initials, not the quality signatory's approval. Do not describe it as a certificate or say BW-9 passed."
+		},
+		{
+			"id": "dv-opening-2",
+			"shift": 3,
+			"date": "2032-04-04",
+			"role": "user",
+			"content": "Rhea Calder at Marshgate printworks booked on-site extraction-balancing service. The quote is $160 attendance plus $45 per measured zone, with four zones booked and no tax. The accepted estimate is $340; a $100 booking deposit has settled and the rest is unpaid. The technician needs machine isolation signed by the plant supervisor, not merely a reception-desk visitor badge. A customer cancellation after confirmed attendance incurs the attendance charge; a provider scheduling failure does not. Rhea can schedule work, but plant supervisor Ellis Dane signs isolation and purchasing officer Noor Clay approves price changes. The commissioning certificate depends on all required zones passing, so a visit alone does not complete the contracted service.\n\nField-service control MS-430: The visit booking, dated machine-isolation permission, actual attendance report, measured-zone report, invoice, and commissioning certificate are distinct documents. Retain their separate references and avoid a single completion label that hides an unpaid invoice or an unmeasured zone. A safety permission is tied to the date it names; a replacement visit needs renewed permission even when the same supervisor signs. Reception cannot stand in for Ellis. Noor approves a scope or price change, while the technician records what was physically measured. If one zone cannot be reached, describe the completed zones accurately and retain the missing zone as an obstacle to whole-system commissioning. Never infer permission to cut a customer enclosure from a technical access advisory. The original deposit must appear once across later invoices. A void attendance draft remains void when a replacement visit succeeds. The final comparison must identify any reduced interim invoice and separate later work, then reconcile their total to the original accepted estimate without turning an issued invoice into a paid receipt."
+		},
+		{
+			"id": "dv-source-3",
+			"shift": 3,
+			"date": "2032-04-04",
+			"role": "user",
+			"content": "2032-04-04; external case correspondence for Rhea Calder, DV-8403. Dispatch offers a morning visit next shift. Rhea accepts, but Ellis has not signed isolation. The technician can arrive and wait at reception, yet cannot work on a running extraction system. Rhea asks whether the remaining $240 will be charged immediately. Payments must wait for the measured-zone record and authorized changes; the deposit is already paid, not another amount to capture. The original quote lists zones A, B, C, D. No source approves deleting a zone to meet time limits. Prepare a visit plan that asks for isolation by the previous afternoon and names the consequence if the plant cannot provide it. Do not tell the customer that a booking confirms technical completion or that reception can sign for Ellis."
+		},
+		{
+			"id": "dv-opening-3",
+			"shift": 4,
+			"date": "2032-04-05",
+			"role": "user",
+			"content": "Yusuf Marin administers Claybank community garden's trade account. The garden ordered eighteen irrigation timers at $22 each and $9 freight. The merchandise carries 5% tax unless the garden supplies a valid exemption certificate effective on the invoice date. Invoice CT-404 charged $19.80 tax, total $424.80, and has not been paid. The garden's old account code is CG-44; its consolidated code is DV-5204. Account consolidation moves a receivable but does not create a second sale. Credit controller Bea Lorne owns allocations and the exemption review. Yusuf can supply documents but cannot approve a tax correction. Any statement must identify which invoice survives and which copies are void, without claiming a refund of money never received.\n\nAccount reconciliation procedure CG-440: Keep invoice identity separate from the ledger view in which it is displayed. During migration, two screenshots can show one receivable. The surviving invoice reference, migration lock, signed credit note, and bank receipt together establish the account position. An exemption letter without its effective date is insufficient for retroactive tax relief; the controller must accept the complete certificate. An unsigned credit-note draft cannot reduce the recorded receivable. A customer's bank advice is not settled cash, and an overpayment cannot be refunded before an actual receipt establishes it. When the garden chooses carry-forward, show the amount as customer credit rather than revenue or a completed future purchase. A later withdrawal of that choice requires a separately authorized refund and a posting receipt. Preserve the distinction between the consolidated remittance route and a correspondence mailbox. A contact change does not redirect bank funds. The final statement must retire inactive draft documents and the old account view while keeping the original invoice and valid cash receipts in the audit trail."
+		},
+		{
+			"id": "dv-source-4",
+			"shift": 4,
+			"date": "2032-04-05",
+			"role": "user",
+			"content": "2032-04-05; external case correspondence for Yusuf Marin, DV-8404. Yusuf sent exemption letter EX-404 dated after the order. It asserts charity status but does not state an effective date. Bea asks for the full certificate before removing tax. Accounts migration copied CT-404 into the consolidated ledger while leaving the old ledger view open. Both views show the same invoice reference and one receivable, not two separate charges. Customer screenshots make the account appear to owe $849.60. Prepare an explanation that respects the uncertainty about exemption while refusing double-counting. No payment has settled. The timers were delivered with receipt CD-404; physical delivery does not resolve tax treatment or the display duplication."
+		},
+		{
+			"id": "dv-opening-4",
+			"shift": 5,
+			"date": "2032-04-06",
+			"role": "user",
+			"content": "Nessa Cole maintains Ridgewater's environmental controller fleet. The support order is a licensed configuration migration for six controllers, at $38 each, plus a $52 validation session, no tax. Ridgewater prepaid $280. The work changes firmware configuration, not ownership of the hardware. The customer's change board approves deployment windows and rollback authority. Engineer Lian Fox signs validation. Configuration package RC-2 is licensed for six serials and must not be copied to a seventh controller without a separate license. A test success on one isolated device cannot authorize deployment to the rest. The customer requires a signed change record and a recovery plan before production access. Support drafts must distinguish proposed commands, approved deployment, actual logs, and verified recovery.\n\nConfiguration change procedure RC-450: Track the serial scope, package version, mapping export, test result, authorized window, actual write log, post-change validation, and final customer acceptance. Read-only inspection and isolated staging consent do not authorize a production write. A sales description of readiness is not Lian's technical signoff. Before a staging change, retain the original export and its device identity so a rollback can restore that device rather than overwrite it with another controller's mapping. If a test fails, stop the proposed production sequence and obtain corrected-package validation and fresh board authority. A completed write on one serial does not prove a fleet deployment. When a network failure prevents writing, retain the device as unchanged and seek another window; the end of a window does not authorize unattended retries. Rollback authority is conditional and can be withdrawn. A reopened alarm needs diagnosis before assuming the configuration caused it. Keep an unrelated customer-maintenance issue visible without billing it as migration work or falsely certifying that it was repaired."
+		},
+		{
+			"id": "dv-source-5",
+			"shift": 5,
+			"date": "2032-04-06",
+			"role": "user",
+			"content": "2032-04-06; Nessa supplies the six controller serials and requests an isolated test on R1. Board consent CB-405 permits inspection and staging only; production writes remain prohibited. Lian has not validated RC-2 against the installed sensor mapping. Sales calls the package ready, which is not technical signoff. Keep a mapping export before any staging write. The prepaid $280 covers the six named serials and validation session. Nessa mentions spare R7, which is outside the license and cannot be added without approval. Prepare a staged plan and name both the missing validation and the missing production consent."
+		},
+		{
+			"id": "dv-opening-5",
+			"shift": 6,
+			"date": "2032-04-07",
+			"role": "user",
+			"content": "Pavel Birch manages consumable deliveries for Holmbrook library's print room. The quarter plan prepays twelve paper cartons at $19 each and four scheduled van drops at $8, total $260, tax exempt. Carton consumption and van visits are separate units. An unused carton can be deferred to the next quarter only with stockkeeper consent; a cancelled future van drop is credited if cancelled before route lock. Already completed drops remain chargeable even if cartons are later unused. Pavel can alter scheduling, while library finance chooses refund versus carry-forward of an account credit. The plan begins with three cartons and one completed drop, documented HD-406. The remaining stock and future route commitments must survive each change without converting a scheduling message into delivery evidence.\n\nSubscription custody procedure HP-460: Account separately for paper cartons and completed van drops. A routing combination can reduce a future delivery charge without changing the purchased carton count. A prepared manifest is not a receiver receipt, and correcting a manifest before loading does not create another shipment. A cancellation after a completed drop cannot erase that completed service. Each posted credit must retain its reason and original document reference, so a later cash refund consumes the existing account credit rather than issuing it twice. Stockkeeper consent governs whether reserved cartons return to available stock; library finance chooses cash or carry-forward. Neither customer instruction by itself proves a treasury transfer. At closure, reconcile the original prepayment into retained delivered units, retained actual visits, and all returned cash. A warehouse picklist remaining in a print queue is an operational obligation to void, not an authorization to send goods after cancellation. Mark the old final-drop commitment inactive in the actual earlier handoff and identify the record proving the void."
+		},
+		{
+			"id": "dv-source-6",
+			"shift": 6,
+			"date": "2032-04-07",
+			"role": "user",
+			"content": "2032-04-07; Pavel postpones the second van drop because the building is closed. The route is not locked and no second delivery occurred. The stockkeeper agrees to hold the next three cartons at Harbour Forms. Payment remains $260 prepaid. Combining the next two drops into one larger delivery is offered but not accepted. HD-406 proves the first three cartons and first drop completed; those remain chargeable. Reopening is provisional. Keep the held cartons, unconfirmed combination, and future schedule separate. Library finance has chosen neither refund nor carry-forward."
+		},
+		{
+			"id": "dv-opening-6",
+			"shift": 7,
+			"date": "2032-04-08",
+			"role": "user",
+			"content": "Ines Brook coordinates accredited tool-safety training for Ternford housing association. The booking covers seven seats at $64 each, no tax, total $448. A bursary pays $160 directly and the association pays $288; both receipts are settled. The bursary is conditional on at least five attended seats and cannot be refunded to the association. A seat can transfer to another named employee before roster lock without a fee. Attendance sheets establish participation; certification additionally requires an individual assessment pass. Ines can nominate employees, while bursary officer Amira Vale decides grant retention and trainer Otis Hall signs assessments. A cancellation or failed assessment must not silently turn into a certificate. Preserve the distinct payer shares in every financial proposal.\n\nTraining evidence procedure TF-470: Preserve one roster position for a free employee transfer. The replaced employee and their approved replacement cannot both count as seats or attendees. A locked roster changes only through an explicit registration exception. Attendance, individual assessment, certificate issue, and certificate receipt are separate stages. The bursary rule concerns the stated attendance threshold; do not silently replace it with an assessment-pass condition. A participant who attended but failed assessment still needs a real reassessment pass before certification. Do not issue a certificate on a promise to return. Protect individual results in internal or authorized individual communications, while an association-wide statement can give aggregate status. Keep the bursary and association payment shares separate. A bursary refund, if ever required, goes through its funding authority rather than automatically to the association. The final certificate index must map each valid named employee to their certificate and retire cancelled roster entries without revoking the legitimate transferred seat. Completion of reassessment does not create another paid seat."
+		},
+		{
+			"id": "dv-source-7",
+			"shift": 7,
+			"date": "2032-04-08",
+			"role": "user",
+			"content": "2032-04-08; Two employees cannot attend. Ines nominates one replacement and requests cancellation of the other seat before roster lock. Registration accepts the one-for-one transfer. Six people remain planned, not seven; a draft counted both the departing employee and replacement. Amira must approve allocation of the possible $64 cancellation refund between the two payers. Five actual attendees would satisfy the bursary threshold, but no attendance has occurred. Correct the roster without issuing certificates or promising bursary retention before its condition is met."
+		},
+		{
+			"id": "dv-opening-7",
+			"shift": 8,
+			"date": "2032-04-09",
+			"role": "user",
+			"content": "Otto Wynn purchases machine lubricant for Redmarsh fabrication. The order contains nine sealed 20-litre drums at $58 each plus $27 freight, tax exempt, total $549 settled. Five drums carry batch LO-81 and four carry LO-82. The supplier opens a quality quarantine on LO-81 only. Quarantine is a stop-use direction, not an instruction for the customer to dispose of liquid. A licensed collection contractor and waste-transfer record are required for any disposal. Supplier quality lead Edda Nash controls release of a batch; Otto can choose a commercial remedy but cannot certify the material safe. The replacement or credit must follow actual affected quantities and custody records. A drum quarantined at Harbour Forms and a drum held by the customer need different transport steps.\n\nBatch quality procedure RM-480: Match every quarantine and release to its batch and, where the quality notice narrows further, its drum serials. An order-wide label cannot enlarge a limited affected set. A hold protects against use while evidence is gathered; it is not disposal authority or proof of a manufacturing fault in unaffected stock. Only the quality lead can release a held serial after the laboratory trace. Licensed collection and the waste-transfer record establish custody of affected material; a booking alone establishes neither. A no-charge exchange replaces the affected goods but does not create a customer cash credit equal to their notional merchandise value. State that distinction explicitly if a previous worksheet displayed the value without a label. Do not deduct it from another invoice without authorization. Supplier dispatch and customer receipt are separate evidence. At closure, show the quantities originally retained, released from hold, collected, and replaced, while avoiding double-counting an exchanged unit as both retained and refunded. An obsolete carrier booking must not trigger a repeated collection after actual custody is confirmed."
+		},
+		{
+			"id": "dv-source-8",
+			"shift": 8,
+			"date": "2032-04-09",
+			"role": "user",
+			"content": "2032-04-09; Otto confirms all nine drums delivered and sealed. He isolates the five LO-81 drums; four LO-82 remain usable. Quality requires label photographs, which have not arrived. Do not ask him to pour out or blend held lubricant. He prefers replacement if stock can meet production needs, but availability is unknown. A warehouse assistant mistakenly marks all nine affected. Preserve the batch-level count and request quality review. Neither collection of unaffected LO-82 nor a full $549 refund follows the limited quarantine."
+		},
+		{
+			"id": "dv-source-9",
+			"shift": 9,
+			"date": "2032-04-10",
+			"role": "user",
+			"content": "2032-04-10; external case correspondence for Alba Kent, DV-8401. Depot receipt DS-401 confirms A, B, C, D only. All four pass condition review. The five-pallet entry was corrected before posting. Treasury receipt TB-401 confirms $112 returned to the mandated bank. Alba reports E and F ready for collection, but G through K remain under stone. The carrier offers collection next shift; Alba consents. Depot asks whether to merge the next return with the completed one. Keep separate receipts because a repeat credit for A–D would be a duplicate. The account view still shows the old provisional count until tonight's refresh, so use the signed receipt for physical truth and ask accounts to reconcile the stale display. The period-end statement must explain why the earlier four-pallet refund is complete while the next two deposits remain held. Accounts rechecks HP-401 and confirms the original $28 deposit rate unchanged. This confirmation authorizes no additional release or payment."
+		},
+		{
+			"id": "dv-source-10",
+			"shift": 10,
+			"date": "2032-04-11",
+			"role": "user",
+			"content": "2032-04-11; external case correspondence for Minh Sato, DV-8402. Quality issued certificates QC-71 and QC-81 for BW-7 and BW-8, and Minh approved the split. Courier scan BC-402 proves those weights left the laboratory. A receiver scan at Brookvale is absent. Before use, Arlo notices that the certificate PDFs show reference R-610, while the accredited worksheet used R-601. Quality confirms a transcription error and withdraws both PDFs. The weights remain physically in transit; withdrawing documents does not undo the shipment. Tell Minh to keep them out of accredited use until corrected certificates arrive. Do not order an unnecessary physical return for a documentary error without quality review. BW-9 remains under investigation and has no signed certificate."
+		},
+		{
+			"id": "dv-source-11",
+			"shift": 11,
+			"date": "2032-04-12",
+			"role": "user",
+			"content": "2032-04-12; external case correspondence for Rhea Calder, DV-8403. Ellis signed isolation IS-403 on time, but dispatch sent the technician to a similarly named address in another town. No work occurred at Marshgate. Dispatch acknowledges provider error and waives any wasted-attendance charge. Rhea wants a replacement slot after the production run. The original visit is closed as missed by provider, not cancelled by customer. A billing draft mistakenly added $160 no-access attendance; accounts marks that draft void. Preserve the void reason so it does not reappear when another operator reads the draft. Noor authorizes the same scope and price for a replacement visit; no additional deposit is required. The isolation signature applies only to its date and must be renewed for the later appointment."
+		},
+		{
+			"id": "dv-source-12",
+			"shift": 12,
+			"date": "2032-04-13",
+			"role": "user",
+			"content": "2032-04-13; external case correspondence for Yusuf Marin, DV-8404. Complete certificate EX-405 confirms exemption took effect before the invoice date. Bea approves a tax credit note for $19.80 against CT-404. The credit-note draft CN-40 is unsigned and not posted. Migration team locks the old CG-44 view against payment, leaving DV-5204 as the valid remittance account. Yusuf must not be asked to pay both views. A customer email says they have arranged $424.80 through online banking, but Harbour Forms has no bank receipt. Keep advised payment separate from cleared cash and do not promise a refund before overpayment is established. Use the consolidated remittance route in the draft and identify the superseded code explicitly."
+		},
+		{
+			"id": "dv-source-13",
+			"shift": 13,
+			"date": "2032-04-14",
+			"role": "user",
+			"content": "2032-04-14; Staging log SL-405 confirms the R1 export and isolated RC-2 installation. Lian finds reversed high and low alert labels and refuses validation. The board withdraws the production window; no other controller changed. Correction and retest of this provider error carry no extra charge. RC-3 is prepared but unsigned. Keep R1 isolated and its original export available. Do not describe all six devices as updated or treat the withdrawn window as active. Repair the actual earlier plan so it stops at the technical refusal."
+		},
+		{
+			"id": "dv-source-14",
+			"shift": 14,
+			"date": "2032-04-15",
+			"role": "user",
+			"content": "2032-04-15; Pavel accepts one six-carton delivery instead of two separate drops. HC-406 cancels one future drop before route lock. HN-406 posts its $8 credit, which library finance elects to retain on account. HM-406 is prepared but not collected. The portal briefly listed nine cartons for this run and was corrected to six before loading. Twelve cartons remain purchased; three are reserved for the final drop after this combined six. Do not create another credit for the completed first drop, or treat a prepared manifest as delivery."
+		},
+		{
+			"id": "dv-source-15",
+			"shift": 15,
+			"date": "2032-04-16",
+			"role": "user",
+			"content": "2032-04-16; Amira permits retaining the $160 bursary if six attend and approves the cancelled-seat $64 refund to the association from its $288 share. Finance has approved but not posted the refund. TR-407 locks six distinct names. Registration refuses an informal after-lock substitution. Otis will use the locked roster unless an explicit exception arrives. Prepare pre-course confirmation, separating the accepted transfer from the unapproved late change. Retire the seven-person draft while preserving the original payment receipts."
+		},
+		{
+			"id": "dv-source-16",
+			"shift": 16,
+			"date": "2032-04-17",
+			"role": "user",
+			"content": "2032-04-17; Photographs confirm the batches. Edda narrows the affected set to RW-11, RW-12, and RW-13 within LO-81; the other two LO-81 drums are explicitly released after laboratory trace. This does not release all LO-81. Otto accepts three clean replacements. WT-408 books licensed collection of the affected serials, which has not occurred. Retire the all-nine entry and the broader hold only for the two released serials. The original five-drum hold was appropriate before the trace; correct the earlier remedy count without blaming the customer."
+		},
+		{
+			"id": "dv-source-17",
+			"shift": 17,
+			"date": "2032-04-18",
+			"role": "user",
+			"content": "2032-04-18; external case correspondence for Alba Kent, DV-8401. Depot scans E and F under DS-402. E is sound. F has a split runner, but dispatch photo HP-401-F shows the same split before the customer received it. Inspector withdraws the proposed $9 repair deduction. Treasury has approved releasing both deposits, but no bank receipt exists yet. Alba has moved banks. The old mandate ending 1842 is revoked, and a signed replacement ending 6073 is verified in the customer lookup. A payment to 1842 would violate the changed instruction even if the refund amount is right. G through K are still in circulation and must not disappear from the statement. Include the withdrawn damage proposal as historical only, so the next clerk does not silently deduct it from the bank instruction."
+		},
+		{
+			"id": "dv-source-18",
+			"shift": 18,
+			"date": "2032-04-19",
+			"role": "user",
+			"content": "2032-04-19; external case correspondence for Minh Sato, DV-8402. Quality certificates QC-72 and QC-82 use R-601 and supersede the withdrawn PDFs. Brookvale receiving scan BR-402 confirms BW-7 and BW-8 delivered. Arlo accepts those two certificates. Investigation of BW-9 finds a loose case screw affecting stability; the lab tightened it with Minh's consent and completed a stable test. The repair labor of $14 is waived because intake failed to notice the loose screw. A draft certificate QC-90 exists but has no authorized signature. The order lookup shows it as draft, and must not be used as final release evidence. Minh requests the third weight as soon as its signed certificate is ready. Their original split consent does not waive the certificate requirement."
+		},
+		{
+			"id": "dv-source-19",
+			"shift": 19,
+			"date": "2032-04-20",
+			"role": "user",
+			"content": "2032-04-20; external case correspondence for Rhea Calder, DV-8403. Replacement visit attendance VA-403 and renewed isolation IS-404 are confirmed. Technician measured A, B, C successfully. Zone D is inaccessible behind a newly installed enclosure. Noor approves a reduced three-zone invoice while arranging a later separate access job; the commissioning certificate for all four zones must remain withheld. The authorized attendance charge is $160 and the three measured zones cost $135. Apply the existing $100 deposit. The technician's report includes an advisory to redesign the access panel, not an approval to cut the enclosure. Rhea wants a document explaining exactly what the visit accomplished. Do not call the system fully commissioned merely because the agreed partial invoice can be paid."
+		},
+		{
+			"id": "dv-source-20",
+			"shift": 20,
+			"date": "2032-04-21",
+			"role": "user",
+			"content": "2032-04-21; external case correspondence for Yusuf Marin, DV-8404. Signed credit note CN-41 posted $19.80 and closes the tax correction. Bank receipt CB-404 confirms $424.80 into DV-5204. Ledger now shows the corrected $405 invoice settled plus $19.80 unallocated credit. Yusuf elects to apply that credit to the garden's next timer-battery invoice, rather than request cash. Bea approves carry-forward on account, but no future sale has been invoiced. Show the credit as a liability to the customer, not as extra revenue or a refund already paid. The earlier advice can be replaced by the actual receipt. A clerk printed the unsigned CN-40 draft for the customer; mark it inactive in the corrected document list and use signed CN-41."
+		},
+		{
+			"id": "dv-source-21",
+			"shift": 21,
+			"date": "2032-04-22",
+			"role": "user",
+			"content": "2032-04-22; Lian signs LV-405 for RC-3 after correct alert tests. Board authority CB-406 permits R1–R6 deployment during an attended window, with rollback if post-change checks fail. DL-405 confirms R1–R5 completed. R6 lost connectivity before any write and remains unchanged. The window has ended, so another approved window is needed for R6. R7 remains outside the license. Retain the per-device exports and checks; a fleet-wide success label would hide the unmigrated device. Report actual progress without counting an attempt as completion."
+		},
+		{
+			"id": "dv-source-22",
+			"shift": 22,
+			"date": "2032-04-23",
+			"role": "user",
+			"content": "2032-04-23; HD-407 confirms six cartons received, giving nine delivered across two actual drops. The library closes its print room and cancels the remaining three cartons and last unlocked van visit. The stockkeeper permits restocking without deduction. Finance withdraws carry-forward and requests cash for all unused credit. Include the existing $8 once; do not credit that cancelled visit again. Use the verified bank account for the request. Customer choice and scheduling cancellation do not prove a treasury transfer. Reconcile the actual earlier plan into completed and cancelled units."
+		},
+		{
+			"id": "dv-source-23",
+			"shift": 23,
+			"date": "2032-04-24",
+			"role": "user",
+			"content": "2032-04-24; TA-407 records all six locked employees attending. Five pass assessment; one needs reassessment. Amira confirms bursary retention because its attendance condition was met. TF-407 posts the $64 association refund. Otis issues five certificates and withholds the sixth. A promise to return cannot justify certification. Offer the included first reassessment free of charge. Protect the individual failed result in the internal note and authorized follow-up. Report attendance and payment completion without calling all six certified."
+		},
+		{
+			"id": "dv-source-24",
+			"shift": 24,
+			"date": "2032-04-25",
+			"role": "user",
+			"content": "2032-04-25; WC-408 confirms collection of RW-11/12/13, and WD-408 proves licensed custody. RS-408 dispatches three clean LO-90 replacements, without a receiver scan. Otto reports an unauthorized $174 deduction from an unrelated invoice because a prior draft displayed the affected merchandise value. No cash credit was approved: this paid order receives a free exchange. Correct the interpretation and refer the separate invoice to accounts. Do not request another collection or describe replacement delivery as completed."
+		},
+		{
+			"id": "dv-source-25",
+			"shift": 25,
+			"date": "2032-04-26",
+			"role": "user",
+			"content": "2032-04-26; external case correspondence for Alba Kent, DV-8401. Treasury TB-402 confirms $56 to 6073. Depot accepts G, H, I, J, K under DS-403, and Alba elects to close the pallet-pool account after the period. All five are sound. Treasury TB-403 confirms $140 returned. The carrier collection job is complete. Accounts issued closing statement HS-401, retaining only the original $44 handling charge. Alba has not acknowledged receipt of that statement. A support draft can explain all three deposit repayments and the count of eleven, but cannot claim the customer received the final document until delivery evidence arrives. The old bank route remains revoked. A clerk has asked to reopen F's damage charge based on an isolated inspection thumbnail; the original dispatch photograph still defeats that charge and must remain linked to the closing record."
+		},
+		{
+			"id": "dv-source-26",
+			"shift": 26,
+			"date": "2032-04-27",
+			"role": "user",
+			"content": "2032-04-27; external case correspondence for Minh Sato, DV-8402. Signed certificate QC-91 for BW-9 carries R-601 and the required 20-degree condition. Courier BC-403 and receiver BR-403 prove dispatch and delivery. Arlo's acceptance AA-402 approves the complete tag-mapped set QC-72, QC-82, QC-91. The service can close. Brookvale asks for an archive index that explicitly retires QC-71, QC-81, and unsigned QC-90 so staff do not use a cached PDF. The index must connect each valid certificate to its own physical tag and show that the waived labor changed no customer payment. No cash refund is requested. If the actual earlier handoff kept a physical return task for BW-7/8, remove it with explanation; the quality correction was documentary and no return was authorized."
+		},
+		{
+			"id": "dv-source-27",
+			"shift": 27,
+			"date": "2032-04-28",
+			"role": "user",
+			"content": "2032-04-28; external case correspondence for Rhea Calder, DV-8403. Payment RP-403 settles $195, completing the $295 partial invoice. Noor approves a separate $45 return measurement forzone D after the plant's contractor opens the panel. Ellis issues dated isolation IS-405, and technician report TZ-404 confirms D passes. The $45 invoice is issued but unpaid. Technical signatory issues full commissioning certificate CM-403 covering A–D. Finance and technical closure differ: commissioning is complete, the final $45 receivable is open. Rhea asks for a final comparison to the original quote. Total authorized service across both visits remains $340 because no second attendance charge was added. Do not describe the unpaid invoice as settled or keep the old inaccessible-zone blocker after the signed report."
+		},
+		{
+			"id": "dv-source-28",
+			"shift": 28,
+			"date": "2032-04-29",
+			"role": "user",
+			"content": "2032-04-29; external case correspondence for Yusuf Marin, DV-8404. Yusuf withdraws the carry-forward choice because the garden is closing its purchasing season. Bea authorizes $19.80 back to the verified sending account, but treasury has not posted it. The account-credit balance must remain until a refund receipt arrives. No battery invoice was ever issued, so there is no later sale to cancel. Yusuf changes correspondence to the garden treasurer's mailbox yusuf.finance@claybank.example, verified in the account lookup; the volunteering mailbox is retired. The closure packet must connect original CT-404, signed CN-41, settled CB-404, and the requested cash refund without reviving the duplicate ledger view. A draft transfer request is not cash sent."
+		},
+		{
+			"id": "dv-source-29",
+			"shift": 29,
+			"date": "2032-04-30",
+			"role": "user",
+			"content": "2032-04-30; Fresh board authority CB-407 permits the attended R6 window. DL-406 completes R6, and LV-406 validates all six. Ridgewater then reopens the ticket for an R3 network alarm. Diagnosis finds a link-cable fault with correct alert mapping; Nessa withdraws the rollback request. Final acceptance FA-405 approves the configuration work. The customer owns the separate cable-maintenance task. Do not perform a rollback under the withdrawn request, bill a cable repair, or claim the cable was fixed. Close the configuration record with RC-3 and all six serials."
+		},
+		{
+			"id": "dv-source-30",
+			"shift": 30,
+			"date": "2032-05-01",
+			"role": "user",
+			"content": "2032-05-01; HN-407 posts $65 for the final three cartons and last drop. HT-406 returns $73 including the earlier $8 credit, and HF-406 acknowledges receipt. Dispatch voids the stale final picklist under HV-406 before collection. The plan is closed. Reconcile $260 originally paid, $73 returned, and $187 retained for nine cartons and two drops. The mistaken nine-carton combined manifest is inactive and proves no extra delivery. Retire any final-drop deadline left in the actual earlier handoff."
+		},
+		{
+			"id": "dv-source-31",
+			"shift": 31,
+			"date": "2032-05-02",
+			"role": "user",
+			"content": "2032-05-02; RA-407 records the remaining employee passing reassessment, and Otis issues TC-406. Ines confirms receipt of all six certificates. A later registry export mistakenly restores the cancelled employee as an attendee. RC-407 removes that entry while preserving the legitimate transferred employee and certificate. Close the service with six valid person-to-certificate pairs. Do not create another paid seat, refund the bursary to the association, or leave the completed reassessment open. Reconcile the actual earlier roster and payer statement."
+		},
+		{
+			"id": "dv-source-32",
+			"shift": 32,
+			"date": "2032-05-03",
+			"role": "user",
+			"content": "2032-05-03; RR-408 proves the three sealed LO-90 replacements delivered. Edda signs QC-408 quality closure and Otto accepts the exchange. AR-408 reverses the unauthorized $174 deduction on the unrelated invoice, restoring its receivable without proving settlement. Close the exchange and retain a separate accounts follow-up. Cached tracking still shows the old collection booking active, but WC-408 and WD-408 prove collection completed. Preserve four LO-82 and two released LO-81 as retained stock, with three exchanged units."
+		}
+	],
+	"tools": {
+		"lookup_order": {},
+		"lookup_customer": {}
+	},
+	"lookups": [
+		{
+			"tool": "lookup_order",
+			"id": "DV-8401",
+			"from": 2,
+			"text": "Order DV-8401; account DV-5201; Four pallets collected; depot identity scans absent; the provisional count of five is unverified."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5201",
+			"from": 2,
+			"text": "Account DV-5201; owner Alba Kent; order DV-8401; active correspondence alba.kent@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8402",
+			"from": 4,
+			"text": "Order DV-8402; account DV-5202; BW-7 and BW-8 readings are stable, with unsigned certificates. BW-9 is unstable; split return is only proposed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5202",
+			"from": 4,
+			"text": "Account DV-5202; owner Minh Sato; order DV-8402; active correspondence minh.sato@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8403",
+			"from": 6,
+			"text": "Order DV-8403; account DV-5203; The visit is accepted, isolation unsigned, four zones contracted, and the $100 deposit settled."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5203",
+			"from": 6,
+			"text": "Account DV-5203; owner Rhea Calder; order DV-8403; active correspondence rhea.calder@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8404",
+			"from": 8,
+			"text": "Order DV-8404; account DV-5204; One unpaid $424.80 invoice appears in two ledger views. The exemption effective date is unresolved; timers are delivered."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5204",
+			"from": 8,
+			"text": "Account DV-5204; owner Yusuf Marin; order DV-8404; active correspondence yusuf.marin@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8405",
+			"from": 10,
+			"text": "Order DV-8405; account DV-5205; Six serials are licensed; R7 is outside scope. RC-2 validation and production authority are missing."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5205",
+			"from": 10,
+			"text": "Account DV-5205; owner Nessa Cole; order DV-8405; active correspondence nessa.cole@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8406",
+			"from": 12,
+			"text": "Order DV-8406; account DV-5206; Three cartons and one drop are complete. Nine cartons remain; the unlocked second drop is postponed and combination unaccepted."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5206",
+			"from": 12,
+			"text": "Account DV-5206; owner Pavel Birch; order DV-8406; active correspondence pavel.birch@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8407",
+			"from": 14,
+			"text": "Order DV-8407; account DV-5207; A free one-for-one transfer is accepted, one seat cancellation requested, and six attendees planned. Attendance has not occurred."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5207",
+			"from": 14,
+			"text": "Account DV-5207; owner Ines Brook; order DV-8407; active correspondence ines.brook@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8408",
+			"from": 16,
+			"text": "Order DV-8408; account DV-5208; Five LO-81 drums are held, four LO-82 remain usable, and label photos are missing. Replacement is requested, unapproved."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5208",
+			"from": 16,
+			"text": "Account DV-5208; owner Otto Wynn; order DV-8408; active correspondence otto.wynn@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8401",
+			"from": 17,
+			"text": "Order DV-8401; account DV-5201; A through D are accepted and $112 repaid; E and F collection is planned. G through K remain retained; the provisional five is corrected."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5201",
+			"from": 17,
+			"text": "Account DV-5201; owner Alba Kent; order DV-8401; active correspondence alba.kent@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8402",
+			"from": 18,
+			"text": "Order DV-8402; account DV-5202; BW-7 and BW-8 shipped. QC-71 and QC-81 are withdrawn for the wrong reference; BW-9 remains unclassified."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5202",
+			"from": 18,
+			"text": "Account DV-5202; owner Minh Sato; order DV-8402; active correspondence minh.sato@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8403",
+			"from": 19,
+			"text": "Order DV-8403; account DV-5203; The provider missed the visit. The $160 no-access draft is void, the original price retained, and the old isolation date expired."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5203",
+			"from": 19,
+			"text": "Account DV-5203; owner Rhea Calder; order DV-8403; active correspondence rhea.calder@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8404",
+			"from": 20,
+			"text": "Order DV-8404; account DV-5204; Exemption is approved, the tax credit draft unposted, the old account locked, and the $424.80 payment advice uncleared."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5204",
+			"from": 20,
+			"text": "Account DV-5204; owner Yusuf Marin; order DV-8404; active correspondence yusuf.marin@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8405",
+			"from": 21,
+			"text": "Order DV-8405; account DV-5205; RC-2 fails the alert test on isolated R1. The production window is withdrawn; no other controller changed and RC-3 is unsigned."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5205",
+			"from": 21,
+			"text": "Account DV-5205; owner Nessa Cole; order DV-8405; active correspondence nessa.cole@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8406",
+			"from": 22,
+			"text": "Order DV-8406; account DV-5206; Six-carton combination is approved, one future $8 drop cancelled and credited, and the manifest corrected from nine to six. Delivery is unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5206",
+			"from": 22,
+			"text": "Account DV-5206; owner Pavel Birch; order DV-8406; active correspondence pavel.birch@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8407",
+			"from": 23,
+			"text": "Order DV-8407; account DV-5207; Six names are locked with the accepted transfer. An informal late substitution is refused; the $64 association refund is approved, unposted."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5207",
+			"from": 23,
+			"text": "Account DV-5207; owner Ines Brook; order DV-8407; active correspondence ines.brook@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8408",
+			"from": 24,
+			"text": "Order DV-8408; account DV-5208; RW-11, RW-12, and RW-13 remain affected; the other two LO-81 drums are released. Three replacements are accepted, collection booked only."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5208",
+			"from": 24,
+			"text": "Account DV-5208; owner Otto Wynn; order DV-8408; active correspondence otto.wynn@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8401",
+			"from": 25,
+			"text": "Order DV-8401; account DV-5201; E and F are accepted; F damage pre-existed dispatch. The $9 deduction is withdrawn and bank mandate 6073 supersedes 1842."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5201",
+			"from": 25,
+			"text": "Account DV-5201; owner Alba Kent; order DV-8401; active correspondence alba.kent@harbourforms.example. Verified bank mandate 6073; 1842 revoked."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8402",
+			"from": 26,
+			"text": "Order DV-8402; account DV-5202; BW-7 and BW-8 are delivered and accepted on corrected certificates. BW-9 tests stable but QC-90 is unsigned; $14 repair labor is waived."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5202",
+			"from": 26,
+			"text": "Account DV-5202; owner Minh Sato; order DV-8402; active correspondence minh.sato@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8403",
+			"from": 27,
+			"text": "Order DV-8403; account DV-5203; The visit measured A through C; D remains inaccessible. The three-zone invoice is approved, whole-system certification withheld."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5203",
+			"from": 27,
+			"text": "Account DV-5203; owner Rhea Calder; order DV-8403; active correspondence rhea.calder@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8404",
+			"from": 28,
+			"text": "Order DV-8404; account DV-5204; The $405 invoice is settled and $19.80 remains as chosen account credit. No cash refund or future invoice exists."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5204",
+			"from": 28,
+			"text": "Account DV-5204; owner Yusuf Marin; order DV-8404; active correspondence yusuf.marin@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8405",
+			"from": 29,
+			"text": "Order DV-8405; account DV-5205; RC-3 is validated; R1 through R5 are deployed. R6 remains unchanged after connectivity failed before writing; the window has ended."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5205",
+			"from": 29,
+			"text": "Account DV-5205; owner Nessa Cole; order DV-8405; active correspondence nessa.cole@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8406",
+			"from": 30,
+			"text": "Order DV-8406; account DV-5206; Nine cartons and two drops are delivered. The final three cartons and drop are cancelled; the old $8 credit exists and finance now elects cash."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5206",
+			"from": 30,
+			"text": "Account DV-5206; owner Pavel Birch; order DV-8406; active correspondence pavel.birch@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8407",
+			"from": 31,
+			"text": "Order DV-8407; account DV-5207; Six attended, the bursary is retained, and the $64 refund posted. Five are certified; one failed assessment."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5207",
+			"from": 31,
+			"text": "Account DV-5207; owner Ines Brook; order DV-8407; active correspondence ines.brook@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8408",
+			"from": 32,
+			"text": "Order DV-8408; account DV-5208; The three affected drums are collected with licensed custody. Three replacements are in transit; no $174 cash credit is authorized."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5208",
+			"from": 32,
+			"text": "Account DV-5208; owner Otto Wynn; order DV-8408; active correspondence otto.wynn@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8401",
+			"from": 33,
+			"text": "Order DV-8401; account DV-5201; All eleven pallets returned; $112, $56, and $140 refunds are posted. Only $44 handling is retained; statement receipt is unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5201",
+			"from": 33,
+			"text": "Account DV-5201; owner Alba Kent; order DV-8401; active correspondence alba.kent@harbourforms.example. Verified bank mandate 6073; 1842 revoked."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8402",
+			"from": 34,
+			"text": "Order DV-8402; account DV-5202; All weights are delivered and accepted. Valid certificates are QC-72, QC-82, and QC-91; older PDFs remain inactive."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5202",
+			"from": 34,
+			"text": "Account DV-5202; owner Minh Sato; order DV-8402; active correspondence minh.sato@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8403",
+			"from": 35,
+			"text": "Order DV-8403; account DV-5203; A through D are technically complete and certified. The partial $295 is paid; the separate $45 invoice remains unpaid."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5203",
+			"from": 35,
+			"text": "Account DV-5203; owner Rhea Calder; order DV-8403; active correspondence rhea.calder@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8404",
+			"from": 36,
+			"text": "Order DV-8404; account DV-5204; Carry-forward is withdrawn, the $19.80 refund approved but unposted, and finance correspondence replaces the old mailbox."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5204",
+			"from": 36,
+			"text": "Account DV-5204; owner Yusuf Marin; order DV-8404; active correspondence yusuf.finance@claybank.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8405",
+			"from": 37,
+			"text": "Order DV-8405; account DV-5205; All six RC-3 configurations are validated and accepted. The R3 cable alarm is unrelated; rollback is withdrawn."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5205",
+			"from": 37,
+			"text": "Account DV-5205; owner Nessa Cole; order DV-8405; active correspondence nessa.cole@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8406",
+			"from": 38,
+			"text": "Order DV-8406; account DV-5206; The $73 refund is received, the obsolete final picklist void, and the plan closed with nine cartons and two drops retained."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5206",
+			"from": 38,
+			"text": "Account DV-5206; owner Pavel Birch; order DV-8406; active correspondence pavel.birch@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8407",
+			"from": 39,
+			"text": "Order DV-8407; account DV-5207; Six valid certificates are received, the cancelled-entry registry error corrected, and reassessment complete."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5207",
+			"from": 39,
+			"text": "Account DV-5207; owner Ines Brook; order DV-8407; active correspondence ines.brook@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "DV-8408",
+			"from": 40,
+			"text": "Order DV-8408; account DV-5208; Exchange and quality are accepted. The unrelated receivable is restored, unconfirmed as settled; the cached collection booking is obsolete."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "DV-5208",
+			"from": 40,
+			"text": "Account DV-5208; owner Otto Wynn; order DV-8408; active correspondence otto.wynn@harbourforms.example. Customer payment instructions require the verified mandate; support has no payment execution tool."
+		}
+	],
+	"goals": [
+		{
+			"id": "dv-01-1",
+			"shift": 1,
+			"after": 2,
+			"request": "Prepare the queue decision sheet for Alba Kent, DV-8401, at shift 1. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-01-2",
+			"shift": 1,
+			"after": 2,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Alba Kent, DV-8401, at shift 1. Use your actual product dv-01-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-01-3",
+			"shift": 1,
+			"after": 2,
+			"request": "Reconcile financial, physical, technical, and document completion for Alba Kent, DV-8401, at shift 1. Use your actual product dv-01-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-01-4",
+			"shift": 1,
+			"after": 2,
+			"request": "Prepare the next-operator handoff for Alba Kent, DV-8401, at shift 1. Use your actual product dv-01-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-02-1",
+			"shift": 2,
+			"after": 4,
+			"request": "Prepare the queue decision sheet for Minh Sato, DV-8402, at shift 2. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-02-2",
+			"shift": 2,
+			"after": 4,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Minh Sato, DV-8402, at shift 2. Use your actual product dv-02-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-02-3",
+			"shift": 2,
+			"after": 4,
+			"request": "Reconcile financial, physical, technical, and document completion for Minh Sato, DV-8402, at shift 2. Use your actual product dv-02-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-02-4",
+			"shift": 2,
+			"after": 4,
+			"request": "Prepare the next-operator handoff for Minh Sato, DV-8402, at shift 2. Use your actual product dv-02-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-03-1",
+			"shift": 3,
+			"after": 6,
+			"request": "Prepare the queue decision sheet for Rhea Calder, DV-8403, at shift 3. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-03-2",
+			"shift": 3,
+			"after": 6,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Rhea Calder, DV-8403, at shift 3. Use your actual product dv-03-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-03-3",
+			"shift": 3,
+			"after": 6,
+			"request": "Reconcile financial, physical, technical, and document completion for Rhea Calder, DV-8403, at shift 3. Use your actual product dv-03-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-03-4",
+			"shift": 3,
+			"after": 6,
+			"request": "Prepare the next-operator handoff for Rhea Calder, DV-8403, at shift 3. Use your actual product dv-03-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-04-1",
+			"shift": 4,
+			"after": 8,
+			"request": "Prepare the queue decision sheet for Yusuf Marin, DV-8404, at shift 4. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-04-2",
+			"shift": 4,
+			"after": 8,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Yusuf Marin, DV-8404, at shift 4. Use your actual product dv-04-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-04-3",
+			"shift": 4,
+			"after": 8,
+			"request": "Reconcile financial, physical, technical, and document completion for Yusuf Marin, DV-8404, at shift 4. Use your actual product dv-04-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-04-4",
+			"shift": 4,
+			"after": 8,
+			"request": "Prepare the next-operator handoff for Yusuf Marin, DV-8404, at shift 4. Use your actual product dv-04-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-05-1",
+			"shift": 5,
+			"after": 10,
+			"request": "Prepare the queue decision sheet for Nessa Cole, DV-8405, at shift 5. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-05-2",
+			"shift": 5,
+			"after": 10,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Nessa Cole, DV-8405, at shift 5. Use your actual product dv-05-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-05-3",
+			"shift": 5,
+			"after": 10,
+			"request": "Reconcile financial, physical, technical, and document completion for Nessa Cole, DV-8405, at shift 5. Use your actual product dv-05-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-05-4",
+			"shift": 5,
+			"after": 10,
+			"request": "Prepare the next-operator handoff for Nessa Cole, DV-8405, at shift 5. Use your actual product dv-05-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-06-1",
+			"shift": 6,
+			"after": 12,
+			"request": "Prepare the queue decision sheet for Pavel Birch, DV-8406, at shift 6. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-06-2",
+			"shift": 6,
+			"after": 12,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Pavel Birch, DV-8406, at shift 6. Use your actual product dv-06-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-06-3",
+			"shift": 6,
+			"after": 12,
+			"request": "Reconcile financial, physical, technical, and document completion for Pavel Birch, DV-8406, at shift 6. Use your actual product dv-06-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-06-4",
+			"shift": 6,
+			"after": 12,
+			"request": "Prepare the next-operator handoff for Pavel Birch, DV-8406, at shift 6. Use your actual product dv-06-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-07-1",
+			"shift": 7,
+			"after": 14,
+			"request": "Prepare the queue decision sheet for Ines Brook, DV-8407, at shift 7. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-07-2",
+			"shift": 7,
+			"after": 14,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Ines Brook, DV-8407, at shift 7. Use your actual product dv-07-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-07-3",
+			"shift": 7,
+			"after": 14,
+			"request": "Reconcile financial, physical, technical, and document completion for Ines Brook, DV-8407, at shift 7. Use your actual product dv-07-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-07-4",
+			"shift": 7,
+			"after": 14,
+			"request": "Prepare the next-operator handoff for Ines Brook, DV-8407, at shift 7. Use your actual product dv-07-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-08-1",
+			"shift": 8,
+			"after": 16,
+			"request": "Prepare the queue decision sheet for Otto Wynn, DV-8408, at shift 8. Start from the actual preceding handoff and the external evidence available at this boundary. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-08-2",
+			"shift": 8,
+			"after": 16,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Otto Wynn, DV-8408, at shift 8. Use your actual product dv-08-1 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-08-3",
+			"shift": 8,
+			"after": 16,
+			"request": "Reconcile financial, physical, technical, and document completion for Otto Wynn, DV-8408, at shift 8. Use your actual product dv-08-2 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-08-4",
+			"shift": 8,
+			"after": 16,
+			"request": "Prepare the next-operator handoff for Otto Wynn, DV-8408, at shift 8. Use your actual product dv-08-3 from this shift as a work dependency. Establish the case commitments for later shifts, with specific evidence and a responsible owner. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-09-1",
+			"shift": 9,
+			"after": 17,
+			"request": "Prepare the queue decision sheet for Alba Kent, DV-8401, at shift 9. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 1 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-09-2",
+			"shift": 9,
+			"after": 17,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Alba Kent, DV-8401, at shift 9. Use your actual product dv-09-1 from this shift as a work dependency. Retrieve your actual products from shifts 1 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-09-3",
+			"shift": 9,
+			"after": 17,
+			"request": "Reconcile financial, physical, technical, and document completion for Alba Kent, DV-8401, at shift 9. Use your actual product dv-09-2 from this shift as a work dependency. Retrieve your actual products from shifts 1 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-09-4",
+			"shift": 9,
+			"after": 17,
+			"request": "Prepare the next-operator handoff for Alba Kent, DV-8401, at shift 9. Use your actual product dv-09-3 from this shift as a work dependency. Retrieve your actual products from shifts 1 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-10-1",
+			"shift": 10,
+			"after": 18,
+			"request": "Prepare the queue decision sheet for Minh Sato, DV-8402, at shift 10. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 2 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-10-2",
+			"shift": 10,
+			"after": 18,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Minh Sato, DV-8402, at shift 10. Use your actual product dv-10-1 from this shift as a work dependency. Retrieve your actual products from shifts 2 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-10-3",
+			"shift": 10,
+			"after": 18,
+			"request": "Reconcile financial, physical, technical, and document completion for Minh Sato, DV-8402, at shift 10. Use your actual product dv-10-2 from this shift as a work dependency. Retrieve your actual products from shifts 2 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-10-4",
+			"shift": 10,
+			"after": 18,
+			"request": "Prepare the next-operator handoff for Minh Sato, DV-8402, at shift 10. Use your actual product dv-10-3 from this shift as a work dependency. Retrieve your actual products from shifts 2 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-11-1",
+			"shift": 11,
+			"after": 19,
+			"request": "Prepare the queue decision sheet for Rhea Calder, DV-8403, at shift 11. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 3 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-11-2",
+			"shift": 11,
+			"after": 19,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Rhea Calder, DV-8403, at shift 11. Use your actual product dv-11-1 from this shift as a work dependency. Retrieve your actual products from shifts 3 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-11-3",
+			"shift": 11,
+			"after": 19,
+			"request": "Reconcile financial, physical, technical, and document completion for Rhea Calder, DV-8403, at shift 11. Use your actual product dv-11-2 from this shift as a work dependency. Retrieve your actual products from shifts 3 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-11-4",
+			"shift": 11,
+			"after": 19,
+			"request": "Prepare the next-operator handoff for Rhea Calder, DV-8403, at shift 11. Use your actual product dv-11-3 from this shift as a work dependency. Retrieve your actual products from shifts 3 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-12-1",
+			"shift": 12,
+			"after": 20,
+			"request": "Prepare the queue decision sheet for Yusuf Marin, DV-8404, at shift 12. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 4 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-12-2",
+			"shift": 12,
+			"after": 20,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Yusuf Marin, DV-8404, at shift 12. Use your actual product dv-12-1 from this shift as a work dependency. Retrieve your actual products from shifts 4 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-12-3",
+			"shift": 12,
+			"after": 20,
+			"request": "Reconcile financial, physical, technical, and document completion for Yusuf Marin, DV-8404, at shift 12. Use your actual product dv-12-2 from this shift as a work dependency. Retrieve your actual products from shifts 4 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-12-4",
+			"shift": 12,
+			"after": 20,
+			"request": "Prepare the next-operator handoff for Yusuf Marin, DV-8404, at shift 12. Use your actual product dv-12-3 from this shift as a work dependency. Retrieve your actual products from shifts 4 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-13-1",
+			"shift": 13,
+			"after": 21,
+			"request": "Prepare the queue decision sheet for Nessa Cole, DV-8405, at shift 13. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 5 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-13-2",
+			"shift": 13,
+			"after": 21,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Nessa Cole, DV-8405, at shift 13. Use your actual product dv-13-1 from this shift as a work dependency. Retrieve your actual products from shifts 5 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-13-3",
+			"shift": 13,
+			"after": 21,
+			"request": "Reconcile financial, physical, technical, and document completion for Nessa Cole, DV-8405, at shift 13. Use your actual product dv-13-2 from this shift as a work dependency. Retrieve your actual products from shifts 5 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-13-4",
+			"shift": 13,
+			"after": 21,
+			"request": "Prepare the next-operator handoff for Nessa Cole, DV-8405, at shift 13. Use your actual product dv-13-3 from this shift as a work dependency. Retrieve your actual products from shifts 5 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-14-1",
+			"shift": 14,
+			"after": 22,
+			"request": "Prepare the queue decision sheet for Pavel Birch, DV-8406, at shift 14. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 6 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-14-2",
+			"shift": 14,
+			"after": 22,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Pavel Birch, DV-8406, at shift 14. Use your actual product dv-14-1 from this shift as a work dependency. Retrieve your actual products from shifts 6 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-14-3",
+			"shift": 14,
+			"after": 22,
+			"request": "Reconcile financial, physical, technical, and document completion for Pavel Birch, DV-8406, at shift 14. Use your actual product dv-14-2 from this shift as a work dependency. Retrieve your actual products from shifts 6 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-14-4",
+			"shift": 14,
+			"after": 22,
+			"request": "Prepare the next-operator handoff for Pavel Birch, DV-8406, at shift 14. Use your actual product dv-14-3 from this shift as a work dependency. Retrieve your actual products from shifts 6 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-15-1",
+			"shift": 15,
+			"after": 23,
+			"request": "Prepare the queue decision sheet for Ines Brook, DV-8407, at shift 15. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 7 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-15-2",
+			"shift": 15,
+			"after": 23,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Ines Brook, DV-8407, at shift 15. Use your actual product dv-15-1 from this shift as a work dependency. Retrieve your actual products from shifts 7 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-15-3",
+			"shift": 15,
+			"after": 23,
+			"request": "Reconcile financial, physical, technical, and document completion for Ines Brook, DV-8407, at shift 15. Use your actual product dv-15-2 from this shift as a work dependency. Retrieve your actual products from shifts 7 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-15-4",
+			"shift": 15,
+			"after": 23,
+			"request": "Prepare the next-operator handoff for Ines Brook, DV-8407, at shift 15. Use your actual product dv-15-3 from this shift as a work dependency. Retrieve your actual products from shifts 7 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-16-1",
+			"shift": 16,
+			"after": 24,
+			"request": "Prepare the queue decision sheet for Otto Wynn, DV-8408, at shift 16. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 8 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-16-2",
+			"shift": 16,
+			"after": 24,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Otto Wynn, DV-8408, at shift 16. Use your actual product dv-16-1 from this shift as a work dependency. Retrieve your actual products from shifts 8 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-16-3",
+			"shift": 16,
+			"after": 24,
+			"request": "Reconcile financial, physical, technical, and document completion for Otto Wynn, DV-8408, at shift 16. Use your actual product dv-16-2 from this shift as a work dependency. Retrieve your actual products from shifts 8 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-16-4",
+			"shift": 16,
+			"after": 24,
+			"request": "Prepare the next-operator handoff for Otto Wynn, DV-8408, at shift 16. Use your actual product dv-16-3 from this shift as a work dependency. Retrieve your actual products from shifts 8 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-17-1",
+			"shift": 17,
+			"after": 25,
+			"request": "Prepare the queue decision sheet for Alba Kent, DV-8401, at shift 17. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 1, 9 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-17-2",
+			"shift": 17,
+			"after": 25,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Alba Kent, DV-8401, at shift 17. Use your actual product dv-17-1 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-17-3",
+			"shift": 17,
+			"after": 25,
+			"request": "Reconcile financial, physical, technical, and document completion for Alba Kent, DV-8401, at shift 17. Use your actual product dv-17-2 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-17-4",
+			"shift": 17,
+			"after": 25,
+			"request": "Prepare the next-operator handoff for Alba Kent, DV-8401, at shift 17. Use your actual product dv-17-3 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-18-1",
+			"shift": 18,
+			"after": 26,
+			"request": "Prepare the queue decision sheet for Minh Sato, DV-8402, at shift 18. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 2, 10 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-18-2",
+			"shift": 18,
+			"after": 26,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Minh Sato, DV-8402, at shift 18. Use your actual product dv-18-1 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-18-3",
+			"shift": 18,
+			"after": 26,
+			"request": "Reconcile financial, physical, technical, and document completion for Minh Sato, DV-8402, at shift 18. Use your actual product dv-18-2 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-18-4",
+			"shift": 18,
+			"after": 26,
+			"request": "Prepare the next-operator handoff for Minh Sato, DV-8402, at shift 18. Use your actual product dv-18-3 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-19-1",
+			"shift": 19,
+			"after": 27,
+			"request": "Prepare the queue decision sheet for Rhea Calder, DV-8403, at shift 19. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 3, 11 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-19-2",
+			"shift": 19,
+			"after": 27,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Rhea Calder, DV-8403, at shift 19. Use your actual product dv-19-1 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-19-3",
+			"shift": 19,
+			"after": 27,
+			"request": "Reconcile financial, physical, technical, and document completion for Rhea Calder, DV-8403, at shift 19. Use your actual product dv-19-2 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-19-4",
+			"shift": 19,
+			"after": 27,
+			"request": "Prepare the next-operator handoff for Rhea Calder, DV-8403, at shift 19. Use your actual product dv-19-3 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-20-1",
+			"shift": 20,
+			"after": 28,
+			"request": "Prepare the queue decision sheet for Yusuf Marin, DV-8404, at shift 20. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 4, 12 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-20-2",
+			"shift": 20,
+			"after": 28,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Yusuf Marin, DV-8404, at shift 20. Use your actual product dv-20-1 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-20-3",
+			"shift": 20,
+			"after": 28,
+			"request": "Reconcile financial, physical, technical, and document completion for Yusuf Marin, DV-8404, at shift 20. Use your actual product dv-20-2 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-20-4",
+			"shift": 20,
+			"after": 28,
+			"request": "Prepare the next-operator handoff for Yusuf Marin, DV-8404, at shift 20. Use your actual product dv-20-3 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-21-1",
+			"shift": 21,
+			"after": 29,
+			"request": "Prepare the queue decision sheet for Nessa Cole, DV-8405, at shift 21. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 5, 13 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-21-2",
+			"shift": 21,
+			"after": 29,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Nessa Cole, DV-8405, at shift 21. Use your actual product dv-21-1 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-21-3",
+			"shift": 21,
+			"after": 29,
+			"request": "Reconcile financial, physical, technical, and document completion for Nessa Cole, DV-8405, at shift 21. Use your actual product dv-21-2 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-21-4",
+			"shift": 21,
+			"after": 29,
+			"request": "Prepare the next-operator handoff for Nessa Cole, DV-8405, at shift 21. Use your actual product dv-21-3 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-22-1",
+			"shift": 22,
+			"after": 30,
+			"request": "Prepare the queue decision sheet for Pavel Birch, DV-8406, at shift 22. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 6, 14 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-22-2",
+			"shift": 22,
+			"after": 30,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Pavel Birch, DV-8406, at shift 22. Use your actual product dv-22-1 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-22-3",
+			"shift": 22,
+			"after": 30,
+			"request": "Reconcile financial, physical, technical, and document completion for Pavel Birch, DV-8406, at shift 22. Use your actual product dv-22-2 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-22-4",
+			"shift": 22,
+			"after": 30,
+			"request": "Prepare the next-operator handoff for Pavel Birch, DV-8406, at shift 22. Use your actual product dv-22-3 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-23-1",
+			"shift": 23,
+			"after": 31,
+			"request": "Prepare the queue decision sheet for Ines Brook, DV-8407, at shift 23. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 7, 15 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-23-2",
+			"shift": 23,
+			"after": 31,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Ines Brook, DV-8407, at shift 23. Use your actual product dv-23-1 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-23-3",
+			"shift": 23,
+			"after": 31,
+			"request": "Reconcile financial, physical, technical, and document completion for Ines Brook, DV-8407, at shift 23. Use your actual product dv-23-2 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-23-4",
+			"shift": 23,
+			"after": 31,
+			"request": "Prepare the next-operator handoff for Ines Brook, DV-8407, at shift 23. Use your actual product dv-23-3 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-24-1",
+			"shift": 24,
+			"after": 32,
+			"request": "Prepare the queue decision sheet for Otto Wynn, DV-8408, at shift 24. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 8, 16 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-24-2",
+			"shift": 24,
+			"after": 32,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Otto Wynn, DV-8408, at shift 24. Use your actual product dv-24-1 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-24-3",
+			"shift": 24,
+			"after": 32,
+			"request": "Reconcile financial, physical, technical, and document completion for Otto Wynn, DV-8408, at shift 24. Use your actual product dv-24-2 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-24-4",
+			"shift": 24,
+			"after": 32,
+			"request": "Prepare the next-operator handoff for Otto Wynn, DV-8408, at shift 24. Use your actual product dv-24-3 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-25-1",
+			"shift": 25,
+			"after": 33,
+			"request": "Prepare the queue decision sheet for Alba Kent, DV-8401, at shift 25. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 1, 9, 17 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-25-2",
+			"shift": 25,
+			"after": 33,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Alba Kent, DV-8401, at shift 25. Use your actual product dv-25-1 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9, 17 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-25-3",
+			"shift": 25,
+			"after": 33,
+			"request": "Reconcile financial, physical, technical, and document completion for Alba Kent, DV-8401, at shift 25. Use your actual product dv-25-2 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9, 17 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-25-4",
+			"shift": 25,
+			"after": 33,
+			"request": "Prepare the next-operator handoff for Alba Kent, DV-8401, at shift 25. Use your actual product dv-25-3 from this shift as a work dependency. Retrieve your actual products from shifts 1, 9, 17 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-26-1",
+			"shift": 26,
+			"after": 34,
+			"request": "Prepare the queue decision sheet for Minh Sato, DV-8402, at shift 26. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 2, 10, 18 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-26-2",
+			"shift": 26,
+			"after": 34,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Minh Sato, DV-8402, at shift 26. Use your actual product dv-26-1 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10, 18 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-26-3",
+			"shift": 26,
+			"after": 34,
+			"request": "Reconcile financial, physical, technical, and document completion for Minh Sato, DV-8402, at shift 26. Use your actual product dv-26-2 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10, 18 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-26-4",
+			"shift": 26,
+			"after": 34,
+			"request": "Prepare the next-operator handoff for Minh Sato, DV-8402, at shift 26. Use your actual product dv-26-3 from this shift as a work dependency. Retrieve your actual products from shifts 2, 10, 18 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-27-1",
+			"shift": 27,
+			"after": 35,
+			"request": "Prepare the queue decision sheet for Rhea Calder, DV-8403, at shift 27. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 3, 11, 19 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-27-2",
+			"shift": 27,
+			"after": 35,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Rhea Calder, DV-8403, at shift 27. Use your actual product dv-27-1 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11, 19 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-27-3",
+			"shift": 27,
+			"after": 35,
+			"request": "Reconcile financial, physical, technical, and document completion for Rhea Calder, DV-8403, at shift 27. Use your actual product dv-27-2 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11, 19 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-27-4",
+			"shift": 27,
+			"after": 35,
+			"request": "Prepare the next-operator handoff for Rhea Calder, DV-8403, at shift 27. Use your actual product dv-27-3 from this shift as a work dependency. Retrieve your actual products from shifts 3, 11, 19 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-28-1",
+			"shift": 28,
+			"after": 36,
+			"request": "Prepare the queue decision sheet for Yusuf Marin, DV-8404, at shift 28. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 4, 12, 20 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-28-2",
+			"shift": 28,
+			"after": 36,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Yusuf Marin, DV-8404, at shift 28. Use your actual product dv-28-1 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12, 20 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-28-3",
+			"shift": 28,
+			"after": 36,
+			"request": "Reconcile financial, physical, technical, and document completion for Yusuf Marin, DV-8404, at shift 28. Use your actual product dv-28-2 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12, 20 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-28-4",
+			"shift": 28,
+			"after": 36,
+			"request": "Prepare the next-operator handoff for Yusuf Marin, DV-8404, at shift 28. Use your actual product dv-28-3 from this shift as a work dependency. Retrieve your actual products from shifts 4, 12, 20 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-29-1",
+			"shift": 29,
+			"after": 37,
+			"request": "Prepare the queue decision sheet for Nessa Cole, DV-8405, at shift 29. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 5, 13, 21 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-29-2",
+			"shift": 29,
+			"after": 37,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Nessa Cole, DV-8405, at shift 29. Use your actual product dv-29-1 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13, 21 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-29-3",
+			"shift": 29,
+			"after": 37,
+			"request": "Reconcile financial, physical, technical, and document completion for Nessa Cole, DV-8405, at shift 29. Use your actual product dv-29-2 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13, 21 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-29-4",
+			"shift": 29,
+			"after": 37,
+			"request": "Prepare the next-operator handoff for Nessa Cole, DV-8405, at shift 29. Use your actual product dv-29-3 from this shift as a work dependency. Retrieve your actual products from shifts 5, 13, 21 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-30-1",
+			"shift": 30,
+			"after": 38,
+			"request": "Prepare the queue decision sheet for Pavel Birch, DV-8406, at shift 30. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 6, 14, 22 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-30-2",
+			"shift": 30,
+			"after": 38,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Pavel Birch, DV-8406, at shift 30. Use your actual product dv-30-1 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14, 22 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-30-3",
+			"shift": 30,
+			"after": 38,
+			"request": "Reconcile financial, physical, technical, and document completion for Pavel Birch, DV-8406, at shift 30. Use your actual product dv-30-2 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14, 22 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-30-4",
+			"shift": 30,
+			"after": 38,
+			"request": "Prepare the next-operator handoff for Pavel Birch, DV-8406, at shift 30. Use your actual product dv-30-3 from this shift as a work dependency. Retrieve your actual products from shifts 6, 14, 22 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-31-1",
+			"shift": 31,
+			"after": 39,
+			"request": "Prepare the queue decision sheet for Ines Brook, DV-8407, at shift 31. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 7, 15, 23 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-31-2",
+			"shift": 31,
+			"after": 39,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Ines Brook, DV-8407, at shift 31. Use your actual product dv-31-1 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15, 23 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-31-3",
+			"shift": 31,
+			"after": 39,
+			"request": "Reconcile financial, physical, technical, and document completion for Ines Brook, DV-8407, at shift 31. Use your actual product dv-31-2 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15, 23 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-31-4",
+			"shift": 31,
+			"after": 39,
+			"request": "Prepare the next-operator handoff for Ines Brook, DV-8407, at shift 31. Use your actual product dv-31-3 from this shift as a work dependency. Retrieve your actual products from shifts 7, 15, 23 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-32-1",
+			"shift": 32,
+			"after": 40,
+			"request": "Prepare the queue decision sheet for Otto Wynn, DV-8408, at shift 32. Start from the actual preceding handoff and the external evidence available at this boundary. Retrieve your actual products from shifts 8, 16, 24 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-32-2",
+			"shift": 32,
+			"after": 40,
+			"request": "Prepare the resolution packet with a remedy calculation, usable customer draft, and internal authorization note for Otto Wynn, DV-8408, at shift 32. Use your actual product dv-32-1 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16, 24 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-32-3",
+			"shift": 32,
+			"after": 40,
+			"request": "Reconcile financial, physical, technical, and document completion for Otto Wynn, DV-8408, at shift 32. Use your actual product dv-32-2 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16, 24 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		},
+		{
+			"id": "dv-32-4",
+			"shift": 32,
+			"after": 40,
+			"request": "Prepare the next-operator handoff for Otto Wynn, DV-8408, at shift 32. Use your actual product dv-32-3 from this shift as a work dependency. Retrieve your actual products from shifts 8, 16, 24 for this case; repair wrong earlier claims rather than treating them as truth. Distinguish the confirmed facts, the still-missing evidence, and the feasible next action. Consult both active order and customer lookups for a packet. Cite document or receipt references for closure, retain due points and authorization limits, and label an obsolete instruction inactive. Do not convert a planned operation, approval, written draft, or earlier answer into an external receipt. Where evidence is missing, identify the exact blocker and the person or lookup that can resolve it. Keep Alba's period-end statement obligation visible until its own delivery evidence is available."
+		}
+	]
+}

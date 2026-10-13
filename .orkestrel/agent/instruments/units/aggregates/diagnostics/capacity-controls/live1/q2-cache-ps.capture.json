@@ -1,0 +1,11 @@
+{
+  "id": "q2-cache-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 424,
+  "hash": "a62ed58aabce19765de9459075d99de7562f77d92d8d3f74ba68c69c714c6f78",
+  "status": 200,
+  "started": "2026-10-11T11:03:53.959Z",
+  "finished": "2026-10-11T11:03:53.961Z",
+  "duration": 2.8667999999997846
+}

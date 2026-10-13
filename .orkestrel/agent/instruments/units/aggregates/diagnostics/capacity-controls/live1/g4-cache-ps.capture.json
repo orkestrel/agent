@@ -1,0 +1,11 @@
+{
+  "id": "g4-cache-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 420,
+  "hash": "d27fc869c14824291f052fcc2e0ad73b8fdca44aaa9348487672f92dc433577d",
+  "status": 200,
+  "started": "2026-10-11T11:07:00.899Z",
+  "finished": "2026-10-11T11:07:00.905Z",
+  "duration": 5.73509999999078
+}

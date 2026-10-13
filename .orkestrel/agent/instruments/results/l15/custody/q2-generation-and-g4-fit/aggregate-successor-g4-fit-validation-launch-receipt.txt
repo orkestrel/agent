@@ -1,0 +1,2 @@
+{"pid":2952,"journal":"tmp/units/aggregate-successor-g4-fit-validation.stdout.jsonl","errors":"tmp/units/aggregate-successor-g4-fit-validation.err"}
+{"pid":2952,"exit":0,"signal":null,"capped":false,"durationMs":460,"journal":"tmp/units/aggregate-successor-g4-fit-validation.stdout.jsonl","errors":"tmp/units/aggregate-successor-g4-fit-validation.err"}

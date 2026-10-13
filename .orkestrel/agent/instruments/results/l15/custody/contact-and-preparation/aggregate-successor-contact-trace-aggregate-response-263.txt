@@ -1,0 +1,3 @@
+(2026-10-10) user: Copperline's accounts team wrote in: they want to put a $1,500 reorder on credit.
+(2026-10-10) tool: lookup_customer {"account":"LH-71592"}: Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding.
+(2026-10-10) tool: lookup_customer {"account":"LH-71592"}: Account manager Tobias Lindqvist since 2026-10-0

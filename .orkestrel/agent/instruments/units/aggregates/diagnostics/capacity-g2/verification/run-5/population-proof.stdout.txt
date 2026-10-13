@@ -1,0 +1,3 @@
+{"offline":true,"message":"No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.","host":"Windows; controlled attached daemon; exclusive serial client; no other service requests"}
+{"offline":true,"message":"No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree."}
+{"pass":true,"evidence":{"path":"tmp/units/aggregate-capacity-g2-verification/run-5/proof/population.json","hash":"6050260fff2d30430591ed74ca5101ffcaaa5de0d657834c0833fbfc21375073","bytes":8150},"inference":2,"metadata":8,"global":0,"native":0}

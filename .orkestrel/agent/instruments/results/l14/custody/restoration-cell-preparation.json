@@ -1,0 +1,265 @@
+{
+  "captured": "2026-10-12T01:27:10.433Z",
+  "root": "C:\\Users\\mikes\\WebstormProjects\\scaffold",
+  "instruction": "Preserve these closed preparation and offline launcher receipts exactly. Restore original temporary paths only in a matching checkout and verify each hash. This index supplements earlier restoration indices without rewriting them.",
+  "entries": [
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-brief.md",
+      "hash": "c4847e5be1e70e167df5cd98067142385a84f57d0b8e467c325f7ada5e488da5",
+      "bytes": 5452
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-brief-2.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-brief-2.md",
+      "hash": "d686ab1fa1a7d2435828d1b912ed2ddd3b7339d6c3573eb7478cbee125502351",
+      "bytes": 4314
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-brief.md",
+      "hash": "1415f066105da9ecfc6ceac7e39d4225d9699b2c77dfc0f1fff7fbea1eface0a",
+      "bytes": 3547
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-flag-probe.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-flag-probe.ts",
+      "hash": "edc86f0edda3a1f309f898000040c1e667aa1e5cb011e6279bafa076f6f5afed",
+      "bytes": 38
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-q4-think0-2.stderr.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-q4-think0-2.stderr.txt",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-q4-think0-2.stdout.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-q4-think0-2.stdout.json",
+      "hash": "3232252f7c65ded7d3be107ad31608874c8db68aafe558bb4eb115924a995225",
+      "bytes": 21220
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-q9-think0-2.stderr.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-q9-think0-2.stderr.txt",
+      "hash": "23e8f90602cd4a190719d61edbe553f933f7fa2e070346e16163fb58349d21bd",
+      "bytes": 936
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-q9-think0-2.stdout.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-q9-think0-2.stdout.txt",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-report-2.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-report-2.md",
+      "hash": "0ba85b36a4ea84ef89d748217be02240cc0367cdfa2b16b355cfa0399dfd4ce0",
+      "bytes": 2979
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-check-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-check-report.md",
+      "hash": "97d13aaa135807e314cf966ec661b568579578d4b8e08b37d1960f8d17873561",
+      "bytes": 1238
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g2-think1-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g2-think1-2.json",
+      "hash": "f279c410dbc36725bf0b38f92d017f0cdfc6334bc975e88fe47f3779b8008140",
+      "bytes": 10404
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g2-think1.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g2-think1.json",
+      "hash": "108764fcd9123e82e99f873d0fb6be046bd71b5343fa05ca19518ea06a1da5d7",
+      "bytes": 10427
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g4-think0-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g4-think0-2.json",
+      "hash": "f1242eed07bd759fac020909b09398d9fedc73ad22e0fd9387226d82c961be24",
+      "bytes": 7270
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g4-think0.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g4-think0.json",
+      "hash": "b4c8edb6387e71857e474be36b61a04104feb264832db20deca37b327ce53e9a",
+      "bytes": 7293
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g4-think1-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g4-think1-2.json",
+      "hash": "c2800567f805f5cdde64124bbc2254a5d6870a2e0806e6504e98236d7a0e1104",
+      "bytes": 7270
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-g4-think1.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-g4-think1.json",
+      "hash": "2c7992b59aa96af1a361ba94eb246cea80222d29d62c612f2ed4f3f05a129fa3",
+      "bytes": 7293
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q2-think1-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q2-think1-2.json",
+      "hash": "677fa06a83e5550499257203ba859ae821b14468f9efad3b231fc29af4e62940",
+      "bytes": 7270
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q2-think1.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q2-think1.json",
+      "hash": "f2a83c8620e2ad66ae0724ac766a0cac28016ff13748fe1ed2adec6b133caa44",
+      "bytes": 7293
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q4-think0-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q4-think0-2.json",
+      "hash": "6410adb67855e29237c7c036f2356663a95174d84c950e4967981f305add8079",
+      "bytes": 10404
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q4-think0.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q4-think0.json",
+      "hash": "c6b14259a008567e7c2d786f3c361f37b9cfaab1e6f931042ca47245567529b8",
+      "bytes": 10427
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q4-think1-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q4-think1-2.json",
+      "hash": "07fb035c63d00cd8c65ebc943d654c3bf5b6ee5a55ed4c9e8dd47ccbf06e711a",
+      "bytes": 10404
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-plan-q4-think1.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-plan-q4-think1.json",
+      "hash": "4cac589e827a5ec48bc5def8ca99c4d65b6ca4520492be9e4223882c8a39ae82",
+      "bytes": 10427
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-report.md",
+      "hash": "d9e07f4f524413aa2dc2f1fb47b0321ec28a06b8c3ad4ad914059b7a9398d6eb",
+      "bytes": 8271
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-validation-2.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-validation-2.json",
+      "hash": "3486afc65f82bdfbd6ec0ba06bcd88e0035bdd29c35ad87f17c4987e8efdb39f",
+      "bytes": 3670
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-validation-negative.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-validation-negative.json",
+      "hash": "eebca360b393e0ebd37117097266428f36348982de88026771c8119ba8ce1538",
+      "bytes": 399
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-validation.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-validation.ts",
+      "hash": "ab594fc012a15cdd34999e88a751f08affee9234a1dbef225321cf13896a998c",
+      "bytes": 4212
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver.ts",
+      "hash": "feef1e8b51e5fa21b46f6be74d11b5f5fb0533e3e4027a6bcc0ea4df8b5f050c",
+      "bytes": 12110
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-brief.md",
+      "hash": "a118ff88b25defebf328dd0894cbad9e8a76b1b394609d63804092b07ce0c050",
+      "bytes": 4057
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-custody.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-custody.json",
+      "hash": "7f4d3465cd252cd4839cf88499c5418eae9f629bb2ccf09830941db79e0ff37c",
+      "bytes": 1518
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-custody.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-custody.ts",
+      "hash": "4f1a314b3a571aa76ea51e5034c1881d55c233130fb1f23f52667d915066b14d",
+      "bytes": 738
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-full-validate.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-full-validate.ts",
+      "hash": "c37153bf45ef73deda212b534487c38cd114af24d5f1e74aaf0134a5e90db1cd",
+      "bytes": 4080
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-full-validation.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-full-validation.json",
+      "hash": "460590f0455ed714bba9478efee72c399bf360e84879337684984f6894b0e48e",
+      "bytes": 92030
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-full.stderr.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-full.stderr.txt",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-full.stdout.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-full.stdout.txt",
+      "hash": "56ce8b554de5ddbb3df53360a8b7c4feb7af5606e045d650451839fef4cb741a",
+      "bytes": 1214
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-report.md",
+      "hash": "ee59d6b1e4cca499a4b2939881bb399651d3cf4acdc86c83b9fe96422cded361",
+      "bytes": 6564
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-resource-validate.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-resource-validate.ts",
+      "hash": "91fe5e972e4442aa7eb146934e9b5967e909ed74cc05c1f3c93bd3ffd50286ac",
+      "bytes": 2088
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-resource-validation.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-resource-validation.json",
+      "hash": "411cc8e91c56344b2e01446151d36e21df148100804a7e55f5d3be95a25c9609",
+      "bytes": 33764
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-resource.stderr.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-resource.stderr.txt",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original": "tmp/units/aggregate-final-g2-preparation-resource.stdout.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-g2-preparation-resource.stdout.txt",
+      "hash": "28f4c1feb9fbae7bd380e7c7641b1c690d0ebfd920eb3859c18240e25a561438",
+      "bytes": 1242
+    },
+    {
+      "original": "tmp/units/aggregate-final-q2-parser-ruling-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q2-parser-ruling-brief.md",
+      "hash": "e09c5b7e725f4de6f34e65c5a524b0e3ca9aeea8cf16b93ff23244a156cbdfff",
+      "bytes": 3600
+    },
+    {
+      "original": "tmp/units/aggregate-final-q2-parser-ruling-extract.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q2-parser-ruling-extract.ts",
+      "hash": "6c36d14715e776f190738ba63899854e3ea42e8cc9155d2409b47b0a1575ab73",
+      "bytes": 2339
+    },
+    {
+      "original": "tmp/units/aggregate-final-q2-parser-ruling-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q2-parser-ruling-report.md",
+      "hash": "5ca0cd7ffc85bb884b6fd22447729f32260e5e565926ddb257ff6a10cf83a8a7",
+      "bytes": 6913
+    },
+    {
+      "original": "tmp/units/aggregate-final-retain-cell-preparation.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-retain-cell-preparation.ts",
+      "hash": "58124cacbe4b8807f4b6e40bdd976a0d505d107118936a3576d4c4838f0c0054",
+      "bytes": 2390
+    }
+  ]
+}

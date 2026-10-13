@@ -1,0 +1,11 @@
+{
+  "id": "g2-restored-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 421,
+  "hash": "d3e09d5593f7b8611c08b7e305c27c06960f4430d09e7064c6f61e78037f8b9b",
+  "status": 200,
+  "started": "2026-10-11T11:06:27.505Z",
+  "finished": "2026-10-11T11:06:27.508Z",
+  "duration": 2.8429999999934807
+}

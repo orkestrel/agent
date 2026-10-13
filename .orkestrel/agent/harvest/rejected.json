@@ -1,0 +1,624 @@
+{
+ "raw": [
+  {
+   "key": "plan",
+   "count": 27
+  },
+  {
+   "key": "refine",
+   "count": 20
+  },
+  {
+   "key": "briefing",
+   "count": 40
+  },
+  {
+   "key": "rounds",
+   "count": 21
+  },
+  {
+   "key": "records",
+   "count": 17
+  }
+ ],
+ "items": [
+  {
+   "what": "READ FIRST: quick list of what was measured and not adopted",
+   "measured": "Each harvested item was checked against its cited lines. Items whose measurement does not support a rejection, and items backed only by a code review, are named in the last two entries. Lane: objective.",
+   "result": "1 Mica selection alone, stock whole-view state. 2 Calibrated Mica selection in place of capped compaction. 3 Mica selection on top of capped compaction. 4 Compaction with `window` and no `sections` cap. 5 Full view as the context policy. 6 Mica threshold lowered to 0.70 or 0.80. 7 The System One wire for selection: tev1, or Mica through it. 8 The v2 summarizer instructions (generic, and tuned without date meaning). 9 A summarizer guard that accepts `No facts.` and restores ids from model replies. 10 Rollup on by default. 11 Selecting or folding single messages instead of whole exchanges. 12 `tool_name` as the call-result pairing. 13 Today's date carried only as a conversation message. 14 A ledger tail that replays earlier requests, answers, call groups, or handle marks. 15 The hold (deny) gate on the first reply. 16 Idle ledger parts: the model `pin` tool, `read`, the Values block, the tally, the horizon, request category and warehouse questions, and auto-pinning every decisive message. 17 Budgets and windows that leave out the tool-schema cost, and a 0.55 budget share. 18 Unbounded recall and an answer run with tools and no cue. 19 Fixing the g06 date rule by rule placement or a judge draft check. 20 Stripping lookup handles to fix the credit check. 21 Gating rule presence on the desk-topic filing. 22 Judge question forms other than the binary must-respect `needed` question. 23 Judge state shapes: the pair alone for `needed`, the whole view for relation questions. 24 Scorer variants that misgrade. 25 `send_reply` as the reply tool. 26 Plain greedy sampling for the thinking 2B. 27 A thinking cap of 1,024 tokens on the bench. 28 An optional `from` on `read`. 29 Reworded tool descriptions and instructions for the reflexive 2B. 30 Refusal copy that names two exits, points at another refusal, or addresses the user. 31 Dispatching calls to tools the scope withdrew. 32 The judge beside the agent on the 15 GB host, and a second client on the daemon. 33 Re-asking a judge question whose readout fails every time. 34 A concrete example id in lookup descriptions. 35 Chat requests without `truncate: false`. 36 A judge handler that judges a fixed input. 37 Readings and methods rejected as evidence. 38 Conflicts among the files. 39 Exclusions.",
+   "why": "The user asked for a short list that is easy to find and read. Each following entry gives the run, the numbers, the reason, and the line evidence.",
+   "caveat": "Most readings come from one run per arm at temperature 0 on one 10-goal scenario with the 2B model and thinking off. No 4B or thinking-on result exists in the files (/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:3).",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:3"
+   ]
+  },
+  {
+   "what": "Mica selection alone, stock whole-view state, `limit` 12",
+   "measured": "Live comparison of 2026-10-08, Larkspur scenario, 10 goals, 3,072 tokens, one run (REPORT.md `selection`).",
+   "result": "Passed 3 of 10 and overflowed from g05, as `none` did. Mica dropped at most 3 of 49 to 67 messages per goal, at 3,800 to 5,300 judge prompt tokens per question, 463,500 in total, over 64.9 minutes.",
+   "why": "It does not bound the prompt, its whole-view cost grows with the square of the view, and `limit` screens only the oldest candidates.",
+   "caveat": "REPORT.md:78-79 names a bounded state and newest-first candidates as changes that could move this, and plan.md:154 defers both to the next selection round.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/REPORT.md:23",
+    "/home/user/agent/tmp/bench/results/REPORT.md:46",
+    "/home/user/agent/tmp/bench/results/REPORT.md:78",
+    "/home/user/agent/tmp/bench/results/REPORT.md:79",
+    "/home/user/scaffold/.orkestrel/agent/context.md:59",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:121",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:122",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:154"
+   ]
+  },
+  {
+   "what": "Calibrated Mica selection (bounded plain state, thresholds 0.90 and 0.95) in place of capped compaction",
+   "measured": "Tuned rerun of 2026-10-08, 10 goals, 3,072 tokens: three selection runs and one tuned-compaction run, one run each, graded by Opus.",
+   "result": "Strict passes for the selection runs were 3, 5, and 4, at 48 to 81 judge questions and 4 to 20 minutes per goal. Tuned compaction passed 5 strict with 0 judge questions at 0.6 minutes per goal.",
+   "why": "Selection costs many times the time of compaction and passes no more on strict scoring.",
+   "caveat": "Answer-counted passes favor selection (6, 7, and 7 against 5), so the rejection rests on cost. The two 0.90 runs differ by decisions within 0.01 of the cut (context.md:76). context.md:65 says this rerun used the bounded plain state, which plan.md:154 still defers.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:65",
+    "/home/user/scaffold/.orkestrel/agent/context.md:71",
+    "/home/user/scaffold/.orkestrel/agent/context.md:72",
+    "/home/user/scaffold/.orkestrel/agent/context.md:73",
+    "/home/user/scaffold/.orkestrel/agent/context.md:74",
+    "/home/user/scaffold/.orkestrel/agent/context.md:76",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:154"
+   ]
+  },
+  {
+   "what": "Mica selection on top of capped compaction",
+   "measured": "REPORT.md `both-s3` against `compaction-s3` (2026-10-08, 3,072 tokens, 10 goals, one run each), and the Round A Opus grades of v7 `both` against v7 `compaction`.",
+   "result": "`both-s3` passed 5 of 10, the same as `compaction-s3`, and spent 322,100 judge prompt tokens. Round A selection plus compaction graded 35 of 60 against 40 for compaction alone, over 50 minutes against 20.",
+   "why": "The judge cost bought no passes, and the Round A arm graded lowest of the four arms.",
+   "caveat": "REPORT.md:71 reads moves of 1 or 2 points as single-run noise.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/REPORT.md:24",
+    "/home/user/agent/tmp/bench/results/REPORT.md:25",
+    "/home/user/agent/tmp/bench/results/REPORT.md:47",
+    "/home/user/agent/tmp/bench/results/REPORT.md:71",
+    "/home/user/scaffold/.orkestrel/agent/context.md:61",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:9",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:32",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:9"
+   ]
+  },
+  {
+   "what": "Compaction with `window` and no `sections` cap",
+   "measured": "Live comparison of 2026-10-08, 10 goals, 3,072 tokens, window 1,200, keep 6, one run.",
+   "result": "Passed 3 of 10, grew to 13 sections, and overflowed from g07 (from g06 with selection), with faithful 4 of 20. With `sections` 3 it passed 5 of 10 with no overflow and faithful 10 of 20.",
+   "why": "Each fold adds a recap that never merges, so an uncapped compaction bounds nothing.",
+   "caveat": "plan.md:197 leaves to the user whether the manager defaults a cap.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/REPORT.md:21",
+    "/home/user/agent/tmp/bench/results/REPORT.md:44",
+    "/home/user/agent/tmp/bench/results/REPORT.md:61",
+    "/home/user/agent/tmp/bench/results/REPORT.md:77",
+    "/home/user/scaffold/.orkestrel/agent/context.md:57",
+    "/home/user/scaffold/.orkestrel/agent/context.md:60",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:122",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:179",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:197"
+   ]
+  },
+  {
+   "what": "Full view with no context management",
+   "measured": "Live runs at 3,072 tokens (2026-10-08 comparison and tuned rerun, 10 goals), and 8 reworded copies at 6,144 tokens (`a1-control-v1` to `v8`) with a two-sided blind audit.",
+   "result": "At 3,072 tokens it overflowed from g05 and passed 3 of 10. At 6,144 tokens it had the lowest adjudicated mean of the three designs (4.38 to 5.13 passes per copy), and 8 of its 48 scorer passes were false.",
+   "why": "It does not fit a 3,072-token window, and at twice that window it loses to both briefing designs.",
+   "caveat": "Measured on the 2B with thinking off. FINAL-CHECK.md:3 tests the 4B and thinking on, and the file holds no results. AUDIT.md:33 marks the 3,072-token cells as a window artifact.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:56",
+    "/home/user/scaffold/.orkestrel/agent/context.md:69",
+    "/home/user/agent/tmp/bench/results/REPORT.md:20",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:33",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:16",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:18",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:22",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:23",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:41",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:3"
+   ]
+  },
+  {
+   "what": "Mica threshold lowered to 0.70 or 0.80 so that selection drops more",
+   "measured": "Calibration `cal-mica-bounded`: 480 questions over all 10 goals, bounded state, 2 neighbors, one run.",
+   "result": "Both thresholds kept 16 of 21 must-keep messages, against 18 of 21 at 0.90 and 19 of 21 at 0.95.",
+   "why": "They lose indirect needs: the approval-code correction, the no-written-date rule, and the ids a lookup needs.",
+   "caveat": "The fit is in-sample on one 48-message scenario, and JUDGE.md:71 requires a held-out goal set before any threshold is fixed.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:33",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:34",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:35",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:38",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:71"
+   ]
+  },
+  {
+   "what": "The System One wire for selection: tev1:0.8b, or Mica through it",
+   "measured": "`cal-tev1-bounded` and `cal-tev1-b2-lookup` (480 questions, 10 goals); harness selection runs against tev1; the judge test that asserts the Mica refusal.",
+   "result": "tev1's needed and noise probabilities overlap (0.36 to 0.61 against 0.18 to 0.67), so the only threshold that keeps all 21 facts drops 19 percent of the noise. Its Modelfile `num_ctx` of 2,050 faults every whole-view selection, and the endpoint refuses Mica with HTTP 400.",
+   "why": "No tev1 threshold separates needed from noise, the wire carries no calibration field, and Mica cannot use the endpoint.",
+   "caveat": "A structured-state test for tev1 has not run (JUDGE.md:23). The Mica refusal test passed on Ollama 0.35.1, and the System One readings were taken on 0.40.0 (small-models.md:58).",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:7",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:11",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:23",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:60",
+    "/home/user/agent/tmp/bench/README.md:356",
+    "/home/user/agent/tmp/bench3/README.md:693",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:56",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:58"
+   ]
+  },
+  {
+   "what": "The v2 summarizer instructions: generic (asks for next steps) and tuned (keeps date tokens without their meaning)",
+   "measured": "v2 single runs `c-generic-s3` and `c-tuned-s3` (wire audit), and the tuned rerun of 2026-10-08 with one run per arm.",
+   "result": "In the tuned rerun the generic instruction passed 3 of 10 with 11 of 20 correct, against 5 and 14 for the tuned summary. In v2 the generic recap wrote an 'Assistant Instructions for Next Turn' section, the tuned one turned 'off tomorrow, Friday' into 'until Friday, Oct 9', and both g07 replies gave a Friday deadline.",
+   "why": "Next-step text enters a recap of past facts, and a date without its meaning becomes a wrong deadline.",
+   "caveat": "plan.md:155, plan.md:182, and REPORT.md:81 call the tuned arm an unmeasured next reading, while context.md:71 reports it as measured.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:70",
+    "/home/user/scaffold/.orkestrel/agent/context.md:71",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:27",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:72",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:155",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:182",
+    "/home/user/agent/tmp/bench/results/REPORT.md:81"
+   ]
+  },
+  {
+   "what": "A summarizer guard that accepts `No facts.` with no retry and restores lost ids from model replies",
+   "measured": "Round A compaction and selection-plus-compaction runs, v7 Opus grades, one run each.",
+   "result": "Folds of four rules that hold no id returned `No facts.` with no retry, and the restores carried 'Manager approval code MX-4471 is required' and 555-0142 into later summaries, so at g10 all 3 sections held 555-0142.",
+   "why": "The guard loses id-free rules and recirculates the model's own errors.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:409",
+    "/home/user/agent/tmp/bench/README.md:410",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:27",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:30",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:28"
+   ]
+  },
+  {
+   "what": "The compaction rollup on by default",
+   "measured": "Wire reading of the 2026-10-08 compaction dump.",
+   "result": "Four of nine summarizer calls produced the rollup, and no agent request carried its text.",
+   "why": "Those summarizer calls produce text the model never sees, so unit 16 makes the rollup opt-in with a default of off.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:30",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:132",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:106",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:196"
+   ]
+  },
+  {
+   "what": "Selecting or folding single messages instead of whole exchanges",
+   "measured": "v2 `selection-tuned` g04 judgments, the v2 compaction runs at g07, and the 2026-10-08 wire dump.",
+   "result": "Selection dropped the g03 request (p 0.0814) and kept its `send_reply` call and result, so the model resent the g03 note at g04. Compaction folded a lookup call away from its result in both v2 compaction runs, and a fold split a request from its reply.",
+   "why": "The model reads an orphaned call or reply as current work, so unit 16 groups whole exchanges.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:15",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:16",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:52",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:131",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:106",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123"
+   ]
+  },
+  {
+   "what": "`tool_name` on tool messages as the call-result pairing",
+   "measured": "`--probe-tool-name` against Ollama 0.40.0 on 2026-10-08: one request with the field and one without.",
+   "result": "`prompt_eval_count` read 122 with the field and 122 without.",
+   "why": "The renderer ignores the field, so exchange-whole grouping does the pairing.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:120",
+    "/home/user/agent/tmp/bench/README.md:427",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:134",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123"
+   ]
+  },
+  {
+   "what": "Today's date carried only as a conversation message",
+   "measured": "v2 `selection-tuned` (seed 0 judgments); the v8 ledger wire, 38 agent calls; and the offline replay of the `--date` flag.",
+   "result": "The stock `needed` criterion dropped the date line at p 0.005 to 0.040 in 6 goals, and the model wrote 'today, Friday, October 9th'. In v8, 0 of 38 ledger calls stated the date and g07 lost 5 of 6 points. In the replay, coverage was 18 of 19 without the date sentence against 19 of 19 with it.",
+   "why": "A date line has no relevance on its own, so the judge drops it or files it as chatter, and the date belongs in the system text.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:26",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:56",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:39",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:69",
+    "/home/user/agent/tmp/bench3/README.md:477"
+   ]
+  },
+  {
+   "what": "A ledger tail that replays earlier requests, answers, call groups, or handle marks",
+   "measured": "Live ledger runs of 2026-10-08 (v3); the v8 trace; live `a1-ledger-v4`, `a2-refined-v1`, and `a3-refined-v1`.",
+   "result": "Kept call groups gave separation counts of 5, 2, 8, and 10, and a first call copied another customer's recall. `[m48]` and `[m49]` prefixes appeared in 2 answers. Replayed answers carried errors from g05 to g06, g06 to g07, and g07 to g09. Earlier requests led g03 and g10 of `a2-refined-v1` and g05 of `a1-ledger-v4` to answer an older request, and `a3-refined-v1`, without them, answered none.",
+   "why": "The 2B copies or answers whatever the tail replays.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:242",
+    "/home/user/agent/tmp/bench3/README.md:548",
+    "/home/user/agent/tmp/bench3/README.md:552",
+    "/home/user/agent/tmp/bench3/README.md:697",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:43",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:31",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:32",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:54",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:21"
+   ]
+  },
+  {
+   "what": "The hold (deny) gate on the first reply",
+   "measured": "v8 traced ledger run, one run at temperature 0; v7 grades; one live goal (deny g08 of 2026-10-08).",
+   "result": "In v8 there were 4 holds and 0 changed answers, at a cost of 7 calls, 110.7 s, and 4 cold prefills. In deny g08 the gate refused a correct reply with 315 tokens left, and the retry ran out of window.",
+   "why": "The gate costs time and window and changes no answer, so refined sets `--gate admit`.",
+   "caveat": "One run. ATTACK-BRIEFING.md:82 plans an 8-copy band before any trim is accepted.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:54",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:82",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:29",
+    "/home/user/agent/tmp/bench3/README.md:274",
+    "/home/user/agent/tmp/bench3/README.md:484"
+   ]
+  },
+  {
+   "what": "Idle ledger parts: the model `pin` tool, `read`, the Values block, the tally, the horizon, request category and warehouse questions, and auto-pinning every decisive message",
+   "measured": "v8 traced ledger run (38 agent calls, one run) and the offline replay of the trims.",
+   "result": "Model pins were 0 in 10 of 10 goals; `read` had 0 calls; the Values block appeared in 0 of 38 calls; the tally cost 51 to 91 tokens per call, and 4 recalls copied its labels; the horizon's net effect left m44 out of g09 and g10; the category question asked 10 questions with no consumer (about 35 s); the warehouse question never reached 0.6 (24.2 s); auto-pinning put distractor m9 in 4 briefings.",
+   "why": "Each part spends tokens or judge time and changed no answer in the run.",
+   "caveat": "One run. ATTACK-BRIEFING.md:58 keeps the horizon for the long scenario, and the trims are proven by replay only (bench3 README:484).",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:55",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:56",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:57",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:58",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:59",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:60",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:61",
+    "/home/user/agent/tmp/bench3/README.md:482",
+    "/home/user/agent/tmp/bench3/README.md:484"
+   ]
+  },
+  {
+   "what": "Budgets and windows that leave out the tool-schema cost, and a 0.55 budget share",
+   "measured": "Live ledger runs of 2026-10-08 (20 goal runs); a ratio fit over six v2 runs; offline replays of both records at a 0.55 share.",
+   "result": "Before the fixed 835-token schema cost was charged, first calls ran 2,329 to 2,580 tokens and 9 of 20 goal runs ended with no answer. The prompt-to-estimate ratio was 1.40 to 2.20 without the tool estimate and 1.16 to 1.42 with it. At a 0.55 share, 15 of 20 replayed runs omitted a request-topic pin.",
+   "why": "The window fills before the answer, and the briefing gets too little room.",
+   "caveat": "The 0.55 reading is replay-only.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:262",
+    "/home/user/agent/tmp/bench3/README.md:264",
+    "/home/user/agent/tmp/bench3/README.md:266",
+    "/home/user/agent/tmp/bench/README.md:357",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:39",
+    "/home/user/agent/tmp/bench3/README.md:701"
+   ]
+  },
+  {
+   "what": "Unbounded recall, and an answer run that keeps its tools and reads no cue",
+   "measured": "Ledger records of 2026-10-08; the roundA A1 sweep; live `a3-refined-v1` g04; live frozen series `a4-refined-v1` to `v8`.",
+   "result": "Of the 9 goal runs that ended with no answer on 2026-10-08, 8 were recall chains. Three A1 goals ended with no reply, one of them after 8 recalls. In `a3-refined-v1` g04 one recall repeated 6 times past the budget and the cued answer run emitted another recall.",
+   "why": "Recall loops spend the run and end it with no reply. The recall budget, the cue, repeat-stop over all arm tools, and the collapsed answer view replace this behavior, and every answer run of the frozen series replied.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:323",
+    "/home/user/agent/tmp/bench3/README.md:516",
+    "/home/user/agent/tmp/bench3/README.md:598",
+    "/home/user/agent/tmp/bench3/README.md:602",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:34",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:55",
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:14"
+   ]
+  },
+  {
+   "what": "Fixing the g06 delivery-date rule by rule placement or a judge draft check",
+   "measured": "Cold replays of 9 recorded g06 requests (`probes/g06.jsonl`); Mica over 74 labeled replies against 3 rules; a rewrite probe over 9 runs.",
+   "result": "Every placement passed 0 of 9. The draft check scored AUC 0.98, 1.00, and 0.64 across the three rules with no shared threshold, and a rewrite request kept the date in 9 of 9 runs.",
+   "why": "The 2B copies the date from the lookup result, and neither placement nor a check removes it.",
+   "caveat": "FINDINGS-A1.md:69 says a per-rule threshold cannot be held out on the short scenario. FINDINGS-A1.md:49 calls the draft check the remaining lever, and line 70 closes that branch.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:42",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:48",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:49",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:63",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:69",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:70",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:84"
+   ]
+  },
+  {
+   "what": "Stripping lookup handles to fix the credit check",
+   "measured": "`probes/credit-probe.ts`: cold replays of the 7 failed frozen g08 requests, once per change.",
+   "result": "With the handles stripped, 1 of 7 passed, the same as with no change, while removing the pinned section passed 5 of 7.",
+   "why": "The handle prefix is not the cause; the pinned account story buries the question.",
+   "caveat": "Cold replays read as direction only (FINDINGS-A1.md:94).",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:87",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:88",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:90",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:93",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:94"
+   ]
+  },
+  {
+   "what": "Gating rule presence on the desk-topic filing",
+   "measured": "Not run as an arm. Judged from the imported filing readings in `results/v3/cal-categories.jsonl`.",
+   "result": "Rule m6 reads delivery at 0.444 against a 0.6 fit, so it would leave g06's view in all 4 recorded copies, and m29 clears its refunds fit by only 0.04.",
+   "why": "Presence would depend on in-sample readings with thin margins, so the `Rules` record holds every live rule.",
+   "caveat": "This entry rests on filing readings, not on a run of the gate.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:45",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:46",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:47",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:50"
+   ]
+  },
+  {
+   "what": "Judge question forms other than the binary must-respect `needed` question: the graded `score`, the necessity wording, and the 'rule, decision, or fact' wording",
+   "measured": "Mica v0.1 4B probes of 2026-10-07: 15 rows (`mica.jsonl`) and 44 rows (`pairs.jsonl`, `pairs2.jsonl`) over one fictional transcript.",
+   "result": "The `score` form was as expected on 2 of 4 rows and leaned to the middle level. 'cannot be carried out correctly without' scored 2 of 4 on the view and on the pair and missed a standing rule at 0.896. 'states a rule, a decision, or a fact' scored 2 of 4 on the pair, against 3 of 4 for 'states something the work in [B] must respect'.",
+   "why": "The other forms miss standing constraints or blur the answer, so the binary must-respect question is the selection form.",
+   "caveat": "44 rows over one transcript (refine.md:56), and another judge model can read differently (refine.md:582). refine.md:29 counts 2 of 4 for `score` and refine.md:442 says 3 of 4. refine.md:405 exports an unmeasured 'can be left out' wording.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:29",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:42",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:44",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:47",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:51",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:56",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:405",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:442",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:582"
+   ]
+  },
+  {
+   "what": "Judge state shapes: the pair alone for `needed`, the whole view for relation questions",
+   "measured": "Pair probes of 2026-10-07: 4 rows per `needed` cell, and 4 and 3 rows for `superseded` and `accepted`.",
+   "result": "For `needed`, the pair tied the view at 3 of 4 but read the archived-accounts rule as a search-box rule at 0.804. For the relation questions, the view read 3 of 4 and 2 of 3, against 3 of 4 and 3 of 3 for the pair, at 358 to 380 prompt tokens against 166 to 212 and about 4 s against 2.3 s.",
+   "why": "The pair hides the question a standing rule answered, and the view costs twice as much for relation questions with no gain.",
+   "caveat": "refine.md:53 and refine.md:581 name the probe that would overturn the `needed` ruling: a second transcript with a clarifying message. The relation questions are deferred (refine.md:444).",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:38",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:40",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:41",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:45",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:52",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:53",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:444",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:581"
+   ]
+  },
+  {
+   "what": "Scorer variants that misgrade: plain substrings, raw markdown, permissive negation and credit phrases, the `rotated from` exemption, and the strict fabrication counter",
+   "measured": "Grader comparisons of 2026-10-08; `--probe-score` on fixed texts; the frozen-harness audit (claim 9); the score audit; a recount of `results/v7/ledger`.",
+   "result": "Plain substrings passed 5 replies the grader faulted and failed 'ESC-2219 (corrected from ESC-2291)'. Raw markdown failed 'not **ESC-2291**' and passed 'by **Friday**'. The permissive edits passed replies with a stale value or a denied fit. The exemption turned a wrong g05 reply into a pass. The strict counter flagged 4 replies, 2 of them falsely.",
+   "why": "Each variant errs in one direction or both. The harness uses adjacent-word patterns over a markdown-stripped copy, strict patterns, and a counter that accepts restatements.",
+   "caveat": "FINDINGS-A1.md:56 treats the negated-room change as a misread fix, and frozen-harness-audit-verdict.md:19 reverts it and keeps only the 'no … room' pattern.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:122",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:76",
+    "/home/user/agent/tmp/bench/README.md:324",
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:19",
+    "/home/user/scaffold/.orkestrel/agent/score-audit-verdict.md:17",
+    "/home/user/agent/tmp/bench3/README.md:469",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:30",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:56"
+   ]
+  },
+  {
+   "what": "`send_reply` as the reply tool (`--reply tool`) by default",
+   "measured": "v6 head-to-head: four 10-goal files, rescored under the later rules.",
+   "result": "With compaction, the tool design passed 2 of 10 against 5 for terminal (3 against 7 as recorded). Without compaction, both designs passed 5.",
+   "why": "With compaction the tool design passed fewer goals, so terminal became the default.",
+   "caveat": "One 10-goal run per design.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:376",
+    "/home/user/agent/tmp/bench/README.md:403"
+   ]
+  },
+  {
+   "what": "Plain greedy sampling (`presence_penalty` 0, `repeat_penalty` 1) for the thinking 2B",
+   "measured": "Store-harness search task with thinking on: 8 attempts with greedy values and 16 with the model card's values.",
+   "result": "Greedy passed search 4 of 8 at 15.1 s, against 16 of 16 at 7.2 s with the card's values.",
+   "why": "Greedy sampling sent the model back to reading the page before it searched.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:21",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:120"
+   ]
+  },
+  {
+   "what": "A thinking cap of 1,024 tokens on the Larkspur bench",
+   "measured": "Pilot `t2-records-v1` (19 agent calls, thinking on) and a 10-call think probe at `num_predict` 4,096.",
+   "result": "In the pilot, 1 of 19 calls spent the whole cap thinking and returned no content, which left g01 with no reply, and the 90th percentile of completion was 1,010 tokens.",
+   "why": "A cap that binds on about one call in ten measures the cap, so the series moved to 2,048.",
+   "caveat": "The 10-call probe stayed between 69 and 666 tokens. The 2,048 series has no results yet, and the store harness keeps 1,024 (plan.md:120).",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:18",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:22",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:24",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:120"
+   ]
+  },
+  {
+   "what": "An optional `from` argument on `read`",
+   "measured": "Ollama store harness, 16 fixed ports, every task, with a baseline arm and a change arm.",
+   "result": "Search fell from 16 of 16 to 6 of 16 and paging from 16 of 16 to 0 of 16, while `read` kept working.",
+   "why": "A regression on any task rejects the change.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:115",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:116"
+   ]
+  },
+  {
+   "what": "Reworded tool descriptions and instructions for the reflexive 2B",
+   "measured": "Store-harness runs at 16 ports; decision bytes re-sent on 4 loopback ports with thinking off; four instruction wordings for the `edit` call.",
+   "result": "Rewording the click and type copy turned every search into a read; the opening click or type choice flipped on 3 of 4 ports with byte-identical bytes; and none of four wordings got `edit` to carry `journey`.",
+   "why": "Copy tuning against a reflexive 2B is a lottery, so a description change is the last lever and a tool default is used where it is unambiguous.",
+   "caveat": "With thinking on, the same bytes read as instructions (small-models.md:15).",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:115",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:15",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:19",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:35",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:39"
+   ]
+  },
+  {
+   "what": "Refusal copy that names two exits, points at another refusal, or addresses the user",
+   "measured": "Store-harness runs and single transcripts of the 2B.",
+   "result": "Two refusals that pointed at each other produced a 36-call alternation, and 'Answer the user.' made the 2B replay a save a second time.",
+   "why": "A refusal names the one next call and says nothing about who asked.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:118",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:135",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:8",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:20",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:40"
+   ]
+  },
+  {
+   "what": "Dispatching calls to tools the active scope withdrew (the loop before agent 0.0.28)",
+   "measured": "Store harness, rows JN and JEN, on qwen3.5:2b-q4_K_M.",
+   "result": "The model kept emitting `save` until the turn limit and the run ended partial. With such calls dropped, 5 of 8 failing journey runs passed, and 15 of 16 passed with the stable-link rule.",
+   "why": "Since agent 0.0.28, a call that the active scope does not admit is never dispatched.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:568",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:570",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:43"
+   ]
+  },
+  {
+   "what": "The judge beside the agent model on the 15 GB host, and a second client on the daemon",
+   "measured": "Judged live runs of 2026-10-08 on the 4-CPU, 15 GB host; the ledger smoke at judge `num_ctx` 4,096; a concurrent probe during the dump.",
+   "result": "At `num_ctx` 8,192, Mica (7.2 GB resident) drew 30 out-of-memory kills and 9 selection faults. At 4,096 it reached about 10.9 GB and was killed twice. A concurrent probe made the agent model reload on every call at about 12 s per load.",
+   "why": "The judged readings fault, and timing figures are contaminated, so the daemon loads one model at a time and serves one client.",
+   "caveat": "plan.md:181 names a larger host or a smaller judge `num_ctx` as the control.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/REPORT.md:11",
+    "/home/user/agent/tmp/bench/results/REPORT.md:49",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:38",
+    "/home/user/agent/tmp/bench3/README.md:695",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:181",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:184",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:136"
+   ]
+  },
+  {
+   "what": "Re-asking a judge question whose logprob readout fails every time",
+   "measured": "Mica calibration of 364 seed questions at `num_ctx` 4,096 (2026-10-08) and the per-goal `questions` field.",
+   "result": "The same 8 questions failed with `invalid or duplicate top logprob token` on every attempt, and 5 of them were re-asked at every select site: 5 of the 12 fresh questions per goal.",
+   "why": "The same bytes return the same readout, so a failure store holds these items undecided.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:336",
+    "/home/user/agent/tmp/bench3/README.md:338",
+    "/home/user/agent/tmp/bench3/README.md:696"
+   ]
+  },
+  {
+   "what": "A concrete example id (`LH-12345`) in lookup descriptions",
+   "measured": "v4 `both` live run.",
+   "result": "The model looked up `LH-12345` 6 times.",
+   "why": "The example drew lookups of an id no goal named.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:377"
+   ]
+  },
+  {
+   "what": "Chat requests without `truncate: false`",
+   "measured": "A live Ollama 0.40.0 call on 2026-10-08.",
+   "result": "An 18,035-token prompt at `num_ctx` 6,144 returned `prompt_eval_count` 25 with no error.",
+   "why": "The daemon silently drops leading messages.",
+   "caveat": "Ollama 0.40.0.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:132",
+    "/home/user/agent/tmp/bench/results/REPORT.md:7"
+   ]
+  },
+  {
+   "what": "A judge handler that judges a fixed input instead of the argument the model passed",
+   "measured": "The desk's first experiment; the file gives no count.",
+   "result": "The handler judged a fixed ticket when the model shortened the argument.",
+   "why": "A handler uses the argument it receives, or its description says that it judges a fixed input.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:130"
+   ]
+  },
+  {
+   "what": "Readings and methods rejected as evidence",
+   "measured": "The 8-port screen against the 16-port reading; the JENL rows; the first briefing-arm run; reruns with another `--seed`.",
+   "result": "The 8-port screen passed a configuration that the 16-port reading failed. The JENL rows were read on agent 0.0.26, where the cap was inert. The first briefing run stopped pinning goal facts from goal 3. Cold reruns reproduced 7 and 7, and 6 and 6, so at temperature 0 the seed selects nothing.",
+   "why": "None of these can decide a change, so the 16-port set and the paired 8-copy band are the instruments.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:115",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:117",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:162",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:186",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:8",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:22",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:96"
+   ]
+  },
+  {
+   "what": "Conflicts among the files (not a design verdict; read before citing an earlier entry)",
+   "measured": "Line-by-line comparison of the cited files.",
+   "result": "(1) plan.md:107 and records-series-verdict.md:77 say the refined briefing ties the full view and that records clear against refined; the corrected table (records-series-verdict.md:22-24) says refined clears against the full view (lower bound 0.07 to 0.43) and records do not clear against refined (−0.57 to −0.08), so the refined briefing is not listed as rejected. (2) The tuned summarizer arm is unmeasured in plan.md:155, plan.md:182, and REPORT.md:81, and measured in context.md:71. (3) context.md:65 used the bounded plain state, which plan.md:154 defers. (4) context.md:76 gives selection's prompt range as 1,166 to 1,939, and context.md:74 reports 2,769. (5) refine.md:29 counts `score` at 2 of 4 rows, and refine.md:442 says 3 of 4. (6) Round A compaction graded 40 of 60 against 41 for the full view, and FINAL-CHECK.md:11 still measures compaction as an arm, so compaction is not listed as rejected.",
+   "why": "Each conflict changes how an earlier entry can be cited.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:107",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:22",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:24",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:77",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:79",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:154",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:155",
+    "/home/user/scaffold/.orkestrel/agent/context.md:65",
+    "/home/user/scaffold/.orkestrel/agent/context.md:71",
+    "/home/user/scaffold/.orkestrel/agent/context.md:74",
+    "/home/user/scaffold/.orkestrel/agent/context.md:76",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:29",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:442",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:9",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:11"
+   ]
+  },
+  {
+   "what": "Exclusions: harvested items dropped from the list",
+   "measured": "Each was checked against its cited lines.",
+   "result": "Dropped because no run backs them (code review or protocol reading only): the OpenAI-compatible logprob wire, trusting a server's `confidence`, the one-writer deferral, the narrow reuse identity, one shared desk manager, derivable `Decision` members, searching `view()` for the request, structured instructions on the logprob wire, the empty noul side, the response-field guard, and `structuredClone`. Dropped because the measurement does not show the rejected thing: the value-only memory (its example comes from a compaction recap, REPORT.md:72), m44 joined to `Rules` (no run), the whole-message supersession drop (one probe reading), the refined briefing and Round A compaction (see the conflicts entry), and the v3 ledger as first recorded (superseded by later fixes). Dropped as scenario or fixture fixes rather than designs: the empty-cart and 'Search for kettle' wordings, the first refunds criterion, the LH-31055 lookup text, the refusal bound that reset on success, and the opening budget, for which the file gives no figures.",
+   "why": "The task keeps only rejections that a measurement supports.",
+   "caveat": "",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:429",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:430",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:407",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:265",
+    "/home/user/agent/tmp/bench/results/REPORT.md:72",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:54",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:8",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:17",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:18",
+    "/home/user/agent/tmp/bench3/README.md:350",
+    "/home/user/agent/tmp/bench3/README.md:435",
+    "/home/user/agent/tmp/bench3/README.md:461"
+   ]
+  }
+ ]
+}

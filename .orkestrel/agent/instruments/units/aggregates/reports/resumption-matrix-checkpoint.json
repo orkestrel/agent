@@ -1,0 +1,245 @@
+{
+  "date": "2026-10-10",
+  "status": "component verified; integration and live measurement pending",
+  "manifest": {
+    "tracked": [
+      ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+      ".orkestrel/agent/instruments/harness/bench5/helpers.ts",
+      ".orkestrel/agent/instruments/harness/bench5/plan.ts",
+      ".orkestrel/agent/instruments/harness/bench5/refit/Refit.ts",
+      ".orkestrel/agent/instruments/harness/bench5/refit/types.ts",
+      ".orkestrel/agent/instruments/harness/bench5/refit/validators.ts",
+      ".orkestrel/agent/instruments/harness/bench5/report.ts",
+      ".orkestrel/agent/instruments/harness/bench5/shadow.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/Driver.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/integration.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/plan.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/report.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/setupAdmission.ts",
+      ".orkestrel/agent/instruments/harness/bench5/types.ts",
+      ".orkestrel/agent/instruments/harness/tools/run-one.ts",
+      ".orkestrel/agent/instruments/harness/tools/series.ts"
+    ],
+    "added": [
+      ".orkestrel/agent/instruments/harness/bench5/FullViewAdapter.ts",
+      ".orkestrel/agent/instruments/harness/bench5/compare.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/Comparison.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/Matrix.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/constants.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/parsers.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/types.ts",
+      ".orkestrel/agent/instruments/harness/bench5/matrix/validators.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/FullViewAdapter.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/context/ContextProof.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/context/Fixture.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/context/RelayFrameParser.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/context/helpers.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/context/types.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/matrix.test.ts",
+      ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts"
+    ],
+    "files": [
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+        "sha256": "270bb8e30d19655bd96bc1b27de457b7fcf5a2bca32b0a6087a6a288e5b557bf"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/FullViewAdapter.ts",
+        "sha256": "10d86c5d98262dfc22cd3b122792df2b3c95188d7d66b31b69c08dc2461a6a11"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/compare.ts",
+        "sha256": "f49648f3983f47cdd6d8aca43bb47dc101ea4c369bf4811a61c3afbcd9fc26f4"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/helpers.ts",
+        "sha256": "033a564eea58cbe7b0d575d9d441e333b6256cc7fae5e1bcb90f37b8102839df"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix.ts",
+        "sha256": "c126b4dedb2c571205c3b7fea623f006298f6d80de5d3449f85555b341511172"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/Comparison.ts",
+        "sha256": "f835b3942f0b3dc5bf05a77962800561403abbd338252dec91eb6724d458cc82"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/Matrix.ts",
+        "sha256": "c021767fd6ae91981bcda0470e3c5b6cc1509f80cade582463df79f142dfb4e4"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/constants.ts",
+        "sha256": "5f01ce4ce08595c64667287c040656902c594425dbf8ebca1a1255165a6b166c"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts",
+        "sha256": "fb419873f0c616b21a76c7c03c1d137f2f47a63e65bf321a0a3a9b4b21f5a310"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/parsers.ts",
+        "sha256": "f17e344ee095c85243809d2f6b1468e8d68b2a55ee31da7f87f510f698fada47"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/types.ts",
+        "sha256": "846b20d5b69ee2421d81af6883441bcf25a77a711d5abefa989debc214c2a020"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/matrix/validators.ts",
+        "sha256": "b54ab6d0177cb30b31c4fc6e7d8dbd342702c4626b3a42f4d977701ec0d9f5d7"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/plan.ts",
+        "sha256": "bde7e7cd602e0f70f4bff223f753d6d4596c1964f11ef2de4f73d43408c812eb"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/refit/Refit.ts",
+        "sha256": "3f03cd2a47fa41184defe0737b53e9c59d1c27ec3e5808d12d384159909357ca"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/refit/types.ts",
+        "sha256": "5b57660adda5ea8bd2a7de727053cbe2e90b0202068c229bd4415c8cc71dc626"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/refit/validators.ts",
+        "sha256": "1a47aa84f36c5706fdc052fc8cd32e9dd2a43ec7c875b07adf581321d0ad1b6e"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/report.ts",
+        "sha256": "b7e1d5134020c6da9719ae6887b4473a757573ccfc69b24e8a3392eaaa181e6e"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/shadow.ts",
+        "sha256": "c679da4eb53a52d54673cf2679ab0035b879574a83f5f8b73c6b3226f30cf953"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/Driver.test.ts",
+        "sha256": "690344da6bc6e1f1ce28900b535f15c7409557b3f1d1b30f14b220623df3448c"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/FullViewAdapter.test.ts",
+        "sha256": "efe70b5460d1399dad90eec0c4faed2e5c1bcf561519b92c91901e72c7f9bd72"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/context/ContextProof.ts",
+        "sha256": "8d1e8a4986a50ffd49b0e74afd8a1d8c71301a0c7e68ffde70f0243e6921aa8e"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/context/Fixture.ts",
+        "sha256": "7aca5156bffd226fa144df1827e93c8ae60e69da50f4c48fc1520dd75e5dab6f"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/context/RelayFrameParser.ts",
+        "sha256": "0613b9a9566a17f014b25eb06ee98ed590e2639149ee779985f83f8776624425"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/context/helpers.ts",
+        "sha256": "9447decf31bb57626043296246f3a3ee76f926b0b0c61bd8f0d6af57a4b561b0"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/context/types.ts",
+        "sha256": "97e4b9d7366f084e74f90db69f185fca4539e086921fc324ad5f8516dcdea39b"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/integration.test.ts",
+        "sha256": "92aa1f42d9ab6e26bed2da4ea8133695886bd730f2defdf2054a9bd1c7690a59"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/matrix.test.ts",
+        "sha256": "25e461667ee6c3438ac6b62f8715c5535c128bd37461f32b8eb198d6e7eda979"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts",
+        "sha256": "5d5b7e9c17d5f779b262221572266a6f4b3b6e3a5012a845189fab0b47954cbc"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/plan.test.ts",
+        "sha256": "dae236320b8dd0d53d5c8b4c49ec469ae8f826641675d84416735ca266b2d8c7"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/report.test.ts",
+        "sha256": "56b04b4def81713746426152209f43a92779f4392a67826b946cb8940c2cf6c7"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/tests/setupAdmission.ts",
+        "sha256": "99d0de6a9056a4d5f6f8ffab06c74f52d13d76609d5591f77caa36ff191bd130"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/bench5/types.ts",
+        "sha256": "7a2f45d0c24154381915f7e7676c89e93a908b2fc24cb5476cca70b4fb188a2b"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/tools/run-one.ts",
+        "sha256": "d97e4053bf589a96a7865b760d9708c5588659369e8db8b4a73d1f226b4b85a6"
+      },
+      {
+        "path": ".orkestrel/agent/instruments/harness/tools/series.ts",
+        "sha256": "db928c61d9f39b8e6054e6456568acd41cf31cc55838a08b4109281e3a9d8117"
+      }
+    ],
+    "diff": "520ce32a9c4d2e0420c49e62c41a90b0bd0f58492a4d5f13c76d7b09fa170689"
+  },
+  "gates": [
+    {
+      "task": "types",
+      "exit": 0,
+      "ms": 2303,
+      "command": "{\"command\":\"C:\\\\Users\\\\mikes\\\\scoop\\\\apps\\\\nodejs-lts\\\\current\\\\node.exe\",\"args\":[\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\node_modules\\\\typescript\\\\bin\\\\tsc\",\"--noEmit\",\"-p\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tsconfig.json\",\"--typeRoots\",\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\node_modules\\\\@types\"],\"cwd\":\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\tmp\\\\worktrees\\\\agent-session\"}",
+      "stdout": "2fad862303fd60dbe112ef6994a4099c92ccc95ed0dde0c2b992a4068edc59c6",
+      "stderr": "2b1b48f1d4f01f341735f9fa2ed2d88088d990d43398bbbea40a50c32cd847d9"
+    },
+    {
+      "task": "tool-types",
+      "exit": 0,
+      "ms": 1253,
+      "command": "node C:/Users/mikes/WebstormProjects/scaffold/node_modules/typescript/bin/tsc --noEmit -p tmp/units/aggregate-matrix-tools-tsconfig.json",
+      "stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "44257684383250db0482ea452ad66b2efd1cfe7334095e56ab26bfc8140bc163"
+    },
+    {
+      "task": "linted",
+      "exit": 0,
+      "ms": 554,
+      "command": "{\"command\":\"C:\\\\Users\\\\mikes\\\\scoop\\\\apps\\\\nodejs-lts\\\\current\\\\node.exe\",\"args\":[\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\node_modules\\\\oxlint\\\\bin\\\\oxlint\",\"--config\",\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\tmp\\\\worktrees\\\\agent-session\\\\tmp\\\\units\\\\aggregate-matrix-lint.json\",\"--no-ignore\",\"--disable-nested-config\",\"--deny-warnings\",\".orkestrel/agent/instruments/harness/bench5/Driver.ts\",\".orkestrel/agent/instruments/harness/bench5/helpers.ts\",\".orkestrel/agent/instruments/harness/bench5/plan.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/Refit.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/types.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/validators.ts\",\".orkestrel/agent/instruments/harness/bench5/report.ts\",\".orkestrel/agent/instruments/harness/bench5/shadow.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/Driver.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/integration.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/plan.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/report.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/setupAdmission.ts\",\".orkestrel/agent/instruments/harness/bench5/types.ts\",\".orkestrel/agent/instruments/harness/tools/run-one.ts\",\".orkestrel/agent/instruments/harness/tools/series.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\Comparison.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\constants.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\helpers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\Matrix.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\parsers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\types.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\validators.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\ContextProof.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\Fixture.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\helpers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\RelayFrameParser.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\types.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\compare.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\FullViewAdapter.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\FullViewAdapter.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\matrix.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\matrixFixture.ts\"],\"cwd\":\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\tmp\\\\worktrees\\\\agent-session\"}",
+      "stdout": "d543d70a125b1fe5d3cfbb03798170ffd5b79b5330ea95d6e02d3f8215b8b318",
+      "stderr": "354111f2f56f88b816a6c72f9d2095b748288008cc5cce0f24426ae527f7b467"
+    },
+    {
+      "task": "formatted",
+      "exit": 0,
+      "ms": 261,
+      "command": "{\"command\":\"C:\\\\Users\\\\mikes\\\\scoop\\\\apps\\\\nodejs-lts\\\\current\\\\node.exe\",\"args\":[\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\node_modules\\\\oxfmt\\\\bin\\\\oxfmt\",\"--config\",\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\.oxfmtrc.json\",\"--ignore-path\",\"tmp/units/aggregate-matrix-empty.ignore\",\"--check\",\".orkestrel/agent/instruments/harness/bench5/Driver.ts\",\".orkestrel/agent/instruments/harness/bench5/helpers.ts\",\".orkestrel/agent/instruments/harness/bench5/plan.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/Refit.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/types.ts\",\".orkestrel/agent/instruments/harness/bench5/refit/validators.ts\",\".orkestrel/agent/instruments/harness/bench5/report.ts\",\".orkestrel/agent/instruments/harness/bench5/shadow.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/Driver.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/integration.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/plan.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/report.test.ts\",\".orkestrel/agent/instruments/harness/bench5/tests/setupAdmission.ts\",\".orkestrel/agent/instruments/harness/bench5/types.ts\",\".orkestrel/agent/instruments/harness/tools/run-one.ts\",\".orkestrel/agent/instruments/harness/tools/series.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\Comparison.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\constants.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\helpers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\Matrix.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\parsers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\types.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix\\\\validators.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\ContextProof.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\Fixture.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\helpers.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\RelayFrameParser.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\context\\\\types.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\matrix.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\compare.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\FullViewAdapter.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\FullViewAdapter.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\matrix.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\matrixFixture.ts\"],\"cwd\":\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\tmp\\\\worktrees\\\\agent-session\"}",
+      "stdout": "404abccad7f17bb7e47e3beff2394c9264d96ed44fec3c5ed475f663a1a81a1e",
+      "stderr": "8a8831ecd2e4ba7e6112c6b33f8099cd35b5edc233e6c5a51240d841a219c168"
+    },
+    {
+      "task": "tests",
+      "exit": 0,
+      "ms": 52477,
+      "runner": 52257.1386,
+      "tests": 360,
+      "suites": 80,
+      "passed": 360,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "command": "{\"command\":\"C:\\\\Users\\\\mikes\\\\scoop\\\\apps\\\\nodejs-lts\\\\current\\\\node.exe\",\"args\":[\"--test\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\aggregates.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\audit.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\calibrate.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\copies.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\Driver.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\fixture.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\FullViewAdapter.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\helpers.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\integration.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\JudgeCache.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\matrix.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\Mirror.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\plan.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\refit.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\report.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\seams.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\shadow.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\Summarizer.test.ts\",\".orkestrel\\\\agent\\\\instruments\\\\harness\\\\bench5\\\\tests\\\\transitions.test.ts\"],\"cwd\":\"C:\\\\Users\\\\mikes\\\\WebstormProjects\\\\scaffold\\\\tmp\\\\worktrees\\\\agent-session\"}",
+      "stdout": "44c34073581c5b830ffb7d2d4ef46dfa8b843dd25be67da5db194f0a1370c9c0",
+      "stderr": "70daeee469a6383ce02d7530263cf9fdfae2c5eccdb71bba1606ef62015e4f87"
+    }
+  ],
+  "tooling": {
+    "extends": "../../.orkestrel/agent/instruments/harness/bench5/tsconfig.json",
+    "compilerOptions": {
+      "typeRoots": [
+        "C:/Users/mikes/WebstormProjects/scaffold/node_modules/@types"
+      ]
+    },
+    "include": [
+      "../../.orkestrel/agent/instruments/harness/tools/run-one.ts",
+      "../../.orkestrel/agent/instruments/harness/tools/series.ts"
+    ]
+  }
+}

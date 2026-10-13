@@ -1,0 +1,1 @@
+{"model":"gemma4:e4b-it-q4_K_M","created_at":"2026-10-11T11:07:26.7823395Z","message":{"role":"assistant","content":"Ready"},"done":true,"done_reason":"length","total_duration":25874859600,"load_duration":11632300,"prompt_eval_count":5239,"prompt_eval_cached_count":0,"prompt_eval_duration":25855683000,"eval_count":1,"eval_duration":1000}

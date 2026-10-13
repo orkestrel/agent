@@ -1,0 +1,2021 @@
+{
+ "raw": [
+  {
+   "key": "plan",
+   "count": 50
+  },
+  {
+   "key": "refine",
+   "count": 39
+  },
+  {
+   "key": "briefing",
+   "count": 50
+  },
+  {
+   "key": "rounds",
+   "count": 86
+  },
+  {
+   "key": "records",
+   "count": 40
+  },
+  {
+   "key": "designs",
+   "count": 26
+  },
+  {
+   "key": "machinery",
+   "count": 50
+  }
+ ],
+ "missed": 30,
+ "catalog": [
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Relevance filter on pinned and record lines (credit check)",
+   "idea": "A Mica judge asks one needed question per pinned or record line per request and drops the lines it reads as unneeded, so the pinned Halvorsen account story stops burying the g08 credit comparison ($3,000 against $5,000 less $1,240). Cold replays without the Pinned section passed 5 of 7 against 1 of 7 unchanged, and the probe readings track need on g04, g08, and g10. The filter arm is not built, and lookup-result lines were not probed. Orchestrator task 52.",
+   "status": "partially-measured",
+   "machinery": "Existing: /home/user/agent/tmp/bench/results/v9/probes/judge-relevance.ts (output relevance.jsonl) and credit-probe.ts; the Mica judge and judgments.resolve in /home/user/agent/tmp/bench3/bench.mjs. Code to write: a per-line question and a filter in the bench3 select and render path; in the port, resolveLedgerRelevance and LedgerRelevanceOptions as the codex design names them.",
+   "hypothesis": "Dropping decisively unneeded lines raises the records arm's credit check from 2 to 3 passes of 8 (the full view scores 6) without losing lookup or correction evidence.",
+   "why": "The judge, the judgment store, and the cold-replay probes exist, and the 5-of-7 replay without Pinned shows the effect the filter targets.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:37",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:81",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:83-105",
+    "/home/user/agent/tmp/codex/records-port-last.md:189",
+    "/home/user/agent/tmp/codex/records-port-last.md:230",
+    "/home/user/agent/tmp/codex/records-port-last.md:281",
+    "/home/user/agent/tmp/codex/records-port-last.md:321",
+    "/home/user/agent/tmp/codex/records-port-last.md:410",
+    "/home/user/agent/tmp/units/records-port-planner.md:293",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:38",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:107",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:131",
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:20"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Records' lead over the refined briefing (open pair)",
+   "idea": "The corrected two-sided audit puts records against refined at mean d 0.63 to 0.88 with lower bound -0.57 to -0.08, which does not clear the fix bar. The superseded table, the ruling, plan.md:107, and the port planner's Measurements section still cite 8.0 against 6.75 with lower bound 0.43. The final check compares records with the full view and compaction only, so no running series reads this pair.",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: /home/user/agent/tmp/bench3/bench.mjs, where --records off is byte-identical to the refined harness (sha 3d75138e) and --records on is sha 59609d38; the series.ts, run-one.ts, and plan.ts drivers in /home/user/agent/tmp/bench/results/v7/tools/; the band rule in /home/user/agent/tmp/bench/results/v9/tools/band.ts.",
+   "hypothesis": "Records raise passes per copy over refined. They win the Sigrid callback (8 against 1) and the depot release (5 against 3 to 4) and lose the Grace escalation (1 against 4 to 5).",
+   "why": "One harness file renders both arms, so adding a refined arm to the f4 and t2 plans costs runs, not code.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:3-24",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:32",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:36",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:39",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:41",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:69",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:77",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:107",
+    "/home/user/agent/tmp/units/records-port-planner.md:461",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:7-11",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:28-30"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Grace escalation lost to wrong copy-list recipients in records",
+   "idea": "Five of 8 records replies copy a wrong recipient on the internal escalation note (the customer, Kenji, or the carrier), so records pass the Grace escalation on 1 of 8 copies against 4 to 5 for refined. No mechanism is traced in the records render. The judge ranks breaks of the Priya-copy rule at AUC 1.00, which a per-rule draft check could use, but no rewrite loop ran on that rule.",
+   "status": "unmeasured",
+   "machinery": "Existing: the Rules record and account scope in /home/user/agent/tmp/bench3/records.mjs; the cold-replay probe /home/user/agent/tmp/bench/results/v9/probes/probe.mjs; judge-rules.jsonl. Code to write: a trace of the g03 records briefing against refined's, then a per-rule threshold and rewrite loop if the trace points at rule visibility.",
+   "hypothesis": "The records render separates the Priya-copy rule from the escalation, or puts other names beside it, and keeping the rule beside the request restores refined's rate.",
+   "why": "The recorded a5 and a4 wires and the cold-replay probe that diagnosed the credit check can diff the two briefings with no live series.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:32",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:43",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:73",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:63-69"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Desk-wide correction stranded by account scope (m44) and global correction scope",
+   "idea": "Under account scope, m44 (the scrapped 15 percent restocking fee, stated inside Luis's message) reaches no other account's record and no Rules line. Grace's refund-fee request therefore loses the line that refined shows. The planner keeps this as a documented limit because the fix revives the 15 percent token for other owners; the codex design lets a decided correction inherit global scope and asks for that configuration to be measured separately.",
+   "status": "unmeasured",
+   "machinery": "Existing: buildRecords and placeMember in /home/user/agent/tmp/bench3/records.mjs (records.mjs:350 and :357 as the audit cites them); the repair diff at /home/user/agent/tmp/codex/records-candidate-last.md:95-111. Code to write: scope inheritance, plus a fixture with a correction that names an obsolete value.",
+   "hypothesis": "Global corrections reach every owner's record; the stated risk is that withdrawn values quoted in the correction distract the answer.",
+   "why": "The repair diff and the records-check fixtures exist, so the change and its distraction risk can be read offline before a live arm.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:20",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:83",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:95-111",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:54",
+    "/home/user/agent/tmp/units/records-port-planner.md:290",
+    "/home/user/agent/tmp/units/records-port-planner.md:483",
+    "/home/user/agent/tmp/units/records-port-plan.md:21",
+    "/home/user/agent/tmp/codex/records-port-last.md:126",
+    "/home/user/agent/tmp/codex/records-port-last.md:318",
+    "/home/user/agent/tmp/codex/records-port-last.md:408",
+    "CONTRADICTION: records-port-planner.md:290 and records-port-plan.md:21 keep a documented limit; records-port-last.md:126 and :318 treat it as a defect fixed by design"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Antecedent grouping in place of the capitalization-based person prefix",
+   "idea": "The records render prefixes a He or She line with the last capitalized name of the preceding sentence, which turns 'The buyer visited Riverside Depot. She orders on Mondays.' into 'Riverside Depot: She orders on Mondays.' The codex design keeps a pronoun-led sentence with its preceding surviving sentence as one indivisible group and invents no name. The planner keeps the measured prefix, which carries the Sigrid callback at 8 of 8.",
+   "status": "unmeasured",
+   "machinery": "Existing: the party rule in /home/user/agent/tmp/bench3/records.mjs; its pinned limit case in records-check.mjs. Code to write: antecedent-group projection in the port helpers.",
+   "hypothesis": "Grouping keeps the depot-release and callback gains without a synthesized attribution.",
+   "why": "The Tomasz and Sigrid seed evidence is fixed, so an assertion on adjacent grouping plus the eight-copy series can compare the two rules directly.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:17",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:39",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:83",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:43-51",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:95",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:187",
+    "/home/user/agent/tmp/units/records-port-plan.md:20",
+    "/home/user/agent/tmp/units/records-port-planner.md:287",
+    "/home/user/agent/tmp/units/records-port-planner.md:324",
+    "/home/user/agent/tmp/units/records-port-planner.md:482",
+    "/home/user/agent/tmp/codex/records-port-last.md:128",
+    "/home/user/agent/tmp/codex/records-port-last.md:277",
+    "/home/user/agent/tmp/codex/records-port-last.md:315",
+    "/home/user/agent/tmp/codex/records-port-last.md:409"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Correction chain retention and stale filtering on every system route",
+   "idea": "When a later source supersedes a correction, the correction's effect drops: for g05 the MX-4471 sentence of m2 revives after the m29 correction is superseded. Separately, the unscoped route renders m22's ESC-2291 sentence raw. The successor-unit ruling keeps a correction's effect after its corrector is superseded and filters stale sentences on every system route.",
+   "status": "unmeasured",
+   "machinery": "Existing: the laters filter in buildRecords (diff at /home/user/agent/tmp/codex/records-candidate-last.md:14-18); the raw route in bench3 bench.mjs. Code to write: a stale filter on the raw fallback, and a stale assertion that tells the chain failure apart.",
+   "hypothesis": "A correction keeps its effect through a superseded corrector, and no stale token reaches any system route.",
+   "why": "The reproduction and the diff exist, and the records-check fixtures can pin both paths with no model call.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:16",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:3-21",
+    "/home/user/agent/tmp/codex/records-port-last.md:414"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Lookup replacement edge cases and tail stubs under a budget cut",
+   "idea": "Three successor fixes in the records module:\n- An identical lookup that returns no record found does not replace the earlier $289 result.\n- Two lookups whose arguments differ only in key order keep both balances.\n- Under a tight budget, records cut a lookup that refined keeps, so the tail stub changes from 'result shown under Pinned' to 'result not shown'.\nNone of the three occurs on the measured scenario.",
+   "status": "unmeasured",
+   "machinery": "Existing: the records.mjs replacement key and the bench.mjs adapter (diffs at /home/user/agent/tmp/codex/records-candidate-last.md:31-41 and :78-93); records-report.mjs compares tail bytes. Code to write: the consolidation repair that keeps baseline lookup visibility.",
+   "hypothesis": "Each fix leaves the measured goals unchanged and closes a path that a longer or less regular conversation reaches.",
+   "why": "Each fix has a written diff and a reproduction the records-check fixtures can carry.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:17-19",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:31-41",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:53-72",
+    "/home/user/agent/tmp/codex/records-candidate-last.md:78-93"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Leave-one-out ablation of the refined profile and the trim bar",
+   "idea": "The refined profile turns on every change flag at once: date line, rules last, bare handles, stable cache, named auto-pin, recall-only arm tools, tally, request questions on topics only, answer cue, recall budget 2, repeat stop on all tools, collapsed answer view, recall split, no recall category, gate admit, horizon 99, and dropped tail answers and requests. The bundle clears the fix bar against the full view, but no flag was measured alone. The attack asked for a stricter trim bar and leave-one-out on any failing bundle, and the user rules whether an arm that clears only the trim bound is kept.",
+   "status": "partially-measured",
+   "machinery": "Existing: per-flag overrides on the bench3 command line, where a flag overrides its profile default; offline --check-ledger replays; band.ts. band.ts trims at >= -1 while the attack ruled > -1.",
+   "hypothesis": "Some bundled changes cost passes and are hidden by the ones that help; a trim that loses one goal on every copy passes the looser bar.",
+   "why": "Every flag is already a command-line override on the measured harness, so each ablation is a planned run with no code.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:78-100",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:82",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:85",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:179-183",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN-ATTACK.md:15",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:22",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:208",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:219",
+    "/home/user/agent/tmp/units/records-port-planner.md:495",
+    "/home/user/agent/tmp/units/records-port-plan.md:27",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:23"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Prompt budget share 0.7 and tail share 0.35, chosen by offline replay",
+   "idea": "The first prompt of a goal can take 0.7 of the window: the fixed cost of the tool schemas and framing comes out first, and the system message and the tail take (ctx times budget minus fixed) divided by SCALE_DRIFT 1.06; the tail takes 0.35 of that budget. Offline replays chose 0.7: at 0.55 the briefing kept 202 to 312 tokens and 15 of 20 replayed goal runs omitted a request-topic pin, while at 0.7 every goal fact of the 20 replayed goal runs rendered at entry and at least 965 tokens stayed for the goal's turns. Every live ledger run since v7 used 0.7 and 0.35, so no live run compares another share.",
+   "status": "partially-measured",
+   "machinery": "Existing: --budget and --tail flags and the fixed-cost charge with SCALE_DRIFT in /home/user/agent/tmp/bench3/bench.mjs; --check-ledger replays. Code to write: none; a share comparison is a planned run per value.",
+   "hypothesis": "0.7 keeps every goal fact at entry and leaves room for the turns; a smaller share loses request-topic pins, and a larger one leaves the 2B too little room to finish a goal (9 of 20 goal runs ended without an answer before the fixed cost was charged).",
+   "why": "Both shares are flags on the measured harness and the replay projects any value offline, so a live sweep needs runs only.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:81-82",
+    "/home/user/agent/tmp/bench3/README.md:264",
+    "/home/user/agent/tmp/bench3/README.md:266",
+    "/home/user/agent/tmp/bench3/README.md:700",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:9",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:82",
+    "CONTRADICTION: /home/user/agent/tmp/bench3/README.md:700 says no live run of the 0.7 budget exists, while /home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:9 grades a live ledger run at budget 0.7 and tail 0.35"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Named auto-pin (F7) and the gift note m11 filed as a request",
+   "idea": "Under --autopin named, the loop auto-pins a decisive user message, and renders an unpinned one, only when it carries an id, a number, or a name; the replay leaves the distractor m9 (about 25 tokens in each of 4 v8 briefings) unpinned and keeps the other 12 auto pins. Separately, the category judge reads the gift note m11, which g06 and g09 need, as a request at 0.73, so no auto-pin ever reaches it; it renders only as an unpinned message on the request's topics or through a name it shares with the request, which carried g09 to 2/2/2 in v8.",
+   "status": "partially-measured",
+   "machinery": "Existing: --autopin named in /home/user/agent/tmp/bench3/bench.mjs and its replay check; the category question and the unpinned-render rule. F7 runs live only inside the refined bundle.",
+   "hypothesis": "A fact the judge misfiles as a request reaches the briefing only through a shared topic or name, so a request that names no entity of that fact loses it; no scenario goal tests that case.",
+   "why": "The replay and the recorded category readings show the filing offline, and the coverage variant can add a goal that needs a misfiled fact with no shared name.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:32",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:61",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:75",
+    "/home/user/agent/tmp/bench3/README.md:90",
+    "/home/user/agent/tmp/bench3/README.md:482",
+    "/home/user/agent/tmp/bench3/README.md:698"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Comparison line for amount thresholds (compareAmounts)",
+   "idea": "compareAmounts takes a Rules sentence with a comparator and a selected record amount and emits a line such as '$289.00 is over $200.' The aim is the g05 comparison error, which caused 3 of 10 A1 g05 failures. It is built and fixtured, kept out of the measured arm, and refused for the port until it has a first real consumer. The codex lane excludes it because it conflates thresholds with unrelated amounts.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: compareAmounts and readAmount in /home/user/agent/tmp/bench3/records.mjs; a --compare on flag is named at RECORDS-PLAN.md:207, but no file confirms it exists.",
+   "hypothesis": "A derived comparison line stops the 2B from reasoning that $289.00 falls below $200; the records arm passes the approval note on 4 of 8 copies.",
+   "why": "The helper and its fixtures are built in the harness, so one flagged arm reads it.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:57-60",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:63",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:72",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:207",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:8",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:34",
+    "/home/user/agent/tmp/units/records-port-planner.md:127",
+    "/home/user/agent/tmp/units/records-port-planner.md:454",
+    "/home/user/agent/tmp/codex/records-port-last.md:120",
+    "/home/user/agent/tmp/codex/records-port-last.md:326"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Assistant text that rides non-lookup calls into the tail",
+   "idea": "The tail rule keeps assistant text attached to a call that is not a lookup, so an old token from an earlier goal reaches the g05 tail ('ESC-2219 (not ESC-2291 as previously noted)'). The plan reports each such entry as a confound and leaves the tail as refined's, and a tail change is its own arm.",
+   "status": "unmeasured",
+   "machinery": "Existing: the tail rule in bench3 bench.mjs (bench.mjs:1907-1909 per RECORDS-PLAN.md:29); run 3's report of tail entries with old tokens. Code to write: a filter for text beside non-lookup calls.",
+   "hypothesis": "Removing the leak keeps ESC-2291 out of g05 replies; the inputs link the control's g05 ESC-2291 replies to the tail only by juxtaposition.",
+   "why": "The dry-render footprint over recorded wires shows which tails carry old tokens with no live call.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:29",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:203",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:215",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN-ATTACK.md:8"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Rules order and cut independent of the request's desk topics",
+   "idea": "The Rules record orders its lines by the request's desk topics, and consolidation cuts lines in that order, so two rewordings of the same Kenji request show different first Rules lines. The codex report rules this a defect and proposes a request-independent order; the audit verdict rules the claim worded too strongly and finds no defect.",
+   "status": "unmeasured",
+   "machinery": "Existing: records.mjs:125 and bench.mjs:2146 as cited. Code to write: a fixed Rules order.",
+   "hypothesis": "A request-independent Rules view makes the Kenji Rules lines identical across rewordings and removes one source of copy-to-copy variance.",
+   "why": "The eight reworded copies already exercise the rewording case, so a dry render can count how often the order differs.",
+   "evidence": [
+    "/home/user/agent/tmp/codex/records-candidate-last.md:113-115",
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:21",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:50"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Stale-sentence render options and the replacement ablation",
+   "idea": "The measured rule (a) replaces raw sources with records. Option (b) adds the record and leaves stale sentences out of the raw render; option (c) renders both unchanged. A five-run 'records scope without replacement' ablation would test whether replacement earns its place. Its trigger (the arm clears against refined) is met only under the superseded table.",
+   "status": "unmeasured",
+   "machinery": "Existing: the stale output of buildRecords, so (b) needs no module change. Code to write: render paths for (b) and (c) in bench3 #render, and a --records scope flag.",
+   "hypothesis": "Option (b) keeps a verbatim copy beside the record at a room cost; refined uses 580 of 590 briefing tokens at g03.",
+   "why": "buildRecords already returns the stale list, so (b) is a render change on the measured harness.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:24-29",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:205-206",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:214",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:24",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:69"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Judge questions over records: agrees, changes, closes and reopens, and the record inside judge states",
+   "idea": "Section 9 of the briefing design and the AGGREGATES plan propose these judge questions over the records:\n- agrees: does a later user message withdraw a value the record lists as current? A decisive yes suppresses the record.\n- changes: the stage-2 question that opens amends and supersedes when the correction gate stays closed.\n- closes and reopens: the explicit-closure question.\n- A judge-reader contrast that puts the record inside the amends and supersedes states.\nThe built records use code checks only and no summarizer prose, which departs from section 9 and is a user ruling. A version that fails agrees is suppressed and not rebuilt, because a code rebuild over unchanged inputs returns the same bytes, while section 9 says rebuild; suppression returns the topic to the raw prompt, where stale read 0 in 10 of 10 rows. The user has not ruled on suppression.",
+   "status": "unmeasured",
+   "machinery": "Existing: the Mica judge, the amends and supersedes questions, and the code consistency checks of records.mjs. Code to write: each question, --calibrate-records, and a long-scenario calibration (fit on days 1 and 2, hold out day 3).",
+   "hypothesis": "A judge check per record version catches stale values the code checks miss; the aggregate in judge states improves keep and drop decisions on indirect needs.",
+   "why": "The judgment store and the calibration mode exist, so each question is a template plus a calibration pass.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:512-519",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:77",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:79",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:83-85",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:109",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:118",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:120",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:126",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:132",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:137-138",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:43",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:196",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:28",
+    "CONTRADICTION: /home/user/agent/tmp/bench/BRIEFING.md:515 proposes a needed state while /home/user/agent/tmp/bench/BRIEFING.md:307 rules a request-keyed needed question out",
+    "CONTRADICTION: RECORDS-PLAN.md:43 drops agrees while RECORDS-PLAN.md:196 defers it",
+    "CONTRADICTION: AGGREGATES.md:85 suppresses a failed version without a rebuild while BRIEFING.md section 9 (lines 511-519) rebuilds it"
+   ]
+  },
+  {
+   "theme": "Briefing and records refinements",
+   "title": "Desk-topic gate on Rules presence",
+   "idea": "A gate would make a rule's presence in the Rules record depend on its desk-topic filing. The plan's analysis on recorded readings shows the gate dropping m6 at g06 and g09 (delivery 0.444 against a 0.6 fit) and possibly m29 at g05. It defers the gate to the long scenario, and rejected.md lists it with no reopen condition.",
+   "status": "measured-negative",
+   "machinery": "Existing: desk readings in /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl. Code to write: a presence gate in selectRecords.",
+   "hypothesis": "Gating keeps Rules to desk-relevant lines and saves room, at the cost of rules filed on thin margins.",
+   "why": "On a long conversation with many rules the room saving can outweigh the margin risk, and the calibration file supplies the readings.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:45-50",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:216",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:25"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Eight-copy paired series on the repaired port (U9)",
+   "idea": "Run the ported ledger over the eight reworded copies and gate it on band.ts against a4-refined (fix bar) and a5-records (trim bar). The codex lane holds that the frozen harness's score does not carry to the repaired port. It requires a separately authorized series with strict scoring and blind adjudication, reported apart from the harness result.",
+   "status": "unmeasured",
+   "machinery": "Existing: band.ts, series.ts, run-one.ts, the strict scorer, and the two-sided blind audit. Code to write: the U9 series directory /home/user/agent/tmp/bench4/.",
+   "hypothesis": "The repaired port keeps the measured gain; the planner's gate assumes records clear refined, which the corrected audit does not show.",
+   "why": "The series drivers and the audit pipeline exist and ran on the frozen harness, so the port series reuses them.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:377-381",
+    "/home/user/agent/tmp/units/records-port-planner.md:407",
+    "/home/user/agent/tmp/codex/records-port-last.md:5",
+    "/home/user/agent/tmp/codex/records-port-last.md:366",
+    "/home/user/agent/tmp/codex/records-port-last.md:421",
+    "/home/user/agent/tmp/codex/records-port-last.md:423",
+    "/home/user/scaffold/.orkestrel/agent/ledger.md:17-23",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:24"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Recorded-wire replay as the preservation gate (U8)",
+   "idea": "Serve recorded judge and chat bodies and require every outgoing agent request to equal its recorded body after the listed normalizations. Any residual diff must fall under a listed repair, and an injected unlisted diff must fail as the control. The planner places it as a probe under tmp/probes; the codex lane places it as an integration test over immutable fixtures that fails on missing, extra, reordered, or unconsumed interactions.",
+   "status": "unmeasured",
+   "machinery": "Existing: /home/user/agent/tmp/bench/results/v9/a5-records-v1-wire and the other a5 wires. Code to write: the replay probe (/home/user/agent/tmp/probes/ledger-replay.test.ts) or the integration test under tests/src/core/ledgers.",
+   "hypothesis": "Unchanged behaviors reproduce judge questions, membership, ordering, and allocation byte for byte.",
+   "why": "The recorded wires and the --check-ledger replay show that byte-level replay of this harness works.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:365-376",
+    "/home/user/agent/tmp/units/records-port-planner.md:406",
+    "/home/user/agent/tmp/units/records-port-planner.md:441",
+    "/home/user/agent/tmp/codex/records-port-last.md:341",
+    "/home/user/agent/tmp/codex/records-port-last.md:346",
+    "/home/user/agent/tmp/codex/records-port-last.md:406-407",
+    "/home/user/agent/tmp/codex/records-port-last.md:420"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Handle removal from briefing and recall output, and the separator change",
+   "idea": "The port removes handles from every model-facing text, including recall results, where an r8 handle was cited in an a5-records-v2 g05 reply. It also changes the briefing separator by two newlines against the measured instruction carrier. Keeping handles through a numbering wrapper is the alternative. The effect of either change on the 2B is unmeasured; 0 of 60 a5 recalls named a handle.",
+   "status": "unmeasured",
+   "machinery": "Existing: the U8 normalizations (handle sentence, separator) and the U9 band. Code to write: the handle-free recall output in the successor harness unit.",
+   "hypothesis": "Handle removal stops handle citations in replies without changing pass rates.",
+   "why": "The U9 band against a4 and a5 measures this change with no extra instrument.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:82",
+    "/home/user/agent/tmp/units/records-port-planner.md:407",
+    "/home/user/agent/tmp/units/records-port-planner.md:420",
+    "/home/user/agent/tmp/units/records-port-planner.md:464",
+    "/home/user/agent/tmp/units/records-port-planner.md:471",
+    "/home/user/agent/tmp/units/records-port-planner.md:479-480",
+    "/home/user/agent/tmp/units/records-port-plan.md:11",
+    "/home/user/agent/tmp/units/records-port-plan.md:17",
+    "/home/user/agent/tmp/codex/records-port-last.md:320",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:55"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Live seed filing against the imported filing",
+   "idea": "Every arm imports the v3 recordings of the seed filing (356 judgments, with 1 amends question asked live), so the variant band cannot vary the filing. Re-asking the questions the conclusions rest on, or filing the whole seed live, would show whether decided readings differ at the thresholds.",
+   "status": "unmeasured",
+   "machinery": "Existing: --probe-filing in bench3 (seed messages 0, 6, 8, 11, 18, and 24, printed beside the imported record); importJudgments at bench.mjs:2770. No output of --probe-filing is recorded.",
+   "hypothesis": "A live filing differs from the imported one on judgments that the verdicts depend on.",
+   "why": "--probe-filing is built and needs only a daemon slot.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:103",
+    "/home/user/agent/tmp/bench3/README.md:511",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:111-124",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:231",
+    "/home/user/agent/tmp/units/records-port-planner.md:367",
+    "/home/user/agent/tmp/units/records-port-planner.md:408",
+    "/home/user/agent/tmp/units/records-port-planner.md:462",
+    "/home/user/agent/tmp/units/records-port-planner.md:470",
+    "/home/user/agent/tmp/codex/records-port-last.md:324"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Calibration agreement of the token gauge",
+   "idea": "Ledger.calibrate spends two full generations on the first call when no gauge is supplied. A probe over the recorded seed bodies must reproduce the measured scale 1.1634671320535195 and fixed 498. The codex design adds a calibration identity and an answer reserve, and flags that schema or framing cost may be understated.",
+   "status": "unmeasured",
+   "machinery": "Existing: /home/user/agent/tmp/bench/results/v9/a5-records-v1/seed.json:1 (identical across v1 to v8); the U5 ledger-gauge unit. Code to write: the agreement probe.",
+   "hypothesis": "Calibration by generation reads the same fixed overhead as the harness seed pass.",
+   "why": "The recorded seed bodies give the expected numbers, so the probe is offline.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:245",
+    "/home/user/agent/tmp/units/records-port-planner.md:409",
+    "/home/user/agent/tmp/units/records-port-planner.md:472",
+    "/home/user/agent/tmp/units/records-port-planner.md:492",
+    "/home/user/agent/tmp/units/records-port-plan.md:25",
+    "/home/user/agent/tmp/codex/records-port-last.md:198",
+    "/home/user/agent/tmp/codex/records-port-last.md:411",
+    "/home/user/scaffold/.orkestrel/agent/ledger.md:19"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Request-side judge: topic eligibility and a judge-off arm",
+   "idea": "The refined profile asks a request no category or warehouse question. The planner ports this as a Topic.requests flag, while the codex lane makes every configured topic eligible for requests. The attack's A6 arm turns the request judge off entirely and takes topics from ids and aliases, to test whether 226.4 seconds of judge time and 84.1 seconds of swaps per run buy a pass.",
+   "status": "unmeasured",
+   "machinery": "Existing: --request-questions topics in bench3; an offline replay that checks 18 of 18 fact slots. Code to write: --request-questions none.",
+   "hypothesis": "Topics from ids and aliases cover the goal facts, so passes hold with the request judge off.",
+   "why": "The offline replay can check fact-slot coverage under judge-off before any live run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:94",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:59-60",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:63",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:68",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:89",
+    "/home/user/agent/tmp/units/records-port-planner.md:143",
+    "/home/user/agent/tmp/units/records-port-planner.md:178",
+    "/home/user/agent/tmp/units/records-port-planner.md:249",
+    "/home/user/agent/tmp/codex/records-port-last.md:42",
+    "/home/user/agent/tmp/codex/records-port-last.md:273"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Entity resolution for unnamed customers, surname-only contacts, and ambiguous aliases",
+   "idea": "Account matching depends on surname overlap: m24 joins Halvorsen only through the shared surname, and no copy has a request that names no customer. The codex design injects subject resolution through an application handler with explicit aliases and leaves ambiguous identity unresolved. The briefing design deferred a concerns choice over registered customers, with a candidate list frozen at arrival.",
+   "status": "unmeasured",
+   "machinery": "Existing: the alias match at bench.mjs:1587-1602; records-check fixtures. Code to write: LedgerSubject and LedgerResolveHandler, scenario variants with an unnamed customer, and, optionally, a concerns choice question.",
+   "hypothesis": "Explicit aliases attach id-less messages correctly, and an ambiguous identity stays unresolved instead of joining the wrong account.",
+   "why": "The records-check fixtures and the variant files can carry the unnamed and ambiguous cases with no live run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:55",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:187",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN-ATTACK.md:14",
+    "/home/user/agent/tmp/codex/records-port-last.md:85",
+    "/home/user/agent/tmp/codex/records-port-last.md:191",
+    "/home/user/agent/tmp/codex/records-port-last.md:195",
+    "/home/user/agent/tmp/codex/records-port-last.md:323",
+    "/home/user/agent/tmp/units/records-port-planner.md:210",
+    "/home/user/agent/tmp/bench/BRIEFING.md:308",
+    "/home/user/agent/tmp/bench/BRIEFING.md:489"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Adversarial integration fixtures and shared-token correction localization",
+   "idea": "The codex design lists adversarial fixture families beyond the measured shift: empty lookups, argument permutations, repeated ids, correction chains, unscoped requests, ambiguous aliases, sentence-initial names, mixed-scope corrections, and budgets too small for the first recall group. Correction marks are gated by shared tokens, which can attach a correction to the wrong sentence; the port keeps that heuristic with provenance exposed.",
+   "status": "unmeasured",
+   "machinery": "Existing: the marks method at bench.mjs:1726 and token extraction at records.mjs:37. Code to write: fixtures under tests/fixtures/ledgers and a setupLedger file.",
+   "hypothesis": "The fixtures reach defects the measured shift does not, and provenance shows where a shared-token mark misfires.",
+   "why": "Each family is deterministic and needs no model call.",
+   "evidence": [
+    "/home/user/agent/tmp/codex/records-port-last.md:89",
+    "/home/user/agent/tmp/codex/records-port-last.md:325",
+    "/home/user/agent/tmp/codex/records-port-last.md:341",
+    "/home/user/agent/tmp/codex/records-port-last.md:349",
+    "/home/user/agent/tmp/units/records-port-planner.md:72",
+    "/home/user/agent/tmp/units/records-port-planner.md:253",
+    "/home/user/agent/tmp/units/records-port-planner.md:317-318"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Interleaved threads and the seed boundary of tail-requests drop",
+   "idea": "The tail-requests drop rule treats everything before the first request as the seed. The planner flags that this matters when threads interleave and leaves it documented and unmeasured. The codex design keeps earlier work requests identifiable without content regexes and holds one ledger per explicit conversation identity.",
+   "status": "unmeasured",
+   "machinery": "Existing: --tail-requests drop in bench3. Code to write: an interleaved fixture or scenario, and a desk integration test with interleaved identities.",
+   "hypothesis": "Two identities never share one record set, and a thread that resumes after another keeps its own evidence.",
+   "why": "A two-identity fixture over the ported ledger needs no model.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:135",
+    "/home/user/agent/tmp/units/records-port-planner.md:493",
+    "/home/user/agent/tmp/units/records-port-plan.md:26",
+    "/home/user/agent/tmp/codex/records-port-last.md:34",
+    "/home/user/agent/tmp/codex/records-port-last.md:269",
+    "/home/user/agent/tmp/codex/records-port-last.md:342",
+    "/home/user/agent/tmp/codex/records-port-last.md:418"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Full ledger snapshot persistence and judgment durability across a restart",
+   "idea": "The codex design makes the whole LedgerSnapshot (conversation plus request and result receipts) the persisted unit, restored before the next request and optionally stored as one database row. The planner defers snapshot and restore out of the first release. The desk keeps judgments in a memory store, so its only claim is process-lifetime reuse; a restart probe would state the expected loss.",
+   "status": "unmeasured",
+   "machinery": "Existing: ConversationSnapshot with judgments (plan.md:96) and the store seam. Code to write: LedgerSnapshot, isLedgerSnapshot, optional persistence through @orkestrel/database, and a desk restart probe.",
+   "hypothesis": "A round-tripped snapshot reproduces the uninterrupted next request; a ConversationSnapshot alone loses request boundaries and failure receipts.",
+   "why": "The snapshot store and the judgment snapshot already round-trip in the agent package.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-plan.md:28",
+    "/home/user/agent/tmp/units/records-port-planner.md:192",
+    "/home/user/agent/tmp/codex/records-port-last.md:188",
+    "/home/user/agent/tmp/codex/records-port-last.md:231",
+    "/home/user/agent/tmp/codex/records-port-last.md:246",
+    "/home/user/agent/tmp/codex/records-port-last.md:258",
+    "/home/user/agent/tmp/codex/records-port-last.md:396",
+    "/home/user/agent/tmp/codex/records-port-last.md:417",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:313",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:417",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:590"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Plan failure falls back to the unbounded full view",
+   "idea": "When the ledger plan throws, for example in a throwing lookup handler, the select site faults, and the contract makes a faulted selection's messages the whole view, so the provider receives the full history and a small window can overflow. The planner pins this with a Ledger test that asserts fault and lets strict turn it into an error; the codex lane rules that a plan failure must not silently send an unbounded history. Which fallback the ledger takes is open.",
+   "status": "unmeasured",
+   "machinery": "Existing: the fault-returns-view contract in the agent contexts types and the strict option. Code to write: the ledger select handler's failure path in the proposed src/core/ledgers module and its test.",
+   "hypothesis": "A non-strict fault sends the whole history to the provider; a bounded fallback (the last plan, or the request alone) keeps the call inside the window. Neither fallback is measured.",
+   "why": "The strict option and the fault receipt exist, so the choice is a handler policy plus one test with a throwing handler.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:411",
+    "/home/user/agent/tmp/units/records-port-planner.md:426",
+    "/home/user/agent/tmp/codex/records-port-last.md:147"
+   ]
+  },
+  {
+   "theme": "Records port to @orkestrel/agent",
+   "title": "Readings missing on the recorded a5 load",
+   "idea": "The planner lists per-goal readings that the a5 ledger logs could give but nobody took: loose units and handle-bearing lines per briefing, and recalls cut or closed by room. It also lists the answer-pass rate (11 of 80 goals, g04 on 7 of 8 copies) as read.",
+   "status": "unmeasured",
+   "machinery": "Existing: a5-records-v1 to v8 ledger.jsonl. Code to write: a reader over those logs.",
+   "hypothesis": "Room cuts and loose units explain part of the per-request spread across copies.",
+   "why": "The logs are recorded, so the readings cost an offline script.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:463",
+    "/home/user/agent/tmp/units/records-port-planner.md:468-469"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Bounded selection state, message-alone state, and newest-first candidates",
+   "idea": "The stock selection's whole-view state makes judge cost grow with the square of the view, and its limit screens the oldest candidates first, so the fresh tail goes unscreened after goal 2 at limit 12. Three variants are proposed:\n- A bounded plain state: the request, the subject, and a few neighbors.\n- A per-message question whose state holds only that message, reusable across requests.\n- Newest-first candidates.\nCalibration with the bounded state ran for Mica and tev1, and the tuned rerun used it, but no live selection has run on the bounded state with newest-first candidates.",
+   "status": "partially-measured",
+   "machinery": "Existing in /home/user/agent/tmp/bench/bench.mjs: --state bounded, --neighbors N, --candidates newest, --limit N; renderSelectionState and the limit in the package's createSelection. Code to write: the package's bounded state and newest-first order.",
+   "hypothesis": "A bounded state keeps Mica's separation (18 of 21 facts kept at 0.90, 128 of 140 chatter dropped) at a flat judge prompt.",
+   "why": "The harness flags exist, and rejected.md names this exact variant as the condition that reopens judge selection.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:122",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:154",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:180",
+    "/home/user/scaffold/.orkestrel/agent/context.md:65",
+    "/home/user/scaffold/.orkestrel/agent/context.md:76",
+    "/home/user/agent/tmp/bench/results/REPORT.md:46",
+    "/home/user/agent/tmp/bench/results/REPORT.md:78-79",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:23",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:29-35",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:40",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:48",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:62",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:67",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:76",
+    "/home/user/agent/tmp/bench/README.md:30-34",
+    "/home/user/agent/tmp/bench/README.md:93",
+    "/home/user/agent/tmp/bench/README.md:111",
+    "/home/user/agent/tmp/bench/README.md:192-196",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:12"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Exchange as the judged selection unit (--unit exchange) and dropping finished exchanges",
+   "idea": "Judge one needed question per exchange (a user message and the messages after it up to the next user message) and keep or drop the exchange whole, under a plain or bounded exchange state keyed by the exchange's leader and the request. With --finished drop, an earlier goal's exchange leaves the view and every judge state without a question, while search_history still reaches its messages. The package adopted exchange-whole keeping for the message unit (unit 16), which differs: it still asks one question per message. The v5 calibration read the exchange unit (bounded state, lookup criterion, 220 questions over 10 goals, mean judge prompt 583 tokens on g01), and the v6 runner scripts list sel-ex-drop and sel-ex-judge runs, but no result directory for them exists.",
+   "status": "partially-measured",
+   "machinery": "Existing: --unit exchange, --finished drop, and --probe-exchanges in /home/user/agent/tmp/bench/bench.mjs (the probe checks grouping and tool-message ownership and exits 1 on failure); /home/user/agent/tmp/bench/results/v5/cal-exchange/; runnerI.sh and runnerJ.sh. Code to write: none for the harness arm.",
+   "hypothesis": "One question per exchange keeps a request with the calls and results that answer it (finding A1) at fewer judge questions than the message unit, and dropping finished exchanges keeps the judge on the active request.",
+   "why": "The flags, the probe, and a calibration exist, and the runner lines are written, so the live arm costs a daemon slot.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:42-46",
+    "/home/user/agent/tmp/bench/README.md:108-109",
+    "/home/user/agent/tmp/bench/README.md:123",
+    "/home/user/agent/tmp/bench/README.md:203-217",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:15",
+    "/home/user/agent/tmp/bench/results/v5/cal-exchange/calibration.md:3",
+    "/home/user/agent/tmp/bench/results/v5/cal-exchange/calibration.md:22",
+    "/home/user/agent/tmp/bench/results/v6/runnerI.sh:18-19",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:1"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judge selection as a context strategy (alone, beside compaction, thresholds 0.90 and 0.95)",
+   "idea": "These measured arms each failed to beat capped compaction:\n- Selection alone at limit 12: 3 of 10, overflow from g05.\n- Mica selection beside compaction with 3 sections: 5 of 10, 13 correct against 11, confounded by judge out-of-memory kills.\n- Calibrated selection at 0.90 (3, then 5 strict passes) and 0.95 (4).\nThe answer-counted reading favored selection (6 and 7 against 5) at many times the time.",
+   "status": "measured-negative",
+   "machinery": "Existing: createSelection with the Mica judge (createOllamaJudge) and calibrate.mjs; the selection, both, and calibration modes of bench.mjs.",
+   "hypothesis": "Selection adds correctness at a flat prompt once the judge is cheap and fault-free.",
+   "why": "rejected.md names a cheaper judge or a bounded state as the reopen condition, and the selection and both modes already exist.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:58-61",
+    "/home/user/scaffold/.orkestrel/agent/context.md:72-76",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:121",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:181",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:12-14",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:5-12"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Thresholds fitted on a held-out goal set",
+   "idea": "Every threshold in use was fitted on the rows it is scored on: the selection cut (0.96 keeps all 21 facts), the LEDGER_FIT values (category 0.70, topic 0.60, amends 0.75, supersedes 0.95, correction 0.30), and the per-question grid readings (escalations 0.85, warehouse 0.80, contacts 0.70). Reworded variants keep the seed, so they do not serve as held-out data. The Criterion threshold has no default; two arguable pairs sat at 0.528 and 0.677 inside its undecided band.",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: --calibrate and --calibrate-categories, calibrate.mjs, and Criterion.threshold with its absent band. Code to write: a held-out labeled seed (the long scenario's day 3 is the planned one).",
+   "hypothesis": "Thresholds fitted in-sample keep fewer facts on held-out messages, and per-question thresholds keep truth yeses that a shared one drops.",
+   "why": "Changing a threshold re-evaluates recorded distributions with no model call, so a held-out set costs labeling and one calibration pass.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:38",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:71",
+    "/home/user/agent/tmp/bench3/README.md:340-350",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:45-64",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:85",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:104",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:142",
+    "/home/user/agent/tmp/bench/BRIEFING.md:290",
+    "/home/user/agent/tmp/bench/BRIEFING.md:454",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:46",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:54",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:310",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:370-375",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:109",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:132",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:21"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Offline judge training with a held-out temperature refit",
+   "idea": "A judge is frozen at inference, so its answers change only through thresholds and criteria in code or through another model. Train that model offline, as a batch, on rows collected for the purpose, and refit the calibration temperature on rows the training run did not see; corrections are recorded, never learned online. Thresholds stay the application's, with no framework default.",
+   "status": "unmeasured",
+   "machinery": "Existing: the judgment store, which records each question, state, and answer as training rows; the per-model calibration temperature (1.124 on the Mica card, the same value in the desk). Code to write: a row export and a training run outside the framework.",
+   "hypothesis": "A judge trained on desk-shaped rows separates needed from noise where Mica's in-sample thresholds do not; no training run exists in the inputs.",
+   "why": "The judgment store already holds labeled rows per question, and the guide rule fixes the procedure.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:129",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:27"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judge decision margin, undecided band, warm runner, and drift",
+   "idea": "The judge's first questions after a runner load drift by up to 0.10; seeds 15 to 29 matched across four processes, and none crossed the 0.1 cut. The two 0.90 runs differ by decisions within 0.01 of the cut. The controls are a margin to the cut on each decision, a warm runner across a goal, and a decision within the drift read as undecided. Per-call timing and prompt size are recorded only in part (the body hash is).",
+   "status": "partially-measured",
+   "machinery": "Existing: --probe-judge-drift (/home/user/agent/tmp/bench/results/v4/drift/), the countingFetch body hash. Code to write: a margin field per judgment, an undecided band, and per-judge-call timing.",
+   "hypothesis": "Counting near-cut decisions as decided inflates the run-to-run spread in selection membership.",
+   "why": "The drift probe and the recorded judgments already hold the probabilities that a margin field needs.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:183",
+    "/home/user/scaffold/.orkestrel/agent/context.md:76",
+    "/home/user/agent/tmp/bench/README.md:119",
+    "/home/user/agent/tmp/bench/README.md:429",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:37-38",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:40",
+    "/home/user/agent/tmp/bench/results/v8/DIVERGENCE.md:9"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judge memory on the 15 GB host: smaller num_ctx, co-residence, or a larger host",
+   "idea": "Mica at num_ctx 8,192 holds 7.2 GB resident, and the kernel killed it 30 times beside the agent. At 4,096 the memory cgroup still killed it twice, and the resident size at 4,096 is not recorded. Setting OLLAMA_MAX_LOADED_MODELS to 2 would cut about 84 seconds of swaps per run; that daemon change needs the user's approval and a reproduction of its own.",
+   "status": "partially-measured",
+   "machinery": "Existing: --judge-ctx; memory.log capture; runnerC3.sh sets OLLAMA_MAX_LOADED_MODELS=1. A larger host is not available here.",
+   "hypothesis": "With no kills, judged arms read selection effects rather than fault fallbacks.",
+   "why": "Judge context and daemon settings are flags and environment, not code.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:121",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:181",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:38",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:49",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:68",
+    "/home/user/agent/tmp/bench/results/REPORT.md:49",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:120",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:45",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:91",
+    "/home/user/agent/tmp/bench/BRIEFING.md:374",
+    "/home/user/agent/tmp/bench/BRIEFING.md:488",
+    "/home/user/agent/tmp/bench3/README.md:206",
+    "/home/user/agent/tmp/bench3/README.md:695",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:27"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Lookup criterion for the needed question",
+   "idea": "The lookup criterion asks whether a message names a fact, rule, correction, or identifier the work must apply, quote, or look up. It targets three indirect misses: the approval-code correction, the no-written-date rule, and ids a task must look up. The tuned rerun used it with the bounded state, but no run compares it with the stock criterion alone, and JUDGE.md both credits it and queues its measurement.",
+   "status": "partially-measured",
+   "machinery": "Existing: --criterion lookup|stock in /home/user/agent/tmp/bench/bench.mjs; calibration directories cal-mica-b2-lookup and cal-mica-b6-lookup.",
+   "hypothesis": "The lookup wording keeps the indirect facts that the needed criterion drops at the same threshold.",
+   "why": "Both criteria are flags, and calibration on recorded judgments reads them with no agent run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:7",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:23",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:60",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:67",
+    "/home/user/agent/tmp/bench/README.md:46",
+    "/home/user/agent/tmp/bench/README.md:54",
+    "/home/user/agent/tmp/bench/README.md:106",
+    "/home/user/scaffold/.orkestrel/agent/context.md:65"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Relation questions (superseded, accepted) and the superseder inclusion rule",
+   "idea": "Pair-only relation questions about whether a later message withdraws, or accepts, an earlier one read as well as the whole transcript at about half the tokens (166 to 212 against 358 to 380). An inclusion rule that keeps a needed message and adds its superseder beside it would protect a mixed message, such as a SQLite acceptance sharing a message with a withdrawn rule. A judgment that needs an earlier answer becomes a second request. All of this is deferred until an application revises decisions mid-conversation.",
+   "status": "partially-measured",
+   "machinery": "Existing: the pair harness /home/user/scaffold/tmp/probes/pairs.ts and pairs2.ts as cited. Code to write: widen SelectionCondition, the relation templates, the inclusion step in createSelection, and the include override.",
+   "hypothesis": "Relation questions identify superseded decisions that the needed question cannot, and the superseder rule removes the mixed-message hazard.",
+   "why": "The judge engine, the judgment store, and the condition-key tuples already carry multi-source questions.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:14",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:34",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:38-41",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:52",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:401",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:405",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:407",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:443-444",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:505",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:80",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:132",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:142",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:24",
+    "CONTRADICTION: refine.md:14 calls both relation questions read well; refine.md:40 records accepted on the whole transcript at 2 of 3"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Needed-criterion no-side wording and a second probe transcript",
+   "idea": "The exported NEEDED_CRITERION no-side wording ('A can be left out and the request in B is still done correctly') appears in no probe row, although refine.md calls the exported wordings measured. The view-shaped state tied the pair at 3 of 4, and refine.md names a second transcript as the probe that would overturn that ruling: a clarifying message appended after a needed outcome.",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: NEEDED_QUESTION and NEEDED_CRITERION in the agent package; the pair harness. Code to write: a probe row for the no-side wording and the second transcript.",
+   "hypothesis": "The view-shaped state holds after a clarifying message, and the no-side wording reads standing constraints as needed.",
+   "why": "The pair harness runs a row per wording in seconds on Mica.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:24",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:42-47",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:51",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:53",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:393",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:399",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:405",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:580-581",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:23-24"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "tev1 with a structured named-parts state, and tev1 against Mica",
+   "idea": "On the string state, tev1's needed and noise probabilities overlap (0.36 to 0.61 against 0.18 to 0.67), and its 2,050-token context faults whole-view selection. A structured state of named parts (request, candidate, two neighbors), or a bounded render under 2,050 tokens, is untested. tev1 conforms to the System One protocol on Ollama 0.40.0, but no accuracy reading ranks it against Mica.",
+   "status": "measured-negative",
+   "machinery": "Existing: createSystemOneJudge and createOllamaJudge; --judge tev1 with --state bounded. Code to write: the structured-state probe.",
+   "hypothesis": "A structured state separates tev1's needed from noise messages where the string state does not, at 752M parameters against Mica's 4.84B.",
+   "why": "rejected.md names the structured-state test as the open reopen condition, and both judge wires exist.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:13-23",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:61-62",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:69",
+    "/home/user/agent/tmp/bench/README.md:91",
+    "/home/user/agent/tmp/bench/README.md:356",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:50-58",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:253",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:472",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:22"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Other judge candidates: small Qwen logprob judge, Qwen3-Reranker, hosted Jev, GPU Mica",
+   "idea": "The candidates are:\n- Qwen3.5 0.8b or 2b as a logprob judge with its own fitted temperature (256k context, 1.3 to 2.6 GB).\n- Qwen3-Reranker 0.6B or 4B through its own template and lowercase labels.\n- Hosted Jev 1.13, if the data policy allows a third party.\n- Mica on a GPU, quoted at tens of milliseconds per decision against 4.3 seconds here.\nEncoder rerankers and NLI classifiers are excluded for lack of an Ollama endpoint.",
+   "status": "unmeasured",
+   "machinery": "Existing: createOllamaJudge on the logprob wire. Code to write: the judge template and labels as options.",
+   "hypothesis": "A smaller or reranker judge separates needed from noise at lower memory and latency than Mica.",
+   "why": "Making the template and labels configurable is the one change, and the calibration mode reads any candidate.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/JUDGE.md:3",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:11",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:27",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:50-54",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:63",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:70",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:75"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Category question form: one choice or one noul per category",
+   "idea": "Calibration of the choice form, in both option orders, shows a lean toward the first option, while the argmax agrees on 36 of 41 messages. The noul fallback asks 7 questions per message and has no calibration reading. The port keeps choice only.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: --categories choice|noul and --calibrate-categories in bench3.",
+   "hypothesis": "The noul form removes the first-option lean at seven times the question cost.",
+   "why": "Both forms are flags in the calibration mode, which needs no agent run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:104",
+    "/home/user/agent/tmp/bench3/README.md:331",
+    "/home/user/agent/tmp/bench3/README.md:395",
+    "/home/user/agent/tmp/bench/BRIEFING.md:281",
+    "/home/user/agent/tmp/bench/BRIEFING.md:301",
+    "/home/user/agent/tmp/bench/BRIEFING.md:487",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:9",
+    "/home/user/agent/tmp/units/records-port-planner.md:24",
+    "/home/user/agent/tmp/codex/records-port-last.md:17"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Correction chaining (correction and amends questions)",
+   "idea": "Chaining keeps a correction with the message it corrects, by a shared id-shaped token or an amends answer, so a folded correction can return when a later goal needs it. The correction question is keyed on the message alone, so each message is asked once for the life of the conversation. The measured both arm chained none, because the corrections were folded first. The exchange-unit item carries the finished-exchange drop.",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: --chain corrections and --probe-chain in /home/user/agent/tmp/bench/bench.mjs.",
+   "hypothesis": "Chaining stops a withdrawal from being dropped while its target stays.",
+   "why": "The flag and its probe are built and await a run without compaction removing the corrections first.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:9",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:29",
+    "/home/user/agent/tmp/bench/README.md:49-54",
+    "/home/user/agent/tmp/bench/README.md:137",
+    "/home/user/agent/tmp/bench/README.md:223-240"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judge draft check against a rule before the reply",
+   "idea": "Ask the judge whether a drafted reply breaks a live rule, and return the draft once for rewriting. Over 74 recorded replies, Mica separated breaking replies for the delivery-date rule (AUC 0.98) and the Priya-copy rule (AUC 1.00) but not the approval-code rule (AUC 0.64), and its probabilities are not calibrated across rules, so each rule needs its own threshold, which the short scenario cannot hold out. A rewrite that named the delivery-date rule kept the date in 9 of 9 runs, so the g06 branch closed with no arm built.",
+   "status": "partially-measured",
+   "machinery": "Existing: /home/user/agent/tmp/bench/results/v9/probes/judge-rules.jsonl and g06-rewrite.jsonl; the cold-replay probe.mjs. Code to write: a per-rule threshold fitted on held-out replies, and a check-and-return step before the reply.",
+   "hypothesis": "With a per-rule threshold, the check catches breaks of a rule the 2B can follow on rewrite, such as the Priya copy; it cannot fix the delivery date, which the 2B copies from the lookup result it quotes.",
+   "why": "The judge already ranks two rules at AUC 0.98 or better, and the rewrite probe is a reusable instrument.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:49",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:59-70"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Criteria wording and option-order checks",
+   "idea": "The judge reads criteria literally, so negations, scoping words, and double indirection cost accuracy, and the TypeSafe jaggedness page notes a first-option lean. The folded guidance compares dates in code, reorders options to detect the lean, and filters irrelevant state first. None of it is measured on Mica on this stack.",
+   "status": "unmeasured",
+   "machinery": "Existing: NEEDED_CRITERION and NEEDED_QUESTION; the option order in the judge options. Code to write: an option-order check and reworded-criteria rows.",
+   "hypothesis": "Reordering options and rewording negations change Mica's answers.",
+   "why": "The pair harness and the both-order category calibration already run this kind of comparison.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:98",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:131-132"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Adversarial note inside a screened message",
+   "idea": "A planted note inside the screened state may flip a needed answer and drop a rule. The Mica card reports right answers on 69.1 percent of perturbed items, and 88.7 percent when the note points at the right option. The desk's injection fixture, placed as a screened message, is the named probe.",
+   "status": "unmeasured",
+   "machinery": "Existing: the ScreenHandler type and createSelection; the desk injection fixture. Code to write: the fixture wired through the screen.",
+   "hypothesis": "A planted wrong-option note moves the needed answer.",
+   "why": "The screen hook exists, so the fixture is data plus one test.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:131",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:173",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:369",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:389",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:583"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judge wire fidelity probes",
+   "idea": "Six probes on the judge wires remain:\n- What the Ollama daemon does with a state over Mica's 8,192-token limit; the official server returns HTTP 400, and the daemon could truncate silently.\n- Whether top_k and top_p filter the logprob list.\n- Whether a re-pulled tag changes weights under the same identity (compare digests from the show endpoint).\n- Whether JavaScript and Python numeric spelling differ in a structured state.\n- Whether a live llama.cpp System One body matches its pull request.\n- Which tokens repeat in the readouts that fail on duplicate top logprobs (8 of 364 seed questions, on every attempt).\nA split-cost comparison of batch against per-question calls is also unread.",
+   "status": "unmeasured",
+   "machinery": "Existing: OllamaJudgeOptions, renderJudgeIdentity, createSystemOneJudge, and the raw generate path. Code to write: one probe per item, and recording of the repeated tokens in the fault.",
+   "hypothesis": "Each probe either confirms the wire matches its assumption or names a guard the judge needs before the desk pins OllamaJudgeOptions.",
+   "why": "Each probe is one daemon request through the existing judge.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:133",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:173",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:55",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:32",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:165-171",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:222",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:237",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:245",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:247",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:252-253",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:584",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:586-588",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:591",
+    "/home/user/agent/tmp/bench3/README.md:336-338",
+    "/home/user/agent/tmp/bench3/README.md:696",
+    "/home/user/agent/tmp/bench/results/JUDGE.md:27",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:26"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Judgment reuse identity, one field at a time",
+   "idea": "Reuse compares the question, sources, rendered state, and judge identity for full equality. The proposed test series changes each field alone over the real manager and asserts reuse only on full equality.",
+   "status": "unmeasured",
+   "machinery": "Existing: matchesJudgment and judgments.resolve. Code to write: a per-field test series.",
+   "hypothesis": "Reuse occurs only when every identity field matches.",
+   "why": "matchesJudgment is a pure exported helper, so a table of cases covers it.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:245",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:298",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:303",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:310",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:589",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:96"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Graded relevance score as the selection signal",
+   "idea": "A three-level score of how much a message matters leaned to the middle level on 3 of 4 rows, and the binary noul became the selection form. The file calls these readings the thinnest in the record and warns that templates may read differently on another judge.",
+   "status": "measured-negative",
+   "machinery": "Existing: the score form of the judge contract on both wires; /home/user/scaffold/tmp/probes/mica.ts as cited.",
+   "hypothesis": "A graded score ranks needed messages as well as the binary form on a different judge model.",
+   "why": "rejected.md names another judge model as the reopen condition, and the score form is already in the contract.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:20",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:29",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:56",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:442",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:582",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:23"
+   ]
+  },
+  {
+   "theme": "Selection and judging",
+   "title": "Substring search as the cheap screen",
+   "idea": "Substring search cannot tell a withdrawn rule from one in force, so it is refused as the selector and kept as a cheap pass that a ScreenHandler can use to narrow the subjects the judge is asked about.",
+   "status": "unmeasured",
+   "machinery": "Existing: Conversation.search and the ScreenHandler type.",
+   "hypothesis": "A substring screen cuts judge questions without dropping needed subjects.",
+   "why": "Both parts exist in the package, so the screen is application wiring.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:369",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:439"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Successor harness unit: recall and answer-run defects",
+   "idea": "The frozen-harness audit lists five defects for the successor unit:\n- A repeated call id hides the repeat stop.\n- The collapsed answer run keeps the seed's assistant tool calls, and nested recall leads survive the digest.\n- Joined handles in recall are normalized before the split.\n- A sent category still prices the recall result.\n- The empty-reply guard assertion cannot see the guard removed.\nNone left a goal without a reply in the frozen series. Orchestrator task 53, with the records-candidate fixes listed in the records items.",
+   "status": "unmeasured",
+   "machinery": "Existing: written edits at /home/user/agent/tmp/codex/frozen-harness-last.md:5-45, :63-100, :112-130, and :160-164 (the split edit passed in memory). Code to write: applying the edits in bench3 bench.mjs and records.mjs after both series.",
+   "hypothesis": "Each edit closes its path without changing the measured goals.",
+   "why": "Each defect has a reproduction and a written replacement, so the unit is a builder brief.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:13-18",
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:21",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:5-11",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:13-45",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:63-100",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:112-130",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:160-164",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:83",
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:15",
+    "/home/user/scaffold/.orkestrel/agent/records-candidate-audit-verdict.md:23"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Word-wise, newest-first search_history and correction ranking",
+   "idea": "The 2B's phrase queries miss under substring search: every multiword first query in GRADES-4 returned nothing. Word ranking keeps at most 6 hits, so the Halvorsen correction (seed 27) sits sixth, and g10's 'Halvorsen' query filled the limit with goal-time messages. Word-wise search ran only bundled with the tuned summary and judge isolation, and the ledger harness keeps the every-word version.",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: --search words and --probe-search in /home/user/agent/tmp/bench/bench.mjs. Code to write: correction-aware ranking and a word-boundary match.",
+   "hypothesis": "Word-wise search with correction-aware ranking returns the g04, g06, and g10 facts that phrase search misses.",
+   "why": "The search tool and its probe exist in both full-view and compaction arms.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:121",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:155",
+    "/home/user/scaffold/.orkestrel/agent/context.md:65",
+    "/home/user/agent/tmp/bench/results/REPORT.md:48",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:32",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:24",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:32-33",
+    "/home/user/agent/tmp/bench/README.md:112",
+    "/home/user/agent/tmp/bench/README.md:137-144",
+    "/home/user/agent/tmp/bench/README.md:368",
+    "/home/user/agent/tmp/bench/README.md:378",
+    "/home/user/agent/tmp/bench3/README.md:76"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Recall tool over the conversation manager (toolbox unit 10) and on the desk",
+   "idea": "A toolbox tool shaped like createWorkspaceTool over ConversationManagerInterface would give the model case-insensitive substring search and whole-section rehydrate, with its description and schema recorded as advertised bytes. The desk would install it on a ticket's conversation only. The unit is open and unbuilt.",
+   "status": "unmeasured",
+   "machinery": "Existing: the search, rehydrate, sections, summary, and reference members of ConversationInterface. Code to write: the toolbox recall tool.",
+   "hypothesis": "On-demand recall recovers identifiers that compaction loses; the 2B reached the gift note only through search_history, in 4 of 80 goals.",
+   "why": "The conversation members exist, and the ledger arm's recall shows that the 2B uses a recall tool (60 calls over a5).",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:100",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:121",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:134",
+    "/home/user/scaffold/.orkestrel/agent/context.md:151",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:39",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:419",
+    "/home/user/agent/tmp/units/records-port-planner.md:464"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "System sentence on omitted messages and when to search",
+   "idea": "The system text states that earlier messages can be omitted from view, and that a request naming a person, id, or fact absent from view needs search_history. It is on the wire, and its effect on search use is unmeasured: GRADES-3 records no search in 30 goals, and GRADES-4 records 9 searches in 6 goals.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: the scenario.json system text.",
+   "hypothesis": "Telling the model that messages can be omitted triggers searches for facts out of view.",
+   "why": "An A/B over the existing system text needs only a variant scenario file.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:22",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:68",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:125",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:18",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:32"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Recall tool removed from the records arm (A5)",
+   "idea": "Run the arm with no recall tool, because the recall calls of the attack run found no fact the prompt lacked. This scenario never omits a fact, so the test cannot show recall's value here; the coverage variant can.",
+   "status": "unmeasured",
+   "machinery": "Code to write: --arm-tools none.",
+   "hypothesis": "Passes hold without recall on the short scenario and drop on a scenario that omits facts.",
+   "why": "Arm-tools is a flag family that already removes pin and read.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:62",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:88"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Model-authored pin tool, read tool, and the Values block",
+   "idea": "A pin tool let the model write a value line beside a source, and a read tool returned one message or result by handle. In the v8 run the model made 0 model-origin pins in 10 of 10 rows, its 3 pin calls all followed a hold and copied the source whole, the Values block appeared in 0 of 38 agent calls, and read had 0 calls while taking 14 percent of schema characters. --arm-tools recall, part of the refined profile, removes pin, read, the pin sentence, and the Values block; the settle step still pins every owed result whole.",
+   "status": "measured-negative",
+   "machinery": "Existing: the pin and read tools, the pin sentence, and the Values block in /home/user/agent/tmp/bench3/bench.mjs, switched by --arm-tools all|recall.",
+   "hypothesis": "Under the 2B, inclusion rests on the loop's auto-pins and settle step alone; a model that writes its own pins, such as the 4B or a thinking pass, might use them. One run on the 2B supports the trim.",
+   "why": "--arm-tools all restores both tools, so the f4 and t2w conditions can read them with a flag.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:17",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:55",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:56",
+    "/home/user/agent/tmp/bench3/README.md:92"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Recall result room: half of the latest call's room at the marginal rate",
+   "idea": "A recall result gets half of the room the latest agent call left beyond the reply reserve, less the call message that asks for it, priced at the marginal rate: the least-squares slope of prompt tokens over estimate units within each run's calls that advertised the same number of tools, pooled over completed runs and the run in progress. Appended calls cost 1.479 to 1.543 tokens per unit against whole-prompt scales of 1.15 to 1.27. The half share and the reserve rule are design parameters that no run varied.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: the marginal, reserve, and room functions of the ledger gauge and the cut notice in /home/user/agent/tmp/bench3/bench.mjs. Code to write: a flag for the share, if a comparison is wanted.",
+   "hypothesis": "The half share may cut a recall item the 2B needs or leave room the model overruns; the pooled slope can lag when a goal's message mix differs from earlier runs.",
+   "why": "The room function and the cut notice exist, and the a5 logs can count recalls cut by room offline.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:317",
+    "/home/user/agent/tmp/bench3/README.md:319",
+    "/home/user/agent/tmp/bench3/README.md:323"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Read pointer under recall-only arm tools, and closed-tool calls that still append",
+   "idea": "A 'read r2' pointer names read, which --arm-tools recall removes, so the model cannot follow it. A model that calls a closed tool still appends about 65 tokens per call, and only the turn limit bounds the growth.",
+   "status": "unmeasured",
+   "machinery": "Code to write: pointer text that depends on --arm-tools, and a bound on closed-tool calls.",
+   "hypothesis": "A pointer that names only open tools is followed, and a closure bound stops prompt growth on refusals.",
+   "why": "Both are local edits to refusal text and the closure check in bench3.",
+   "evidence": [
+    "/home/user/agent/tmp/bench3/README.md:529",
+    "/home/user/agent/tmp/bench3/README.md:699"
+   ]
+  },
+  {
+   "theme": "Recall and tools",
+   "title": "Tool description equalization across arms",
+   "idea": "The first-call tool arrays differ between arms: the ledger lookup description says 'such as LH-12345', while the control says 'exactly as written in the conversation'. The model looked up the example id 6 times in GRADES-4. Diff the arrays and make the descriptions equal before an arm comparison.",
+   "status": "unmeasured",
+   "machinery": "Existing: the tool arrays in the ledger-wire and none-6144-wire first calls.",
+   "hypothesis": "Description differences account for part of the arm difference.",
+   "why": "A byte diff of recorded first calls shows any remaining difference with no run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:202-206",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:36",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:61"
+   ]
+  },
+  {
+   "theme": "Answer pass and reply route",
+   "title": "Bounded answer recovery after a local first-pass failure",
+   "idea": "In the harness, a first run that times out for a reason other than repeat, or raises a transport error, yields an empty reply with no answer pass. The planner runs the answer pass after any first pass without final text unless the caller aborted, through a continuation select. The codex design runs one bounded recovery through a separate scratch conversation and copies back only the delivered answer, gated by budget and an outer deadline.",
+   "status": "unmeasured",
+   "machinery": "Existing: the answer scope and the collapsed answer view. Code to write: the recovery path in the port, and the replacement at /home/user/agent/tmp/codex/frozen-harness-last.md:47-61 in the harness.",
+   "hypothesis": "Local failures recover without repeating side effects, and caller cancellation still forbids recovery.",
+   "why": "The answer run with no tools already works in the refined harness (11 of 80 a5 goals replied through it).",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:15",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:47-61",
+    "/home/user/agent/tmp/units/records-port-planner.md:9",
+    "/home/user/agent/tmp/units/records-port-planner.md:118",
+    "/home/user/agent/tmp/units/records-port-planner.md:265",
+    "/home/user/agent/tmp/units/records-port-planner.md:278",
+    "/home/user/agent/tmp/units/records-port-planner.md:463",
+    "/home/user/agent/tmp/codex/records-port-last.md:150",
+    "/home/user/agent/tmp/codex/records-port-last.md:154",
+    "/home/user/agent/tmp/codex/records-port-last.md:293",
+    "/home/user/agent/tmp/codex/records-port-last.md:306",
+    "/home/user/agent/tmp/codex/records-port-last.md:416"
+   ]
+  },
+  {
+   "theme": "Answer pass and reply route",
+   "title": "Terminal hold gate and its F9 repairs",
+   "idea": "Under --gate deny with terminal replies, the gate holds the first final answer while a lookup result of the run is unpinned and runs one more pass. In v8 it held 4 answers at 110.7 s of agent calls and 4 cold prefills and changed none (g01 reworded the same $289.00), so the refined profile sets --gate admit and keeps only the settle step. Fix F9 applies only if the gate stays: hold only when closed() leaves pin open, and move a pin to an identical repeat lookup instead of ending it. In v8 g06 the hold told the model to call pin after the arm tools had closed, because affords() and closed() measure room differently. The authority already admits a reply when the room cannot cover the retry (deny g08 of 2026-10-08 refused at 315 tokens left).",
+   "status": "measured-inconclusive",
+   "machinery": "Existing: --gate deny|admit, the hold path, the authority's room check, and the settle step in /home/user/agent/tmp/bench3/bench.mjs. Code to write: the F9 room check and the repeat-lookup pin move, with fixtures for low room and an identical repeat.",
+   "hypothesis": "The hold buys no answer change at this cost in one 2B run; a model that answers before reading its result might need it, and a multi-run comparison is needed before the gate is removed for all consumers.",
+   "why": "Both gate values are flags, so a paired band run reads the gate with no code; F9 has its offline proofs named.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:14",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:40",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:54",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:77",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:29",
+    "/home/user/agent/tmp/bench3/README.md:79",
+    "/home/user/agent/tmp/bench3/README.md:270-274"
+   ]
+  },
+  {
+   "theme": "Answer pass and reply route",
+   "title": "send_reply route and a nudge turn",
+   "idea": "With compaction, send_reply as the reply route scored 2 of 10 against 5 for a terminal reply, from one run per design. A nudge turn that asks for send_reply after a prose answer was ruled out by reasoning, because every later goal would carry it.",
+   "status": "measured-negative",
+   "machinery": "Existing: --reply terminal|tool and --probe-reply.",
+   "hypothesis": "A tool route helps where the reply must be structured; the single runs cannot separate route from noise.",
+   "why": "rejected.md records one run per design, and the paired band can rerun it with a flag.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:55",
+    "/home/user/agent/tmp/bench/README.md:57-67",
+    "/home/user/agent/tmp/bench/README.md:148-174",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:19",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:48"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Cap merge from folded originals, with an identifier-loss check",
+   "idea": "Section merges under the cap returned the first section verbatim and erased the others with no fault. In GRADES-4, all 9 goal-time merges returned section 1 unchanged. Building the merge from the folded originals rather than from summaries, and checking that every id in the merge inputs appears in the output (retry, then append), are unmeasured.",
+   "status": "unmeasured",
+   "machinery": "Existing: compact and the merge under --sections. Code to write: an originals-based merge and an identifier-loss check.",
+   "hypothesis": "Merging from originals keeps far facts (Tomasz, FL-660412, extension 4127, MX-4486) that summary-of-summary merges drop.",
+   "why": "The guard machinery already compares id-shaped tokens, so the check reuses it at the merge site.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:28",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:72",
+    "/home/user/agent/tmp/bench/results/REPORT.md:45",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:15",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:20",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:30"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Summarizer identifier guard: allowed set and restore sources",
+   "idea": "The guard rejects a summary whose id-shaped tokens no folded message states, retries once, and then filters. In GRADES-3 it fired 3 times and caught no invented id, because it rejected the required scenario date and an id that sat only in tool-call arguments. Its allowed set must take tool-call arguments and the system text and exempt date-shaped tokens. Restores from user and lookup sentences only are covered by the probe and a rescore, with no live run.",
+   "status": "partially-measured",
+   "machinery": "Existing: --probe-guard and rescore.mjs in /home/user/agent/tmp/bench/. Code to write: the widened allowed set and per-goal counters.",
+   "hypothesis": "A guard with the right allowed set stops invented ids (ORD-2026-9981, ACC-7745, TRK-1122) without rejecting true ones.",
+   "why": "The guard and its probe exist, so the change is to the allowed set and a probe case.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:182",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:185",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:133",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:29",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:16",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:20",
+    "/home/user/agent/tmp/bench/README.md:121",
+    "/home/user/agent/tmp/bench/README.md:241-251",
+    "/home/user/agent/tmp/bench/README.md:407-410",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:47"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Fact-only summary instruction with absolute dates",
+   "idea": "The tuned instruction passed 5 of 10 with 14 of 20 correct, against 3 and 11 for the generic one, each from a single run. A rewrite that turns relative times into absolute dates with their meaning and keeps past facts only, with no next steps, is untested. Both measured instructions failed differently: next-step text and bare dates becoming wrong deadlines.",
+   "status": "partially-measured",
+   "machinery": "Existing: SUMMARY_INSTRUCTIONS and --summary generic|tuned in /home/user/agent/tmp/bench/bench.mjs. Code to write: the rewritten instruction text.",
+   "hypothesis": "Absolute dates with meaning stop 'off tomorrow, Friday' from becoming a deadline, and dropping next steps stops invented follow-ups.",
+   "why": "The summary instruction is a harness constant and the application's lever, so the arm is a text change.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:65",
+    "/home/user/scaffold/.orkestrel/agent/context.md:70-71",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:155",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:182",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:27",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:72",
+    "/home/user/agent/tmp/bench/results/REPORT.md:81",
+    "/home/user/agent/tmp/bench/README.md:28",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:46"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Per-topic aggregate prose written by a summarizer",
+   "idea": "Section 9 of the briefing design makes compaction a projection that builds one aggregate per topic from that topic's events, gives the aggregate's prose to a summarizer, and has the judge check the aggregate against its source events and read it as context in its own states. The built records drop summarizer prose and keep code-copied lines only, which is a departure the user has not ruled.",
+   "status": "unmeasured",
+   "machinery": "Existing: the summarizer route and identifier guard of the main harness; the records builder of /home/user/agent/tmp/bench3/records.mjs. Code to write: a per-topic summarize call, the agrees check over its output, and an arm flag beside the code-only records.",
+   "hypothesis": "Summarizer prose carries indirect facts that code-copied lines lose, at the risk compaction showed: a summary of summaries lost far facts, and a small fold invented ids. Neither form is measured as an aggregate.",
+   "why": "The summarizer, its guard, and the records module exist, so the arm is a render path plus the judge check.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:511-519",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:137",
+    "/home/user/agent/tmp/bench/results/REPORT.md:45"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Default sections cap in createConversationManager",
+   "idea": "Uncapped compaction overflowed in both measured arms (from g07 and g06), while 3 sections never overflowed and passed 5 of 10. The user rules whether the manager defaults a cap or the guide carries the window and sections pairing; a default changes bytes for every compaction consumer.",
+   "status": "partially-measured",
+   "machinery": "Existing: the sections and window options of createConversationManager; the guide pairing in guides/agent.md.",
+   "hypothesis": "A default cap bounds view growth for consumers that set window alone; the default value itself is not measured.",
+   "why": "The option exists, so the ruling is a default value and a guide sentence.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:57-58",
+    "/home/user/scaffold/.orkestrel/agent/context.md:60",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:179",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:197",
+    "/home/user/agent/tmp/bench/results/REPORT.md:24-25",
+    "/home/user/agent/tmp/bench/results/REPORT.md:44-45",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:15"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "First-fold size and progressive seed folding",
+   "idea": "One 43-message fold dropped PW-5521-9930 and FL-660412, while tiny folds of id-less inputs returned 'No facts.' Progressive folding during the seed load put the first fold at 25 to 27 messages, and the v4 c-tuned rerun ran with it. The fold size that keeps both identifiers and small facts is still open.",
+   "status": "partially-measured",
+   "machinery": "Existing: --progressive, --window, and --keep in /home/user/agent/tmp/bench/bench.mjs.",
+   "hypothesis": "An intermediate fold size keeps identifiers and small facts together.",
+   "why": "Fold size is a window and keep setting on the existing harness.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:29",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:72",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-both.md:27",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:28",
+    "/home/user/agent/tmp/bench/README.md:118",
+    "/home/user/agent/tmp/bench/README.md:133",
+    "/home/user/agent/tmp/bench/README.md:387",
+    "/home/user/agent/tmp/bench/README.md:428",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:8"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "A summarizer model separate from the agent model",
+   "idea": "The summarizer defaults to the 2B agent model, and the fold is where facts leave the prompt. The final check's f4 condition uses the 4B as both agent and summarizer, so it confounds the two; no run pairs the 2B agent with a larger summarizer.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: --summary-model in /home/user/agent/tmp/bench/bench.mjs; the ledger harness has no counterpart.",
+   "hypothesis": "A larger summarizer drops fewer identifiers in folds and merges.",
+   "why": "The flag exists, so the arm is a command line.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:69",
+    "/home/user/agent/tmp/bench/README.md:115",
+    "/home/user/agent/tmp/bench3/README.md:468",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:17-18"
+   ]
+  },
+  {
+   "theme": "Compaction and summaries",
+   "title": "Compaction over the unpinned remainder only",
+   "idea": "Where an application keeps compaction beside a briefing, compact would skip tool messages, call messages, and pinned sources, and fold only the rest. The package change waits on the ledger reading.",
+   "status": "unmeasured",
+   "machinery": "Code to write: Conversation.compact with a pin-aware skip.",
+   "hypothesis": "A fold that never touches pinned sources keeps the values compaction loses.",
+   "why": "Unit 16 already folds whole exchanges, so the remaining step is a skip predicate.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:9",
+    "/home/user/agent/tmp/bench/BRIEFING.md:15",
+    "/home/user/agent/tmp/bench/BRIEFING.md:73",
+    "/home/user/agent/tmp/bench/BRIEFING.md:466",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:106",
+    "CONTRADICTION: /home/user/agent/tmp/bench/BRIEFING.md:512 makes compaction a projection, while :15 keeps it over the remainder"
+   ]
+  },
+  {
+   "theme": "Model and thinking conditions",
+   "title": "Final check: records, full view, and compaction under the 4B and the thinking 2B",
+   "idea": "Three arms run under two conditions: f4 (the 4B, thinking off, with the 4B as summarizer) and t2w (the 2B, thinking on, at a 2,048-token cap). The 1,024 cap bound about one call in ten, so the t2 copy-1 runs stay as the pilot. Copy 1 of every f4 and t2 arm ended with exit 0, and f4-records-v2 has a log, but no audited score is recorded. Stage 1 stops a condition at 4 copies when both its pairs clear the band.",
+   "status": "partially-measured",
+   "machinery": "Existing: --think-predict 2048 in both harnesses; series.ts, run-one.ts, plan.ts, and plan-stage1.json; the blind double audit of every row.",
+   "hypothesis": "Records keep or widen their lead over the full view and compaction under the 4B and under thinking.",
+   "why": "The runs are launched with the existing drivers, and only scoring and audit remain per copy.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:3",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:7-11",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:17-18",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:22-26",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:28-30",
+    "/home/user/agent/tmp/bench/results/v10/run.log:2-12",
+    "/home/user/scaffold/.orkestrel/agent/ledger.md:18",
+    "/home/user/scaffold/.orkestrel/agent/ledger.md:26-27",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:57",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:7",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:81",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:111",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:118-121",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:191-195"
+   ]
+  },
+  {
+   "theme": "Model and thinking conditions",
+   "title": "Kenji's delivery date under the 4B or with thinking",
+   "idea": "The 2B copies the carrier estimate from the lookup result despite rule 6. Every rule placement passed 0 of 9 (unchanged, rule appended to the request, and rule as the last desk note), replies acknowledged the rule and still wrote the date, a judge-triggered rewrite kept the date in 9 of 9, and 0 of 27 probe replies dropped it. Filing the rule-6 clause under delivery and rendering it after r19 is planned and not built. The model-limit ruling names a larger model as the reopen condition.",
+   "status": "measured-negative",
+   "machinery": "Existing: the f4 and t2w runs score g06; the cold-replay probe.mjs and g06-rewrite.jsonl. Code to write: clause splitting by topic, for an arm on the small model.",
+   "hypothesis": "The 4B or a thinking pass obeys rule 6 where the 2B does not.",
+   "why": "The final check scores g06 under both conditions with no extra code.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:35",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:84",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:38-50",
+    "/home/user/agent/tmp/bench/results/v9/FINDINGS-A1.md:70",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:38",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:40",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:64",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:71",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:145-154",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:216-218",
+    "/home/user/agent/tmp/bench/results/v3/cal-categories.md:213",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:39"
+   ]
+  },
+  {
+   "theme": "Model and thinking conditions",
+   "title": "Tool copy and context arms under thinking in the store harness",
+   "idea": "Under think false, rewording tool copy turned every search into a read, and byte-identical description changes flipped a near-tie on 3 of 4 ports. Thinking makes the 2B read the same bytes as instructions, so the negative may not transfer. The context arms of the store harness have no thinking run.",
+   "status": "measured-negative",
+   "machinery": "Existing: store-live.test.ts variants, wire-replay --think true, the ollama store harness (tests/setupStore.ts), and the model card's sampler.",
+   "hypothesis": "With thinking on, description and result wording act as advice, and the arm ranking may change.",
+   "why": "rejected.md names thinking-on as the reopen condition, and the harness takes a think flag.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:81",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:115",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:118",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:120",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:9",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:15",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:21",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:29",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:32",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:41",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:56",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:59"
+   ]
+  },
+  {
+   "theme": "Model and thinking conditions",
+   "title": "Sampling variance and presence_penalty at temperature 0",
+   "idea": "Every call takes temperature and seed (defaults 0 and 7), but no sampled run exists. Both arms send presence_penalty 1.5, and nobody has read whether the runner applies it before greedy selection; if it does, it can push the model away from copying exact values.",
+   "status": "unmeasured",
+   "machinery": "Existing: --temperature and --seed in both harnesses; the sampler options in the recorded request bodies. Code to write: a g07 probe with presence_penalty 0.",
+   "hypothesis": "The penalty contributes to the exact-value copy failures in g07 and g10.",
+   "why": "A cold replay with one option changed is a single probe on the recorded body.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:97-99",
+    "/home/user/agent/tmp/bench3/README.md:65-67",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:197-200",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:21",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:24"
+   ]
+  },
+  {
+   "theme": "Scenarios and lifetimes",
+   "title": "The 152-message long scenario: setup and first run",
+   "idea": "/home/user/agent/tmp/bench/scenario-long.json (152 messages, 24 goals) validated 31 of 31 checks and never ran. It lacks a ledger section, reworded copies, and audited scorer fields. It is the planned home of the lifetime arms, the desk-topic gate, the second threshold rule, and a held-out day for calibration.",
+   "status": "unmeasured",
+   "machinery": "Existing: scenario-long.json with forbiddenPatterns; the --scenario flag. Code to write: the loader (seed up to each goal's index, lookups by version, a clock from its days entry), the ledger section, variant copies, scorer fields, and check-long.mjs.",
+   "hypothesis": "A long conversation shows per-lifetime pass rates, stale counts, and judge cost that the 10-goal shift cannot.",
+   "why": "The scenario exists and validates, so the work is a loader and fields, not authoring.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:107",
+    "/home/user/agent/tmp/bench/results/v10/FINAL-CHECK.md:32",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:60",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:216",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:100",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:120",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:131-133",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:34",
+    "/home/user/agent/tmp/bench/BRIEFING.md:519"
+   ]
+  },
+  {
+   "theme": "Scenarios and lifetimes",
+   "title": "Pin lifetimes: horizon retirement, expiry, and changed lookups",
+   "idea": "Horizon 99 retires nothing in a 10-request shift, so retirement was never exercised; the port drops it and relies on consolidation alone. Application-set expiry (until, checked against an advancing clock) is exercised only by the ledger fixture. No scenario has a lookup whose text changes, or a pin that expires.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: --horizon and --check-ledger in bench3 (the fixture checks retirement, touch re-pin, the rule exemption, and expiry). Code to write: offline fixtures for a changed lookup and expiry; horizon in the offline replay (bench.mjs:4441); an expiry callback in the port, if adopted.",
+   "hypothesis": "Retiring untouched topics bounds the briefing on long threads without losing a fact a later goal needs; message 22, which serves g04 and g08, is the stated risk.",
+   "why": "The lifecycle code and its fixture exist in bench3, and the long scenario supplies the load.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:13",
+    "/home/user/agent/tmp/bench/BRIEFING.md:88",
+    "/home/user/agent/tmp/bench/BRIEFING.md:102",
+    "/home/user/agent/tmp/bench/BRIEFING.md:114",
+    "/home/user/agent/tmp/bench/BRIEFING.md:117",
+    "/home/user/agent/tmp/bench/BRIEFING.md:369",
+    "/home/user/agent/tmp/bench/BRIEFING.md:497",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:19-20",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:58",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:156-170",
+    "/home/user/agent/tmp/units/records-port-planner.md:25",
+    "/home/user/agent/tmp/units/records-port-planner.md:494",
+    "/home/user/agent/tmp/units/records-port-plan.md:26",
+    "/home/user/agent/tmp/codex/records-port-last.md:18",
+    "/home/user/agent/tmp/codex/records-port-last.md:61",
+    "/home/user/agent/tmp/codex/records-port-last.md:91",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:35"
+   ]
+  },
+  {
+   "theme": "Scenarios and lifetimes",
+   "title": "Thread close decider: a judge closes question against an application close",
+   "idea": "A closes question would let the judge close or reopen a thread from one explicit message. A close that needs the wider conversation goes to the application, through a retirement handler that overrides the judge. The ruling asks for both as separate arms on a long hand-built seed that a large model writes under a validator. The two BRIEFING copies disagree on whether the judge close is adopted or deferred.",
+   "status": "unmeasured",
+   "machinery": "Code to write: the closes question, a retirement handler option, and the two arms on the long scenario.",
+   "hypothesis": "The judge close and the application close differ only on long conversations.",
+   "why": "The judgment store and the end-derivation code exist; the long scenario supplies explicit closes.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:115",
+    "/home/user/agent/tmp/bench/BRIEFING.md:298",
+    "/home/user/agent/tmp/bench/BRIEFING.md:318",
+    "/home/user/agent/tmp/bench/BRIEFING.md:463",
+    "/home/user/agent/tmp/bench/BRIEFING.md:505-506",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:115",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:318",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:501",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:505-506",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:79",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:120"
+   ]
+  },
+  {
+   "theme": "Scenarios and lifetimes",
+   "title": "Coverage goals variant and entity-described rewordings",
+   "idea": "The attack adds goals the 10-goal shift lacks: a fact with no entity that is not a rule, a request carrying a correction, a fact the budget must omit, and a goal that refers back to an earlier answer. It also asks that two of the eight reworded copies describe the entity (the duvet customer) rather than name it; the files do not say whether the variants did.",
+   "status": "unmeasured",
+   "machinery": "Existing: the variants under /home/user/agent/tmp/bench/variants/ (v1 to v8 and the ledger twins) with check.mjs and make-variants.mjs. Code to write: a coverage scenario variant.",
+   "hypothesis": "Trimmed arms lose on the added goals even where the 10 goals show no loss, and entity-described requests test topic filing.",
+   "why": "The variant pipeline and its checker exist, so a variant file runs on both harnesses.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:82",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:84",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:90",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:96",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:172-177",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:185-189",
+    "/home/user/agent/tmp/bench/README.md:431-466"
+   ]
+  },
+  {
+   "theme": "Scoring and audit machinery",
+   "title": "Stale check across tail and recall, with a mutation test",
+   "idea": "briefing.stale scans only Pinned lines and skips any line that carries an amend marker, so the claim 'stale 0' cannot fail on this scenario. --report full widens the scan. The attack asks to scan the tail and recall results and to add a mutation test that renders a withdrawn value without its marker; the codex risk table asks for the same on every provenance route.",
+   "status": "partially-measured",
+   "machinery": "Existing: --report full in bench3; the stale scan at bench.mjs:2510-2513. Code to write: tail and recall scanning and the mutation case.",
+   "hypothesis": "An extended stale check detects a withdrawn value rendered without its marker.",
+   "why": "The scan exists, so the extension and its mutation case are local.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:137-143",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:28",
+    "/home/user/agent/tmp/bench3/README.md:91",
+    "/home/user/agent/tmp/codex/records-port-last.md:414"
+   ]
+  },
+  {
+   "theme": "Scoring and audit machinery",
+   "title": "Reply hashes and judge spread across reloads",
+   "idea": "Send one judge request and one agent request twice, warm and after a reload, and record a body hash and a reply hash for each. The cache-history effect on agent replies is confirmed, and cold reruns of one design varied by up to 2 passes. The reply hash and the judge spread across loads are not recorded.",
+   "status": "partially-measured",
+   "machinery": "Existing: cold-start.mjs and record-fetch.mjs in /home/user/agent/tmp/bench/results/v7/tools/. Code to write: replyHash.",
+   "hypothesis": "Identical bytes give identical replies only under the same cache history, and the judge spread across loads is bounded.",
+   "why": "The recording tools exist, so a reply hash is one field.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:18",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:135-136",
+    "/home/user/agent/tmp/bench/results/v8/DIVERGENCE.md:26",
+    "/home/user/agent/tmp/bench/results/v8/DIVERGENCE.md:36-37",
+    "/home/user/agent/tmp/bench/results/v8/DIVERGENCE.md:42",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:70"
+   ]
+  },
+  {
+   "theme": "Scoring and audit machinery",
+   "title": "Remaining main-harness scorer repairs",
+   "idea": "The audits list these scorer repairs, but the files do not show which landed after the strict scorer revert:\n- inPrompt computed from rendered text, so toolsOk stops demanding search for facts held in a summary.\n- expectedAny widened to whole-word phrases such as 'sufficient for'.\n- Fabricated-flag false positives such as '5-QUART' and '3760'.\n- Forbidden patterns for a Friday deadline on g07 and g10.\nThe blind two-sided audit catches the residual errors.",
+   "status": "unmeasured",
+   "machinery": "Existing: rescore.mjs, scenario.json forbiddenPatterns, and the --probe-score cases.",
+   "hypothesis": "Each repair removes a known false pass or false fail and leaves audited verdicts unchanged.",
+   "why": "rescore.mjs replays recorded replies, so each repair is checked offline against audited verdicts.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:35-36",
+    "/home/user/agent/tmp/bench/results/REPORT.md:73-74",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-ledger.md:30",
+    "/home/user/agent/tmp/bench/results/v7/GRADES-compaction.md:31",
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:19",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:68-69"
+   ]
+  },
+  {
+   "theme": "Scoring and audit machinery",
+   "title": "Two copies of the briefing design record disagree on the arm bar, thread close, and the package line",
+   "idea": "The same design record exists in two versions. The bench copy rules the bar as at least 7 of 10, where a 6 of 10 with fewer fabrications than c-tuned-s3 is not a win, and rules thread close and the package line. The bench3 copy passes 6 of 10 with fewer graded fabrications and leaves thread close, the bar, and the package line open for the user. The bench copy carries section 9 and the rulings, so it reads as the later text; that ordering is inference from content, not from a date in either file.",
+   "status": "unmeasured",
+   "machinery": "None; a contradiction between /home/user/agent/tmp/bench/BRIEFING.md and /home/user/agent/tmp/bench3/BRIEFING.md.",
+   "hypothesis": "The 6-of-10 clause decides whether an arm wins on a tie, so the two copies give different verdicts on the same run until the user confirms one copy.",
+   "why": "Every later bar (band.ts, the trim and fix bars) descends from this ruling, so one confirmed copy keeps the verdicts consistent.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:448",
+    "/home/user/agent/tmp/bench/BRIEFING.md:505",
+    "/home/user/agent/tmp/bench/BRIEFING.md:508",
+    "/home/user/agent/tmp/bench/BRIEFING.md:509",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:448",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:505",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:508",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:509",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:96"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Desk toggle to compare designs, model, and thinking on one conversation",
+   "idea": "The user proposes a desk control that runs the same conversation through the briefing with per-topic records, the full view, or compaction, with the model and thinking as switches, and shows the replies side by side. The desk already routes speeches by slot (an agent speech and contrast speeches) through one #speak method that takes a model name, and it hardcodes think false.",
+   "status": "unmeasured",
+   "machinery": "Existing: Desk.ts #speak with slot routing and a model parameter; the contrast path that the codex design keeps isolated from ledger evidence. Code to write: a context-design option per speech, a think option in place of the literal false, and the page control.",
+   "hypothesis": "Side-by-side replies on real desk conversations show whether the benchmark ranking holds in the desk's own domain.",
+   "why": "The slot and model plumbing exists in Desk.ts, so the toggle adds a context-design and think choice per speech.",
+   "evidence": [
+    "/home/user/desk/app/server/Desk.ts:201-223",
+    "/home/user/desk/app/server/Desk.ts:249-291",
+    "/home/user/desk/app/server/Desk.ts:272",
+    "/home/user/agent/tmp/codex/records-port-last.md:387",
+    "/home/user/agent/tmp/codex/records-port-last.md:389",
+    "/home/user/agent/tmp/units/records-port-planner.md:442"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Desk adoption of the ledger: evidence split, identity, concurrency, thread limits, and a desk-shaped series",
+   "idea": "The codex design supplies the raw customer message as ledger evidence and the rendered policy prompt as the work request, holds one ledger per explicit conversation identity, and rejects or queues overlapping requests. The planner instead passes the prompt as the request. Desk adoption leaves these application choices open: a per-thread cap and an id length limit beside NUM_CTX, eviction of old threads from the per-thread ledger map, whether customer turns are requests or statements, and whether the page shows the briefing. The desk's turn shape (customer turns, no lookups, uncalibrated thresholds, an 8,192-token context) lies outside the measured load, and the planner lists a desk-shaped series and desk-topic thresholds as missing readings.",
+   "status": "unmeasured",
+   "machinery": "Existing: Desk.ts, the parsers, and handlers; @orkestrel/queue; the NUM_CTX constant in the desk server constants. Code to write: unit U10, the thread cap and eviction, and desk fixtures in its own domain.",
+   "hypothesis": "The gain transfers only if customer statements survive as evidence and generated text never does; per-thread ledgers grow without bound until a cap and eviction exist.",
+   "why": "The ported ledger lands as a package export, and the desk's request flow has the insertion points the codex table names.",
+   "evidence": [
+    "/home/user/agent/tmp/codex/records-port-last.md:186",
+    "/home/user/agent/tmp/codex/records-port-last.md:245",
+    "/home/user/agent/tmp/codex/records-port-last.md:257",
+    "/home/user/agent/tmp/codex/records-port-last.md:376-398",
+    "/home/user/agent/tmp/codex/records-port-last.md:418-419",
+    "/home/user/agent/tmp/units/records-port-planner.md:356",
+    "/home/user/agent/tmp/units/records-port-planner.md:382-400",
+    "/home/user/agent/tmp/units/records-port-planner.md:412-413",
+    "/home/user/agent/tmp/units/records-port-planner.md:473-474",
+    "/home/user/agent/tmp/units/records-port-planner.md:486-491",
+    "/home/user/agent/tmp/units/records-port-plan.md:24",
+    "/home/user/agent/tmp/units/records-port-plan.md:65-66",
+    "CONTRADICTION: records-port-planner.md:392 passes the prompt as the request; records-port-last.md:388 splits evidence from the request"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Duplicate agent copy defeats the judge-abort class check",
+   "idea": "isJudgeAbortError tests class identity, so a judge built on a second copy of the agent package throws error classes the loop does not recognize, and a judge abort loses partial usage and the pending key. The desk fixed this at its re-pin with a scoped override that makes ollama 0.0.21 share the root agent, because ollama's ^0.0.28 range admits one version and two copies broke the guard. The port planner names npm ls and a mid-filing abort test as the check.",
+   "status": "partially-measured",
+   "machinery": "Existing: isJudgeAbortError in the agent errors module; the desk package override; the ollama judge wire. Code to write: a desk test that aborts mid-filing and asserts partial usage, and removal of the override after ollama republishes against the released agent.",
+   "hypothesis": "Any consumer that installs two agent copies loses the abort guard; a name-based match, which the main harness uses for JudgeAbortError, would survive two copies.",
+   "why": "The override and the npm ls check exist, and the failure is reproducible with two installed copies.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/AUDIT.md:25",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:102",
+    "/home/user/agent/tmp/units/records-port-planner.md:410",
+    "/home/user/agent/tmp/bench/README.md:199"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "A judge-backed tool must judge the argument the model passed",
+   "idea": "A tool whose handler calls a judge must judge the argument the model sent, or its description must say it judges a fixed input. The desk's first experiment judged a fixed ticket when the model shortened its argument, so the handler answered a different question without signalling it. The rule binds the guide unit and any unit that builds a tool over a judge.",
+   "status": "partially-measured",
+   "machinery": "Existing: the desk's judge-backed handler and the guide. Code to write: a handler change or a description sentence, and a test that passes a shortened argument.",
+   "hypothesis": "A fixed-input handler silently answers a different question; neither guard is tested.",
+   "why": "The hazard was observed once on the desk, and the fix is local to one handler.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:130"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Desk per-ticket reply agent with stock selection, judgment reuse, and recall (unit 15)",
+   "idea": "Each ticket gets one ConversationManager and one reply agent, with select: createSelection({ judge, screen, needed, limit }) under a named scope that carries the mode's description. Judgments are reused through judgments.resolve, and recall is installed on the ticket's conversation. The acceptance requires that a repeated POST /turn issues no judge call; refine.md notes that a needed question's request changes on every user turn, which limits reuse to identical text. The unit is blocked on re-pins, and the ledger adoption may supersede it.",
+   "status": "unmeasured",
+   "machinery": "Existing: AgentOptions.select, createSelection, judgments.resolve, the select event, and the Selection receipt. Code to write: the desk wiring and the page receipt.",
+   "hypothesis": "Repeated turns on one ticket issue fewer judge calls, and a follow-up folds only the kept messages.",
+   "why": "Every package member the unit names has landed, so the work is desk wiring after the re-pin.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:68",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:105",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:192",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:16",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:310-311",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:339",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:361",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:403",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:417"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Live check of JSON-tuple question ids",
+   "idea": "Stock selection keys are JSON tuples such as [\"needed\",\"<id>\",\"<id>\"], and nothing on this host shows whether a live System One or TypeSafe server accepts them. The desk's first live POST /turn against a recording daemon origin is the probe.",
+   "status": "unmeasured",
+   "machinery": "Existing: buildConditionKey and parseConditionKey; a recording daemon origin.",
+   "hypothesis": "A server refuses or truncates tuple ids, so the keys never reach the judge.",
+   "why": "One recorded request answers the question.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:80",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:98",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:178"
+   ]
+  },
+  {
+   "theme": "Desk and product",
+   "title": "Decision-card capture, desk fixtures, and registry integrity",
+   "idea": "Three desk housekeeping items:\n- No decision-card capture exists, because a browser journey fails at a line that predates the campaign.\n- The desk's shared fixtures sit in tests/app/fixtures.ts until the scaffold setup project is aligned.\n- An npm view integrity check before release would catch registry bytes that differ from the judge-bearing checkouts.",
+   "status": "unmeasured",
+   "machinery": "Existing: desk tests at tests/app/vue/integration.test.ts:47 and App.test.ts; scaffold repair; npm view dist.integrity.",
+   "hypothesis": "Each repair unblocks a capture or prevents a consumer from installing a judge-less build.",
+   "why": "Each item is a repair with a named probe in refine.md.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:472",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:511",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:535",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:537-538",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:592-594"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Measure the whole provider request against the window",
+   "idea": "The window budget and clause 24 measure the message array only, while tool definitions and the per-run schema reach the provider unmeasured. In the main harness, agent prompts ran 1.46 to 1.96 times the estimate without tool cost, and 9 of 20 ledger goal runs ended with no answer before the 835-token schema cost was charged. The proposals are to widen the estimator, or to have the port's provider adapter refuse an estimated over-window call before forwarding it and report the estimation error. The context ruling refuses an explicit over-budget preparation failure, because an over-window prompt already reaches the provider explicitly, and the port plan defers adapter refusal out of the first release.",
+   "status": "partially-measured",
+   "machinery": "Existing: estimateTokens and estimateMessages; the bench3 fixed-cost charge; the daemon's over-window refusal. Code to write: an estimator input that takes tools and schema, or a provider adapter in the port.",
+   "hypothesis": "A tool-aware estimate keeps prompts inside the window and stops silent overflow for consumers with large schemas; an estimate-based refusal could stop a call the daemon would accept, so the estimate's error needs measuring first.",
+   "why": "bench3 already charges schema cost out of its budget, which shows the fix on one consumer.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:118",
+    "/home/user/scaffold/.orkestrel/agent/context.md:119",
+    "/home/user/scaffold/.orkestrel/agent/context.md:141",
+    "/home/user/scaffold/.orkestrel/agent/context.md:162",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:362",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:39",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:94",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:121",
+    "/home/user/agent/tmp/bench/README.md:95",
+    "/home/user/agent/tmp/bench/README.md:357",
+    "/home/user/agent/tmp/bench3/README.md:694",
+    "/home/user/agent/tmp/units/records-port-plan.md:29",
+    "/home/user/agent/tmp/codex/records-port-last.md:244",
+    "/home/user/agent/tmp/codex/records-port-last.md:411-412",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:36",
+    "CONTRADICTION: records-port-last.md:244 has the adapter refuse an estimated over-window call; records-port-plan.md:29 defers that refusal; context.md:119 refuses an explicit over-budget preparation failure"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Overlapping runs: concurrent append or apply during select",
+   "idea": "Overlapping runs on one agent are permitted, so another run can append to the conversation, or apply a scope, while a select handler reads. select records the live tail's ids before the handler and compares them after; a changed tail is a fault with a view() fallback and no retry, under strict. A concurrent apply changes the next turn's scope for both runs; that race is 0.0.28 behavior, documented and not changed.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: the view-unchanged check around the handler in the contexts AgentContext module and its fault receipt. Code to write: a desk test of overlapping turns on one ticket, or per-thread serialization through @orkestrel/queue.",
+   "hypothesis": "The fault path makes a concurrent append safe at the cost of a full-view call; a concurrent apply is unmeasured for overlapping desk turns.",
+   "why": "The tail check exists and the desk's concurrency choice (serialize or refuse) is a planned test.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:360",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:166",
+    "/home/user/agent/tmp/units/records-port-planner.md:412",
+    "/home/user/agent/tmp/units/records-port-planner.md:428"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Message-level records over @orkestrel/database and ranked search",
+   "idea": "Each message would be a row with the call member as a column, searchable through portable conditions, for a consumer that queries messages or judgments across conversations. Ranked or full-text search is not expressible on the portable surface and would need an engine operation designed with its consumer.",
+   "status": "unmeasured",
+   "machinery": "Code to write: records over @orkestrel/database beside the snapshot store.",
+   "hypothesis": "Cross-conversation queries need rows that snapshot blobs cannot answer.",
+   "why": "The call member landed with correlate, so the column exists.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:94",
+    "/home/user/scaffold/.orkestrel/agent/context.md:117",
+    "/home/user/scaffold/.orkestrel/agent/context.md:153",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:144",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:313"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Span-addressed judgments and typed revision records",
+   "idea": "Judgments addressed to spans inside a message would serve a consumer that selects rules rather than messages. A typed record that keeps replaced text would serve a consumer that must keep it. The round instead removes a replaced message and re-asks its dependents.",
+   "status": "unmeasured",
+   "machinery": "Code to write: a span key in judgment sources and a revision record in conversations.",
+   "hypothesis": "Rule selection needs span addresses; the records' sentence-level units point the same way.",
+   "why": "The records module already works at sentence granularity, which is a span consumer in waiting.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:143",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:270-271",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:314",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:484"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Judge trace seam on the judge result",
+   "idea": "A trace field would expose raw wire exchanges and the server-reported model name, which differs from the configured judge.model because a Mica server reports an alias. The probe harness keeps the top-list readout as a diagnostic meanwhile.",
+   "status": "unmeasured",
+   "machinery": "Code to write: a trace member on the judge result.",
+   "hypothesis": "A consumer that must show which model answered needs the trace.",
+   "why": "The desk's decision card is a likely first consumer.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:78",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:147",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:255",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:433",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:554"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Sub-agent mode route, job fields, and the role registry",
+   "idea": "The deferred items for the spawning layer:\n- A wrapping AgentRegistryInterface whose build applies a mode after the stock build.\n- A scopes pool on AgentRegistryOptions with an accessor.\n- A per-job mode name and job instructions.\n- A registry-wide default select.\n- AgentJobInput.window and strict, with a summarizer route.\n- A mode on the toolbox agent tool (AgentToolOptions.scope), fixed in its options first, where a model-chosen name in AgentToolArguments changes the advertised bytes and is measured before adoption.\n- A role registry (a scope plus agent options).\nAll wait for the spawning layer's consumer; that change rules stable keys across a restore.",
+   "status": "unmeasured",
+   "machinery": "Existing: createAgentQueue, createAgentRunner, and the toolbox agent tool accept any registry. Code to write: the members named in the idea.",
+   "hypothesis": "A post-build apply reaches a sub-agent built from a serializable job.",
+   "why": "The registry seam already accepts a wrapper, so the route needs no core change.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:65",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:70",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:113",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:145",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:148-150",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:193-194",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:564",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:572"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "Package boundaries: conversations and contexts lift, provider split",
+   "idea": "conversations/ and contexts/ lift into their own package when a consumer outside the loop imports them without agents/; the @orkestrel/context package was refused for this round. Splitting providers/ into a provider package would give ollama a lighter install, gated on a measured install closure.",
+   "status": "unmeasured",
+   "machinery": "Existing: the carved modules. Code to write: the packages, and supervisor renames for the ProviderInterface collisions.",
+   "hypothesis": "ollama's install closure shrinks with a provider package.",
+   "why": "carve already separated the modules, so a split is a packaging change.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/context.md:96",
+    "/home/user/scaffold/.orkestrel/agent/context.md:102-104",
+    "/home/user/scaffold/.orkestrel/agent/context.md:138",
+    "/home/user/scaffold/.orkestrel/agent/context.md:155",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:146"
+   ]
+  },
+  {
+   "theme": "Agent package surface deferred to a consumer",
+   "title": "JSONSafe weak-type clause in @orkestrel/test",
+   "idea": "JSONSafe maps an all-optional object such as NoulCriteria to never, so four snapshot round trips are typed unknown. The fix belongs in the test package, and the agent drops the type argument when it re-pins.",
+   "status": "unmeasured",
+   "machinery": "Code to write: a weak-type clause in @orkestrel/test; four roundTripJSON<unknown> call sites under tests/src/core/conversations/.",
+   "hypothesis": "The round trip type-checks without unknown.",
+   "why": "It is a type fix with known call sites.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:96",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:153"
+   ]
+  },
+  {
+   "theme": "Small-model store harness",
+   "title": "Ollama framing removal under the live regression gate (unit 13)",
+   "idea": "Unit 13 removes ollama's framing option. When default bytes change, the live store harness runs every task on the same ports, and a regression on any task rejects the change against the 16-of-16 baseline. A fleet search for a framing format passed to createOllama or createRelayProvider comes first. The unit waits on the 0.0.30 release.",
+   "status": "unmeasured",
+   "machinery": "Existing: tests/setupStore.ts, wire-replay, confirm.ts, and the hermetic wire fixtures.",
+   "hypothesis": "Removal changes system bytes only for a consumer that set a provider format.",
+   "why": "The live harness and the baseline exist, so the gate is a run.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:103",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:115",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:117",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:168",
+    "/home/user/scaffold/.orkestrel/agent/context.md:174",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:29",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:33"
+   ]
+  },
+  {
+   "theme": "Small-model store harness",
+   "title": "tool_name and the call member on Ollama tool messages",
+   "idea": "The main harness sends tool_name, the name of the call each tool message answers, on every tool message. The --probe-tool-name run of 2026-10-08 returned prompt_eval_count 122 with the field and 122 without, so the qwen3.5 renderer ignores it, and the harness keeps it only because it changes no token. Unit 13 decides from the /api/chat shape whether ollama forwards the agent's call member; the renderer evidence predicts no token change for this model.",
+   "status": "partially-measured",
+   "machinery": "Existing: tool_name in mapMessages of /home/user/agent/tmp/bench/bench.mjs and the --probe-tool-name flag; the hermetic wire fixtures and the wire-dump test in ollama.",
+   "hypothesis": "On the 2B, result-to-call pairing depends on position and exchange grouping, not on the name; another model's renderer might read the field, and the probe answers per model.",
+   "why": "The probe is two requests per model, and a wire-fixture diff answers the ollama side before any live run.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/README.md:120",
+    "/home/user/agent/tmp/bench/README.md:365",
+    "/home/user/agent/tmp/bench/README.md:427",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:17",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:125",
+    "/home/user/agent/tmp/bench/results/AUDIT.md:134",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:103",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:123",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:169",
+    "/home/user/scaffold/.orkestrel/agent/context.md:176",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:28"
+   ]
+  },
+  {
+   "theme": "Small-model store harness",
+   "title": "Answer-only scope cap after the harness re-pins",
+   "idea": "The store harness's answer-only scope (tools []) takes effect when its checkout re-pins to an agent with the dispatch fix. The earlier reading, where dropping refused calls at the provider boundary passed 5 of 8 failing runs, came from a stale pin.",
+   "status": "built-unmeasured",
+   "machinery": "Existing: STORE_ANSWER_SCOPE and createScope({ name: 'answer', tools: [] }).",
+   "hypothesis": "A small model's repeated refused call ends the run as an answer.",
+   "why": "The scope is in the harness, and only the re-pin and a run remain.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:568",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:570",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:572",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:574",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:162"
+   ]
+  },
+  {
+   "theme": "Small-model store harness",
+   "title": "Turn-intent admission in a context layer",
+   "idea": "The store harness ends a later turn's tool access after its first successful call, by policy. A context capability that carries turn intent and closes admission after the request is met would generalize that rule; it waits for a consumer beyond the harness.",
+   "status": "unmeasured",
+   "machinery": "Existing: the harness policy and the answer-only scope. Code to write: a turn-intent field.",
+   "hypothesis": "A residual second replay after a refused save is held without harness policy.",
+   "why": "The harness policy shows the behavior on one consumer.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:151",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:20-21",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:42-43",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:62"
+   ]
+  },
+  {
+   "theme": "Small-model store harness",
+   "title": "Small-model campaign leftovers",
+   "idea": "Several items stay with the small-model campaign's records:\n- Oracle strictness O1.\n- The opening-turn budget.\n- The double use of the T0 arm name.\n- The edit tool's refusal, which names no journey over a store of faulted entries (browser 0.0.27).\nThose records are deleted or not read here.",
+   "status": "unmeasured",
+   "machinery": "Existing: the browser edit tool and the store harness; the matrix at .orkestrel/veneer/lifecycle/reading/small/matrix.md (named, not read).",
+   "hypothesis": "A refusal that names the saved journeys lets the model recover on a faulted store.",
+   "why": "The refusal copy is a string in the browser package, and the harness can measure it.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:49",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:195",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:3",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:19",
+    "/home/user/scaffold/.orkestrel/agent/small-models.md:63"
+   ]
+  },
+  {
+   "theme": "Refused designs kept for reopening",
+   "title": "Agent API surfaces refused for lack of a consumer",
+   "idea": "The rulings refused these agent API shapes:\n- AgentOptions extending AgentContextOptions, and a context regroup of the forwarded members.\n- A whole-context option, and authority on the scope.\n- The judge on AgentOptions, and job workspaces, conversations, select, or on.\n- A per-mode strict, a boolean selection switch, an exported pass-through handler, and a per-run scope or select (a one-run mode is apply, generate, and a restore in finally; runs that need different modes at once need separate agents).\n- Rebuilding the system block every turn (it changes bytes and work on every multi-turn run), minting a unique id per call (it changes wire bytes on every provider and the ids the deny and tool events carry; correlate was chosen instead), and forbidding apply during the entry select (it adds a scope snapshot before select and changes apply timing for every caller).\n- From the external proposal: an awaitable Conversation.add, prepare and build(frame), incremental bounded repair, an over-budget preparation failure, and a vertical slice first.",
+   "status": "unmeasured",
+   "machinery": "None; each would need code in the loop or the context.",
+   "hypothesis": "Each is needed only when its consumer exists or changes bytes and timing for every caller.",
+   "why": "The design law creates a capability with its first real consumer, so each reopens when that consumer appears.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:63",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:66-67",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:71",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:73",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:161",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:165",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:174",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:190",
+    "/home/user/scaffold/.orkestrel/agent/context.md:14",
+    "/home/user/scaffold/.orkestrel/agent/context.md:114-122"
+   ]
+  },
+  {
+   "theme": "Refused designs kept for reopening",
+   "title": "Judge engine, wire, name, and selection-seam shapes refused",
+   "idea": "The rulings refused these judge and seam shapes:\n- A package per wire, an encode and decode transport, an AsyncIterable of calls, and a per-request model.\n- SDK generic result typing, and a protocol discriminant in fleet code.\n- A judge held only in ollama, and a partition-returning split.\n- An OpenAI-compatible logprob wire.\n- Trusting a server's confidence, score, or choice.\n- A context-level decide, an asynchronous build, selection as a Conversation method, and judgments as a workspace document.\n- Context-side validation of a Selection, and a message-agnostic assertion layer.\n- The Decision name family.",
+   "status": "unmeasured",
+   "machinery": "None; the rulings rest on design reasons.",
+   "hypothesis": "Each adds a second pattern or an await on the default path.",
+   "why": "Each refusal names its reason, so a consumer or wire change that removes the reason reopens it.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/refine.md:62",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:243",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:425-440",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:445-446",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:480-481",
+    "/home/user/scaffold/.orkestrel/agent/refine.md:553",
+    "/home/user/agent/tmp/units/judge-protocol.md:1"
+   ]
+  },
+  {
+   "theme": "Refused designs kept for reopening",
+   "title": "Briefing ledger shapes refused by ruling",
+   "idea": "The briefing design refused these ledger shapes by ruling, without measurement:\n- Results as tool-message content or workspace files, keyed by message id, or as a Result type.\n- A digest store, stores on AgentContext, and pins shared across conversations.\n- Pins as judgments or mutable pins, purged ended pins, two pin kinds, and stored position, topic, or handle.\n- Supersede-on-write, an unpin tool, an until or topic argument on pin, and codes or dates as topics.\n- A scope that hides send_reply, a second system message, a model summary of the remainder, and a reserved rule slice.\n- A request-keyed needed question, per-customer topic nouls, whole-view and JSON states, and refusing removal while a pin references a message.",
+   "status": "unmeasured",
+   "machinery": "None; each would need code in bench3.",
+   "hypothesis": "Each lets the 2B end a true pin, breaks record reuse, or orphans state.",
+   "why": "Several rulings rest on the 2B's limits, so the 4B or thinking results can reopen the model-facing ones.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/BRIEFING.md:73-90",
+    "/home/user/agent/tmp/bench/BRIEFING.md:174",
+    "/home/user/agent/tmp/bench/BRIEFING.md:220",
+    "/home/user/agent/tmp/bench/BRIEFING.md:259-271",
+    "/home/user/agent/tmp/bench/BRIEFING.md:307-317",
+    "/home/user/agent/tmp/bench/BRIEFING.md:464",
+    "/home/user/agent/tmp/bench3/BRIEFING.md:73-84"
+   ]
+  },
+  {
+   "theme": "Refused designs kept for reopening",
+   "title": "Records additions dropped without measurement",
+   "idea": "The records plan dropped these parts because refined covers them or nothing supports them:\n- Date notes after bounding words.\n- A record placed in the request turn or the system message, compared against a same-day baseline, and the --record-share cap.\n- Replaced lines, segment copying, and a rider on lookup results.\n- Notes on every nearby date, a Desk notes block, regrouping Pinned under record headings, and a two-phone contrast line.",
+   "status": "unmeasured",
+   "machinery": "None built; the AGGREGATES units name the flags.",
+   "hypothesis": "Placement next to the request fixes misses the system placement leaves; the evidence cited for it does not say which message held the fact.",
+   "why": "The records render is one module, so a placement flag is a small arm if the relevance filter leaves placement misses.",
+   "evidence": [
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:22",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:24",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:29-30",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:60",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:71-72",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:114",
+    "/home/user/agent/tmp/bench/results/v7/AGGREGATES.md:128",
+    "/home/user/agent/tmp/bench/results/v9/RECORDS-PLAN.md:43"
+   ]
+  },
+  {
+   "theme": "Refused designs kept for reopening",
+   "title": "Port alternatives the two design lanes split on",
+   "idea": "The two port design lanes split on several shapes:\n- The briefing as an instruction inside select (the measured carrier) against Selection.briefing.\n- A seam-only kit against a ledger that owns its agent.\n- The repeat stop through AgentOptions.authority.\n- A createLedger factory against a Ledger class constructor.\n- AgentOptions.window omitted.\n- An answer-policy judge for delivery-date violations, refused as uncalibrated.",
+   "status": "unmeasured",
+   "machinery": "Existing: the U1 to U5 port units in the port worktree.",
+   "hypothesis": "Each alternative trades a measured invariant (cache stability, repeat abort, answer scope) for flexibility.",
+   "why": "The objective lane or the Orchestrator rules each, and the replay gate tests the chosen one.",
+   "evidence": [
+    "/home/user/agent/tmp/units/records-port-planner.md:231",
+    "/home/user/agent/tmp/units/records-port-planner.md:418-421",
+    "/home/user/agent/tmp/units/records-port-planner.md:479-481",
+    "/home/user/agent/tmp/codex/records-port-last.md:179",
+    "/home/user/agent/tmp/codex/records-port-last.md:243",
+    "/home/user/agent/tmp/codex/records-port-last.md:322",
+    "/home/user/scaffold/.orkestrel/agent/ledger.md:19-23"
+   ]
+  },
+  {
+   "theme": "Catalog coverage",
+   "title": "Sweep risk and what this catalog dropped, merged, or corrected",
+   "idea": "Coverage facts for this catalog:\n- `.orkestrel/agent/` is deleted in the acceptance commit, and that deletes rejected.md and harvest/rejected.json with it. rejected.md:38 points at an ideas.md that does not exist, so this catalog needs a home that survives the sweep, and many items cite only files inside the swept folder.\n- Dropped as adopted and settled: the unit 16 seam fixes (exchange grouping, rollup off, no fold after abort, newest request kept, failed subject undecided), which the v4 post-fix reruns exercised; correlate; the scope-held select; judgments; the selection seam; the dated summarizer message; every refined-profile flag as a measured bundle; the answerwork fixes; the per-topic record built by code; F4 (the LH-31055 lookup gives 555-0142 as Ines Albrecht's direct line); and the two-sided blind audit, which adopted the attack's request for a blind second grader over the one-grader 49-against-41 margin. The user still rules whether 0.0.30 or a minor bump carries the keep and rollup behavior changes, and the release note names both.\n- Merged into existing items: the over-length judge state and the repeated top-logprob tokens (judge wire fidelity probes); the rule-placement probe (Kenji's delivery date); adapter refusal of over-window calls (measure the whole provider request); desk thread cap, eviction, customer-turn kind, and briefing display (desk adoption); suppression instead of rebuild (judge questions over records); the per-run scope, per-turn system rebuild, minted call ids, and the entry-select side effect (agent API surfaces refused); the toolbox agent tool mode (sub-agent mode route); the context-proposal refusals (agent API surfaces refused); tool_name (the Ollama call-member item); finished-exchange drop (the exchange-unit item).\n- Corrected: the v4 rerun on the seam-fixed package did run (GRADES-3, GRADES-4). Frozen-harness claim 7 (the recall budget) is a confirmed correct behavior, not a defect. The records-over-refined lead cited at plan.md:107 and records-port-planner.md:461 is superseded. bench3/README.md:700 says no live run at budget 0.7 exists, which the v7 ledger run at 0.7 contradicts. The exchange unit has a v5 calibration, so it is partially measured, not built-unmeasured.",
+   "status": "unmeasured",
+   "machinery": "None; a coverage note, not an idea.",
+   "hypothesis": "Not applicable.",
+   "why": "Not applicable.",
+   "evidence": [
+    "/home/user/scaffold/.orkestrel/agent/plan.md:31",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:5",
+    "/home/user/scaffold/.orkestrel/agent/rejected.md:38",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:93",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:97-98",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:106",
+    "/home/user/scaffold/.orkestrel/agent/plan.md:196",
+    "/home/user/agent/tmp/bench3/README.md:78-100",
+    "/home/user/agent/tmp/bench3/README.md:700",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-3.md:1",
+    "/home/user/agent/tmp/bench/results/v4/GRADES-4.md:1",
+    "/home/user/agent/tmp/bench/results/v8/ATTACK-BRIEFING.md:208-210",
+    "/home/user/agent/tmp/bench/results/v5/cal-exchange/calibration.md:3",
+    "/home/user/scaffold/.orkestrel/agent/frozen-harness-audit-verdict.md:7",
+    "/home/user/agent/tmp/codex/frozen-harness-last.md:110",
+    "/home/user/agent/tmp/bench/scenario.json:1",
+    "/home/user/scaffold/.orkestrel/agent/records-series-verdict.md:3-24"
+   ]
+  }
+ ]
+}

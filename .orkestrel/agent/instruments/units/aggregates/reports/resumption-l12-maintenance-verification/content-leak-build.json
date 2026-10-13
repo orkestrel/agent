@@ -1,0 +1,16 @@
+{
+  "name": "content-leak-build",
+  "args": [
+    ".orkestrel/agent/instruments/harness/tools/build.ts",
+    "--compiler",
+    "node_modules/typescript/bin/tsc",
+    "--types",
+    "node_modules/@types"
+  ],
+  "expected": 0,
+  "code": 0,
+  "pid": 75092,
+  "durationMs": 4291,
+  "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\content-leak-build.stdout.log",
+  "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\content-leak-build.stderr.log"
+}

@@ -1,0 +1,644 @@
+diff --git a/tmp/units/aggregate-admission-screen-r2/types.ts b/tmp/units/aggregate-admission-screen-r2/types.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/types.ts
+@@ -0,0 +1,26 @@
++import type { Binding, Packet, Reading } from '../aggregate-judge-counterfactual/types.ts'
++
++/** Carries the frozen screen and its preparation custody. */
++export interface ScreenPacket extends Packet {
++	readonly specification: Binding
++	readonly predecessor: Binding
++	readonly operator: string
++}
++
++/** Carries the score fields required by the fixed ranking screen. */
++export type RankingReading = Pick<Reading, 'ordinal' | 'name' | 'score'>
++
++/** Carries each supported-versus-unsupported comparison without averaging. */
++export interface Comparison {
++	readonly pass: 'forward' | 'reverse'
++	readonly name: string
++	readonly supported: number
++	readonly unsupported: number
++	readonly exceeds: boolean
++}
++
++/** Carries local discrimination, complete refusal, or incomplete measurement. */
++export interface RankingResult {
++	readonly status: 'passed' | 'refused' | 'incomplete'
++	readonly comparisons: readonly Comparison[]
++}
+diff --git a/tmp/units/aggregate-admission-screen-r2/constants.ts b/tmp/units/aggregate-admission-screen-r2/constants.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/constants.ts
+@@ -0,0 +1,23 @@
++import { dirname, resolve } from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++/** Names the owned instrument directory. */
++export const UNIT = dirname(fileURLToPath(import.meta.url))
++/** Names the frozen specification. */
++export const SPECIFICATION = resolve(UNIT, '../../../.orkestrel/agent/instruments/units/aggregates/admission-l8.json')
++/** Binds the root-selected specification bytes. */
++export const SPECIFICATION_HASH = '1559a844e9593577995c748fed379e3c8fd5b107446e7327d786001dec251828'
++/** Names the accepted diagnostic packet. */
++export const PREDECESSOR = resolve(UNIT, '../aggregate-judge-counterfactual/packet-final.json')
++/** Binds the accepted diagnostic packet bytes. */
++export const PREDECESSOR_HASH = '438710a277663ca0c28a2b6bf3f6c47b354312c12ddb02d0cd697a212499c11f'
++/** Names the create-only prepared packet. */
++export const PACKET = resolve(UNIT, 'packet-final.json')
++/** Names the executable source population bound by the operator digest. */
++export const OPERATOR_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Operator.ts', 'main.ts', 'prepare.ts', 'offline.config.ts'])
++/** Names emitted modules added to the predecessor runtime bindings. */
++export const EMITTED_FILES = Object.freeze(['bench5/aggregates/helpers.js', 'bench5/aggregates/helpers.d.ts', 'bench5/aggregates/constants.js', 'bench5/aggregates/constants.d.ts', 'bench5/types.js', 'bench5/types.d.ts', 'vendor/agent-0.0.30-trimmed/index.js', 'vendor/agent-0.0.30-trimmed/index.d.ts'])
++/** Names accepted instrument files imported at runtime. */
++export const REUSED_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Recorder.ts', 'Completion.ts', 'NetworkWitness.ts'])
++/** Names the frozen forward and reverse request order. */
++export const SEQUENCE = Object.freeze(['original', 'repair-removed', 'cause-removed', 'both-removed', 'both-removed', 'cause-removed', 'repair-removed', 'original'])
+diff --git a/tmp/units/aggregate-admission-screen-r2/helpers.ts b/tmp/units/aggregate-admission-screen-r2/helpers.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/helpers.ts
+@@ -0,0 +1,143 @@
++import type { AggregateSource } from '../../../.orkestrel/agent/instruments/harness/.build/bench5/types.js'
++import type { ExecutionOptions, Packet } from '../aggregate-judge-counterfactual/types.ts'
++import type { Comparison, RankingReading, RankingResult, ScreenPacket } from './types.ts'
++import { existsSync, lstatSync, realpathSync } from 'node:fs'
++import { isAbsolute, relative, resolve, sep } from 'node:path'
++import { renderSource } from '../../../.orkestrel/agent/instruments/harness/.build/bench5/aggregates/helpers.js'
++import { BUILD, BUILD_HASH, ROOT } from '../aggregate-judge-counterfactual/constants.ts'
++import { computeHash, readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString } from '../aggregate-judge-counterfactual/helpers.ts'
++import { OPERATOR_FILES, PACKET, PREDECESSOR, PREDECESSOR_HASH, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++
++/** Reads only the fields the emitted source renderer consumes.
++ * @param value - An original source object; extra fields remain in the packet
++ * @returns A source projection accepted by the installed renderer
++ * @example readSource({ id: 'source', sentence: 0, role: 'user', text: 'Complete.', day: '2026-10-10' })
++ */
++export function readSource(value: unknown): AggregateSource {
++	const source = readObject(value)
++	const role = source.role
++	if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool') throw new Error('Malformed source role')
++	return { id: readString(source.id), sentence: readNumber(source.sentence), role, text: readString(source.text), day: readString(source.day) }
++}
++
++/** Renders evidence before the candidate with the specification's serialization.
++ * @param sources - The complete original ordered sources
++ * @param candidate - The complete unchanged variant prose
++ * @returns The JSON state with one-space indentation and retained escaping
++ * @example renderState([], 'Complete.')
++ */
++export function renderState(sources: readonly unknown[], candidate: string): string {
++	return JSON.stringify({ evidence: sources.map(source => renderSource(readSource(source))), candidate }, null, 1)
++}
++
++/** Checks custody through a separate JSON decode of a rendered state.
++ * @param state - The serialized state to check
++ * @param sources - The expected original ordered sources
++ * @param candidate - The expected exact variant prose
++ * @returns Nothing when complete source and candidate custody holds
++ * @example validateState(renderState([], 'Complete.'), [], 'Complete.')
++ */
++export function validateState(state: string, sources: readonly unknown[], candidate: string): void {
++	const decoded = readObject(JSON.parse(state))
++	if (JSON.stringify(Object.keys(decoded)) !== JSON.stringify(['evidence', 'candidate']) || decoded.candidate !== candidate) throw new Error('Candidate/property custody mismatch')
++	const evidence = readArray(decoded.evidence).map(readString)
++	if (evidence.length !== sources.length) throw new Error('Source membership custody mismatch')
++	for (const [index, value] of sources.entries()) {
++		const source = readObject(value)
++		if (evidence[index] !== `(${readString(source.day)}) ${readString(source.role)}: ${readString(source.text)}`) throw new Error('Ordered source custody mismatch')
++	}
++}
++
++/** Computes the digest of the exact executable instrument bytes.
++ * @returns The source-population SHA-256
++ * @example computeOperator()
++ */
++export function computeOperator(): string {
++	return computeHash(JSON.stringify(OPERATOR_FILES.map(name => [name, readBinding(resolve(UNIT, name)).hash])))
++}
++
++/** Reads the packet and its additional frozen custody fields.
++ * @param value - The decoded packet
++ * @returns The checked packet shape
++ * @example readScreen(readJSON(PACKET))
++ */
++export function readScreen(value: unknown): ScreenPacket {
++	const row = readObject(value)
++	return { ...readPacket(row), specification: readBinding(SPECIFICATION, readString(readObject(row.specification).hash)), predecessor: readBinding(PREDECESSOR, readString(readObject(row.predecessor).hash)), operator: readString(row.operator) }
++}
++
++/** Checks predecessor custody while allowing only the frozen question and rendering changes.
++ * @param packet - The screen packet
++ * @param predecessor - The accepted diagnostic packet
++ * @returns Nothing when every unchanged semantic field agrees
++ * @example validatePopulation(readScreen(readJSON(PACKET)), readPacket(readJSON(PREDECESSOR)))
++ */
++export function validatePopulation(packet: Packet, predecessor: Packet): void {
++	if (packet.id !== predecessor.id || packet.identity !== predecessor.identity || packet.digest !== predecessor.digest || packet.separator !== predecessor.separator || packet.suffix !== predecessor.suffix || JSON.stringify(packet.sources) !== JSON.stringify(predecessor.sources) || JSON.stringify(packet.sequence) !== JSON.stringify(SEQUENCE) || JSON.stringify(predecessor.sequence) !== JSON.stringify(SEQUENCE)) throw new Error('Predecessor population custody mismatch')
++	if (packet.variants.length !== predecessor.variants.length) throw new Error('Variant membership custody mismatch')
++	for (const [index, variant] of packet.variants.entries()) {
++		const original = predecessor.variants[index]
++		if (original === undefined || variant.name !== original.name || variant.expectation !== original.expectation || variant.repair !== original.repair || variant.cause !== original.cause || variant.candidate !== original.candidate) throw new Error('Variant semantic custody mismatch')
++		validateState(variant.state, predecessor.sources, original.candidate)
++		if (variant.state !== renderState(predecessor.sources, original.candidate)) throw new Error('Frozen state serialization mismatch')
++	}
++}
++
++/** Validates exact execution hashes, every runtime binding, and a vacant owned descendant.
++ * @param options - Explicit execution custody arguments
++ * @returns The frozen screen packet before any fetch can run
++ * @example validateExecution({ packet: 'HASH', build: 'HASH', operator: 'HASH', output: 'DIRECTORY' })
++ */
++export function validateExecution(options: ExecutionOptions): ScreenPacket {
++	if (!/^[a-f0-9]{64}$/.test(options.packet) || !/^[a-f0-9]{64}$/.test(options.operator) || options.build !== BUILD_HASH) throw new Error('Expected exact packet/build/operator hash arguments')
++	readBinding(PACKET, options.packet)
++	readBinding(BUILD, options.build)
++	if (computeOperator() !== options.operator) throw new Error('Operator hash mismatch')
++	validateDestination(options.output)
++	const packet = readScreen(readJSON(PACKET))
++	if (packet.operator !== options.operator || packet.specification.hash !== SPECIFICATION_HASH || packet.predecessor.hash !== PREDECESSOR_HASH) throw new Error('Frozen packet custody mismatch')
++	for (const binding of packet.bindings) readBinding(resolve(ROOT, binding.path), binding.hash)
++	const specification = readObject(readJSON(SPECIFICATION))
++	if (JSON.stringify(packet.question) !== JSON.stringify(specification.question)) throw new Error('Frozen question mismatch')
++	validatePopulation(packet, readPacket(readJSON(PREDECESSOR)))
++	return packet
++}
++
++/** Refuses occupied output or a path outside the owned directory.
++ * @param path - The proposed create-only descendant
++ * @returns Nothing when output custody holds
++ * @example validateDestination('OWNED_DIRECTORY')
++ */
++export function validateDestination(path: string): void {
++	const output = resolve(path)
++	const descendant = relative(realpathSync(UNIT), output)
++	if (descendant === '' || descendant === '..' || descendant.startsWith(`..${sep}`) || isAbsolute(descendant)) throw new Error('Output must be a descendant of the owned directory')
++	let cursor = realpathSync(UNIT)
++	for (const segment of descendant.split(sep)) {
++		cursor = resolve(cursor, segment)
++		if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) throw new Error('Output crosses a symbolic link')
++	}
++	if (existsSync(output)) throw new Error('Output directory is occupied')
++}
++
++/** Compares supported and unsupported scores separately in each frozen pass.
++ * @param readings - Sequential normalized scores without averaging
++ * @returns Incomplete for a prefix, refused for any failed comparison, or passed
++ * @example computeRanking([]).status // 'incomplete'
++ */
++export function computeRanking(readings: readonly RankingReading[]): RankingResult {
++	if (readings.length > SEQUENCE.length) throw new Error('Ranking sequence overrun')
++	for (const [index, reading] of readings.entries()) {
++		if (reading.ordinal !== index + 1 || reading.name !== SEQUENCE[index] || !Number.isFinite(reading.score) || reading.score < 0 || reading.score > 1) throw new Error('Ranking sequence or finite probability mismatch')
++	}
++	if (readings.length !== SEQUENCE.length) return { status: 'incomplete', comparisons: [] }
++	const comparisons: Comparison[] = []
++	for (const offset of [0, 4]) {
++		const pass = offset === 0 ? 'forward' : 'reverse'
++		const batch = readings.slice(offset, offset + 4)
++		const supported = batch.find(reading => reading.name === 'both-removed')
++		if (supported === undefined) throw new Error('Supported ranking member absent')
++		for (const unsupported of batch.filter(reading => reading.name !== 'both-removed')) comparisons.push({ pass, name: unsupported.name, supported: supported.score, unsupported: unsupported.score, exceeds: supported.score > unsupported.score })
++	}
++	return { status: comparisons.every(comparison => comparison.exceeds) ? 'passed' : 'refused', comparisons }
++}
+diff --git a/tmp/units/aggregate-admission-screen-r2/Operator.ts b/tmp/units/aggregate-admission-screen-r2/Operator.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/Operator.ts
+@@ -0,0 +1,199 @@
++import type { Binding, ExecutionOptions, Reading } from '../aggregate-judge-counterfactual/types.ts'
++import type { RankingResult, ScreenPacket } from './types.ts'
++import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
++import { createRequire } from 'node:module'
++import { dirname, resolve } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { AgentJudge, isJudgeQuestion } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import { createOllamaJudge, MICA_RENDER_REVISION, renderJudgePrompt } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/ollama/index.js'
++import { BUILD, BUILD_HASH, DAEMON, HARNESS, ROOT, VENDOR } from '../aggregate-judge-counterfactual/constants.ts'
++import { computeHash, computeReplay, readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { Recorder } from '../aggregate-judge-counterfactual/Recorder.ts'
++import { Completion } from '../aggregate-judge-counterfactual/Completion.ts'
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++import { EMITTED_FILES, PACKET, PREDECESSOR, PREDECESSOR_HASH, REUSED_FILES, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++import { computeOperator, computeRanking, renderState, validateDestination, validateExecution, validatePopulation } from './helpers.ts'
++
++/** Prepares and executes the frozen local discrimination screen. */
++export class Operator {
++	#tags = 0
++	#dispatches = 0
++
++	/** Prepares exact requests under a rejecting global-fetch guard.
++	 * @param output - The create-only artifact destination inside the owned directory
++	 * @returns Nothing after writing the frozen packet and preparation plan
++	 * @example new Operator().prepare()
++	 */
++	prepare(output: string = UNIT): void {
++		const fetch = globalThis.fetch
++		const witness = new NetworkWitness()
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		this.#dispatches = 0
++		try {
++			const packetpath = resolve(output, 'packet-final.json')
++			const planpath = resolve(output, 'plan-final.json')
++			if (resolve(output) !== UNIT) validateDestination(output)
++			if (existsSync(packetpath) || existsSync(planpath) || (output !== UNIT && existsSync(output))) throw new Error('Preparation artifacts are occupied')
++			const specification = readBinding(SPECIFICATION, SPECIFICATION_HASH)
++			const predecessor = readBinding(PREDECESSOR, PREDECESSOR_HASH)
++			readBinding(BUILD, BUILD_HASH)
++			const original = readPacket(readJSON(PREDECESSOR))
++			const spec = readObject(readJSON(SPECIFICATION))
++			if (spec.revision !== 'l8' || JSON.stringify(readObject(spec.screen).sequence) !== JSON.stringify(SEQUENCE) || !isJudgeQuestion(spec.question)) throw new Error('Frozen specification mismatch')
++			const tuple = readArray(JSON.parse(original.identity))
++			if (tuple.length !== 5 || tuple[4] !== MICA_RENDER_REVISION) throw new Error('Frozen identity revision mismatch')
++			const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]), url: DAEMON, timeout: 300000 })
++			if (!(judge instanceof AgentJudge) || judge.model !== original.identity) throw new Error('Installed judge identity mismatch')
++			const variants = original.variants.map(variant => ({ ...variant, state: renderState(original.sources, variant.candidate) }))
++			const question = spec.question
++			const rendering = variants.map(variant => {
++				const body = judge.body({ state: variant.state, questions: { agree: question } })
++				if (readObject(body).prompt !== renderJudgePrompt(variant.state, question, readString(tuple[1]))) throw new Error('Actual emitted renderer mismatch')
++				return { name: variant.name, body: JSON.stringify(body) }
++			})
++			const bindings: Binding[] = original.bindings.map(binding => readBinding(resolve(ROOT, binding.path), binding.hash))
++			bindings.push(specification, predecessor)
++			for (const name of REUSED_FILES) bindings.push(readBinding(resolve(UNIT, '../aggregate-judge-counterfactual', name)))
++			const build = readObject(readJSON(BUILD))
++			for (const name of EMITTED_FILES) {
++				const declared = readArray(build.outputs).map(readObject).find(entry => entry.path === name)
++				if (declared === undefined) throw new Error(`Emitted runtime missing from frozen build: ${name}`)
++				bindings.push(readBinding(resolve(HARNESS, '.build', name), readString(declared.hash)))
++			}
++			this.#bindDependencies(bindings)
++			const packet: ScreenPacket = { ...original, specification, predecessor, operator: computeOperator(), question, variants, bindings: [...new Map(bindings.map(binding => [binding.path, binding])).values()], rendering }
++			validatePopulation(packet, original)
++			if (resolve(output) !== UNIT) mkdirSync(output)
++			writeArtifact(packetpath, packet)
++			if (this.#dispatches !== 0 || witness.count !== 0) throw new Error('Offline preparation dispatched a request')
++			writeArtifact(planpath, { packet: readBinding(packetpath), build: BUILD_HASH, operator: packet.operator, specification, predecessor, sequence: SEQUENCE, host: { platform: process.platform, node: process.version }, requests: { inference: SEQUENCE.length, daemon: 2, retries: 0 }, guard: { dispatches: this.#dispatches, native: witness.count }, interpretation: 'Local discrimination only; no classifier accuracy, cutoff fitting, or adoption verdict.' })
++			console.log(JSON.stringify({ prepared: true, packet: readBinding(packetpath), operator: packet.operator, dispatches: this.#dispatches, modelRequests: 0 }))
++		} finally {
++			globalThis.fetch = fetch
++			console.log(`Offline global-fetch guard dispatches: ${this.#dispatches}; native dispatches: ${witness.count}`)
++			witness.close()
++		}
++	}
++
++	/** Imports the execution entry under a refusing global-fetch guard.
++	 * @returns Nothing after reporting global and native dispatch counts
++	 * @example await new Operator().inspect()
++	 */
++	async inspect(): Promise<void> {
++		const fetch = globalThis.fetch
++		const witness = new NetworkWitness()
++		this.#dispatches = 0
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		try { await import('./main.ts') }
++		finally {
++			globalThis.fetch = fetch
++			console.log(`Offline global-fetch guard dispatches: ${this.#dispatches}; native dispatches: ${witness.count}`)
++			witness.close()
++		}
++	}
++
++	/** Executes only after complete local custody validation.
++	 * @param options - Exact packet, build, and operator hashes with a vacant owned output
++	 * @returns Nothing after persisting complete ranking or incomplete execution evidence
++	 * @example await new Operator().execute({ packet: 'HASH', build: 'HASH', operator: 'HASH', output: 'DIRECTORY' })
++	 */
++	async execute(options: ExecutionOptions): Promise<void> {
++		const packet = validateExecution(options)
++		const output = resolve(options.output)
++		mkdirSync(output)
++		const recorder = new Recorder(output)
++		const controller = new AbortController()
++		const readings: Reading[] = []
++		let complete = false
++		let failure: string | undefined
++		let ranking: RankingResult = { status: 'incomplete', comparisons: [] }
++		this.#tags = 0
++		const abort = controller.abort.bind(controller)
++		process.once('SIGINT', abort)
++		process.once('SIGTERM', abort)
++		try {
++			writeArtifact(resolve(output, 'custody.json'), { options, packet: readBinding(PACKET), operator: computeOperator(), bindings: packet.bindings, sequence: packet.sequence, host: { node: process.version, platform: process.platform }, at: new Date().toISOString() })
++			const start = await this.#verifyDaemon(packet, output, 'start', controller.signal)
++			const tuple = readArray(JSON.parse(packet.identity))
++			const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]), url: DAEMON, timeout: 300000, fetch: recorder.fetch.bind(recorder) })
++			if (!(judge instanceof AgentJudge) || judge.model !== packet.identity || !isJudgeQuestion(packet.question)) throw new Error('Frozen judge identity/question/superclass mismatch')
++			for (const [index, name] of packet.sequence.entries()) {
++				const variant = packet.variants.find(entry => entry.name === name)
++				const frozen = packet.rendering.find(entry => entry.name === name)
++				if (variant === undefined || frozen === undefined) throw new Error('Frozen sequence variant absent')
++				const label = `${String(index + 1).padStart(2, '0')}-${name}`
++				const request = { state: variant.state, questions: { agree: packet.question } }
++				const body = JSON.stringify(judge.body(request))
++				if (body !== frozen.body) throw new Error('Frozen runtime rendering mismatch')
++				recorder.arm(label, body)
++				const started = performance.now()
++				const result = await new Completion({ output, label, capture: recorder }).execute(() => judge.ask(request, controller.signal))
++				if (recorder.count !== index + 1 || recorder.response === undefined) throw new Error('Actual response accounting mismatch')
++				const response = Buffer.from(recorder.response).toString('utf8')
++				const raw = readObject(JSON.parse(response))
++				const answer = result.answers.agree
++				if (answer?.form !== 'noul' || result.model !== packet.identity || result.refusals?.agree !== undefined) throw new Error('Missing/malformed normalized Yes answer')
++				const replay = computeReplay(raw, readNumber(tuple[2]))
++				const score = readNumber(answer.noul)
++				const difference = replay - score
++				writeArtifact(resolve(output, `${label}.replay.json`), { replay, library: score, difference, token: raw.response, finish: raw.done_reason, top: raw.logprobs, usage: { prompt: raw.prompt_eval_count, completion: raw.eval_count, normalized: result.usage }, timing: { total: raw.total_duration, load: raw.load_duration, prompt: raw.prompt_eval_duration, evaluation: raw.eval_duration } })
++				if (Math.abs(difference) > 1e-12 || score < 0 || score > 1) throw new Error('Independent arithmetic replay mismatch')
++				if (raw.done !== true || typeof raw.response !== 'string' || typeof raw.done_reason !== 'string' || raw.eval_count !== 1 || result.usage === undefined || result.usage.prompt + result.usage.completion >= 4096) throw new Error('Incomplete, missing-usage, or capacity-bound response evidence')
++				readings.push({ ordinal: index + 1, name, score, replay, difference, body, response, usage: result.usage, wall: performance.now() - started })
++			}
++			const end = await this.#verifyDaemon(packet, output, 'end', controller.signal)
++			writeArtifact(resolve(output, 'daemon-comparison.json'), { start, end })
++			for (const binding of packet.bindings) readBinding(resolve(ROOT, binding.path), binding.hash)
++			if (computeOperator() !== options.operator) throw new Error('Operator changed during execution')
++			readBinding(PACKET, options.packet)
++			ranking = computeRanking(readings)
++			writeArtifact(resolve(output, 'ranking.json'), ranking)
++			complete = true
++		} catch (error) {
++			failure = error instanceof Error ? error.message : String(error)
++			throw error
++		} finally {
++			controller.abort()
++			process.removeListener('SIGINT', abort)
++			process.removeListener('SIGTERM', abort)
++			writeArtifact(resolve(output, 'outcome.json'), { complete, status: complete ? ranking.status : 'incomplete', ...(failure === undefined ? {} : { failure }), modelRequests: recorder.count, daemonChecks: this.#tags, completed: readings.length, readings, ranking, interpretation: complete ? 'Complete local screen; failed ordering refuses the method.' : 'Incomplete measurement; no method ruling.', at: new Date().toISOString() })
++		}
++	}
++
++	#refuseFetch(): Promise<Response> {
++		this.#dispatches += 1
++		return Promise.reject(new Error('Offline preparation refuses global fetch'))
++	}
++
++	#bindDependencies(bindings: Binding[]): void {
++		const queue = [{ origin: VENDOR, name: '@orkestrel/agent' }, { origin: VENDOR, name: '@orkestrel/ndjson' }]
++		const visited = new Set<string>()
++		for (const dependency of queue) {
++			const require = createRequire(pathToFileURL(dependency.origin))
++			const packagepath = require.resolve(`${dependency.name}/package.json`)
++			if (visited.has(packagepath)) continue
++			visited.add(packagepath)
++			const packagevalue = readObject(readJSON(packagepath))
++			const exported = readObject(readObject(packagevalue.exports)['.'])
++			const imports = exported.import
++			const entry = resolve(dirname(packagepath), typeof imports === 'string' ? imports : readString(readObject(imports).default))
++			const declaration = typeof imports === 'string' ? readString(exported.types) : readString(readObject(imports).types)
++			bindings.push(readBinding(packagepath), readBinding(entry), readBinding(resolve(dirname(packagepath), declaration)))
++			if (packagevalue.dependencies !== undefined) for (const name of Object.keys(readObject(packagevalue.dependencies))) queue.push({ origin: entry, name })
++		}
++	}
++
++	async #verifyDaemon(packet: ScreenPacket, output: string, phase: string, signal: AbortSignal): Promise<unknown> {
++		this.#tags += 1
++		const response = await fetch(`${DAEMON}/api/tags`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]), redirect: 'error' })
++		const bytes = new Uint8Array(await response.arrayBuffer())
++		writeFileSync(resolve(output, `daemon-${phase}.bin`), bytes, { flag: 'wx' })
++		writeArtifact(resolve(output, `daemon-${phase}.json`), { status: response.status, hash: computeHash(bytes), body: Buffer.from(bytes).toString('utf8') })
++		if (!response.ok) throw new Error('Daemon tag check transport failure')
++		const models = readArray(readObject(JSON.parse(Buffer.from(bytes).toString('utf8'))).models).map(readObject)
++		const model = readString(readArray(JSON.parse(packet.identity))[0])
++		const matches = models.filter(entry => entry.name === model || entry.model === model)
++		if (matches.length !== 1 || matches[0]?.digest !== packet.digest) throw new Error('Daemon judge tag/digest mismatch')
++		return matches[0]
++	}
++}
+diff --git a/tmp/units/aggregate-admission-screen-r2/main.ts b/tmp/units/aggregate-admission-screen-r2/main.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/main.ts
+@@ -0,0 +1,9 @@
++import { Operator } from './Operator.ts'
++
++if (process.argv.includes('--execute')) {
++	if (process.argv.length !== 11 || process.argv[2] !== '--execute' || process.argv[3] !== '--packet' || process.argv[5] !== '--build' || process.argv[7] !== '--operator' || process.argv[9] !== '--output' || process.argv[4] === undefined || process.argv[6] === undefined || process.argv[8] === undefined || process.argv[10] === undefined) throw new Error('Use --execute --packet HASH --build HASH --operator HASH --output DIRECTORY')
++	await new Operator().execute({ packet: process.argv[4], build: process.argv[6], operator: process.argv[8], output: process.argv[10] })
++} else {
++	if (process.argv.length !== 2) throw new Error('Default invocation is offline; only explicit execution arguments are accepted')
++	console.log('Offline default: no model or network request. Run prepare.ts to create the frozen preparation.')
++}
+diff --git a/tmp/units/aggregate-admission-screen-r2/prepare.ts b/tmp/units/aggregate-admission-screen-r2/prepare.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/prepare.ts
+@@ -0,0 +1,5 @@
++import { Operator } from './Operator.ts'
++
++if (process.argv.length === 2) new Operator().prepare()
++else if (process.argv.length === 4 && process.argv[2] === '--output' && process.argv[3] !== undefined) new Operator().prepare(process.argv[3])
++else throw new Error('Use prepare.ts [--output VACANT_OWNED_DIRECTORY]')
+diff --git a/tmp/units/aggregate-admission-screen-r2/offline.config.ts b/tmp/units/aggregate-admission-screen-r2/offline.config.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/offline.config.ts
+@@ -0,0 +1,3 @@
++import { Operator } from './Operator.ts'
++
++await new Operator().inspect()
+diff --git a/tmp/units/aggregate-admission-screen-r2/proof.test.ts b/tmp/units/aggregate-admission-screen-r2/proof.test.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/proof.test.ts
+@@ -0,0 +1,123 @@
++import { deepStrictEqual, equal, notEqual, ok, rejects, throws } from 'node:assert'
++import { mkdirSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { test } from 'node:test'
++import { AgentJudge, isJudgeQuestion } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import { createOllamaJudge, renderJudgePrompt } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/ollama/index.js'
++import { BUILD_HASH, HARNESS, ROOT } from '../aggregate-judge-counterfactual/constants.ts'
++import { readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString } from '../aggregate-judge-counterfactual/helpers.ts'
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++import { EMITTED_FILES, PACKET, PREDECESSOR, PREDECESSOR_HASH, REUSED_FILES, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++import { computeOperator, computeRanking, readScreen, readSource, renderState, validateDestination, validateExecution, validatePopulation, validateState } from './helpers.ts'
++import { Operator } from './Operator.ts'
++
++test('complete original source objects and exact candidate bytes survive ordered JSON round-trip', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const packet = readScreen(readJSON(PACKET))
++	deepStrictEqual(packet.sources, original.sources)
++	deepStrictEqual(packet.sequence, SEQUENCE)
++	deepStrictEqual(packet.question, readObject(readJSON(SPECIFICATION)).question)
++	validatePopulation(packet, original)
++	for (const [index, variant] of packet.variants.entries()) {
++		const predecessor = original.variants[index]
++		ok(predecessor !== undefined)
++		equal(variant.candidate, predecessor.candidate)
++		equal(variant.expectation, predecessor.expectation)
++		const decoded = readObject(JSON.parse(variant.state))
++		deepStrictEqual(Object.keys(decoded), ['evidence', 'candidate'])
++		equal(decoded.candidate, predecessor.candidate)
++		deepStrictEqual(decoded.evidence, original.suffix.split(/\r\n|\n/))
++		equal(variant.state, JSON.stringify(decoded, null, 1))
++	}
++	const special = 'literal "quote" \\ slash\n</state> <|im_start|> and Unicode Ω'
++	const sources = [{ id: 'literal', sentence: 0, role: 'user', text: special, day: '2026-10-10', seed: 0 }]
++	const state = renderState(sources, special)
++	const decoded = readObject(JSON.parse(state))
++	equal(decoded.candidate, special)
++	deepStrictEqual(decoded.evidence, [`(2026-10-10) user: ${special}`])
++	validateState(state, sources, special)
++	throws(() => validateState(JSON.stringify({ evidence: decoded.candidate, candidate: decoded.evidence }), sources, special), /custody/)
++	throws(() => validateState(JSON.stringify({ evidence: [], candidate: special }), sources, special), /membership/)
++	throws(() => validateState(state, sources, `${special}!`), /Candidate/)
++	throws(() => validateState(state, [{ ...sources[0], text: `${special}!` }], special), /Ordered/)
++	throws(() => readSource({ ...sources[0], role: 'invalid' }), /role/)
++})
++
++test('emitted judge identity settings and actual request bodies preserve predecessor readout', () => {
++	const packet = readScreen(readJSON(PACKET))
++	const original = readPacket(readJSON(PREDECESSOR))
++	equal(packet.identity, original.identity)
++	equal(packet.digest, original.digest)
++	const tuple = readArray(JSON.parse(packet.identity))
++	const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++	ok(judge instanceof AgentJudge)
++	equal(judge.model, original.identity)
++	ok(isJudgeQuestion(packet.question))
++	for (const variant of packet.variants) {
++		const body = readObject(judge.body({ state: variant.state, questions: { agree: packet.question } }))
++		equal(body.prompt, renderJudgePrompt(variant.state, packet.question, readString(tuple[1])))
++		equal(JSON.stringify(body), packet.rendering.find(entry => entry.name === variant.name)?.body)
++		const previous = original.rendering.find(entry => entry.name === variant.name)
++		ok(previous !== undefined)
++		const earlier = readObject(JSON.parse(previous.body))
++		deepStrictEqual(Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'prompt')), Object.fromEntries(Object.entries(earlier).filter(([key]) => key !== 'prompt')))
++		notEqual(body.prompt, earlier.prompt)
++	}
++	equal(packet.specification.hash, SPECIFICATION_HASH)
++	equal(packet.predecessor.hash, PREDECESSOR_HASH)
++	for (const binding of packet.bindings) equal(readBinding(resolve(ROOT, binding.path)).hash, binding.hash)
++	for (const name of EMITTED_FILES) ok(packet.bindings.some(binding => resolve(ROOT, binding.path) === resolve(HARNESS, '.build', name)))
++	for (const name of REUSED_FILES) ok(packet.bindings.some(binding => resolve(ROOT, binding.path) === resolve(UNIT, '../aggregate-judge-counterfactual', name)))
++	for (const name of Object.keys(readObject(readObject(readJSON(resolve(HARNESS, 'package.json'))).dependencies))) ok(packet.bindings.some(binding => binding.path.endsWith(`node_modules/${name}/dist/src/core/index.js`)))
++})
++
++test('strict supported ordering passes separately and refuses equality direction and reverse-pass failures', () => {
++	const readings = SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: name === 'both-removed' ? 0.9 : 0.2 }))
++	const result = computeRanking(readings)
++	equal(result.status, 'passed')
++	deepStrictEqual(result.comparisons.map(comparison => `${comparison.pass}:${comparison.name}`), ['forward:original', 'forward:repair-removed', 'forward:cause-removed', 'reverse:cause-removed', 'reverse:repair-removed', 'reverse:original'])
++	equal(computeRanking(readings.map(reading => ({ ...reading, score: 0.5 }))).status, 'refused')
++	equal(computeRanking(readings.map(reading => ({ ...reading, score: 1 - reading.score }))).status, 'refused')
++	const reverseFailure = computeRanking(readings.map(reading => ({ ...reading, score: reading.ordinal === 5 ? 0.1 : reading.score })))
++	equal(reverseFailure.status, 'refused')
++	ok(reverseFailure.comparisons.filter(comparison => comparison.pass === 'forward').every(comparison => comparison.exceeds))
++	ok(reverseFailure.comparisons.filter(comparison => comparison.pass === 'reverse').every(comparison => !comparison.exceeds))
++	equal(computeRanking(readings.slice(0, 7)).status, 'incomplete')
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: Number.NaN }))), /finite/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: Number.POSITIVE_INFINITY }))), /finite/)
++	throws(() => computeRanking([...readings, ...readings]), /overrun/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: -0.1 }))), /probability/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: 1.1 }))), /probability/)
++	throws(() => computeRanking(readings.map((reading, index) => ({ ...reading, name: SEQUENCE[(index + 4) % 8] ?? '' }))), /sequence/)
++})
++
++test('changed hashes and occupied or escaped destinations refuse before global or native fetch', async () => {
++	const witness = new NetworkWitness()
++	const fetch = globalThis.fetch
++	let count = 0
++	Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: () => { count += 1; return Promise.reject(new Error('Offline test refuses fetch')) } })
++	try {
++		const options = { packet: readBinding(PACKET).hash, build: BUILD_HASH, operator: computeOperator(), output: resolve(UNIT, `proof-vacant-${process.pid}`) }
++		equal(validateExecution(options).operator, options.operator)
++		for (const field of ['packet', 'build', 'operator']) await rejects(new Operator().execute({ ...options, [field]: '0'.repeat(64) }), /hash|Hash/)
++		const occupied = resolve(UNIT, `proof-occupied-${process.pid}`)
++		mkdirSync(occupied)
++		await rejects(new Operator().execute({ ...options, output: occupied }), /occupied/)
++		await rejects(new Operator().execute({ ...options, output: resolve(UNIT, '..') }), /descendant/)
++		throws(() => validateDestination(UNIT), /descendant/)
++		equal(count, 0)
++		equal(witness.count, 0)
++	} finally { globalThis.fetch = fetch; witness.close() }
++})
++
++test('create-only preparation produces identical frozen bytes under a refusing global guard with zero native dispatch', () => {
++	const witness = new NetworkWitness()
++	try {
++		const output = resolve(UNIT, `proof-preparation-${process.pid}`)
++		new Operator().prepare(output)
++		equal(readBinding(resolve(output, 'packet-final.json')).hash, readBinding(PACKET).hash)
++		deepStrictEqual(readObject(readJSON(resolve(output, 'plan-final.json'))).guard, { dispatches: 0, native: 0 })
++		throws(() => new Operator().prepare(output), /occupied/)
++		equal(witness.count, 0)
++	} finally { witness.close() }
++})
+diff --git a/tmp/units/aggregate-admission-screen-r2/negative.test.ts b/tmp/units/aggregate-admission-screen-r2/negative.test.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/negative.test.ts
+@@ -0,0 +1,43 @@
++import { equal } from 'node:assert'
++import { test } from 'node:test'
++import { readObject, readPacket, readJSON } from '../aggregate-judge-counterfactual/helpers.ts'
++import { PREDECESSOR, SEQUENCE } from './constants.ts'
++import { computeRanking, renderState, validateState } from './helpers.ts'
++
++test('swapped evidence and candidate control is collected and must fail custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	const state = readObject(JSON.parse(renderState(original.sources, candidate)))
++	validateState(JSON.stringify({ evidence: state.candidate, candidate: state.evidence }), original.sources, candidate)
++})
++
++test('omitted source control is collected and must fail custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	validateState(renderState(original.sources.slice(1), candidate), original.sources, candidate)
++})
++
++test('candidate byte mutation control independently fails candidate custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	validateState(renderState(original.sources, `${candidate}!`), original.sources, candidate)
++})
++
++test('source byte mutation control independently fails ordered source custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	const sources = original.sources.map((source, index) => index === 0 ? { ...readObject(source), text: 'Mutated source boundary.' } : source)
++	validateState(renderState(sources, candidate), original.sources, candidate)
++})
++
++test('wrong ranking direction control is collected and must fail strict ordering assertion', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: name === 'both-removed' ? 0.1 : 0.9 }))).status, 'passed')
++})
++
++test('equal scores control is collected and must fail strict ordering assertion', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: 0.5 }))).status, 'passed')
++})
++
++test('reversed pass control is collected and must fail its separate pass assertion', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: index < 4 ? name === 'both-removed' ? 0.9 : 0.2 : name === 'both-removed' ? 0.1 : 0.8 }))).status, 'passed')
++})
+diff --git a/tmp/units/aggregate-admission-screen-r2/tsconfig.json b/tmp/units/aggregate-admission-screen-r2/tsconfig.json
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-admission-screen-r2/tsconfig.json
+@@ -0,0 +1,20 @@
++{
++	"compilerOptions": {
++		"target": "ESNext",
++		"module": "NodeNext",
++		"moduleResolution": "NodeNext",
++		"allowImportingTsExtensions": true,
++		"lib": ["ESNext", "DOM", "DOM.Iterable"],
++		"types": ["node"],
++		"strict": true,
++		"verbatimModuleSyntax": true,
++		"noUncheckedIndexedAccess": true,
++		"exactOptionalPropertyTypes": true,
++		"noUnusedLocals": true,
++		"noUnusedParameters": true,
++		"noImplicitOverride": true,
++		"skipLibCheck": true,
++		"noEmit": true
++	},
++	"include": ["*.ts"]
++}

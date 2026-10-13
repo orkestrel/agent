@@ -1,0 +1,156 @@
+{
+  "packetHash": "2f7c267dc8ed24a6fc68adc7609bfe6637df34a30d1d7fd8eb8a2b5926bba45b",
+  "mappingHash": "8c935f627ff5f8dabc38c57398276ddf612738bea2e80545a2e3c8ab261228ac",
+  "verdictHash": "6b16ba75bf88184eec455c6af6cf405bd050ad289ddd2991c5a5c5a1e4704cf6",
+  "corrections": [
+    "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+    "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+    "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001"
+  ],
+  "grouping": {
+    "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+    "seed": 6,
+    "sentences": [
+      "Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "And never promise a customer a delivery date in writing."
+    ]
+  },
+  "population": {
+    "total": 12,
+    "supported": 5,
+    "negative": 6,
+    "ambiguous": 1,
+    "scored": 9,
+    "unscored": 3
+  },
+  "diagnostic": {
+    "cutoff": 0.78,
+    "positives": 4,
+    "negatives": 4,
+    "ambiguous": 1,
+    "recalled": 0,
+    "recall": 0,
+    "leaked": 0,
+    "feasible": false,
+    "deployed": false
+  },
+  "rows": [
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+      "index": 15,
+      "topic": "escalations",
+      "version": 2,
+      "original": "contradicted",
+      "verdict": "supported",
+      "corrected": true,
+      "score": 0.5112304729912349
+    },
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+      "index": 17,
+      "topic": "escalations",
+      "version": 3,
+      "original": "contradicted",
+      "verdict": "supported",
+      "corrected": true,
+      "score": 0.5112304729912349
+    },
+    {
+      "id": "0ee3f70dd454adb7ecc8c58e66185b67c18259a59b8b4158c8062d4037a7f1a6-000001",
+      "index": 33,
+      "topic": "owner:LH-44870",
+      "version": 2,
+      "original": "unsupported",
+      "verdict": "unsupported",
+      "corrected": false,
+      "score": 0.716448021609171
+    },
+    {
+      "id": "3b467737f13f859307aa7ff8d58e425647eb31d4de1229bb836846706d4a9045-000001",
+      "index": 4,
+      "topic": "refunds",
+      "version": 3,
+      "original": "supported",
+      "verdict": "supported",
+      "corrected": false,
+      "score": 0.49741159905610755
+    },
+    {
+      "id": "4f3e0f4b0735c2aa5939faaf58ad6d9b1ac336f0f9c141f01d9b8f884b171d9d-000001",
+      "index": 25,
+      "topic": "delivery",
+      "version": 3,
+      "original": "supported",
+      "verdict": "supported",
+      "corrected": false
+    },
+    {
+      "id": "797dffb6c68900f1e432f3f9f631eb1ac6618557709519d80e70a8fbda47abd7-000001",
+      "index": 35,
+      "topic": "owner:LH-44870",
+      "version": 3,
+      "original": "unsupported",
+      "verdict": "unsupported",
+      "corrected": false,
+      "score": 0.7753600931549042
+    },
+    {
+      "id": "8d43ad8054d2e661f2ea2adaffc2d60377134331401cbfca57761c2772c343ad-000001",
+      "index": 10,
+      "topic": "returns",
+      "version": 3,
+      "original": "unsupported",
+      "verdict": "unsupported",
+      "corrected": false,
+      "score": 0.48327988713877107
+    },
+    {
+      "id": "92b9b6d5c640cb8c87068d1dc0f0881d98f6d65f61ae541e42b9ade9fcd0e36b-000001",
+      "index": 21,
+      "topic": "contacts",
+      "version": 3,
+      "original": "contradicted",
+      "verdict": "contradicted",
+      "corrected": false
+    },
+    {
+      "id": "e3ffb897670d8e1bd5fb249ec5435ae1832aaeb58a8b3a2461b1662b22d89576-000001",
+      "index": 2,
+      "topic": "refunds",
+      "version": 2,
+      "original": "genuinely ambiguous",
+      "verdict": "genuinely ambiguous",
+      "corrected": false,
+      "score": 0.4801168705769321
+    },
+    {
+      "id": "ec45ae9450422b8336babe85020cfe94128cd97daed19799be267c6f20d658f1-000001",
+      "index": 8,
+      "topic": "returns",
+      "version": 2,
+      "original": "unsupported",
+      "verdict": "unsupported",
+      "corrected": false,
+      "score": 0.5308665977384849
+    },
+    {
+      "id": "ec50f45ca83af4b14470d27bcd5f423b737e3e7a01e494d73705693e394ccbde-000001",
+      "index": 29,
+      "topic": "warehouse",
+      "version": 3,
+      "original": "unsupported",
+      "verdict": "unsupported",
+      "corrected": false
+    },
+    {
+      "id": "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001",
+      "index": 13,
+      "topic": "escalations",
+      "version": 1,
+      "original": "contradicted",
+      "verdict": "supported",
+      "corrected": true,
+      "score": 0.47218748995940685
+    }
+  ]
+}

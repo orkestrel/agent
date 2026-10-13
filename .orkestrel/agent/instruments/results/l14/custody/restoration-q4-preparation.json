@@ -1,0 +1,127 @@
+{
+  "captured": "2026-10-12T02:50:08.411Z",
+  "root": "C:\\Users\\mikes\\WebstormProjects\\scaffold",
+  "instruction": "Retain the closed Qwen preparation, operational failure, and independent criterion/design findings exactly. Restore temporary references only in a matching checkout and verify hashes. No frozen result is relabeled.",
+  "entries": [
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-live.err",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-live.err",
+      "hash": "f2acd009379e89bb7aeab305b0d0bdcd2cb5558d6a7dad5583729fcc8e2faaa9",
+      "bytes": 110
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl",
+      "hash": "1b1d619d9301882651a6d213b53f4ccd6c54f18aa8cc190ed49958338a443507",
+      "bytes": 11628
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.pid",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.pid",
+      "hash": "ae5afa70255c2c22d3b8e7e0712e71a10b3c53de8dda380921fa24095991e376",
+      "bytes": 6
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.status-after.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.status-after.txt",
+      "hash": "e941d0a744a77f1ce5c2fc5264ab165d5107937a63688b801b0865f58f1d130b",
+      "bytes": 468
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.status-before.txt",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-live.jsonl.status-before.txt",
+      "hash": "f92404fe0e35a222e37545ebc558f58e24f064f456a644d88f4a51d06bb412d6",
+      "bytes": 102
+    },
+    {
+      "original": "tmp/units/aggregate-final-cell-driver-q4-think0-sequence.jsonl",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-cell-driver-q4-think0-sequence.jsonl",
+      "hash": "5089da675c96d5b97ab081c71513548e621a183b149fb68f541b04a3b8790fec",
+      "bytes": 11952
+    },
+    {
+      "original": "tmp/units/aggregate-final-gauge-criterion-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-gauge-criterion-brief.md",
+      "hash": "f73c8666ec0a65035bda42adca70de993230cb0e90a047b490b16038fb356890",
+      "bytes": 4840
+    },
+    {
+      "original": "tmp/units/aggregate-final-gauge-criterion-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-gauge-criterion-report.md",
+      "hash": "fb82832f0271bbd01eb92f3c3685d2a6586b8192bb5bfed32d8670529f89cd24",
+      "bytes": 7554
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-brief.md",
+      "hash": "51b0882135c65563272c4f231070025be5abc9c7de1d6b7c10dac9b28e04d94d",
+      "bytes": 5004
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-custody.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-custody.json",
+      "hash": "f5e31b3f676bd399248d95f49f5e2b5f28289d7a0c03f24a41913c21465d43a4",
+      "bytes": 46621
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-custody.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-custody.ts",
+      "hash": "5c15286b25b504e172d8b951abde9409b80284787e594515301acfcfa251ecc0",
+      "bytes": 1788
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-receipt.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-receipt.ts",
+      "hash": "f2942c3defdf660f2dc8f64b10206fdae2c46dadb8642829c5f5608f9e8652b5",
+      "bytes": 2797
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-receipts.json",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-receipts.json",
+      "hash": "ed336ae5866042c7ef235350a9cf39f977f2751c458fecec53f4f8bc79bbe780",
+      "bytes": 18951
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-cell-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-cell-report.md",
+      "hash": "e369a6b24b1b31de0b4b3ce5217ebd0cce1a06ad943aa10780e547cc44bfb217",
+      "bytes": 7109
+    },
+    {
+      "original": "tmp/units/aggregate-final-qualification-direction-citations.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-qualification-direction-citations.md",
+      "hash": "df69fbe4441427c74bf58ea9a865cd8fe6a061c3968bd7da8b0c137f19218937",
+      "bytes": 7319
+    },
+    {
+      "original": "tmp/units/aggregate-final-qualification-direction-opus-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-qualification-direction-opus-report.md",
+      "hash": "01e49699659897fbe674cb9d27cfc202404a89a5e9b245b519d46426dc14daa6",
+      "bytes": 13572
+    },
+    {
+      "original": "tmp/units/aggregate-final-retain-q4-preparation.ts",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-retain-q4-preparation.ts",
+      "hash": "4242735d50ab8a22b48514275b7ca332a7690ff56c51027ebf44dca683304730",
+      "bytes": 2545
+    },
+    {
+      "original": "tmp/units/aggregate-final-evaluation-lookup-report.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-evaluation-lookup-report.md",
+      "hash": "64fa766bc239a01abd01d610ae17cfb8db78cf2fe75c3d9e2c6b83225c1c8a8e",
+      "bytes": 7162
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/units/aggregate-final-q4-pilot-brief.md",
+      "hash": "e72126a57ed26ed50d4d41e084503ad9e6eb8bab19ba084ffd8c6c6134e6b9ac",
+      "bytes": 5654
+    },
+    {
+      "original": "tmp/claude/aggregate-final-qualification-direction-brief.md",
+      "retained": ".orkestrel/agent/instruments/results/l14/custody/files/tmp/claude/aggregate-final-qualification-direction-brief.md",
+      "hash": "60021c2d128c5ebde5eba8acd858bb00181744a6fe543b3c07e087ae47909d42",
+      "bytes": 7557
+    }
+  ]
+}

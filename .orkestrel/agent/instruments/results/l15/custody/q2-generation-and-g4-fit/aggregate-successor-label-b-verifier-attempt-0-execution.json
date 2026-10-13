@@ -1,0 +1,55 @@
+{
+    "command":  "node tmp/units/aggregate-successor-label-b-verifier-check.ts",
+    "node":  "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "startUtc":  "2026-10-12T09:57:18.4643592Z",
+    "endUtc":  "2026-10-12T09:57:18.5842867Z",
+    "durationMs":  117,
+    "exitCode":  0,
+    "stdoutBytes":  0,
+    "stderrBytes":  0,
+    "immutableBefore":  {
+                            "tmp/units/aggregate-successor-label-b-packet.jsonl":  {
+                                                                                       "sha256":  "64b0f89566458745c8099e9351db3b44686102145721ef9395bbd8e06e9d57f5",
+                                                                                       "bytes":  3263411
+                                                                                   },
+                            "tmp/units/aggregate-successor-label-b-report.md":  {
+                                                                                    "sha256":  "59736ce8a0d487377b8b3f0fdb86a56403d608a4ee3a1a7cf2db5183644f5635",
+                                                                                    "bytes":  13658
+                                                                                },
+                            "tmp/units/aggregate-successor-label-b.json":  {
+                                                                               "sha256":  "51e53477083dad07e229b951a796b857017f58627310a3e595d844dabfbb53cf",
+                                                                               "bytes":  231369
+                                                                           },
+                            "tmp/units/aggregate-successor-label-a-reader.ts":  {
+                                                                                    "sha256":  "ddc5045b85fae720bbabb1374bfb058712efa233449863f715ee557dc1c347e1",
+                                                                                    "bytes":  3892
+                                                                                },
+                            "tmp/units/aggregate-successor-label-a-verifier-check.ts":  {
+                                                                                            "sha256":  "3f05be0f95b30230e5d4d57e153e08785c9214367aa97397366e231d685e3a40",
+                                                                                            "bytes":  3818
+                                                                                        }
+                        },
+    "immutableAfter":  {
+                           "tmp/units/aggregate-successor-label-b-packet.jsonl":  {
+                                                                                      "sha256":  "64b0f89566458745c8099e9351db3b44686102145721ef9395bbd8e06e9d57f5",
+                                                                                      "bytes":  3263411
+                                                                                  },
+                           "tmp/units/aggregate-successor-label-b-report.md":  {
+                                                                                   "sha256":  "59736ce8a0d487377b8b3f0fdb86a56403d608a4ee3a1a7cf2db5183644f5635",
+                                                                                   "bytes":  13658
+                                                                               },
+                           "tmp/units/aggregate-successor-label-b.json":  {
+                                                                              "sha256":  "51e53477083dad07e229b951a796b857017f58627310a3e595d844dabfbb53cf",
+                                                                              "bytes":  231369
+                                                                          },
+                           "tmp/units/aggregate-successor-label-a-reader.ts":  {
+                                                                                   "sha256":  "ddc5045b85fae720bbabb1374bfb058712efa233449863f715ee557dc1c347e1",
+                                                                                   "bytes":  3892
+                                                                               },
+                           "tmp/units/aggregate-successor-label-a-verifier-check.ts":  {
+                                                                                           "sha256":  "3f05be0f95b30230e5d4d57e153e08785c9214367aa97397366e231d685e3a40",
+                                                                                           "bytes":  3818
+                                                                                       }
+                       },
+    "immutableUnchanged":  true
+}

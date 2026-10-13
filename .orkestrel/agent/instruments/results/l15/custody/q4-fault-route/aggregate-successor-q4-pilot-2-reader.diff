@@ -1,0 +1,13 @@
+diff --git a/.orkestrel/agent/instruments/results/l15/custody/q4-pilot/aggregate-successor-q4-pilot-closure-2.ts b/tmp/units/aggregate-successor-q4-pilot-2-read.ts
+index 4e0c05014..f3ae79103 100644
+--- a/.orkestrel/agent/instruments/results/l15/custody/q4-pilot/aggregate-successor-q4-pilot-closure-2.ts
++++ b/tmp/units/aggregate-successor-q4-pilot-2-read.ts
+@@ -23,7 +23,7 @@ const cell = join(results, 'q4-think0')
+ const frozenFile = hashFile(join(cell, 'freeze', 'manifest.json'))
+ const resourceFile = hashFile(join(cell, 'resource', 'manifest.json'))
+ const fitFile = hashFile(join(results, 'calibration', 'q4', 'fit', 'fit.json'))
+-const pilotFile = hashFile(join(cell, 'pilot', 'manifest.json'))
++const pilotFile = hashFile(join(cell, 'pilot-2', 'manifest.json'))
+ const frozen = readFrozen(frozenFile)
+ const resource = readResource(resourceFile, frozenFile)
+ 

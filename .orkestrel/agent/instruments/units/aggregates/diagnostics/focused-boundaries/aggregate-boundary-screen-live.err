@@ -1,0 +1,15 @@
+file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/helpers.ts:164
+	if (!/^[a-f0-9]{64}$/.test(options.packet) || !/^[a-f0-9]{64}$/.test(options.operator) || options.build !== BUILD_HASH) throw new Error('Expected exact packet/build/operator hashes')
+	                                                                                                                              ^
+
+Error: Expected exact packet/build/operator hashes
+    at validateExecution (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/helpers.ts:164:128)
+    at Operator.execute (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/Operator.ts:95:18)
+    at file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/main.ts:5:23
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.21.0
+
+exit=1 signal=none capped=false duration_ms=179

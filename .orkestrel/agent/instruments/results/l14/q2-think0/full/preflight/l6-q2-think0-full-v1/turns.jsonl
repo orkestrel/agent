@@ -1,0 +1,15 @@
+{"turn":1,"goal":"g01-luis-refund-amount","estimate":1740,"scope":"aggregate"}
+{"turn":2,"goal":"g01-luis-refund-amount","estimate":1804,"scope":"aggregate"}
+{"turn":3,"goal":"g02-luis-card","estimate":1870,"scope":"aggregate"}
+{"turn":4,"goal":"g02-luis-card","estimate":1938,"scope":"aggregate"}
+{"turn":5,"goal":"g03-grace-escalation","estimate":2012,"scope":"aggregate"}
+{"turn":6,"goal":"g03-grace-escalation","estimate":2253,"scope":"aggregate"}
+{"turn":7,"goal":"g03-grace-escalation","estimate":2516,"scope":"aggregate"}
+{"turn":8,"goal":"g04-halvorsen-ticket","estimate":2730,"scope":"aggregate"}
+{"turn":9,"goal":"g04-halvorsen-ticket","estimate":2993,"scope":"aggregate"}
+{"turn":10,"goal":"g04-halvorsen-ticket","estimate":3254,"scope":"aggregate"}
+{"turn":11,"goal":"g04-halvorsen-ticket","estimate":3306,"scope":"aggregate"}
+{"turn":12,"goal":"g04-halvorsen-ticket","estimate":3588,"scope":"answer"}
+{"turn":13,"goal":"g05-luis-approval-note","estimate":3705,"scope":"aggregate"}
+{"turn":14,"goal":"g05-luis-approval-note","estimate":3946,"scope":"aggregate"}
+{"turn":15,"goal":"g05-luis-approval-note","estimate":4207,"scope":"answer"}

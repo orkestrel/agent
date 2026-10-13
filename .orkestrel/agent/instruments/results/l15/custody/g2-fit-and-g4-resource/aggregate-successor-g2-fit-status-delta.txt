@@ -1,0 +1,3 @@
+Git status delta: one owned output path added; no previous status entry removed or changed.
+Added: ?? .orkestrel/agent/instruments/results/l15/calibration/g2/fit/
+Existing unowned entries remain as captured in the before/after status files.

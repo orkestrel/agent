@@ -1,0 +1,110 @@
+[
+ {
+  "id": "edaa8b81",
+  "run": "t2a-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "5fee0c4b",
+  "run": "t2a-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "72eb7d71",
+  "run": "t2a-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b6a4ec8c",
+  "run": "t2a-control-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "52e5713d",
+  "run": "t2a-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "393a769f",
+  "run": "t2a-control-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "7be84cbe",
+  "run": "t2a-control-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "09074b19",
+  "run": "t2a-control-v2",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "9d00ba6f",
+  "run": "t2a-control-v3",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "8f57c7eb",
+  "run": "t2a-control-v3",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "20269e06",
+  "run": "t2a-control-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "c5d1f0de",
+  "run": "t2a-control-v3",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "4f799a51",
+  "run": "t2a-control-v3",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "4e3ace9d",
+  "run": "t2a-control-v4",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "500910af",
+  "run": "t2a-control-v4",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "200070ab",
+  "run": "t2a-control-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "16f9c0cf",
+  "run": "t2a-control-v4",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "8f777575",
+  "run": "t2a-control-v4",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ }
+]

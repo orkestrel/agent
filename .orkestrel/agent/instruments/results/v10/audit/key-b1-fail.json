@@ -1,0 +1,242 @@
+[
+ {
+  "id": "bffc886a",
+  "run": "f4-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "377089d2",
+  "run": "f4-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "cc33a3a1",
+  "run": "f4-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "591bc43d",
+  "run": "f4-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "c0378384",
+  "run": "f4-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "4eca5395",
+  "run": "f4-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "60812bd1",
+  "run": "f4-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a0d10c20",
+  "run": "f4-compaction-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "6ea5f1c9",
+  "run": "f4-records-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "0f3b7155",
+  "run": "f4-records-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "0c2a1689",
+  "run": "f4-control-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "10fe01e0",
+  "run": "f4-control-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "2863088d",
+  "run": "t2-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": false
+ },
+ {
+  "id": "be94c07a",
+  "run": "t2-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "701ca3c2",
+  "run": "t2-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "02b4bfd0",
+  "run": "t2-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "c7eed745",
+  "run": "t2-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "a7fb21f6",
+  "run": "t2-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "53da9eac",
+  "run": "t2-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b7b43d25",
+  "run": "t2-control-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "a9142ca0",
+  "run": "t2-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "98fa25cc",
+  "run": "t2-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "86909740",
+  "run": "t2-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "d23e7928",
+  "run": "t2-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "57cfc0c8",
+  "run": "t2-compaction-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "e48154c4",
+  "run": "t2-compaction-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": false
+ },
+ {
+  "id": "8ee80f55",
+  "run": "t2-compaction-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "f4af2f0e",
+  "run": "t2w-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": false
+ },
+ {
+  "id": "bb070584",
+  "run": "t2w-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "547914fe",
+  "run": "t2w-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "f649ea27",
+  "run": "t2w-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "f50cc678",
+  "run": "t2w-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "773d4e62",
+  "run": "t2w-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "4b63a397",
+  "run": "t2w-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "2edec340",
+  "run": "t2w-control-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "fb5c09d5",
+  "run": "t2w-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "36a01643",
+  "run": "t2w-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "21739f8d",
+  "run": "t2w-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "483611af",
+  "run": "t2w-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "82f913e5",
+  "run": "t2w-compaction-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": false
+ }
+]

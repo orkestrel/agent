@@ -1,0 +1,14 @@
+{
+  "url": "http://127.0.0.1:11434/api/chat",
+  "method": "POST",
+  "body": {
+    "hash": "663fd9489d365b7306e75f94244cf8b3a9c994e595c5178d72910adc19deb222",
+    "bytes": 5636
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "started": "2026-10-11T11:07:00.905Z",
+  "timeout": 300000,
+  "limit": 262144
+}

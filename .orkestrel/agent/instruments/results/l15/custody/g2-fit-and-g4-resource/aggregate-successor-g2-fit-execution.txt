@@ -1,0 +1,8 @@
+command=node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl --errors .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err --cap 240 --status -- node .orkestrel/agent/instruments/harness/.build/bench5/refit.js fit --frozen .orkestrel/agent/instruments/results/l15/g2-think0/freeze/manifest.json --corpus .orkestrel/agent/instruments/results/l15/calibration/g2/corpus --attempts .orkestrel/agent/instruments/results/l15/calibration/g2/generation --labels .orkestrel/agent/instruments/results/l15/calibration/g2/labels.json --model gemma4:e2b-it-q4_K_M --out .orkestrel/agent/instruments/results/l15/calibration/g2/fit --url http://127.0.0.1:11435
+launcher_pid=10792
+launcher_exit=0; child_exit=0 signal=null capped=false durationMs=2549
+.orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+.orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err bytes=50 sha256=96c591ccf6ee015504e88f87798ba57c52da241880fd42512b265436946140e6
+.orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.pid contents=10792
+launch stdout tmp/units/aggregate-successor-g2-fit-launch.stdout.txt bytes=410; launcher stderr tmp/units/aggregate-successor-g2-fit-launcher-stderr.txt bytes=0
+validator_exit=0; validator_stdout_bytes=1822; validator_stderr_bytes=0

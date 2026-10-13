@@ -1,0 +1,212 @@
+[
+ {
+  "id": "9442cbec",
+  "run": "t4-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "d01b2458",
+  "run": "t4-records-v1",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "206fe4e3",
+  "run": "t4-records-v1",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "c68c4718",
+  "run": "t4-records-v1",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "8e257d31",
+  "run": "t4-records-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "cc5cf03f",
+  "run": "t4-records-v1",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "cfd47820",
+  "run": "t4-records-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "9a6cc89d",
+  "run": "t4-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "19f3de17",
+  "run": "t4-control-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "4f3afb9d",
+  "run": "t4-control-v1",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "01a79561",
+  "run": "t4-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "f5e4b1c7",
+  "run": "t4-control-v1",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "6e6691ea",
+  "run": "t4-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "2cf7157e",
+  "run": "t4-control-v1",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "727cefe8",
+  "run": "t4-control-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "7abd83da",
+  "run": "t4-control-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "3a7db6e1",
+  "run": "t4-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "43292876",
+  "run": "t4-records-v2",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "6d6529e1",
+  "run": "t4-records-v2",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "7b9250ea",
+  "run": "t4-records-v2",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "6b97a4ee",
+  "run": "t4-records-v2",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "d120b387",
+  "run": "t4-records-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "feb9e29c",
+  "run": "t4-records-v2",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "7f6add50",
+  "run": "t4-records-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "da86f7a7",
+  "run": "t4-records-v2",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "5d8ccf43",
+  "run": "t4-records-v2",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "63f2f8a2",
+  "run": "t4-control-v2",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "e1afc597",
+  "run": "t4-control-v2",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "e2a9fc37",
+  "run": "t4-control-v2",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "d40e567e",
+  "run": "t4-control-v2",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "ce29e9f1",
+  "run": "t4-control-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "0dffef6f",
+  "run": "t4-control-v2",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "3e0555b9",
+  "run": "t4-control-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "1c96baaa",
+  "run": "t4-control-v2",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "08f8a292",
+  "run": "t4-control-v2",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ }
+]

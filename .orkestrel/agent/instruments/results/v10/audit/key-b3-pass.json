@@ -1,0 +1,80 @@
+[
+ {
+  "id": "ea3aa101",
+  "run": "t2a-records-v4",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "02c5642c",
+  "run": "t2a-records-v4",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "0e70c11d",
+  "run": "t2a-records-v4",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "49ccc201",
+  "run": "t2a-records-v4",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "d14e7c54",
+  "run": "t2a-records-v4",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "d002bb56",
+  "run": "t2a-records-v4",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "d1318a0d",
+  "run": "t2a-records-v4",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "e12317a3",
+  "run": "t2a-records-v4",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "cc2d25b4",
+  "run": "t2w-control-v4",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "e6ac282c",
+  "run": "t2w-control-v4",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "1a483acf",
+  "run": "t2w-control-v4",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "c359f68d",
+  "run": "t2w-control-v4",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "564b402b",
+  "run": "t2w-control-v4",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ }
+]

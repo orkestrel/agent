@@ -1,0 +1,67 @@
+[
+ {
+  "id": "62d973a7",
+  "run": "a4-refined-v2",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "4bb98d89",
+  "run": "a4-refined-v6",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "e3951e48",
+  "run": "a4-refined-v6",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "2116eee6",
+  "run": "a4-refined-v6",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "6791a02e",
+  "run": "a4-refined-v6",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "d20dbfce",
+  "run": "a4-refined-v6",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "7a8bd5e5",
+  "run": "a4-refined-v7",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "e133427f",
+  "run": "a4-refined-v7",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "e421c7ac",
+  "run": "a4-refined-v7",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "6b5892f0",
+  "run": "a4-refined-v7",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "8deba591",
+  "run": "a4-refined-v8",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "8607b631",
+  "run": "a4-refined-v8",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "089570e2",
+  "run": "a4-refined-v8",
+  "goal": "g10-sigrid-callback"
+ }
+]

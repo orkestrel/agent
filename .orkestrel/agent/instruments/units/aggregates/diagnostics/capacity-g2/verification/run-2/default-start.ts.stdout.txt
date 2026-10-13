@@ -1,0 +1,2 @@
+{"offline":true,"message":"No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree."}
+{"witness":true,"global":0,"native":0}

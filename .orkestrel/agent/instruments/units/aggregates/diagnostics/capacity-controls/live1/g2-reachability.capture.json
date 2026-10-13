@@ -1,0 +1,11 @@
+{
+  "id": "g2-reachability",
+  "complete": true,
+  "breached": false,
+  "bytes": 338,
+  "hash": "5a26044bc9451e7251637766ba095360241dfbfb8a5a3e0b468562d4b8e7ddf9",
+  "status": 200,
+  "started": "2026-10-11T11:05:58.946Z",
+  "finished": "2026-10-11T11:06:12.313Z",
+  "duration": 13367.612000000008
+}

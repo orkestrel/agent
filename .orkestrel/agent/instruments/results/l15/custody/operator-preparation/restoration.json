@@ -1,0 +1,268 @@
+{
+  "files": [
+    {
+      "original": "tmp\\units\\aggregate-successor-audit-reuse-brief.md",
+      "archive": "aggregate-successor-audit-reuse-brief.md",
+      "bytes": 3117,
+      "sha256": "6a0f70db24fc3a7fc961f7ed8909615b88343c379235bf77fdc0adcad9509063"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-audit-reuse-report.md",
+      "archive": "aggregate-successor-audit-reuse-report.md",
+      "bytes": 6873,
+      "sha256": "eb6626cfb7866204cae9a218c8098274e6e50433e6bc6b63d5715439fdbed454"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-cell-adaptation.patch",
+      "archive": "aggregate-successor-cell-adaptation.patch",
+      "bytes": 11204,
+      "sha256": "1fb8a0d343a6a65fcf29f74eeda30ff322440d7ec4fdae1ba64b5cbae1b27dbe"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-cell-preparation-brief.md",
+      "archive": "aggregate-successor-cell-preparation-brief.md",
+      "bytes": 4562,
+      "sha256": "b98f534420509f17279047a6e1973bdcc85b0e8b57899449365e4b1cf1975817"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-cell-preparation-report.md",
+      "archive": "aggregate-successor-cell-preparation-report.md",
+      "bytes": 5036,
+      "sha256": "b0094cbe215a32ac69d6e3b8cc05c263d1a99115dff1a37207c44e2dff1d776e"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-cell-run.ts",
+      "archive": "aggregate-successor-cell-run.ts",
+      "bytes": 12392,
+      "sha256": "3095b52463bbeacd1f1788ac8096be28f5282cbd431af6ce5b266e22803124ae"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-g2-operators.diff",
+      "archive": "aggregate-successor-model-g2-operators.diff",
+      "bytes": 16906,
+      "sha256": "97ca48439239ffd3c1c64a1e631642fd7a802a30420945487f04806a8b8c76f5"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-g2-plan.json",
+      "archive": "aggregate-successor-model-g2-plan.json",
+      "bytes": 9991,
+      "sha256": "4f875648d30934971697bd0959cc148ac32b5ddbb7b431dc3f672177a82c2619"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-g4-generation-brief.md",
+      "archive": "aggregate-successor-model-g4-generation-brief.md",
+      "bytes": 4614,
+      "sha256": "5e9638c5b5ef1baf0b8eaa22ee885d9268679f67c6fb2cdfe7e036ab6984e801"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-g4-operators.diff",
+      "archive": "aggregate-successor-model-g4-operators.diff",
+      "bytes": 16906,
+      "sha256": "53a8eab1f59d4f5f1e9c101e2cab0cf3f719e828981602b2b27bd89516417c06"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-g4-plan.json",
+      "archive": "aggregate-successor-model-g4-plan.json",
+      "bytes": 9991,
+      "sha256": "0e091e45ed2d7ead59ee486565b1c702d96b7338190487a980fda3cd1de3bb22"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-plan.diff",
+      "archive": "aggregate-successor-model-plan.diff",
+      "bytes": 11648,
+      "sha256": "bbf37bc7fd57bf60b090b46c74399459a9fe0b8c49bcf0e36aa19758bf486005"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-plan.ts",
+      "archive": "aggregate-successor-model-plan.ts",
+      "bytes": 8670,
+      "sha256": "2e3466afcdbc4dd25c1b9f8c6e9c8722cd47a54afa0e0859c3a10a5598d747ba"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-preparation-acceptance.md",
+      "archive": "aggregate-successor-model-preparation-acceptance.md",
+      "bytes": 1372,
+      "sha256": "684a7be5602c987bc4320eebb28a980a88565dcd322f7fab305096834165205c"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-preparation-brief.md",
+      "archive": "aggregate-successor-model-preparation-brief.md",
+      "bytes": 5499,
+      "sha256": "bb68e06a67e4c4ccfed56b3c6a6faf48bf38b94835145a5f9622964cc214f760"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-preparation-report.md",
+      "archive": "aggregate-successor-model-preparation-report.md",
+      "bytes": 10998,
+      "sha256": "c20eb8b5070aa07ac6e5e247f3814960fffae5443a5d4464f119395a2d7f73d3"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-q2-operators.diff",
+      "archive": "aggregate-successor-model-q2-operators.diff",
+      "bytes": 16887,
+      "sha256": "1902c3d15fb46e1eb3ffab68a6e2a317473a6a632a3a20b73eb8d9f758adf2a7"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-q2-plan.json",
+      "archive": "aggregate-successor-model-q2-plan.json",
+      "bytes": 9982,
+      "sha256": "5cd2cb31ae98c6643cdb83d7253c7259cd3afcf1bf3670d70adce270377ec622"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-run.diff",
+      "archive": "aggregate-successor-model-run.diff",
+      "bytes": 18926,
+      "sha256": "c0066e6631de419d144c5395d8b4c2631d8d8f92284a36a277f3e83ff52533d5"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-run.ts",
+      "archive": "aggregate-successor-model-run.ts",
+      "bytes": 9483,
+      "sha256": "2781d346a006a8f2fb343504b4a3682568806a9239b41246ed4d0f3dc28193bb"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-2.meta.json",
+      "archive": "aggregate-successor-model-verifier-2.meta.json",
+      "bytes": 346,
+      "sha256": "99319588cb2ee4dc3d9b030ee6cb8455042d5a7b8a954b7ebe7f3d269769341f"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-2.stderr.txt",
+      "archive": "aggregate-successor-model-verifier-2.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-2.stdout.txt",
+      "archive": "aggregate-successor-model-verifier-2.stdout.txt",
+      "bytes": 2676,
+      "sha256": "583f3af4a838b8d4de428b37b5d57678cea57615fbf2550d1ff58de2c550d283"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-2.ts",
+      "archive": "aggregate-successor-model-verifier-2.ts",
+      "bytes": 10357,
+      "sha256": "81100820cfbaa438f986adfb16d6ef1fd0c458cfe484f391dc705f4a9756baea"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-brief-2.md",
+      "archive": "aggregate-successor-model-verifier-brief-2.md",
+      "bytes": 4123,
+      "sha256": "2c9715d4aaf61f86cc5313462ac55a8ac5db4079a99e59aa7d79390518d2d357"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-brief.md",
+      "archive": "aggregate-successor-model-verifier-brief.md",
+      "bytes": 3408,
+      "sha256": "f5318b3c4f8fb152e1aa26648ce767c16e88a3084f144a94d5062363eac73200"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-report-2.md",
+      "archive": "aggregate-successor-model-verifier-report-2.md",
+      "bytes": 3101,
+      "sha256": "b774e2200d8b2d9aa6364378239da2ca35eb9a8f848aa07cced6dad5c3112c11"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier-report.md",
+      "archive": "aggregate-successor-model-verifier-report.md",
+      "bytes": 1783,
+      "sha256": "89e8698a1e5d0686d51a8bb8c6f8012e9222c276b70bb00071bf69886f819d92"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier.meta.json",
+      "archive": "aggregate-successor-model-verifier.meta.json",
+      "bytes": 342,
+      "sha256": "f7200b3a326602cdf3f19476f6a1220f1a1c06482b72a3ad6542d4085ed8baf1"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier.stderr.txt",
+      "archive": "aggregate-successor-model-verifier.stderr.txt",
+      "bytes": 2006,
+      "sha256": "ef79c2660176b78ce577078b39c979e9ae245e98a54577f95187953bb4261eb2"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier.stdout.txt",
+      "archive": "aggregate-successor-model-verifier.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-model-verifier.ts",
+      "archive": "aggregate-successor-model-verifier.ts",
+      "bytes": 10107,
+      "sha256": "f9cccb298123b515567dfac4fa87a3edc4f00a12cfa66ae0e7c4d4c2e22b714c"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-packet-map-acceptance.md",
+      "archive": "aggregate-successor-packet-map-acceptance.md",
+      "bytes": 2893,
+      "sha256": "26ad4311bd3d4eca5e1a3a41850378a88db06e4d1af9d7e8e509a0e44d6b195d"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-packet-map-report.md",
+      "archive": "aggregate-successor-packet-map-report.md",
+      "bytes": 8918,
+      "sha256": "996d992910dd7558e9d406e5a9c3f6c421751e7637e7cb6f3a47a7156e517211"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-live-brief.md",
+      "archive": "aggregate-successor-q4-thinking-live-brief.md",
+      "bytes": 4886,
+      "sha256": "ef20203ea34c0543894a836cac62f6f56fcfa207395b0724e863cebffd3859b0"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan-brief.md",
+      "archive": "aggregate-successor-q4-thinking-plan-brief.md",
+      "bytes": 3483,
+      "sha256": "27e0169fe9e814e2f6239a7947e7dd9c43d9dd7296bfd3378a6ff07b00ed1081"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan-report.md",
+      "archive": "aggregate-successor-q4-thinking-plan-report.md",
+      "bytes": 6883,
+      "sha256": "94ac0338510069b0ac33a70fd1b7dcd23949302c8b0eb7d1faa4daec229c768e"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan-run.ts",
+      "archive": "aggregate-successor-q4-thinking-plan-run.ts",
+      "bytes": 1818,
+      "sha256": "5b13bf35d4bf201903f3b5a221d7e68f0e43ea2d95722cd7820c1c7fff910026"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan.meta.json",
+      "archive": "aggregate-successor-q4-thinking-plan.meta.json",
+      "bytes": 977,
+      "sha256": "9893391d4a41fffa3702fb5a81392c4f1a3b868855118029a1232041847c6878"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan.stderr.log",
+      "archive": "aggregate-successor-q4-thinking-plan.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-thinking-plan.stdout.log",
+      "archive": "aggregate-successor-q4-thinking-plan.stdout.log",
+      "bytes": 10759,
+      "sha256": "cd031ec41455a008e8d7b16448c93f5dec7ba4a6f5f9ca00470eaf2d21be34d4"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-quality-controls-brief.md",
+      "archive": "aggregate-successor-quality-controls-brief.md",
+      "bytes": 3318,
+      "sha256": "8d0c8cac3f0c334a1a476a449d4cece36404cbfd737fa3e722ef607c2118b60a"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-quality-controls-report.md",
+      "archive": "aggregate-successor-quality-controls-report.md",
+      "bytes": 6847,
+      "sha256": "4c483b9f1d2c34385f2e1e167b3edc2e739e0759d09dadeaa90b59af911dfaef"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-retain.ts",
+      "archive": "aggregate-successor-preparation-retain.ts",
+      "bytes": 2239,
+      "sha256": "5f6695dcc1ef33b29bc696e97c976a20609a95a2cdccbdaddbe6d24f0e156f13"
+    }
+  ]
+}

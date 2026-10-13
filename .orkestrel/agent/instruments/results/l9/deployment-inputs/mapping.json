@@ -1,0 +1,38 @@
+[
+  {
+    "original": "tmp/units/aggregate-capacity-probe/daemon-start.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/daemon-start.json",
+    "hash": "19c077e9190accb54e1e791d2be4493412431d22a86778a1b1e229255854a120",
+    "bytes": 449
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/prepared/packet.json",
+    "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+    "bytes": 80122
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/prepared/packet.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/prepared/packet.json",
+    "hash": "bb7d5de942f9c4e5168fa77d0bb344bcb2d585b931129294b68c74bb8e94bd56",
+    "bytes": 7380
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/prepared/generation.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/prepared/generation.json",
+    "hash": "695dba977ed20b4221d997a93a34e9cb5a5c7acd831c8fa56cd399d95cd7dab3",
+    "bytes": 1148
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-probe/live1/inventory.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/live1/inventory.json",
+    "hash": "06c7f02d44f0a30d320d091711c4762b0c9a5d77d50d83cacd2d008f23b7e80d",
+    "bytes": 95140
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/live1/inventory.json",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/live1/inventory.json",
+    "hash": "ca9653b2b87817a617a3559b81958f533aad585c21fe1aabe759d9aec5ac1b2a",
+    "bytes": 14434
+  }
+]

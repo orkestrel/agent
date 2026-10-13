@@ -1,0 +1,2126 @@
+[
+  {
+    "id": "094a559fbb2db57f62255cebedff4d56",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct direct extension 4127 and after-2-pm window. Recall satisfies the listed history tool, but no fresh LH-80941/LH-31055 lookup occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/0/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/0/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/0/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/0/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/0/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24/content"
+      ]
+    }
+  },
+  {
+    "id": "0ef683846e7c0e92b5d7e4f4ab5535a8",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct full $289 refund under the withdrawn fee. Recall of an old lookup is not a fresh lookup_order, so both lookup obligations fail.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/1/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/1/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/1/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/1/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/1/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content"
+      ]
+    }
+  },
+  {
+    "id": "13cdd31e59900614c73b5d77ee2ae6dc",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh LH-81660 lookup occurred, but the customer reply gives the prohibited October 12 delivery estimate, calls October 7 'today' on October 8, and promises to add a gift note without an available write action.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/2/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/2/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/2/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/2/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/2/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/0/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "167405b5bb113c5483cdcdbe77e20c93",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correctly refuses Saturday walk-in returns because of floor work and directs them to Monday. This generic counter-policy question carries no order/account lookup obligation.",
+    "eligibleSource": {
+      "through": 123,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/3/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/3/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/3/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/122/content"
+      ]
+    }
+  },
+  {
+    "id": "19112a9ddc7e1b8124e528ca2bf8f8b9",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Twin parcel, TR-3307, and original tracking are correct, but Ruth's Friday cover expired; Marcus signs on Saturday. Only recall occurred, with no fresh Grace lookup.",
+    "eligibleSource": {
+      "through": 145,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/4/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/4/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/4/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/4/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/4/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/144/content"
+      ]
+    }
+  },
+  {
+    "id": "1af48095bbec7447f326dcbb0656cced",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Lists completed Copperline and Beatriz shipments as active, omits Farah PW-7120-4466, and speculates that Dalia is in transit despite the warehouse result. No fresh order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 132,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/5/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/5/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/5/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/96/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/101/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/105/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/126/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/130/content"
+      ]
+    }
+  },
+  {
+    "id": "1e3e3f1686875bb686ab626d1d81d3c7",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct $289 full refund and expressly withdraws the old fee. Only recall occurred; a recalled order result does not satisfy fresh lookup_order.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/6/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/6/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/6/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/6/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/6/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content"
+      ]
+    }
+  },
+  {
+    "id": "275a429af95a7bebe5a2975866b14254",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct direct extension 4127 and after-2-pm window. No actions occurred: missing both system fresh lookup and listed recall.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/7/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/7/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/7/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24/content"
+      ]
+    }
+  },
+  {
+    "id": "2ebbbfabdbb516e65a597e45ce670748",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct full $289 refund and card. Fresh lookup_customer LH-44870 satisfies the system's order-or-account alternative, but the explicit lookup_order requirement is missing.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/8/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/8/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/8/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/8/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/8/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "2f9a8a0a3ef2418f9797c42ae2193f8f",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Draft correctly states $289, no fee, the over-$200 rule, and current MX-4486 while rejecting MX-4471. Only recall occurred; required fresh lookup_order is absent.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/9/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/9/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/9/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/9/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/9/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "2fccdfc445bc0e7fc273aaa327466bd9",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh order check and shipping/tracking facts are correct, but this is an internal summary rather than the requested sendable customer reply. It includes October 12 and infers missing gift-note inclusion from an absent record.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/10/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/10/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/10/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/10/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/10/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/0/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "337999917ca10a86b75cae7fc7fd634d",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Incorrectly lists Beatriz and Copperline as still in transit after their deliveries and omits Farah's active PW-7120-4466 chase. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 132,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/11/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/11/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/11/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/96/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/101/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/105/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/130/content"
+      ]
+    }
+  },
+  {
+    "id": "34a542d81b9d38ae1befe038a36d5d14",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Hana Ikeda, email-only contact, and exact email; Owen is named only as departed. No fresh Copperline account/order lookup occurred.",
+    "eligibleSource": {
+      "through": 139,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/12/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/12/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/12/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/138/content"
+      ]
+    }
+  },
+  {
+    "id": "380325fcf96cd26765aca1e1329daba1",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct ticket ESC-2219. Only recall occurred, so the system fresh lookup is missing. Final text reaches the shift lead; it does not prove delivery to Priya. Content passes as a draft-only bound.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/13/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/13/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/13/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/13/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/13/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27/content"
+      ]
+    }
+  },
+  {
+    "id": "3c1ce27dcdf729c384a70b30c90a129d",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh account lookup supports $5,000 minus $1,240 = $3,760 available and Ines Albrecht. Stating that amount is available for the requested $3,000 order adequately conveys that it fits.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/14/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/14/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/14/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/14/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/14/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "3c5e7368f6189eadeb0f199d1c9b65ca",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh account lookup supports $3,760 available and Ines Albrecht; availability for the requested $3,000 order conveys that the reorder fits.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/15/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/15/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/15/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/15/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/15/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "3c67c9f336e7318e9d1e38b379bf5d3a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct WKND15, 15 percent, and October 10-11 validity. Only recall occurred; the request concerns Farah's known order/account and still requires a fresh lookup.",
+    "eligibleSource": {
+      "through": 133,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/16/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/16/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/16/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/16/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/16/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/114/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/133/content"
+      ]
+    }
+  },
+  {
+    "id": "41eb1ff88c4ad505d423817fcafd22da",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct replacement cause, trace, and tracking, but incorrectly assigns Ruth's expired cover and calls Saturday October 10 Friday. No fresh Grace lookup occurred.",
+    "eligibleSource": {
+      "through": 145,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/17/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/17/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/17/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/17/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/17/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/144/content"
+      ]
+    }
+  },
+  {
+    "id": "45ac4e19dbfb7184ca696965d0bbd606",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct 91 Quarry Lane, Ashby; the awkward sentence about 19 still explicitly rejects 19 rather than asserting it as current. No fresh Farah lookup occurred.",
+    "eligibleSource": {
+      "through": 105,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/18/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/18/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/18/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/103/content"
+      ]
+    }
+  },
+  {
+    "id": "45c6b2d05a936ca2c9ea248b57a8777d",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correctly assigns Ruth Adeyemi during Friday cover. No fresh Grace order/account lookup occurred despite the system obligation.",
+    "eligibleSource": {
+      "through": 89,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/19/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/19/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/19/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/88/content"
+      ]
+    }
+  },
+  {
+    "id": "49dbf227270f8b4cfe163b1db5cb0fa2",
+    "status": "failed",
+    "semantic": "unattempted",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Operational status is failed; the retained reply is empty and actions are empty. There is no semantic answer to assess and no completed final reply or fresh lookup.",
+    "eligibleSource": {
+      "through": 145,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/20/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/20/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/20/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/144/content"
+      ]
+    }
+  },
+  {
+    "id": "588cf676ee59fb9eaee658a9fc794666",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Tobias Lindqvist. No fresh lookup_customer or lookup_order occurred; the seeded account lookup does not discharge this goal's system obligation.",
+    "eligibleSource": {
+      "through": 137,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/21/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/21/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/21/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/136/content"
+      ]
+    }
+  },
+  {
+    "id": "5aa4589dfcdaeae856136f8b9c8a0f79",
+    "status": "unattempted",
+    "semantic": "unattempted",
+    "systemTool": "unattempted",
+    "listedTool": "unattempted",
+    "completeWork": "fail",
+    "reason": "Planned work is unattempted, with no reply and no actions. Cracked pendants, pro number, and claim deadline remain unanswered; it cannot count as completed.",
+    "eligibleSource": {
+      "through": 149,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/22/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/22/actions"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/148/content"
+      ]
+    }
+  },
+  {
+    "id": "5f7842156c9c4d22606a299eb246a703",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct free freight on the next order, explicitly replacing the $50 credit. Only recall occurred; this Copperline-specific request still requires a fresh account/order lookup.",
+    "eligibleSource": {
+      "through": 95,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/23/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/23/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/23/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/23/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/23/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/94/content"
+      ]
+    }
+  },
+  {
+    "id": "608ff468510671f682662d7accf4b321",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correct Saturday closure and Monday alternative. Generic counter policy has no order/account lookup obligation; the final message satisfies the listed reply requirement.",
+    "eligibleSource": {
+      "through": 123,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/24/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/24/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/24/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/122/content"
+      ]
+    }
+  },
+  {
+    "id": "648fa0799faff6a9ede0578c1cad39ce",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh LH-44870 account lookup and correct Mastercard ending 7719 answer the requested card-on-file question.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/25/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/25/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/25/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/25/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/25/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "677b2556a9fdc73c27da146a0a8e31dd",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Wrong day and active calls: ESC-2219 was closed, so 555-0188 is no longer required; Dalia 555-0175 is omitted. Owen's availability alone creates no callback task. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 127,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/26/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/26/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/26/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/124/content"
+      ]
+    }
+  },
+  {
+    "id": "684db9c35486e3e4107c398c28bc8352",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct WKND15, 15 percent, and expiry October 11. No fresh Farah order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 133,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/27/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/27/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/27/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/114/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/133/content"
+      ]
+    }
+  },
+  {
+    "id": "6a1f1e552060bce84a9d567dbfa8f675",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Pro number and deadline are right, but omits the known cracked glass and treats superseded depot history as an unresolved discrepancy. Only recall occurred, not a fresh lookup.",
+    "eligibleSource": {
+      "through": 149,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/28/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/28/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/28/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/28/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/28/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/148/content"
+      ]
+    }
+  },
+  {
+    "id": "6c79213e439109ab8277a1bebfb18470",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Omits the known cracked glass and says no claim is needed unless damage exists, even though that damage is already reported. Pro and deadline are correct. Only recall occurred.",
+    "eligibleSource": {
+      "through": 149,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/29/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/29/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/29/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/29/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/29/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/148/content"
+      ]
+    }
+  },
+  {
+    "id": "737e888cbcb46c25a57c2316d3c09fe3",
+    "status": "served",
+    "semantic": "ambiguous",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Requested $289, Mastercard 7719, and October 21 date are correct. Required-content reading passes; 'should appear ... shortly' adds an unsupported near-term posting assurance to a missing-refund reply. No fresh lookup_customer occurred.",
+    "eligibleSource": {
+      "through": 115,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/30/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/30/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/30/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "7aa8d576a89e0e1b86282bfb5f3a3213",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Exact gift text is correct, but no customer-facing reply is supplied and the response reuses the first kettle's October 12 estimate for the second replacement despite the no-written-date rule. Only recall occurred.",
+    "eligibleSource": {
+      "through": 143,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/31/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/31/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/31/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/31/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/31/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/142/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "7c2242efda40f8cc0099d17053f89b48",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Exchange, sage rug, and PW-7042-1185 are correct, but 'expected delivery every afternoon until it lands' turns a daily chase instruction into invented delivery timing. Only recall occurred, not a fresh lookup.",
+    "eligibleSource": {
+      "through": 111,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/32/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/32/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/32/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/32/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/32/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/71/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/108/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/110/content"
+      ]
+    }
+  },
+  {
+    "id": "879f271fbd8b611f3831fb7243da194d",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct free freight on the next order; old credit and discount are rejected. No fresh Copperline order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 95,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/33/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/33/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/33/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/94/content"
+      ]
+    }
+  },
+  {
+    "id": "912eebe5172a3d100b2819fb7079e802",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct 91 Quarry Lane, Ashby; 19 is explicitly rejected. No fresh Farah order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 105,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/34/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/34/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/34/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/103/content"
+      ]
+    }
+  },
+  {
+    "id": "9136a1c053a19a7b6d361aa874955ac7",
+    "status": "served",
+    "semantic": "ambiguous",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct extension 4127 and after-2-pm window, but directs a switchboard transfer rather than the supplied direct line. A working switchboard route is plausible; transfer routing is not established. Recall occurred but fresh lookup did not.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/35/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/35/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/35/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/35/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/35/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "9144a35ee681b36722f18c202edd2046",
+    "status": "served",
+    "semantic": "ambiguous",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct $289, Mastercard 7719, and October 21 deadline. Literal 'closed on' says a future window has already closed on October 9; a retrospective hypothetical-window reading answers the user's wording. No fresh lookup_customer occurred.",
+    "eligibleSource": {
+      "through": 115,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/36/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/36/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/36/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "927dc35d13959a0bf047a33899bfccfb",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Exact 'Happy 40th, Aiko' is correct. Recall fulfills history retrieval, but neither the system fresh lookup nor explicit lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/37/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/37/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/37/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/37/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/37/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content"
+      ]
+    }
+  },
+  {
+    "id": "946e150c8ae837224a4edd32df2ea1d9",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Hana Ikeda and exact email-only contact. No fresh Copperline order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 139,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/38/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/38/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/38/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/138/content"
+      ]
+    }
+  },
+  {
+    "id": "951da7151b896fc723558b6417fffe13",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Marcus, Priya, and tracking are correct, but the note instructs initiation of an already-open trace and attaches the refund approval code as an escalation sign-off requirement without support. No fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/39/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/39/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/39/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/19/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29/content"
+      ]
+    }
+  },
+  {
+    "id": "96347e6db821d00674b4f9275c9eca23",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct Tomasz Brennan, today's deadline because he is off Friday, and FL-660412. No fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/40/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/40/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/40/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36/content"
+      ]
+    }
+  },
+  {
+    "id": "96ba6d265f4ed1c02e1ce52c70d2cb54",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct sage exchange, dispatched state, and PW-7042-1185; daily monitoring paraphrases the chase instruction. Only recall occurred, with no fresh order/account lookup.",
+    "eligibleSource": {
+      "through": 111,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/41/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/41/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/41/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/41/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/41/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/71/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/108/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/110/content"
+      ]
+    }
+  },
+  {
+    "id": "9a1559cb91b0683813634744b2367b0b",
+    "status": "served",
+    "semantic": "ambiguous",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct requested refund amount, card, and October 21 date. Required-content reading passes; 'should appear ... shortly' is an unsupported near-term posting assurance. No fresh lookup_customer occurred.",
+    "eligibleSource": {
+      "through": 115,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/42/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/42/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/42/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "9a779dc7007dfc12b4a3a769e0cb6056",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Friday substitution: Marcus normally signs and Ruth gives it today. Only recall occurred; no fresh Grace order/account lookup.",
+    "eligibleSource": {
+      "through": 89,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/43/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/43/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/43/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/43/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/43/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/88/content"
+      ]
+    }
+  },
+  {
+    "id": "9dd8f9867bb1d72347b5d84f4793de62",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct ticket ESC-2219, but no fresh Halvorsen lookup. Final text is delivered only to the shift lead, so Priya delivery is unproved; content passes under a draft-only reading.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/44/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/44/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/44/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27/content"
+      ]
+    }
+  },
+  {
+    "id": "a1f354a204f722adc50ff17690cd54da",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Gift text is right, but no sendable customer reply is supplied and October 12 is reproduced from the earlier shipment despite the written-date rule. Only recall occurred.",
+    "eligibleSource": {
+      "through": 143,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/45/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/45/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/45/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/45/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/45/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/142/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "a7c6d2b2e40d9d7d2dc9317b3bd3112a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct remaining morning call: Dalia 555-0175 for the sofa slot. No fresh Dalia order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 127,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/46/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/46/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/46/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/124/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/126/content"
+      ]
+    }
+  },
+  {
+    "id": "a9a0896acef1ec56579feed0c35eb3eb",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct $289 full refund and MX-4486 for the over-$200 note; old code and fee are clearly withdrawn. Only recall occurred; fresh lookup_order is missing.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/47/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/47/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/47/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/47/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/47/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content"
+      ]
+    }
+  },
+  {
+    "id": "aca45d451c04013cb9d9cd735da70e4d",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh account lookup returns Mastercard ending 7719 and the reply identifies it correctly.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/48/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/48/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/48/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/48/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/48/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "accfe3ce83aa3e19943f3e05cecd6a6a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct exact gift wording. No actions occurred: both the fresh lookup_order and explicitly listed recall are absent.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/49/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/49/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/49/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content"
+      ]
+    }
+  },
+  {
+    "id": "b509796ac8a7c2c7b7fac36b0b3058ba",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Tobias is correct and Owen remains the buyer at boundary 137, but the reply misattributes the account's preferred-contact field to Tobias and presents the buyer as his contact method. No fresh account/order lookup occurred.",
+    "eligibleSource": {
+      "through": 137,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/50/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/50/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/50/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/136/content"
+      ]
+    }
+  },
+  {
+    "id": "bcecfd143b247c78a0c80aa7784e254f",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh account lookup supports $3,760 available and Ines Albrecht. The available amount stated for the requested $3,000 order conveys that it fits.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/51/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/51/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/51/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/51/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/51/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "c1751deb6e693f77f54c317116c60d85",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Wrong active chases: Copperline and Beatriz are delivered; Farah PW-7120-4466 is missing. Dalia's speculative transit/depot location also contradicts the warehouse result. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 132,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/52/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/52/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/52/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/96/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/101/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/105/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/126/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/130/content"
+      ]
+    }
+  },
+  {
+    "id": "c4af686a8fc7f8e06c3907e671e7c329",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct Tomasz Brennan, today rather than his Friday absence, and FL-660412. No fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/53/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/53/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/53/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36/content"
+      ]
+    }
+  },
+  {
+    "id": "ce1563819cc8200a68cabb87b577aad1",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Ruth Adeyemi for Friday cover. Recall of old Grace records does not satisfy the separate fresh lookup requirement.",
+    "eligibleSource": {
+      "through": 89,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/54/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/54/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/54/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/54/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/54/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/88/content"
+      ]
+    }
+  },
+  {
+    "id": "d0df3a7f235524073d747779dc48a78b",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct Marcus sign-off, Priya copy, tracking, and already-open trace. Actual actions are recall only; no fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/actions/0/result",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/actions/1/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/55/actions/1/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/19/content"
+      ]
+    }
+  },
+  {
+    "id": "d20ad46e2a9a6a5451a69fa77c88ed68",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Mistakes Saturday for Friday, revives the closed Halvorsen morning call, adds an unsupported Owen call, and omits Dalia 555-0175. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 127,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/56/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/56/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/56/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/124/content"
+      ]
+    }
+  },
+  {
+    "id": "d27901658d915149f46be87e251a4b9d",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Marcus, Priya, and tracking are correct, but adds the warehouse team as copied recipients with no instruction or evidence. Both actions are recall, including one for an unrelated order; no fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/actions/0/result",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/actions/1/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/57/actions/1/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18/content"
+      ]
+    }
+  },
+  {
+    "id": "d65b39280525dc856927e0266fe90c35",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh LH-81660 lookup occurred, but the draft promises October 12, invents that the gift note was added/included, and calls October 7 today on October 8.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/58/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/58/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/58/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/58/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/58/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/0/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "d92b1fc8425598e5e183ee33eaf2c169",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct complete redirect address 91 Quarry Lane, Ashby. No fresh Farah order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 105,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/59/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/59/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/59/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/103/content"
+      ]
+    }
+  },
+  {
+    "id": "dc7d9ee7d99b320d3245321799fc931d",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct ESC-2219, but no fresh lookup and no proof of sending Priya the number. Final text goes to the shift lead; draft-only content passes.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/60/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/60/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/60/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27/content"
+      ]
+    }
+  },
+  {
+    "id": "ddde8d1acf1ecddc584a078c1783d8c7",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh LH-44870 lookup and correct Mastercard ending 7719.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/61/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/61/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/61/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/61/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/61/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "e59d4a787ddd20e31cc3b42f41517e7c",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct free freight replacing the $50 credit. No fresh Copperline order/account lookup occurred.",
+    "eligibleSource": {
+      "through": 95,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/62/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/62/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/62/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/94/content"
+      ]
+    }
+  },
+  {
+    "id": "ea83ed9b93ff326a88fd92a1193e6467",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Hana Ikeda, exact email, email-only contact, and Owen's departure. Recall is not a fresh Copperline account/order lookup.",
+    "eligibleSource": {
+      "through": 139,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/63/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/63/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/63/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/63/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/63/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/138/content"
+      ]
+    }
+  },
+  {
+    "id": "eae66e79f2fa5c1fb8a57330164dde8a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correct all-day Saturday closure and Monday resumption. No precise opening hour is asserted; the morning wording does not change the required no-today answer. Generic counter policy needs no lookup.",
+    "eligibleSource": {
+      "through": 123,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/64/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/64/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/64/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/122/content"
+      ]
+    }
+  },
+  {
+    "id": "ef2091c5dd2e6ad0a5509ac09b719e7a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct Tomasz Brennan, today's release deadline, and FL-660412. No fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/65/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/65/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/65/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36/content"
+      ]
+    }
+  },
+  {
+    "id": "ef314622d03e8b6ee9a1dfa269ceca5a",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct $289 full refund, but the internal authorization note omits mandatory current manager approval code MX-4486 for a refund above $200. No fresh lookup_order occurred.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/66/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/66/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/66/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44/content"
+      ]
+    }
+  },
+  {
+    "id": "ef71c47fc3d27ddd5cf3b6ced248cc94",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Exact gift text is right, but invents tracking PW-6013-2281 and confirmed inclusion, and gives the forbidden October 12 arrival expectation for the second kettle. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 143,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/67/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/67/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/67/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/142/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "f40edf1b1adf6004485d22bc6eb76fd1",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Exact gift wording is correct. Recall occurred, but no fresh lookup_order; both system and explicit lookup obligations fail.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/68/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/68/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/68/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/68/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/68/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11/content"
+      ]
+    }
+  },
+  {
+    "id": "f5394b5e927a7d83ec6612184168b278",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct sage exchange instead of refund and PW-7042-1185, explicitly marked shipped on October 9. 'Initiate' is draft setup wording alongside the supplied shipped state, not evidence of a second dispatch. No fresh lookup occurred.",
+    "eligibleSource": {
+      "through": 111,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/69/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/69/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/69/reply"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/71/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/108/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/110/content"
+      ]
+    }
+  },
+  {
+    "id": "fcc46551c0e831e628377c680c4c21f7",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct WKND15, 15 percent, and October 10-11 validity. Only recall occurred; no fresh Farah order/account lookup.",
+    "eligibleSource": {
+      "through": 133,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/70/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/70/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/70/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/70/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/70/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/114/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/133/content"
+      ]
+    }
+  },
+  {
+    "id": "fcf987176680976a39db6be0f2ca424a",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correctly selects Tobias and labels Ines as earlier. Owen and extension 4310 are still eligible at boundary 137; Hana's later correction must not be imported. Only recall occurred, not a fresh lookup.",
+    "eligibleSource": {
+      "through": 137,
+      "goal": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19"
+    },
+    "references": {
+      "packet": [
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/71/status",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/71/actions",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/71/reply",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/71/actions/0/call",
+        "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-development-blind-packet-l14-b/packet.json#/goals/71/actions/0/result"
+      ],
+      "scenario": [
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/request",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/tools",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92/content",
+        "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/136/content"
+      ]
+    }
+  }
+]

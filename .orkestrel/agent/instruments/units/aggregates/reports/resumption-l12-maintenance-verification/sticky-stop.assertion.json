@@ -1,0 +1,6 @@
+{
+  "selector": "withholds a capped rebuilt summary while real development decisions and later recovery continue",
+  "assertion": "a capped summary must leave later development decisions reachable",
+  "requiredRefusal": "development integrity failure at request",
+  "result": "required assertion failed"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "development",
+  "args": [
+    "--test",
+    ".orkestrel/agent/instruments/harness/.build/bench5/tests/development.test.js"
+  ],
+  "expected": 0,
+  "code": 0,
+  "pid": 54040,
+  "durationMs": 71843,
+  "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\development.stdout.log",
+  "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\development.stderr.log"
+}

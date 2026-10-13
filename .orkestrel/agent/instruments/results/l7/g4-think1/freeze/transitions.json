@@ -1,0 +1,1323 @@
+{
+  "scenario": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v1.json",
+    "hash": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b"
+  },
+  "opportunities": [
+    {
+      "index": 0,
+      "text": "Morning, it's Thursday 2026-10-08. I'm Dana Whitcombe, shift lead on the Larkspur Home support desk, and you're helping me work the queue today.",
+      "topics": [],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 2,
+      "text": "Standing rule: any refund over $200 needs a manager approval code in the internal note. This week's code from Marcus Oyelaran, our escalations manager, is MX-4471.",
+      "topics": [
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 3,
+      "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+      "topics": [
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 3,
+      "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+      "topics": [
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "repetition",
+      "prior": [
+        2
+      ]
+    },
+    {
+      "index": 4,
+      "text": "Second rule: returns of opened items carry a 15 percent restocking fee, taken off the refund.",
+      "topics": [
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 5,
+      "text": "Noted, a 15 percent restocking fee comes off refunds for opened items.",
+      "topics": [
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 5,
+      "text": "Noted, a 15 percent restocking fee comes off refunds for opened items.",
+      "topics": [
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "repetition",
+      "prior": [
+        4
+      ]
+    },
+    {
+      "index": 6,
+      "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+      "topics": [
+        "escalations",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 7,
+      "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+      "topics": [
+        "escalations",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 8,
+      "text": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release. He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+      "topics": [
+        "warehouse",
+        "delivery",
+        "contacts"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 11,
+      "text": "Quick one before the queue: Kenji Nakamura's replacement kettle on order LH-81660 needs a gift note that reads 'Happy 40th, Aiko'.",
+      "topics": [
+        "LH-81660",
+        "LH-52307"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 12,
+      "text": "Noted the gift note request on LH-81660.",
+      "topics": [
+        "LH-81660"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 13,
+      "text": "First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+      "topics": [
+        "LH-20418",
+        "LH-77302",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 15,
+      "text": "Order LH-77302 for account LH-20418 (Grace Okafor): linen duvet set, queen, total $148.50. Shipped 2026-09-30 by Parcelway, tracking PW-5521-9930; marked delivered 2026-10-03 to a parcel locker at Elm Street station.",
+      "topics": [
+        "LH-77302",
+        "LH-20418",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 16,
+      "text": "Account LH-20418: Grace Okafor, Gold tier, member since 2021-04-12. 2 claims in the last 12 months; preferred contact is email.",
+      "topics": [
+        "LH-20418"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 17,
+      "text": "LH-77302 was marked delivered on 2026-10-03 to a parcel locker, Parcelway tracking PW-5521-9930. Grace is Gold tier with 2 claims in the last 12 months, so I'd open a locker trace before sending anything.",
+      "topics": [
+        "LH-77302",
+        "LH-20418",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 18,
+      "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "topics": [
+        "LH-20418",
+        "escalations"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 19,
+      "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+      "topics": [
+        "LH-20418",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 22,
+      "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+      "topics": [
+        "LH-31055",
+        "LH-80941",
+        "ESC-2291",
+        "escalations",
+        "delivery"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 23,
+      "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+      "topics": [
+        "ESC-2291",
+        "LH-80941",
+        "escalations"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 24,
+      "text": "Their buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.",
+      "topics": [
+        "LH-31055",
+        "contacts"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 27,
+      "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+      "topics": [
+        "ESC-2219",
+        "LH-31055",
+        "escalations"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": [
+        22,
+        23
+      ]
+    },
+    {
+      "index": 28,
+      "text": "Updated: the Halvorsen escalation is ESC-2219.",
+      "topics": [
+        "ESC-2219",
+        "escalations"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 29,
+      "text": "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+      "topics": [
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": [
+        2,
+        3
+      ]
+    },
+    {
+      "index": 30,
+      "text": "Switched to approval code MX-4486 and retired MX-4471.",
+      "topics": [
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 36,
+      "text": "Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.",
+      "topics": [
+        "LH-80941",
+        "LH-31055",
+        "delivery",
+        "warehouse"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 37,
+      "text": "LH-80941 has been held at Freightline's Riverside depot since 2026-10-02 under pro number FL-660412, waiting on a release from our warehouse.",
+      "topics": [
+        "LH-80941",
+        "delivery",
+        "warehouse"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 40,
+      "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+      "topics": [
+        "LH-44870",
+        "LH-79215",
+        "returns"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 42,
+      "text": "Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00. Delivered 2026-09-21; return window open until 2026-10-21.",
+      "topics": [
+        "LH-79215",
+        "LH-44870",
+        "returns"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 43,
+      "text": "LH-79215 is a $289.00 stand mixer delivered 2026-09-21, inside the return window that runs to 2026-10-21.",
+      "topics": [
+        "LH-79215",
+        "returns"
+      ],
+      "after": 47,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 44,
+      "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning. Opened-item returns get a full refund again.",
+      "topics": [
+        "LH-44870",
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 44,
+      "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning. Opened-item returns get a full refund again.",
+      "topics": [
+        "LH-44870",
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "supersession",
+      "prior": [
+        4,
+        5
+      ]
+    },
+    {
+      "index": 44,
+      "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning. Opened-item returns get a full refund again.",
+      "topics": [
+        "LH-44870",
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "withdrawal",
+      "prior": [
+        4,
+        5
+      ]
+    },
+    {
+      "index": 45,
+      "text": "Understood, the restocking fee rule is withdrawn and opened-item returns are refunded in full.",
+      "topics": [
+        "returns",
+        "refunds"
+      ],
+      "after": 47,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 48,
+      "text": "Afternoon, it's Dana again. Marketing sent a goodwill code for customers hit by this week's carrier delays: LATE10, 10 percent off the next order, valid until 2026-10-09.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 49,
+      "text": "Noted: LATE10 takes 10 percent off a delayed customer's next order through 2026-10-09.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 49,
+      "text": "Noted: LATE10 takes 10 percent off a delayed customer's next order through 2026-10-09.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "repetition",
+      "prior": [
+        48
+      ]
+    },
+    {
+      "index": 54,
+      "text": "Tomorrow, Friday 2026-10-09, Marcus is at the supplier summit. Until 2026-10-09, Ruth Adeyemi, our deputy manager, gives any sign-off that would normally need Marcus.",
+      "topics": [
+        "escalations",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 55,
+      "text": "Got it: Ruth Adeyemi covers Marcus's sign-offs through 2026-10-09.",
+      "topics": [
+        "escalations",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 56,
+      "text": "Parcelway logged the locker trace on Grace Okafor's missing duvet as TR-3307. They say they'll answer within a day.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 57,
+      "text": "Recorded TR-3307 as the locker trace reference for Grace's order LH-77302.",
+      "topics": [
+        "LH-20418",
+        "LH-77302",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 58,
+      "text": "While ESC-2219 is open, phone Freightline's Riverside desk at 555-0188 every morning for a status on the Halvorsen lights.",
+      "topics": [
+        "ESC-2219",
+        "LH-31055",
+        "delivery",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 59,
+      "text": "Will do: a morning call to Freightline Riverside on 555-0188 for as long as ESC-2219 stays open.",
+      "topics": [
+        "ESC-2219",
+        "delivery",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 62,
+      "text": "New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late. Escalations opened ESC-2244.",
+      "topics": [
+        "LH-71592",
+        "LH-84056",
+        "ESC-2244",
+        "escalations",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 64,
+      "text": "Order LH-84056 for account LH-71592 (Copperline Cafes): 24 oak bistro chairs, total $2,880.00. Shipped 2026-10-01 by Freightline, pro number FL-661978; in transit, delayed by a linehaul shortage at the Dunmore hub.",
+      "topics": [
+        "LH-84056",
+        "LH-71592",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 65,
+      "text": "Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding. Account manager Ines Albrecht; preferred contact is the buyer.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 66,
+      "text": "LH-84056 is in transit on Freightline pro FL-661978, held up at the Dunmore hub. I logged ESC-2244 and copied Priya Raman.",
+      "topics": [
+        "LH-84056",
+        "ESC-2244",
+        "delivery",
+        "escalations"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 67,
+      "text": "Chase Freightline on FL-661978 every afternoon until Copperline's chairs land.",
+      "topics": [
+        "ESC-2244",
+        "LH-71592",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 68,
+      "text": "Copperline's buyer is Owen Pritchard. He takes calls before noon on extension 4301.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 71,
+      "text": "Last ticket today: Beatriz Solano, account LH-60214, received a rust-colored rug instead of the sage one she ordered on LH-83317.",
+      "topics": [
+        "LH-60214",
+        "LH-83317",
+        "returns"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 73,
+      "text": "Order LH-83317 for account LH-60214 (Beatriz Solano): wool rug, 6 x 9 ft, sage, total $412.00. Delivered 2026-10-06; the pick record shows the rust colorway was packed by mistake.",
+      "topics": [
+        "LH-83317",
+        "LH-60214",
+        "returns",
+        "warehouse"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 78,
+      "text": "Morning, it's Friday 2026-10-09, day two on the desk.",
+      "topics": [],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 80,
+      "text": "Freightline emailed overnight: Tomasz released the Halvorsen lights from the Riverside depot before he left yesterday.",
+      "topics": [
+        "LH-31055",
+        "warehouse",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "transition": "tool",
+      "index": 81,
+      "prior": [
+        36
+      ],
+      "text": "Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; released from the Riverside depot 2026-10-08 and delivered 2026-10-09 at 7:40 am to the Halvorsen Interiors loading dock, signed by S. Halvorsen. Carrier damage claims accepted until 2026-10-16.",
+      "topics": [
+        "LH-80941"
+      ],
+      "before": 47,
+      "after": 89,
+      "tool": "lookup_order",
+      "id": "LH-80941"
+    },
+    {
+      "index": 82,
+      "text": "Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; released from the Riverside depot 2026-10-08 and delivered 2026-10-09 at 7:40 am to the Halvorsen Interiors loading dock, signed by S. Halvorsen. Carrier damage claims accepted until 2026-10-16.",
+      "topics": [
+        "LH-80941",
+        "LH-31055",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 83,
+      "text": "LH-80941 was delivered at 7:40 this morning and signed for by S. Halvorsen; Freightline takes damage claims until 2026-10-16.",
+      "topics": [
+        "LH-80941",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 84,
+      "text": "Sigrid confirmed by email that all 8 pendants are in. Ticket ESC-2219 is resolved, close it.",
+      "topics": [
+        "ESC-2219",
+        "LH-31055",
+        "escalations"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 85,
+      "text": "Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "topics": [
+        "ESC-2219",
+        "LH-80941",
+        "escalations"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 88,
+      "text": "Grace Okafor emailed again about her duvet. Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 89,
+      "text": "Understood: Grace's replacement goes out at the end of the day unless TR-3307 turns something up first.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 89,
+      "text": "Understood: Grace's replacement goes out at the end of the day unless TR-3307 turns something up first.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 47,
+      "after": 89,
+      "transition": "repetition",
+      "prior": [
+        88
+      ]
+    },
+    {
+      "index": 90,
+      "text": "Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm. Trace TR-3307 is resolved, close it, and drop the replacement.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 90,
+      "text": "Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm. Trace TR-3307 is resolved, close it, and drop the replacement.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "withdrawal",
+      "prior": [
+        56,
+        88,
+        89
+      ]
+    },
+    {
+      "index": 91,
+      "text": "Closed TR-3307 and cancelled Grace's replacement.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 92,
+      "text": "Small fix on Copperline: Owen's extension is 4310, not 4301. The before-noon window stands.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "correction",
+      "prior": [
+        68
+      ]
+    },
+    {
+      "index": 93,
+      "text": "Updated: Owen Pritchard is on extension 4310, calls before noon.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 94,
+      "text": "Marcus changed his mind on late wholesale orders: instead of the $50 store credit, he'd rather we offer free freight on their next order.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 89,
+      "after": 95,
+      "transition": "supersession",
+      "prior": [
+        50,
+        51
+      ]
+    },
+    {
+      "index": 96,
+      "text": "Owen Pritchard emailed that all 24 chairs arrived this morning and look great. He thanked us for chasing Freightline.",
+      "topics": [
+        "LH-71592",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 99,
+      "text": "Farah Haddad on account LH-58841 has moved house. She wants order LH-85123 redirected to 19 Quarry Lane, Ashby.",
+      "topics": [
+        "LH-58841",
+        "LH-85123",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 101,
+      "text": "Order LH-85123 for account LH-58841 (Farah Haddad): blackout curtains, 2 panels, total $134.00. Shipped 2026-10-08 by Parcelway, tracking PW-7120-4466, to 7 Mill Road, Ashby; redirects accepted until it reaches the delivery depot.",
+      "topics": [
+        "LH-85123",
+        "LH-58841",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 102,
+      "text": "LH-85123 is still in transit on PW-7120-4466, so a redirect to 19 Quarry Lane can go in.",
+      "topics": [
+        "LH-85123",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 103,
+      "text": "Fix on Farah's redirect: the house number is 91 Quarry Lane, not 19. The rest of it stands.",
+      "topics": [
+        "LH-58841",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "correction",
+      "prior": [
+        99,
+        102
+      ]
+    },
+    {
+      "index": 104,
+      "text": "Updated the redirect to 91 Quarry Lane.",
+      "topics": [
+        "LH-58841",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 105,
+      "text": "Chase Parcelway every afternoon on Farah's redirect until the curtains land.",
+      "topics": [
+        "LH-58841",
+        "delivery"
+      ],
+      "before": 95,
+      "after": 105,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 108,
+      "text": "Beatriz Solano called back. She's changed her mind: she'd like the sage rug sent as an exchange instead of the refund.",
+      "topics": [
+        "LH-60214",
+        "returns"
+      ],
+      "before": 105,
+      "after": 111,
+      "transition": "supersession",
+      "prior": [
+        74,
+        75
+      ]
+    },
+    {
+      "index": 110,
+      "text": "The warehouse sent the sage rug for LH-83317 this afternoon on Parcelway, tracking PW-7042-1185. Chase Parcelway on it every afternoon until it lands.",
+      "topics": [
+        "LH-83317",
+        "delivery",
+        "warehouse"
+      ],
+      "before": 105,
+      "after": 111,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 111,
+      "text": "Noted PW-7042-1185 for Beatriz's exchange rug; I'll chase it each afternoon.",
+      "topics": [
+        "LH-60214",
+        "delivery"
+      ],
+      "before": 105,
+      "after": 111,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 112,
+      "text": "For tomorrow, Saturday 2026-10-10: the walk-in returns counter is open 9 am to 1 pm.",
+      "topics": [
+        "returns"
+      ],
+      "before": 111,
+      "after": 115,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 113,
+      "text": "Noted: Saturday walk-in returns run 9 am to 1 pm.",
+      "topics": [
+        "returns"
+      ],
+      "before": 111,
+      "after": 115,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 113,
+      "text": "Noted: Saturday walk-in returns run 9 am to 1 pm.",
+      "topics": [
+        "returns"
+      ],
+      "before": 111,
+      "after": 115,
+      "transition": "repetition",
+      "prior": [
+        112
+      ]
+    },
+    {
+      "index": 114,
+      "text": "Marketing's weekend code for customers whose orders ran late: WKND15, 15 percent off the next order, valid 2026-10-10 through 2026-10-11.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 111,
+      "after": 115,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 115,
+      "text": "Noted WKND15, 15 percent off the next order, for 2026-10-10 and 2026-10-11.",
+      "topics": [
+        "delivery",
+        "refunds"
+      ],
+      "before": 111,
+      "after": 115,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 120,
+      "text": "Morning, it's Saturday 2026-10-10, the last day of this stretch.",
+      "topics": [],
+      "before": 115,
+      "after": 123,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 122,
+      "text": "Disregard yesterday's note about the Saturday walk-in returns counter: facilities closed it all day for floor work, so walk-in returns wait until Monday.",
+      "topics": [
+        "returns"
+      ],
+      "before": 115,
+      "after": 123,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 122,
+      "text": "Disregard yesterday's note about the Saturday walk-in returns counter: facilities closed it all day for floor work, so walk-in returns wait until Monday.",
+      "topics": [
+        "returns"
+      ],
+      "before": 115,
+      "after": 123,
+      "transition": "supersession",
+      "prior": [
+        112,
+        113
+      ]
+    },
+    {
+      "index": 122,
+      "text": "Disregard yesterday's note about the Saturday walk-in returns counter: facilities closed it all day for floor work, so walk-in returns wait until Monday.",
+      "topics": [
+        "returns"
+      ],
+      "before": 115,
+      "after": 123,
+      "transition": "withdrawal",
+      "prior": [
+        112,
+        113
+      ]
+    },
+    {
+      "index": 123,
+      "text": "Understood: the walk-in returns counter is closed today and walk-in returns wait until Monday.",
+      "topics": [
+        "returns"
+      ],
+      "before": 115,
+      "after": 123,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 124,
+      "text": "Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "topics": [
+        "LH-66208",
+        "LH-86610",
+        "contacts",
+        "delivery"
+      ],
+      "before": 123,
+      "after": 127,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 126,
+      "text": "Order LH-86610 for account LH-66208 (Dalia Moreno): 3-seat sofa, charcoal, total $1,180.00. At the Larkspur Home warehouse awaiting a two-person delivery slot; slots are booked by phone with the customer.",
+      "topics": [
+        "LH-86610",
+        "LH-66208",
+        "warehouse",
+        "delivery"
+      ],
+      "before": 123,
+      "after": 127,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 127,
+      "text": "LH-86610 is in our warehouse waiting on a delivery slot, so a call to Dalia on 555-0175 is the next step.",
+      "topics": [
+        "LH-86610",
+        "contacts",
+        "delivery"
+      ],
+      "before": 123,
+      "after": 127,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 130,
+      "text": "Beatriz Solano emailed: the sage rug came this morning and it's perfect. She thanked the whole team.",
+      "topics": [
+        "LH-60214",
+        "delivery"
+      ],
+      "before": 127,
+      "after": 132,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 133,
+      "text": "Farah emailed: her curtains still haven't arrived, and she'd like something off her next order for the wait.",
+      "topics": [
+        "LH-58841",
+        "delivery"
+      ],
+      "before": 132,
+      "after": 133,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "transition": "tool",
+      "index": 135,
+      "prior": [
+        65
+      ],
+      "text": "Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding. Account manager Tobias Lindqvist since 2026-10-09; preferred contact is the buyer.",
+      "topics": [
+        "LH-71592"
+      ],
+      "before": 133,
+      "after": 137,
+      "tool": "lookup_customer",
+      "id": "LH-71592"
+    },
+    {
+      "index": 136,
+      "text": "Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding. Account manager Tobias Lindqvist since 2026-10-09; preferred contact is the buyer.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 133,
+      "after": 137,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 137,
+      "text": "Copperline's $6,000.00 limit leaves room for a $1,500 reorder.",
+      "topics": [
+        "LH-71592"
+      ],
+      "before": 133,
+      "after": 137,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 138,
+      "text": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday. Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 137,
+      "after": 139,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 138,
+      "text": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday. Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 137,
+      "after": 139,
+      "transition": "supersession",
+      "prior": [
+        68,
+        92,
+        93
+      ]
+    },
+    {
+      "index": 138,
+      "text": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday. Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 137,
+      "after": 139,
+      "transition": "withdrawal",
+      "prior": [
+        68,
+        92,
+        93
+      ]
+    },
+    {
+      "index": 139,
+      "text": "Updated: Copperline's buyer is Hana Ikeda, by email only.",
+      "topics": [
+        "LH-71592",
+        "contacts"
+      ],
+      "before": 137,
+      "after": 139,
+      "transition": "correction",
+      "prior": []
+    },
+    {
+      "index": 142,
+      "text": "Kenji Nakamura called: the replacement kettle on LH-81660 arrived with a dented lid. The warehouse is sending him another one today.",
+      "topics": [
+        "LH-52307",
+        "LH-81660",
+        "warehouse",
+        "delivery"
+      ],
+      "before": 139,
+      "after": 143,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 143,
+      "text": "Noted: a second replacement kettle goes out to Kenji today on LH-81660.",
+      "topics": [
+        "LH-81660",
+        "warehouse"
+      ],
+      "before": 139,
+      "after": 143,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 144,
+      "text": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set. She still wants her own replacement.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 143,
+      "after": 145,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 145,
+      "text": "Reopened TR-3307; Grace's replacement is back on.",
+      "topics": [
+        "LH-20418",
+        "TR-3307",
+        "delivery"
+      ],
+      "before": 143,
+      "after": 145,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 148,
+      "text": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass. Her electrician found it when unpacking this morning.",
+      "topics": [
+        "ESC-2219",
+        "LH-31055",
+        "escalations"
+      ],
+      "before": 145,
+      "after": 149,
+      "transition": "arrival",
+      "prior": []
+    },
+    {
+      "index": 149,
+      "text": "Reopened ESC-2219 for the cracked pendants and copied Priya Raman.",
+      "topics": [
+        "ESC-2219",
+        "escalations"
+      ],
+      "before": 145,
+      "after": 149,
+      "transition": "arrival",
+      "prior": []
+    }
+  ]
+}

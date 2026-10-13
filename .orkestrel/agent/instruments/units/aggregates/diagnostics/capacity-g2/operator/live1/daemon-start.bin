@@ -1,0 +1,16 @@
+{
+  "executable": {
+    "path": "../../scoop/apps/ollama-full/current/ollama.exe",
+    "hash": "9eaec399fd941073f8ddfbd56e0447f77fca5c006b26b8b1874a7fb12719b2a0",
+    "bytes": 27854728
+  },
+  "values": {
+    "OLLAMA_HOST": "http://127.0.0.1:11434",
+    "OLLAMA_NUM_PARALLEL": "1",
+    "OLLAMA_MAX_LOADED_MODELS": "0",
+    "LLAMA_ARG_CONTEXT_SHIFT": "0",
+    "LLAMA_ARG_N_PARALLEL": "1"
+  },
+  "pid": 38284,
+  "started": "2026-10-11T11:00:49.815Z"
+}

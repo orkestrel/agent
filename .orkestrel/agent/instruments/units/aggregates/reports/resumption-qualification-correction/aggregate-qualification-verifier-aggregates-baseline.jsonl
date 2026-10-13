@@ -1,0 +1,71 @@
+▶ Aggregator
+  ▶ render
+    ✖ orders the request owners before its desk topics and renders the heading and prose (594.8276ms)
+    ✖ binds the exact rendered version and refuses source changes before the next maintenance (509.5721ms)
+  ✖ render (1105.7343ms)
+✖ Aggregator (1111.2944ms)
+ℹ tests 2
+ℹ suites 2
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1449.8435
+
+✖ failing tests:
+
+test at .orkestrel\agent\instruments\harness\.build\bench5\tests\aggregates.test.js:992:9
+✖ orders the request owners before its desk topics and renders the heading and prose (594.8276ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /^Ids:/m. Input:
+  
+  '### Topic summaries\n' +
+    '\n' +
+    '#### Luis Ferreira (account LH-44870), as of 2026-10-08\n' +
+    'Ids: LH-44870, LH-79215, 2026-10-21\n' +
+    'Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215. The order totals $289.00 and the return window is open until 2026-10-21.\n' +
+    '\n' +
+    '#### refunds, as of 2026-10-08\n' +
+    'Ids: MX-4486, MX-4471, LH-44870, LH-79215\n' +
+    'Any refund over $200 needs a manager approval code; use MX-4486 from now on, because MX-4471 is dead. Opened-item returns get a full refund again after the director scrapped the 15 percent restocking fee.\n' +
+    '\n' +
+    '#### returns, as of 2026-10-08\n' +
+    'Ids: LH-44870, LH-79215\n' +
+    'Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215. Opened-item returns get a full refund again after the 15 percent restocking fee was scrapped.'
+  
+      at TestContext.<anonymous> (file:///C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/.build/bench5/tests/aggregates.test.js:1004:20)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1905:7)
+      at async Promise.all (index 4)
+      at async Suite.run (node:internal/test_runner/test:1905:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '### Topic summaries\n\n#### Luis Ferreira (account LH-44870), as of 2026-10-08\nIds: LH-44870, LH-79215, 2026-10-21\nLuis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215. The order totals $289.00 and the return window is open until 2026-10-21.\n\n#### refunds, as of 2026-10-08\nIds: MX-4486, MX-4471, LH-44870, LH-79215\nAny refund over $200 needs a manager approval code; use MX-4486 from now on, because MX-4471 is dead. Opened-item returns get a full refund again after the director scrapped the 15 percent restocking fee.\n\n#### returns, as of 2026-10-08\nIds: LH-44870, LH-79215\nLuis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215. Opened-item returns get a full refund again after the 15 percent restocking fee was scrapped.',
+    expected: /^Ids:/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at .orkestrel\agent\instruments\harness\.build\bench5\tests\aggregates.test.js:1017:9
+✖ binds the exact rendered version and refuses source changes before the next maintenance (509.5721ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+    '#### refunds, as of 2026-10-08\n' +
+  +   'Ids: LH-44870, LH-79215, MX-4490, MX-4486\n' +
+      'Any refund over $200 needs a manager approval code, and MX-4490 is the code to use from now on, not MX-4486.'
+  
+      at TestContext.<anonymous> (file:///C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/harness/.build/bench5/tests/aggregates.test.js:1043:20)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '#### refunds, as of 2026-10-08\nIds: LH-44870, LH-79215, MX-4490, MX-4486\nAny refund over $200 needs a manager approval code, and MX-4490 is the code to use from now on, not MX-4486.',
+    expected: '#### refunds, as of 2026-10-08\nAny refund over $200 needs a manager approval code, and MX-4490 is the code to use from now on, not MX-4486.',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

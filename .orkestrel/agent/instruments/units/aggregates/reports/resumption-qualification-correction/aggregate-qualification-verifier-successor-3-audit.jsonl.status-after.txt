@@ -1,0 +1,14 @@
+ M .orkestrel/agent/instruments/bench4/Driver.mjs
+ M .orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts
+ M .orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts
+ M .orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts
+ M .orkestrel/agent/instruments/harness/bench5/tests/aggregates.test.ts
+ M .orkestrel/agent/instruments/harness/bench5/tests/development.test.ts
+ M .orkestrel/agent/instruments/harness/bench5/tests/matrix.test.ts
+ M .orkestrel/agent/instruments/harness/bench5/tests/sustained/audit/Comparison.test.ts
+ M .orkestrel/agent/ledger.md
+ M .orkestrel/agent/plan.md
+ M .orkestrel/agent/progress.md
+ M RESULTS.md
+?? .orkestrel/agent/instruments/harness/.orkestrel/
+?? .orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-quality/

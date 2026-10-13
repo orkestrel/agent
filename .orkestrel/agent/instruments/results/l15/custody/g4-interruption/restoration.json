@@ -1,0 +1,108 @@
+{
+  "head": "b33dc98e13f589b0196b9f1aad9bd100306926f5",
+  "records": [
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-brief.md",
+      "archive": "aggregate-successor-g4-interruption-brief.md",
+      "bytes": 5170,
+      "hash": "4af02690cab7b99b9929fb438bc90ba6793f66c298e10088d3bb1111e726310a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-report.md",
+      "archive": "aggregate-successor-g4-interruption-report.md",
+      "bytes": 8081,
+      "hash": "019baea668af7291e1df40830db53f17de01c5cdd28283cbfd431b6135c01dc2"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-evidence.json",
+      "archive": "aggregate-successor-g4-interruption-evidence.json",
+      "bytes": 21265,
+      "hash": "0193260f63b0f4d7daa7e7200fbb2792b322d1e4b6e5aaf86ec09c67d4cd2a2d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-reader.stdout.txt",
+      "archive": "aggregate-successor-g4-interruption-reader.stdout.txt",
+      "bytes": 17046,
+      "hash": "abec791db6cd4fc0d1f5f783f484e252df2cfc5cae7d7166eccaf6db11cd885e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-reader.stderr.txt",
+      "archive": "aggregate-successor-g4-interruption-reader.stderr.txt",
+      "bytes": 0,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-launch.jsonl",
+      "archive": "aggregate-successor-g4-interruption-launch.jsonl",
+      "bytes": 1070,
+      "hash": "5ffdb2dc4e533e79d77f419432923d067b0c6158ae494b319b7b92d5aa909167"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-launch.err",
+      "archive": "aggregate-successor-g4-interruption-launch.err",
+      "bytes": 728,
+      "hash": "ec315879a72b66b875a9a70bbba04230f9d950d550c79da7dc87408cbf34f81d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-launch.pid",
+      "archive": "aggregate-successor-g4-interruption-launch.pid",
+      "bytes": 6,
+      "hash": "39b5db87d136e9b269cccaf85a8f0ccd2c75f66be934d15da30b719e8bac26e5"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-interruption-status-before.txt",
+      "archive": "aggregate-successor-g4-interruption-status-before.txt",
+      "bytes": 298,
+      "hash": "94764bae2c044efdf53dce538d03fba213c0006e9f6c8513ac475277794d1672"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-aggregate-brief.md",
+      "archive": "aggregate-successor-g4-think0-aggregate-brief.md",
+      "bytes": 7218,
+      "hash": "2301c2654093f3e257541c1146fd3a1ecf62cc1cb88613b310e1cdcd15ceec35"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-aggregate-read-2.ts",
+      "archive": "aggregate-successor-g4-think0-aggregate-read-2.ts",
+      "bytes": 2455,
+      "hash": "d9c6cd3e564a81f97e6a92777af3b39fa22cdb15b49080aba4b99f011d03cff7"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-start.json",
+      "archive": "aggregate-successor-daemon-start.json",
+      "bytes": 460,
+      "hash": "52286dd60e1cb02d9b5fc625523d4b9d21d37d7408b353cd39f520e05311db54"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-deployment.json",
+      "archive": "aggregate-successor-daemon-deployment.json",
+      "bytes": 5152,
+      "hash": "40442197423b574b61548feb702b55c948d77f61dd719d9d6b26e24ad3016e19"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-recovery-start.json",
+      "archive": "aggregate-successor-daemon-recovery-start.json",
+      "bytes": 460,
+      "hash": "8e361df3592a0b4f1f1f747e57075c494c84eda7118e7729606f411e1e3303b5"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-recovery-launch.ts",
+      "archive": "aggregate-successor-daemon-recovery-launch.ts",
+      "bytes": 1727,
+      "hash": "50b7503ce8069c69fa888837ef305b2c615756b65a65a55a5b9f512bc61ca5e2"
+    },
+    {
+      "original": "tmp/units/aggregate-root-interruption-retain.ts",
+      "archive": "aggregate-root-interruption-retain.ts",
+      "bytes": 3123,
+      "hash": "2d8a69b466d8c7a9526347ab61c78f00dcab53d1c82fe5c886450c3cf39236cc"
+    },
+    {
+      "original": "tmp/units/aggregate-root-interruption-retain-2.ts",
+      "archive": "aggregate-root-interruption-retain-2.ts",
+      "bytes": 3199,
+      "hash": "e3621168c8ba279043830c604eecc189a267c2bfa227c6eda9d87dfb890b084a"
+    }
+  ],
+  "durationMs": 14
+}

@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "text": "OK",
+  "url": "http://127.0.0.1:11434/api/chat",
+  "redirected": false,
+  "headers": [
+    [
+      "content-length",
+      "348"
+    ],
+    [
+      "content-type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "date",
+      "Sun, 11 Oct 2026 11:06:20 GMT"
+    ]
+  ],
+  "at": "2026-10-11T11:06:20.034Z",
+  "duration": 363.9684000000125
+}

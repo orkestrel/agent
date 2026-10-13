@@ -1,0 +1,642 @@
+{
+	"title": "Larkspur Home support desk",
+	"system": "You are the operations assistant on the Larkspur Home online store's customer-support desk, working for the shift lead in this conversation. You must use the facts, rules, corrections, and withdrawals stated earlier in the conversation: a correction replaces the earlier value, and a withdrawn rule no longer applies. When a request concerns an order id or account number from the conversation, you must call lookup_order or lookup_customer with it before you answer. When a fact you need is not in view, you must call search_history with a distinctive name, id, or word to recover it from the full conversation record. You must finish every request by calling send_reply with the complete answer; only the send_reply text counts as your answer.",
+	"ledger": {
+		"system": "You are the operations assistant on the Larkspur Home online store's customer-support desk, working for the shift lead in this conversation. You must use the facts, rules, corrections, and withdrawals stated earlier in the conversation: a correction replaces the earlier value, and a withdrawn rule no longer applies. When a request concerns an order id or account number from the conversation, you must call lookup_order or lookup_customer with it before you answer. When a fact you need is not in view, you must call recall with a topic (a customer name, an order or account id, or a desk topic) to recover it from the full conversation record. You must finish every request by calling send_reply with the complete answer; only the send_reply text counts as your answer. After a lookup, you must call pin with the result handle and the exact value you will use, before send_reply. A message marked amended is changed by the message it names.",
+		"gate": "The first send_reply while a lookup result is unpinned is refused one time, and the refusal names the handle.",
+		"clock": "2026-10-09",
+		"topics": {
+			"refunds": "refunds, refund amounts, refund methods, and the manager approval codes refunds need",
+			"returns": "returns of items, return windows, and fees taken off a return",
+			"escalations": "escalations, escalation tickets, sign-offs, and who is copied on an escalation",
+			"delivery": "shipping, packing, gift notes, carriers, tracking, depots, and delivery status or dates",
+			"warehouse": "the Larkspur Home warehouse, its staff, and releases of held shipments",
+			"contacts": "who to reach, how, and when"
+		}
+	},
+	"seed": [
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Morning, it's Friday 2026-10-09. I'm Dana Whitcombe, shift lead on the Larkspur Home support desk, and you're helping me work the queue today.",
+			"truth": {
+				"category": "fact",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "Good morning, Dana. Send over today's rules and the first ticket whenever you're ready.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Standing rule: any refund over $200 needs a manager approval code in the internal note. This week's code from Marcus Oyelaran, our escalations manager, is MX-4471.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"refunds"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"refunds"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Second rule: returns of opened items carry a 15 percent restocking fee, taken off the refund.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"refunds",
+					"returns"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Noted, a 15 percent restocking fee comes off refunds for opened items.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"refunds",
+					"returns"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Third rule: copy Priya Raman from the refunds team on every escalation. And never put a delivery date, a carrier estimate included, in a customer reply.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"escalations",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"escalations",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release. He's off on Monday 2026-10-12, so release requests have to reach him today.",
+			"truth": {
+				"category": "rule",
+				"topics": [
+					"delivery",
+					"warehouse",
+					"contacts"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "Ugh, the label printer by the door just jammed again and ate half a roll of shipping labels.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "Sorry about that. Those thermal printers usually clear if you open the hatch and feed the roll forward by hand.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Quick one before the queue: Kenji Nakamura's replacement kettle on order LH-81660 needs a gift note that reads 'Happy 40th, Aiko'.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Noted the gift note request on LH-81660.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-20418",
+					"LH-77302",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "tool-group",
+			"content": "I'll pull up the order and Grace's account.",
+			"calls": [
+				{
+					"id": "call_1",
+					"name": "lookup_order",
+					"arguments": {
+						"id": "LH-77302"
+					}
+				},
+				{
+					"id": "call_2",
+					"name": "lookup_customer",
+					"arguments": {
+						"account": "LH-20418"
+					}
+				}
+			],
+			"truth": {
+				"category": "chatter",
+				"topics": [
+					"LH-77302",
+					"LH-20418"
+				]
+			}
+		},
+		{
+			"role": "tool",
+			"kind": "tool-group",
+			"call": "call_1",
+			"content": "Order LH-77302 for account LH-20418 (Grace Okafor): linen duvet set, queen, total $148.50. Shipped 2026-10-01 by Parcelway, tracking PW-5521-9930; marked delivered 2026-10-06 to a parcel locker at Elm Street station.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-77302",
+					"LH-20418"
+				]
+			}
+		},
+		{
+			"role": "tool",
+			"kind": "tool-group",
+			"call": "call_2",
+			"content": "Account LH-20418: Grace Okafor, Gold tier, member since 2021-04-12. 2 claims in the last 12 months; preferred contact is email.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-20418"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "LH-77302 was marked delivered on 2026-10-06 to a parcel locker, Parcelway tracking PW-5521-9930. Grace is Gold tier with 2 claims in the last 12 months, so I'd open a locker trace before sending anything.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-77302",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"escalations",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"escalations",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "Is it supposed to storm this afternoon? I biked in and left my rain jacket at home.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "I can't see a forecast from here, but the bike rack by the loading dock is covered.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-31055",
+					"LH-80941",
+					"escalations",
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-80941",
+					"escalations"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Their buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"contacts"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "Totally unrelated, but my side project cataloguing my grandmother's seed packets hit 300 varieties last night.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "That's a big collection. Sorting it by plant family might make it easier to browse.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "correction",
+			"content": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"escalations"
+				],
+				"amends": [
+					22,
+					23
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "correction",
+			"content": "Updated: the Halvorsen escalation is ESC-2219.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"escalations"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "correction",
+			"content": "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"refunds"
+				],
+				"amends": [
+					2,
+					3
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "correction",
+			"content": "Switched to approval code MX-4486 and retired MX-4471.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"refunds"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "Who left pad thai in the break room fridge? There's an unlabeled container on the top shelf.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "Not mine, I'm afraid. A note in the team channel might find the owner.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "And the label printer jammed again, so I put in a facilities request.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Anyway, can you check where the Halvorsen shipment actually is?",
+			"truth": {
+				"category": "request",
+				"topics": [
+					"delivery"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "tool-group",
+			"content": "Checking the Halvorsen order.",
+			"calls": [
+				{
+					"id": "call_3",
+					"name": "lookup_order",
+					"arguments": {
+						"id": "LH-80941"
+					}
+				}
+			],
+			"truth": {
+				"category": "chatter",
+				"topics": [
+					"LH-80941"
+				]
+			}
+		},
+		{
+			"role": "tool",
+			"kind": "tool-group",
+			"call": "call_3",
+			"content": "Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-05, awaiting a release from the Larkspur Home warehouse.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-80941",
+					"LH-31055"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "LH-80941 has been held at Freightline's Riverside depot since 2026-10-05 under pro number FL-660412, waiting on a release from our warehouse.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-80941",
+					"delivery",
+					"warehouse"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "Heads up, the fire drill moved to 3 pm, so don't panic when the alarm goes off.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "Thanks for the warning.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		},
+		{
+			"role": "user",
+			"kind": "fact",
+			"content": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-44870",
+					"LH-79215",
+					"returns"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "tool-group",
+			"content": "Pulling up the mixer order.",
+			"calls": [
+				{
+					"id": "call_4",
+					"name": "lookup_order",
+					"arguments": {
+						"id": "LH-79215"
+					}
+				}
+			],
+			"truth": {
+				"category": "chatter",
+				"topics": [
+					"LH-79215"
+				]
+			}
+		},
+		{
+			"role": "tool",
+			"kind": "tool-group",
+			"call": "call_4",
+			"content": "Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00. Delivered 2026-09-22; return window open until 2026-10-22.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-79215",
+					"LH-44870"
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "fact",
+			"content": "LH-79215 is a $289.00 stand mixer delivered 2026-09-22, inside the return window that runs to 2026-10-22.",
+			"truth": {
+				"category": "fact",
+				"topics": [
+					"LH-79215",
+					"returns"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "withdrawal",
+			"content": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning. Opened-item returns get a full refund again.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"refunds",
+					"returns"
+				],
+				"supersedes": [
+					4,
+					5
+				]
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "withdrawal",
+			"content": "Understood, the restocking fee rule is withdrawn and opened-item returns are refunded in full.",
+			"truth": {
+				"category": "correction",
+				"topics": [
+					"refunds",
+					"returns"
+				]
+			}
+		},
+		{
+			"role": "user",
+			"kind": "distractor",
+			"content": "The coffee machine on the third floor is finally fixed, so I'm grabbing a cup before we start sending replies.",
+			"truth": {
+				"category": "distractor",
+				"topics": []
+			}
+		},
+		{
+			"role": "assistant",
+			"kind": "chatter",
+			"content": "Enjoy it. I'll be ready when you're back.",
+			"truth": {
+				"category": "chatter",
+				"topics": []
+			}
+		}
+	],
+	"tools": {
+		"lookup_order": {
+			"LH-77302": "Order LH-77302 for account LH-20418 (Grace Okafor): linen duvet set, queen, total $148.50. Shipped 2026-10-01 by Parcelway, tracking PW-5521-9930; marked delivered 2026-10-06 to a parcel locker at Elm Street station.",
+			"LH-80941": "Order LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-05, awaiting a release from the Larkspur Home warehouse.",
+			"LH-79215": "Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00. Delivered 2026-09-22; return window open until 2026-10-22.",
+			"LH-81660": "Order LH-81660 for account LH-52307 (Kenji Nakamura): replacement electric kettle, gift wrapped, no charge. Shipped 2026-10-08 by Parcelway, tracking PW-6013-2280, carrier estimated delivery 2026-10-13; gift note text is not recorded on the order."
+		},
+		"lookup_customer": {
+			"LH-20418": "Account LH-20418: Grace Okafor, Gold tier, member since 2021-04-12. 2 claims in the last 12 months; preferred contact is email.",
+			"LH-31055": "Account LH-31055: Halvorsen Interiors, wholesale tier, net 30 terms, credit limit $5,000.00 with $1,240.00 outstanding. Account manager Ines Albrecht, direct line 555-0142.",
+			"LH-44870": "Account LH-44870: Luis Ferreira, Standard tier, member since 2023-02-08. Refund method on file is Mastercard ending 7719; email luis.ferreira@example.net.",
+			"LH-52307": "Account LH-52307: Kenji Nakamura, Silver tier, member since 2022-07-19, preferred contact email. No gift note text is stored on the account."
+		}
+	},
+	"goals": [
+		{
+			"id": "g06-kenji-shipping",
+			"distance": "far",
+			"request": "Kenji Nakamura is checking whether the replacement kettle has shipped. Pull up the order and write a reply I can pass on to him.",
+			"expected": [
+				"pw-6013-2280"
+			],
+			"forbidden": [
+				"2026-10-13",
+				"october 13",
+				"oct 13",
+				"oct. 13",
+				"13 oct",
+				"13th oct",
+				"10/13"
+			],
+			"forbiddenPatterns": [
+				"\\b(?:2026[-/.]0?10[-/.]0?13|0?10[-/.]0?13(?:[-/.](?:2026|26))?|0?13[-/.]0?10[-/.](?:2026|26)|oct(?:ober)?\\.?[ \\t-]*(?:the\\s+)?(?:13(?:th)?|thirteenth|thirteen)|(?:13(?:th)?|thirteenth|thirteen)[ \\t-]+(?:of\\s+)?oct(?:ober)?\\.?)\\b",
+				"\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?(?<!\\b(?:shipped|sent|dispatched)\\s+(?:out\\s+)?(?:on\\s+)?(?:\\w+\\s+)?\\(?)(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)|(?<!\\b(?:shipped|sent|dispatched)\\s+(?:out\\s+)?(?:on\\s+)?(?:\\w+\\s+)?\\(?)(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b",
+				"(?<!\\b(?:when|once|until|till|after|before|if|whenever|as soon as)\\b[^.!?\\n]{0,40})(?<!\\b(?:not|never|hasn't|haven't|hadn't)\\s+(?:yet\\s+)?)\\barrived\\b|(?<!\\b(?:when|once|until|till|after|before|if|whenever|as soon as)\\b[^.!?\\n]{0,40})\\b(?:(?:was|were|is|has been|have been|had been|s been|ve been|got)\\s+(?:(?:already|successfully)\\s+)?delivered|(?:we|they|parcelway|the carrier)\\s+(?:have\\s+|has\\s+)?delivered)\\b|(?:^|[\\n:¦])\\s*delivered\\b",
+				"^(?![\\s\\S]*(?:\\b(?:hi|hello|dear)\\s+kenji\\b|(?:^|[\\n\"“])\\s*kenji(?:\\s+nakamura)?\\s*[,!:]|\\byour\\s+(?:replacement|electric|kettle|order|tracking|package|parcel|shipment)\\b))",
+				"\\b(?:i've|we've|i have|we have|i|we)\\s+(?:already\\s+)?(?:added|included|attached|recorded|updated|written|printed)\\b[^.!?\\n]*\\b(?:gift\\s+(?:note|card)|(?:that|the|this)\\s+(?:text|wording))\\b|\\b(?:gift\\s+(?:note|card)(?:\\s+text)?)\\s+(?:has been|was|is|has already been)\\s+(?:added|included|attached|recorded|printed)\\b"
+			],
+			"facts": [
+				6,
+				11
+			],
+			"tools": [
+				"lookup_order",
+				"send_reply"
+			]
+		}
+	],
+	"notes": "Chosen: candidate 1 (Larkspur Home support desk). Seed indices are zero-based. The seed has 48 messages: the first third is 0-15 and the near window is 40-47. 14 of the 48 (29.2 percent) are distractors or chatter. Far facts: the over-$200 approval rule (2), the Priya Raman copy rule and the no-written-delivery-date rule (6), Tomasz Brennan as the depot-release contact who is off Monday 2026-10-12 (8), the LH-81660 gift note 'Happy 40th, Aiko' (11), and Grace Okafor's tracking number PW-5521-9930 (15). Far goals: g03, g05, g06, g07, and g09. Superseded values: MX-4471 (2, 3) is replaced by MX-4486 (29, 30) and scored by g05. ESC-2291 (22, 23) is replaced by ESC-2219 (27, 28) and scored by g04. Withdrawn rule: the 15 percent restocking fee (4, 5) is withdrawn at 44 and 45, so g01 expects 289 and forbids 245.65 and 43.35. Lookups by an id or account from the chat: g02 (LH-44870), g06 (LH-81660), and g08 (LH-31055). Their expected values exist only in canned data. search_history goals: g09 and g10. Expected drop set for every goal: distractors 9, 20, 25, 31, 33, 38, and 46, and chatter 1, 10, 21, 26, 32, 39, and 47. For each goal, a good judge also keeps the listed facts, the correction or withdrawal that governs them, and their acknowledgments, and drops the other tickets. For example, g09 keeps 11 and drops every Grace, Halvorsen, and Luis message. Traps: (a) acknowledgment 12 does not repeat the gift wording, and the LH-81660 and LH-52307 lookups both say no gift text is recorded, so g09 can recover the wording only from 11 or through search_history. (b) No message after 24 repeats extension 4127, and g08's lookup adds the switchboard 555-0142 to the record as a decoy for g10. (c) The LH-81660 lookup gives a carrier estimate of 2026-10-13, which rule 6 forbids writing to a customer. g06's forbidden list therefore scores a rule violation, not a superseded value. (d) Acknowledgments 3 and 23 repeat the superseded code and ticket. (e) g07 and g10 also ask timing questions that are not scored (Tomasz must get the request today; Sigrid takes calls after 2 pm). Changes made: (1) the system prompt now states each duty in the brief as 'you must': use the facts, call a lookup when an id is at hand, call search_history when a fact is out of view, and finish with send_reply. (2) '13 oct' was added to g06's forbidden list so a day-first date such as '13 October' also counts as a violation. (3) 'oct. 13' and '13th oct' were added to g06's forbidden list so an abbreviated or ordinal date also counts as a violation. (4) An optional forbiddenPatterns array of JavaScript regex sources, tested case-insensitively against the reply and the answer, was added to 4 goals. g06 and g09 carry one pattern that matches any written calendar date: an ISO date, a month name or abbreviation before or after a day number ('October 13', 'Oct. 13', '13th of October'), and a numeric month/day date ('10/13'), because rule 6 forbids writing a delivery date to a customer; a correct reply names no date, so a shipped-on date also counts. g03 and g05 carry 5 patterns that match a revived restocking fee: a percentage followed by 'restocking', 'restocking fee (if applicable)', 'subject to' a restocking fee, a restocking fee that applies or is deducted, and 'restocking fee of'. Each restocking pattern except the '(if applicable)' one skips a sentence that also says the fee was withdrawn, scrapped, waived, removed, or not charged, so a correct reply that reports the withdrawal passes. The bare words 'restocking fee' are not forbidden. A script checked the result literally. It found 48 messages and 3 tool groups. Each tool group is followed by exactly one tool message per call, each tool message's call matches its call id, and each tool message's text is identical to its canned result. All 7 ids in the seed, plus LH-52307, have canned data. Every expected substring appears in its listed fact or in the named lookup's canned result (LH-44870 for g02, LH-81660 for g06, and LH-31055 for g08) and in none of the goal requests. Each goal's computed distance matches its label. Candidate 2 (Frankfurt on-call runbook) was not chosen because of criterion 1. Its g07 forbids 'ops-audit', which fails a correct reply that says the cc was dropped. Its g08 expects '1,450', which fails 'EUR 1450' or '1.450'. Its g02 depends on the reader treating an optic swap as a production change, which the seed never says. Its g04 status notice can write the date as 'Sunday 18 October' and miss '2026-10-18'."
+}

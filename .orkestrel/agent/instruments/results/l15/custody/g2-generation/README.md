@@ -1,0 +1,11 @@
+# Gemma2 calibration generation
+
+Root accepts the closed Gemma2 generation at execution HEAD `1491e6b2b8913f814d308c3d45ff002e1506abe4`. The outer sequence exited 0 uncapped in 1126851 ms; generation took 1114591 ms. Both decision-mode freezes, corpus construction, and generation passed. Before/after custody hashes match, and the recorded processes closed.
+
+The offline reader exited 0 in 784 ms. It validated 174 exact attempt/packet joins, all 162 corpus contexts over 24 points, 12 controls, no generation error, and no missing usage. The generation packet SHA256 is `9ae5f8622b50bfd09672c243499fccf01b775451cba03671a33c46755025cb2d`. Clean Astra receives its byte-identical opaque alias for independent support labeling; no calibration fit or task-quality conclusion is accepted from generation alone. See [the closed report](aggregate-successor-model-g2-generation-report.md) and [the complete reader output](aggregate-successor-model-g2-generation-read.stdout.txt).
+
+Calibration used 246376 tokens across all recorded roles. Summarization used 54 requests and 44777 tokens; trajectory judging used 165 requests and 183338 tokens; control judging used 25 requests and 18261 tokens. The reader reports no cost failures and 459 replayed readings. Both Ollama services remain running under the user's instruction; shared GPU use limits timing comparisons.
+
+The archive also preserves the prepared Gemma4 exploratory materializer. Root read its complete script and report; syntax passed. It uses the existing development entry, cutoff 0.61, and withholding enabled. Runtime admission remains unattempted pending the cell-specific resource/full manifests. See [the preparation report](aggregate-successor-g4-exploratory-preparation-report.md).
+
+Retention copied 48 originals totaling 2389533 bytes in 625 ms, with exact equality and all 45 expected seals matching. HEAD, tracked paths, and index were unchanged. The [restoration manifest](restoration.json) binds every original and copy; its SHA256 is `2808ff4317e6da9eb241be0987701126ccbd33deffe8940ab726ee9b35119b72`. Raw corpus, generation, cache, and frozen configurations remain in their canonical l15 directories. The active independent labels and their unfinished helpers are excluded.

@@ -1,0 +1,13 @@
+{
+  "name": "population-proof",
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-verification\\run-4\\population.ts"
+  ],
+  "expected": 0,
+  "exit": 1,
+  "signal": null,
+  "durationMs": 137.07209999999986,
+  "stdoutPath": "population-proof.stdout.txt",
+  "stderrPath": "population-proof.stderr.txt"
+}

@@ -1,0 +1,864 @@
+{
+  "causes": [
+    "C1 seed assistant statements",
+    "C2 cut room",
+    "C3 earlier reading of a lookup",
+    "C4 call text on a lookup line",
+    "C5 earlier answer note in a recall",
+    "C6 stale removal off the briefing route",
+    "C8 unclassified"
+  ],
+  "copies": [
+    {
+      "copy": 1,
+      "agentBodies": 24,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 24,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 2,
+        "C8 unclassified": 2
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": [
+        {
+          "kind": "agent",
+          "file": "00036_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00037_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "copy": 2,
+      "agentBodies": 19,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 19,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 0,
+        "C8 unclassified": 0
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": []
+    },
+    {
+      "copy": 3,
+      "agentBodies": 22,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 22,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 2,
+        "C8 unclassified": 2
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": [
+        {
+          "kind": "agent",
+          "file": "00036_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00037_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "copy": 4,
+      "agentBodies": 17,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 17,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 0,
+        "C8 unclassified": 0
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": []
+    },
+    {
+      "copy": 5,
+      "agentBodies": 22,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 22,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 0,
+        "C8 unclassified": 0
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": []
+    },
+    {
+      "copy": 6,
+      "agentBodies": 20,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 20,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 2,
+        "C8 unclassified": 2
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": [
+        {
+          "kind": "agent",
+          "file": "00036_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00037_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "copy": 7,
+      "agentBodies": 23,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 23,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 5,
+        "C8 unclassified": 5
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": [
+        {
+          "kind": "agent",
+          "file": "00037_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00038_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00061_api_chat-request.json",
+          "goal": "g07-depot-release",
+          "call": 1,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[18]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "user message line"
+              ],
+              "recorded": {
+                "lines": [
+                  "Anyway, can you check where the Halvorsen shipment actually is?"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "Anyway, can you check where the Halvorsen shipment actually is?"
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00062_api_chat-request.json",
+          "goal": "g07-depot-release",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[18]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "user message line"
+              ],
+              "recorded": {
+                "lines": [
+                  "Anyway, can you check where the Halvorsen shipment actually is?"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "Anyway, can you check where the Halvorsen shipment actually is?"
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ]
+              }
+            },
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "2 older items not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "2 older items not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00063_api_chat-request.json",
+          "goal": "g07-depot-release",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "copy": 8,
+      "agentBodies": 23,
+      "judgeBodies": 56,
+      "recordedJudgeBodies": 51,
+      "usagePromptRewritten": 23,
+      "counts": {
+        "C1 seed assistant statements": 0,
+        "C2 cut room": 0,
+        "C3 earlier reading of a lookup": 0,
+        "C4 call text on a lookup line": 0,
+        "C5 earlier answer note in a recall": 0,
+        "C6 stale removal off the briefing route": 2,
+        "C8 unclassified": 2
+      },
+      "heldSecondAsks": [
+        "topic m2 warehouse",
+        "topic m3 warehouse",
+        "topic m7 warehouse",
+        "topic m10 escalations",
+        "topic m10 warehouse"
+      ],
+      "bodies": [
+        {
+          "kind": "agent",
+          "file": "00036_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 2,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[20]",
+              "role": "tool",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port",
+                "recall cut line"
+              ],
+              "recorded": {
+                "lines": [
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+                  "1 older item not shown; name a narrower topic to narrow the recall"
+                ],
+                "port": [
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "kind": "agent",
+          "file": "00037_api_chat-request.json",
+          "goal": "g04-halvorsen-ticket",
+          "call": 3,
+          "causes": [
+            "C6 stale removal off the briefing route",
+            "C8 unclassified"
+          ],
+          "diff": [
+            {
+              "where": "messages[13]",
+              "role": "user",
+              "causes": [
+                "C6 stale removal off the briefing route",
+                "C8 unclassified"
+              ],
+              "kinds": [
+                "line only in the port"
+              ],
+              "recorded": {
+                "lines": [],
+                "omitted": 0
+              },
+              "port": {
+                "lines": [
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ],
+                "omitted": 0
+              },
+              "unclassified": {
+                "recorded": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+                ],
+                "port": [
+                  "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+                  "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+                  "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.",
+                  "Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

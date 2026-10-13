@@ -1,0 +1,14 @@
+{
+  "name": "content-leak-proof",
+  "args": [
+    "--test",
+    "--test-name-pattern=withholds a capped rebuilt summary while real development decisions and later recovery continue",
+    ".orkestrel/agent/instruments/harness/.build/bench5/tests/development.test.js"
+  ],
+  "expected": 1,
+  "code": 1,
+  "pid": 46228,
+  "durationMs": 11501,
+  "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\content-leak-proof.stdout.log",
+  "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\content-leak-proof.stderr.log"
+}

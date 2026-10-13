@@ -1,0 +1,1373 @@
+{
+	"settings": {
+		"allowance": 555,
+		"retry": 2,
+		"predict": 160
+	},
+	"wall": 197014,
+	"walls": {
+		"agent": 60899,
+		"summarizer": 85422,
+		"judge": 48353,
+		"flush": 1032
+	},
+	"judge": {
+		"hits": {
+			"category": 63,
+			"topic": 354,
+			"amends": 49,
+			"supersedes": 8,
+			"agree": 74
+		},
+		"misses": {
+			"agree": 19
+		},
+		"transient": 0
+	},
+	"largest": 145,
+	"predict": 160,
+	"heads": [
+		{
+			"head": "build",
+			"count": 249,
+			"fresh": 56,
+			"wall": 133986.43250000014
+		},
+		{
+			"head": "agree",
+			"count": 93,
+			"fresh": 19,
+			"wall": 48383.75460000001
+		},
+		{
+			"head": "change",
+			"count": 0,
+			"fresh": 0,
+			"wall": 0
+		}
+	],
+	"ownerBuilds": 33,
+	"ownerFresh": 19,
+	"attempts": [
+		{
+			"key": "[\"g01-luis-refund-amount\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g01-luis-refund-amount\",\"owner:LH-44870\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g02-luis-card\",\"owner:LH-44870\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g03-grace-escalation\",\"owner:LH-20418\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g04-halvorsen-ticket\",\"owner:LH-31055\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g05-luis-approval-note\",\"owner:LH-44870\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g06-kenji-shipping\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g07-depot-release\",\"owner:LH-31055\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g08-halvorsen-credit\",\"owner:LH-31055\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g09-kenji-gift-note\",\"owner:LH-52307\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g10-sigrid-callback\",\"owner:LH-31055\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g11-grace-signoff-today\",\"owner:LH-20418\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"refunds\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"returns\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"escalations\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"contacts\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"delivery\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"warehouse\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		},
+		{
+			"key": "[\"g12-copperline-gesture\",\"owner:LH-71592\"]",
+			"builds": 3,
+			"withheld": true,
+			"successful": false
+		}
+	],
+	"completions": [
+		{
+			"sequence": 3,
+			"goal": "g01-luis-refund-amount",
+			"completion": 72
+		},
+		{
+			"sequence": 4,
+			"goal": "g01-luis-refund-amount",
+			"completion": 65
+		},
+		{
+			"sequence": 6,
+			"goal": "g01-luis-refund-amount",
+			"completion": 87
+		},
+		{
+			"sequence": 8,
+			"goal": "g01-luis-refund-amount",
+			"completion": 52
+		},
+		{
+			"sequence": 9,
+			"goal": "g01-luis-refund-amount",
+			"completion": 64
+		},
+		{
+			"sequence": 11,
+			"goal": "g01-luis-refund-amount",
+			"completion": 60
+		},
+		{
+			"sequence": 13,
+			"goal": "g01-luis-refund-amount",
+			"completion": 87
+		},
+		{
+			"sequence": 15,
+			"goal": "g01-luis-refund-amount",
+			"completion": 88
+		},
+		{
+			"sequence": 17,
+			"goal": "g01-luis-refund-amount",
+			"completion": 80
+		},
+		{
+			"sequence": 18,
+			"goal": "g01-luis-refund-amount",
+			"completion": 77
+		},
+		{
+			"sequence": 19,
+			"goal": "g01-luis-refund-amount",
+			"completion": 84
+		},
+		{
+			"sequence": 20,
+			"goal": "g01-luis-refund-amount",
+			"completion": 59
+		},
+		{
+			"sequence": 21,
+			"goal": "g01-luis-refund-amount",
+			"completion": 57
+		},
+		{
+			"sequence": 22,
+			"goal": "g01-luis-refund-amount",
+			"completion": 60
+		},
+		{
+			"sequence": 23,
+			"goal": "g01-luis-refund-amount",
+			"completion": 96
+		},
+		{
+			"sequence": 24,
+			"goal": "g01-luis-refund-amount",
+			"completion": 62
+		},
+		{
+			"sequence": 26,
+			"goal": "g01-luis-refund-amount",
+			"completion": 68
+		},
+		{
+			"sequence": 34,
+			"goal": "g03-grace-escalation",
+			"completion": 74
+		},
+		{
+			"sequence": 36,
+			"goal": "g03-grace-escalation",
+			"completion": 130
+		},
+		{
+			"sequence": 42,
+			"goal": "g04-halvorsen-ticket",
+			"completion": 141
+		},
+		{
+			"sequence": 43,
+			"goal": "g04-halvorsen-ticket",
+			"completion": 138
+		},
+		{
+			"sequence": 45,
+			"goal": "g04-halvorsen-ticket",
+			"completion": 97
+		},
+		{
+			"sequence": 50,
+			"goal": "g05-luis-approval-note",
+			"completion": 94
+		},
+		{
+			"sequence": 51,
+			"goal": "g05-luis-approval-note",
+			"completion": 109
+		},
+		{
+			"sequence": 66,
+			"goal": "g09-kenji-gift-note",
+			"completion": 59
+		},
+		{
+			"sequence": 67,
+			"goal": "g09-kenji-gift-note",
+			"completion": 80
+		},
+		{
+			"sequence": 71,
+			"goal": "g10-sigrid-callback",
+			"completion": 108
+		},
+		{
+			"sequence": 72,
+			"goal": "g10-sigrid-callback",
+			"completion": 134
+		},
+		{
+			"sequence": 73,
+			"goal": "g10-sigrid-callback",
+			"completion": 104
+		},
+		{
+			"sequence": 77,
+			"goal": "g11-grace-signoff-today",
+			"completion": 54
+		},
+		{
+			"sequence": 78,
+			"goal": "g11-grace-signoff-today",
+			"completion": 63
+		},
+		{
+			"sequence": 80,
+			"goal": "g11-grace-signoff-today",
+			"completion": 70
+		},
+		{
+			"sequence": 81,
+			"goal": "g11-grace-signoff-today",
+			"completion": 55
+		},
+		{
+			"sequence": 82,
+			"goal": "g11-grace-signoff-today",
+			"completion": 71
+		},
+		{
+			"sequence": 84,
+			"goal": "g11-grace-signoff-today",
+			"completion": 60
+		},
+		{
+			"sequence": 85,
+			"goal": "g11-grace-signoff-today",
+			"completion": 93
+		},
+		{
+			"sequence": 86,
+			"goal": "g11-grace-signoff-today",
+			"completion": 124
+		},
+		{
+			"sequence": 87,
+			"goal": "g11-grace-signoff-today",
+			"completion": 88
+		},
+		{
+			"sequence": 88,
+			"goal": "g11-grace-signoff-today",
+			"completion": 108
+		},
+		{
+			"sequence": 89,
+			"goal": "g11-grace-signoff-today",
+			"completion": 63
+		},
+		{
+			"sequence": 91,
+			"goal": "g11-grace-signoff-today",
+			"completion": 81
+		},
+		{
+			"sequence": 93,
+			"goal": "g11-grace-signoff-today",
+			"completion": 87
+		},
+		{
+			"sequence": 94,
+			"goal": "g11-grace-signoff-today",
+			"completion": 135
+		},
+		{
+			"sequence": 95,
+			"goal": "g11-grace-signoff-today",
+			"completion": 67
+		},
+		{
+			"sequence": 96,
+			"goal": "g11-grace-signoff-today",
+			"completion": 34
+		},
+		{
+			"sequence": 97,
+			"goal": "g11-grace-signoff-today",
+			"completion": 59
+		},
+		{
+			"sequence": 98,
+			"goal": "g11-grace-signoff-today",
+			"completion": 108
+		},
+		{
+			"sequence": 100,
+			"goal": "g11-grace-signoff-today",
+			"completion": 113
+		},
+		{
+			"sequence": 105,
+			"goal": "g12-copperline-gesture",
+			"completion": 64
+		},
+		{
+			"sequence": 106,
+			"goal": "g12-copperline-gesture",
+			"completion": 88
+		},
+		{
+			"sequence": 108,
+			"goal": "g12-copperline-gesture",
+			"completion": 66
+		},
+		{
+			"sequence": 110,
+			"goal": "g12-copperline-gesture",
+			"completion": 79
+		},
+		{
+			"sequence": 111,
+			"goal": "g12-copperline-gesture",
+			"completion": 145
+		},
+		{
+			"sequence": 112,
+			"goal": "g12-copperline-gesture",
+			"completion": 85
+		},
+		{
+			"sequence": 113,
+			"goal": "g12-copperline-gesture",
+			"completion": 67
+		},
+		{
+			"sequence": 114,
+			"goal": "g12-copperline-gesture",
+			"completion": 128
+		}
+	],
+	"goals": [
+		{
+			"goal": "g01-luis-refund-amount",
+			"wall": 3011.0109999999986,
+			"stage": 41406.172,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-44870",
+				"refunds",
+				"returns"
+			],
+			"questions": {
+				"category": {
+					"fresh": 0,
+					"hits": 41
+				},
+				"topic": {
+					"fresh": 0,
+					"hits": 197
+				},
+				"amends": {
+					"fresh": 0,
+					"hits": 17
+				},
+				"supersedes": {
+					"fresh": 0,
+					"hits": 7
+				},
+				"agree": {
+					"fresh": 8,
+					"hits": 1
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 2901
+				},
+				{
+					"role": "judge",
+					"count": 8,
+					"wall": 18709
+				},
+				{
+					"role": "summarizer",
+					"count": 17,
+					"wall": 22624
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 102
+				}
+			]
+		},
+		{
+			"goal": "g02-luis-card",
+			"wall": 1711.8335999999981,
+			"stage": 19.30529999999999,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-44870"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 9
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 1688
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 89
+				}
+			]
+		},
+		{
+			"goal": "g03-grace-escalation",
+			"wall": 7073.532600000006,
+			"stage": 8480.162599999996,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-20418",
+				"escalations",
+				"delivery"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 2,
+					"hits": 8
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 3,
+					"wall": 7024
+				},
+				{
+					"role": "judge",
+					"count": 2,
+					"wall": 4951
+				},
+				{
+					"role": "summarizer",
+					"count": 2,
+					"wall": 3501
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 78
+				}
+			]
+		},
+		{
+			"goal": "g04-halvorsen-ticket",
+			"wall": 4353.14469999999,
+			"stage": 8576.789900000003,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-31055",
+				"escalations",
+				"delivery"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 1,
+					"hits": 7
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 3,
+					"wall": 4306
+				},
+				{
+					"role": "judge",
+					"count": 1,
+					"wall": 2707
+				},
+				{
+					"role": "summarizer",
+					"count": 3,
+					"wall": 5839
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 76
+				}
+			]
+		},
+		{
+			"goal": "g05-luis-approval-note",
+			"wall": 8810.199800000002,
+			"stage": 3470.7063999999955,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-44870",
+				"refunds",
+				"returns"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 7
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 4,
+					"wall": 8759
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 2,
+					"wall": 3447
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 80
+				}
+			]
+		},
+		{
+			"goal": "g06-kenji-shipping",
+			"wall": 3789.0264000000025,
+			"stage": 18.954299999997602,
+			"rendered": [],
+			"withheld": [
+				"delivery"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 7
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 3757
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 85
+				}
+			]
+		},
+		{
+			"goal": "g07-depot-release",
+			"wall": 3676.455999999991,
+			"stage": 21.27379999999539,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-31055",
+				"escalations",
+				"delivery",
+				"contacts"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 8
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 3639
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 90
+				}
+			]
+		},
+		{
+			"goal": "g08-halvorsen-credit",
+			"wall": 1994.2487999999867,
+			"stage": 21.259900000004563,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-31055"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 8
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 1967
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 90
+				}
+			]
+		},
+		{
+			"goal": "g09-kenji-gift-note",
+			"wall": 2887.3315000000002,
+			"stage": 2451.898399999991,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-52307",
+				"delivery",
+				"contacts"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 7
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 2847
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 2,
+					"wall": 2427
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 77
+				}
+			]
+		},
+		{
+			"goal": "g10-sigrid-callback",
+			"wall": 4201.798399999985,
+			"stage": 5966.164600000004,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-31055",
+				"delivery",
+				"contacts"
+			],
+			"questions": {
+				"topic": {
+					"fresh": 0,
+					"hits": 5
+				},
+				"agree": {
+					"fresh": 0,
+					"hits": 7
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 4157
+				},
+				{
+					"role": "judge",
+					"count": 0,
+					"wall": 0
+				},
+				{
+					"role": "summarizer",
+					"count": 3,
+					"wall": 5936
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 89
+				}
+			]
+		},
+		{
+			"goal": "g11-grace-signoff-today",
+			"wall": 3684.495799999975,
+			"stage": 43565.332200000004,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-20418",
+				"escalations",
+				"delivery",
+				"contacts"
+			],
+			"questions": {
+				"category": {
+					"fresh": 0,
+					"hits": 19
+				},
+				"topic": {
+					"fresh": 0,
+					"hits": 89
+				},
+				"agree": {
+					"fresh": 6,
+					"hits": 2
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 2,
+					"wall": 3613
+				},
+				{
+					"role": "judge",
+					"count": 6,
+					"wall": 15784
+				},
+				{
+					"role": "summarizer",
+					"count": 19,
+					"wall": 27710
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 86
+				}
+			]
+		},
+		{
+			"goal": "g12-copperline-gesture",
+			"wall": 5231.237599999993,
+			"stage": 20188.280100000004,
+			"rendered": [],
+			"withheld": [
+				"owner:LH-71592"
+			],
+			"questions": {
+				"category": {
+					"fresh": 0,
+					"hits": 3
+				},
+				"topic": {
+					"fresh": 0,
+					"hits": 23
+				},
+				"amends": {
+					"fresh": 0,
+					"hits": 32
+				},
+				"supersedes": {
+					"fresh": 0,
+					"hits": 1
+				},
+				"agree": {
+					"fresh": 2,
+					"hits": 3
+				}
+			},
+			"calls": [
+				{
+					"role": "agent",
+					"count": 3,
+					"wall": 5110
+				},
+				{
+					"role": "judge",
+					"count": 2,
+					"wall": 6202
+				},
+				{
+					"role": "summarizer",
+					"count": 8,
+					"wall": 13938
+				},
+				{
+					"role": "flush",
+					"count": 1,
+					"wall": 90
+				}
+			]
+		}
+	]
+}

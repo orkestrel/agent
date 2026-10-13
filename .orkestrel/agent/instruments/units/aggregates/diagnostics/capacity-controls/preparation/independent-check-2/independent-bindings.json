@@ -1,0 +1,650 @@
+{
+  "pass": true,
+  "packet": {
+    "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+    "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+    "bytes": 80122
+  },
+  "operator": "b054ebc86779435ff2935b9a1a669d9a7eac6f20b538ab5fe5d8d6dcce50aa6f",
+  "finalInventory": {
+    "path": "tmp/units/aggregate-capacity-probe/final-source-inventory.json",
+    "hash": "cdfead2e08c018d73fab43e274b8c8abef7103f231517064ede4ace99bfcb0e2",
+    "bytes": 3736
+  },
+  "preparedInventory": {
+    "path": "tmp/units/aggregate-capacity-probe/prepared/inventory.json",
+    "hash": "f32a5243fb2765f786be00726d555f11da7a89dfe73c083406f71acc1775f117",
+    "bytes": 7379
+  },
+  "unchanged": {
+    "packet": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+    "finalInventory": "cdfead2e08c018d73fab43e274b8c8abef7103f231517064ede4ace99bfcb0e2"
+  },
+  "counts": {
+    "declaredSourcesAndChecks": 18,
+    "finalPacketAndPrepared": 2,
+    "preparedInventoryFiles": 35,
+    "packetBindings": 23,
+    "requestBodies": 30,
+    "inference": 30
+  },
+  "maximumRequestBytes": 5639,
+  "membership": [
+    {
+      "model": "q2",
+      "ids": [
+        "q2-positive",
+        "q2-cache",
+        "q2-reachability",
+        "q2-overflow",
+        "q2-smaller",
+        "q2-restored",
+        "q2-generation"
+      ]
+    },
+    {
+      "model": "q4",
+      "ids": [
+        "q4-positive",
+        "q4-cache",
+        "q4-reachability",
+        "q4-overflow",
+        "q4-smaller",
+        "q4-restored",
+        "q4-generation"
+      ]
+    },
+    {
+      "model": "g2",
+      "ids": [
+        "g2-positive",
+        "g2-cache",
+        "g2-reachability",
+        "g2-overflow",
+        "g2-smaller",
+        "g2-restored",
+        "g2-generation"
+      ]
+    },
+    {
+      "model": "g4",
+      "ids": [
+        "g4-positive",
+        "g4-cache",
+        "g4-reachability",
+        "g4-overflow",
+        "g4-smaller",
+        "g4-restored",
+        "g4-generation"
+      ]
+    },
+    {
+      "model": "mica",
+      "ids": [
+        "mica-reachability",
+        "mica-overflow"
+      ]
+    }
+  ],
+  "bindings": {
+    "sourcesAndChecks": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/additions.diff",
+        "hash": "ebfe21ed76b6bb5d9b7c2b844c9fa170335997db174b554b6634ab17a19be679",
+        "bytes": 41875
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/constants.ts",
+        "hash": "08ea68139897ce904045e38320508d67db4c1a50823d46c28c3d9dc7b3dc7d28",
+        "bytes": 2570
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/Daemon.ts",
+        "hash": "68db7adfa74a89b72cd213424bd7b5a941ac4dfd0f05bff16bbf124fa110f8de",
+        "bytes": 3985
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/Driver.ts",
+        "hash": "3fb4f63cf7a7ac973932c7cd4d47d4c47ed85f9e6a714f1d1f41342bfcf7b15b",
+        "bytes": 10037
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/execute.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/final-additions.diff",
+        "hash": "628a5a9b76f8497b6a5c1244cee8fc42728e14be0ec898758b0f59c8c3a7846f",
+        "bytes": 42245
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/helpers.ts",
+        "hash": "e910098e98024b82300101e59f2817a7a9fb9edd3cefc1933f7ec441dfe897fb",
+        "bytes": 11181
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/index.ts",
+        "hash": "45d73a109bfd9a89d6169319d9b739bd126cb6d9d25f1a587e3f9fc80b530b6b",
+        "bytes": 143
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/inventory.ts",
+        "hash": "b57b3069685da79829874d7279c9fd552e42256f978391e79546873243ba2609",
+        "bytes": 1221
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/main.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepare.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/source-inventory.json",
+        "hash": "7811ba49ffec0ae4fba5e6720b6a8e69257f6188d61fc4cfdfa8c076b5969ee0",
+        "bytes": 3183
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/start.ts",
+        "hash": "1d9bfca5c85f61e26f7b5933da53d191e9dd30fe60e78d93ce43a8f53bd4c570",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/tsconfig.json",
+        "hash": "61b286a13545687b8f22180934d2402e10c7d48e4f19eef95fe04a5829472237",
+        "bytes": 367
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/types.ts",
+        "hash": "023f2eb80650fc927c34b71feefb8717ed17fe76558ef5bcafa439ae7857064e",
+        "bytes": 2392
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/Validation.ts",
+        "hash": "7a35bcbdf124a39ca1f4bae1a9ea52ac686a2de093de3e413e82d74bae48365f",
+        "bytes": 6243
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/verify.ts",
+        "hash": "33c07c8df74759a7210aa100466d4ed7b8513ec65bb40b41ee0f76776a140fcf",
+        "bytes": 79
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/checks/offline.json",
+        "hash": "db5daf8d0277e563db9ce4fa89091fca33f107f85a32e5156a6d66f382919cfe",
+        "bytes": 3114
+      }
+    ],
+    "sourcePacket": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+        "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+        "bytes": 80122
+      }
+    ],
+    "sourcePrepared": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/inventory.json",
+        "hash": "f32a5243fb2765f786be00726d555f11da7a89dfe73c083406f71acc1775f117",
+        "bytes": 7379
+      }
+    ],
+    "preparedPacket": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+        "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+        "bytes": 80122
+      }
+    ],
+    "preparedFiles": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-cache.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-generation.request.bin",
+        "hash": "dfa52c5dd1d77d505928d3de9a831b23c79cab4bcce49d3600b245cc6fd091f5",
+        "bytes": 420
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-overflow.request.bin",
+        "hash": "74fb88bc590c40d8261de8aa2b98140976149a974f6384f8205f0347ae2be565",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-positive.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-reachability.request.bin",
+        "hash": "8c06b15eb7b97de27aeacb4e1acc97fa369b670eeb04b041ee99385154799725",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-restored.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-smaller.request.bin",
+        "hash": "8792987c0858c04152b59b19f9fcfc71de86582550c323e95cbe0caeceae9b87",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-cache.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-generation.request.bin",
+        "hash": "bbde250cbe2b5c2783a2ff3fda381e6b9cb1995c84fa4185f01ce41557d878fd",
+        "bytes": 420
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-overflow.request.bin",
+        "hash": "af4231fe84ca15cc7bccd8a57a3b4f1dcd2157de73a624f5e807accfa195b98e",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-positive.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-reachability.request.bin",
+        "hash": "663fd9489d365b7306e75f94244cf8b3a9c994e595c5178d72910adc19deb222",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-restored.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-smaller.request.bin",
+        "hash": "067d78dfdc21b41f3912aeb38c0db7ca0fc18dcadd5c8fb35ccbd7e8d84553a6",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/generation.json",
+        "hash": "9397686e3628da2b270235a5a08ec520c3687f9153b4905469b9630da0a129cb",
+        "bytes": 218
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/history.json",
+        "hash": "4c6ef90eead678cabdc269178b3bd5bc0b9694505e69b5d952dae2f35302f978",
+        "bytes": 5473
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica-overflow.request.bin",
+        "hash": "981891e7ec40048f4e60cb113ac0eab038d620d695dc95444bd1cd9b7d920f8e",
+        "bytes": 5639
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica-reachability.request.bin",
+        "hash": "c2570add5f19f6903f9124592262fd141838f2a8dbe2f267ac04b437d8d3e502",
+        "bytes": 5639
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica.txt",
+        "hash": "40391512abbc57aedf2771cb292a18491b60c0db96e18c8b61db5237400a665e",
+        "bytes": 5435
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+        "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+        "bytes": 80122
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-cache.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-generation.request.bin",
+        "hash": "033f3744e5cd55251febdd0657fcba48f9fe4c0597dfa9c06101efc31325c51a",
+        "bytes": 417
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-overflow.request.bin",
+        "hash": "d32206df51dcf263922477ff4a8e21cd860c5ffe612ad0c598cce87cfc8a74f1",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-positive.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-reachability.request.bin",
+        "hash": "8eaddb1340c2c3eeb82fd3145baa1a7d8b3afc0a32cc8c037ebb5c70eb1d8c58",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-restored.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-smaller.request.bin",
+        "hash": "0b75592a59e4cad53ffa13924ef0f076cfd72640af0490015d878b56df53ce03",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-cache.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-generation.request.bin",
+        "hash": "71567d6fc419575d55c8dac6b8ea4d78a60f8f2b6a700e564dbbc571eaa9c0af",
+        "bytes": 417
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-overflow.request.bin",
+        "hash": "bae6ba390456e739d0a7ee97ed72b3378e9f82cfc2e42e5efc42ba5ea087e81e",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-positive.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-reachability.request.bin",
+        "hash": "4dc932dbe9d4b3171c947f053d4e913803eede4771a9278f95436ddfb369b3d6",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-restored.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-smaller.request.bin",
+        "hash": "e689594733795737eef12c785e99e1a30d19d399d5562cbfe6ea463e219427fd",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/short.json",
+        "hash": "85616c62752eef54905ad4509a14f02bfd45c1864d98452c93f32919761b649a",
+        "bytes": 355
+      }
+    ],
+    "packet": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/types.ts",
+        "hash": "023f2eb80650fc927c34b71feefb8717ed17fe76558ef5bcafa439ae7857064e",
+        "bytes": 2392
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/constants.ts",
+        "hash": "08ea68139897ce904045e38320508d67db4c1a50823d46c28c3d9dc7b3dc7d28",
+        "bytes": 2570
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/helpers.ts",
+        "hash": "e910098e98024b82300101e59f2817a7a9fb9edd3cefc1933f7ec441dfe897fb",
+        "bytes": 11181
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/Driver.ts",
+        "hash": "3fb4f63cf7a7ac973932c7cd4d47d4c47ed85f9e6a714f1d1f41342bfcf7b15b",
+        "bytes": 10037
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/Daemon.ts",
+        "hash": "68db7adfa74a89b72cd213424bd7b5a941ac4dfd0f05bff16bbf124fa110f8de",
+        "bytes": 3985
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/main.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepare.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/execute.ts",
+        "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+        "bytes": 104
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/start.ts",
+        "hash": "1d9bfca5c85f61e26f7b5933da53d191e9dd30fe60e78d93ce43a8f53bd4c570",
+        "bytes": 104
+      },
+      {
+        "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-direction.md",
+        "hash": "e55224d7b9300739dc568f5f5e3601a541cec5a9ee293ba94b8172c4dfff9230",
+        "bytes": 3865
+      },
+      {
+        "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-clarification.md",
+        "hash": "a96a1d965fed096f13fa6e7fd1ffc1a6305f1532149e785af0cd8926b179bc31",
+        "bytes": 13178
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-startup-report.md",
+        "hash": "fd5a236913b56a9c360275249f529e7de08252fffc0033d842508c627614219a",
+        "bytes": 5612
+      },
+      {
+        "path": "tmp/units/aggregate-focused-screen/live-forward-reverse/01-statement-a.request.json",
+        "hash": "37430d08fd152afdd3a768029d3f34bed8bad426b5a873ef12cafc721dd76e28",
+        "bytes": 5775
+      },
+      {
+        "path": "tmp/units/aggregate-judge-counterfactual/helpers.ts",
+        "hash": "403a364d5f6974171b8116636ff0cbb372b95ad33cf2055f2b511c0e06d97bb5",
+        "bytes": 9454
+      },
+      {
+        "path": "tmp/units/aggregate-judge-counterfactual/constants.ts",
+        "hash": "0a4d866d8481755f6b4968f1295e280d8e2d982d47e1530051de074cfdebb046",
+        "bytes": 2326
+      },
+      {
+        "path": ".orkestrel/agent/instruments/results/l7/q2-think0/freeze/manifest.json",
+        "hash": "026ae06de9f2d132d93b20f5077ce17f77898c241bc94a4fa071f6579166d172",
+        "bytes": 18935
+      },
+      {
+        "path": ".orkestrel/agent/instruments/results/l7/q4-think0/freeze/manifest.json",
+        "hash": "e77d3b27a0a5b5dd6d17a998f4887e734061d5b8f1290f4b03e18c1eaa330656",
+        "bytes": 18935
+      },
+      {
+        "path": ".orkestrel/agent/instruments/results/l7/g2-think0/freeze/manifest.json",
+        "hash": "04a1e41ae941899e6af64b3289b7e9604f64b508db86f376fc0bccc0403ef487",
+        "bytes": 18941
+      },
+      {
+        "path": ".orkestrel/agent/instruments/results/l7/g4-think0/freeze/manifest.json",
+        "hash": "b8007bb044629362cabaf8626cd61d2e7657e717d59d083ea872bdf60f73da04",
+        "bytes": 18941
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/short.json",
+        "hash": "85616c62752eef54905ad4509a14f02bfd45c1864d98452c93f32919761b649a",
+        "bytes": 355
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/history.json",
+        "hash": "4c6ef90eead678cabdc269178b3bd5bc0b9694505e69b5d952dae2f35302f978",
+        "bytes": 5473
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/generation.json",
+        "hash": "9397686e3628da2b270235a5a08ec520c3687f9153b4905469b9630da0a129cb",
+        "bytes": 218
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica.txt",
+        "hash": "40391512abbc57aedf2771cb292a18491b60c0db96e18c8b61db5237400a665e",
+        "bytes": 5435
+      }
+    ],
+    "requestBodies": [
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-positive.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-cache.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-reachability.request.bin",
+        "hash": "8eaddb1340c2c3eeb82fd3145baa1a7d8b3afc0a32cc8c037ebb5c70eb1d8c58",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-overflow.request.bin",
+        "hash": "d32206df51dcf263922477ff4a8e21cd860c5ffe612ad0c598cce87cfc8a74f1",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-smaller.request.bin",
+        "hash": "0b75592a59e4cad53ffa13924ef0f076cfd72640af0490015d878b56df53ce03",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-restored.request.bin",
+        "hash": "835ac66fdf4550f084c4d8e8c6d2a37c784596304f951a4c92c9f237b8446927",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q2-generation.request.bin",
+        "hash": "033f3744e5cd55251febdd0657fcba48f9fe4c0597dfa9c06101efc31325c51a",
+        "bytes": 417
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-positive.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-cache.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-reachability.request.bin",
+        "hash": "4dc932dbe9d4b3171c947f053d4e913803eede4771a9278f95436ddfb369b3d6",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-overflow.request.bin",
+        "hash": "bae6ba390456e739d0a7ee97ed72b3378e9f82cfc2e42e5efc42ba5ea087e81e",
+        "bytes": 5633
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-smaller.request.bin",
+        "hash": "e689594733795737eef12c785e99e1a30d19d399d5562cbfe6ea463e219427fd",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-restored.request.bin",
+        "hash": "e35e6c376227c843cee122177dbfcbd26d9c872677792d36a444512638d255b7",
+        "bytes": 516
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/q4-generation.request.bin",
+        "hash": "71567d6fc419575d55c8dac6b8ea4d78a60f8f2b6a700e564dbbc571eaa9c0af",
+        "bytes": 417
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-positive.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-cache.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-reachability.request.bin",
+        "hash": "8c06b15eb7b97de27aeacb4e1acc97fa369b670eeb04b041ee99385154799725",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-overflow.request.bin",
+        "hash": "74fb88bc590c40d8261de8aa2b98140976149a974f6384f8205f0347ae2be565",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-smaller.request.bin",
+        "hash": "8792987c0858c04152b59b19f9fcfc71de86582550c323e95cbe0caeceae9b87",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-restored.request.bin",
+        "hash": "fa4a8f5df8f90a601fe439a2124232f40b6c35355d8346e35886fa1ac5a5f586",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g2-generation.request.bin",
+        "hash": "dfa52c5dd1d77d505928d3de9a831b23c79cab4bcce49d3600b245cc6fd091f5",
+        "bytes": 420
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-positive.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-cache.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-reachability.request.bin",
+        "hash": "663fd9489d365b7306e75f94244cf8b3a9c994e595c5178d72910adc19deb222",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-overflow.request.bin",
+        "hash": "af4231fe84ca15cc7bccd8a57a3b4f1dcd2157de73a624f5e807accfa195b98e",
+        "bytes": 5636
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-smaller.request.bin",
+        "hash": "067d78dfdc21b41f3912aeb38c0db7ca0fc18dcadd5c8fb35ccbd7e8d84553a6",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-restored.request.bin",
+        "hash": "b730d10911f72c19ffea41266e41f55bf8a45820e4b6a03a1bd24ac5e8642f29",
+        "bytes": 519
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/g4-generation.request.bin",
+        "hash": "bbde250cbe2b5c2783a2ff3fda381e6b9cb1995c84fa4185f01ce41557d878fd",
+        "bytes": 420
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica-reachability.request.bin",
+        "hash": "c2570add5f19f6903f9124592262fd141838f2a8dbe2f267ac04b437d8d3e502",
+        "bytes": 5639
+      },
+      {
+        "path": "tmp/units/aggregate-capacity-probe/prepared/mica-overflow.request.bin",
+        "hash": "981891e7ec40048f4e60cb113ac0eab038d620d695dc95444bd1cd9b7d920f8e",
+        "bytes": 5639
+      }
+    ]
+  }
+}

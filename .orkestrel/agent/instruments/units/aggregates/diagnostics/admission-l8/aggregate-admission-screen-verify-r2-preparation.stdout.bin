@@ -1,0 +1,2 @@
+{"prepared":true,"packet":{"path":"tmp/units/aggregate-admission-screen-r2/verification-preparation-verifier-r2/packet-final.json","hash":"5bcb670e5304dce5fd688500f1a8e62e1edbc01f14124513441ead0a51bb6470","bytes":58309},"operator":"75d4de27ef8f82e76ce80ae04b7f1281d217934bfa1359ff0e1ca652baa6b159","dispatches":0,"modelRequests":0}
+Offline global-fetch guard dispatches: 0; native dispatches: 0

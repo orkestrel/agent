@@ -1,0 +1,3086 @@
+diff --git a/src/core/conversations/Conversation.ts b/src/core/conversations/Conversation.ts
+index f619f10..c8bc318 100644
+--- a/src/core/conversations/Conversation.ts
++++ b/src/core/conversations/Conversation.ts
+@@ -16,57 +16,48 @@ import { Emitter } from '@orkestrel/emitter'
+ import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
+ import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
+ import { ConversationError } from './errors.js'
+-import { buildRecapMessage, buildSummaryMessage } from './helpers.js'
++import { buildRecapMessage, buildSummaryMessage, requireSectionsCap } from './helpers.js'
+ import { JudgmentManager } from './JudgmentManager.js'
+ 
+ /**
+  * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat
+- * message store, plus compacted, summarized {@link Section}s, an opt-in rollup `summary`, and
+- * a `summarizable` flag, with on-demand `rehydrate` and substring `search`, driven by a
+- * provider-agnostic {@link ConversationSummaryHandler} seam so `core` never imports a provider.
+- * Observable through its own `emitter`.
++ * message store, plus compacted, summarized {@link Section} records and a `summarizable` flag,
++ * with on-demand `rehydrate` and substring `search`, driven by a provider-agnostic
++ * {@link ConversationSummaryHandler} seam so `core` never imports a provider. Observable through
++ * its own `emitter`.
+  *
+  * @remarks
+  * - **Live tail + sections.** The conversation owns its live tail directly — `#messages` is an
+- *   insertion-ordered `Map` of immutable {@link Message}s keyed by their minted id
+- *   (the same store mechanics a flat manager had, folded in: `add` / `message` / `messages` /
+- *   `remove` / `clear` / `count`), exactly as a `Workspace` owns its files (no separate
+- *   per-value manager). `#sections` are the compacted history (oldest → newest), each a
+- *   summarized slice that retains its originals. `#summary` is the rollup (a
+- *   summary-of-summaries over all sections), regenerated on each compaction when the `rollup`
+- *   option is `true`; otherwise it keeps its value, `undefined` or the restored snapshot's.
++ *   insertion-ordered `Map` of immutable {@link Message} records keyed by their minted id
++ *   (`add` / `message` / `messages` / `remove` / `clear` / `count`), exactly as a `Workspace`
++ *   owns its files (no separate per-value manager). `#sections` are the compacted history
++ *   (oldest → newest), each a summarized slice that retains its originals.
+  * - **`view()`.** Each section folds to one synthetic summary message (role `'assistant'` — a
+- *   prior-context recap — keyed by the section's stable `id`), then the live messages
+- *   verbatim. The rollup `summary` is not injected (it is separately pull-able); `view()`
+- *   carries the per-section summaries, which are the compaction benefit.
+- * - **`compact()`.** Folds the oldest `count - keep` live messages into a new section
+- *   (its `summary` from `#summarize`), removes them from the live tail by id, regenerates the
+- *   rollup (a second `#summarize` over all section summaries) when the `rollup` option is
+- *   `true`, and emits `summary` (only for a regenerated rollup) then `compact`. The fold stops
+- *   before the newest user message, so the request a run serves and its turns stay live. An
+- *   exchange is a user message and every message after it up to the next user message. Leading
+- *   messages form a separate exchange, retained until the first user exchange can also fold.
+- *   A cut inside an exchange moves back to its start, so a fold removes whole exchanges.
+- *   A cut inside an assistant call group, which only a group spanning two exchanges allows,
+- *   moves before the group, so a tool result never stays live without its call. Returns the
+- *   section, or `undefined` when nothing folds. Throws a {@link ConversationError} when no
+- *   `#summarize` was supplied. A compaction calls the summarizer for the section digest, and
+- *   again for the rollup only when `rollup` is `true`.
+- * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns a section's full original
+- *   messages (`[]` for an unknown id) and emits `rehydrate` — a pure read (the caller decides
+- *   whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
+- *   substring scan of `content` across all messages (every section's originals + the live tail).
++ *   prior-context recap — keyed by the stable `id` of the section), then the live messages
++ *   verbatim. The per-section summaries are the compaction benefit.
++ * - **`compact()`.** Folds the oldest `count - keep` live messages into a section (its
++ *   `summary` from `#summarize`), removes them from the live tail by id, and emits `compact`.
++ *   The fold stops before the newest user message, so the request a run serves and its turns
++ *   stay live. An exchange is a user message and every message after it up to the next user
++ *   message. Leading messages form a separate exchange, retained until the first user exchange
++ *   can also fold. A cut inside an exchange moves back to its start, so a fold removes whole
++ *   exchanges. A cut inside an assistant call group, which only a group spanning two exchanges
++ *   allows, moves before the group, so a tool result never stays live without its call. Returns
++ *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
++ *   `#summarize` was supplied.
++ * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns the full original messages of a
++ *   section (`undefined` for an unknown id) and emits `rehydrate` — a pure read (the caller
++ *   decides whether to re-add them; `rehydrate` never reinserts). `search` is a case-insensitive
++ *   substring scan of `content` across all messages (the originals of every section + the live
++ *   tail).
+  * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries
+- *   `compact` / `summary` / `rehydrate`, emitted directly, strictly after the state change;
++ *   `compact` / `collapse` / `rehydrate`, emitted directly, strictly after the state change;
+  *   the emitter isolates a listener throw and routes it to its `error` handler (the `error`
+  *   option), so a buggy observer can never corrupt a compaction.
+  *
+  * @example
+  * ```ts
+- * const conversation = new Conversation({
+- * 	summarize: async (m) => `recap of ${m.length}`,
+- * 	rollup: true,
+- * })
++ * const conversation = new Conversation({ summarize: async (m) => `recap of ${m.length}` })
+  * conversation.add([
+  * 	{ role: 'user', content: 'Hello' },
+  * 	{ role: 'assistant', content: 'Hi there' },
+@@ -74,7 +65,6 @@ import { JudgmentManager } from './JudgmentManager.js'
+  * ])
+  * const section = await conversation.compact() // folds the first two into one summarized section
+  * conversation.view() // [<recap of 2>, { role: 'user', content: 'What did I say?' }]
+- * conversation.summary // 'recap of 1' — the rollup over the one section
+  * ```
+  */
+ export class Conversation implements ConversationInterface {
+@@ -88,44 +78,28 @@ export class Conversation implements ConversationInterface {
+ 	// How many recent live messages a `compact()` retains verbatim (older ones fold).
+ 	readonly #keep: number
+ 	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
+-	// after pushing a fresh `compact()` fold: an overflow folds the oldest sections into one.
++	// after appending a fresh `compact()` fold: an overflow folds the oldest sections into one.
+ 	readonly #cap: number | undefined
+-	// Whether each compaction spends a further summarizer call regenerating the rollup.
+-	readonly #rollup: boolean
+ 	// The compacted history, oldest → newest — each summarized slice retains its originals.
+-	readonly #sections: Section[] = []
+-	// The rollup (a summary-of-summaries over all sections); restored from a snapshot as is.
+-	#summary: string | undefined
++	// Replaced on every change rather than mutated in place.
++	#sections: readonly Section[]
+ 	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
+-	// immutable messages keyed by their minted id (the flat store mechanics folded in).
++	// immutable messages keyed by their minted id.
+ 	readonly #messages = new Map<string, Message>()
+ 	readonly #judgments: JudgmentManager
+ 
+ 	constructor(options?: ConversationOptions) {
+-		// An optional snapshot to hydrate from — its `id` is the conversation's identity (so it
+-		// wins over `options.id`), and its rollup `summary` / compacted `sections` / live tail are
+-		// restored, with the live `summarize` / `keep` / `on` supplied through `options` alongside it
+-		// (a summarizer is a function, not serialized — re-supplied as config). Restoring is silent
+-		// (no events — nothing was edited). `ConversationOptions.snapshot` is the one declared seam
+-		// every caller reaches it through — `createConversation(options)` hydrates through it, and
+-		// `ConversationManager.add` passes a stored snapshot in the same options object.
++		// A summarizer is a function and is never serialized, so it comes from options beside the
++		// snapshot. Restoring is silent: nothing was edited, so no event fires.
+ 		const snapshot = options?.snapshot
+ 		this.#judgments = new JudgmentManager(snapshot?.judgments)
+ 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
+-		this.#emitter = new Emitter<ConversationEventMap>({
+-			...(options?.on === undefined ? {} : { on: options.on }),
+-			...(options?.error === undefined ? {} : { error: options.error }),
+-		})
++		this.#emitter = new Emitter<ConversationEventMap>(options)
+ 		this.#summarize = options?.summarize
+ 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+-		if (options?.sections !== undefined && options.sections < 1) {
+-			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
+-		}
+-		this.#cap = options?.sections
+-		this.#rollup = options?.rollup ?? false
++		this.#cap = requireSectionsCap(options?.sections)
++		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
+ 		if (snapshot !== undefined) {
+-			this.#summary = snapshot.summary
+-			for (const section of snapshot.sections) this.#sections.push(section)
+ 			for (const message of snapshot.messages) this.#messages.set(message.id, message)
+ 		}
+ 	}
+@@ -142,18 +116,14 @@ export class Conversation implements ConversationInterface {
+ 		return this.#emitter
+ 	}
+ 
+-	get summary(): string | undefined {
+-		return this.#summary
+-	}
+-
+ 	get sections(): readonly Section[] {
+ 		return [...this.#sections]
+ 	}
+ 
+ 	get summarizable(): boolean {
+-		// True exactly when a summarizer was supplied — the clean signal the agent loop's automatic
+-		// compaction gates on (a non-summarizable conversation is never auto-compacted, so the auto
+-		// path never throws the `SUMMARIZER` ConversationError). A manual `compact()` still throws.
++		// True exactly when a summarizer was supplied — the clean signal the automatic compaction of
++		// the agent loop gates on (a non-summarizable conversation is never auto-compacted, so the
++		// auto path never throws the `SUMMARIZER` ConversationError). A manual `compact()` still throws.
+ 		return this.#summarize !== undefined
+ 	}
+ 
+@@ -190,11 +160,9 @@ export class Conversation implements ConversationInterface {
+ 	}
+ 
+ 	view(): readonly Message[] {
+-		// Each section → one synthetic recap message (the compaction benefit), then the live
+-		// tail verbatim. The rollup `summary` is deliberately not injected here. The recap is
+-		// framed (a `[Summary of earlier messages]` label prefix) so a small model reads it as a
+-		// condensed recap of prior turns, not as a literal assistant turn it must echo / treat as
+-		// the latest answer — a lean label (a handful of tokens), proven no-bloat by a test guard.
++		// The recap is framed (a `[Summary of earlier messages]` label prefix) so a small model reads
++		// it as a condensed recap of prior turns, not as a literal assistant turn it must echo / treat
++		// as the latest answer — a lean label (a handful of tokens), proven no-bloat by a test guard.
+ 		return [
+ 			...this.#sections.map((section) => buildRecapMessage(section)),
+ 			...this.#messages.values(),
+@@ -209,10 +177,7 @@ export class Conversation implements ConversationInterface {
+ 				'cannot compact a conversation without a summarizer',
+ 			)
+ 		}
+-		const cap = options?.sections ?? this.#cap
+-		if (cap !== undefined && cap < 1) {
+-			throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
+-		}
++		const cap = requireSectionsCap(options?.sections ?? this.#cap)
+ 		const keep = options?.keep ?? this.#keep
+ 		const live = [...this.#messages.values()]
+ 		// The newest user message is the request a run serves, so it and its turns stay live.
+@@ -232,59 +197,42 @@ export class Conversation implements ConversationInterface {
+ 		if (first >= 0 && fold <= first) fold = 0
+ 		if (fold <= 0) return undefined
+ 		const slice = live.slice(0, fold)
+-		// 1. Digest the folded slice into the section summary (the first summarizer call).
+ 		const summary = await summarize(stripThinking(slice, 'none'))
+ 		const section: Section = {
+ 			id: crypto.randomUUID(),
+ 			summary,
+ 			messages: slice,
+ 		}
+-		// 2. Remove the folded messages from the live tail (by their ids) and push the section.
+ 		for (const message of slice) this.#messages.delete(message.id)
+-		this.#sections.push(section)
+-		// 3. Enforce the bounded-`sections` cap: an overflow past `cap` folds the oldest
+-		// overflow sections into one merged section (a further summarizer call over the folded
+-		// section summaries), so `#sections.length === cap` afterward.
++		this.#sections = [...this.#sections, section]
++		// An overflow past `cap` folds the oldest sections into one merged section, a further
++		// summarizer call over their summaries, so `#sections.length === cap` afterward. A throwing
++		// merge call leaves the sections at `cap + 1` and propagates before `compact` is emitted.
+ 		if (cap !== undefined && this.#sections.length > cap) {
+ 			const overflow = this.#sections.length - cap + 1
+ 			const folded = this.#sections.slice(0, overflow)
+-			try {
+-				const merged: Section = {
+-					id: crypto.randomUUID(),
+-					summary: await summarize(folded.map((one) => buildSummaryMessage(one))),
+-					messages: folded.flatMap((one) => one.messages),
+-				}
+-				this.#sections.splice(0, overflow, merged)
+-				this.#emitter.emit('collapse', merged)
+-			} catch (error) {
+-				// The merge summarizer call threw — the sections stay transiently at `cap + 1`
+-				// (no splice, no loss), but an opted-in rollup still regenerates over the current
+-				// (unmerged) sections so it is never left stale, then the error propagates
+-				// (manual `compact()` always surfaces a summarizer failure to its caller; the
+-				// next successful `compact()` self-heals the over-cap count).
+-				await this.#regenerate(summarize)
+-				throw error
++			const merged: Section = {
++				id: crypto.randomUUID(),
++				summary: await summarize(folded.map((one) => buildSummaryMessage(one))),
++				messages: folded.flatMap((one) => one.messages),
+ 			}
++			this.#sections = [merged, ...this.#sections.slice(overflow)]
++			this.#emitter.emit('collapse', merged)
+ 		}
+-		// 4. Regenerate an opted-in rollup — a summary-of-summaries over all (now-capped)
+-		// sections — then observe it, after the mutation, through the guarded path.
+-		await this.#regenerate(summarize)
+-		// 5. Observe the new section last, so a swallowed listener throw can't perturb the fold.
++		// Observe the section last, so a swallowed listener throw can't perturb the fold.
+ 		this.#emitter.emit('compact', section)
+ 		return section
+ 	}
+ 
+-	rehydrate(id: string): readonly Message[] {
++	rehydrate(id: string): readonly Message[] | undefined {
+ 		const section = this.#sections.find((one) => one.id === id)
+-		// A pure read — emit `rehydrate` after resolving (no mutation to perturb); `rehydrate`
+-		// never reinserts the originals (the caller decides). Unknown id ⇒ an empty list.
++		// Emitted after resolving, because a read has no mutation for a listener to perturb.
+ 		this.#emitter.emit('rehydrate', id)
+-		return section === undefined ? [] : section.messages
++		return section?.messages
+ 	}
+ 
+ 	search(query: string): readonly Message[] {
+-		// Case-insensitive substring over `content` across all messages — every section's
+-		// retained originals (oldest → newest) first, then the live tail.
++		// Section originals (oldest → newest) come before the live tail.
+ 		const needle = query.toLowerCase()
+ 		const all = [
+ 			...this.#sections.flatMap((section) => section.messages),
+@@ -294,20 +242,11 @@ export class Conversation implements ConversationInterface {
+ 	}
+ 
+ 	reference(options?: ConversationReferenceOptions): string {
+-		// Render this conversation as a self-labeled, fenced provenance block to pull into another
+-		// conversation (as a `document`). A pure string — never a model call. The leading marker
+-		// names the source (`label`, default the `id`) and states it is not part of the live
+-		// conversation, so a small model reads the rollup + cherry-picked excerpts as foreign
+-		// material it attributes to that source, never as its own latest turns.
++		// The leading marker states the block is not part of the live conversation, so a small
++		// model reads the cherry-picked excerpts as foreign material it attributes to that source,
++		// never as its own latest turns.
+ 		const label = options?.label ?? this.#id
+ 		const lines = [`[Reference — conversation "${label}" — NOT part of this conversation]`]
+-		// The rollup `summary` (a summary-of-summaries) — included when opted in (default true) and
+-		// one exists (`undefined` until the first compaction drops the line).
+-		if (options?.summary !== false && this.#summary !== undefined) {
+-			lines.push(`Summary: ${this.#summary}`)
+-		}
+-		// The cherry-picked excerpts (each `- role: content`) — the few relevant turns the caller
+-		// selected (through this conversation's own `search` / `rehydrate`), not the whole history.
+ 		const messages = options?.messages ?? []
+ 		if (messages.length > 0) {
+ 			lines.push('Relevant messages:')
+@@ -317,32 +256,17 @@ export class Conversation implements ConversationInterface {
+ 	}
+ 
+ 	snapshot(): ConversationSnapshot {
+-		// The container serializes itself: its id + the rollup summary + the compacted sections +
+-		// the live tail. The summarizer / keep are not serialized — they are live config re-supplied
+-		// on hydrate (a ConversationSummaryHandler is a function, not data). The sections + messages are
+-		// already plain immutable records, so the snapshot JSON-round-trips losslessly; mutates nothing.
++		// The summarizer / keep are not serialized — they are live config re-supplied on hydrate
++		// (a ConversationSummaryHandler is a function, not data).
+ 		return {
+ 			id: this.#id,
+-			...(this.#summary === undefined ? {} : { summary: this.#summary }),
+ 			sections: this.sections,
+ 			messages: this.messages(),
+ 			...(this.#judgments.count === 0 ? {} : { judgments: this.#judgments.judgments() }),
+ 		}
+ 	}
+ 
+-	// Regenerate the rollup over every section summary, then observe it; without the `rollup`
+-	// option no summarizer call is spent. The summarizer is a parameter because the caller has
+-	// already narrowed the optional field.
+-	async #regenerate(summarize: ConversationSummaryHandler): Promise<void> {
+-		if (!this.#rollup) return
+-		this.#summary = await summarize(this.#sections.map((one) => buildSummaryMessage(one)))
+-		this.#emitter.emit('summary', this.#summary)
+-	}
+-
+-	// Mint an immutable live-tail message from one input — a fresh UUID id plus the input's
+-	// role / content, carrying `calls`, `call`, `images`, and `thinking` only when the input supplied them (each
+-	// spread in conditionally, so an absent optional is never stored as `undefined`). Stored
+-	// by id and returned; never mutated after creation.
++	// Spread each optional only when present, so an absent optional is never stored as `undefined`.
+ 	#create(input: MessageInput): Message {
+ 		const message: Message = {
+ 			id: crypto.randomUUID(),
+diff --git a/src/core/conversations/ConversationManager.ts b/src/core/conversations/ConversationManager.ts
+index c9aad0f..3c4f665 100644
+--- a/src/core/conversations/ConversationManager.ts
++++ b/src/core/conversations/ConversationManager.ts
+@@ -12,7 +12,7 @@ import { Conversation } from './Conversation.js'
+ import { removeEntries } from '../helpers.js'
+ 
+ /**
+- * Registers {@link Conversation}s keyed by `id`, in insertion order, with an active pointer —
++ * Registers {@link Conversation} instances keyed by `id`, in insertion order, with an active pointer —
+  * the id-keyed store over the conversation layer, the `active` / `switch` seam the
+  * {@link import('../contexts/index.js').AgentContext} renders, and the durable `open` / `save`
+  * store seam. Event-free (a registry, like
+@@ -22,7 +22,7 @@ import { removeEntries } from '../helpers.js'
+  * @remarks
+  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`
+  *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`), flowing the
+- *   manager's default `#summarize` / `#keep` / `#rollup` in unless the `input` overrides them, and stores
++ *   default `#summarize` / `#keep` of the manager in unless the `input` overrides them, and stores
+  *   it (an already-present `id` overwrites — last write wins). `count` is the map size,
+  *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
+  * - **Active pointer.** `active` is the active conversation (the agent's message source the
+@@ -30,7 +30,7 @@ import { removeEntries } from '../helpers.js'
+  *   with conversations always has one active). A subsequent `add` leaves `active` unchanged.
+  *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown `id`
+  *   returns `undefined` and leaves `active` unchanged (the lenient lookup style — never throws,
+- *   no new error code).
++ *   no added error code).
+  * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id was
+  *   removed; removing the active conversation sets `active` to `undefined`. `clear` empties the registry
+  *   and sets `active` to `undefined`.
+@@ -59,8 +59,6 @@ export class ConversationManager implements ConversationManagerInterface {
+ 	readonly #keep: number
+ 	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.
+ 	readonly #sections: number | undefined
+-	// The default `rollup` switch flowed into every conversation `add` creates (overridable).
+-	readonly #rollup: boolean
+ 	// The optional durable store backing `open` / `save`; `undefined` ⇒ registry-only (both lenient).
+ 	readonly #store: ConversationStoreInterface | undefined
+ 
+@@ -68,7 +66,6 @@ export class ConversationManager implements ConversationManagerInterface {
+ 		this.#summarize = options?.summarize
+ 		this.#keep = options?.keep ?? DEFAULT_CONVERSATION_KEEP
+ 		this.#sections = options?.sections
+-		this.#rollup = options?.rollup ?? false
+ 		this.#store = options?.store
+ 	}
+ 
+@@ -89,11 +86,8 @@ export class ConversationManager implements ConversationManagerInterface {
+ 	}
+ 
+ 	add(input?: ConversationInput): ConversationInterface {
+-		// The manager's defaults flow in unless the input overrides them — so a conversation
+-		// created through the manager inherits its summarizer / keep / rollup by default. An optional
+-		// `snapshot` hydrates the conversation through the declared `ConversationOptions.snapshot`
+-		// seam — its `id` / `summary` / `sections` / live tail restored, the live summarize / keep
+-		// re-supplied alongside it in the same options object.
++		// An optional `snapshot` hydrates through the declared `ConversationOptions.snapshot` seam,
++		// so the live summarize / keep ride beside it in the same options object.
+ 		const sections = input?.sections ?? this.#sections
+ 		const summarize = input?.summarize ?? this.#summarize
+ 		const conversation = new Conversation({
+@@ -102,7 +96,6 @@ export class ConversationManager implements ConversationManagerInterface {
+ 			...(summarize === undefined ? {} : { summarize }),
+ 			keep: input?.keep ?? this.#keep,
+ 			...(sections === undefined ? {} : { sections }),
+-			rollup: input?.rollup ?? this.#rollup,
+ 			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
+ 		})
+ 		this.#conversations.set(conversation.id, conversation)
+@@ -120,19 +113,15 @@ export class ConversationManager implements ConversationManagerInterface {
+ 	}
+ 
+ 	async open(id: string): Promise<ConversationInterface | undefined> {
+-		// Already registered ⇒ activate it (no store hit) — the registry is the live source.
+ 		const existing = this.#conversations.get(id)
+ 		if (existing !== undefined) {
+ 			this.#active = id
+ 			return existing
+ 		}
+-		// No store ⇒ a registry miss resolves nothing (lenient, like `switch`/`conversation`).
+ 		if (this.#store === undefined) return undefined
+-		// Store hit ⇒ rehydrate through the `snapshot` option (it restores id / summary /
+-		// sections / live tail) by reusing `add`, which registers + auto-activates a fresh
+-		// Conversation (flowing the manager's default summarize / keep in); a miss ⇒ undefined.
+ 		const snapshot = await this.#store.get(id)
+ 		if (snapshot === undefined) return undefined
++		// Reuse `add` so the default summarize / keep of the manager flow into the rehydrated conversation.
+ 		const conversation = this.add({ snapshot })
+ 		// Re-point `active` explicitly: `add` only auto-activates the first conversation, so an open
+ 		// into a non-empty registry must still make the rehydrated one active.
+@@ -141,18 +130,14 @@ export class ConversationManager implements ConversationManagerInterface {
+ 	}
+ 
+ 	async save(id: string): Promise<boolean> {
+-		// Lenient: persist only when a store is set and the id is registered; otherwise a no-op.
+ 		const conversation = this.#conversations.get(id)
+ 		if (this.#store === undefined || conversation === undefined) return false
+ 		await this.#store.set(conversation.snapshot())
+ 		return true
+ 	}
+ 
+-	// The array overload comes first, so a list resolves to the batch form (an `id` is a string,
+-	// never an array, so the two never overlap — but the project declares the array overload
+-	// first by convention).
+-	remove(ids: readonly string[]): boolean
+ 	remove(id: string): boolean
++	remove(ids: readonly string[]): boolean
+ 	remove(ids: string | readonly string[]): boolean {
+ 		if (isArray(ids)) {
+ 			// Each present id still clears `active` when it was the active conversation.
+diff --git a/src/core/conversations/JudgmentManager.ts b/src/core/conversations/JudgmentManager.ts
+index c962dd8..6bee42d 100644
+--- a/src/core/conversations/JudgmentManager.ts
++++ b/src/core/conversations/JudgmentManager.ts
+@@ -8,8 +8,7 @@ import type {
+ } from '../types.js'
+ import { isArray, isRecord } from '@orkestrel/contract'
+ import { ConversationError } from './errors.js'
+-import { buildJudgments } from './helpers.js'
+-import { isJudgment } from './validators.js'
++import { buildJudgments, requireJudgment } from './helpers.js'
+ import { copyJSON } from '../cloners.js'
+ import { JudgeAbortError, isJudgeAbortError } from '../errors.js'
+ import { matchesJudgment, removeEntries } from '../helpers.js'
+@@ -40,7 +39,7 @@ export class JudgmentManager implements JudgmentManagerInterface {
+ 	 */
+ 	constructor(judgments: readonly Judgment[] = []) {
+ 		for (const judgment of judgments) {
+-			const owned = this.#own(copyJSON(judgment))
++			const owned = requireJudgment(copyJSON(judgment))
+ 			this.#judgments.set(owned.id, owned)
+ 		}
+ 	}
+@@ -111,16 +110,16 @@ export class JudgmentManager implements JudgmentManagerInterface {
+ 		}
+ 		if (pending.length > 0) {
+ 			if (signal.aborted) throw new JudgeAbortError({ model: judge.model, answers: {} })
+-			const sub: JudgeRequest = { state, questions: Object.fromEntries(pending) }
++			const unmatched: JudgeRequest = { state, questions: Object.fromEntries(pending) }
+ 			try {
+-				const result = await judge.ask(sub, signal)
++				const result = await judge.ask(unmatched, signal)
+ 				for (const judgment of this.add(
+-					buildJudgments(sub, result, origins, rendered, judge.model),
++					buildJudgments(unmatched, result, origins, rendered, judge.model),
+ 				))
+ 					resolved.set(judgment.id, judgment)
+ 			} catch (error) {
+ 				if (isJudgeAbortError(error))
+-					this.add(buildJudgments(sub, error.partial, origins, rendered, judge.model))
++					this.add(buildJudgments(unmatched, error.partial, origins, rendered, judge.model))
+ 				throw error
+ 			}
+ 		}
+@@ -132,20 +131,8 @@ export class JudgmentManager implements JudgmentManagerInterface {
+ 
+ 	#store(input: JudgmentInput): Judgment {
+ 		const copy = copyJSON(input)
+-		const judgment = this.#own(isRecord(copy) ? { ...copy, time: Date.now() } : copy)
++		const judgment = requireJudgment(isRecord(copy) ? { ...copy, time: Date.now() } : copy)
+ 		this.#judgments.set(judgment.id, judgment)
+ 		return structuredClone(judgment)
+ 	}
+-
+-	// A stored record is the JSON copy of its input, so a proxied record is accepted and the stored
+-	// value is exactly what a snapshot can carry.
+-	#own(copy: unknown): Judgment {
+-		if (!isJudgment(copy)) {
+-			throw new ConversationError(
+-				'JUDGMENT',
+-				'conversation error: a judgment must be a JSON record',
+-			)
+-		}
+-		return copy
+-	}
+ }
+diff --git a/src/core/conversations/constants.ts b/src/core/conversations/constants.ts
+index ed25ec5..5ec029a 100644
+--- a/src/core/conversations/constants.ts
++++ b/src/core/conversations/constants.ts
+@@ -1,6 +1,6 @@
+ /**
+- * Sets the default number of recent live messages a {@link ConversationInterface}'s `compact()`
+- * retains verbatim — `0`, so a manual `compact()` keeps no recent tail and folds every
++ * Sets the default number of recent live messages the `compact()` method of a
++ * {@link ConversationInterface} retains verbatim — `0`, so a manual `compact()` keeps no recent tail and folds every
+  * exchange before the newest user message into one summarized section. A caller retains a recent
+  * tail by passing `keep` (on
+  * {@link ConversationOptions}, {@link ConversationManagerOptions}, or per-fold through
+@@ -10,8 +10,8 @@
+ export const DEFAULT_CONVERSATION_KEEP = 0
+ 
+ /**
+- * Names the framing label a {@link ConversationInterface}'s `view()` prefixes onto each compacted
+- * section's summary so a small model reads it as a condensed recap of earlier turns — the lean
++ * Names the framing label the `view()` method of a {@link ConversationInterface} prefixes onto the
++ * summary of each compacted section so a small model reads it as a condensed recap of earlier turns — the lean
+  * `'[Summary of earlier messages] '` marker, never a literal assistant turn to echo or treat as
+  * the live answer.
+  *
+@@ -19,9 +19,9 @@ export const DEFAULT_CONVERSATION_KEEP = 0
+  * Deliberately a fixed, lean handful of tokens (a short bracketed marker) so the framing adds a
+  * bounded `prefix × sections` overhead and never an open-ended blow-up — the
+  * {@link ConversationInterface} no-bloat test guard pins exactly that. Kept here (beside
+- * {@link DEFAULT_CONVERSATION_KEEP}) as the conversation layer's one tunable framing constant, so
+- * the wording has a single source of truth as it is optimized against real small-model behavior
+- * (the `view()` recap framing is distinct from `reference()`'s cross-conversation provenance
+- * marker, which is rendered inline since it interpolates the per-call provenance `label`).
++ * {@link DEFAULT_CONVERSATION_KEEP}) as the one tunable framing constant of the conversation
++ * layer, so the wording has a single source of truth (the `view()` recap framing is distinct
++ * from the cross-conversation provenance marker of `reference()`, which is rendered inline
++ * because it interpolates the per-call provenance `label`).
+  */
+ export const CONVERSATION_RECAP_PREFIX = '[Summary of earlier messages] '
+diff --git a/src/core/conversations/errors.ts b/src/core/conversations/errors.ts
+index ef813b1..8a7e97a 100644
+--- a/src/core/conversations/errors.ts
++++ b/src/core/conversations/errors.ts
+@@ -1,21 +1,15 @@
+ import { isInstance } from '@orkestrel/contract'
+ 
+-// A real error type, not a sentinel. A `ConversationInterface.compact()` is a
+-// programmer error when no `ConversationSummaryHandler` was supplied — there is nothing to fold
+-// the messages with — so it throws this, carrying a machine-readable `code` ('SUMMARIZER')
+-// so a `catch` branches on `error.code` instead of parsing the message. The guard narrows a
+-// caught value with `instanceof`, mirroring the provider and agent errors.
+-
+ /**
+  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with, a
+- * `sections` cap below `1`, or a judgment or judge request that JSON cannot carry — thrown by a
+- * {@link ConversationInterface}'s `compact()`, its construction, or its judgment store, carrying
+- * the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
++ * `sections` cap below `1`, or a judgment or judge request that JSON cannot carry — thrown by the
++ * `compact()` method of a {@link ConversationInterface}, its construction, or its judgment store,
++ * carrying the machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT'`.
+  *
+  * @remarks
+- * Compaction requires a summarizer (it digests the folded slice into a section summary and,
+- * with the `rollup` option, regenerates the rollup); a conversation created without one can still store + `view()` its
+- * live tail, but a `compact()` is a programmer error and throws this with `'SUMMARIZER'`.
++ * Compaction requires a summarizer (it digests the folded slice into a section summary); a
++ * conversation created without one can still store + `view()` its live tail, but a `compact()`
++ * is a programmer error and throws this with `'SUMMARIZER'`.
+  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
+  * {@link import('./types.js').ConversationManagerOptions} /
+  * {@link import('./types.js').CompactOptions}) must be `>= 1` — a sub-1 cap is a programmer
+diff --git a/src/core/conversations/factories.ts b/src/core/conversations/factories.ts
+index 73ccd19..87491a6 100644
+--- a/src/core/conversations/factories.ts
++++ b/src/core/conversations/factories.ts
+@@ -16,22 +16,22 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
+ 
+ /**
+  * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
+- * message store it owns directly, with compaction into summarized sections, an opt-in
+- * rollup `summary`, on-demand `rehydrate`, and substring `search`, driven by a
+- * provider-agnostic {@link ConversationSummaryHandler} seam.
++ * message store it owns directly, with compaction into summarized sections, on-demand
++ * `rehydrate`, and substring `search`, driven by a provider-agnostic
++ * {@link ConversationSummaryHandler} seam.
+  *
+  * @remarks
+  * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
+  * (each section as a summary message, then the live tail). `compact()` folds the older live
+- * messages into a summarized {@link Section}, whole exchanges at a time, and regenerates the
+- * rollup when `rollup` is `true` — it requires a `summarize` (omitted ⇒ `compact()` throws a
+- * `ConversationError`); `keep` retains a recent tail (default `DEFAULT_CONVERSATION_KEEP` —
+- * fold up to the newest user message). `rehydrate(id)` / `search(query)` read the retained
+- * originals. Observable (`emitter` — `compact` / `summary` / `rehydrate`), wired
++ * messages into a summarized {@link Section}, whole exchanges at a time — it requires a
++ * `summarize` (without one `compact()` throws a `ConversationError`); `keep` retains a recent
++ * tail (Default: `DEFAULT_CONVERSATION_KEEP`, which folds up to the newest user message).
++ * `rehydrate(id)` / `search(query)` read the retained originals. Observable (`emitter` —
++ * `compact` / `collapse` / `rehydrate`), wired
+  * through the reserved `on` option; the emitter isolates a listener throw and routes it to
+  * its `error` handler (the `error` option), so it can never corrupt a compaction.
+  *
+- * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `rollup` (see {@link ConversationOptions})
++ * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `sections` (see {@link ConversationOptions})
+  * @returns A working {@link ConversationInterface}
+  *
+  * @example Conversations & compaction
+@@ -54,8 +54,7 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
+  * 				AbortSignal.timeout(30_000),
+  * 			)
+  * 		).content,
+- * 	keep: 2, // retain at least the two most recent messages verbatim on each compaction
+- * 	rollup: true, // also regenerate the rollup summary on each compaction
++ * 	keep: 2, // retain at least the 2 most recent messages verbatim on each compaction
+  * })
+  * conversation.add([
+  * 	{ role: 'user', content: 'My name is Ada.' },
+@@ -67,7 +66,6 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
+  *
+  * const section = await conversation.compact() // folds the first exchange → a summarized section
+  * conversation.view() // [<section summary message>, ...the retained recent exchanges] — the model input
+- * conversation.summary // the regenerated rollup (a summary-of-summaries over all sections)
+  * conversation.search('ada') // case-insensitive across sections' originals + the live tail
+  * section && conversation.rehydrate(section.id) // the section's full original messages (a pure read)
+  * ```
+@@ -78,7 +76,7 @@ export function createConversation(options?: ConversationOptions): ConversationI
+ 
+ /**
+  * Creates a conversation registry — a {@link ConversationManagerInterface} holding
+- * {@link ConversationInterface}s keyed by their `id`, in insertion order, with an active pointer:
++ * {@link ConversationInterface} instances keyed by their `id`, in insertion order, with an active pointer:
+  * the id-keyed store over the conversation layer plus the `active` / `switch` seam the context
+  * renders. `add` auto-activates the first conversation and flows the registry's default
+  * `summarize` / `keep` into every conversation it creates.
+@@ -116,7 +114,7 @@ export function createConversationManager(
+ 
+ /**
+  * Creates the in-memory conversation store — a {@link ConversationStoreInterface} backed by a
+- * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot}s keyed by conversation
++ * process-lifetime `Map` of {@link import('./types.js').ConversationSnapshot} records keyed by conversation
+  * id, the default backing for the durable {@link ConversationManagerInterface.open} /
+  * {@link ConversationManagerInterface.save} seam. The exact twin of
+  * {@link import('@orkestrel/workspace').createMemoryWorkspaceStore}.
+@@ -151,8 +149,8 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
+ }
+ 
+ /**
+- * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface}, defaulting to
+- * `createMemoryDriver()` — the durable, driver-pluggable backing for the conversation persistence
++ * Creates a {@link DatabaseConversationStore} over any {@link DriverInterface} — the durable,
++ * driver-pluggable backing for the conversation persistence
+  * seam, holding each snapshot as one opaque JSON column and standing as the opt-in twin of
+  * {@link createMemoryConversationStore}. The exact twin of
+  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore}.
+@@ -164,13 +162,13 @@ export function createMemoryConversationStore(): ConversationStoreInterface {
+  * {@link import('@orkestrel/workspace').createDatabaseWorkspaceStore} stores its snapshot. The
+  * snapshot is already a complete, self-contained, pure-JSON payload, so storing it whole is lossless
+  * and keeps the row type flat (the column reads back as `unknown`, narrowed on `get` by
+- * {@link import('./validators.js').isConversationSnapshot}). The `driver` defaults to
++ * {@link import('./validators.js').isConversationSnapshot}). Default driver:
+  * {@link createMemoryDriver}, so the store also works in memory out of the box; pass a server
+  * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
+  * the durability is the driver's job, the store engine is shared. It swaps in behind
+  * {@link ConversationStoreInterface} without touching the manager or the conversation.
+  *
+- * @param driver - The storage backend the snapshots persist to (defaults to {@link createMemoryDriver})
++ * @param driver - The storage backend the snapshots persist to. Default: {@link createMemoryDriver}
+  * @returns A {@link ConversationStoreInterface} over the driver
+  *
+  * @example
+diff --git a/src/core/conversations/helpers.ts b/src/core/conversations/helpers.ts
+index 041e0d9..65ca265 100644
+--- a/src/core/conversations/helpers.ts
++++ b/src/core/conversations/helpers.ts
+@@ -1,6 +1,8 @@
+ import type { Section } from './types.js'
+-import type { JudgeRequest, JudgeResult, JudgmentInput, Message } from '../types.js'
++import type { JudgeRequest, JudgeResult, Judgment, JudgmentInput, Message } from '../types.js'
+ import { CONVERSATION_RECAP_PREFIX } from './constants.js'
++import { ConversationError } from './errors.js'
++import { isJudgment } from './validators.js'
+ 
+ /**
+  * Builds records for answered or refused request keys, attaching usage only for a single question.
+@@ -50,9 +52,9 @@ export function buildJudgments(
+  * section's stable `id`, and its `summary` verbatim as content.
+  *
+  * @remarks
+- * Pure and total. This is the unframed form an opted-in rollup regeneration digests (a
+- * summary-of-summaries over the section summaries); the recap label is a `view()`
+- * presentation concern kept out of what the summarizer re-reads — see
++ * Pure and total. This is the unframed form a `sections` cap merge digests when it folds the
++ * oldest sections into one (a summary over their section summaries); the recap label is a
++ * `view()` presentation concern kept out of what the summarizer re-reads — see
+  * {@link buildRecapMessage}.
+  *
+  * @param section - The compacted section to render
+@@ -95,3 +97,52 @@ export function buildRecapMessage(section: Section): Message {
+ 		content: `${CONVERSATION_RECAP_PREFIX}${section.summary}`,
+ 	}
+ }
++
++/**
++ * Returns a stored judgment record after checking it, or throws a coded error.
++ *
++ * @remarks
++ * A stored record is the JSON copy of its input, so a proxied record is accepted and the stored
++ * value is exactly what a snapshot can carry. The check is {@link isJudgment}.
++ *
++ * @param value - The JSON copy of a judgment record or input
++ * @returns The value, narrowed to a {@link Judgment}
++ * @throws ConversationError Thrown when the value is not a valid judgment record (code `'JUDGMENT'`)
++ *
++ * @example
++ * ```ts
++ * requireJudgment(copyJSON(record)) // the record, narrowed
++ * requireJudgment({ id: 'refund' }) // throws ConversationError ('JUDGMENT')
++ * ```
++ */
++export function requireJudgment(value: unknown): Judgment {
++	if (!isJudgment(value)) {
++		throw new ConversationError('JUDGMENT', 'conversation error: a judgment must be a JSON record')
++	}
++	return value
++}
++
++/**
++ * Returns a `sections` cap after checking its lower bound, or throws a coded error.
++ *
++ * @remarks
++ * Only the `>= 1` bound is checked, so a fractional cap passes, and `NaN` passes because it
++ * compares false against `1`; a `NaN` cap never triggers a merge.
++ *
++ * @param cap - The cap to check, or `undefined` for no cap
++ * @returns The cap unchanged, or `undefined` when none was supplied
++ * @throws ConversationError Thrown when the cap is below `1` (code `'SECTIONS'`)
++ *
++ * @example
++ * ```ts
++ * requireSectionsCap(2) // 2
++ * requireSectionsCap(undefined) // undefined
++ * requireSectionsCap(0) // throws ConversationError ('SECTIONS')
++ * ```
++ */
++export function requireSectionsCap(cap: number | undefined): number | undefined {
++	if (cap !== undefined && cap < 1) {
++		throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
++	}
++	return cap
++}
+diff --git a/src/core/conversations/stores/DatabaseConversationStore.ts b/src/core/conversations/stores/DatabaseConversationStore.ts
+index 248efbf..573eee9 100644
+--- a/src/core/conversations/stores/DatabaseConversationStore.ts
++++ b/src/core/conversations/stores/DatabaseConversationStore.ts
+@@ -21,9 +21,9 @@ import { isConversationSnapshot } from '../validators.js'
+  * IndexedDB backend swaps in without touching the
+  * {@link import('../ConversationManager.js').ConversationManager} or the
+  * {@link import('../Conversation.js').Conversation} — the same seam as
+- * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. The
+- * driver defaults to memory ({@link import('../factories.js').createDatabaseConversationStore}
+- * passes `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
++ * {@link import('@orkestrel/workspace').DatabaseWorkspaceStore}. Default driver: memory
++ * ({@link import('../factories.js').createDatabaseConversationStore} passes
++ * `createMemoryDriver()`), so it also works in memory out of the box; you opt into the
+  * durable plumbing by passing a JSON / SQLite / IndexedDB driver.
+  *
+  * The {@link ConversationSnapshot} is stored as one opaque JSON column — the table is a row of
+diff --git a/src/core/conversations/stores/MemoryConversationStore.ts b/src/core/conversations/stores/MemoryConversationStore.ts
+index 16c0c08..0990bd4 100644
+--- a/src/core/conversations/stores/MemoryConversationStore.ts
++++ b/src/core/conversations/stores/MemoryConversationStore.ts
+@@ -2,7 +2,7 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../types.
+ 
+ /**
+  * Implements the {@link ConversationStoreInterface} in memory — a process-lifetime `Map` of
+- * {@link ConversationSnapshot}s keyed by conversation id, the default store
++ * {@link ConversationSnapshot} records keyed by conversation id, the default store
+  * {@link import('../factories.js').createMemoryConversationStore} builds and the default
+  * backing for `open` / `save`. The exact twin of
+  * {@link import('@orkestrel/workspace').MemoryWorkspaceStore}.
+@@ -54,13 +54,12 @@ export class MemoryConversationStore implements ConversationStoreInterface {
+ 
+ 	/**
+ 	 * Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param —
+-	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
++	 * mirroring the `set` method of {@link import('@orkestrel/workspace').WorkspaceStoreInterface}).
+ 	 *
+ 	 * @param snapshot - The snapshot to store (keyed by its `id`)
+ 	 * @returns A promise that resolves after the snapshot is stored
+ 	 */
+ 	set(snapshot: ConversationSnapshot): Promise<void> {
+-		// Insert / replace under the snapshot's own id (no separate id param).
+ 		this.#snapshots.set(snapshot.id, snapshot)
+ 		return Promise.resolve()
+ 	}
+@@ -72,7 +71,7 @@ export class MemoryConversationStore implements ConversationStoreInterface {
+ 	 * @returns A promise that resolves after the snapshot is dropped
+ 	 */
+ 	delete(id: string): Promise<void> {
+-		// Drop by id; `Map.delete` of an absent id is already a no-op (no throw).
++		// `Map.delete` of an absent id is a no-op, so no presence check is needed.
+ 		this.#snapshots.delete(id)
+ 		return Promise.resolve()
+ 	}
+diff --git a/src/core/conversations/types.ts b/src/core/conversations/types.ts
+index b4f530b..0171ffa 100644
+--- a/src/core/conversations/types.ts
++++ b/src/core/conversations/types.ts
+@@ -11,14 +11,33 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
+ /** Stores judgments by caller key and resolves requests by reusing matching records. */
+ export interface JudgmentManagerInterface {
+ 	readonly count: number
+-	/** Stores inputs with the current epoch milliseconds; an existing key is replaced. */
++	/**
++	 * Stores inputs with the current epoch milliseconds; an existing key is replaced.
++	 *
++	 * @param input - One {@link JudgmentInput}, or a batch
++	 * @returns The stored {@link Judgment} record or records, each stamped with its storage time
++	 */
+ 	add(input: JudgmentInput): Judgment
+ 	add(inputs: readonly JudgmentInput[]): readonly Judgment[]
+-	/** Returns the record for a key, or `undefined` when absent. */
++	/**
++	 * Returns the record for a key, or `undefined` when absent.
++	 *
++	 * @param id - The judgment key to resolve
++	 * @returns The {@link Judgment}, or `undefined` when absent
++	 */
+ 	judgment(id: string): Judgment | undefined
+-	/** Returns stored records in insertion order. */
++	/**
++	 * Returns stored records in insertion order.
++	 *
++	 * @returns Every stored {@link Judgment}, in insertion order
++	 */
+ 	judgments(): readonly Judgment[]
+-	/** Removes every supplied key; returns `true` only when all were present. */
++	/**
++	 * Removes every supplied key; returns `true` only when all were present.
++	 *
++	 * @param id - One judgment key, or a batch
++	 * @returns True if every supplied key was present and removed; false otherwise
++	 */
+ 	remove(id: string): boolean
+ 	remove(ids: readonly string[]): boolean
+ 	/** Removes all records. */
+@@ -42,14 +61,14 @@ export interface JudgmentManagerInterface {
+ }
+ 
+ /**
+- * Stores immutable {@link Message}s in insertion order and mints each `id` on `add` — the
++ * Stores immutable {@link Message} records in insertion order and mints each `id` on `add` — the
+  * message-store contract {@link AgentContextInterface.messages} is typed to, which the active
+  * {@link ConversationInterface} satisfies structurally.
+  *
+  * @remarks
+  * - **Store.** Messages live in insertion order; `count` is how many are stored.
+- *   `add` takes one {@link MessageInput} or a batch and mints each message's
+- *   `id` (a random UUID), returning the created message(s). A stored message is
++ *   `add` takes one {@link MessageInput} or a batch and mints the `id` of each message
++ *   (a random UUID), returning the created message or messages. A stored message is
+  *   immutable — created once from its input, never mutated.
+  * - **Lookup.** `message(id)` resolves one by id (`undefined` when absent);
+  *   `messages()` lists every message in insertion order.
+@@ -62,15 +81,30 @@ export interface MessageManagerInterface {
+ 	/**
+ 	 * Stores one {@link MessageInput}, or a batch — mints each message's `id` and returns the
+ 	 * created message or messages; a stored message is immutable.
++	 *
++	 * @param input - One {@link MessageInput}, or a batch
++	 * @returns The created {@link Message} record or records, each with its minted `id` value
+ 	 */
+ 	add(input: MessageInput): Message
+ 	add(inputs: readonly MessageInput[]): readonly Message[]
+-	/** Looks up one stored message by id (`undefined` when absent). */
++	/**
++	 * Looks up one stored message by id (`undefined` when absent).
++	 *
++	 * @param id - The message id to resolve
++	 * @returns The {@link Message}, or `undefined` when absent
++	 */
+ 	message(id: string): Message | undefined
+-	/** Lists every stored message, in insertion order. */
++	/**
++	 * Lists every stored message, in insertion order.
++	 *
++	 * @returns Every stored {@link Message}, in insertion order
++	 */
+ 	messages(): readonly Message[]
+ 	/**
+ 	 * Removes one message by id, or a batch — `true` only when every supplied id was removed.
++	 *
++	 * @param id - One message id, or a batch
++	 * @returns True if every supplied id was present and removed; false otherwise
+ 	 */
+ 	remove(id: string): boolean
+ 	remove(ids: readonly string[]): boolean
+@@ -81,8 +115,7 @@ export interface MessageManagerInterface {
+ /**
+  * Summarizes a conversation, provider-agnostically — the seam the agent runtime supplies so core
+  * never imports a provider. Given the folded messages, it resolves their digest, the model-written
+- * summary used to summarize a compacted {@link Section} and, when the `rollup` option is `true`,
+- * to regenerate a {@link ConversationInterface}'s rollup `summary`.
++ * summary of a compacted {@link Section} or of the oldest sections a `sections` cap merges.
+  *
+  * @remarks
+  * The agent runtime builds one from its `ProviderInterface` (for example
+@@ -98,7 +131,7 @@ export type ConversationSummaryHandler = (messages: readonly Message[]) => Promi
+ 
+ /**
+  * Holds a slice of folded messages digested into a summary — the unit of compaction a
+- * {@link ConversationInterface} produces when it `compact`s its live tail.
++ * {@link ConversationInterface} produces when its `compact()` call folds the live tail.
+  *
+  * @remarks
+  * `summary` is the model-written digest of this slice (through the
+@@ -108,7 +141,7 @@ export type ConversationSummaryHandler = (messages: readonly Message[]) => Promi
+  */
+ export interface Section {
+ 	readonly id: string
+-	/** Holds the model-written digest of this slice (its {@link ConversationSummaryHandler} output). */
++	/** Holds the model-written digest of this slice (the output of its {@link ConversationSummaryHandler}). */
+ 	readonly summary: string
+ 	/** Retains the folded original messages in full for `rehydrate` / `search`. */
+ 	readonly messages: readonly Message[]
+@@ -119,23 +152,19 @@ export interface Section {
+  * moments a fire-and-forget observer subscribes to through `conversation.emitter.on`.
+  *
+  * @remarks
+- * `compact` carries the newly-folded {@link Section}; `collapse` carries a section
++ * `compact` carries the newly folded {@link Section}; `collapse` carries a section
+  * created by folding multiple older sections together (a bounded-`sections` cap enforcement,
+- * distinct from `compact`'s fresh live-tail fold); `summary` carries the regenerated
+- * conversation rollup (refreshed on each compaction when the `rollup` option is `true`, and
+- * never emitted otherwise); `rehydrate` carries the `id` of a
+- * section whose originals were pulled back. Listener isolation is the emitter's:
+- * every event is emitted directly and a listener throw is routed to the emitter's
+- * `error` handler (the `error` option), never onto this map, so a buggy observer can never
++ * distinct from the fresh live-tail fold that `compact` reports); `rehydrate` carries the `id`
++ * of a section whose originals were pulled back. Listener isolation is the emitter's:
++ * every event is emitted directly and a listener throw is routed to the `error` handler of the
++ * emitter (the `error` option), never onto this map, so a buggy observer can never
+  * corrupt a compaction. A `type` alias (not `interface extends EventMap`) so the
+  * type-literal satisfies `EventMap` structurally.
+  */
+ export type ConversationEventMap = {
+-	/** Reports a new section folded from the live tail — the created section. */
++	/** Reports a section folded from the live tail — the created section. */
+ 	readonly compact: readonly [section: Section]
+-	/** Reports the conversation rollup regenerated — the new summary text. */
+-	readonly summary: readonly [summary: string]
+-	/** Reports a section's original messages pulled back — the section's `id`. */
++	/** Reports the original messages of a section pulled back — the `id` of the section. */
+ 	readonly rehydrate: readonly [id: string]
+ 	/**
+ 	 * Reports the bounded-`sections` cap folding the oldest sections into one merged section — the
+@@ -147,45 +176,38 @@ export type ConversationEventMap = {
+ /**
+  * Configures `createConversation` — the optional `id`, the reserved `on` hooks, the
+  * provider-agnostic `summarize` seam, the retained-tail size, an optional cap on the compacted
+- * `sections` list, the `rollup` switch, and a {@link ConversationSnapshot} to hydrate from.
++ * `sections` list, and a {@link ConversationSnapshot} to hydrate from.
+  *
+  * @remarks
+- * `id` is the conversation's identity (a random UUID when omitted). `on` is the reserved
++ * `id` is the identity of the conversation. Default: a random UUID. `on` is the reserved
+  * listener key (initial {@link ConversationEventMap} listeners). `summarize` is the
+- * {@link ConversationSummaryHandler} compaction needs — absent ⇒ `compact()` throws a
++ * {@link ConversationSummaryHandler} compaction needs — without it `compact()` throws a
+  * {@link import('./errors.js').ConversationError} (a conversation can still store + view a
+  * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
+- * retains verbatim (folding only the older ones); it defaults to
++ * retains verbatim (folding only the older ones). Default:
+  * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
+  * folds every exchange before the newest user message into one section). `sections` is an
+- * optional cap on the
+- * compacted `sections` list — when set (`>= 1`), a `compact()` that would leave more than
+- * `sections` sections folds the oldest overflow into one merged section so the list never
+- * exceeds `sections`, emitting `collapse`; omitted ⇒ unlimited.
+- * `rollup` decides whether each compaction regenerates the rollup `summary`, a further summarizer
+- * call over every section summary. Default: `false`, so no summarizer call is spent on a rollup
+- * and `summary` keeps its value: `undefined`, or the summary a restored snapshot carried.
+- * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, rollup
+- * `summary`, compacted `sections`, and live tail are restored into the new conversation, with
+- * the live `summarize` / `keep` / `on` supplied alongside it (a summarizer is a function, not
+- * serialized data). Restoring is silent (no events — nothing was edited), and a `snapshot.id`
+- * wins over `id` (the snapshot is the conversation's identity). It is what lets
+- * `createConversation` hydrate, and what a {@link ConversationManagerInterface.open} reads a
+- * stored snapshot back through.
++ * optional cap on the compacted `sections` list — when set (`>= 1`), a `compact()` that would
++ * leave more than `sections` sections folds the oldest overflow into one merged section so the
++ * list never exceeds `sections`, emitting `collapse`. Default: no cap.
++ * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, compacted
++ * `sections`, and live tail are restored into the conversation, with the live `summarize` /
++ * `keep` / `on` supplied alongside it (a summarizer is a function, not serialized data).
++ * Restoring is silent (no events — nothing was edited), and a `snapshot.id` wins over `id` (the
++ * snapshot is the identity of the conversation). It is what lets `createConversation` hydrate,
++ * and what a {@link ConversationManagerInterface.open} reads a stored snapshot back through.
+  */
+ export interface ConversationOptions {
+ 	readonly id?: string
+ 	readonly on?: EmitterHooks<ConversationEventMap>
+-	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
++	/** Holds the listener-error handler of the emitter — a listener throw routes here, not to a domain event. */
+ 	readonly error?: EmitterErrorHandler
+-	/** Supplies the summarizer compaction needs; absent ⇒ `compact()` throws a `ConversationError`. */
++	/** Supplies the summarizer compaction needs; without it `compact()` throws a `ConversationError`. */
+ 	readonly summarize?: ConversationSummaryHandler
+-	/** Keeps this many recent live messages verbatim on `compact`; defaults to `DEFAULT_CONVERSATION_KEEP` (`0`). */
++	/** Keeps this many recent live messages verbatim on `compact`. Default: `DEFAULT_CONVERSATION_KEEP` (`0`). */
+ 	readonly keep?: number
+-	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Omitted ⇒ unlimited. */
++	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Default: no cap. */
+ 	readonly sections?: number
+-	/** If `true`, each compaction regenerates the rollup `summary`; if `false`, none is generated. Default: `false`. */
+-	readonly rollup?: boolean
+ 	/** Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent. */
+ 	readonly snapshot?: ConversationSnapshot
+ }
+@@ -195,122 +217,108 @@ export interface ConversationOptions {
+  * `sections` cap, or both, overridden for one fold.
+  *
+  * @remarks
+- * `keep` overrides the conversation's configured retained-tail size for this compaction only
+- * (at most the older `count - keep` live messages fold, cut back to whole exchanges, never the
+- * newest user message or a message after it; when nothing is left to fold, `compact()` is a no-op returning
+- * `undefined`). Omitted ⇒ the conversation's own `keep`
+- * (its option, or `DEFAULT_CONVERSATION_KEEP`) applies. `sections` overrides the conversation's
+- * configured `sections` cap for this compaction only — after the new section is pushed, an
+- * overflow past `sections` folds the oldest sections into one merged section. Omitted ⇒ the
+- * conversation's own `sections` cap (or unlimited) applies.
++ * `keep` overrides the configured retained-tail size of the conversation for this compaction
++ * only (at most the older `count - keep` live messages fold, cut back to whole exchanges, never
++ * the newest user message or a message after it; when nothing is left to fold, `compact()` is a
++ * no-op returning `undefined`). Default: the `keep` of the conversation (its option, or
++ * `DEFAULT_CONVERSATION_KEEP`). `sections` overrides the configured `sections` cap of the
++ * conversation for this compaction only — after the folded section is appended, an overflow past
++ * `sections` folds the oldest sections into one merged section. Default: the cap of the
++ * conversation (or no cap).
+  */
+ export interface CompactOptions {
+-	/** Overrides the retained-tail size for this compaction; omitted ⇒ the conversation's own `keep`. */
++	/** Overrides the retained-tail size for this compaction. Default: the `keep` of the conversation. */
+ 	readonly keep?: number
+-	/** Overrides the `sections` cap for this compaction; omitted ⇒ the conversation's own cap (or unlimited). */
++	/** Overrides the `sections` cap for this compaction. Default: the cap of the conversation (or no cap). */
+ 	readonly sections?: number
+ }
+ 
+ /**
+  * Configures {@link ConversationInterface.reference} — how to render one conversation as a
+  * self-labeled, fenced provenance block to pull into another conversation by writing it to the
+- * active context's active workspace: `label` defaults to the `id`, `summary` defaults to `true`,
+- * and `messages` are cherry-picked excerpts defaulting to none.
++ * active workspace of the active context: `label` names the source and `messages` lists the
++ * cherry-picked excerpts.
+  *
+  * @remarks
+  * The rendered block is a cross-conversation reference a small model must read as foreign
+  * material, not as part of the live thread — so every member keeps it concise and unmistakably
+  * attributed:
+- * - `label` — the human provenance name shown in the block's leading marker (for example `'planning'`);
+- *   defaults to the conversation's own `id`. It is what the model attributes the content to.
+- * - `summary` — whether to include the conversation's rollup `summary` (its summary-of-summaries)
+- *   in the block; defaults to `true` (the rollup is included when one exists — `undefined` until
+- *   the first compaction omits the `Summary:` line). Pass `false` to exclude it.
+- * - `messages` — the cherry-picked excerpts to include (each rendered `role: content`), default
+- *   none. The intended source is the conversation's own `search(query)` / `rehydrate(id)` output
+- *   (select the few relevant turns), not its whole history — dumping every message defeats the
+- *   point (it re-bloats the destination context a small model then has to wade through).
++ * - `label` — the human provenance name shown in the leading marker of the block (for example
++ *   `'planning'`). It is what the model attributes the content to. Default: the `id` of the
++ *   conversation.
++ * - `messages` — the cherry-picked excerpts to include (each rendered `role: content`). The
++ *   intended source is the `search(query)` / `rehydrate(id)` output of the conversation (select
++ *   the few relevant turns), not its whole history — dumping every message defeats the point (it
++ *   re-bloats the destination context a small model then has to wade through). Default: none.
+  */
+ export interface ConversationReferenceOptions {
+-	/** Names the human provenance label in the block's marker; defaults to the conversation's `id`. */
++	/** Names the human provenance label in the marker of the block. Default: the `id` of the conversation. */
+ 	readonly label?: string
+-	/** Includes the conversation's rollup `summary` (when one exists); defaults to `true`. */
+-	readonly summary?: boolean
+-	/** Lists the cherry-picked excerpts to include (`role: content`); defaults to none. */
++	/** Lists the cherry-picked excerpts to include (`role: content`). Default: none. */
+ 	readonly messages?: readonly Message[]
+ }
+ 
+ /**
+  * Groups messages above the flat {@link MessageManagerInterface} — a live uncompacted tail plus
+- * compacted, summarized {@link Section}s and an opt-in conversation rollup `summary`, with on-demand
+- * `rehydrate`, substring `search`, a cross-conversation `reference`, and a JSON `snapshot`, driven
+- * by a provider-agnostic {@link ConversationSummaryHandler} seam; `summarizable` reports whether
+- * that seam was supplied, and the agent loop gates automatic compaction on it.
++ * compacted, summarized {@link Section} records, with on-demand `rehydrate`, substring `search`, a
++ * cross-conversation `reference`, and a JSON `snapshot`, driven by a provider-agnostic
++ * {@link ConversationSummaryHandler} seam; `summarizable` reports whether that seam was supplied,
++ * and the agent loop gates automatic compaction on it.
+  *
+  * @remarks
+  * - **Live tail + sections.** The conversation owns its live uncompacted tail directly — a
+  *   caller appends turns through its own message verbs (`add` mints each `id`, `message` /
+  *   `messages` look up, `remove` / `clear` drop, `count` tallies), exactly as a `Workspace`
+  *   owns its files (no separate per-value manager). `sections` are the compacted history
+- *   (oldest → newest), each a summarized slice that retains its originals. `summary` is the
+- *   conversation rollup (a summary-of-summaries over all sections), regenerated on each
+- *   compaction when the `rollup` option is `true`; otherwise it keeps its value, `undefined` or
+- *   the summary a restored snapshot carried.
+- * - **Message verbs (the inlined store).** `add` takes one {@link MessageInput} or a batch,
+- *   mints each message's `id` (a random UUID), stores it, and returns the created
+- *   message(s); a stored message is immutable. `message(id)` resolves one (`undefined` when
+- *   absent); `messages()` lists the live tail in insertion order; `remove` drops one by id or
+- *   a batch (`true` only when every supplied id was removed); `clear` empties the tail;
+- *   `count` is how many live messages are stored.
++ *   (oldest → newest), each a summarized slice that retains its originals.
++ * - **Message verbs.** `add` takes one {@link MessageInput} or a batch, mints the `id` of each
++ *   message (a random UUID), stores it, and returns the created message or messages; a stored
++ *   message is immutable. `message(id)` resolves one (`undefined` when absent); `messages()`
++ *   lists the live tail in insertion order; `remove` drops one by id or a batch (`true` only when
++ *   every supplied id was removed); `clear` empties the tail; `count` is how many live messages
++ *   are stored.
+  * - **`view()` — the model input.** Each section folds to one synthetic summary message,
+  *   followed by the live messages verbatim: `[...sections-as-summary-messages, ...live]`. The
+- *   rollup `summary` is not injected (it is a separately pull-able digest for a
+- *   cross-conversation case); `view()` carries the per-section summaries, which are the
+- *   compaction benefit.
++ *   per-section summaries are the compaction benefit.
+  * - **`compact()` — fold older live → a section.** Folds the oldest `count - keep` live
+  *   messages, cut short at the newest user message and moved back to whole exchanges and
+- *   before any call group the cut would split, into a new {@link Section} (its `summary` from
+- *   `summarize`), removes them from the live tail, regenerates the rollup (a second
+- *   `summarize` over all section summaries) when the `rollup` option is `true`, and emits
+- *   `summary` (only for a regenerated rollup) then `compact` — returning the new section (or
+- *   `undefined` when nothing folds). A compaction calls the summarizer for the section
+- *   digest, and again for the rollup only when `rollup` is `true`. Throws a
+- *   {@link import('./errors.js').ConversationError} when no `summarize` was supplied.
++ *   before any call group the cut would split, into a {@link Section} (its `summary` from
++ *   `summarize`), removes them from the live tail, and emits `compact` — returning the section
++ *   (or `undefined` when nothing folds). A {@link import('./errors.js').ConversationError} is
++ *   thrown when no `summarize` was supplied.
+  * - **`summarizable` — whether a `compact()` can fold.** `true` when a
+- *   {@link ConversationSummaryHandler} was supplied, `false` otherwise. The agent loop's automatic
+- *   compaction (`AgentOptions.window`) gates on it so a conversation that has no summarizer is
+- *   never auto-compacted (and the loop never throws the `compact()` `SUMMARIZER` error from the
+- *   auto path). A manual `compact()` still throws without a summarizer — only the auto path is
+- *   guarded.
++ *   {@link ConversationSummaryHandler} was supplied, `false` otherwise. The automatic compaction
++ *   of the agent loop (`AgentOptions.window`) gates on it so a conversation that has no
++ *   summarizer is never auto-compacted (and the loop never throws the `compact()` `SUMMARIZER`
++ *   error from the auto path). A manual `compact()` still throws without a summarizer — only the
++ *   auto path is guarded.
+  * - **`rehydrate(id)` / `search(query)` — read the retained originals.** `rehydrate` returns
+- *   a section's full original messages (`[]` for an unknown id) and emits `rehydrate` — a
+- *   pure read (the caller decides whether to re-add them; `rehydrate` never reinserts).
+- *   `search` is a case-insensitive substring scan of `content` across all messages (every
+- *   section's originals + the live tail).
++ *   the full original messages of a section (`undefined` for an unknown id) and emits
++ *   `rehydrate` — a pure read (the caller decides whether to re-add them; `rehydrate` never
++ *   reinserts). `search` is a case-insensitive substring scan of `content` across all messages
++ *   (the originals of every section + the live tail).
+  * - **`reference(options?)` — pull this conversation into another with provenance.** A pure
+- *   string render (no model call) of a self-labeled, fenced cross-conversation block — the
+- *   rollup `summary` (when included + present) plus cherry-picked excerpts — framed so a small
+- *   model reads it as foreign material. Written into the active conversation's context through
+- *   the active workspace (`context.workspaces.active?.write(path, block)`); the cherry-pick
+- *   comes from this conversation's own `search` / `rehydrate`, never its whole history.
++ *   string render (no model call) of a self-labeled, fenced cross-conversation block of
++ *   cherry-picked excerpts, framed so a small model reads it as foreign material. Written into
++ *   the context of the active conversation through the active workspace
++ *   (`context.workspaces.active?.write(path, block)`); the cherry-pick comes from the `search` /
++ *   `rehydrate` of this conversation, never its whole history.
+  * - **Observable.** The owned `emitter` ({@link ConversationEventMap}) carries
+- *   `compact` / `summary` / `rehydrate`; the emitter isolates a listener throw and routes it
++ *   `compact` / `collapse` / `rehydrate`; the emitter isolates a listener throw and routes it
+  *   to its `error` handler (the `error` option).
+  */
+ export interface ConversationInterface {
+ 	readonly id: string
+-	/** Holds the judgments recorded beside this conversation's messages. */
++	/** Holds the judgments recorded beside the messages of this conversation. */
+ 	readonly judgments: JudgmentManagerInterface
+ 	readonly emitter: EmitterInterface<ConversationEventMap>
+-	/** Holds the conversation rollup (a summary-of-summaries), regenerated on each compaction when the `rollup` option is `true`; otherwise `undefined` or the restored snapshot's summary. */
+-	readonly summary: string | undefined
+ 	/** Lists the compacted history, oldest → newest. */
+ 	readonly sections: readonly Section[]
+ 	/**
+ 	 * Reports whether a `compact()` can fold — `true` when a {@link ConversationSummaryHandler} was supplied.
+-	 * The agent loop's automatic compaction (`AgentOptions.window`) gates on it (a non-summarizable
+-	 * conversation is never auto-compacted, so the auto path never throws the `SUMMARIZER` error);
+-	 * a manual `compact()` still throws without a summarizer.
++	 * The automatic compaction of the agent loop (`AgentOptions.window`) gates on it (a
++	 * non-summarizable conversation is never auto-compacted, so the auto path never throws the
++	 * `SUMMARIZER` error); a manual `compact()` still throws without a summarizer.
+ 	 */
+ 	readonly summarizable: boolean
+ 	/** Counts the live (uncompacted) messages stored in the tail. */
+@@ -321,7 +329,7 @@ export interface ConversationInterface {
+ 	 * immutable.
+ 	 *
+ 	 * @param input - One {@link MessageInput}, or a batch
+-	 * @returns The created {@link Message}(s), with their minted `id`s
++	 * @returns The created {@link Message} record or records, each with its minted `id` value
+ 	 */
+ 	add(input: MessageInput): Message
+ 	add(inputs: readonly MessageInput[]): readonly Message[]
+@@ -343,7 +351,7 @@ export interface ConversationInterface {
+ 	 * supplied id was removed.
+ 	 *
+ 	 * @param id - One message id, or a batch
+-	 * @returns True when every supplied id was present and removed; false otherwise
++	 * @returns True if every supplied id was present and removed; false otherwise
+ 	 */
+ 	remove(id: string): boolean
+ 	remove(ids: readonly string[]): boolean
+@@ -352,8 +360,7 @@ export interface ConversationInterface {
+ 	/**
+ 	 * Builds the model input for the next turn — each section as one synthetic recap message,
+ 	 * its summary prefixed with `CONVERSATION_RECAP_PREFIX` so a small model reads it as a
+-	 * recap rather than a literal turn, then the live tail verbatim; the rollup `summary` is
+-	 * not injected.
++	 * recap rather than a literal turn, then the live tail verbatim.
+ 	 *
+ 	 * @returns `[...sections-as-summary-messages, ...live messages]`
+ 	 */
+@@ -361,122 +368,116 @@ export interface ConversationInterface {
+ 	/**
+ 	 * Folds whole exchanges from the oldest `count - keep` live messages, cut short at the newest
+ 	 * user message, into a summarized {@link Section} through the
+-	 * {@link ConversationSummaryHandler}, removes them from the live tail, regenerates the rollup
+-	 * when the `rollup` option is `true`, and emits `summary` (only for a regenerated rollup) then
+-	 * `compact` — resolving `undefined` when nothing folds. Throws a
+-	 * {@link import('./errors.js').ConversationError} when no summarizer was supplied.
++	 * {@link ConversationSummaryHandler}, removes them from the live tail, and emits `compact` —
++	 * resolving `undefined` when nothing folds.
+ 	 *
+ 	 * @remarks
+-	 * The effective `keep` comes from `options`, else the conversation's own. With `rollup` set,
+-	 * regenerating the rollup runs `summarize` again, over all sections. The newest user message
+-	 * is the request a run serves, so it and every message after it stay live. An exchange is a
+-	 * user message and every message after it up to the next user message. Leading messages form
+-	 * their own exchange, retained until the first user exchange can also fold. A cut inside an
+-	 * exchange moves back to its start, so a fold removes whole exchanges. An assistant message with
+-	 * calls and the tool messages that answer it, grouped as
++	 * The effective `keep` comes from `options`, else the `keep` of the conversation. The newest
++	 * user message is the request a run serves, so it and every message after it stay live. An
++	 * exchange is a user message and every message after it up to the next user message. Leading
++	 * messages form their own exchange, retained until the first user exchange can also fold. A cut
++	 * inside an exchange moves back to its start, so a fold removes whole exchanges. An assistant
++	 * message with calls and the tool messages that answer it, grouped as
+ 	 * {@link import('../helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
+ 	 * a group moves before its assistant message, then back to whole exchanges again. Only a group
+ 	 * that spans two exchanges reaches that rule.
+ 	 *
+-	 * @remarks
+ 	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
+-	 * merge step folds the oldest sections into one — if that merge's `summarize` call throws,
+-	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss) but, with `rollup`
+-	 * set, the rollup still regenerates over the current unmerged sections (never left stale)
+-	 * before the error propagates; the next successful `compact()` self-heals the section count
++	 * merge step folds the oldest sections into one. If the `summarize` call of that merge throws,
++	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss), no `compact` is
++	 * emitted, and the error propagates; the next successful `compact()` merges the section count
+ 	 * back to `cap`.
+ 	 *
+ 	 * @param options - Optional {@link CompactOptions} (`keep` overrides the retained-tail size)
+-	 * @returns The new {@link Section}, or `undefined` when nothing folded
++	 * @returns The folded {@link Section}, or `undefined` when nothing folded
++	 * @throws ConversationError Thrown when no summarizer was supplied, or when the effective
++	 * sections cap is below `1`
+ 	 */
+ 	compact(options?: CompactOptions): Promise<Section | undefined>
+ 	/**
+-	 * Returns a section's full original messages — a pure read that emits `rehydrate`, empty for
+-	 * an unknown id and never reinserting.
++	 * Returns the full original messages of a section — a pure read that emits `rehydrate` and
++	 * never reinserts.
+ 	 *
+ 	 * @param id - The {@link Section} `id` to pull back
+-	 * @returns The section's retained original messages (empty when no such section)
++	 * @returns The retained original messages of the section, or `undefined` when no section has `id`
+ 	 */
+-	rehydrate(id: string): readonly Message[]
++	rehydrate(id: string): readonly Message[] | undefined
+ 	/**
+-	 * Searches `content` for a case-insensitive substring across every message — each section's
+-	 * retained originals, then the live tail.
++	 * Searches `content` for a case-insensitive substring across every message — the retained
++	 * originals of each section, then the live tail.
+ 	 *
+ 	 * @param query - The substring to match (case-insensitive)
+-	 * @returns The matching messages, sections' originals first then the live tail
++	 * @returns The matching messages, section originals first then the live tail
+ 	 */
+ 	search(query: string): readonly Message[]
+ 	/**
+ 	 * Renders this conversation as a self-labeled, fenced provenance block to pull into another
+ 	 * conversation — a pure string with no model call: a leading
+-	 * `[Reference — conversation "<label>" — NOT part of this conversation]` marker, the rollup
+-	 * `Summary:` when `summary` is not `false` and a rollup exists, and the cherry-picked
+-	 * excerpts (`- role: content`) when `messages` is supplied. `label` defaults to the `id`.
++	 * `[Reference — conversation "<label>" — NOT part of this conversation]` marker, then the
++	 * cherry-picked excerpts (`- role: content`) when `messages` is supplied. The `label` option
++	 * names the source. Default: the `id`.
+ 	 *
+ 	 * @remarks
+ 	 * The block leads with an unmistakable provenance marker
+-	 * (`[Reference — conversation "<label>" — NOT part of this conversation]`), then optionally
+-	 * the rollup `Summary:` (when `options.summary !== false` and a rollup exists), then the
++	 * (`[Reference — conversation "<label>" — NOT part of this conversation]`), then the
+ 	 * cherry-picked `Relevant messages:` (each `- role: content`) when `options.messages` is
+-	 * supplied. The intended flow is to pull another conversation B into the active conversation
+-	 * A's active workspace: decide relevance from `B.summary`, select the few right turns with
+-	 * `B.search(query)` / `B.rehydrate(id)`, frame them here, then
++	 * supplied. The intended flow is to pull another conversation B into the active workspace of the
++	 * active conversation A: select the few right turns with `B.search(query)` / `B.rehydrate(id)`,
++	 * frame them here, then
+ 	 * `A.context.workspaces.active?.write(\`conversation:${B.id}.md\`, B.reference({ label, messages }))`.
+-	 * Keep the excerpts cherry-picked, never B's whole history — this content enters another
++	 * Keep the excerpts cherry-picked, never the whole history of B — this content enters another
+ 	 * context a small model must read.
+ 	 *
+-	 * @param options - The {@link ConversationReferenceOptions} (label / summary / cherry-picked messages)
++	 * @param options - The {@link ConversationReferenceOptions} (label / cherry-picked messages)
+ 	 * @returns The rendered provenance block (a concise, fenced, self-attributed string)
+ 	 */
+ 	reference(options?: ConversationReferenceOptions): string
+ 	/**
+ 	 * Serializes this conversation to a plain, JSON-serializable {@link ConversationSnapshot} —
+-	 * its `id`, the rollup `summary`, the compacted `sections`, and the live tail; the live
+-	 * `summarize` / `keep` are configuration re-supplied on hydrate rather than serialized.
++	 * its `id`, the compacted `sections`, and the live tail; the live `summarize` / `keep` are
++	 * configuration re-supplied on hydrate rather than serialized.
+ 	 *
+ 	 * @remarks
+-	 * The container serializes itself (`{ id, summary?, sections, messages, judgments? }`) — the
+-	 * {@link ConversationStoreInterface} persistence seam's payload, the exact analogue of
+-	 * {@link import('@orkestrel/workspace').WorkspaceInterface}'s `snapshot`. The summarizer /
+-	 * `keep` are not serialized — they are live
+-	 * config re-supplied on hydrate (a `ConversationSummaryHandler` is a function, not data). The snapshot
+-	 * is the durable analogue of the `snapshot` option: a {@link ConversationManagerInterface}
+-	 * hydrates a conversation from it through that seam (see {@link ConversationManagerInterface.open}).
+-	 * Pure — the sections + messages are already plain immutable records (so the snapshot
+-	 * `structuredClone`s / JSON-round-trips losslessly), and snapshotting mutates nothing.
+-	 *
+-	 * @returns The {@link ConversationSnapshot} (`{ id, summary?, sections, messages, judgments? }`), the
++	 * The container serializes itself (`{ id, sections, messages, judgments? }`) — the payload of
++	 * the {@link ConversationStoreInterface} persistence seam, the exact analogue of the `snapshot`
++	 * method of {@link import('@orkestrel/workspace').WorkspaceInterface}. The summarizer /
++	 * `keep` are not serialized — they are live config re-supplied on hydrate (a
++	 * `ConversationSummaryHandler` is a function, not data). The snapshot is the durable analogue
++	 * of the `snapshot` option: a {@link ConversationManagerInterface} hydrates a conversation from
++	 * it through that seam (see {@link ConversationManagerInterface.open}). Pure — the sections +
++	 * messages are already plain immutable records (so a `structuredClone` call or a JSON round
++	 * trip keeps the snapshot lossless), and snapshotting mutates nothing.
++	 *
++	 * @returns The {@link ConversationSnapshot} (`{ id, sections, messages, judgments? }`), the
+ 	 * judgments present only when the store holds one
+ 	 */
+ 	snapshot(): ConversationSnapshot
+ }
+ 
+ /**
+- * Holds a JSON-serializable snapshot of a conversation's state — its `id`, the rollup `summary`, the
+- * compacted `sections`, and the live tail `messages` — the durable payload the
++ * Holds a JSON-serializable snapshot of the state of a conversation — its `id`, the compacted
++ * `sections`, and the live tail `messages` — the durable payload the
+  * {@link ConversationStoreInterface} persists. The exact analogue of
+  * {@link import('@orkestrel/workspace').WorkspaceSnapshot}.
+  *
+  * @remarks
+  * Pure JSON data (no class instances, no functions): each {@link Section} and
+- * {@link Message} is already a plain record that `structuredClone`s / JSON-round-trips
+- * losslessly. The snapshot carries the rollup `summary` (a summary-of-summaries; absent until a
+- * compaction with the `rollup` option `true`, unless a restored snapshot carried one), the
+- * compacted `sections` (each retaining its folded originals), and the live uncompacted tail
+- * `messages` — but not the `summarize` / `keep` / `rollup`, which are live config
+- * re-supplied on hydrate (a summarizer is a function, not serializable data). The snapshot the
+- * container produces from itself ({@link ConversationInterface.snapshot}); the durable analogue of
+- * the {@link ConversationOptions.snapshot} hydration seam. A {@link ConversationManagerInterface}
+- * hydrates a conversation from it through that seam (see {@link ConversationManagerInterface.open}). It is narrowed back from an
+- * untrusted storage read by {@link import('./validators.js').isConversationSnapshot} (the total
+- * boundary guard).
++ * {@link Message} is already a plain record that a `structuredClone` call or a JSON round trip
++ * keeps lossless. The snapshot carries the compacted `sections` (each retaining its folded
++ * originals) and the live uncompacted tail `messages` — but not the `summarize` / `keep`, which
++ * are live config re-supplied on hydrate (a summarizer is a function, not serializable data). The
++ * container produces the snapshot from itself ({@link ConversationInterface.snapshot}); it is the
++ * durable analogue of the {@link ConversationOptions.snapshot} hydration seam. A
++ * {@link ConversationManagerInterface} hydrates a conversation from it through that seam (see
++ * {@link ConversationManagerInterface.open}). It is narrowed back from an untrusted storage read by
++ * {@link import('./validators.js').isConversationSnapshot} (the total boundary guard), which
++ * admits unknown members: a 0.0.29 snapshot that carries a conversation `summary` passes and
++ * hydrates without it.
+  */
+ export interface ConversationSnapshot {
+ 	readonly id: string
+ 	/** Carries recorded judgments; absent in snapshots saved before judgment storage. */
+ 	readonly judgments?: readonly Judgment[]
+-	/** Holds the rollup (a summary-of-summaries); absent until a compaction with the `rollup` option `true`. */
+-	readonly summary?: string
+ 	/** Lists the compacted history, oldest → newest (each section retains its folded originals). */
+ 	readonly sections: readonly Section[]
+ 	/** Lists the live uncompacted tail, in insertion order. */
+@@ -502,8 +503,8 @@ export interface ConversationSnapshot {
+  *
+  * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
+  * same shape as the memory one. The snapshot carries its own id, so `set` takes no separate id
+- * param (mirroring
+- * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`). Unlike a session store
++ * param (mirroring the `set` method of
++ * {@link import('@orkestrel/workspace').WorkspaceStoreInterface}). Unlike a session store
+  * there is no idle-TTL
+  * / eviction — a persisted conversation lives until an explicit `delete`. It is concrete over
+  * {@link ConversationSnapshot} — no generic parameter, because the
+@@ -519,7 +520,7 @@ export interface ConversationStoreInterface {
+ 	get(id: string): Promise<ConversationSnapshot | undefined>
+ 	/**
+ 	 * Inserts or replaces a snapshot under its own `snapshot.id` (no separate id param —
+-	 * mirroring {@link import('@orkestrel/workspace').WorkspaceStoreInterface}'s `set`).
++	 * mirroring the `set` method of {@link import('@orkestrel/workspace').WorkspaceStoreInterface}).
+ 	 *
+ 	 * @param snapshot - The snapshot to store (keyed by its `id`)
+ 	 */
+@@ -559,35 +560,31 @@ export interface ConversationSnapshotRow {
+ /**
+  * Carries the data to author a {@link ConversationInterface} through a {@link
+  * ConversationManagerInterface} — the optional `id`, a `summarize` override, a `keep` override, a
+- * `sections` cap override, a `rollup` override, the reserved `on` hooks, and a
+- * {@link ConversationSnapshot} to hydrate from.
++ * `sections` cap override, the reserved `on` hooks, and a {@link ConversationSnapshot} to hydrate
++ * from.
+  *
+  * @remarks
+- * `id` is the conversation's identity (minted when omitted). `summarize` overrides the
+- * manager's default {@link ConversationSummaryHandler} for this conversation (omitted ⇒ the
+- * manager's default flows in). `keep` overrides the manager's default retained-tail size.
+- * `sections` overrides the manager's default `sections` cap. `rollup` overrides the manager's
+- * default {@link ConversationOptions.rollup} switch. `on` is the reserved listener key
+- * (initial {@link ConversationEventMap} listeners). `snapshot` is
+- * the construction-time hydration seam — a {@link ConversationSnapshot} whose `id` / `summary` /
+- * `sections` / live tail are restored into the new conversation (the live `summarize` / `keep` /
+- * `on` re-supplied alongside it), the conversation analogue of
+- * {@link import('@orkestrel/workspace').WorkspaceOptions}'s `seed`, carried onto
+- * {@link ConversationOptions.snapshot}, that a
++ * `id` is the identity of the conversation. Default: a minted id. `summarize` overrides the
++ * default {@link ConversationSummaryHandler} of the manager for this conversation. Default: the
++ * manager default. `keep` overrides the default retained-tail size of the manager. `sections`
++ * overrides the default `sections` cap of the manager. `on` is the reserved listener key
++ * (initial {@link ConversationEventMap} listeners). `snapshot` is the construction-time hydration
++ * seam — a {@link ConversationSnapshot} whose `id` / `sections` / live tail are restored into the
++ * conversation (the live `summarize` / `keep` / `on` re-supplied alongside it), the conversation
++ * analogue of the `seed` option of {@link import('@orkestrel/workspace').WorkspaceOptions},
++ * carried onto {@link ConversationOptions.snapshot}, that a
+  * {@link ConversationManagerInterface.open} reads a stored snapshot back through; hydration is
+  * silent (no events). When both `snapshot.id` and `id` are given, `snapshot.id` wins (the snapshot
+- * is the conversation's identity).
++ * is the identity of the conversation).
+  */
+ export interface ConversationInput {
+ 	readonly id?: string
+-	/** Overrides the manager's default summarizer for this conversation. */
++	/** Overrides the default summarizer of the manager for this conversation. */
+ 	readonly summarize?: ConversationSummaryHandler
+-	/** Overrides the manager's default retained-tail size for this conversation. */
++	/** Overrides the default retained-tail size of the manager for this conversation. */
+ 	readonly keep?: number
+-	/** Overrides the manager's default `sections` cap for this conversation. */
++	/** Overrides the default `sections` cap of the manager for this conversation. */
+ 	readonly sections?: number
+-	/** Overrides the manager's default `rollup` switch for this conversation. */
+-	readonly rollup?: boolean
+ 	readonly on?: EmitterHooks<ConversationEventMap>
+ 	/** Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot}. */
+ 	readonly snapshot?: ConversationSnapshot
+@@ -595,88 +592,100 @@ export interface ConversationInput {
+ 
+ /**
+  * Configures `createConversationManager` — the default `ConversationSummaryHandler`, retained-tail
+- * size, `sections` cap, and `rollup` switch the conversations it creates inherit, plus the
+- * optional durable `store` backing `open` / `save`.
++ * size, and `sections` cap the conversations it creates inherit, plus the optional durable `store`
++ * backing `open` / `save`.
+  *
+  * @remarks
+  * `summarize` is the default summarizer flowed into every conversation the manager creates
+  * (a per-`add` {@link ConversationInput.summarize} overrides it); a conversation created
+  * with neither cannot `compact` (it throws a `ConversationError`). `keep` is the default
+- * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it), defaulting
+- * to {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
+- * on a created conversation's compacted `sections` list (a per-`add` {@link ConversationInput.sections}
+- * overrides it); omitted ⇒ unlimited. `rollup` is the default {@link ConversationOptions.rollup}
+- * switch (a per-`add` {@link ConversationInput.rollup} overrides it); omitted ⇒ `false`.
++ * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it). Default:
++ * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
++ * on the compacted `sections` list of a created conversation (a per-`add`
++ * {@link ConversationInput.sections} overrides it). Default: no cap.
+  */
+ export interface ConversationManagerOptions {
+ 	/** Supplies the default summarizer for conversations this manager creates (a per-`add` override wins). */
+ 	readonly summarize?: ConversationSummaryHandler
+-	/** Sets the default retained-tail size (a per-`add` override wins); defaults to `DEFAULT_CONVERSATION_KEEP`. */
++	/** Sets the default retained-tail size (a per-`add` override wins). Default: `DEFAULT_CONVERSATION_KEEP`. */
+ 	readonly keep?: number
+-	/** Sets the default `sections` cap for conversations this manager creates (a per-`add` override wins); omitted ⇒ unlimited. */
++	/** Sets the default `sections` cap for conversations this manager creates (a per-`add` override wins). Default: no cap. */
+ 	readonly sections?: number
+-	/** Sets the default `rollup` switch for conversations this manager creates (a per-`add` override wins). Default: `false`. */
+-	readonly rollup?: boolean
+ 	/**
+ 	 * Holds the optional durable {@link ConversationStoreInterface} backing
+ 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory
+ 	 * / JSON / SQLite / IndexedDB store a conversation is hydrated from (`open` a registry-miss) and
+-	 * persisted to (`save`). Omitted ⇒ the manager is registry-only: `open` resolves only what is
+-	 * already registered, and `save` is a no-op (`false`). The exact analogue of
+-	 * {@link import('@orkestrel/workspace').WorkspaceManagerOptions}'s `store`.
++	 * persisted to (`save`). Default: none, so the manager is registry-only: `open` resolves only
++	 * what is already registered, and `save` is a no-op (`false`). The exact analogue of the `store`
++	 * option of {@link import('@orkestrel/workspace').WorkspaceManagerOptions}.
+ 	 */
+ 	readonly store?: ConversationStoreInterface
+ }
+ 
+ /**
+- * Registers {@link ConversationInterface}s keyed by their `id`, in insertion order, with an active
+- * pointer — the id-keyed store over the conversation layer, the `active` / `switch` seam the {@link
+- * AgentContextInterface} renders, and the durable `open` / `save` store seam. Event-free (a
++ * Registers {@link ConversationInterface} instances keyed by their `id`, in insertion order, with an
++ * active pointer — the id-keyed store over the conversation layer, the `active` / `switch` seam the
++ * {@link AgentContextInterface} renders, and the durable `open` / `save` store seam. Event-free (a
+  * registry, like {@link import('@orkestrel/workspace').WorkspaceManagerInterface}); the
+  * observability lives on each {@link ConversationInterface}.
+  *
+  * @remarks
+  * - **Registry.** `count` is how many are stored. `add(input?)` mints a
+  *   {@link ConversationInterface} (its `id` from `input` or a random UUID), flowing the
+- *   manager's default `summarize` / `keep` in unless the `input` overrides them; `add` of an
++ *   default `summarize` / `keep` of the manager in unless the `input` overrides them; `add` of an
+  *   already-present `id` overwrites it (last write wins). `conversation(id)` looks one up
+  *   (`undefined` when absent); `conversations()` lists them in insertion order.
+- * - **Active pointer.** `active` is the active conversation (the agent's message source the
+- *   context renders), `undefined` until the first `add` (which auto-activates it — a registry
+- *   with conversations always has one active). A subsequent `add` leaves `active` unchanged.
+- *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown
+- *   `id` returns `undefined` and leaves `active` unchanged (the lenient lookup style — never
+- *   throws, no new error code).
+- * - **Removal.** `remove` drops one by id, or a batch (the array overload declared first) — `true`
+- *   only when every supplied id was removed; removing the active conversation sets `active` to `undefined`. `clear`
+- *   empties the registry and sets `active` to `undefined`.
++ * - **Active pointer.** `active` is the active conversation (the message source of the agent
++ *   that the context renders), `undefined` until the first `add` (which auto-activates it — a
++ *   registry with conversations always has one active). A subsequent `add` leaves `active`
++ *   unchanged. `switch(id)` re-points `active` to the conversation with `id` and returns it; an
++ *   unknown `id` returns `undefined` and leaves `active` unchanged (the lenient lookup style —
++ *   never throws, no added error code).
++ * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id was
++ *   removed; removing the active conversation sets `active` to `undefined`. `clear` empties the
++ *   registry and sets `active` to `undefined`.
+  * - **Durable open / save (the optional `store` seam).** When a {@link ConversationStoreInterface}
+  *   is supplied (the `store` option), `open(id)` hydrates a conversation from the store on a registry
+- *   miss (rebuilding it through the `snapshot` option, flowing the manager's
+- *   default `summarize` / `keep` in) and `save(id)` persists a registered conversation's
+- *   {@link ConversationInterface.snapshot}. Both are lenient without a store — `open` resolves only
+- *   registered ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. It mirrors
+- *   the workspace package manager's `open` / `save` seam.
++ *   miss (rebuilding it through the `snapshot` option, flowing the default `summarize` / `keep`
++ *   of the manager in) and `save(id)` persists the {@link ConversationInterface.snapshot} of a
++ *   registered conversation. Both are lenient without a store — `open` resolves only registered
++ *   ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. It mirrors the
++ *   `open` / `save` seam of the workspace package manager.
+  * - **Event-free.** A purely registry store — no Emitter, no events (each conversation owns
+  *   its own).
+  */
+ export interface ConversationManagerInterface {
+ 	readonly count: number
+-	/** Holds the active conversation — the agent's message source the context renders; `undefined` until the first `add`. */
++	/** Holds the active conversation — the message source of the agent that the context renders; `undefined` until the first `add`. */
+ 	readonly active: ConversationInterface | undefined
+-	/** Looks up one conversation by id (`undefined` when absent). */
++	/**
++	 * Looks up one conversation by id (`undefined` when absent).
++	 *
++	 * @param id - The conversation id to resolve
++	 * @returns The conversation, or `undefined` when absent
++	 */
+ 	conversation(id: string): ConversationInterface | undefined
+-	/** Lists every conversation, in insertion order. */
++	/**
++	 * Lists every conversation, in insertion order.
++	 *
++	 * @returns Every registered conversation, in insertion order
++	 */
+ 	conversations(): readonly ConversationInterface[]
+ 	/**
+ 	 * Mints a conversation, taking its `id` from the input or a fresh UUID and flowing the
+-	 * manager's default `summarize` / `keep` in unless the input overrides them — auto-activates
+-	 * the first, and an already-present `id` overwrites, last write wins.
++	 * default `summarize` / `keep` of the manager in unless the input overrides them —
++	 * auto-activates the first, and an already-present `id` overwrites, last write wins.
++	 *
++	 * @param input - Optional {@link ConversationInput} overrides
++	 * @returns The created conversation
+ 	 */
+ 	add(input?: ConversationInput): ConversationInterface
+ 	/**
+ 	 * Re-points `active` at the conversation with `id` and returns it; an unknown `id` returns
+ 	 * `undefined` and leaves `active` unchanged, never throwing.
++	 *
++	 * @param id - The conversation id to activate
++	 * @returns The activated conversation, or `undefined` for an unknown id
+ 	 */
+ 	switch(id: string): ConversationInterface | undefined
+ 	/**
+@@ -688,8 +697,8 @@ export interface ConversationManagerInterface {
+ 	 * - If `id` is already registered, it is activated through `switch` and returned — no store hit.
+ 	 * - Else if a `store` is set, `store.get(id)` is awaited; on a hit the snapshot is rehydrated
+ 	 *   into a fresh {@link ConversationInterface} through the `snapshot` option
+-	 *   (`add({ snapshot, ... })`, flowing the manager's default `summarize` / `keep` in), which
+-	 *   registers and activates it, and it is returned.
++	 *   (`add({ snapshot, ... })`, flowing the default `summarize` / `keep` of the manager in),
++	 *   which registers and activates it, and it is returned.
+ 	 * - Else (no store, or a store miss) ⇒ `undefined` (lenient — no throw).
+ 	 *
+ 	 * @param id - The conversation id to open
+@@ -713,9 +722,12 @@ export interface ConversationManagerInterface {
+ 	/**
+ 	 * Removes one conversation by id, or a batch — `true` only when every supplied id was
+ 	 * removed; clears `active` when a removed conversation was the active one.
++	 *
++	 * @param id - One conversation id, or a batch
++	 * @returns True if every supplied id was present and removed; false otherwise
+ 	 */
+-	remove(ids: readonly string[]): boolean
+ 	remove(id: string): boolean
++	remove(ids: readonly string[]): boolean
+ 	/** Removes every conversation and clears `active`. */
+ 	clear(): void
+ }
+diff --git a/src/core/conversations/validators.ts b/src/core/conversations/validators.ts
+index 22f3789..2fc2afb 100644
+--- a/src/core/conversations/validators.ts
++++ b/src/core/conversations/validators.ts
+@@ -4,7 +4,6 @@ import { isTokenUsage } from '@orkestrel/budget'
+ import {
+ 	arrayOf,
+ 	attempt,
+-	isArray,
+ 	isNumber,
+ 	isRecord,
+ 	isString,
+@@ -97,14 +96,15 @@ export function isJudgment(value: unknown): value is Judgment {
+ 
+ /**
+  * Checks whether an `unknown` is structurally a {@link Section} record — a `string` `id` and
+- * `summary` beside a `messages` array of valid {@link Message}s, the per-section step of the
+- * {@link isConversationSnapshot} read-boundary narrow. Total, never throwing, and never an
++ * `summary` beside a `messages` array of valid {@link Message} records, the per-section step of
++ * the {@link isConversationSnapshot} read-boundary narrow. Total, never throwing, and never an
+  * assertion.
+  *
+  * @remarks
+- * A total guard (it never throws — adversarial input returns `false`). It checks the section's
+- * shape: a record with a `string` `id`, a `string` `summary`, and a `messages` array every element
+- * of which is a valid {@link Message} record ({@link isMessage}). Enough to safely impose
++ * A total guard (it never throws — adversarial input, a throwing getter included, returns
++ * `false`). It checks the shape of the section: a record with a `string` `id`, a `string`
++ * `summary`, and a dense `messages` array every element of which is a valid {@link Message}
++ * record ({@link isMessage}); a sparse `messages` array is refused. Enough to safely impose
+  * the {@link Section} type at a storage boundary without a cast.
+  *
+  * @param value - The value to test (one element of a snapshot's `sections` array)
+@@ -118,28 +118,29 @@ export function isJudgment(value: unknown): value is Judgment {
+  * ```
+  */
+ export function isSection(value: unknown): value is Section {
+-	if (!isRecord(value)) return false
+-	if (!isString(value.id) || !isString(value.summary)) return false
+-	return isArray(value.messages) && value.messages.every(isMessage)
++	return (
++		isRecord(value) &&
++		objectOf({ id: isString, summary: isString, messages: arrayOf(isMessage) })(value)
++	)
+ }
+ 
+ /**
+- * Narrows an `unknown` to a {@link ConversationSnapshot} — a `string` `id`, an optional `string`
+- * `summary`, and valid `sections` and `messages` arrays; the total boundary guard for an
+- * untrusted snapshot read (a storage row a
++ * Narrows an `unknown` to a {@link ConversationSnapshot} — a `string` `id` and valid
++ * `sections` and `messages` arrays; the total boundary guard for an untrusted snapshot read (a storage row a
+  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
+  * reads back from its opaque JSON column, a snapshot loaded from disk), never throwing. The exact
+  * analogue of {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
+  *
+  * @remarks
+- * A total guard (it never throws — adversarial input returns `false`). It checks the snapshot's
+- * shape: a `string` `id`, an optional `string` `summary` (present-or-absent — the rollup is
+- * `undefined` until the first compaction), a `sections` array every element of which is a valid
+- * {@link Section} ({@link isSection}), and a `messages` array every element of which is a
+- * valid {@link Message} ({@link isMessage}) — enough to safely impose the
++ * A total guard (it never throws — adversarial input returns `false`). It checks the shape of the
++ * snapshot: a `string` `id`, a `sections` array every element of which is a valid
++ * {@link Section} ({@link isSection}), a `messages` array every element of which is a
++ * valid {@link Message} ({@link isMessage}), and optional valid `judgments` — enough to safely
++ * impose the
+  * {@link ConversationSnapshot} type at a storage boundary without a cast. The structural twin of
+- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. A malformed blob (a non-record, a missing / non-string `id`, a
+- * non-string `summary` when present, a non-array `sections` / `messages`, or any malformed
++ * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. Unknown members are admitted, so a
++ * 0.0.29 snapshot that carries a conversation `summary` passes. A malformed blob (a non-record,
++ * a missing / non-string `id`, a non-array `sections` / `messages`, or any malformed
+  * element) resolves `false`, so a
+  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
+  * read yields `undefined` rather than a broken conversation.
+@@ -150,7 +151,6 @@ export function isSection(value: unknown): value is Section {
+  * @example
+  * ```ts
+  * isConversationSnapshot({ id: 'c1', sections: [], messages: [] }) // true
+- * isConversationSnapshot({ id: 'c1', summary: 'recap', sections: [], messages: [] }) // true
+  * isConversationSnapshot({ id: 'c1', sections: 'nope', messages: [] }) // false
+  * isConversationSnapshot({ sections: [], messages: [] }) // false (missing id)
+  * ```
+@@ -161,12 +161,11 @@ export function isConversationSnapshot(value: unknown): value is ConversationSna
+ 		objectOf(
+ 			{
+ 				id: isString,
+-				summary: optionalOf(isString),
+ 				sections: arrayOf(isSection),
+ 				messages: arrayOf(isMessage),
+ 				judgments: optionalOf(arrayOf(isJudgment)),
+ 			},
+-			['summary', 'judgments'],
++			['judgments'],
+ 		)(value)
+ 	)
+ }
+diff --git a/tests/src/core/conversations/Conversation.test.ts b/tests/src/core/conversations/Conversation.test.ts
+index 257e04f..cdda69f 100644
+--- a/tests/src/core/conversations/Conversation.test.ts
++++ b/tests/src/core/conversations/Conversation.test.ts
+@@ -1,4 +1,4 @@
+-import type { ConversationEventMap, Message } from '@src/core'
++import type { ConversationEventMap } from '@src/core'
+ import {
+ 	CONVERSATION_RECAP_PREFIX,
+ 	Conversation,
+@@ -8,22 +8,21 @@ import {
+ 	isConversationError,
+ } from '@src/core'
+ import { describe, expect, it } from 'vitest'
+-import { createStubSummarizer, createToolCall } from '../../../setup.js'
++import {
++	createStubSummarizer,
++	createToolCall,
++	renderRecap,
++	SUMMARIZED_CONVERSATION_SNAPSHOT,
++} from '../../../setup.js'
+ import { createRecorder, createRecorders, requireValue, roundTripJSON } from '@orkestrel/test'
+ 
+-// The framed recap content a section's summary renders as in view() — the lean RECAP label
+-// prefix (CONVERSATION_RECAP_PREFIX) + the summary text. Centralizes the framing so these tests
+-// assert against the ONE source of truth (the exported constant), not a duplicated literal.
+-const recap = (summary: string): string => `${CONVERSATION_RECAP_PREFIX}${summary}`
+-
+-// Conversation OWNS its live message tail DIRECTLY (the flat store verbs folded in, like a
+-// Workspace owns its files) — a live tail plus compacted, summarized sections + an opt-in
+-// rollup + the `summarizable` flag, with rehydrate / search over the retained originals, driven by
+-// a provider-agnostic summarizer seam — real behavior, a data-stub summarizer, NOT a
+-// behavior-mock; the LIVE model is exercised in tests/src/ollama).
+-// `compact()` folds the older live messages into a section (its summary from the seam),
+-// regenerates an opted-in rollup (a second seam call), and emits `summary` then `compact`; view() =
+-// section summaries ++ the live tail; rehydrate/search read the retained originals.
++// Conversation OWNS its live message tail DIRECTLY (like a Workspace owns its files) — a live tail
++// plus compacted, summarized sections + the `summarizable` flag, with rehydrate / search over the
++// retained originals, driven by a provider-agnostic summarizer seam — real behavior, a data-stub
++// summarizer, NOT a behavior-mock.
++// `compact()` folds the older live messages into a section (its summary from the seam) and emits
++// `compact`; view() = section summaries ++ the live tail; rehydrate/search read the retained
++// originals.
+ 
+ describe('Conversation — construction & accessors', () => {
+ 	it('mints an id when none is supplied, and accepts an explicit one', () => {
+@@ -34,11 +33,10 @@ describe('Conversation — construction & accessors', () => {
+ 		expect(explicit.id).toBe('fixed')
+ 	})
+ 
+-	it('starts with no sections, an undefined rollup, and an empty live tail', () => {
++	it('starts with no sections and an empty live tail', () => {
+ 		const conversation = new Conversation()
+ 
+ 		expect(conversation.sections).toEqual([])
+-		expect(conversation.summary).toBeUndefined()
+ 		expect(conversation.count).toBe(0)
+ 		expect(conversation.view()).toEqual([])
+ 	})
+@@ -167,12 +165,12 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
+ 		expect(section?.messages[1]?.thinking).toBe('private plan')
+ 	})
+ 
+-	it('folds every message before the newest user message into ONE section, sets the rollup, emits', async () => {
++	it('folds every message before the newest user message into ONE section and emits compact', async () => {
+ 		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
+-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
++		const conversation = new Conversation({ summarize: stub.summarize })
++		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse' | 'rehydrate'>(
+ 			conversation.emitter,
+-			['compact', 'summary', 'rehydrate'],
++			['compact', 'collapse', 'rehydrate'],
+ 		)
+ 		conversation.add([
+ 			{ role: 'user', content: 'a' },
+@@ -189,38 +187,35 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
+ 		// The newest user message stays live.
+ 		expect(conversation.messages().map((message) => message.content)).toEqual(['c'])
+ 		// view() is the section's FRAMED recap message (the lean RECAP-label prefix + the summary),
+-		// keyed by the section id, role assistant, then the live tail. The raw `summary` and the rollup
+-		// stay UNframed — the label is a view()-only presentation concern.
++		// keyed by the section id, role assistant, then the live tail. The raw `summary` stays
++		// UNframed — the label is a view()-only presentation concern.
+ 		const view = conversation.view()
+ 		expect(view).toHaveLength(2)
+-		expect(view[0]?.content).toBe(recap('recap of 2'))
++		expect(view[0]?.content).toBe(renderRecap('recap of 2'))
+ 		expect(view[0]?.role).toBe('assistant')
+ 		expect(view[0]?.id).toBe(section?.id)
+ 		expect(view[1]?.content).toBe('c')
+-		// The rollup is the summary-of-summaries over the one section (one summary ⇒ 'recap of 1').
+-		expect(conversation.summary).toBe('recap of 1')
+ 		expect(conversation.sections).toHaveLength(1)
+-		// Both events fired (summary + compact); the section is carried on `compact`.
+-		expect(events.summary.calls).toEqual([['recap of 1']])
+-		expect(events.compact.count).toBe(1)
+-		expect(events.compact.calls[0]?.[0]).toBe(section)
++		// Only `compact` fired, carrying the section.
++		expect(events.compact.calls).toEqual([[section]])
++		expect(events.collapse.count).toBe(0)
+ 		expect(events.rehydrate.count).toBe(0)
+ 	})
+ 
+-	it('makes TWO summarizer calls per compaction with rollup (the section digest + the rollup)', async () => {
++	it('makes ONE summarizer call per compaction, over the folded slice', async () => {
+ 		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
++		const conversation = new Conversation({ summarize: stub.summarize })
+ 		conversation.add([
+-			{ role: 'assistant', content: 'a' },
+-			{ role: 'assistant', content: 'b' },
++			{ role: 'user', content: 'Is the depot open on Friday?' },
++			{ role: 'assistant', content: 'The depot is open on Friday.' },
++			{ role: 'user', content: 'Which order is late?' },
+ 		])
+ 
+-		await conversation.compact()
++		const section = await conversation.compact()
+ 
+-		// Call 1: the folded slice (2 messages). Call 2: the rollup over all section summaries (1).
+-		expect(stub.calls).toHaveLength(2)
+-		expect(stub.calls[0]).toHaveLength(2)
+-		expect(stub.calls[1]).toHaveLength(1)
++		expect(stub.calls).toEqual([section?.messages])
++		expect('summary' in conversation).toBe(false)
++		expect('summary' in conversation.snapshot()).toBe(false)
+ 	})
+ })
+ 
+@@ -245,7 +240,7 @@ describe('Conversation — compact({ keep }) retains a recent tail', () => {
+ 		])
+ 		// view() = [framed section recap, ...the retained live tail verbatim (NOT framed)].
+ 		expect(conversation.view().map((message) => message.content)).toEqual([
+-			recap('recap of 2'),
++			renderRecap('recap of 2'),
+ 			'recent-1',
+ 			'recent-2',
+ 		])
+@@ -288,9 +283,9 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
+ 	it('returns undefined and emits nothing when count <= keep', async () => {
+ 		const stub = createStubSummarizer()
+ 		const conversation = new Conversation({ summarize: stub.summarize })
+-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
++		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+ 			conversation.emitter,
+-			['compact', 'summary'],
++			['compact', 'collapse'],
+ 		)
+ 		conversation.add([
+ 			{ role: 'user', content: 'a' },
+@@ -300,12 +295,11 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
+ 		const section = await conversation.compact({ keep: 5 })
+ 
+ 		expect(section).toBeUndefined()
+-		// No fold ⇒ no summarizer call, no events, the live tail intact, no rollup.
++		// No fold ⇒ no summarizer call, no events, the live tail intact.
+ 		expect(stub.calls).toHaveLength(0)
+ 		expect(events.compact.count).toBe(0)
+-		expect(events.summary.count).toBe(0)
++		expect(events.collapse.count).toBe(0)
+ 		expect(conversation.count).toBe(2)
+-		expect(conversation.summary).toBeUndefined()
+ 	})
+ 
+ 	it('returns undefined for an empty conversation (keep 0)', async () => {
+@@ -497,7 +491,7 @@ describe('Conversation — summarizable reflects whether a summarizer was suppli
+ 	it('is true with a summarizer (compact can fold) and false without (manual compact throws)', () => {
+ 		// `summarizable` is the clean signal the agent loop gates AUTO-compaction on: a conversation
+ 		// with no summarizer is never auto-compacted (so the auto path never throws the SUMMARIZER
+-		// error). A manual compact() is still gated — proven by the throw test above.
++		// error). A manual compact() is still gated — proven by the preceding throw test.
+ 		const withSeam = new Conversation({ summarize: createStubSummarizer().summarize })
+ 		const without = new Conversation()
+ 
+@@ -521,7 +515,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
+ 		const section = await conversation.compact()
+ 		const id = section?.id ?? ''
+ 
+-		const pulled = conversation.rehydrate(id)
++		const pulled = requireValue(conversation.rehydrate(id))
+ 
+ 		// The full originals come back (by id + content) — compaction retained them.
+ 		expect(pulled.map((message) => message.content)).toEqual(['remember me', 'and me'])
+@@ -531,14 +525,14 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
+ 		expect(conversation.count).toBe(1)
+ 	})
+ 
+-	it('returns [] for an unknown section id (still emits rehydrate)', async () => {
++	it('returns undefined for an unknown section id (still emits rehydrate)', async () => {
+ 		const stub = createStubSummarizer()
+ 		const conversation = new Conversation({ summarize: stub.summarize })
+ 		const events = createRecorders<ConversationEventMap, 'rehydrate'>(conversation.emitter, [
+ 			'rehydrate',
+ 		])
+ 
+-		expect(conversation.rehydrate('nope')).toEqual([])
++		expect(conversation.rehydrate('nope')).toBeUndefined()
+ 		expect(events.rehydrate.calls).toEqual([['nope']])
+ 	})
+ })
+@@ -551,7 +545,7 @@ describe('Conversation — search(query) over sections + live (case-insensitive)
+ 			{ role: 'user', content: 'The quick brown FOX' },
+ 			{ role: 'assistant', content: 'a lazy dog' },
+ 		])
+-		// Fold the two above into a section, then add a fresh live message.
++		// Fold the two preceding messages into a section, then add a fresh live message.
+ 		await conversation.compact()
+ 		conversation.add({ role: 'user', content: 'another fox sighting' })
+ 
+@@ -582,18 +576,17 @@ describe('Conversation — search(query) over sections + live (case-insensitive)
+ 	})
+ })
+ 
+-describe('Conversation — multiple compactions accumulate sections + regenerate the rollup', () => {
+-	it('appends a new section each compaction and refreshes the rollup over ALL sections', async () => {
++describe('Conversation — multiple compactions accumulate sections', () => {
++	it('appends a section each compaction, oldest first', async () => {
+ 		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
++		const conversation = new Conversation({ summarize: stub.summarize })
+ 
+-		// First fold: one message → section 1; rollup over 1 section.
++		// First fold: one message → section 1.
+ 		conversation.add({ role: 'assistant', content: 'first batch' })
+ 		const first = await conversation.compact()
+ 		expect(conversation.sections).toHaveLength(1)
+-		expect(conversation.summary).toBe('recap of 1')
+ 
+-		// Second fold: two messages → section 2; rollup over 2 sections.
++		// Second fold: two messages → section 2.
+ 		conversation.add([
+ 			{ role: 'assistant', content: 'second' },
+ 			{ role: 'assistant', content: 'batch' },
+@@ -603,90 +596,36 @@ describe('Conversation — multiple compactions accumulate sections + regenerate
+ 		expect(conversation.sections).toHaveLength(2)
+ 		expect(conversation.sections.map((one) => one.id)).toEqual([first?.id, second?.id])
+ 		expect(second?.summary).toBe('recap of 2')
+-		// The rollup is regenerated over BOTH section summaries (2) ⇒ 'recap of 2'.
+-		expect(conversation.summary).toBe('recap of 2')
++		expect(stub.calls.map((call) => call.length)).toEqual([1, 2])
+ 		// view() now carries BOTH section recap messages (each framed), no live tail left.
+ 		expect(conversation.view().map((message) => message.content)).toEqual([
+-			recap('recap of 1'),
+-			recap('recap of 2'),
++			renderRecap('recap of 1'),
++			renderRecap('recap of 2'),
+ 		])
+ 	})
+ })
+ 
+-describe('Conversation — the rollup is opt-in', () => {
+-	it('spends no summarizer call on a rollup by default and leaves summary undefined', async () => {
+-		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize })
+-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary'>(
+-			conversation.emitter,
+-			['compact', 'summary'],
+-		)
+-		conversation.add([
+-			{ role: 'user', content: 'Is the depot open on Friday?' },
+-			{ role: 'assistant', content: 'The depot is open on Friday.' },
+-			{ role: 'user', content: 'Which order is late?' },
+-		])
+-
+-		const section = await conversation.compact()
+-
+-		expect(stub.calls).toEqual([section?.messages])
+-		expect(conversation.summary).toBeUndefined()
+-		expect(events.summary.count).toBe(0)
+-		expect(events.compact.calls).toEqual([[section]])
+-		expect('summary' in conversation.snapshot()).toBe(false)
+-	})
+-
+-	it('regenerates the rollup with a second summarizer call when rollup is true', async () => {
+-		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize, rollup: true })
+-		const events = createRecorders<ConversationEventMap, 'summary'>(conversation.emitter, [
+-			'summary',
+-		])
+-		conversation.add([
+-			{ role: 'user', content: 'Is the depot open on Friday?' },
+-			{ role: 'assistant', content: 'The depot is open on Friday.' },
+-			{ role: 'user', content: 'Which order is late?' },
+-		])
+-
+-		await conversation.compact()
+-
+-		expect(stub.calls.map((call) => call.length)).toEqual([2, 1])
+-		expect(conversation.summary).toBe('recap of 1')
+-		expect(events.summary.calls).toEqual([['recap of 1']])
+-	})
+-
+-	it('merges an overflow without a rollup call when rollup is false', async () => {
+-		const stub = createStubSummarizer()
+-		const conversation = new Conversation({ summarize: stub.summarize, sections: 1 })
+-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+-		await conversation.compact()
+-		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
+-
+-		await conversation.compact()
+-
+-		// The first fold, the second fold, then the merge over the two section summaries.
+-		expect(stub.calls.map((call) => call.length)).toEqual([1, 1, 2])
+-		expect(conversation.sections).toHaveLength(1)
+-		expect(conversation.summary).toBeUndefined()
+-	})
+-
+-	it('carries a restored rollup through a compaction and a snapshot when rollup is false', async () => {
++describe('Conversation — a 0.0.29 snapshot hydrates without its conversation summary', () => {
++	it('restores the sections and the tail, and neither a compaction nor a snapshot carries the summary', async () => {
+ 		const stub = createStubSummarizer()
+ 		const conversation = new Conversation({
+ 			summarize: stub.summarize,
+-			snapshot: { id: 'desk', summary: 'Ada prefers email.', sections: [], messages: [] },
++			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
++		})
++
++		expect(conversation.snapshot()).toEqual({
++			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
++			sections: SUMMARIZED_CONVERSATION_SNAPSHOT.sections,
++			messages: SUMMARIZED_CONVERSATION_SNAPSHOT.messages,
+ 		})
+ 		conversation.add([
+-			{ role: 'user', content: 'Is the depot open on Friday?' },
+-			{ role: 'assistant', content: 'The depot is open on Friday.' },
+-			{ role: 'user', content: 'Which order is late?' },
++			{ role: 'assistant', content: 'Order LH-81660 is late.' },
++			{ role: 'user', content: 'Who carries it?' },
+ 		])
+-
+ 		await conversation.compact()
+ 
+-		expect(stub.calls).toHaveLength(1)
+-		expect(conversation.summary).toBe('Ada prefers email.')
+-		expect(conversation.snapshot().summary).toBe('Ada prefers email.')
++		expect(stub.calls.map((call) => call.length)).toEqual([2])
++		expect('summary' in conversation.snapshot()).toBe(false)
+ 	})
+ })
+ 
+@@ -696,7 +635,6 @@ describe('Conversation — observation is side-effect-free', () => {
+ 		const errors = createRecorder<readonly [error: unknown, event: string]>()
+ 		const conversation = new Conversation({
+ 			summarize: stub.summarize,
+-			rollup: true,
+ 			error: errors.handler,
+ 			on: {
+ 				compact() {
+@@ -708,11 +646,10 @@ describe('Conversation — observation is side-effect-free', () => {
+ 
+ 		const section = await conversation.compact()
+ 
+-		// The listener threw, but the compaction completed (the section + rollup landed) and the
+-		// throw was routed to the emitter's error handler, never escaping.
++		// The listener threw, but the compaction completed (the section landed) and the throw was
++		// routed to the error handler of the emitter, never escaping.
+ 		expect(section).toBeDefined()
+ 		expect(conversation.sections).toHaveLength(1)
+-		expect(conversation.summary).toBe('recap of 1')
+ 		// (error, event) order.
+ 		expect(errors.count).toBe(1)
+ 		expect(errors.calls[0]?.[1]).toBe('compact')
+@@ -749,7 +686,7 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)',
+ 		// The section folds to a FRAMED recap (prefix + summary), role assistant; the live tail
+ 		// message is carried through UNTOUCHED (never gets the recap label).
+ 		expect(view).toHaveLength(2)
+-		expect(view[0]?.content).toBe(recap('recap of 1'))
++		expect(view[0]?.content).toBe(renderRecap('recap of 1'))
+ 		expect(view[0]?.content.startsWith(CONVERSATION_RECAP_PREFIX)).toBe(true)
+ 		expect(view[1]?.content).toBe('live tail')
+ 		expect(view[1]?.content.includes(CONVERSATION_RECAP_PREFIX)).toBe(false)
+@@ -786,19 +723,15 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)',
+ })
+ 
+ describe('Conversation — reference() renders a provenance-labeled cross-conversation block (D1)', () => {
+-	it('includes the provenance label, the rollup summary, and ONLY the supplied excerpts', async () => {
++	it('includes the provenance label and ONLY the supplied excerpts, with no summary line', async () => {
+ 		const stub = createStubSummarizer()
+-		const conversation = new Conversation({
+-			id: 'planning',
+-			summarize: stub.summarize,
+-			rollup: true,
+-		})
++		const conversation = new Conversation({ id: 'planning', summarize: stub.summarize })
+ 		const all = conversation.add([
+ 			{ role: 'user', content: 'the API endpoint is /v2/sync' },
+ 			{ role: 'assistant', content: 'noted, /v2/sync it is' },
+ 			{ role: 'user', content: 'also the weather is nice' },
+ 		])
+-		await conversation.compact() // sets the rollup `summary` (= 'recap of 1' over one section)
++		await conversation.compact()
+ 
+ 		// Cherry-pick ONE relevant message (as search() would surface), NOT the whole history.
+ 		const picked = conversation.search('endpoint')
+@@ -807,15 +740,15 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
+ 
+ 		// Provenance marker names the source + states it is NOT part of this conversation.
+ 		expect(block).toContain('[Reference — conversation "planning" — NOT part of this conversation]')
+-		// The rollup summary line is present (summary defaults to true, and one exists).
+-		expect(block).toContain('Summary: recap of 1')
++		// A compacted conversation renders no summary line.
++		expect(block).not.toContain('Summary:')
+ 		// ONLY the cherry-picked excerpt appears — rendered `- role: content`.
+ 		expect(block).toContain('Relevant messages:')
+ 		expect(block).toContain('- user: the API endpoint is /v2/sync')
+ 		// The OTHER messages are NOT dumped into the block (cherry-pick, never the whole history).
+ 		expect(block).not.toContain('also the weather is nice')
+ 		expect(block).not.toContain('noted, /v2/sync it is')
+-		// Sanity: the picked message really was one of the conversation's own messages.
++		// The picked message really was one of the conversation's own messages.
+ 		expect(all.map((message) => message.content)).toContain(picked[0]?.content)
+ 	})
+ 
+@@ -827,35 +760,16 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
+ 		)
+ 	})
+ 
+-	it('omits the Summary line when there is no rollup (no compaction yet)', () => {
++	it('renders the marker alone when no excerpts are supplied', () => {
+ 		const conversation = new Conversation({ id: 'fresh' })
+ 		conversation.add({ role: 'user', content: 'hi' })
+ 
+-		const block = conversation.reference()
+-
+-		// No compaction ⇒ summary is undefined ⇒ no `Summary:` line; and no excerpts supplied ⇒ no
+-		// `Relevant messages:` block. The marker still renders cleanly on its own.
+-		expect(block).toBe('[Reference — conversation "fresh" — NOT part of this conversation]')
+-	})
+-
+-	it('excludes the summary when summary:false even if a rollup exists', async () => {
+-		const stub = createStubSummarizer()
+-		const conversation = new Conversation({
+-			id: 'planning',
+-			summarize: stub.summarize,
+-			rollup: true,
+-		})
+-		conversation.add({ role: 'assistant', content: 'decided on Postgres' })
+-		await conversation.compact()
+-		expect(conversation.summary).toBeDefined()
+-
+-		const block = conversation.reference({ summary: false })
+-
+-		expect(block).not.toContain('Summary:')
+-		expect(block).toBe('[Reference — conversation "planning" — NOT part of this conversation]')
++		expect(conversation.reference()).toBe(
++			'[Reference — conversation "fresh" — NOT part of this conversation]',
++		)
+ 	})
+ 
+-	it('renders excerpts with no summary line when summary-less but messages are supplied', () => {
++	it('renders each supplied excerpt as role: content under the marker', () => {
+ 		const conversation = new Conversation({ id: 'chat' })
+ 		const messages = conversation.add([
+ 			{ role: 'user', content: 'one' },
+@@ -871,15 +785,10 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
+ 	})
+ })
+ 
+-describe('Conversation — snapshot() serializes id + summary + sections + live tail (C-c)', () => {
+-	it('snapshot() captures id, sections, the live tail, and the rollup summary', async () => {
++describe('Conversation — snapshot() serializes id + sections + live tail (C-c)', () => {
++	it('snapshot() captures id, sections, and the live tail, and carries no summary member', async () => {
+ 		const stub = createStubSummarizer()
+-		const conversation = new Conversation({
+-			id: 'snap',
+-			summarize: stub.summarize,
+-			rollup: true,
+-			keep: 1,
+-		})
++		const conversation = new Conversation({ id: 'snap', summarize: stub.summarize, keep: 1 })
+ 		conversation.add([
+ 			{ role: 'user', content: 'first' },
+ 			{ role: 'assistant', content: 'second' },
+@@ -889,19 +798,17 @@ describe('Conversation — snapshot() serializes id + summary + sections + live
+ 
+ 		const snapshot = conversation.snapshot()
+ 		expect(snapshot.id).toBe('snap')
+-		expect(snapshot.summary).toBe(conversation.summary) // the regenerated rollup
++		expect('summary' in snapshot).toBe(false)
+ 		expect(snapshot.sections).toEqual(conversation.sections)
+ 		expect(snapshot.messages).toEqual(conversation.messages()) // the live tail
+ 		expect(snapshot.messages.map((one) => one.content)).toEqual(['third'])
+ 	})
+ 
+-	it('snapshot() OMITS summary before any compaction (undefined rollup, present-when-set)', () => {
++	it('snapshot() before any compaction holds no sections and the live tail', () => {
+ 		const conversation = new Conversation({ id: 'fresh' })
+ 		conversation.add({ role: 'user', content: 'hi' })
+ 
+ 		const snapshot = conversation.snapshot()
+-		// The rollup is undefined until the first compaction — the key is OMITTED (not present-but-undefined).
+-		expect('summary' in snapshot).toBe(false)
+ 		expect(snapshot.sections).toEqual([])
+ 		expect(snapshot.messages.map((one) => one.content)).toEqual(['hi'])
+ 	})
+@@ -920,7 +827,6 @@ describe('Conversation — snapshot() serializes id + summary + sections + live
+ 		// The declared option is the ONE seam every caller reaches — there is no positional form.
+ 		const restored = createConversation({ snapshot, summarize: stub.summarize, keep: 1 })
+ 		expect(restored.id).toBe('stored') // the snapshot IS the identity
+-		expect(restored.summary).toBe(source.summary)
+ 		expect(restored.sections).toEqual(source.sections)
+ 		expect(restored.messages()).toEqual(source.messages())
+ 		// A re-snapshot of the restored conversation equals the original (a faithful round-trip).
+@@ -964,12 +870,11 @@ describe('Conversation — snapshot() serializes id + summary + sections + live
+ 
+ describe('Conversation — sections cap', () => {
+ 	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
+-		const zero = (): Conversation => new Conversation({ sections: 0 })
+-		const negative = (): Conversation => new Conversation({ sections: -1 })
+-
+-		expect(zero).toThrow(ConversationError)
+-		expect(negative).toThrow(ConversationError)
+-		expect(zero).toThrow(expect.objectContaining({ code: 'SECTIONS' }))
++		expect(() => new Conversation({ sections: 0 })).toThrow(ConversationError)
++		expect(() => new Conversation({ sections: -1 })).toThrow(ConversationError)
++		expect(() => new Conversation({ sections: 0 })).toThrow(
++			expect.objectContaining({ code: 'SECTIONS' }),
++		)
+ 	})
+ 
+ 	it('accepts a fractional cap >= 1 (only the >= 1 bound is validated)', () => {
+@@ -1077,6 +982,20 @@ describe('Conversation — sections cap', () => {
+ 		expect(conversation.sections).toHaveLength(1)
+ 	})
+ 
++	it('merges an overflow with one further summarizer call over the folded section summaries', async () => {
++		const stub = createStubSummarizer()
++		const conversation = new Conversation({ summarize: stub.summarize, sections: 1 })
++		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
++		await conversation.compact()
++		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
++
++		await conversation.compact()
++
++		// The first fold, the second fold, then the merge over the two section summaries.
++		expect(stub.calls.map((call) => call.length)).toEqual([1, 1, 2])
++		expect(conversation.sections).toHaveLength(1)
++	})
++
+ 	it('DEFAULT unset sections: repeated compacts grow the sections list unbounded (regression guard)', async () => {
+ 		const stub = createStubSummarizer()
+ 		const conversation = new Conversation({ summarize: stub.summarize })
+@@ -1089,24 +1008,26 @@ describe('Conversation — sections cap', () => {
+ 		expect(conversation.sections).toHaveLength(4)
+ 	})
+ 
+-	// Cap-collapse resilience: when the OVERFLOW MERGE's `summarize` call throws, the merge
+-	// (and its splice) is skipped — sections transiently sit at `cap + 1`, no loss — but the
+-	// rollup regeneration still runs over the CURRENT (unmerged) sections so it is never left
+-	// stale, and the error propagates (a manual `compact()` always surfaces a summarizer
+-	// failure). The section fold + rollup calls both succeed; only the merge call (identified by
+-	// call count) throws.
+-	it('regenerates a fresh rollup over the unmerged sections when the overflow merge throws, then propagates the error', async () => {
++	// Cap-collapse resilience: when the `summarize` call of the OVERFLOW MERGE throws, the merge
++	// is skipped — sections transiently sit at `cap + 1`, no loss — and the error propagates (a
++	// manual `compact()` always surfaces a summarizer failure) before `compact` is emitted. One
++	// summarizer call per round without overflow, so rounds 1 and 2 are calls 1 and 2; round 3
++	// folds at call 3 and merges at call 4, the only call that throws.
++	it('keeps the unmerged sections and propagates the error when the overflow merge throws', async () => {
+ 		const boom = new Error('merge summarizer boom')
+ 		let calls = 0
+-		// Calls per compact() round without overflow: 1 (fold) + 1 (rollup) = 2 — so rounds 1 and 2
+-		// consume calls 1-2 and 3-4. Round 3 overflows the cap of 2: its fold is call 5, its
+-		// overflow MERGE is call 6 (before the rollup) — make only that merge call throw.
+-		const summarize = async (messages: readonly Message[]): Promise<string> => {
+-			calls += 1
+-			if (calls === 6) throw boom
+-			return `recap of ${messages.length}`
+-		}
+-		const conversation = new Conversation({ summarize, sections: 2, rollup: true })
++		const conversation = new Conversation({
++			summarize: async (messages) => {
++				calls += 1
++				if (calls === 4) throw boom
++				return `recap of ${messages.length}`
++			},
++			sections: 2,
++		})
++		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
++			conversation.emitter,
++			['compact', 'collapse'],
++		)
+ 
+ 		conversation.add({ role: 'assistant', content: 'round-1' })
+ 		await conversation.compact()
+@@ -1116,15 +1037,15 @@ describe('Conversation — sections cap', () => {
+ 
+ 		// Round 3 overflows the cap — the merge call throws.
+ 		conversation.add({ role: 'assistant', content: 'round-3' })
+-		const rollupBeforeAttempt = conversation.summary
+ 		await expect(conversation.compact()).rejects.toBe(boom)
+ 
+-		// No splice, no loss: 3 sections remain (transiently over the cap of 2), unmerged.
+-		expect(conversation.sections).toHaveLength(3)
+-		// The rollup is FRESH — regenerated over the current (unmerged) 3 sections, so it
+-		// differs from whatever it was before this failed attempt (never left stale).
+-		expect(conversation.summary).not.toBe(rollupBeforeAttempt)
+-		expect(conversation.summary).toBe('recap of 3')
++		// No merge, no loss: 3 sections remain (transiently over the cap of 2), unmerged, and the
++		// failed round emitted neither `collapse` nor `compact`.
++		expect(
++			conversation.sections.map((one) => one.messages.map((message) => message.content)),
++		).toEqual([['round-1'], ['round-2'], ['round-3']])
++		expect(events.compact.count).toBe(2)
++		expect(events.collapse.count).toBe(0)
+ 
+ 		// A subsequent successful compact() restores the cap.
+ 		conversation.add({ role: 'assistant', content: 'round-4' })
+@@ -1198,13 +1119,13 @@ describe('Conversation — hydrating through the snapshot option (C-c)', () => {
+ 			summarize: createStubSummarizer().summarize,
+ 			snapshot: source.snapshot(),
+ 		})
+-		const events = createRecorders<ConversationEventMap, 'compact' | 'summary' | 'rehydrate'>(
++		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse' | 'rehydrate'>(
+ 			restored.emitter,
+-			['compact', 'summary', 'rehydrate'],
++			['compact', 'collapse', 'rehydrate'],
+ 		)
+ 		// No event fires merely from construction — the recorder saw nothing post-hydrate.
+ 		expect(events.compact.count).toBe(0)
+-		expect(events.summary.count).toBe(0)
++		expect(events.collapse.count).toBe(0)
+ 		expect(events.rehydrate.count).toBe(0)
+ 	})
+ })
+diff --git a/tests/src/core/conversations/ConversationManager.test.ts b/tests/src/core/conversations/ConversationManager.test.ts
+index 57a91dd..01939bf 100644
+--- a/tests/src/core/conversations/ConversationManager.test.ts
++++ b/tests/src/core/conversations/ConversationManager.test.ts
+@@ -1,11 +1,21 @@
+ import {
+ 	Conversation,
+ 	ConversationManager,
++	createDatabaseConversationStore,
+ 	createMemoryConversationStore,
+ 	isConversationError,
++	isConversationSnapshot,
+ } from '@src/core'
++import { rawShape, stringShape } from '@orkestrel/contract'
++import { createDatabase, createMemoryDriver } from '@orkestrel/database'
++import { requireValue } from '@orkestrel/test'
+ import { describe, expect, it } from 'vitest'
+-import { createStubSummarizer, seedConversation } from '../../../setup.js'
++import {
++	createStubSummarizer,
++	renderRecap,
++	seedConversation,
++	SUMMARIZED_CONVERSATION_SNAPSHOT,
++} from '../../../setup.js'
+ 
+ // ConversationManager is the id-keyed registry over the conversation layer WITH an active pointer — an
+ // insertion-ordered store keyed by id (add / conversation / conversations / count / remove(id|ids[])
+@@ -303,44 +313,6 @@ describe('ConversationManager — the default sections cap flows in, and per-add
+ 	})
+ })
+ 
+-describe('ConversationManager — the default rollup flows in, and per-add overrides win', () => {
+-	it('creates conversations that generate no rollup when neither the manager nor the add asks', async () => {
+-		const stub = createStubSummarizer()
+-		const manager = new ConversationManager({ summarize: stub.summarize })
+-		const conversation = manager.add()
+-
+-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+-		await conversation.compact()
+-
+-		expect(stub.calls).toHaveLength(1)
+-		expect(conversation.summary).toBeUndefined()
+-	})
+-
+-	it("created conversations inherit the manager's default rollup", async () => {
+-		const stub = createStubSummarizer()
+-		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
+-		const conversation = manager.add()
+-
+-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+-		await conversation.compact()
+-
+-		expect(stub.calls).toHaveLength(2)
+-		expect(conversation.summary).toBe('recap of 1')
+-	})
+-
+-	it('a per-add rollup OVERRIDES the manager default', async () => {
+-		const stub = createStubSummarizer()
+-		const manager = new ConversationManager({ summarize: stub.summarize, rollup: true })
+-		const conversation = manager.add({ rollup: false })
+-
+-		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
+-		await conversation.compact()
+-
+-		expect(stub.calls).toHaveLength(1)
+-		expect(conversation.summary).toBeUndefined()
+-	})
+-})
+-
+ describe('ConversationManager — created conversations are independent', () => {
+ 	it('each conversation has its own live tail + sections', async () => {
+ 		const stub = createStubSummarizer()
+@@ -371,7 +343,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
+ 		expect(manager.active).toBe(b) // activated
+ 	})
+ 
+-	it('open(id) HYDRATES from the store on a registry miss (sections + tail + summary restored)', async () => {
++	it('open(id) HYDRATES from the store on a registry miss (sections + tail restored)', async () => {
+ 		const store = createMemoryConversationStore()
+ 		// Persist a conversation through one manager, with keep: 1 so BOTH a section and a live tail exist.
+ 		const source = new ConversationManager({ summarize: createStubSummarizer().summarize, keep: 1 })
+@@ -398,7 +370,6 @@ describe('ConversationManager — durable open / save (the optional store seam)'
+ 		expect(opened.id).toBe('persisted')
+ 		expect(opened.snapshot()).toEqual(original.snapshot())
+ 		expect(opened.sections).toHaveLength(1)
+-		expect(opened.summary).toBe(original.summary)
+ 		expect(opened.messages().map((one) => one.content)).toEqual(['third'])
+ 		// It is registered AND activated, and a fresh-built conversation (not the original instance).
+ 		expect(manager.conversation('persisted')).toBe(opened)
+@@ -539,3 +510,32 @@ describe('ConversationManager — durable open / save (the optional store seam)'
+ 		expect(await manager.save('missing')).toBe(false)
+ 	})
+ })
++
++describe('ConversationManager — open reads a 0.0.29 snapshot without its conversation summary', () => {
++	it('narrows the persisted row, hydrates sections and tail, and drops the summary from the next snapshot', async () => {
++		const driver = createMemoryDriver()
++		const database = createDatabase({
++			driver,
++			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
++		})
++		await database.table('conversations').set({
++			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
++			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
++		})
++		await database.close()
++		const manager = new ConversationManager({
++			summarize: createStubSummarizer().summarize,
++			store: createDatabaseConversationStore(driver),
++		})
++
++		const opened = requireValue(await manager.open(SUMMARIZED_CONVERSATION_SNAPSHOT.id))
++
++		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
++		expect(manager.active).toBe(opened)
++		expect('summary' in opened.snapshot()).toBe(false)
++		expect(opened.view().map((message) => message.content)).toEqual([
++			renderRecap('recap of 2'),
++			'Which order is late?',
++		])
++	})
++})
+diff --git a/tests/src/core/conversations/helpers.test.ts b/tests/src/core/conversations/helpers.test.ts
+index 5857057..1e17fe3 100644
+--- a/tests/src/core/conversations/helpers.test.ts
++++ b/tests/src/core/conversations/helpers.test.ts
+@@ -3,9 +3,18 @@ import {
+ 	buildRecapMessage,
+ 	buildSummaryMessage,
+ 	CONVERSATION_RECAP_PREFIX,
++	ConversationError,
++	requireJudgment,
++	requireSectionsCap,
+ } from '@src/core'
+ import { describe, expect, it } from 'vitest'
+-import { JUDGMENT_INPUT, JUDGMENT_QUESTION, JUDGMENT_USAGE } from '../../../setup.js'
++import {
++	INVALID_JUDGMENTS,
++	JUDGMENT_INPUT,
++	JUDGMENT_QUESTION,
++	JUDGMENT_RECORD,
++	JUDGMENT_USAGE,
++} from '../../../setup.js'
+ 
+ describe('judgment helpers', () => {
+ 	it('builds the answered record and attaches single-question usage', () => {
+@@ -77,3 +86,38 @@ describe('buildSummaryMessage / buildRecapMessage — a section as a message', (
+ 		})
+ 	})
+ })
++
++describe('requireJudgment', () => {
++	it('returns a valid record unchanged', () => {
++		expect(requireJudgment(JUDGMENT_RECORD)).toBe(JUDGMENT_RECORD)
++	})
++
++	it.each(INVALID_JUDGMENTS)('throws the JUDGMENT code for malformed record %#', (record) => {
++		expect(() => requireJudgment(record)).toThrow(ConversationError)
++		expect(() => requireJudgment(record)).toThrow(expect.objectContaining({ code: 'JUDGMENT' }))
++	})
++
++	it('throws the JUDGMENT code for an input that carries no storage time', () => {
++		expect(() => requireJudgment(JUDGMENT_INPUT)).toThrow(
++			expect.objectContaining({ code: 'JUDGMENT' }),
++		)
++	})
++})
++
++describe('requireSectionsCap', () => {
++	it('returns undefined, a cap of 1, and a fractional cap above 1 unchanged', () => {
++		expect(requireSectionsCap(undefined)).toBeUndefined()
++		expect(requireSectionsCap(1)).toBe(1)
++		expect(requireSectionsCap(1.5)).toBe(1.5)
++	})
++
++	it('passes NaN, which compares false against the bound', () => {
++		expect(requireSectionsCap(Number.NaN)).toBeNaN()
++	})
++
++	it('throws the SECTIONS code below 1, at zero of either sign, and for negative infinity', () => {
++		for (const cap of [0.5, 0, -0, -1, Number.NEGATIVE_INFINITY]) {
++			expect(() => requireSectionsCap(cap)).toThrow(expect.objectContaining({ code: 'SECTIONS' }))
++		}
++	})
++})
+diff --git a/tests/src/core/conversations/stores/DatabaseConversationStore.test.ts b/tests/src/core/conversations/stores/DatabaseConversationStore.test.ts
+index 9ee9a44..959a210 100644
+--- a/tests/src/core/conversations/stores/DatabaseConversationStore.test.ts
++++ b/tests/src/core/conversations/stores/DatabaseConversationStore.test.ts
+@@ -5,38 +5,35 @@ import { createDatabaseWorkspaceStore } from '@orkestrel/workspace'
+ import { describe, expect, it } from 'vitest'
+ import {
+ 	buildConversationSnapshot,
+-	conversationStoreDeleteAbsent,
+-	conversationStoreDeleteThenAbsent,
+-	conversationStoreGetAbsent,
+-	conversationStoreRoundTrip,
+-	conversationStoreRoundTripExpectation,
+-	conversationStoreTwoIds,
+-	conversationStoreUpsert,
++	exerciseConversationStoreDeleteAbsent,
++	exerciseConversationStoreDeleteThenAbsent,
++	exerciseConversationStoreGetAbsent,
++	exerciseConversationStoreRoundTrip,
++	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
++	exerciseConversationStoreTwoIds,
++	exerciseConversationStoreUpsert,
+ 	TOOL_SNAPSHOT,
+ 	JUDGMENT_SNAPSHOT,
+ } from '../../../../setup.js'
+ 
+-const makeStore = (): ReturnType<typeof createDatabaseConversationStore> =>
+-	createDatabaseConversationStore(createMemoryDriver())
+-
+ // src/core/agents/conversations/stores/DatabaseConversationStore.ts — the durable, driver-pluggable
+ // twin of the plain-Map MemoryConversationStore behind the ConversationStoreInterface seam (get /
+ // set / delete, async, keyed by a snapshot's own id). It persists the ConversationSnapshot as ONE
+ // OPAQUE JSON column over a `databases` table (driver default = createMemoryDriver), narrowing the
+ // column back to a ConversationSnapshot on `get` (the total boundary guard). Exercised over a REAL
+ // memory driver, with REAL ConversationSnapshot values (NO mocks) — a genuine `compact()`
+-// produces real sections + a rollup, plus a live tail.
++// produces real sections plus a live tail.
+ 
+ // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
+ // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
+ // tests/setup.ts. `setup.ts` exports each scenario as a plain function returning its
+ // result (NO `describe` / `it` / `expect` bound in), so THIS file registers the battery against the
+ // database factory (over a REAL memory driver) and asserts on what each scenario returns, keeping only
+-// its TWIN-SPECIFIC blocks below: the default-driver overload, cross-instance durability over a shared
++// its TWIN-SPECIFIC blocks in the following describe: the default-driver overload, cross-instance durability over a shared
+ // driver, and sibling-store non-collision.
+ describe('DatabaseConversationStore', () => {
+ 	it('round trips judgment answers, refusals, and recorded times', async () => {
+-		const store = makeStore()
++		const store = createDatabaseConversationStore(createMemoryDriver())
+ 		await store.set(JUDGMENT_SNAPSHOT)
+ 		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+ 	})
+@@ -54,38 +51,42 @@ describe('DatabaseConversationStore', () => {
+ 		await database.close()
+ 		expect(await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id)).toBeUndefined()
+ 	})
+-	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
+-		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+-			const { snapshot, got } = await conversationStoreRoundTrip(
+-				makeStore,
++	describe('set → get round-trip (sections + live tail)', () => {
++		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
++			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
++				() => createDatabaseConversationStore(createMemoryDriver()),
+ 				buildConversationSnapshot,
+ 			)
+ 			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
+ 			expect(got).toEqual(snapshot)
+-			// It carries a compacted section, a live tail, AND a rollup summary (round-trip is non-vacuous).
++			// It carries a compacted section AND a live tail (round-trip is non-vacuous).
+ 			expect(got?.sections).toHaveLength(1)
+-			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
++			expect(got?.sections[0]?.summary).toBe(
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary,
++			)
+ 			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
+-				conversationStoreRoundTripExpectation.sectionMessages,
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
+ 			)
+ 			expect(got?.messages.map((message) => message.content)).toEqual(
+-				conversationStoreRoundTripExpectation.liveTail,
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
+ 			)
+-			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+ 		})
+ 	})
+ 
+ 	describe('upsert (set replaces under the same id)', () => {
+ 		it('set replaces an existing snapshot under the same id', async () => {
+-			const { second, got } = await conversationStoreUpsert(makeStore, buildConversationSnapshot)
++			const { second, got } = await exerciseConversationStoreUpsert(
++				() => createDatabaseConversationStore(createMemoryDriver()),
++				buildConversationSnapshot,
++			)
+ 			expect(got).toEqual(second)
+ 		})
+ 	})
+ 
+ 	describe('delete & absent', () => {
+ 		it('set → delete → get returns undefined', async () => {
+-			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+-				makeStore,
++			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
++				() => createDatabaseConversationStore(createMemoryDriver()),
+ 				buildConversationSnapshot,
+ 			)
+ 			expect(beforeDelete).toBeDefined()
+@@ -93,18 +94,29 @@ describe('DatabaseConversationStore', () => {
+ 		})
+ 
+ 		it('deleting an absent id does not throw (a no-op)', async () => {
+-			await expect(conversationStoreDeleteAbsent(makeStore)).resolves.toBeUndefined()
++			await expect(
++				exerciseConversationStoreDeleteAbsent(() =>
++					createDatabaseConversationStore(createMemoryDriver()),
++				),
++			).resolves.toBeUndefined()
+ 		})
+ 
+ 		it('get of an absent id returns undefined', async () => {
+-			expect(await conversationStoreGetAbsent(makeStore)).toBeUndefined()
++			expect(
++				await exerciseConversationStoreGetAbsent(() =>
++					createDatabaseConversationStore(createMemoryDriver()),
++				),
++			).toBeUndefined()
+ 		})
+ 	})
+ 
+ 	describe('two distinct conversation ids coexist', () => {
+ 		it('two distinct conversation ids coexist without cross-contamination', async () => {
+ 			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
+-				await conversationStoreTwoIds(makeStore, buildConversationSnapshot)
++				await exerciseConversationStoreTwoIds(
++					() => createDatabaseConversationStore(createMemoryDriver()),
++					buildConversationSnapshot,
++				)
+ 			expect(gotAlpha).toEqual(alpha)
+ 			expect(gotBeta).toEqual(beta)
+ 			// Dropping one leaves the other intact.
+@@ -126,9 +138,9 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
+ 	})
+ 
+ 	it('a SECOND store over the SAME driver reads back the snapshot (cross-instance durability)', async () => {
+-		// The durable guarantee: a snapshot written through one store instance is readable through a
+-		// DISTINCT store instance over the SAME driver — the row persists in the shared backend, not
+-		// in the store object. (The memory driver's table is the durable seam a real DB would be.)
++		// A snapshot written through one store instance is readable through a DISTINCT store
++		// instance over the SAME driver — the row persists in the shared backend, not in the store
++		// object. (The memory driver's table is the durable seam a real DB would be.)
+ 		const driver = createMemoryDriver()
+ 		const writer = createDatabaseConversationStore(driver)
+ 		const snapshot = await buildConversationSnapshot('shared')
+@@ -163,7 +175,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
+ 	})
+ 
+ 	it('reads back a tool message naming its call beside one saved without call', async () => {
+-		const store = makeStore()
++		const store = createDatabaseConversationStore(createMemoryDriver())
+ 		await store.set(TOOL_SNAPSHOT)
+ 		const got = await store.get(TOOL_SNAPSHOT.id)
+ 		expect(got).toEqual(TOOL_SNAPSHOT)
+diff --git a/tests/src/core/conversations/stores/MemoryConversationStore.test.ts b/tests/src/core/conversations/stores/MemoryConversationStore.test.ts
+index 735cdcd..12e2423 100644
+--- a/tests/src/core/conversations/stores/MemoryConversationStore.test.ts
++++ b/tests/src/core/conversations/stores/MemoryConversationStore.test.ts
+@@ -4,25 +4,22 @@ import { isToolCall } from '@orkestrel/tool'
+ import { describe, expect, it } from 'vitest'
+ import {
+ 	buildConversationSnapshot,
+-	conversationStoreDeleteAbsent,
+-	conversationStoreDeleteThenAbsent,
+-	conversationStoreGetAbsent,
+-	conversationStoreRoundTrip,
+-	conversationStoreRoundTripExpectation,
+-	conversationStoreTwoIds,
+-	conversationStoreUpsert,
++	exerciseConversationStoreDeleteAbsent,
++	exerciseConversationStoreDeleteThenAbsent,
++	exerciseConversationStoreGetAbsent,
++	exerciseConversationStoreRoundTrip,
++	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
++	exerciseConversationStoreTwoIds,
++	exerciseConversationStoreUpsert,
+ 	TOOL_SNAPSHOT,
+ 	JUDGMENT_SNAPSHOT,
+ } from '../../../../setup.js'
+ 
+-const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
+-	createMemoryConversationStore()
+-
+ // The C-c MemoryConversationStore — the in-memory default behind the ConversationStoreInterface
+ // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the
+ // ConversationSnapshot (the self-contained, pure-JSON conversation state) UNCHANGED. REAL data only
+ // — a real Conversation's `snapshot()` carrying BOTH compacted sections AND a live tail
+-// AND a rollup `summary` (produced by a genuine compaction over a data-stub summarizer), NO mocks.
++// (produced by a genuine compaction over a data-stub summarizer), NO mocks.
+ 
+ // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
+ // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
+@@ -30,47 +27,50 @@ const makeStore = (): ReturnType<typeof createMemoryConversationStore> =>
+ // each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
+ // THIS file registers the battery against the memory factory and asserts on what each scenario
+ // returns, keeping only its TWIN-SPECIFIC blocks: the JSON driver-swap-parity round-trip and the
+-// per-call element guard the snapshot's assistant `calls` rests on. The snapshot and section guards
+-// live in tests/src/core/conversations/validators.test.ts and the message guard in
+-// tests/src/core/validators.test.ts, each beside its module.
++// per-call element guard the snapshot's assistant `calls` rests on. The snapshot, section, and
++// message guards live in tests/src/core/conversations/validators.test.ts, beside their module.
+ describe('MemoryConversationStore', () => {
+ 	it('round trips judgment answers, refusals, and recorded times', async () => {
+-		const store = makeStore()
++		const store = createMemoryConversationStore()
+ 		await store.set(JUDGMENT_SNAPSHOT)
+ 		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toEqual(JUDGMENT_SNAPSHOT)
+ 	})
+-	describe('set → get round-trip (sections + live tail + rollup summary)', () => {
+-		it('set → get returns an equal snapshot (sections + tail + summary survive)', async () => {
+-			const { snapshot, got } = await conversationStoreRoundTrip(
+-				makeStore,
++	describe('set → get round-trip (sections + live tail)', () => {
++		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
++			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
++				createMemoryConversationStore,
+ 				buildConversationSnapshot,
+ 			)
+ 			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
+ 			expect(got).toEqual(snapshot)
+-			// It carries a compacted section, a live tail, AND a rollup summary (round-trip is non-vacuous).
++			// It carries a compacted section AND a live tail (round-trip is non-vacuous).
+ 			expect(got?.sections).toHaveLength(1)
+-			expect(got?.sections[0]?.summary).toBe(conversationStoreRoundTripExpectation.sectionSummary)
++			expect(got?.sections[0]?.summary).toBe(
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionSummary,
++			)
+ 			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
+-				conversationStoreRoundTripExpectation.sectionMessages,
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.sectionMessages,
+ 			)
+ 			expect(got?.messages.map((message) => message.content)).toEqual(
+-				conversationStoreRoundTripExpectation.liveTail,
++				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.liveTail,
+ 			)
+-			expect(got?.summary).toBe(conversationStoreRoundTripExpectation.rollupSummary)
+ 		})
+ 	})
+ 
+ 	describe('upsert (set replaces under the same id)', () => {
+ 		it('set replaces an existing snapshot under the same id', async () => {
+-			const { second, got } = await conversationStoreUpsert(makeStore, buildConversationSnapshot)
++			const { second, got } = await exerciseConversationStoreUpsert(
++				createMemoryConversationStore,
++				buildConversationSnapshot,
++			)
+ 			expect(got).toEqual(second)
+ 		})
+ 	})
+ 
+ 	describe('delete & absent', () => {
+ 		it('set → delete → get returns undefined', async () => {
+-			const { beforeDelete, afterDelete } = await conversationStoreDeleteThenAbsent(
+-				makeStore,
++			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
++				createMemoryConversationStore,
+ 				buildConversationSnapshot,
+ 			)
+ 			expect(beforeDelete).toBeDefined()
+@@ -78,18 +78,25 @@ describe('MemoryConversationStore', () => {
+ 		})
+ 
+ 		it('deleting an absent id does not throw (a no-op)', async () => {
+-			await expect(conversationStoreDeleteAbsent(makeStore)).resolves.toBeUndefined()
++			await expect(
++				exerciseConversationStoreDeleteAbsent(createMemoryConversationStore),
++			).resolves.toBeUndefined()
+ 		})
+ 
+ 		it('get of an absent id returns undefined', async () => {
+-			expect(await conversationStoreGetAbsent(makeStore)).toBeUndefined()
++			expect(
++				await exerciseConversationStoreGetAbsent(createMemoryConversationStore),
++			).toBeUndefined()
+ 		})
+ 	})
+ 
+ 	describe('two distinct conversation ids coexist', () => {
+ 		it('two distinct conversation ids coexist without cross-contamination', async () => {
+ 			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
+-				await conversationStoreTwoIds(makeStore, buildConversationSnapshot)
++				await exerciseConversationStoreTwoIds(
++					createMemoryConversationStore,
++					buildConversationSnapshot,
++				)
+ 			expect(gotAlpha).toEqual(alpha)
+ 			expect(gotBeta).toEqual(beta)
+ 			// Dropping one leaves the other intact.
+@@ -101,8 +108,8 @@ describe('MemoryConversationStore', () => {
+ 
+ describe('MemoryConversationStore — JSON driver-swap parity', () => {
+ 	it('the retrieved snapshot survives JSON.stringify/parse identically (driver-swap parity)', async () => {
+-		// After `set`, the retrieved payload must survive a full JSON round-trip — proving it persists
+-		// unchanged across ANY JSON / SQLite / IndexedDB backend (the real driver-swap guarantee).
++		// After `set`, the retrieved payload must survive a full JSON round-trip, so it persists
++		// unchanged across ANY JSON / SQLite / IndexedDB backend.
+ 		const store = createMemoryConversationStore()
+ 		const snapshot = await buildConversationSnapshot()
+ 
+diff --git a/tests/src/core/conversations/validators.test.ts b/tests/src/core/conversations/validators.test.ts
+index 93590dc..c2eaefc 100644
+--- a/tests/src/core/conversations/validators.test.ts
++++ b/tests/src/core/conversations/validators.test.ts
+@@ -3,7 +3,9 @@ import { roundTripJSON } from '@orkestrel/test'
+ import { describe, expect, it } from 'vitest'
+ import {
+ 	approveEvery,
++	buildCallsSnapshot,
+ 	buildConversationSnapshot,
++	SUMMARIZED_CONVERSATION_SNAPSHOT,
+ 	TOOL_SNAPSHOT,
+ 	JUDGMENT_RECORD,
+ 	JUDGMENT_SNAPSHOT,
+@@ -63,14 +65,6 @@ describe('isJudgment and snapshot carriage', () => {
+ // through a guard rather than an assertion. Real data throughout — `buildConversationSnapshot`
+ // produces a genuine compacted conversation, no mocks.
+ 
+-// A snapshot valid in every field EXCEPT the planted `calls` value, so a rejection isolates the
+-// deepened per-call check rather than some sibling field.
+-const withCalls = (calls: unknown): unknown => ({
+-	id: 'c',
+-	sections: [],
+-	messages: [{ id: 'a1', role: 'assistant', content: '', calls }],
+-})
+-
+ describe('isSection — the per-section shape guard (total + defensive)', () => {
+ 	it('accepts the real Section shape, including an empty retained list', () => {
+ 		expect(
+@@ -99,18 +93,41 @@ describe('isSection — the per-section shape guard (total + defensive)', () =>
+ 			false,
+ 		)
+ 	})
++
++	it('rejects a sparse messages array, as the snapshot guard rejects one', () => {
++		const sparse: unknown[] = []
++		sparse.length = 1
++		expect(isSection({ id: 's', summary: 'recap', messages: sparse })).toBe(false)
++		expect(isConversationSnapshot({ id: 'c', sections: [], messages: sparse })).toBe(false)
++	})
++
++	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
++		const hostile = {
++			id: 's',
++			summary: 'recap',
++			get messages(): never {
++				throw new Error('unreadable')
++			},
++		}
++		const revoked = Proxy.revocable({}, {})
++		revoked.revoke()
++		expect(isSection(hostile)).toBe(false)
++		expect(isSection(revoked.proxy)).toBe(false)
++		expect(isConversationSnapshot({ id: 'c', sections: [hostile], messages: [] })).toBe(false)
++	})
+ })
+ 
+ describe('isConversationSnapshot — the read-boundary guard (total + defensive)', () => {
+-	it('accepts a real snapshot (sections + tail + summary)', async () => {
++	it('accepts a real snapshot (sections + tail)', async () => {
+ 		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
+ 		// An empty-sections + empty-tail snapshot is still valid (a fresh conversation, no summary).
+ 		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(true)
+ 		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
+-		// An optional rollup `summary` (present) is accepted.
+-		expect(isConversationSnapshot({ id: 'c', summary: 'rollup', sections: [], messages: [] })).toBe(
+-			true,
+-		)
++	})
++
++	it('admits the conversation summary a 0.0.29 snapshot carries, as an unknown member', () => {
++		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
++		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(true)
+ 	})
+ 
+ 	it('rejects malformed input without throwing (total guard)', () => {
+@@ -122,8 +139,6 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
+ 		// Missing / wrong-typed `id`.
+ 		expect(isConversationSnapshot({ sections: [], messages: [] })).toBe(false)
+ 		expect(isConversationSnapshot({ id: 1, sections: [], messages: [] })).toBe(false)
+-		// A non-string `summary` when present.
+-		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(false)
+ 		// `sections` / `messages` not arrays.
+ 		expect(isConversationSnapshot({ id: 'c', sections: 'nope', messages: [] })).toBe(false)
+ 		expect(isConversationSnapshot({ id: 'c', sections: [], messages: { a: 1 } })).toBe(false)
+@@ -149,16 +164,20 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
+ 		// A null / bare-string element, a missing-arguments call, a non-string name, and a
+ 		// non-record arguments are each rejected WITHOUT throwing — the poisoned row reads
+ 		// back as absent and hydrate mints a fresh thread (the absent-on-tamper posture).
+-		expect(isConversationSnapshot(withCalls([null]))).toBe(false)
+-		expect(isConversationSnapshot(withCalls(['x']))).toBe(false)
+-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool' }]))).toBe(false)
+-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 123, arguments: {} }]))).toBe(false)
+-		expect(isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: null }]))).toBe(
+-			false,
+-		)
++		expect(isConversationSnapshot(buildCallsSnapshot([null]))).toBe(false)
++		expect(isConversationSnapshot(buildCallsSnapshot(['x']))).toBe(false)
++		expect(isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool' }]))).toBe(false)
++		expect(
++			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 123, arguments: {} }])),
++		).toBe(false)
++		expect(
++			isConversationSnapshot(buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: null }])),
++		).toBe(false)
+ 		// A well-formed calls[] still passes (the deepening rejects only real tampering).
+ 		expect(
+-			isConversationSnapshot(withCalls([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }])),
++			isConversationSnapshot(
++				buildCallsSnapshot([{ id: 'c1', name: 'tool', arguments: { q: 'acme' } }]),
++			),
+ 		).toBe(true)
+ 	})
+ 
+diff --git a/tests/src/core/conversations/factories.test.ts b/tests/src/core/conversations/factories.test.ts
+new file mode 100644
+index 0000000..09968c1
+--- /dev/null
++++ b/tests/src/core/conversations/factories.test.ts
+@@ -0,0 +1,98 @@
++import {
++	Conversation,
++	ConversationManager,
++	createConversation,
++	createConversationManager,
++	createDatabaseConversationStore,
++	createMemoryConversationStore,
++	DatabaseConversationStore,
++	MemoryConversationStore,
++} from '@src/core'
++import { createMemoryDriver } from '@orkestrel/database'
++import { describe, expect, it } from 'vitest'
++import { buildConversationSnapshot, createStubSummarizer, renderRecap } from '../../../setup.js'
++
++describe('createConversation', () => {
++	it('returns a Conversation that folds through the supplied summarizer and keep', async () => {
++		const stub = createStubSummarizer()
++		const conversation = createConversation({ id: 'desk', summarize: stub.summarize, keep: 1 })
++		conversation.add([
++			{ role: 'user', content: 'Is the depot open on Friday?' },
++			{ role: 'assistant', content: 'The depot is open on Friday.' },
++			{ role: 'user', content: 'Which order is late?' },
++		])
++
++		const section = await conversation.compact()
++
++		expect(conversation).toBeInstanceOf(Conversation)
++		expect(conversation.id).toBe('desk')
++		expect(section?.messages.map((message) => message.content)).toEqual([
++			'Is the depot open on Friday?',
++			'The depot is open on Friday.',
++		])
++		expect(conversation.view().map((message) => message.content)).toEqual([
++			renderRecap('recap of 2'),
++			'Which order is late?',
++		])
++	})
++
++	it('returns a conversation without a summarizer when called with no options', () => {
++		const conversation = createConversation()
++
++		expect(conversation.summarizable).toBe(false)
++		expect(conversation.count).toBe(0)
++	})
++})
++
++describe('createConversationManager', () => {
++	it('returns an empty ConversationManager whose first add becomes active and inherits the defaults', async () => {
++		const stub = createStubSummarizer()
++		const manager = createConversationManager({ summarize: stub.summarize, sections: 1 })
++
++		expect(manager).toBeInstanceOf(ConversationManager)
++		expect(manager.count).toBe(0)
++		const conversation = manager.add({ id: 'desk' })
++		conversation.add({ role: 'assistant', content: 'The depot is open on Friday.' })
++		await conversation.compact()
++		conversation.add({ role: 'assistant', content: 'Order LH-81660 is late.' })
++		await conversation.compact()
++
++		expect(manager.active).toBe(conversation)
++		expect(conversation.sections).toHaveLength(1)
++	})
++})
++
++describe('createMemoryConversationStore', () => {
++	it('returns an independent MemoryConversationStore on every call', async () => {
++		const first = createMemoryConversationStore()
++		const second = createMemoryConversationStore()
++		const snapshot = await buildConversationSnapshot('desk')
++		await first.set(snapshot)
++
++		expect(first).toBeInstanceOf(MemoryConversationStore)
++		expect(await first.get('desk')).toEqual(snapshot)
++		expect(await second.get('desk')).toBeUndefined()
++	})
++})
++
++describe('createDatabaseConversationStore', () => {
++	it('returns a DatabaseConversationStore over the supplied driver', async () => {
++		const driver = createMemoryDriver()
++		const snapshot = await buildConversationSnapshot('desk')
++		const store = createDatabaseConversationStore(driver)
++		await store.set(snapshot)
++
++		expect(store).toBeInstanceOf(DatabaseConversationStore)
++		expect(await createDatabaseConversationStore(driver).get('desk')).toEqual(snapshot)
++	})
++
++	it('defaults to a memory driver of its own on every call', async () => {
++		const first = createDatabaseConversationStore()
++		const second = createDatabaseConversationStore()
++		const snapshot = await buildConversationSnapshot('desk')
++		await first.set(snapshot)
++
++		expect(await first.get('desk')).toEqual(snapshot)
++		expect(await second.get('desk')).toBeUndefined()
++	})
++})

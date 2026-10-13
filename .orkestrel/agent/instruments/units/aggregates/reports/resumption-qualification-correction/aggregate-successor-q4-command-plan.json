@@ -1,0 +1,203 @@
+{
+  "root": "C:/Users/mikes/WebstormProjects/scaffold",
+  "results": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/results/l15",
+  "deployment": "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-successor-daemon-deployment.json",
+  "seed": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+  "settings": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+  "sequence": "After root accepts source/build and the dedicated service, run Qwen4 freezes and corpus/generation. Stop after generation for independent blind labels and root adjudication. Fit only after explicit root release; never retry generation for a refused fit.",
+  "commands": [
+    {
+      "sequence": 1,
+      "id": "q4-think0-freeze",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think0-freeze.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think0-freeze.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "freeze",
+        "--key",
+        "q4",
+        "--think",
+        "false",
+        "--seed",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+        "--settings",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+        "--deployment",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-daemon-deployment.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\freeze",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\freeze\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 2,
+      "id": "q4-think1-freeze",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-freeze.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-freeze.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "freeze",
+        "--key",
+        "q4",
+        "--think",
+        "true",
+        "--seed",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+        "--settings",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+        "--deployment",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-daemon-deployment.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 3,
+      "id": "q4-calibration-corpus",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-corpus.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-corpus.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "freeze",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\freeze\\manifest.json",
+        "--cache",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache",
+        "--model",
+        "qwen3.5:4b-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\corpus",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\corpus\\corpus.json",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\corpus\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 4,
+      "id": "q4-calibration-generate",
+      "capSeconds": 1800,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-generate.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-generate.err",
+        "--cap",
+        "1800",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "generate",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\freeze\\manifest.json",
+        "--corpus",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\corpus",
+        "--cache",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\cache",
+        "--model",
+        "qwen3.5:4b-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation\\attempts.jsonl",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation\\packet.jsonl",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 5,
+      "id": "q4-calibration-fit",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-fit.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-calibration-fit.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "fit",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\freeze\\manifest.json",
+        "--corpus",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\corpus",
+        "--attempts",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation",
+        "--labels",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\labels.json",
+        "--model",
+        "qwen3.5:4b-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\fit",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\fit\\fit.json"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "key": "q4",
+      "packet": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\generation\\packet.jsonl",
+      "labels": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\labels.json",
+      "fit": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\fit\\fit.json"
+    }
+  ]
+}

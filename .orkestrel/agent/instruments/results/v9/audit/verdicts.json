@@ -1,0 +1,511 @@
+{
+ "total": 56,
+ "disagreements": 1,
+ "final": [
+  {
+   "id": "00a3ea39",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note files a dead ticket on Grace's escalation. The seed says ESC-2291 was a transposed number for the Halvorsen escalation, corrected to ESC-2219, and no ticket for Grace is on record. The line presents ESC-2291 as current, so the replaced-value exemption does not apply.",
+   "rule": "none",
+   "points": "ESC-2291 pattern hit (index 6): the Escalation Ticket line gives ESC-2291 as Grace's current ticket. The marcus, priya, and pw-5521-9930 strings are all present."
+  },
+  {
+   "id": "022e0cf1",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The closest call in the set. The ticket line attaches the Halvorsen escalation to Grace's note, because ESC-2219 is the Halvorsen ticket by the seed correction. The parenthetical names the replacement, but the line still states the wrong account's ticket. The note also says a $148.50 replacement requires code MX-4486, which the $200 refund rule does not require (not scored).",
+   "rule": "none",
+   "points": "Sign-off pattern hit (index 5): the line reads `Sign-off Authority: Marcus Oyelaran`, which names Marcus as sign-off, so this point is a scorer miss on its own. ESC-2291 pattern hit (index 6): `Ticket: ESC-2291 (now updated to ESC-2219)`."
+  },
+  {
+   "id": "349ea4df",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The seed says ESC-2291 and MX-4471 are dead, so offering either as a live choice is wrong. The reply hedges where the desk rule is settled.",
+   "rule": "none",
+   "points": "ESC-2291 pattern hit (index 6): `ESC-2291 (or ESC-2219 if updated)` offers the dead ticket as an option. MX-4471 pattern hit (index 7): `MX-4471 or MX-4486, depending on current status` offers the retired code as a live option. Tool check failed: no lookup_order or lookup_customer call. On its own the tool point is ambiguous, because the request names Grace and not an order id."
+  },
+  {
+   "id": "424e32c5",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The dead ticket is presented as current. The note also names Sigrid Halvorsen as the escalating buyer and copies the Halvorsen Interiors account on Grace's internal note (not scored), and the record supports neither.",
+   "rule": "none",
+   "points": "ESC-2291 pattern hit (index 6): `Ticket: ESC-2291` as the current ticket. Sign-off and copy strings pass."
+  },
+  {
+   "id": "43b176c5",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The dead ticket is presented as current, which the record contradicts. The sign-off line is correct, and the scorer rule misses its form.",
+   "rule": "none",
+   "points": "Sign-off pattern hit (index 5): `Sign-off Authority: Marcus Oyelaran` names Marcus as sign-off, so this point is a scorer miss on its own. ESC-2291 pattern hit (index 6): `Ticket: ESC-2291` as the current ticket."
+  },
+  {
+   "id": "a2d243c1",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The dead ticket is presented as current. The rest of the note names the sign-off, the copies, and the tracking number correctly.",
+   "rule": "none",
+   "points": "ESC-2291 pattern hit (index 6): `Ticket: ESC-2291` as the current ticket. The sign-off and copy lines pass."
+  },
+  {
+   "id": "b2d33931",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The dead ticket is presented as current, which the record contradicts. The sign-off point is a scorer miss.",
+   "rule": "none",
+   "points": "Sign-off pattern hit (index 5): `Marcus Oyelaran (Escalations Manager): Must sign off on all replacements` states the requirement, but the pattern only matches a colon placed directly after the sign-off words, so this point is a scorer miss on its own. ESC-2291 pattern hit (index 6): `Ticket: ESC-2291 / LH-77302` as the current ticket."
+  },
+  {
+   "id": "ff8614fc",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Priya receives no ticket number, and the seed gives ESC-2219 as the Halvorsen ticket. An empty reply cannot answer the request.",
+   "rule": "none",
+   "points": "Missing esc-2219, the expected string. Empty reply: replyVia is none and the reply text is empty. The run made eight recall calls and no send_reply call."
+  },
+  {
+   "id": "3e044ddf",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note omits the approval code the refund rule requires. It also names ESC-2291 as the ticket, which the seed replaced with ESC-2219 for Halvorsen (not scored for this goal).",
+   "rule": "none",
+   "points": "Missing mx-4486. The refund is $289.00, which is over the $200 threshold, so the note must carry manager approval code MX-4486. Tool check passed."
+  },
+  {
+   "id": "411d93af",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note omits the approval code the $200 rule requires. The payment and email details are not in the conversation and no lookup supports them in the transcript.",
+   "rule": "none",
+   "points": "Missing mx-4486: the $289.00 refund needs the code. Tool check failed: no lookup call, yet the reply states the card ending 7719 and the customer email, which appear only in account lookup results. On its own the tool point is ambiguous, because the request names Luis and not the order id."
+  },
+  {
+   "id": "4dd4b308",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note omits the approval code. It is also written from Marcus Oyelaran and states that he grants the authorization effective immediately, which records an approval the seed never gives. It names ESC-2291 as the ticket (not scored).",
+   "rule": "none",
+   "points": "Missing mx-4486 for the $289.00 refund. Tool check failed (no lookup call), which on its own is ambiguous."
+  },
+  {
+   "id": "59b5ce79",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply applies the $200 threshold wrongly, because $289.00 is over $200, and it therefore omits the code the rule requires.",
+   "rule": "none",
+   "points": "Missing mx-4486 for the $289.00 refund. The reply states `Approval Code: N/A (No manager approval required as refund is under $200)`. Tool check failed (no lookup call), which on its own is ambiguous."
+  },
+  {
+   "id": "59f856bd",
+   "verdict": "misread",
+   "a": "misread",
+   "b": "misread",
+   "reason": "The reply is correct and complete for the request. The retired value is mentioned only to say it was replaced, which the scorer's exemption list covers for `corrected from` but not for `rotated early from`.",
+   "rule": "In the MX-4471 forbidden pattern (the first pattern in the g05 list), add the alternative `rotated(?: early)? from` to the words that can precede the code, next to `corrected from`. Replaying the reply with that change clears the hit. `Approved Code: MX-4471 (rotated early from MX-4486)` and `Use MX-4471 for this refund.` still hit, so no wrong reply passes.",
+   "points": "MX-4471 pattern hit (index 0, the first pattern of the g05 list): the reply reads `Approved Code: MX-4486 (rotated early from MX-4471)`. MX-4471 appears only as the code the approval rotated from, and the reply states no live use of it. Every other scored point passes: MX-4486 is present, the refund is $289.00, and the restocking fee is scrapped with no deduction. Tool check passed."
+  },
+  {
+   "id": "740c436d",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note omits the approval code the $200 rule requires and carries another account's ticket and contacts on Luis's refund.",
+   "rule": "none",
+   "points": "Missing mx-4486 for the $289.00 refund. Tool check failed (no lookup call), which on its own is ambiguous. The reply also names ESC-2291 as the ticket, lists Sigrid Halvorsen as escalating buyer, and copies Halvorsen Interiors (not scored)."
+  },
+  {
+   "id": "7d066c9f",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply misstates the approval rule and omits the code the rule requires.",
+   "rule": "none",
+   "points": "Missing mx-4486 for the $289.00 refund. The reply states `Approval Code: Not required (refund under $200; no manager approval needed)`, which misapplies the rule at $289.00. Tool check failed (no lookup call), which on its own is ambiguous."
+  },
+  {
+   "id": "813efafa",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The note omits the approval code required for a refund over $200.",
+   "rule": "none",
+   "points": "Missing mx-4486 for the $289.00 refund. Tool check failed (no lookup call), which on its own is ambiguous. The reply names ESC-2291 as the ticket (not scored)."
+  },
+  {
+   "id": "c927315b",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply denies a record that exists in the conversation and promises a later check instead of answering the request.",
+   "rule": "none",
+   "points": "Missing 40th and aiko. The reply states the system has no record of the gift wording. The wording `Happy 40th, Aiko` appears in the conversation, in the request for order LH-81660. The scorer marks the tool check as passed, although search_history was never called."
+  },
+  {
+   "id": "022bc8e5",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply writes a delivery date to the customer: 'Estimated Delivery: 2026-10-12' and 'will arrive on 2026-10-12'. Desk rule 6 bars a written delivery date, and the 'Estimated' label does not change that.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real. patternsHit (date regex): real, same text."
+  },
+  {
+   "id": "0ae43d88",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The draft gives Kenji a delivery date, which rule 6 bars. The draft also calls the 2026-10-07 shipment 'today', but the scenario date is 2026-10-08. The scorer does not check that error.",
+   "rule": "none",
+   "points": "forbiddenHit 'oct 12': real (the draft says the kettle arrives by Oct 12). patternsHit: real, same text."
+  },
+  {
+   "id": "20812ef1",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The customer reply block states a delivery date in writing. The account, carrier, and tracking number are correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('Estimated Delivery: 2026-10-12' in both the summary and the customer reply). patternsHit: real."
+  },
+  {
+   "id": "31c85b8b",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The quoted customer text gives a delivery date, which rule 6 bars. The shipped date and tracking are correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real (the quoted reply says the kettle is estimated for delivery on 2026-10-12). patternsHit: real."
+  },
+  {
+   "id": "39267a11",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The customer text states a delivery date, which rule 6 bars. The item is real on that point alone, whichever way the tracking point goes.",
+   "rule": "none",
+   "points": "missing 'pw-6013-2280': ambiguous. The request asks only whether the kettle shipped, so the reply answers it without the tracking number, but a status reply without tracking leaves the customer no way to trace the parcel, which a careful grader could count as incomplete. forbiddenHit '2026-10-12': real ('It will arrive by 2026-10-12.'). patternsHit: real."
+  },
+  {
+   "id": "3ab75faa",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives a delivery date, which rule 6 bars. The shipped date and tracking number are correct.",
+   "rule": "none",
+   "points": "forbiddenHit 'october 12': real ('estimated to arrive on October 12th'). patternsHit: real."
+  },
+  {
+   "id": "3fce8efe",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives a delivery date, which rule 6 bars. It also says the gift note has already been applied to the item, which contradicts the lookup (no gift note text recorded). The scorer does not check that claim.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('estimated delivery of 2026-10-12'). patternsHit: real."
+  },
+  {
+   "id": "52572b2b",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The customer draft gives a delivery date, which rule 6 bars. The draft also says the kettle went out with the 'Happy 40th, Aiko' note, which the lookup does not support. The scorer does not check that claim.",
+   "rule": "none",
+   "points": "forbiddenHit 'october 12': real ('will arrive on October 12th'). patternsHit: real."
+  },
+  {
+   "id": "53e81ae6",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The update gives a delivery date, which rule 6 bars. The status and tracking number are correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('Estimated Delivery: 2026-10-12' in the update the shift lead is told to send). patternsHit: real."
+  },
+  {
+   "id": "58600b17",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The customer draft gives a delivery date, which rule 6 bars. The item is real on that point alone.",
+   "rule": "none",
+   "points": "missing 'pw-6013-2280': ambiguous, for the same reason as item 39267a11. forbiddenHit 'october 12': real (the customer draft says the kettle arrives by October 12th). patternsHit: real."
+  },
+  {
+   "id": "5b3a9d2a",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The quoted customer text gives a delivery date, which rule 6 bars. The tracking number is present and correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('Estimated delivery is 2026-10-12.' in the quoted customer text). patternsHit: real."
+  },
+  {
+   "id": "74332835",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives Kenji a delivery date, which rule 6 bars. The tracking number and shipped status are correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('Estimated Delivery: 2026-10-12'). patternsHit: real."
+  },
+  {
+   "id": "f6eadfa3",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The table gives a delivery date, which rule 6 bars. The shipped date and tracking number are correct.",
+   "rule": "none",
+   "points": "forbiddenHit '2026-10-12': real ('Estimated Delivery' row in the table the shift lead is told to send). patternsHit: real."
+  },
+  {
+   "id": "385c7541",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names no release owner and gives no by-when. It also says Freightline releases the shipment 'to our side,' which reverses the flow: the seed says the Larkspur Home warehouse issues the release. The pro number FL-660412 is correct.",
+   "rule": "none",
+   "points": "missing tomasz: real; missing any of today/2026-10-08: real"
+  },
+  {
+   "id": "3eb0eb17",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says to wait until Friday 2026-10-09 when Tomasz Brennan will be available. The seed says he is off Friday and release requests must reach him today, so the reply contradicts a fact and omits the by-when. The pattern hit correctly flags that error. The pro number is correct.",
+   "rule": "none",
+   "points": "missing any of today/2026-10-08: real; pattern hit (Friday availability): real"
+  },
+  {
+   "id": "47e48b65",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Same reply text as 3eb0eb17, with the same contradiction about Tomasz's Friday availability and no request to reach him today.",
+   "rule": "none",
+   "points": "missing any of today/2026-10-08: real; pattern hit (Friday availability): real"
+  },
+  {
+   "id": "49504698",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names Marcus Oyelaran as the person to ask and says he must sign off. The seed says Tomasz Brennan issues depot releases, and gives Marcus approval codes and sign-off for Grace's replacement, not depot releases. The today date and the pro number are correct.",
+   "rule": "none",
+   "points": "missing tomasz: real"
+  },
+  {
+   "id": "679164c9",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says Tomasz is available tomorrow, Friday 2026-10-09, and that he is off today. The seed says he is off tomorrow, Friday, so the reply inverts his schedule; the pattern hit flags a real error. The tool point is ambiguous because the request names no order id, although the shipment is an order from the conversation. The Friday error alone makes the item real. The pro number and the today action are correct.",
+   "rule": "none",
+   "points": "pattern hit (Friday availability): real; toolsOk false (lookup_order not called, search_history called instead): ambiguous on its own"
+  },
+  {
+   "id": "b1437ed0",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names Marcus Oyelaran as the person to ask and invents a '5:30 PM today' deadline tied to a fire drill that the seed gives only as a 3 pm time. It also says the fire drill is 'tomorrow,' which the seed does not state. The pro number is correct.",
+   "rule": "none",
+   "points": "missing tomasz: real"
+  },
+  {
+   "id": "c05b27f6",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names Marcus Oyelaran as the person to ask and cites approval code MX-4486 for a depot release. The seed applies that code to refunds over $200, not depot releases. The today date and the pro number are correct.",
+   "rule": "none",
+   "points": "missing tomasz: real"
+  },
+  {
+   "id": "e63875c7",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says the reader must check with Marcus for 'the specific release date' and gives no date. It names no Tomasz and no by-when. The pro number and ESC-2219 are correct but do not answer the request.",
+   "rule": "none",
+   "points": "missing tomasz: real; missing any of today/2026-10-08: real"
+  },
+  {
+   "id": "f5d4111a",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names Marcus Oyelaran as having 'the authority to issue the release.' The seed says Tomasz Brennan issues depot releases. The today date and the pro number are correct.",
+   "rule": "none",
+   "points": "missing tomasz: real"
+  },
+  {
+   "id": "2305ce3a",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives the credit limit ($5,000.00), the outstanding balance ($1,240.00), and the account manager (Ines Albrecht), but never says whether a $3,000 reorder fits. The request asks for that verdict. The record supports a yes (available credit $3,760), so the reply leaves the question open.",
+   "rule": "none",
+   "points": "missing any of fits/within/enough/covers/approve/...: real"
+  },
+  {
+   "id": "9c419b77",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Same omission as 2305ce3a: limit and balance are stated, but no fit verdict. The added manager line and the direct line 555-0142 are correct and do not answer the fit question.",
+   "rule": "none",
+   "points": "missing any of fits/within/enough/covers/approve/...: real"
+  },
+  {
+   "id": "b5003f73",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Same omission as 2305ce3a: limit and balance are stated, but no fit verdict. The account manager and direct line are correct.",
+   "rule": "none",
+   "points": "missing any of fits/within/enough/covers/approve/...: real"
+  },
+  {
+   "id": "bd903650",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Same omission as 2305ce3a: limit and balance are stated, but no fit verdict. The account manager and direct line are correct.",
+   "rule": "none",
+   "points": "missing any of fits/within/enough/covers/approve/...: real"
+  },
+  {
+   "id": "f651b726",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Same omission as 2305ce3a: limit and balance are stated, but no fit verdict. The account manager and direct line are correct.",
+   "rule": "none",
+   "points": "missing any of fits/within/enough/covers/approve/...: real"
+  },
+  {
+   "id": "034a519e",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as Sigrid Halvorsen's direct line and the number to dial. The seed says 555-0142 is account manager Ines Albrecht's line (LH-31055 lookup), and Sigrid's direct line is at extension 4127. The after-2-pm timing and the extension are correct, but the dial target is wrong.",
+   "rule": "none",
+   "points": "patternsHit: the 555-0142 pattern (the only failed point)."
+  },
+  {
+   "id": "03bd4cc0",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply labels 555-0142 as Sigrid's direct line with extension 4127, so the number to dial is wrong. The ESC-2219 mention is correct and does not offset the wrong number.",
+   "rule": "none",
+   "points": "patternsHit: the 555-0142 pattern (the only failed point)."
+  },
+  {
+   "id": "1fcf11e2",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as the voicemail number, omits extension 4127 and the after-2-pm time, and says Sigrid picks up with a status update once Marcus Oyelaran releases the order from the Riverside depot. The seed gives depot releases to Tomasz Brennan and gives Marcus only the sign-off on replacements, so the pickup clause answers a different question and names the wrong releaser.",
+   "rule": "none",
+   "points": "missing: 4127 and any pickup-time string; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "490caa8a",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply lists 555-0142 as Sigrid's direct line and tells the desk that Sigrid calls back at that number, which reverses the callback her voicemail asks for. It names Ines Albrecht as account manager correctly, then assigns that account manager's line to Sigrid. The reply also gives no pickup time.",
+   "rule": "none",
+   "points": "missing: any pickup-time string; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "64952363",
+   "verdict": "real",
+   "a": "ambiguous",
+   "b": "real",
+   "tie": "real",
+   "reason": "The reply gives the right extension (4127) and the right availability (after 2 pm), and it does not claim Sigrid picks up before 2 pm. The flagged clause is its operative advice: 'you should call her now (before 2 pm) to reach her voicemail'. The request is a callback Sigrid herself asked for, and the seed rules out live calls before 2 pm, so a call in that window reaches only her voicemail and cannot complete the callback. The reply gives no purpose for that call beyond reaching voicemail. The trailing alternative, 'ask for the number she picks up at that time', names no number and no time, so the timing answer is also unclear. The auditor who read this as ambiguous has the strongest case: a pre-2 pm voicemail is a harmless step, and the reply makes no false claim about pickup time. I rule real because the reply's timing advice points the shift lead at a call that cannot reach Sigrid, and its second option is unintelligible.",
+   "rule": "none",
+   "points": "patternsHit: the before-2-pm time pattern matched 'call her now (before 2 pm)'. This is the only failed point. The extension 4127 and the after-2-pm expectedAny phrase both pass, and no forbidden string or other pattern hits."
+  },
+  {
+   "id": "6aa35151",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as Sigrid's direct line, omits extension 4127, and gives the after-2-pm time. The number to dial is wrong and the extension is missing.",
+   "rule": "none",
+   "points": "missing: 4127; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "7b5f4c7a",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as Sigrid's direct line and omits extension 4127. Its after-2-pm timing is correct, but the number to dial is wrong.",
+   "rule": "none",
+   "points": "missing: 4127; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "886b1aea",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply names 555-0142 as the callback number, which is Ines Albrecht's line. The right extension and after-2-pm time appear in a parenthetical, but the headline number the desk would dial is wrong.",
+   "rule": "none",
+   "points": "patternsHit: the 555-0142 pattern (the only failed point)."
+  },
+  {
+   "id": "b98155f5",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply's first statement is that Sigrid's direct line is 555-0142, and the extension 4127 follows as a qualifier. The number to dial is wrong, and the seed does not tie 555-0142 to Sigrid.",
+   "rule": "none",
+   "points": "patternsHit: the 555-0142 pattern (the only failed point)."
+  },
+  {
+   "id": "c290deb7",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as Sigrid's direct line, omits extension 4127, and gives the after-2-pm timing. The number to dial is wrong.",
+   "rule": "none",
+   "points": "missing: 4127; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "cc160ee2",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives 555-0142 as the callback number, omits extension 4127 and any 2 pm time, and says Sigrid picks up with the voicemail as soon as possible today. That gives no pickup time and no dialable direct line for Sigrid.",
+   "rule": "none",
+   "points": "missing: 4127 and any pickup-time string; patternsHit: the 555-0142 pattern."
+  },
+  {
+   "id": "f06a5408",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply states that Sigrid's direct line is 555-0142, which contradicts the seed. Its instruction to call extension 4127 after 2 pm is correct, but the reply still gives the shift lead a wrong direct line.",
+   "rule": "none",
+   "points": "patternsHit: the 555-0142 pattern (the only failed point)."
+  }
+ ]
+}

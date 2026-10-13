@@ -1,0 +1,85 @@
+diff --git a/tmp/units/aggregate-l14-b-quality-join-2.ts b/tmp/units/aggregate-l14-b-quality-join-3.ts
+index 1b2bed5c3..ed8f03218 100644
+--- a/tmp/units/aggregate-l14-b-quality-join-2.ts
++++ b/tmp/units/aggregate-l14-b-quality-join-3.ts
+@@ -77,6 +77,7 @@ function checkCoverage(expectedIds: Iterable<string>, actualIds: Iterable<string
+ }
+ function allowsVerdict(key: string, verdict: string, status: string, reply: unknown): boolean {
+ 	if (key === 'completeWork' && status !== 'served') return verdict === 'fail'
++	if ((key === 'systemTool' || key === 'listedTool') && verdict === 'unattempted') return status === 'unattempted' && reply === undefined
+ 	if (['pass', 'fail', 'ambiguous'].includes(verdict)) return true
+ 	return key === 'semantic' && verdict === 'unattempted' && ['failed', 'unattempted'].includes(status) && (reply === undefined || reply === '')
+ }
+@@ -232,9 +233,15 @@ const absentGoal = packetById.get(absentOpaque)
+ const absentJudgment = judgmentsById.get(absentOpaque)
+ const absentJoin = joinsByOpaque.get(absentOpaque)
+ if (absentGoal === undefined || absentJudgment === undefined || absentJoin === undefined) throw new Error('Absent-row control binding is incomplete')
+-rejectControl('absent raw row marked served', () => bindRaw(undefined, absentGoal, { ...absentJudgment, status: 'served' }, absentOpaque))
+-rejectControl('absent raw row supplied a reply', () => bindRaw(undefined, { ...absentGoal, reply: '' }, absentJudgment, absentOpaque))
+-rejectControl('absent raw row supplied actions', () => bindRaw(undefined, { ...absentGoal, actions: [{}] }, absentJudgment, absentOpaque))
++const absentAsServed = { ...absentJudgment, status: 'served' }
++const absentWithReply = { ...absentGoal, reply: '' }
++const absentWithActions = { ...absentGoal, actions: [{}] }
++rejectControl('absent raw row marked served', () => bindRaw(undefined, absentGoal, absentAsServed, absentOpaque))
++rejectControl('absent raw row supplied a reply', () => bindRaw(undefined, absentWithReply, absentJudgment, absentOpaque))
++rejectControl('absent raw row supplied actions', () => bindRaw(undefined, absentWithActions, absentJudgment, absentOpaque))
++const absentVerdicts = object(absentRow.verdicts, 'sealed absent-row verdicts')
++const sealedAbsentPositiveControl = absentRow.status === 'unattempted' && absentRow.automatic === undefined && !Object.hasOwn(absentGoal, 'reply') && Array.isArray(absentGoal.actions) && absentGoal.actions.length === 0 && absentVerdicts.semantic === 'unattempted' && absentVerdicts.systemTool === 'unattempted' && absentVerdicts.listedTool === 'unattempted' && absentVerdicts.completeWork === 'fail'
++if (!sealedAbsentPositiveControl) throw new Error('Sealed absent-row positive control did not retain its status and verdicts')
+ 
+ const completionControls: string[] = []
+ for (const status of ['failed', 'unattempted']) {
+@@ -246,10 +253,25 @@ for (const status of ['failed', 'unattempted']) {
+ 	const packetGoal = packetById.get(opaque)
+ 	if (packetGoal === undefined) throw new Error(`Completion control packet goal is missing ${status}`)
+ 	for (const verdict of ['pass', 'ambiguous']) {
+-		rejectControl(`${status} completeWork=${verdict}`, () => validateVerdicts({ ...judgment, completeWork: verdict }, status, packetGoal.reply, opaque))
++		const controlledJudgment = { ...judgment, completeWork: verdict }
++		rejectControl(`${status} completeWork=${verdict}`, () => validateVerdicts(controlledJudgment, status, packetGoal.reply, opaque))
+ 		completionControls.push(`${status}:${verdict}`)
+ 	}
+ }
++const actionControls: string[] = []
++for (const axis of ['systemTool', 'listedTool']) {
++	for (const status of ['served', 'failed']) {
++		const output = outputRows.find(row => row.status === status)
++		if (output === undefined) throw new Error(`Missing planned status for action control ${status}`)
++		const opaque = string(output.opaqueId, `action control opaque ${status}`)
++		const judgment = judgmentsById.get(opaque)
++		const packetGoal = packetById.get(opaque)
++		if (judgment === undefined || packetGoal === undefined) throw new Error(`Action control input is missing ${status}/${axis}`)
++		const controlledJudgment = { ...judgment, [axis]: 'unattempted' }
++		rejectControl(`${status} ${axis}=unattempted`, () => validateVerdicts(controlledJudgment, status, packetGoal.reply, opaque))
++		actionControls.push(`${status}:${axis}`)
++	}
++}
+ 
+ const adjusted = new Map<string, Record<string, Record<string, number>>>()
+ for (const [armName, categories] of armCounts) {
+@@ -269,19 +291,21 @@ const controls = {
+ 	absentRowMarkedServedRejected: true,
+ 	absentRowReplyRejected: true,
+ 	absentRowActionsRejected: true,
+-	completionControls
++	sealedAbsentPositiveControl,
++	completionControls,
++	actionControls
+ }
+ const report = { validated: true, controls, hashes, population: { entries: outputRows.length, uniquePacketIds: packetById.size, uniqueJudgmentIds: judgmentsById.size, uniqueJoinIds: joinsByOpaque.size, statusCounts }, armCounts: Object.fromEntries(armCounts), adjustedArmCounts: Object.fromEntries(adjusted), rows: outputRows }
+-const joinedPath = 'tmp/units/aggregate-l14-b-quality-joined-2.json'
+-const joinedMarkdownPath = 'tmp/units/aggregate-l14-b-quality-report-2.md'
+-const validationPath = 'tmp/units/aggregate-l14-b-quality-join-validation-2.md'
++const joinedPath = 'tmp/units/aggregate-l14-b-quality-joined-3.json'
++const joinedMarkdownPath = 'tmp/units/aggregate-l14-b-quality-report-3.md'
++const validationPath = 'tmp/units/aggregate-l14-b-quality-join-validation-3.md'
+ await writeFile(joinedPath, `${JSON.stringify(report, null, 2)}\n`)
+ const table = ['| Arm | Goal | Status | Automatic pattern match | Semantic | System-tool | Listed-tool | Complete-work | Reason |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+ for (const row of outputRows) { const verdicts = object(row.verdicts, 'joined verdicts'); table.push(`| ${row.arm} | ${row.goal} | ${row.status} | ${row.automatic ?? 'unattempted'} | ${verdicts.semantic} | ${verdicts.systemTool} | ${verdicts.listedTool} | ${verdicts.completeWork} | ${string(row.reason, 'reason').replaceAll('|', '\\|')} |`) }
+ await writeFile(joinedMarkdownPath, `# L14 alias b sealed quality join\n\nValidated ${outputRows.length} unique judgments against packet, authored scenario goals, private retained identities, and run rows. Verdicts and reasons are copied unchanged.\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts }, null, 2)}\n\`\`\`\n\n## Per-goal judgments\n\n${table.join('\n')}\n`)
+ const outputHashes = {}
+ for (const path of [joinedPath, joinedMarkdownPath]) outputHashes[path] = digest(await readFile(path))
+-const validation = `# L14 alias b quality join validation\n\nThe l14-b checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, wrong-file, absent-row status/reply/actions, and failed/unattempted completion controls were rejected by their checking paths. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
++const validation = `# L14 alias b quality join validation\n\nThe l14-b checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, wrong-file, absent-row status/reply/actions, completion, and served/failed action-axis controls were rejected by their checking paths. The sealed absent-row positive control retained all four verdicts. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
+ await writeFile(validationPath, validation)
+ const validationHash = digest(await readFile(validationPath))
+ console.log(JSON.stringify({ output: joinedPath, joinedMarkdown: joinedMarkdownPath, validation: validationPath, hashes, outputHashes: { ...outputHashes, [validationPath]: validationHash }, counts: report.armCounts, adjusted: report.adjustedArmCounts, population: report.population, controls }, null, 2))

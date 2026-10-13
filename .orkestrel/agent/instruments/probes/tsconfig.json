@@ -1,0 +1,5 @@
+{
+	"extends": "../../tsconfig.json",
+	"include": ["./census.ts", "./census.test.ts", "./store-live.test.ts", "./paging-live.test.ts", "./wire-dump.test.ts"],
+	"exclude": []
+}

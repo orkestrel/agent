@@ -1,0 +1,11 @@
+{
+  "id": "mica-reachability-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 451,
+  "hash": "a694c592d68e06040d9d771a1c163632c2ba9114b01c63957a46f0402ae90a88",
+  "status": 200,
+  "started": "2026-10-11T11:08:50.114Z",
+  "finished": "2026-10-11T11:08:50.116Z",
+  "duration": 2.396100000012666
+}

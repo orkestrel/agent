@@ -1,0 +1,11 @@
+--- a/guides/README.md
++++ b/guides/README.md
+@@ -17,7 +17,7 @@
+ concept, the conversation runtime, so `agent.md` is the one guide over all four. The root files of
+ `src/core` hold the declarations two or more of those modules import — the `Message` and
+ `MessageInput` types, `filterAllowList`, `joinThinking`, `sanitizeUsage`, and `sumUsage` — beside
+-the message wire shape, `isMessage`, and the judge value types. One barrel, `src/core/index.ts`,
++the message wire shape and the judge value types. One barrel, `src/core/index.ts`,
+ publishes the root and the four modules. The `@orkestrel/scaffold` guide index maps `src/core`,
+ `src/server`, and `src/bin` to one `scaffold.md` the same way.
+ 

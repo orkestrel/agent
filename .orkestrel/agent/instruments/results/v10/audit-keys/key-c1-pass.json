@@ -1,0 +1,134 @@
+[
+ {
+  "id": "677ce587",
+  "run": "t2a-control-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "76017ff1",
+  "run": "t2a-control-v1",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "37e4205b",
+  "run": "t2a-control-v1",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "596642a1",
+  "run": "t2a-control-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "37915aa0",
+  "run": "t2a-control-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "f0b61566",
+  "run": "t2a-control-v2",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "7ab4e4a1",
+  "run": "t2a-control-v2",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "35b6ea7f",
+  "run": "t2a-control-v2",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "03fa461a",
+  "run": "t2a-control-v2",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "39610b6f",
+  "run": "t2a-control-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "91e79251",
+  "run": "t2a-control-v2",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "66708c25",
+  "run": "t2a-control-v2",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "d0cdd842",
+  "run": "t2a-control-v3",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "0da0cc04",
+  "run": "t2a-control-v3",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "5b0fb704",
+  "run": "t2a-control-v3",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "3288b39e",
+  "run": "t2a-control-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "9335c376",
+  "run": "t2a-control-v3",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "5bd4b51b",
+  "run": "t2a-control-v4",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "6a97907c",
+  "run": "t2a-control-v4",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "96f0a774",
+  "run": "t2a-control-v4",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "8628a587",
+  "run": "t2a-control-v4",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "6948823f",
+  "run": "t2a-control-v4",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ }
+]

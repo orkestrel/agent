@@ -1,0 +1,103 @@
+{
+  "status": "complete",
+  "mode": "seed",
+  "copy": 1,
+  "model": "qwen3.5:2b-q4_K_M",
+  "arm": "control",
+  "live": true,
+  "url": "http://127.0.0.1:11434",
+  "goals": [
+    "g01-luis-refund-amount",
+    "g02-luis-card",
+    "g03-grace-escalation",
+    "g04-halvorsen-ticket",
+    "g05-luis-approval-note",
+    "g06-kenji-shipping",
+    "g07-depot-release",
+    "g08-halvorsen-credit",
+    "g09-kenji-gift-note",
+    "g10-sigrid-callback",
+    "g11-grace-signoff-today",
+    "g12-copperline-gesture",
+    "g13-farah-address",
+    "g14-beatriz-remedy",
+    "g15-luis-returns",
+    "g16-walk-in-return",
+    "g17-phone-list",
+    "g18-chase-list",
+    "g19-farah-code",
+    "g20-copperline-manager",
+    "g21-copperline-buyer",
+    "g22-kenji-returns",
+    "g23-grace-reopened",
+    "g24-halvorsen-claim"
+  ],
+  "build": {
+    "entry": "/home/user/scaffold/.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+    "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+  },
+  "settings": {
+    "allowance": 300,
+    "retry": 2,
+    "predict": 160
+  },
+  "fit": {
+    "change": 0.6,
+    "agree": 0.6,
+    "separated": false
+  },
+  "judge": {
+    "hits": {
+      "category": 41,
+      "topic": 192,
+      "amends": 16,
+      "supersedes": 7
+    },
+    "misses": {
+      "topic": 348,
+      "amends": 96,
+      "category": 48,
+      "supersedes": 8
+    },
+    "transient": 0
+  },
+  "checks": [
+    {
+      "name": "copy.seed",
+      "equal": true
+    },
+    {
+      "name": "copy.tools",
+      "equal": true
+    },
+    {
+      "name": "copy.lookups",
+      "equal": true
+    },
+    {
+      "name": "copy.days",
+      "equal": true
+    },
+    {
+      "name": "copy.ledger",
+      "equal": true
+    },
+    {
+      "name": "copy.system",
+      "equal": true
+    },
+    {
+      "name": "copy.goals",
+      "equal": true
+    },
+    {
+      "name": "capacity",
+      "equal": true
+    }
+  ],
+  "requests": 500,
+  "walls": {
+    "judge": 1894718
+  },
+  "wall": 1897000
+}

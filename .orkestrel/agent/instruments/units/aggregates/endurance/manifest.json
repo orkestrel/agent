@@ -1,0 +1,385 @@
+{
+	"schema": 1,
+	"estimator": "agent-0.0.30-trimmed estimateTokens; ceil UTF-16 length /4; no model or provider usage",
+	"files": [
+		{
+			"path": ".orkestrel/agent/instruments/units/aggregates/endurance/runtime/evaluation.json",
+			"bytes": 149851,
+			"hash": "e8b4143efbbc9251166852c2d993f6b1f0b3f44eaa181f0973c27878109a47f5"
+		},
+		{
+			"path": ".orkestrel/agent/instruments/units/aggregates/endurance/runtime/development.json",
+			"bytes": 185488,
+			"hash": "361b92cf427cd1edcd4f54fa4e349f174fc5ea896c4a68c86de50913fc00ca49"
+		},
+		{
+			"path": ".orkestrel/agent/instruments/units/aggregates/endurance/private/evaluation.json",
+			"bytes": 695026,
+			"hash": "249a307bcdf31664676626b45090f1ce58aff10de39a31dcf447cec821650e6b"
+		},
+		{
+			"path": ".orkestrel/agent/instruments/units/aggregates/endurance/private/development.json",
+			"bytes": 1371800,
+			"hash": "e1c44d1f3ddcba6835837cfc05956cdbb0453a859e84342ddc69404b8f3d6674"
+		},
+		{
+			"path": ".orkestrel/agent/instruments/units/aggregates/endurance/private/invalid.json",
+			"bytes": 1215,
+			"hash": "f66a4e528457152d496c7cdf9e5900305166aef29c5126c34d7932378f169845"
+		},
+		{
+			"path": ".orkestrel/agent/instruments/harness/vendor/agent-0.0.30-trimmed/index.js",
+			"bytes": 310864,
+			"hash": "8f040acf72b6426246b79e5c2f31d3644291e4c08f49434ad1224e16f176311d"
+		}
+	],
+	"corpora": [
+		{
+			"name": "evaluation",
+			"measurement": {
+				"shifts": 24,
+				"goals": 96,
+				"threads": 12,
+				"system": {
+					"bytes": 690,
+					"characters": 690,
+					"tokens": 173,
+					"hash": "c33d03f1f30552749478e936f7809f44b201bea42f6daee3791fad57d0cd5937"
+				},
+				"arrivals": {
+					"bytes": 56924,
+					"characters": 56924,
+					"tokens": 14231,
+					"hash": "a6620945231db1c5b28d234d55057d96ca7f248425b5cd8e0ce8f9a5da767a2d"
+				},
+				"requests": {
+					"bytes": 58257,
+					"characters": 58257,
+					"tokens": 14565,
+					"hash": "673f05b4ed4630b1d6fc45060419b0661be71a4d84d3e1bf606d848b8174798e"
+				},
+				"lookups": {
+					"bytes": 8293,
+					"characters": 8293,
+					"tokens": 2074,
+					"hash": "4f857c1722f316f04b49af04e703114dd3592a26403bbd0eddb967fec1a29295"
+				},
+				"bounds": {
+					"initial": 721,
+					"shift": 1243,
+					"request": 189,
+					"sources": 1457,
+					"current": 8968
+				},
+				"checkpoints": [
+					{
+						"shift": 4,
+						"goal": "ev-04-4",
+						"arrivals": {
+							"bytes": 11641,
+							"characters": 11641,
+							"tokens": 2911,
+							"hash": "772c593430c519f42a67b6aa6ba942a5d59df5ec3a5c4a8437fc02fb8d64279a"
+						},
+						"requests": {
+							"bytes": 9183,
+							"characters": 9183,
+							"tokens": 2296,
+							"hash": "e6b4229e7728f4c5323dd2fe70e6d20824f4849c511aaf546be742d8440f9b2d"
+						}
+					},
+					{
+						"shift": 8,
+						"goal": "ev-08-4",
+						"arrivals": {
+							"bytes": 21190,
+							"characters": 21190,
+							"tokens": 5298,
+							"hash": "4c906475c6f7b56510a19eed6207687d2e5f7220628102d6863627d486f7f912"
+						},
+						"requests": {
+							"bytes": 18372,
+							"characters": 18372,
+							"tokens": 4593,
+							"hash": "fb13631c1136fee20a7a912213dc2ca9c004f34ed13a918b1b62a670662feec5"
+						}
+					},
+					{
+						"shift": 12,
+						"goal": "ev-12-4",
+						"arrivals": {
+							"bytes": 30358,
+							"characters": 30358,
+							"tokens": 7590,
+							"hash": "a123c9726e7c3ed6bf52f5fb3d1b78b8a2c6ecc75cb8915e64e3c2208dee48cf"
+						},
+						"requests": {
+							"bytes": 27586,
+							"characters": 27586,
+							"tokens": 6897,
+							"hash": "c0864858dabced9847040d3d1cf40e7abd68807eff22a41cdb19dad66e7fd792"
+						}
+					},
+					{
+						"shift": 16,
+						"goal": "ev-16-4",
+						"arrivals": {
+							"bytes": 39589,
+							"characters": 39589,
+							"tokens": 9898,
+							"hash": "3f917784e89ba1f7e31cc1cd7af729c316be57c875a7114847c301344b29dd17"
+						},
+						"requests": {
+							"bytes": 37786,
+							"characters": 37786,
+							"tokens": 9447,
+							"hash": "d6aa88364af1a967448189f3a6f7d0fcd31664900a471fc378467c13a53ac9cf"
+						}
+					},
+					{
+						"shift": 20,
+						"goal": "ev-20-4",
+						"arrivals": {
+							"bytes": 48427,
+							"characters": 48427,
+							"tokens": 12107,
+							"hash": "ef02a166bf2c7825efb13c244f1b271d88ea2d61e7384ed3e3b6408f97386e83"
+						},
+						"requests": {
+							"bytes": 47991,
+							"characters": 47991,
+							"tokens": 11998,
+							"hash": "34f30f682e425cb80f5db0870ed89b0a533aa4bb6ebef424638ae0fbc2daf845"
+						}
+					},
+					{
+						"shift": 24,
+						"goal": "ev-24-4",
+						"arrivals": {
+							"bytes": 56924,
+							"characters": 56924,
+							"tokens": 14231,
+							"hash": "a6620945231db1c5b28d234d55057d96ca7f248425b5cd8e0ce8f9a5da767a2d"
+						},
+						"requests": {
+							"bytes": 58257,
+							"characters": 58257,
+							"tokens": 14565,
+							"hash": "673f05b4ed4630b1d6fc45060419b0661be71a4d84d3e1bf606d848b8174798e"
+						}
+					}
+				]
+			},
+			"transitions": {
+				"arrival": 37,
+				"repetition": 2,
+				"correction": 2,
+				"withdrawal": 2,
+				"supersession": 2,
+				"tool": 3
+			},
+			"atoms": 1476,
+			"obligations": 30,
+			"calculations": 48
+		},
+		{
+			"name": "development",
+			"measurement": {
+				"shifts": 32,
+				"goals": 128,
+				"threads": 8,
+				"system": {
+					"bytes": 466,
+					"characters": 466,
+					"tokens": 117,
+					"hash": "27cf24191f5412d47988192675d8bee7042954306e01c319d47dd6495c884b09"
+				},
+				"arrivals": {
+					"bytes": 37856,
+					"characters": 37848,
+					"tokens": 9462,
+					"hash": "b45fff86d4789ad1904dca3deff9b5a0f85ab787c627bf3cb8138b522bc704c8"
+				},
+				"requests": {
+					"bytes": 113459,
+					"characters": 113459,
+					"tokens": 28365,
+					"hash": "6afafd051d0713aa67ea49fff11371c1888e1db911d1dc8947dcbd467d474b56"
+				},
+				"lookups": {
+					"bytes": 11387,
+					"characters": 11387,
+					"tokens": 2847,
+					"hash": "0b751fa970d147339428c85e5c9de3d8a5257137d26c36b4c7ec2b1796a2b672"
+				},
+				"bounds": {
+					"initial": 273,
+					"shift": 1574,
+					"request": 236,
+					"sources": 1527,
+					"current": 9462
+				},
+				"checkpoints": [
+					{
+						"shift": 4,
+						"goal": "dv-04-4",
+						"arrivals": {
+							"bytes": 11583,
+							"characters": 11583,
+							"tokens": 2896,
+							"hash": "ca807de2f0d9f2bdfdde15a9277fba3f0bb994d25ad61a9728fda376cdfa03ba"
+						},
+						"requests": {
+							"bytes": 13811,
+							"characters": 13811,
+							"tokens": 3453,
+							"hash": "0f72311e36adeb2be8177a5b77ecbe94bc13b43d5199dc31d4f827b7c1d54b4a"
+						}
+					},
+					{
+						"shift": 8,
+						"goal": "dv-08-4",
+						"arrivals": {
+							"bytes": 21752,
+							"characters": 21752,
+							"tokens": 5438,
+							"hash": "51b6fd37f3d07492bc813600278c61c3a9fc9be77c3932b3fafea291e6de424f"
+						},
+						"requests": {
+							"bytes": 27623,
+							"characters": 27623,
+							"tokens": 6906,
+							"hash": "173dc0609df0e799d2ccb608cefd26978fe4fb2ee3eae76fe29e2c86576bd28d"
+						}
+					},
+					{
+						"shift": 12,
+						"goal": "dv-12-4",
+						"arrivals": {
+							"bytes": 25050,
+							"characters": 25048,
+							"tokens": 6262,
+							"hash": "f9cd44a55f56f4485209c23c8379ea87d4ed8801566c3c35c0647086dfc9748a"
+						},
+						"requests": {
+							"bytes": 41863,
+							"characters": 41863,
+							"tokens": 10466,
+							"hash": "4d75d93c20528ffa26fa86138aa5077e1719d432bf561a52ff3921448ee74c84"
+						}
+					},
+					{
+						"shift": 16,
+						"goal": "dv-16-4",
+						"arrivals": {
+							"bytes": 27207,
+							"characters": 27205,
+							"tokens": 6802,
+							"hash": "6ccece386ca7ffc1558d90b93851f2efe1f4501a36f48cf9097df37d3195099f"
+						},
+						"requests": {
+							"bytes": 56107,
+							"characters": 56107,
+							"tokens": 14027,
+							"hash": "153a97c251125ef3784d3098e90162191a8f6277caa2f70ddb75d70b7b80dfac"
+						}
+					},
+					{
+						"shift": 20,
+						"goal": "dv-20-4",
+						"arrivals": {
+							"bytes": 30297,
+							"characters": 30295,
+							"tokens": 7574,
+							"hash": "12f8d551cddc3c0e99f2a162787883c1189e4a6eac8909bbd768e2a195cbb484"
+						},
+						"requests": {
+							"bytes": 70411,
+							"characters": 70411,
+							"tokens": 17603,
+							"hash": "4e8d77bdc1b014d4492a0eb390d4088c5fd60241fe298a090997d4e7590b9bc9"
+						}
+					},
+					{
+						"shift": 24,
+						"goal": "dv-24-4",
+						"arrivals": {
+							"bytes": 32507,
+							"characters": 32501,
+							"tokens": 8126,
+							"hash": "cbb15116f705d65d7155e7ab892437a61ff58d7b36e0ed5a59d75bf5002fb498"
+						},
+						"requests": {
+							"bytes": 84719,
+							"characters": 84719,
+							"tokens": 21180,
+							"hash": "3269da42deb55eb8fb5877e36a6a22e6391d51f792195fcd1ceb95c72b035a49"
+						}
+					},
+					{
+						"shift": 28,
+						"goal": "dv-28-4",
+						"arrivals": {
+							"bytes": 35710,
+							"characters": 35702,
+							"tokens": 8926,
+							"hash": "80a576feb26401f08e9561543e0bd528132c68c2ce4f0be22f9dc94e0fbdea59"
+						},
+						"requests": {
+							"bytes": 99087,
+							"characters": 99087,
+							"tokens": 24772,
+							"hash": "73ae6325de545effb4c4e0e9c65bc3b7658d854750b65f62342bbde058d09944"
+						}
+					},
+					{
+						"shift": 32,
+						"goal": "dv-32-4",
+						"arrivals": {
+							"bytes": 37856,
+							"characters": 37848,
+							"tokens": 9462,
+							"hash": "b45fff86d4789ad1904dca3deff9b5a0f85ab787c627bf3cb8138b522bc704c8"
+						},
+						"requests": {
+							"bytes": 113459,
+							"characters": 113459,
+							"tokens": 28365,
+							"hash": "6afafd051d0713aa67ea49fff11371c1888e1db911d1dc8947dcbd467d474b56"
+						}
+					}
+				]
+			},
+			"transitions": {
+				"arrival": 65,
+				"repetition": 2,
+				"correction": 2,
+				"withdrawal": 2,
+				"supersession": 2,
+				"tool": 2
+			},
+			"atoms": 3124,
+			"obligations": 37,
+			"calculations": 64
+		}
+	],
+	"limits": {
+		"selection": 3072,
+		"evaluation": {
+			"shifts": 24,
+			"goals": 96,
+			"threads": 12
+		},
+		"development": {
+			"shifts": 32,
+			"goals": 128,
+			"threads": 8
+		}
+	},
+	"pending": [
+		"shared runtime integration",
+		"development calibration and resource readings",
+		"independent integrated audit",
+		"live evaluation"
+	]
+}

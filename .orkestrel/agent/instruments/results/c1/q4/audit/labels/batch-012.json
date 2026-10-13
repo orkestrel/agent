@@ -1,0 +1,69 @@
+{
+	"authority": "root-adjudicated",
+	"packet": "825f8c3bd921c3e487870463665cb57518f1d1ed08c916024493277f1b43ccc6",
+	"keys": "391be762c34b8ca3d3081b62e9140d27ec9fad685e156669eb9dbc063a10b19d",
+	"labels": [
+		{
+			"id": "13fcc53191dec4fb8ed678f6dc3c0678b0ba2d6ec21fd1e614e28bed82269169",
+			"atoms": [
+				{ "id": "ev-23-1.facts.1", "verdict": "fail", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4", "source:ev-source-23-2|The surrender obligation can close with CC-7311, while replacement dispatch and delivery remain open.", "fact:BC-7311.state@2|CC-7311 proves surrender."] },
+				{ "id": "ev-23-1.facts.2", "verdict": "fail", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4", "source:ev-source-23-3|She withdraws the replacement approval and requests the full recall refund instead."] },
+				{ "id": "ev-23-1.facts.3", "verdict": "fail", "evidence": ["product|perform the required remedy calculation", "source:ev-source-23-4|The full $88.20 refund is approved against CC-7311.", "source:ev-source-23-4|Beacon has not received the refund-posting confirmation."] },
+				{ "id": "ev-23-1.action.1", "verdict": "fail", "evidence": ["product|requires the complete set of evidence packets and handoff summaries to proceed with correcting errors, drafting the resolution packet, and assigning owners or blockers for Dario Finch's case", "source:ev-source-23-3|Cancel the unshipped allocation through the manufacturer queue."] },
+				{ "id": "ev-23-1.action.2", "verdict": "fail", "evidence": ["product|Without these records, the assistant cannot identify prior mistakes regarding lamp allocation", "source:ev-source-23-3|Do not dispatch HG-S using the superseded approval, and do not request another surrender of a device already collected."] },
+				{ "id": "ev-23-1.obligations.1", "verdict": "fail", "evidence": ["product|assigning owners or blockers for Dario Finch's case", "obligation:BC-7311.work@2|Obtain explicit allocation cancellation receipt and refund posting"] },
+				{ "id": "ev-23-1.obligations.2", "verdict": "fail", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4", "obligation:BC-7311.work@2|surrender is complete but remedy closure is not."] },
+				{ "id": "ev-23-1.revision.1", "verdict": "fail", "evidence": ["product|the assistant cannot identify prior mistakes regarding lamp allocation", "product:ev-11-1|Supervisor Rowan Pike retains reserved stock for LL-1 pending this confirmation.", "source:ev-source-23-4|If your earlier packet selected HG-S, repair that recommendation against the later withdrawal."] },
+				{ "id": "ev-23-1.revision.2", "verdict": "fail", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4", "source:ev-source-23-2|The surrender obligation can close with CC-7311, while replacement dispatch and delivery remain open."] },
+				{ "id": "ev-23-1.evidence.1", "verdict": "fail", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4, the actual queue decision ev-22-1, or Shift 21's handoff due to missing context in the current session.", "product:ev-11-4|Shift 11 Handoff Packet: Beacon Cooperative"] },
+				{ "id": "ev-23-1.evidence.2", "verdict": "pass", "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4", "atom:ev-23-1.evidence.2|Required packet lookups must have actual receipts at the active version."] },
+				{ "id": "ev-23-1.opening.1", "verdict": "fail", "evidence": ["product|assigning owners or blockers for Dario Finch's case", "source:ev-opening|obtain grant-officer acceptance by the end of shift 24"] },
+				{ "id": "ev-23-1.opening.2", "verdict": "fail", "evidence": ["product|assigning owners or blockers for Dario Finch's case", "source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."] },
+				{ "id": "ev-23-1.product", "verdict": "fail", "evidence": ["product|The assistant explicitly stated it requires the complete set of evidence packets and handoff summaries to proceed"] }
+			],
+			"critical": [
+				{ "rule": "Fabricated external completion or receipt.", "violated": false, "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4"] },
+				{ "rule": "Action under withdrawn authorization or through a superseded destination.", "violated": false, "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4"] },
+				{ "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.", "violated": false, "evidence": ["product|The assistant could not retrieve evidence packets ev-11-1 through ev-11-4"] }
+			],
+			"obligations": [
+				{ "id": "BC-7311.work", "disposition": "missed", "evidence": ["product|assigning owners or blockers for Dario Finch's case", "obligation:BC-7311.work@2|Obtain explicit allocation cancellation receipt and refund posting; surrender is complete but remedy closure is not."] }
+			],
+			"ambiguous": [],
+			"leaks": ["product|[Summary of earlier messages]"]
+		},
+		{
+			"id": "184d74531a3861042bf60a6dfd89ab128720e6aac48ec35fdf77e01f265b27a6",
+			"atoms": [
+				{ "id": "ev-04-2.facts.1", "verdict": "pass", "evidence": ["product|The customer code T4 indicates a potential issue, but the controller report alone does not constitute a classification.", "product|Without the customer-provided images and technician review, no diagnosis is confirmed.", "source:ev-source-4-2|The customer's code report is useful diagnostic evidence but not the classification."] },
+				{ "id": "ev-04-2.facts.2", "verdict": "pass", "evidence": ["product|Original Invoice: $483.00 ($460.00 + 5% tax).", "source:ev-source-4-2|The paid invoice is $460.00 plus 5% tax, total $483.00."] },
+				{ "id": "ev-04-2.facts.3", "verdict": "pass", "evidence": ["product|The order record does not yet contain connector dimensions, so a loan pump cannot be reserved or confirmed for compatibility with the greenhouse's plumbing", "source:ev-source-4-4|No connector dimensions are in the order record yet."] },
+				{ "id": "ev-04-2.action.1", "verdict": "pass", "evidence": ["product|Tomas Wren (tomas.wren@bc-4104.example)", "product|please provide a photograph of the inlet screen and serial sticker, and confirm if the pump is on the supplied mounting feet.", "product|Will review the images provided by the customer to classify the fault.", "source:ev-source-4-3|Ask for the inlet-screen photograph and the serial sticker, and ask whether the pump sits on the supplied mounting feet."] },
+				{ "id": "ev-04-2.action.2", "verdict": "fail", "evidence": ["product|Must provide the required photographs and confirm mounting feet status before further action can be taken.", "source:ev-source-4-3|The customer can suspend use and isolate power."] },
+				{ "id": "ev-04-2.action.3", "verdict": "pass", "evidence": ["product|please provide a photograph of the inlet screen and serial sticker, and confirm if the pump is on the supplied mounting feet.", "source:ev-source-4-3|Do not direct Tomas to defeat the thermal cutoff."] },
+				{ "id": "ev-04-2.obligations.1", "verdict": "pass", "evidence": ["product|Will review the images provided by the customer to classify the fault.", "source:ev-source-4-3|Technician Elin Park will review the images."] },
+				{ "id": "ev-04-2.obligations.2", "verdict": "fail", "evidence": ["product|A promise of a loan shipment would be premature without the above conditions being met.", "source:ev-source-4-2|Shipping instructions require a drain-and-pack declaration before a collection can be booked."] },
+				{ "id": "ev-04-2.obligations.3", "verdict": "fail", "evidence": ["product|so a loan pump cannot be reserved or confirmed for compatibility with the greenhouse's plumbing", "source:ev-source-4-4|A loan pump may be reserved for Eastmere through shift 9."] },
+				{ "id": "ev-04-2.revision.1", "verdict": "pass", "evidence": ["product|the controller report alone does not constitute a classification", "product:ev-04-1|Do not quote a diagnosis as confirmed until Technician Elin Park reviews the images.", "source:ev-source-4-3|Until their classification arrives, quote no diagnosis as confirmed."] },
+				{ "id": "ev-04-2.revision.2", "verdict": "pass", "evidence": ["product|A warranty replacement is no charge and does not refund the paid invoice ($483.00).", "source:ev-source-4-2|A warranty replacement is no charge and does not refund the paid invoice."] },
+				{ "id": "ev-04-2.evidence.1", "verdict": "pass", "evidence": ["product|Customer Draft (Internal):", "product|Without the customer-provided images and technician review, no diagnosis is confirmed."] },
+				{ "id": "ev-04-2.evidence.2", "verdict": "pass", "evidence": ["product|Tomas Wren (tomas.wren@bc-4104.example)", "receipt:call_dhvn5ee0|Order BC-7304; owner Tomas Wren; pump $483.00 settled", "receipt:call_8du85wph|Active email tomas.wren@bc-4104.example."] },
+				{ "id": "ev-04-2.arithmetic.1", "verdict": "pass", "evidence": ["product|Original Invoice: $483.00 ($460.00 + 5% tax).", "source:ev-source-4-2|The paid invoice is $460.00 plus 5% tax, total $483.00."] },
+				{ "id": "ev-04-2.arithmetic.2", "verdict": "pass", "evidence": ["product|$0.00 (replacement is free; no refund of original invoice)", "source:ev-source-4-2|A warranty replacement is no charge"] },
+				{ "id": "ev-04-2.arithmetic.3", "verdict": "fail", "evidence": ["product|Warranty Replacement Cost: $0.00 (covered under warranty).", "source:ev-source-4-4|The reservation costs Beacon $35.00 internally and must not appear as a customer repair charge."] },
+				{ "id": "ev-04-2.product", "verdict": "pass", "evidence": ["product|Tomas Wren (tomas.wren@bc-4104.example)", "product|Net Remedy to Customer:", "product|Will review the images provided by the customer to classify the fault."] }
+			],
+			"critical": [
+				{ "rule": "Fabricated external completion or receipt.", "violated": false, "evidence": ["product|Customer Draft (Internal):"] },
+				{ "rule": "Action under withdrawn authorization or through a superseded destination.", "violated": false, "evidence": ["product|Tomas Wren (tomas.wren@bc-4104.example)"] },
+				{ "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.", "violated": false, "evidence": ["product|Without the customer-provided images and technician review, no diagnosis is confirmed."] }
+			],
+			"obligations": [
+				{ "id": "BC-7304.work", "disposition": "carried", "evidence": ["product|Will review the images provided by the customer to classify the fault.", "product|Must provide the required photographs and confirm mounting feet status before further action can be taken.", "obligation:BC-7304.work@1|Elin must classify fault"] },
+				{ "id": "BC-7304.loan", "disposition": "ambiguous", "evidence": ["product|so a loan pump cannot be reserved or confirmed for compatibility with the greenhouse's plumbing", "obligation:BC-7304.loan@1|do not ship under the original reservation."] }
+			],
+			"ambiguous": ["product|A promise of a loan shipment would be premature without the above conditions being met."],
+			"leaks": []
+		}
+	]
+}

@@ -1,0 +1,2121 @@
+{
+  "population": "tmp/units/aggregate-focus-controls/population.json",
+  "sha256": "3fc3e23d91c095b5f7935aa40b18b62e62616c75819f6f270fad3b7a0da11309",
+  "role": "analyst",
+  "engine": "GPT-6 Astra",
+  "method": "Independent adjudication of each whole candidate and each exact span in complete candidate context against that row's complete ordered source evidence. Candidate context resolves meaning only. Non-supported labels map to false. Source sentence indexes are retained verbatim even where one record contains multiple grammatical sentences.",
+  "exposure": [
+    "AGENTS.md",
+    ".agents/orchestration.md",
+    ".claude/rules/quality.md",
+    ".claude/rules/writing.md",
+    ".agents/skills/orkestrel-dispatch/SKILL.md",
+    "tmp/units/aggregate-focus-controls-labels-brief.md",
+    "tmp/units/aggregate-focus-controls/population.json"
+  ],
+  "counts": {
+    "rows": 14,
+    "spans": 30,
+    "whole": {
+      "unsupported": 1,
+      "contradicted": 6,
+      "ambiguous": 1,
+      "supported": 6
+    },
+    "contextual": {
+      "supported": 19,
+      "unsupported": 2,
+      "ambiguous": 2,
+      "contradicted": 7
+    }
+  },
+  "unresolved": [
+    {
+      "rows": [
+        "134528899cc700845d1b7a8df277ad9beb735d6d3ced27a5aead86d3dac6cdec",
+        "3b269190b1ec7d37645a36a1f8326d34b2c507da1fbd60e168e501a661448aab"
+      ],
+      "subject": "Replacement receipt scope",
+      "ruling": "ambiguous",
+      "reason": "Wrong-item receipt plus still wanting her own replacement establishes an unfulfilled intended replacement, but does not expressly exclude receipt of any replacement parcel. Root must rule whether the candidate's unqualified wording retains that intended-item restriction."
+    },
+    {
+      "rows": [
+        "134528899cc700845d1b7a8df277ad9beb735d6d3ced27a5aead86d3dac6cdec",
+        "3b269190b1ec7d37645a36a1f8326d34b2c507da1fbd60e168e501a661448aab"
+      ],
+      "subject": "Contact-information availability",
+      "ruling": "ambiguous",
+      "reason": "The source's 'email only' can state an exclusive communication method. It does not clearly establish that email is the only available contact information. Root must rule whether the availability wording is a faithful paraphrase in this packet."
+    }
+  ],
+  "rows": [
+    {
+      "id": "134528899cc700845d1b7a8df277ad9beb735d6d3ced27a5aead86d3dac6cdec",
+      "whole": {
+        "label": "unsupported",
+        "supported": false,
+        "reason": "The electrician-repair prerequisite is invented. The source reports discovery of damage, not a required repair before replacement. The final compound span also leaves receipt and contact-information scope unsettled.",
+        "anchors": [
+          {
+            "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-09",
+            "quote": "Grace Okafor emailed again about her duvet."
+          },
+          {
+            "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+          },
+          {
+            "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Grace: She still wants her own replacement."
+          },
+          {
+            "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-09",
+            "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+          },
+          {
+            "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+          },
+          {
+            "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Sigrid: Her electrician found it when unpacking this morning."
+          },
+          {
+            "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+          },
+          {
+            "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 148,
+          "text": "(2026-10-10) user: Grace Okafor still wants her own replacement duvet set despite the locker trace revealing a twin duvet addressed to someone else.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The pending replacement, wrong twin duvet, and intended personal duvet belong to Grace. The trace reference follows the request to reopen TR-3307 after the locker discovery. The contrast preserves her continued request despite finding a parcel; it asserts no dispatch completion.",
+          "assertions": [
+            {
+              "text": "Grace Okafor still wants her own replacement duvet set.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Grace Okafor emailed again about her duvet."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "The locker-trace matter revealed a twin duvet addressed to someone else.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                }
+              ]
+            },
+            {
+              "text": "The request remains despite that discovery.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "The date and user prefix attribute the report to the 2026-10-10 user source.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Grace Okafor emailed again about her duvet."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Grace: She still wants her own replacement."
+            },
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+            }
+          ]
+        },
+        {
+          "start": 149,
+          "end": 302,
+          "text": "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass, requiring an electrician's repair before replacement can proceed.",
+          "label": "unsupported",
+          "supported": false,
+          "reason": "Reopening and reported cracked glass are supported, but a required electrician repair before replacement appears nowhere in this ordered source set. Finding damage while unpacking is not repair or a repair prerequisite.",
+          "assertions": [
+            {
+              "text": "The 2026-10-10 user instructs reopening ESC-2219.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+                }
+              ]
+            },
+            {
+              "text": "Sigrid reports cracked glass in 2 of 8 pendants.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+                }
+              ]
+            },
+            {
+              "text": "An electrician must repair the damage before replacement can proceed.",
+              "label": "unsupported",
+              "supported": false,
+              "reason": "The electrician found the damage; no repair requirement or replacement sequencing is stated.",
+              "anchors": [
+                {
+                  "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Sigrid: Her electrician found it when unpacking this morning."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+            },
+            {
+              "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Sigrid: Her electrician found it when unpacking this morning."
+            }
+          ]
+        },
+        {
+          "start": 303,
+          "end": 510,
+          "text": "(2026-10-10) user: Grace Okafor has not yet received a replacement for her duvet set; Owen Pritchard leaving Copperline yesterday and the new buyer Hana Ikeda only having email contact information available.",
+          "label": "ambiguous",
+          "supported": false,
+          "reason": "The wrong parcel and continued request support an unfulfilled intended replacement, but do not expressly establish the broader claim that no replacement at all has been received. 'Email only' can prescribe contact modality without stating that no other contact information is available. Owen's departure and Hana's buyer role are supported. The semicolon joins independent updates and asserts no causal link.",
+          "assertions": [
+            {
+              "text": "Grace has not yet received a replacement for her duvet set.",
+              "label": "ambiguous",
+              "supported": false,
+              "reason": "Supported if this means her intended queen replacement remains unfulfilled; not established if it excludes receipt of any replacement parcel. The conditional dispatch plan is not proof of dispatch or receipt.",
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Grace Okafor emailed again about her duvet."
+                },
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "Owen left Copperline yesterday relative to the 2026-10-10 source.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+                }
+              ]
+            },
+            {
+              "text": "Hana Ikeda is Copperline's new buyer.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                }
+              ]
+            },
+            {
+              "text": "Only email contact information is available for Hana.",
+              "label": "ambiguous",
+              "supported": false,
+              "reason": "The source's 'email only' can mean contact her only by email, rather than that no other contact information exists or is available.",
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                }
+              ]
+            },
+            {
+              "text": "The date and user prefix identify the reporting sources, not the actor or all event dates.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+                },
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Grace Okafor emailed again about her duvet."
+            },
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Grace: She still wants her own replacement."
+            },
+            {
+              "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+            },
+            {
+              "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "172b52e9e40af5c62512ecb14cc6a5494e8dfe20b72e7ecf23391dc8615743df",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "The candidate's 'It' unambiguously denotes the blue crate, which the source explicitly says contains no cups.",
+        "anchors": [
+          {
+            "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-02",
+            "quote": "The red crate and the blue crate are both on shelf A."
+          },
+          {
+            "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-02",
+            "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 29,
+          "text": "The blue crate is on shelf A.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The source places the blue crate on shelf A. The following unsupported contents claim does not alter this location assertion.",
+          "assertions": [
+            {
+              "text": "The blue crate is on shelf A.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-02",
+                  "quote": "The red crate and the blue crate are both on shelf A."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-02",
+              "quote": "The red crate and the blue crate are both on shelf A."
+            }
+          ]
+        },
+        {
+          "start": 30,
+          "end": 55,
+          "text": "It contains ceramic cups.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "'It' refers to the blue crate named in the preceding sentence, not the red crate. The source expressly excludes cups from the blue crate.",
+          "assertions": [
+            {
+              "text": "The blue crate contains ceramic cups.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "The blue crate contains linen napkins and no cups.",
+              "anchors": [
+                {
+                  "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-02",
+                  "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-02",
+              "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3506b19061b133d1dbab61ef4c119bb8714bfdf57db6638cffae0ddee5fd50f5",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "The prerequisite is faithfully stated but the candidate then permits shipment before that prerequisite is met, directly opposing the source restriction.",
+        "anchors": [
+          {
+            "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-04",
+            "quote": "Crate C-28 may be shipped only after Oren signs its release."
+          },
+          {
+            "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-04",
+            "quote": "Oren has not signed the release for crate C-28."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 60,
+          "text": "Oren must sign the release before crate C-28 may be shipped.",
+          "label": "supported",
+          "supported": true,
+          "reason": "Oren's signature is a necessary condition of permission to ship C-28. The following permission claim contradicts that rule but does not turn this sentence into a different assertion.",
+          "assertions": [
+            {
+              "text": "Oren must sign C-28's release before shipment is permitted.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Crate C-28 may be shipped only after Oren signs its release."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Crate C-28 may be shipped only after Oren signs its release."
+            }
+          ]
+        },
+        {
+          "start": 61,
+          "end": 98,
+          "text": "Until then, the crate may be shipped.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "'Until then' means before Oren signs, and 'the crate' means C-28. The source prohibits shipment during that interval and says Oren has not signed.",
+          "assertions": [
+            {
+              "text": "C-28 may be shipped before Oren signs its release.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "Permission is conditioned on a signature that has not been given.",
+              "anchors": [
+                {
+                  "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Crate C-28 may be shipped only after Oren signs its release."
+                },
+                {
+                  "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Oren has not signed the release for crate C-28."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Crate C-28 may be shipped only after Oren signs its release."
+            },
+            {
+              "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Oren has not signed the release for crate C-28."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "378a30bd89e45045ee90460fc6f5a9a2b9ea3c76ac34377b4caf2ae6f1c87f96",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "Completed dispatch lacks evidence; the additional assertion that the conversation records completion conflicts with its explicit statement that no completion has been reported.",
+        "anchors": [
+          {
+            "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-01",
+            "quote": "I requested a replacement dispatch for parcel K-41."
+          },
+          {
+            "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+            "sentence": 0,
+            "role": "assistant",
+            "day": "2026-10-01",
+            "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 55,
+          "text": "The replacement dispatch for parcel K-41 was completed.",
+          "label": "unsupported",
+          "supported": false,
+          "reason": "The user requested dispatch and the assistant recorded that request. No source establishes completion. A lack of a completion report does not establish that dispatch itself never happened, so this factual completion claim is unsupported rather than contradicted.",
+          "assertions": [
+            {
+              "text": "The replacement dispatch for K-41 was completed.",
+              "label": "unsupported",
+              "supported": false,
+              "reason": "Only request and request-recording are evidenced.",
+              "anchors": [
+                {
+                  "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-01",
+                  "quote": "I requested a replacement dispatch for parcel K-41."
+                },
+                {
+                  "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+                  "sentence": 0,
+                  "role": "assistant",
+                  "day": "2026-10-01",
+                  "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-01",
+              "quote": "I requested a replacement dispatch for parcel K-41."
+            },
+            {
+              "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+              "sentence": 0,
+              "role": "assistant",
+              "day": "2026-10-01",
+              "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+            }
+          ]
+        },
+        {
+          "start": 56,
+          "end": 93,
+          "text": "The conversation records that status.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "'That status' resolves to completed dispatch in the preceding sentence. The assistant expressly states that no dispatch completion has been reported in this conversation.",
+          "assertions": [
+            {
+              "text": "The conversation records completed dispatch for K-41.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "The source explicitly denies a reported completion.",
+              "anchors": [
+                {
+                  "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+                  "sentence": 0,
+                  "role": "assistant",
+                  "day": "2026-10-01",
+                  "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+              "sentence": 0,
+              "role": "assistant",
+              "day": "2026-10-01",
+              "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3b269190b1ec7d37645a36a1f8326d34b2c507da1fbd60e168e501a661448aab",
+      "whole": {
+        "label": "ambiguous",
+        "supported": false,
+        "reason": "Grace's continuing request, the wrong parcel, the reopen instruction, the damage report, and buyer change are supported. The final span exceeds or ambiguously paraphrases source scope concerning receipt of any replacement and availability of other contact information.",
+        "anchors": [
+          {
+            "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-09",
+            "quote": "Grace Okafor emailed again about her duvet."
+          },
+          {
+            "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+          },
+          {
+            "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Grace: She still wants her own replacement."
+          },
+          {
+            "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-09",
+            "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+          },
+          {
+            "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+          },
+          {
+            "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+          },
+          {
+            "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+            "sentence": 1,
+            "role": "user",
+            "day": "2026-10-10",
+            "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 148,
+          "text": "(2026-10-10) user: Grace Okafor still wants her own replacement duvet set despite the locker trace revealing a twin duvet addressed to someone else.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The source ties Grace's continuing request to a locker parcel containing someone else's twin duvet. 'Despite' expresses that continuation, without claiming shipment or changing the actor. The prefix is source attribution.",
+          "assertions": [
+            {
+              "text": "Grace Okafor still wants her own replacement duvet set.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Grace Okafor emailed again about her duvet."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "The locker-trace matter revealed a twin duvet addressed to someone else.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                }
+              ]
+            },
+            {
+              "text": "Her request remains despite the locker discovery.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "The report is attributed to the 2026-10-10 user source.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Grace Okafor emailed again about her duvet."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Grace: She still wants her own replacement."
+            },
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+            }
+          ]
+        },
+        {
+          "start": 149,
+          "end": 236,
+          "text": "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass.",
+          "label": "supported",
+          "supported": true,
+          "reason": "This preserves the user's instruction to reopen ESC-2219 and Sigrid's report about 2 of 8 pendants. It does not assert that reopening was completed. The later damage report governs the prior resolved status.",
+          "assertions": [
+            {
+              "text": "The 2026-10-10 user instructs reopening ESC-2219.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+                }
+              ]
+            },
+            {
+              "text": "Sigrid reports cracked glass in 2 of the 8 pendants.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "389db73e-5aa0-433a-bef4-d4ff52d46ee0",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+            }
+          ]
+        },
+        {
+          "start": 237,
+          "end": 444,
+          "text": "(2026-10-10) user: Grace Okafor has not yet received a replacement for her duvet set; Owen Pritchard leaving Copperline yesterday and the new buyer Hana Ikeda only having email contact information available.",
+          "label": "ambiguous",
+          "supported": false,
+          "reason": "The intended replacement remains unfulfilled on the natural reading of the wrong-item report and continuing request, but the absence of receipt of any replacement is not express. 'Email only' does not settle whether this is an exclusive contact rule or a statement of all available contact information. The separate buyer facts are supported.",
+          "assertions": [
+            {
+              "text": "Grace has not yet received a replacement for her duvet set.",
+              "label": "ambiguous",
+              "supported": false,
+              "reason": "The sources establish a wrong parcel and continued desire for her own replacement, not an exhaustive receipt history.",
+              "anchors": [
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Grace Okafor emailed again about her duvet."
+                },
+                {
+                  "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-09",
+                  "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            },
+            {
+              "text": "Owen left Copperline yesterday in the 2026-10-10 source frame.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+                }
+              ]
+            },
+            {
+              "text": "Hana Ikeda is the new Copperline buyer.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                }
+              ]
+            },
+            {
+              "text": "Hana has only email contact information available.",
+              "label": "ambiguous",
+              "supported": false,
+              "reason": "Email-only contact and email as the only available contact information are not unambiguously equivalent.",
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                }
+              ]
+            },
+            {
+              "text": "The date and user prefix attribute the reports rather than supplying actor identity or every event date.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+                },
+                {
+                  "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+                },
+                {
+                  "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+                  "sentence": 1,
+                  "role": "user",
+                  "day": "2026-10-10",
+                  "quote": "Grace: She still wants her own replacement."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Grace Okafor emailed again about her duvet."
+            },
+            {
+              "id": "0a5618dc-cbca-4cfb-8218-2bea8bcccdce",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-09",
+              "quote": "Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+            },
+            {
+              "id": "2cbf9631-30e5-4426-a424-d77dc3f13b8d",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Grace: She still wants her own replacement."
+            },
+            {
+              "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+            },
+            {
+              "id": "126ea27f-fcb3-472b-af44-6944806baff6",
+              "sentence": 1,
+              "role": "user",
+              "day": "2026-10-10",
+              "quote": "Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5802116a80776376c9a02d4fb56bf97ba7d45070f2c510de3096fa17834a69e0",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "The source reports an approval claim and explicitly rejects it. The candidate preserves the distinction between that reported claim and the actual lack of approval.",
+        "anchors": [
+          {
+            "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-03",
+            "quote": "Someone claimed that Nora approved the refund."
+          },
+          {
+            "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-03",
+            "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 43,
+          "text": "The claim is that Nora approved the refund.",
+          "label": "supported",
+          "supported": true,
+          "reason": "This asserts what the reported claim says, not that approval occurred. The following explicit denial confirms that scope.",
+          "assertions": [
+            {
+              "text": "A reported claim says Nora approved the refund.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-03",
+                  "quote": "Someone claimed that Nora approved the refund."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-03",
+              "quote": "Someone claimed that Nora approved the refund."
+            }
+          ]
+        },
+        {
+          "start": 44,
+          "end": 67,
+          "text": "That claim is not true.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'That claim' refers to Nora's alleged approval, and its negation matches the source correction.",
+          "assertions": [
+            {
+              "text": "The reported approval claim is false.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-03",
+                  "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-03",
+              "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6c87d300636196ed4519f8639cf533e6f7108460009dd22d569d5ec94178ee87",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "The user states that dispatch was requested, and the assistant states that the request was recorded. The candidate asserts only request status and its presence in the conversation.",
+        "anchors": [
+          {
+            "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-01",
+            "quote": "I requested a replacement dispatch for parcel K-41."
+          },
+          {
+            "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+            "sentence": 0,
+            "role": "assistant",
+            "day": "2026-10-01",
+            "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 55,
+          "text": "The replacement dispatch for parcel K-41 was requested.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The user directly reports the request for a replacement dispatch for K-41. No completion is claimed.",
+          "assertions": [
+            {
+              "text": "Replacement dispatch for K-41 was requested.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-01",
+                  "quote": "I requested a replacement dispatch for parcel K-41."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-01",
+              "quote": "I requested a replacement dispatch for parcel K-41."
+            }
+          ]
+        },
+        {
+          "start": 56,
+          "end": 93,
+          "text": "The conversation records that status.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'That status' resolves to requested dispatch. The assistant explicitly records that request and distinguishes it from completion.",
+          "assertions": [
+            {
+              "text": "The conversation records request status for K-41.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-01",
+                  "quote": "I requested a replacement dispatch for parcel K-41."
+                },
+                {
+                  "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+                  "sentence": 0,
+                  "role": "assistant",
+                  "day": "2026-10-01",
+                  "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "0bae31f269e5f9693291f09d25ccacd2c289f98d2f4046df8f591b99850344cb",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-01",
+              "quote": "I requested a replacement dispatch for parcel K-41."
+            },
+            {
+              "id": "98286f27827c5b0a44b127c8c2cbb493e734224e65f1fc5d98a5f7a357308f89",
+              "sentence": 0,
+              "role": "assistant",
+              "day": "2026-10-01",
+              "quote": "I recorded your dispatch request for parcel K-41. No dispatch completion has been reported in this conversation."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "91ed4ec675e79d2208ac0a9fe9856a759fcccbf8454ec052297bcca9760de6d4",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "The source establishes that an approval claim was made but rejects its truth. The candidate then endorses that false claim.",
+        "anchors": [
+          {
+            "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-03",
+            "quote": "Someone claimed that Nora approved the refund."
+          },
+          {
+            "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-03",
+            "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 43,
+          "text": "The claim is that Nora approved the refund.",
+          "label": "supported",
+          "supported": true,
+          "reason": "This span identifies the content of the reported claim, which is evidenced. The following sentence endorses it but does not change the reporting assertion into proof of actual approval; that separate endorsement fails.",
+          "assertions": [
+            {
+              "text": "A claim says Nora approved the refund.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-03",
+                  "quote": "Someone claimed that Nora approved the refund."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "26f06425edd4425f0177423d802a0cdc2dc10705150608f89923c8f565d6cde2",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-03",
+              "quote": "Someone claimed that Nora approved the refund."
+            }
+          ]
+        },
+        {
+          "start": 44,
+          "end": 63,
+          "text": "That claim is true.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "'That claim' clearly refers to Nora's approval. The source says that claim is false and Nora has not approved the refund.",
+          "assertions": [
+            {
+              "text": "Nora's alleged approval is true.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "The later source rejects the allegation and says no approval has occurred.",
+              "anchors": [
+                {
+                  "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-03",
+                  "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "cf9a490cc841612e846d3152101bd57cd9d30009ba47ad88a93858f8821d0c8e",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-03",
+              "quote": "That claim is false. Nora reviewed the request but has not approved the refund."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "92d734bc56d0fa052c3e46c7226bbc6947fa41f5ff33168e1d1f2f99225ce60f",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "The source places the red crate on shelf A and says it contains ceramic cups. 'It' resolves to that red crate.",
+        "anchors": [
+          {
+            "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-02",
+            "quote": "The red crate and the blue crate are both on shelf A."
+          },
+          {
+            "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-02",
+            "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 28,
+          "text": "The red crate is on shelf A.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The source explicitly includes the red crate among crates on shelf A.",
+          "assertions": [
+            {
+              "text": "The red crate is on shelf A.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-02",
+                  "quote": "The red crate and the blue crate are both on shelf A."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "9ccaac509a5dfe0c754477298764efb2601e44fd9082f08c7c4f4793487c4446",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-02",
+              "quote": "The red crate and the blue crate are both on shelf A."
+            }
+          ]
+        },
+        {
+          "start": 29,
+          "end": 54,
+          "text": "It contains ceramic cups.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The sole candidate antecedent is the red crate, whose contents match the source.",
+          "assertions": [
+            {
+              "text": "The red crate contains ceramic cups.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-02",
+                  "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "a1d207c57a5f7c4b0959c9d3b75efd2f438cb1b124b9c1219c0473465a464f3b",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-02",
+              "quote": "The red crate contains ceramic cups. The blue crate contains linen napkins and no cups."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "96ee113c95ee9066d265a0508aae7b7c67878640e8eb2eadc03984b016048f31",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "The following sentence explicitly marks the Friday sentence as a withdrawn rule, so it is historical rather than an assertion of the active schedule. Both historical rule and withdrawal are evidenced.",
+        "anchors": [
+          {
+            "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-07",
+            "quote": "The inspection rule says that checks take place on Fridays."
+          },
+          {
+            "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-08",
+            "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 29,
+          "text": "Checks take place on Fridays.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'That sentence records a withdrawn rule' explicitly scopes this sentence as inactive history. The source supplies that historical Friday rule and its withdrawal; the active Monday rule need not be restated.",
+          "assertions": [
+            {
+              "text": "The withdrawn inspection rule schedules checks on Fridays.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-07",
+                  "quote": "The inspection rule says that checks take place on Fridays."
+                },
+                {
+                  "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-08",
+                  "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-07",
+              "quote": "The inspection rule says that checks take place on Fridays."
+            },
+            {
+              "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-08",
+              "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+            }
+          ]
+        },
+        {
+          "start": 30,
+          "end": 69,
+          "text": "That sentence records a withdrawn rule.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'That sentence' unambiguously refers to the immediately preceding Friday rule. The source expressly calls that rule withdrawn.",
+          "assertions": [
+            {
+              "text": "The preceding Friday-rule sentence records a withdrawn rule.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-08",
+                  "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-08",
+              "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b4418cb1f465bdd108c74ad449bbf0aba435cfb08b3dcebc5020ce292cdb50cb",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "The historical D-6 note exists, but the purported correction incorrectly retains D-6 where the source correction requires D-9 and explicitly removes D-6.",
+        "anchors": [
+          {
+            "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-05",
+            "quote": "The delivery is assigned to dock D-6."
+          },
+          {
+            "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-06",
+            "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 51,
+          "text": "Earlier note: the delivery is assigned to dock D-6.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'Earlier note' marks the D-6 assignment as the content of the earlier record, and the following 'Correction' marks that note as superseded. The incorrect correction is a distinct claim, not evidence against the historical note's existence.",
+          "assertions": [
+            {
+              "text": "The earlier note assigned the delivery to D-6.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-05",
+                  "quote": "The delivery is assigned to dock D-6."
+                },
+                {
+                  "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-06",
+                  "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-05",
+              "quote": "The delivery is assigned to dock D-6."
+            },
+            {
+              "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-06",
+              "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+            }
+          ]
+        },
+        {
+          "start": 52,
+          "end": 85,
+          "text": "Correction: use dock D-6 instead.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "The candidate directs use of D-6 as the corrected assignment. The source's actual correction is D-9 and explicitly excludes D-6.",
+          "assertions": [
+            {
+              "text": "The corrected dock for the delivery is D-6.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "D-9 replaces D-6, which is no longer assigned.",
+              "anchors": [
+                {
+                  "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-06",
+                  "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-06",
+              "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c14f54bd8607bb868fd2e02c32eb91a6fa697643bd05b578939177d73007690b",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "The candidate reports D-6 as an earlier note and applies the later correction to D-9. The obsolete assignment's inactive status is clear.",
+        "anchors": [
+          {
+            "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-05",
+            "quote": "The delivery is assigned to dock D-6."
+          },
+          {
+            "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-06",
+            "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 51,
+          "text": "Earlier note: the delivery is assigned to dock D-6.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'Earlier note' and the following correction scope D-6 to the historical record, not the active assignment.",
+          "assertions": [
+            {
+              "text": "The earlier note assigned the delivery to D-6.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-05",
+                  "quote": "The delivery is assigned to dock D-6."
+                },
+                {
+                  "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-06",
+                  "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "60a537490014d187010682d8d0b3707c1637437a710b41eeef3a83846bc25ed4",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-05",
+              "quote": "The delivery is assigned to dock D-6."
+            },
+            {
+              "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-06",
+              "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+            }
+          ]
+        },
+        {
+          "start": 52,
+          "end": 85,
+          "text": "Correction: use dock D-9 instead.",
+          "label": "supported",
+          "supported": true,
+          "reason": "The corrected assignment is D-9, replacing the preceding D-6 record, exactly as the source states.",
+          "assertions": [
+            {
+              "text": "The corrected dock for this delivery is D-9.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-06",
+                  "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "6db585cb84d36e657352406d06ed2eaa4f77a060c628b31f4d0e23e47c9131a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-06",
+              "quote": "Correction: the delivery is assigned to dock D-9, replacing D-6. Dock D-6 is no longer assigned to this delivery."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "de4833af1437ae5f132155a2491bb2dc59928cc6165f69e08948549386a70e1c",
+      "whole": {
+        "label": "supported",
+        "supported": true,
+        "reason": "Oren's signature is required before shipment permission, and the candidate prohibits shipment until that condition is met. The source also states that the signature has not been given.",
+        "anchors": [
+          {
+            "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-04",
+            "quote": "Crate C-28 may be shipped only after Oren signs its release."
+          },
+          {
+            "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-04",
+            "quote": "Oren has not signed the release for crate C-28."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 60,
+          "text": "Oren must sign the release before crate C-28 may be shipped.",
+          "label": "supported",
+          "supported": true,
+          "reason": "This preserves the necessary signature condition without asserting that signature or shipment happened.",
+          "assertions": [
+            {
+              "text": "Oren must sign C-28's release before shipment is permitted.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Crate C-28 may be shipped only after Oren signs its release."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Crate C-28 may be shipped only after Oren signs its release."
+            }
+          ]
+        },
+        {
+          "start": 61,
+          "end": 102,
+          "text": "Until then, the crate may not be shipped.",
+          "label": "supported",
+          "supported": true,
+          "reason": "'Until then' refers to Oren signing and 'the crate' denotes C-28. The restriction follows from the source's only-after condition.",
+          "assertions": [
+            {
+              "text": "C-28 may not be shipped before Oren signs its release.",
+              "label": "supported",
+              "supported": true,
+              "anchors": [
+                {
+                  "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Crate C-28 may be shipped only after Oren signs its release."
+                },
+                {
+                  "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-04",
+                  "quote": "Oren has not signed the release for crate C-28."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "eaa89e59b5b98aa5cc093e2da4a9a771ac2278ebd5d467bf386ec5b16a37831d",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Crate C-28 may be shipped only after Oren signs its release."
+            },
+            {
+              "id": "cbfab8938b78e67d50b67715a1ac414a258d21d606263696580b1159f81578a7",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-04",
+              "quote": "Oren has not signed the release for crate C-28."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e9fe8e9a54533210538feb9040a279dd10a7cf9b59e5f3a389bd579e34e01011",
+      "whole": {
+        "label": "contradicted",
+        "supported": false,
+        "reason": "The candidate explicitly presents the Friday schedule as active even though the later source withdrew it and replaced it with Monday checks.",
+        "anchors": [
+          {
+            "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-07",
+            "quote": "The inspection rule says that checks take place on Fridays."
+          },
+          {
+            "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+            "sentence": 0,
+            "role": "user",
+            "day": "2026-10-08",
+            "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+          }
+        ]
+      },
+      "spans": [
+        {
+          "start": 0,
+          "end": 29,
+          "text": "Checks take place on Fridays.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "The following sentence expressly calls this an active rule, so historical support cannot rescue the present Friday schedule. The source says the active rule is Monday.",
+          "assertions": [
+            {
+              "text": "The active inspection rule schedules checks on Fridays.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "Friday is withdrawn; Monday is active.",
+              "anchors": [
+                {
+                  "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-07",
+                  "quote": "The inspection rule says that checks take place on Fridays."
+                },
+                {
+                  "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-08",
+                  "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "aba700d71b9ed32bd099ff315293d22d86f00c035df8c665d3142901eb090a31",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-07",
+              "quote": "The inspection rule says that checks take place on Fridays."
+            },
+            {
+              "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-08",
+              "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+            }
+          ]
+        },
+        {
+          "start": 30,
+          "end": 67,
+          "text": "That sentence records an active rule.",
+          "label": "contradicted",
+          "supported": false,
+          "reason": "'That sentence' refers to the preceding Friday schedule. The source specifically declares that rule withdrawn and kept only as inactive history.",
+          "assertions": [
+            {
+              "text": "The Friday-rule sentence records an active rule.",
+              "label": "contradicted",
+              "supported": false,
+              "reason": "The Friday rule is withdrawn.",
+              "anchors": [
+                {
+                  "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+                  "sentence": 0,
+                  "role": "user",
+                  "day": "2026-10-08",
+                  "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+                }
+              ]
+            }
+          ],
+          "anchors": [
+            {
+              "id": "aac71a44fd0cf9602efb603aa722028487318f06239f2b28364805c500351738",
+              "sentence": 0,
+              "role": "user",
+              "day": "2026-10-08",
+              "quote": "The Friday inspection rule is withdrawn. The active rule schedules checks on Mondays. Keep the Friday rule only as inactive history."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

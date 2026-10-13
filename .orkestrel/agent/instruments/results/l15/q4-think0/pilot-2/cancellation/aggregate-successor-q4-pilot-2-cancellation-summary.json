@@ -1,0 +1,75 @@
+{
+    "observation":  "aggregate-successor-q4-pilot-2",
+    "classification":  "user-canceled",
+    "terminal":  {
+                     "pid":  64012,
+                     "exit":  1,
+                     "signal":  null,
+                     "capped":  false,
+                     "durationMs":  781517,
+                     "launcherReceipt":  "{\"pid\":64012,\"exit\":1,\"signal\":null,\"capped\":false,\"durationMs\":781517,\"journal\":\".orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.jsonl\",\"errors\":\".orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.err\"}"
+                 },
+    "counts":  {
+                   "completedRows":  10,
+                   "requests":  129,
+                   "sent":  129,
+                   "unsent":  0,
+                   "loggedRequestFailures":  0
+               },
+    "observedKnownUsage":  {
+                               "scope":  "saved request events only; partial observation",
+                               "promptTokens":  116070,
+                               "completionTokens":  3323,
+                               "unknownUsage":  0,
+                               "roles":  [
+                                             {
+                                                 "unsent":  0,
+                                                 "records":  21,
+                                                 "failed":  0,
+                                                 "unknownUsage":  0,
+                                                 "role":  "agent",
+                                                 "promptTokens":  40936,
+                                                 "sent":  21,
+                                                 "completionTokens":  976
+                                             },
+                                             {
+                                                 "unsent":  0,
+                                                 "records":  80,
+                                                 "failed":  0,
+                                                 "unknownUsage":  0,
+                                                 "role":  "judge",
+                                                 "promptTokens":  64179,
+                                                 "sent":  80,
+                                                 "completionTokens":  80
+                                             },
+                                             {
+                                                 "unsent":  0,
+                                                 "records":  18,
+                                                 "failed":  0,
+                                                 "unknownUsage":  0,
+                                                 "role":  "summarizer",
+                                                 "promptTokens":  10735,
+                                                 "sent":  18,
+                                                 "completionTokens":  2257
+                                             },
+                                             {
+                                                 "unsent":  0,
+                                                 "records":  10,
+                                                 "failed":  0,
+                                                 "unknownUsage":  0,
+                                                 "role":  "flush",
+                                                 "promptTokens":  220,
+                                                 "sent":  10,
+                                                 "completionTokens":  10
+                                             }
+                                         ]
+                           },
+    "processClosure":  {
+                           "recordedPid":  64012,
+                           "taskkill":  "Root reports taskkill /PID 64012 /T /F returned success at 13:03 UTC",
+                           "followup":  "Root reports CIM found PID 64012 and all descendants absent",
+                           "services":  "Root reports dedicated daemon 4668 and user service 32104 remained alive"
+                       },
+    "manifestExists":  false,
+    "savedReaderRun":  false
+}

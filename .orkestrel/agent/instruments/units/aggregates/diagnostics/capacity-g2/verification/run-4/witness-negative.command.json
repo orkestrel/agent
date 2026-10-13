@@ -1,0 +1,13 @@
+{
+  "name": "witness-negative",
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\witness-negative.ts"
+  ],
+  "expected": 3,
+  "exit": 3,
+  "signal": null,
+  "durationMs": 98.30659999999989,
+  "stdoutPath": "witness-negative.stdout.txt",
+  "stderrPath": "witness-negative.stderr.txt"
+}

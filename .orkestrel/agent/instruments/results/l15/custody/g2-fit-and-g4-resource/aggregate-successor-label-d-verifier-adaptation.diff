@@ -1,0 +1,55 @@
+diff --git tmp/units/aggregate-successor-label-a-reader.ts tmp/units/aggregate-successor-label-d-verifier-reader.ts
+index a54c846e0..29d5e4d7a 100644
+--- tmp/units/aggregate-successor-label-a-reader.ts
++++ tmp/units/aggregate-successor-label-d-verifier-reader.ts
+@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
+ import { createHash } from 'node:crypto';
+ import { isRecord, isString, isArray } from '@orkestrel/contract';
+ 
+-const path = 'tmp/units/aggregate-successor-label-a-packet.jsonl';
++const path = 'tmp/units/aggregate-successor-label-d-packet.jsonl';
+ const bytes = readFileSync(path);
+ const seal = createHash('sha256').update(bytes).digest('hex');
+-if (seal !== '0e3eaecbf38d7dad2450fb2748db860aeb8117679f06f8a7bf27ea93ad5f9541' || bytes.length !== 3160469) throw Error('Seal mismatch');
++if (seal !== '9ae5f8622b50bfd09672c243499fccf01b775451cba03671a33c46755025cb2d' || bytes.length !== 3208183) throw Error('Seal mismatch');
+ export const items = bytes.toString('utf8').trim().split('\n').map(line => {
+   const item: unknown = JSON.parse(line);
+   if (!isRecord(item) || !isString(item.id) || !isString(item.revision) || !isString(item.candidate) || !isString(item.state) || !isRecord(item.question) || !isArray(item.components) || !isArray(item.sources)) throw Error('Item shape');
+@@ -26,7 +26,7 @@ export const items = bytes.toString('utf8').trim().split('\n').map(line => {
+   }
+   return item;
+ });
+-if (items.length !== 171 || new Set(items.map(item => item.id)).size !== items.length) throw Error('Census mismatch');
++if (items.length !== 174 || new Set(items.map(item => item.id)).size !== items.length) throw Error('Census mismatch');
+ export const groups = [...Map.groupBy(items, item => JSON.stringify({candidate:item.candidate,question:item.question,state:item.state,sources:item.sources})).values()];
+ export const sources = [...new Map(items.map(item => [JSON.stringify(item.sources), item.sources])).values()];
+ const mode = process.argv[2];
+diff --git tmp/units/aggregate-successor-label-a-verifier-check.ts tmp/units/aggregate-successor-label-d-verifier-check.ts
+index 090d6e011..a5f495fe5 100644
+--- tmp/units/aggregate-successor-label-a-verifier-check.ts
++++ tmp/units/aggregate-successor-label-d-verifier-check.ts
+@@ -1,17 +1,17 @@
+ import { readFileSync } from 'node:fs';
+ import { createHash } from 'node:crypto';
+ import { isRecord, isString, isArray } from '@orkestrel/contract';
+-import { items } from './aggregate-successor-label-a-reader.ts';
++import { items } from './aggregate-successor-label-d-verifier-reader.ts';
+ 
+ const seals = {
+-  packet: '0e3eaecbf38d7dad2450fb2748db860aeb8117679f06f8a7bf27ea93ad5f9541',
+-  labels: '532865b974936adafddbba040b38a54224b08ba6060c5c4cad5ce652d488adae',
+-  report: '867f5c34f765d280f268cca403e8ce63f5d0e3f2acf9e621704a150dae0560b0',
++  packet: '9ae5f8622b50bfd09672c243499fccf01b775451cba03671a33c46755025cb2d',
++  labels: '5f2c0c2a781a9e3888b07e17ee9a3fd484984be9a0916c37d6514fcb7ce7a923',
++  report: '6507a0d6d7399e38fe94d6c8dd79f280188c279cc11a7e7dc62f6bc3078b4029',
+ };
+-const path='tmp/units/aggregate-successor-label-a.json';
+-const packet = readFileSync('tmp/units/aggregate-successor-label-a-packet.jsonl');
++const path='tmp/units/aggregate-successor-label-d.json';
++const packet = readFileSync('tmp/units/aggregate-successor-label-d-packet.jsonl');
+ const labelBytes = readFileSync(path);
+-const report = readFileSync('tmp/units/aggregate-successor-label-a-report.md');
++const report = readFileSync('tmp/units/aggregate-successor-label-d-report.md');
+ const hash = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
+ if (hash(packet) !== seals.packet) throw Error('Packet seal');
+ if (hash(labelBytes) !== seals.labels) throw Error('Label seal');

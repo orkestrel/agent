@@ -1,0 +1,1437 @@
+{
+  "validated": true,
+  "controls": {
+    "duplicateMissingIdRejected": true,
+    "servedAnswerUnattemptedRejected": true,
+    "wrongFileReferenceRejected": true,
+    "relativeAbsoluteReferenceAgreement": true,
+    "absentRowMarkedServedRejected": true,
+    "absentRowReplyRejected": true,
+    "absentRowActionsRejected": true,
+    "statusControlSource": "synthetic objects outside the measured population",
+    "syntheticAbsentPositiveControl": true,
+    "completionControls": [
+      "failed:pass",
+      "failed:ambiguous",
+      "unattempted:pass",
+      "unattempted:ambiguous"
+    ],
+    "actionControls": [
+      "served:systemTool",
+      "failed:systemTool",
+      "served:listedTool",
+      "failed:listedTool"
+    ]
+  },
+  "hashes": {
+    "tmp/units/aggregate-development-blind-packet-successor-a/packet.json": "6d10d40bc303dc09c4db2d643fbc913cafe647899e070703a7856db9a7641745",
+    "tmp/units/aggregate-successor-quality-a-judgments.json": "83c4dea97eaffd9a9dac1a5b9377f516f543f03f7b1abef54453270ddc79eeb2",
+    "tmp/units/aggregate-development-blind-packet-successor-a/private/joins.json": "9254b82a2417bd56b46bac38851d3c9af36dd5a69a0d27b638f81f369fcd4be3",
+    ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v1.json": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\resource\\reserve-512\\l6-q4-think0-records-v1\\run.json": "34cbe22cb30edaead07a102001fef0aee3d49b8d103249d9b1c5cebd04126ae5",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\resource\\reserve-512\\l6-q4-think0-records-v1\\rows.jsonl": "5b0cc7de6ee1b5c56d8e04259222f5d7af4db13957f7a0aaab600cadeb9baf9e",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\resource\\reserve-512\\l6-q4-think0-records-v1\\messages.jsonl": "e501f044ad13598e160e7d2e86fbccfcd70f74db613a26a0ba6273ad7f03e4a1",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\pilot\\development\\l6-q4-think0-aggregate-v1\\run.json": "cf1471a9447fc3ae5370c4ed56662df2a167c215c9db1190e485ce610402eba7",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\pilot\\development\\l6-q4-think0-aggregate-v1\\rows.jsonl": "f86f968fb03491214096869ea1c509dac6c422b3dfb988b1be458bb30af50ac5",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\pilot\\development\\l6-q4-think0-aggregate-v1\\messages.jsonl": "537c8878fd1047cf0ada345136da99002941aa663ea6802845534f51bd8ad8d6",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\full\\preflight\\l6-q4-think0-full-v1\\run.json": "1b1544de7b516a1ea055620f07a9e62392316ae5516eac302685cc9dfec5f8a6",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\full\\preflight\\l6-q4-think0-full-v1\\rows.jsonl": "676b24d436363cf831a32ba404d872a63adccf1393cb474c82d42b7494c0539f",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think0\\full\\preflight\\l6-q4-think0-full-v1\\messages.jsonl": "b54ba732a26bcc63e9818a8e7a0d17d9cbb9e3849e214089273d2001b568cae2"
+  },
+  "population": {
+    "entries": 72,
+    "uniquePacketIds": 72,
+    "uniqueJudgmentIds": 72,
+    "uniqueJoinIds": 72,
+    "statusCounts": {
+      "served": 72
+    }
+  },
+  "armCounts": {
+    "records": {
+      "semantic": {
+        "pass": 18,
+        "fail": 5,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 4,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 18,
+        "fail": 6,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 3,
+        "fail": 21,
+        "ambiguous": 0,
+        "unattempted": 0
+      }
+    },
+    "aggregate": {
+      "semantic": {
+        "pass": 17,
+        "fail": 6,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 4,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 18,
+        "fail": 6,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 3,
+        "fail": 21,
+        "ambiguous": 0,
+        "unattempted": 0
+      }
+    },
+    "full": {
+      "semantic": {
+        "pass": 16,
+        "fail": 7,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 5,
+        "fail": 19,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 17,
+        "fail": 7,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 2,
+        "fail": 21,
+        "ambiguous": 1,
+        "unattempted": 0
+      }
+    }
+  },
+  "adjustedArmCounts": {
+    "records": {
+      "semantic": {
+        "pass": 18,
+        "fail": 4,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 3,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 17,
+        "fail": 6,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 3,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      }
+    },
+    "aggregate": {
+      "semantic": {
+        "pass": 17,
+        "fail": 5,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 3,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 17,
+        "fail": 6,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 3,
+        "fail": 20,
+        "ambiguous": 0,
+        "unattempted": 0
+      }
+    },
+    "full": {
+      "semantic": {
+        "pass": 16,
+        "fail": 6,
+        "ambiguous": 1,
+        "unattempted": 0
+      },
+      "systemTool": {
+        "pass": 4,
+        "fail": 19,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "listedTool": {
+        "pass": 16,
+        "fail": 7,
+        "ambiguous": 0,
+        "unattempted": 0
+      },
+      "completeWork": {
+        "pass": 2,
+        "fail": 20,
+        "ambiguous": 1,
+        "unattempted": 0
+      }
+    }
+  },
+  "rows": [
+    {
+      "opaqueId": "02324152fcc5b34a315e07ca6b1f2250",
+      "goal": "g08-halvorsen-credit",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The account lookup establishes $3,760 available credit against the $3,000 request and Ines Albrecht; the answer conveys that the reorder fits.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "036a0aa3c5daf56a26da0a1204e21d04",
+      "goal": "g24-halvorsen-claim",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The reply denies a claim unless damage was noted at delivery and omits the two cracked pendants reported on reopening. Seed 148 makes damage known; signed delivery does not remove that fact. Only recall ran, with no fresh LH-80941 lookup.",
+      "eligibleThrough": 149
+    },
+    {
+      "opaqueId": "04c19d8058e3587b0c6742203f447bff",
+      "goal": "g01-luis-refund-amount",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The $289 full refund and withdrawn fee are correct. Recalling an old LH-79215 result does not fulfill either the fresh-lookup system rule or the explicit lookup_order requirement.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "07ecd2a45bd9a778db058d1b8d44a0a2",
+      "goal": "g02-luis-card",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "A fresh LH-44870 account lookup returns Mastercard ending 7719, and the reply identifies that refund card.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "1402d3ad9fc6315360553d2a2f6d7f3d",
+      "goal": "g03-grace-escalation",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The note supplies Marcus, Priya Raman, and PW-5521-9930 correctly. Both actions are recalls; neither is the required fresh order lookup.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "14350268c78c3dffe566143d07909f5f",
+      "goal": "g06-kenji-shipping",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The fresh kettle lookup is valid, but the customer reply writes an October 12 arrival estimate despite the writing restriction, calls October 7 today although the conversation date is October 8, and claims the gift note was added without action evidence.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "1ac59d0eec739c59c5017861671c68ff",
+      "goal": "g03-grace-escalation",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Marcus, Priya Raman, PW-5521-9930, and the already-open trace are correct. Two recalls reproduce history but do not fulfill the required fresh order lookup.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "1cb249447480765d6fbbdca06192c1ff",
+      "goal": "g01-luis-refund-amount",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The answer correctly refunds $289 without the withdrawn fee. The sole recall does not satisfy the fresh-lookup rule or the listed lookup_order action.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "223e94250b4325dcab6a9abdac512499",
+      "goal": "g13-farah-address",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "91 Quarry Lane, Ashby is the correct redirect. Calling 7 Mill Road incorrect is read as incorrect for the redirect, not as the prior house-number correction. No fresh lookup for Farah's known order/account occurred.",
+      "eligibleThrough": 105
+    },
+    {
+      "opaqueId": "23ad639b83120a4a3ebe0a7dd40bd0e4",
+      "goal": "g06-kenji-shipping",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The fresh LH-81660 lookup passes both action axes. The customer draft nevertheless expects delivery by October 12, contradicting the no-written-date rule; the internal text also mislabels October 7 as today and invents completion of the gift-note addition.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "26b5c539d791dccba2ba74c242b264d0",
+      "goal": "g05-luis-approval-note",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The note correctly authorizes $289 with MX-4486 and rejects the withdrawn fee and old code. Only refund history was recalled; the listed order lookup and system fresh lookup are absent.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "2b98147c8a9005a3f3e4f7d9c30bad57",
+      "goal": "g12-copperline-gesture",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Free freight on the next order is the corrected goodwill gesture. This request concerns Copperline's known wholesale order/account, so the system still requires a fresh lookup despite the narrower final-message-only list.",
+      "eligibleThrough": 95
+    },
+    {
+      "opaqueId": "2df1aa6ffec2d6adf9abc306b8e82024",
+      "goal": "g14-beatriz-remedy",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The note correctly records the sage exchange, dispatched status, Parcelway, and PW-7042-1185. Recall is present, but no fresh lookup for LH-83317 or LH-60214 occurred.",
+      "eligibleThrough": 111
+    },
+    {
+      "opaqueId": "2f48db8cf251080cd078aa46942672fe",
+      "goal": "g07-depot-release",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Tomasz Brennan, today before his Friday absence, and FL-660412 answer every substantive question. No action fulfills the system or listed lookup_order requirement.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "30e155a4cbe8f1307626e7e69ca5d947",
+      "goal": "g19-farah-code",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "WKND15, 15 percent, and validity today/tomorrow match October 10–11. Recalling Farah's history is not a fresh order/account lookup.",
+      "eligibleThrough": 133
+    },
+    {
+      "opaqueId": "3116d7527c41b36a4f5349b52e76070a",
+      "goal": "g19-farah-code",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "WKND15 and validity through October 11 are correct. No fresh lookup for Farah's known order/account occurred.",
+      "eligibleThrough": 133
+    },
+    {
+      "opaqueId": "33a8713061f69aed9b382c74d660a883",
+      "goal": "g11-grace-signoff-today",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Ruth Adeyemi is the October 9 substitute signatory. Recall alone does not satisfy the system's fresh lookup for Grace's known account/order.",
+      "eligibleThrough": 89
+    },
+    {
+      "opaqueId": "34400600b01826ee290a59efe448812f",
+      "goal": "g11-grace-signoff-today",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Read together, the sentences identify the ordinary Marcus requirement and Ruth's substitution through October 9; they do not require both signatures. The sole recall is not a fresh lookup.",
+      "eligibleThrough": 89
+    },
+    {
+      "opaqueId": "34ce5486a63238f64056f3d71085d664",
+      "goal": "g23-grace-reopened",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The note correctly identifies the wrong twin set and trace/tracking, but assigns Ruth today's sign-off after her October 9 cover expired. October 10 requires Marcus. No fresh lookup occurred.",
+      "eligibleThrough": 145
+    },
+    {
+      "opaqueId": "3808bffd91361a8f119f48762af83281",
+      "goal": "g18-chase-list",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The answer chases Copperline and Beatriz after their arrivals, omits Farah's active PW-7120-4466 chase, and speculates that Dalia is in transit/depot despite the warehouse result. No fresh order/account lookup occurred.",
+      "eligibleThrough": 132
+    },
+    {
+      "opaqueId": "3a753fb3f584c85064c9f23e412eb5bb",
+      "goal": "g18-chase-list",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Both listed shipments had arrived by this boundary; Farah's PW-7120-4466 is the remaining chase and is missing. No fresh lookup occurred.",
+      "eligibleThrough": 132
+    },
+    {
+      "opaqueId": "3af49fe832222dfa802f4f789a670cb4",
+      "goal": "g09-kenji-gift-note",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The exact gift wording is correct and recall fulfills the history action. The explicit lookup_order and the system fresh-lookup requirement are still unmet.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "3c50f71ba429bf71e5c9824c536e049b",
+      "goal": "g15-luis-returns",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The amount, card, and deadline values are correct, but the reply says the return window closed on October 21 although the eligible conversation date is October 9 and the window remains open. No fresh customer lookup occurred.",
+      "eligibleThrough": 115
+    },
+    {
+      "opaqueId": "3f1815b386e798994bef9772fde7e9f5",
+      "goal": "g23-grace-reopened",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The wrong twin parcel, TR-3307, and PW-5521-9930 are correct. Ruth's cover ended October 9; assigning her sign-off on October 10 is wrong. Recall is not the required fresh lookup.",
+      "eligibleThrough": 145
+    },
+    {
+      "opaqueId": "4001023f2ab8560d85fd3472216b5b23",
+      "goal": "g18-chase-list",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The answer revives the completed Copperline and Beatriz carrier chases, omits Farah's PW-7120-4466, and speculates incorrectly about Dalia's warehouse-held sofa. No fresh lookup occurred.",
+      "eligibleThrough": 132
+    },
+    {
+      "opaqueId": "4a6801b598f71bbdc3fbe066ffaf2386",
+      "goal": "g04-halvorsen-ticket",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "ESC-2219 is correct, and Priya being copied is supported as historical state by seed 23. The recall does not satisfy fresh lookup. A final answer reaches the shift lead only: it does not prove this requested number was sent to Priya; draft-only content is acceptable, external delivery is unproved.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "4d08a00afbde7c29c4a0551645533ea9",
+      "goal": "g04-halvorsen-ticket",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "ESC-2219 is correct. No fresh order/account lookup occurred. The final reply provides the number to the shift lead, but the protocol has no demonstrated action delivering it to Priya; the draft-only content bound passes.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "50edc8cf7c8607f1cf71086769da5369",
+      "goal": "g04-halvorsen-ticket",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "ESC-2219 is correct. No fresh order/account lookup occurred. Delivery to Priya is unproved by a final message to the shift lead; only the informational/draft-only bound is satisfied.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "6175ce8c13c7f6604341ac5e93de22a7",
+      "goal": "g22-kenji-returns",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "ambiguous",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The exact gift text and refusal to promise a date are correct. As internal advice, explicitly calling October 12 the original estimate can be historical context; as the requested customer reply, this is not a sendable addressed draft and associates an old kettle estimate with the second shipment without evidence. Recall is not a fresh lookup.",
+      "eligibleThrough": 143
+    },
+    {
+      "opaqueId": "626b24faebd639520a54b1b5772d7115",
+      "goal": "g20-copperline-manager",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Tobias Lindqvist is correct, and Owen/4310 have not yet been superseded at boundary 137. However, the reply turns Copperline's preferred buyer contact into Tobias's own contact method, an unsupported route for reaching the account manager. No fresh account lookup occurred.",
+      "eligibleThrough": 137
+    },
+    {
+      "opaqueId": "62f0b5dd7196e6c723a3358791d4515b",
+      "goal": "g13-farah-address",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "91 Quarry Lane, Ashby preserves the corrected number and unchanged locality. No fresh lookup for Farah's known order/account occurred.",
+      "eligibleThrough": 105
+    },
+    {
+      "opaqueId": "63cfe9e0dcf03790dc1a9d7856866030",
+      "goal": "g24-halvorsen-claim",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The answer identifies two cracked pendants, delivered status, FL-660412, and the October 16 claim deadline. No fresh order/account lookup occurred.",
+      "eligibleThrough": 149
+    },
+    {
+      "opaqueId": "65ec43ad22655c740ae2071e1f77daec",
+      "goal": "g16-walk-in-return",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The answer refuses a Saturday afternoon walk-in and defers it to Monday or later. This generic counter-policy request names no customer order/account and needs no fresh lookup.",
+      "eligibleThrough": 123
+    },
+    {
+      "opaqueId": "6e4995126285dd666c53621b708498d0",
+      "goal": "g06-kenji-shipping",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The fresh order lookup fulfills both action axes, but the customer reply supplies October 12 as the expected arrival and falsely calls October 7 today. The added promise to attach the note is not evidence that it was attached.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "784e187a063079b4bdcb10af424b62ad",
+      "goal": "g22-kenji-returns",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "ambiguous",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The gift wording and refusal to promise a date are correct. The historical-original-estimate reading is defensible internal advice; the requested customer-draft reading is incomplete and risks applying the prior kettle's October 12 estimate to the second shipment. No fresh lookup occurred.",
+      "eligibleThrough": 143
+    },
+    {
+      "opaqueId": "7e80ca312a9c3739c1bd49880942059f",
+      "goal": "g15-luis-returns",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The reply gives $289, Mastercard 7719, and October 21 correctly and says the window ends rather than has closed. 'Shortly' is non-specific reassurance, not a verified processing deadline. No fresh lookup_customer occurred.",
+      "eligibleThrough": 115
+    },
+    {
+      "opaqueId": "7f8d25ba543f51147b021e483c6f2608",
+      "goal": "g16-walk-in-return",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "ambiguous",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "ambiguous"
+      },
+      "reason": "The Saturday closure and Monday reopening day follow the correction, and no lookup is required for this generic policy question. 'Monday morning' adds an opening period that the source does not specify: the day-level answer passes, while an exact reopening-time reading is unsupported.",
+      "eligibleThrough": 123
+    },
+    {
+      "opaqueId": "820398db304781c8ae0c3e8b9f37f62b",
+      "goal": "g07-depot-release",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Tomasz Brennan, the today deadline, and FL-660412 are correct. The required fresh and explicitly listed order lookup is missing.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "8245da0c926fba598dab338e350be78b",
+      "goal": "g02-luis-card",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The fresh account lookup and reply identify Luis's Mastercard ending 7719.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "85992cd84d77797f1242ef62deb9d0dc",
+      "goal": "g02-luis-card",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The fresh account lookup and reply identify Luis's Mastercard ending 7719.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "85c1cb2a5edbe123fa90c78185f14c86",
+      "goal": "g01-luis-refund-amount",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The $289 full refund and withdrawn fee are correct. A fresh lookup_customer for LH-44870 satisfies the system's order-or-account disjunction, but it does not satisfy this goal's explicit lookup_order requirement.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "87e6be39aaf855e7c6b413ed7bfcfff8",
+      "goal": "g13-farah-address",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The reply repeatedly selects 91 Quarry Lane, Ashby. Its awkward description of the earlier 19 does not assert 19 as the destination. No fresh order/account lookup occurred.",
+      "eligibleThrough": 105
+    },
+    {
+      "opaqueId": "8813ccb54395fb7823de4e7b0de133ef",
+      "goal": "g21-copperline-buyer",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Hana Ikeda and email-only hana.ikeda@copperline.example honor the complete buyer-contact supersession. No fresh account/order lookup occurred.",
+      "eligibleThrough": 139
+    },
+    {
+      "opaqueId": "884c3295e5ed406745a2ca20948a57ce",
+      "goal": "g24-halvorsen-claim",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The reply omits the known cracked-glass report and treats the old depot hold as an unresolved discrepancy instead of superseded history. FL-660412 and October 16 are correct but do not answer the actual damage state. Only recall occurred.",
+      "eligibleThrough": 149
+    },
+    {
+      "opaqueId": "8bded1d0ed95d38066b4d13f85f77c80",
+      "goal": "g17-phone-list",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The morning is Saturday October 10, not Friday. ESC-2219 was closed, so the Riverside 555-0188 call has ended; Dalia's required 555-0175 callback is absent. Owen's contact availability does not itself require a call. No fresh lookup occurred.",
+      "eligibleThrough": 127
+    },
+    {
+      "opaqueId": "8f742551e1c0722ff5e838e49301f164",
+      "goal": "g21-copperline-buyer",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Hana Ikeda, email only, and the complete email address are correct; Owen is mentioned only as having left. Recall does not satisfy the fresh account/order lookup rule.",
+      "eligibleThrough": 139
+    },
+    {
+      "opaqueId": "918a292b96a9aa1a1003bd9b0e87ec8c",
+      "goal": "g05-luis-approval-note",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The note has the full $289 refund, valid MX-4486 approval code, and withdrawn fee. Its card/email details agree with the authorized account source. Recall alone fails the system and listed order lookup.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "93c36dd26c373d661a07a592d2587a5c",
+      "goal": "g08-halvorsen-credit",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The fresh account result supports $3,760 available against the $3,000 reorder and Ines Albrecht. The answer conveys that the credit fits.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "94845caba18949f785c7dd31aa7c6b28",
+      "goal": "g07-depot-release",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Tomasz Brennan, today before his Friday absence, and FL-660412 are correct. No required order lookup occurred.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "976ce369ef7be38094be3d352df635da",
+      "goal": "g21-copperline-buyer",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Hana Ikeda's email-only contact is correct. Recalling historical account results does not count as a fresh lookup.",
+      "eligibleThrough": 139
+    },
+    {
+      "opaqueId": "995e08f8cc13883b87a41d3e212d9af2",
+      "goal": "g14-beatriz-remedy",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The note correctly identifies the sage exchange, dispatched status, and PW-7042-1185. Only recall ran; the known order/account still requires a fresh lookup.",
+      "eligibleThrough": 111
+    },
+    {
+      "opaqueId": "9e4402ab16915ea67767de5f604c243e",
+      "goal": "g10-sigrid-callback",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Extension 4127 and after 2 pm answer both questions. No recall fulfills the listed history action, and no fresh lookup fulfills the system requirement for the known shipment/account.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "a161de802970226549ab31741d665395",
+      "goal": "g22-kenji-returns",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The gift text is correct, but PW-6013-2281 is invented, the customer reply promises an October 12 arrival, and completed shipping/gift-note inclusion goes beyond the warehouse-is-sending statement. No fresh lookup occurred.",
+      "eligibleThrough": 143
+    },
+    {
+      "opaqueId": "a899fd6fd6e6cbcb9e65a43b2e357245",
+      "goal": "g12-copperline-gesture",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Free freight on the next order correctly replaces the $50 credit; mentioning the withdrawn preference is not a stale assertion. No fresh lookup for Copperline's known account/order occurred.",
+      "eligibleThrough": 95
+    },
+    {
+      "opaqueId": "aab92349e4d5ea46cbc602e882d5cf0c",
+      "goal": "g20-copperline-manager",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Tobias Lindqvist is the correct account manager. The system still requires a fresh account/order lookup; none occurred.",
+      "eligibleThrough": 137
+    },
+    {
+      "opaqueId": "b12bf57dd83ca96b1f21273d29ea2e66",
+      "goal": "g20-copperline-manager",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The reply clearly selects Tobias and labels Ines as earlier information. Owen and extension 4310 remain valid through seed 137; the later Hana correction is ineligible. Recall is not a fresh lookup.",
+      "eligibleThrough": 137
+    },
+    {
+      "opaqueId": "b2335f4ab670eafbfc4d75f83f08e54f",
+      "goal": "g10-sigrid-callback",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Extension 4127 and after 2 pm are correct, and recall satisfies the listed history action. The system's additional fresh order/account lookup is absent.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "b33fa4f859f82f3ead9e0676234a2a51",
+      "goal": "g05-luis-approval-note",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The $289 amount and waived fee are correct, but the required manager approval code MX-4486 is missing from the authorization note. Neither the explicit order lookup nor the system fresh lookup occurred.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "b4fbbea67c279783e4161232d132cb20",
+      "goal": "g10-sigrid-callback",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The switchboard 555-0142, direct extension 4127, and after-2-pm availability agree with the account source and seed 24. Recall satisfies the listed history action, but no fresh order/account lookup occurred.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "b691d80e4d458722a74dd80f76fe8bf5",
+      "goal": "g03-grace-escalation",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "Marcus, Priya, and PW-5521-9930 are correct, but the note adds MX-4486 as replacement authorization even though that code governs refunds over $200, and orders initiation of a trace already opened. No fresh or listed order lookup occurred.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "b728a47af42e1ae33b3bfb64839ce879",
+      "goal": "g15-luis-returns",
+      "arm": "aggregate",
+      "runIdentity": "97ef58d0f98459ba40153c2a7c48822cc6506d1ec7be23fe47f5e02bfc9a5c3c",
+      "retainedRunIdentity": "l6-q4-think0-aggregate-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The reply correctly gives $289, Mastercard 7719, and an October 21 window end. 'Shortly' is non-specific reassurance, not a verified deadline. The fresh customer lookup required by both axes is absent.",
+      "eligibleThrough": 115
+    },
+    {
+      "opaqueId": "b8e620195a07ad54e5a3dd053e5c7ba2",
+      "goal": "g12-copperline-gesture",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Free freight correctly replaces the $50 credit; the older credit is named only to reject it. Recalling escalation history is not a fresh lookup for Copperline's known order/account.",
+      "eligibleThrough": 95
+    },
+    {
+      "opaqueId": "ba253855c23e2df892e63d25880ce875",
+      "goal": "g23-grace-reopened",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The wrong twin-set reason and TR-3307 are correct, but Ruth's cover expired, PW-5521-9930 is missing, and the note invents dispatch pending tracking and replacement approval code MX-4486. No fresh lookup occurred.",
+      "eligibleThrough": 145
+    },
+    {
+      "opaqueId": "be16cd12739fc5081f4c71139dcf0829",
+      "goal": "g17-phone-list",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "fail",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The reply uses Friday instead of Saturday, revives the closed Riverside callback, and omits Dalia's required 555-0175 call. Owen's before-noon availability alone does not create a required call. No fresh lookup occurred.",
+      "eligibleThrough": 127
+    },
+    {
+      "opaqueId": "c0ddb4d6660da8d58b8ca70dedb2f51e",
+      "goal": "g09-kenji-gift-note",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The exact gift wording is correct and recall satisfies the history action. The listed order lookup and system fresh lookup are absent.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "cd3b3bed618619bdc37589afd91d2ea1",
+      "goal": "g17-phone-list",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Dalia Moreno at 555-0175 for the sofa slot is the active morning callback; omitting the closed Riverside chase is correct. Because this concerns LH-86610/LH-66208, the system requires a fresh lookup, which is absent.",
+      "eligibleThrough": 127
+    },
+    {
+      "opaqueId": "d491e05032e7e9b8da1975cbbfd9a9bd",
+      "goal": "g09-kenji-gift-note",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "fail",
+        "completeWork": "fail"
+      },
+      "reason": "The exact gift wording is correct. Neither listed recall nor listed lookup_order occurred, and the system fresh-lookup rule is also unmet.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "ddf08712689221cc7373a63db353185f",
+      "goal": "g16-walk-in-return",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "The answer correctly refuses today's walk-in return and defers it to Monday or later. This generic counter-policy request requires no order/account lookup.",
+      "eligibleThrough": 123
+    },
+    {
+      "opaqueId": "de06596b0d8c7b614f808a663c7a63e6",
+      "goal": "g08-halvorsen-credit",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": false,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "pass",
+        "listedTool": "pass",
+        "completeWork": "pass"
+      },
+      "reason": "A fresh account lookup establishes $3,760 available credit and Ines Albrecht; the reply conveys that the $3,000 reorder fits.",
+      "eligibleThrough": 47
+    },
+    {
+      "opaqueId": "de1b7b34699077f3fe42658037b44245",
+      "goal": "g14-beatriz-remedy",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "The draft identifies the correct sage exchange and PW-7042-1185, explicitly recording it as shipped October 9. 'Initiate exchange' is read as the draft's authorization heading, not proof of a second dispatch. No fresh lookup occurred.",
+      "eligibleThrough": 111
+    },
+    {
+      "opaqueId": "e1bbad92278672994c948d7fa483cd5c",
+      "goal": "g11-grace-signoff-today",
+      "arm": "full",
+      "runIdentity": "915a71827fc5ce400ae7a59590ba564e9ed65f91adcd9e62f02357687997a84b",
+      "retainedRunIdentity": "l6-q4-think0-full-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "Ruth Adeyemi is the correct October 9 signatory. No fresh order/account lookup fulfills the system rule.",
+      "eligibleThrough": 89
+    },
+    {
+      "opaqueId": "e29ccdd4166fb480d48f777381bb74f7",
+      "goal": "g19-farah-code",
+      "arm": "records",
+      "runIdentity": "67b346187f578d3e84719d72de7af3c0bc7d94f04235a8b55c872bcaa6bf870e",
+      "retainedRunIdentity": "l6-q4-think0-records-v1",
+      "status": "served",
+      "automatic": true,
+      "verdicts": {
+        "semantic": "pass",
+        "systemTool": "fail",
+        "listedTool": "pass",
+        "completeWork": "fail"
+      },
+      "reason": "WKND15, 15 percent, and today/tomorrow validity are correct. Recall alone does not fulfill the system's fresh lookup for Farah's known order/account.",
+      "eligibleThrough": 133
+    }
+  ]
+}

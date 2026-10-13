@@ -1,0 +1,5 @@
+{
+ "status": 200,
+ "ms": 2264,
+ "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:36:19.0660238Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_ahi3xtgu\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"Luis Ferreira\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:36:19.0757599Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":2261419300,\"load_duration\":9198700,\"prompt_eval_count\":1274,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":1952586000,\"eval_count\":28,\"eval_duration\":258629000}\n"
+}

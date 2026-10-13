@@ -1,0 +1,14 @@
+{
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-judge-counterfactual\\prepare-offline.ts"
+  ],
+  "name": "preparation-occupied",
+  "expected": 1,
+  "exit": 1,
+  "signal": null,
+  "wall": 160.5882,
+  "stdout": "Observed native fetch dispatches during preparation: 0\n",
+  "stderr": "Preparation artifacts are occupied\n",
+  "error": "absent"
+}

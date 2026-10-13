@@ -1,0 +1,139 @@
+[
+ {
+  "id": "4d86e39d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis Ferreira is entitled to a full refund of $289.00 for his opened stand mixer, as the 15 percent restocking fee has been scrapped\". The value matches the seed (order LH-79215, $289.00, fee withdrawn) and the forbidden values are absent.",
+  "points": "Refund amount $289.00 (expected 289). Restocking fee treated as scrapped. No 245.65 or 43.35 in the reply."
+ },
+ {
+  "id": "f092de62",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund for the $289 stand mixer is $289, since the restocking fee has been withdrawn and he gets a full refund.\" Matches the seed withdrawal and order total.",
+  "points": "Refund amount $289 (expected 289). Restocking fee stated as withdrawn. No 245.65 or 43.35."
+ },
+ {
+  "id": "478f7d57",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719.\" The lookup_customer canned result for LH-44870 gives Mastercard ending 7719 as the refund method on file.",
+  "points": "Card on file is Mastercard ending 7719 (expected mastercard, 7719). Account LH-44870 matches."
+ },
+ {
+  "id": "8038ecb0",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719, which is the payment method on file for account LH-44870.\" Matches the canned customer record.",
+  "points": "Card on file is Mastercard ending 7719 (expected mastercard, 7719). Names the account as the source of the value."
+ },
+ {
+  "id": "28e0e797",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"**Sign-off:** Marcus Oyelaran (required due to two prior claims).\" and \"**Copy:** Priya Raman (refunds team).\" and \"PW-5521-9930 (Parcelway, for the locker trace)\". All three requested elements match the seed. The delivered-to-locker date in the escalation draft is a past event, not a promise. Scorer note for the owner, not a content issue: read literally, the g03 forbiddenPattern at items-file line 114 (the Marcus sign-off check) does not match the bolded form \"Sign-off:** Marcus\" in this reply, so the scorer pass may rest on another match. The content verdict does not depend on that regex. Referral to the scorer owner.",
+  "points": "Sign-off: Marcus Oyelaran, with the reason (two prior claims). Copy: Priya Raman. Carrier tracking number PW-5521-9930. No restocking fee text, no delivery date promised, no ESC-2291 or MX-4471 used as current."
+ },
+ {
+  "id": "c1e9998d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Sign-off Required: Marcus Oyelaran (Approval Code: MX-4486)\", \"Copy: Priya Raman (Refunds Team)\", \"Tracking Number PW-5521-9930\". The code is the current one from the seed, so no superseded value is given as current. The 2026-10-03 locker date describes the past delivery and is not a customer-facing promise.",
+  "points": "Sign-off Marcus Oyelaran marked required. Copy Priya Raman. Tracking PW-5521-9930. Current code MX-4486 used; MX-4471 absent. No restocking text, no written delivery promise."
+ },
+ {
+  "id": "75a1ef25",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"The escalation ticket number for the Halvorsen Interiors late delivery is **ESC-2219**.\" Matches the seed correction.",
+  "points": "Escalation ticket ESC-2219 (expected esc-2219). ESC-2291 not given as current."
+ },
+ {
+  "id": "e817ba39",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "correct",
+  "tie": "ambiguous",
+  "reason": "Reply: \"The escalation ticket number for Halvorsen Interiors (Order LH-80941) is **ESC-2219**. I will include that in the reply to Priya Raman.\" The value is right and nothing contradicts the seed or the correction. The request asked for the number to be sent to Priya, and the reply only states a future send ('I will include that'). No send_reply result or past-tense confirmation appears in the reply text, so a careful grader could read the request as answered or only acknowledged. Referral to the reviewer: decide whether an unconfirmed future-tense send counts as fulfilling 'Can you send it to her?'.",
+  "points": "Ticket number: reply states ESC-2219, matching the correction (expected esc-2219 present; ESC-2291 absent from the reply). Copy rule: reply names Priya Raman as the recipient. Request element 'send it to her': not confirmed as done."
+ },
+ {
+  "id": "7fc71296",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "correct",
+  "tie": "false-pass",
+  "reason": "Reply: \"*   **Status:** Returned (Opened Item)\". The seed says only that Luis 'wants to return an opened stand mixer' and that the return window is open until 2026-10-21. No fact says the mixer has come back, so the status states a completed return the facts do not support, and it sits in an internal refund authorization that the shift lead acts on. The other values are right, but this wrong status point means the pass does not stand.",
+  "points": "Approval code MX-4486 with Marcus Oyelaran (expected mx-4486 present); MX-4471 absent; refund $289.00 full; restocking fee stated as withdrawn; Mastercard ending in 7719. Status line: 'Returned (Opened Item)' is not supported by the seed."
+ },
+ {
+  "id": "92bdd532",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"**Manager Approval Code:** MX-4486 (Required as the refund exceeds $200).\" and \"Refund Amount:** $289.00 (Full refund).\" The note states the withdrawal in the same sentence as the 15% mention, which matches the seed.",
+  "points": "Approval code MX-4486 marked required over $200 (expected mx-4486). Refund $289.00 full. Mastercard ending 7719. Restocking fee stated as scrapped, and the 15% line is in a sentence that also says scrapped, so the scorer pattern does not fire."
+ },
+ {
+  "id": "5a3e2cd1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You must get this done **today**, Thursday 2026-10-08, because he is off tomorrow (Friday 2026-10-09).\" and \"The pro number you give Freightline is **FL-660412**.\" All three elements match the seed.",
+  "points": "Contact Tomasz Brennan (expected tomasz). Deadline today, Thursday 2026-10-08 (expectedAny today). Pro number FL-660412. Friday 2026-10-09 framed as his day off, not as the deadline."
+ },
+ {
+  "id": "eb00b6e5",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You must get this done **today**, as he is off tomorrow (Friday, 2026-10-09).\" and \"The pro number you provide to Freightline is **FL-660412**.\" Matches the seed.",
+  "points": "Contact Tomasz Brennan (expected tomasz). Deadline today (expectedAny today). Pro number FL-660412. Friday described as his day off."
+ },
+ {
+  "id": "a3b988da",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Kenji Nakamura requested the gift note: **'Happy 40th, Aiko'**.\" Matches the seed wording exactly.",
+  "points": "Exact gift note wording 'Happy 40th, Aiko' (expected 40th, aiko). No date in the reply."
+ },
+ {
+  "id": "b53aa099",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: 'The gift note should read: \"Happy 40th, Aiko\".' The wording matches the seed. The word 'should' is a style point and does not change the verdict.",
+  "points": "Exact gift note wording \"Happy 40th, Aiko\" (expected 40th, aiko). No date in the reply."
+ },
+ {
+  "id": "e0d15c99",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You should call Sigrid Halvorsen on her direct line at extension 4127. She only takes calls after 2 pm, so you'll need to dial that number once the clock hits 2:00 PM.\" Matches the seed.",
+  "points": "Dial extension 4127 (expected 4127). Available after 2 pm (expectedAny 2 pm and 2:00 PM). 555-0142 absent. No 'before 2 pm' or Friday deadline."
+ }
+]

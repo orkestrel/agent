@@ -1,0 +1,123 @@
+diff --git a/tmp/units/aggregate-successor-g4-think0-resource-read.ts b/tmp/units/aggregate-successor-g4-think1-resource-read.ts
+index 9e0d010b1..ef23d9a82 100644
+--- a/tmp/units/aggregate-successor-g4-think0-resource-read.ts
++++ b/tmp/units/aggregate-successor-g4-think1-resource-read.ts
+@@ -2,8 +2,8 @@
+ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/bench5/refit/helpers.js'
+ import { measureMatrixCosts, readAttempt, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/freeze/manifest.json'))
+-const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/resource/manifest.json'))
++const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think1/freeze/manifest.json'))
++const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think1/resource/manifest.json'))
+ const resource = readResource(manifest, frozen)
+ const attempts = resource.attempts.map((attempt) => {
+   const run = readAttempt(attempt)
+diff --git a/tmp/units/aggregate-successor-q4-thinking-full-read.ts b/tmp/units/aggregate-successor-g4-think1-full-read.ts
+index aadecf91f..cb6dd8aaa 100644
+--- a/tmp/units/aggregate-successor-q4-thinking-full-read.ts
++++ b/tmp/units/aggregate-successor-g4-think1-full-read.ts
+@@ -5,7 +5,7 @@ import { readJSON } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { buildMatrixBound, measureMatrixCosts, readAttempt, readExecution, readFrozen, readResource, verifyMatrixFeasibility } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ import { isMatrixResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/validators.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/q4-think1')
++const root = resolve('.orkestrel/agent/instruments/results/l15/g4-think1')
+ const frozen = hashFile(resolve(root, 'freeze/manifest.json'))
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))
+ const fullFile = hashFile(resolve(root, 'full/manifest.json'))
+diff --git a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts b/tmp/units/aggregate-successor-g4-think1-aggregate-read.ts
+index 20c5e3edc..000204b37 100644
+--- a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts
++++ b/tmp/units/aggregate-successor-g4-think1-aggregate-read.ts
+@@ -4,7 +4,7 @@ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { parseMatrixRun } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/parsers.js'
+ import { listMatrixPairFailures, matchesMatrixExposure, measureMatrixCosts, readAttempt, readDevelopment, readExecution, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/g4-think0')
++const root = resolve('.orkestrel/agent/instruments/results/l15/g4-think1')
+ const frozenFile = hashFile(resolve(root, 'freeze/manifest.json'))
+ const frozen = readFrozen(frozenFile)
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))
+diff --git a/tmp/units/aggregate-successor-g4-think0-resource-read.ts b/tmp/units/aggregate-successor-q2-think0-resource-read.ts
+index 9e0d010b1..d7dbcbdd0 100644
+--- a/tmp/units/aggregate-successor-g4-think0-resource-read.ts
++++ b/tmp/units/aggregate-successor-q2-think0-resource-read.ts
+@@ -2,8 +2,8 @@
+ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/bench5/refit/helpers.js'
+ import { measureMatrixCosts, readAttempt, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/freeze/manifest.json'))
+-const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/resource/manifest.json'))
++const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/q2-think0/freeze/manifest.json'))
++const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/q2-think0/resource/manifest.json'))
+ const resource = readResource(manifest, frozen)
+ const attempts = resource.attempts.map((attempt) => {
+   const run = readAttempt(attempt)
+diff --git a/tmp/units/aggregate-successor-q4-thinking-full-read.ts b/tmp/units/aggregate-successor-q2-think0-full-read.ts
+index aadecf91f..84e1d36c8 100644
+--- a/tmp/units/aggregate-successor-q4-thinking-full-read.ts
++++ b/tmp/units/aggregate-successor-q2-think0-full-read.ts
+@@ -5,7 +5,7 @@ import { readJSON } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { buildMatrixBound, measureMatrixCosts, readAttempt, readExecution, readFrozen, readResource, verifyMatrixFeasibility } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ import { isMatrixResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/validators.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/q4-think1')
++const root = resolve('.orkestrel/agent/instruments/results/l15/q2-think0')
+ const frozen = hashFile(resolve(root, 'freeze/manifest.json'))
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))
+ const fullFile = hashFile(resolve(root, 'full/manifest.json'))
+diff --git a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts b/tmp/units/aggregate-successor-q2-think0-aggregate-read.ts
+index 20c5e3edc..f344858d6 100644
+--- a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts
++++ b/tmp/units/aggregate-successor-q2-think0-aggregate-read.ts
+@@ -4,7 +4,7 @@ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { parseMatrixRun } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/parsers.js'
+ import { listMatrixPairFailures, matchesMatrixExposure, measureMatrixCosts, readAttempt, readDevelopment, readExecution, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/g4-think0')
++const root = resolve('.orkestrel/agent/instruments/results/l15/q2-think0')
+ const frozenFile = hashFile(resolve(root, 'freeze/manifest.json'))
+ const frozen = readFrozen(frozenFile)
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))
+diff --git a/tmp/units/aggregate-successor-g4-think0-resource-read.ts b/tmp/units/aggregate-successor-q2-think1-resource-read.ts
+index 9e0d010b1..ce088c1f1 100644
+--- a/tmp/units/aggregate-successor-g4-think0-resource-read.ts
++++ b/tmp/units/aggregate-successor-q2-think1-resource-read.ts
+@@ -2,8 +2,8 @@
+ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/bench5/refit/helpers.js'
+ import { measureMatrixCosts, readAttempt, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/freeze/manifest.json'))
+-const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/g4-think0/resource/manifest.json'))
++const frozen = hashFile(resolve('.orkestrel/agent/instruments/results/l15/q2-think1/freeze/manifest.json'))
++const manifest = hashFile(resolve('.orkestrel/agent/instruments/results/l15/q2-think1/resource/manifest.json'))
+ const resource = readResource(manifest, frozen)
+ const attempts = resource.attempts.map((attempt) => {
+   const run = readAttempt(attempt)
+diff --git a/tmp/units/aggregate-successor-q4-thinking-full-read.ts b/tmp/units/aggregate-successor-q2-think1-full-read.ts
+index aadecf91f..1453f2f17 100644
+--- a/tmp/units/aggregate-successor-q4-thinking-full-read.ts
++++ b/tmp/units/aggregate-successor-q2-think1-full-read.ts
+@@ -5,7 +5,7 @@ import { readJSON } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { buildMatrixBound, measureMatrixCosts, readAttempt, readExecution, readFrozen, readResource, verifyMatrixFeasibility } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ import { isMatrixResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/validators.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/q4-think1')
++const root = resolve('.orkestrel/agent/instruments/results/l15/q2-think1')
+ const frozen = hashFile(resolve(root, 'freeze/manifest.json'))
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))
+ const fullFile = hashFile(resolve(root, 'full/manifest.json'))
+diff --git a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts b/tmp/units/aggregate-successor-q2-think1-aggregate-read.ts
+index 20c5e3edc..c46f2053c 100644
+--- a/tmp/units/aggregate-successor-g4-think0-aggregate-read.ts
++++ b/tmp/units/aggregate-successor-q2-think1-aggregate-read.ts
+@@ -4,7 +4,7 @@ import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/benc
+ import { parseMatrixRun } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/parsers.js'
+ import { listMatrixPairFailures, matchesMatrixExposure, measureMatrixCosts, readAttempt, readDevelopment, readExecution, readFrozen, readResource } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+ 
+-const root = resolve('.orkestrel/agent/instruments/results/l15/g4-think0')
++const root = resolve('.orkestrel/agent/instruments/results/l15/q2-think1')
+ const frozenFile = hashFile(resolve(root, 'freeze/manifest.json'))
+ const frozen = readFrozen(frozenFile)
+ const resourceFile = hashFile(resolve(root, 'resource/manifest.json'))

@@ -1,0 +1,5 @@
+{
+ "status": 200,
+ "ms": 14805,
+ "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:48:02.651019251Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_hx2h2mwj\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"Grace Okafor\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:48:02.72321146Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":14779683161,\"load_duration\":3783670102,\"prompt_eval_count\":1666,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":8942342000,\"eval_count\":29,\"eval_duration\":2046296000}\n"
+}

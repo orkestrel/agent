@@ -1,0 +1,50 @@
+[
+	{
+		"name": "g2-records-v1",
+		"harness": "bench3",
+		"estimate": 900,
+		"args": [
+			"--mode",
+			"ledger",
+			"--profile",
+			"refined",
+			"--scenario",
+			"/home/user/agent/tmp/bench/variants/ledger/v1.json",
+			"--ctx",
+			"3072",
+			"--judge",
+			"mica",
+			"--judge-ctx",
+			"4096",
+			"--tail",
+			"0.35",
+			"--judgments",
+			"/home/user/agent/tmp/bench/results/v3/cal-categories.jsonl",
+			"--reply",
+			"terminal",
+			"--records",
+			"on",
+			"--model",
+			"gemma4:e2b-it-q4_K_M"
+		]
+	},
+	{
+		"name": "g2-control-v1",
+		"harness": "bench",
+		"estimate": 600,
+		"args": [
+			"--mode",
+			"none",
+			"--ctx",
+			"6144",
+			"--search",
+			"words",
+			"--reply",
+			"terminal",
+			"--scenario",
+			"/home/user/agent/tmp/bench/variants/v1.json",
+			"--model",
+			"gemma4:e2b-it-q4_K_M"
+		]
+	}
+]

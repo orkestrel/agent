@@ -1,0 +1,10 @@
+{"tag":"granite4:tiny-h","capabilities":["completion","tools"],"details":{"parent_model":"/Users/runner/.ollama/models/blobs/sha256-491ba81786c46a345a5da9a60cdb9f9a3056960c8411dd857153c194b1f91313","format":"gguf","family":"granitehybrid","families":["granitehybrid"],"parameter_size":"6.9B","quantization_level":"Q4_K_M"},"context":1048576}
+{"tag":"lfm2.5-thinking:1.2b","capabilities":["completion","tools","thinking"],"details":{"parent_model":"","format":"gguf","family":"lfm2","families":["lfm2"],"parameter_size":"1.2B","quantization_level":"Q4_K_M"},"context":128000,"parameters":"top_k                          50
+temperature                    0.05"}
+{"tag":"granite4.2:3b","capabilities":["tools","thinking","completion"],"details":{"parent_model":"/Users/runner/.ollama/models/blobs/sha256-20e436143017578687f7f848225cc6c6038126c84149192229c7dff6e4e0f427","format":"gguf","family":"granite","families":["granite"],"parameter_size":"3.7B","quantization_level":"Q4_K_M"},"context":131072,"parameters":"temperature                    1
+top_p                          0.95"}
+{"tag":"lfm2.5:8b","capabilities":["completion","tools","thinking"],"details":{"parent_model":"","format":"gguf","family":"lfm2moe","families":["lfm2moe"],"parameter_size":"8.5B","quantization_level":"Q4_K_M"},"context":128000,"parameters":"repeat_penalty                 1.05
+temperature                    0.2
+top_k                          80"}
+{"tag":"granite4.1:3b","capabilities":["completion","tools"],"details":{"parent_model":"/Users/runner/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29","format":"gguf","family":"granite","families":["granite"],"parameter_size":"3.4B","quantization_level":"Q4_K_M"},"context":131072}
+{"tag":"ministral-3:3b","capabilities":["completion","vision","tools"],"details":{"parent_model":"","format":"gguf","family":"mistral3","families":["mistral3"],"parameter_size":"3.8B","quantization_level":"Q4_K_M"},"context":262144,"parameters":"temperature                    0.15"}

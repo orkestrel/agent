@@ -1,0 +1,5 @@
+{"turn":1,"goal":"g01-luis-refund-amount","estimate":1146,"scope":"aggregate"}
+{"turn":2,"goal":"g01-luis-refund-amount","estimate":1283,"scope":"aggregate"}
+{"turn":3,"goal":"g02-luis-card","estimate":990,"scope":"aggregate"}
+{"turn":4,"goal":"g02-luis-card","estimate":1058,"scope":"aggregate"}
+{"turn":5,"goal":"g03-grace-escalation","estimate":2231,"scope":"aggregate"}

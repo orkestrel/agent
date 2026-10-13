@@ -1,0 +1,3673 @@
+{
+	"verdicts": [
+		{
+			"lane": "check:agent:contract",
+			"index": 0,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1748,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 1,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1777,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 2,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1898,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 3,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 2591,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 4,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3075,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 5,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3399,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly includes this generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 6,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 96,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:96 declares reusable USAGE; tests.md:189 requires setup ownership.",
+			"fix": "Export a frozen usage fixture from tests/setup.ts and import it."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 7,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 107,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:107 declares the reused deadline; tests.md:189 requires setup ownership.",
+			"fix": "Export a qualified deadline constant from tests/setup.ts and import it."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 8,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3236,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:3236-3247 declares a shared event table and type; tests.md:189,191.",
+			"fix": "Export the frozen event tuple and its derived type from tests/setup.ts."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 9,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1510,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[260] owns these provider literals, explicitly including the duplicate pair at 4393/4423.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 10,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 375,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:375 derives expected consumption with its configured estimator; tests.md:37.",
+			"fix": "Use independently declared expected charges for each replay case."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 11,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4761,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:4761 repeats the production charge estimator; tests.md:37.",
+			"fix": "Assert completion 1 followed by residual 11."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 12,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4794,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:4794 repeats the production charge estimator; tests.md:37.",
+			"fix": "Assert completion 1 followed by residual 11."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 13,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1649,
+			"verdict": "refuted",
+			"evidence": "The comment means after the test delay, not publication recency; writing.md:89; audit refuted[145].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 14,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1803,
+			"verdict": "refuted",
+			"evidence": "The comment means the rejection checkpoint during this run; writing.md:89; confirmed[259] expressly leaves it.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 15,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1993,
+			"verdict": "refuted",
+			"evidence": "Latest names run ordering, not version currency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 16,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4140,
+			"verdict": "refuted",
+			"evidence": "Latest names turn ordering, not version currency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 17,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4195,
+			"verdict": "refuted",
+			"evidence": "The comment describes round-two state and an added turn; writing.md:89; audit refuted[146].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 18,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1680,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:1662,1680 narrates the former lazy-settle implementation; writing.md:46.",
+			"fix": "State the requirement that result settles without draining events."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 19,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1773,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:1773 narrates a fix; writing.md:46.",
+			"fix": "Explain why the rejection must be marked handled, without change history."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 20,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 2814,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:2814-2815 contrasts former denial behavior; writing.md:46.",
+			"fix": "State that empty errors produce a nonempty denial reason."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 21,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3781,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] removes this old-estimator clause.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 22,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1712,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:1712 guarantees a timer outcome; writing.md:21.",
+			"fix": "Describe the intended deadline ordering without a guarantee."
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 23,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3225,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] replaces this guarantee.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 24,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1825,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] replaces via in this title.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 25,
+			"file": "tests/setup.ts",
+			"line": 1262,
+			"verdict": "covered",
+			"evidence": "confirmed[276]; phase 1 rewrote the scenario comment at setup.ts:1262-1263.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 26,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1222,
+			"verdict": "refuted",
+			"evidence": "JSON.stringify serializes literal 5 independently of the agent; an incorrect tool result still fails. tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 27,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3256,
+			"verdict": "refuted",
+			"evidence": "The test already calls shared createRecorders; another forwarding helper adds no contract. architecture.md:163-165.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 28,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3731,
+			"verdict": "refuted",
+			"evidence": "Repeated calls to shared createRecorders are not duplicate helper implementations; tests.md:188.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 29,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "refuted",
+			"evidence": "DOMException is a host-shared global used without DOM access; tests.md:199; audit refuted[178].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 30,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 644,
+			"verdict": "refuted",
+			"evidence": "The literal supplies a minimal authority boundary recorder, not an authority algorithm; tests.md:32.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 31,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3169,
+			"verdict": "refuted",
+			"evidence": "The error and guard sit in a behavioral suite; tests.md:45 prohibits a dedicated errors-only file.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 32,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3799,
+			"verdict": "refuted",
+			"evidence": "unrulable: the regression title does not establish absent original failing/passing run records; tests.md:42.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:contract",
+			"index": 33,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1713,
+			"verdict": "refuted",
+			"evidence": "unrulable: no evidence establishes interfering work or nondeterminism in this timer-count check; tests.md:27.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 0,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3236,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 1,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1748,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[216] explicitly lists every cited generator.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:444 exposes a mutable request array; typescript.md:27,41.",
+			"fix": "Keep requests private and expose a readonly collection."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:527,693 exposes compound maxInFlight; names.md:27.",
+			"fix": "Rename the public member to peak and update consumers."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:514 declares compound option deltasOf; names.md:29.",
+			"fix": "Rename the option to chunk and update consumers and documentation."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:2077 declares compound option readAbort; names.md:29.",
+			"fix": "Rename it to abort and update consumers."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 490,
+			"verdict": "covered",
+			"evidence": "confirmed[291]; phase-1 replacement types are at setup.ts:490,1267,1270.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 1305,
+			"verdict": "covered",
+			"evidence": "confirmed[292]; phase 1 exports frozen CONVERSATION_STORE_ROUND_TRIP_EXPECTATION here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 611,
+			"verdict": "covered",
+			"evidence": "confirmed[297] and phase 1 add function tags; type descriptions are at setup.ts:1266-1270.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 9,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 96,
+			"verdict": "covered",
+			"evidence": "Duplicates check:agent:contract[6,7].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 10,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3247,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 11,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1649,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[13], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 12,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1803,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[14], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 13,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1825,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] includes this title.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 14,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1993,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[15], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 15,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4140,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[16], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 16,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4179,
+			"verdict": "refuted",
+			"evidence": "New means an additional user turn, not version recency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 17,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 4195,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[17], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 18,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 2461,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] explicitly includes this comment.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 19,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1712,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[22].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 20,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3225,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[259] includes this comment.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 21,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3222,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:3222 uses an unsupported multiplier and effort adjective; writing.md:21.",
+			"fix": "Delete 3×hardened and describe the settle/wakeup behavior."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 22,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1662,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[18].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 23,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1926,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:1926,1992,2033 adds history beyond duplicate site 1773; writing.md:46.",
+			"fix": "Remove fix/regression history at the additional sites; retain present failure conditions."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 24,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 1855,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:1855,1894,3640-3645 inflects code tokens; writing.md:27.",
+			"fix": "Use noun phrases such as calls the close method."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 25,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 3654,
+			"verdict": "confirmed",
+			"evidence": "Agent.test.ts:3654 and related comments abbreviate tokens/messages; writing.md:41.",
+			"fix": "Write tokens and messages; delete or expand NB."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 26,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 69,
+			"verdict": "covered",
+			"evidence": "confirmed[244,298] and critic.missed[8] cover these absent Ollama references.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 27,
+			"file": "tests/setup.ts",
+			"line": 1262,
+			"verdict": "covered",
+			"evidence": "confirmed[276]; phase-1 replacement is at setup.ts:1262-1263.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 28,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "refuted",
+			"evidence": "Latest describes write ordering, not publication currency; writing.md:89; audit refuted[174].",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 29,
+			"file": "tests/setup.ts",
+			"line": 505,
+			"verdict": "covered",
+			"evidence": "confirmed[275,295]; phase 1 uses after at setup.ts:505,571.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 30,
+			"file": "tests/setup.ts",
+			"line": 498,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:498-503 writes defaults to instead of Default:; typescript.md:87.",
+			"fix": "Use Default: consistently in the cited TSDoc defaults."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 31,
+			"file": "tests/setup.ts",
+			"line": 493,
+			"verdict": "covered",
+			"evidence": "confirmed[296] and phase 1 replace the summaries at setup.ts:493,1585,1590.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 32,
+			"file": "tests/setup.ts",
+			"line": 1983,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1983 says Returns a callable value, but :1988 returns a string; writing.md:21.",
+			"fix": "Describe the returned string; note that the function itself is the non-JSON fixture."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 33,
+			"file": "tests/setup.ts",
+			"line": 542,
+			"verdict": "covered",
+			"evidence": "C1 and confirmed[280]; phase 1 renames the helper to splitTurn.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 34,
+			"file": "tests/setup.ts",
+			"line": 1322,
+			"verdict": "covered",
+			"evidence": "C3 explicitly prescribes exerciseConversationStore* helpers; do not introduce the proposed class.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 35,
+			"file": "tests/setup.ts",
+			"line": 1902,
+			"verdict": "refuted",
+			"evidence": "setup.ts:1898 identifies every as the array method being overridden; the name is intelligible under names.md:85,89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 36,
+			"file": "tests/setup.ts",
+			"line": 727,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:727-746 repeats identical partial-result construction; tests.md:188.",
+			"fix": "Centralize partial-result construction and use it at all abort sites."
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 37,
+			"file": "tests/setup.ts",
+			"line": 754,
+			"verdict": "refuted",
+			"evidence": "setup.ts:760-763 discards deltas; drainProvider at 1948 collects them. Different jobs; patterns.md:17-18.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 38,
+			"file": "tests/src/core/agents/Agent.test.ts",
+			"line": 395,
+			"verdict": "refuted",
+			"evidence": "unrulable: tracking labels are not prohibited by the cited comment-only law; missing applicable title rule.",
+			"fix": ""
+		},
+		{
+			"lane": "check:agent:naming-prose",
+			"index": 39,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 0,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1156,
+			"verdict": "confirmed",
+			"evidence": "AgentContext.test.ts:1159 builds expected rendering with production accessors; tests.md:37.",
+			"fix": "Assert the declared literal system block at each cited site."
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 1,
+			"file": "tests/src/core/contexts/factories.test.ts",
+			"line": 96,
+			"verdict": "refuted",
+			"evidence": "The assertion checks selection pass-through against conversation input; view is not the selection implementation. tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 2,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 871,
+			"verdict": "refuted",
+			"evidence": "Now-present describes an instruction added by the test; writing.md:89; audit refuted[144].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 3,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1087,
+			"verdict": "refuted",
+			"evidence": "Now describes state after compaction; writing.md:89; audit refuted[142].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 4,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1167,
+			"verdict": "refuted",
+			"evidence": "New describes the replacement active instance, not release recency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 5,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1181,
+			"verdict": "refuted",
+			"evidence": "Now describes the switch in this test; writing.md:89; audit refuted[143].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 6,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 354,
+			"verdict": "confirmed",
+			"evidence": "AgentContext.test.ts:36,354 narrates the original lean design; writing.md:46.",
+			"fix": "Remove history clauses; retain the expected message shape."
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 7,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 409,
+			"verdict": "confirmed",
+			"evidence": "AgentContext.test.ts:409 adds a possessive to a code token; writing.md:27.",
+			"fix": "Write the text files of the active workspace."
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 8,
+			"file": "tests/src/core/contexts/helpers.test.ts",
+			"line": 161,
+			"verdict": "confirmed",
+			"evidence": "contexts/helpers.test.ts:161,183,210,224,276 repeats the request fixture; tests.md:187-194.",
+			"fix": "Use one exported request fixture, without coupling unrelated cases to an array position."
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 9,
+			"file": "tests/src/core/contexts/instructions/InstructionManager.test.ts",
+			"line": 24,
+			"verdict": "covered",
+			"evidence": "critic.missed[11] covers INSTRUCTION_EVENTS and its type. Repeated createRecorders calls need no wrapper.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 10,
+			"file": "tests/src/core/contexts/scopes/ScopeManager.test.ts",
+			"line": 19,
+			"verdict": "covered",
+			"evidence": "critic.missed[11] covers SCOPE_EVENTS and its type. Repeated createRecorders calls need no wrapper.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:contract",
+			"index": 11,
+			"file": "tests/src/core/contexts/scopes/Scope.test.ts",
+			"line": 159,
+			"verdict": "refuted",
+			"evidence": "Scope.test.ts:157-164 checks Scope's select/description behavior through construction; tests.md:13 does not ban that route.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 0,
+			"file": "tests/src/core/conversations/stores/MemoryConversationStore.test.ts",
+			"line": 138,
+			"verdict": "confirmed",
+			"evidence": "MemoryConversationStore.test.ts:138 tests a dependency guard independently of the store; tests.md:13-14.",
+			"fix": "Move needed malformed-call coverage through isConversationSnapshot; remove standalone dependency tests."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 1,
+			"file": "tests/src/core/conversations/stores/DatabaseConversationStore.test.ts",
+			"line": 42,
+			"verdict": "confirmed",
+			"evidence": "DatabaseConversationStore.test.ts:42 and later cases repeat raw database planting; tests.md:187-194.",
+			"fix": "Export a raw-row planting helper from tests/setup.ts."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 2,
+			"file": "tests/src/core/conversations/JudgmentManager.test.ts",
+			"line": 66,
+			"verdict": "confirmed",
+			"evidence": "JudgmentManager.test.ts:65-70 and sibling cases repeat a judge/transport fixture; tests.md:187-194.",
+			"fix": "Export a customizable fixture returning the real judge and its transport."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 3,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 349,
+			"verdict": "confirmed",
+			"evidence": "ConversationManager.test.ts:349-358 and sibling cases repeat seed/compact/persist; tests.md:188.",
+			"fix": "Reuse compactSeedTurns or seedConversation, then persist at the test call site."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 4,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 209,
+			"verdict": "covered",
+			"evidence": "U5 commit a2285b8 removes the cited rollup cases and repeated transcript; a surviving transcript is at 209.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 5,
+			"file": "tests/src/core/conversations/stores/DatabaseConversationStore.test.ts",
+			"line": 35,
+			"verdict": "confirmed",
+			"evidence": "DatabaseConversationStore.test.ts:35 and its memory twin repeat store scenarios; tests.md:188.",
+			"fix": "Share judgment and tool-snapshot round-trip drivers; retain assertions in each suite."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 6,
+			"file": "tests/src/core/conversations/helpers.test.ts",
+			"line": 71,
+			"verdict": "confirmed",
+			"evidence": "conversations/helpers.test.ts:71 shares a section fixture across cases; tests.md:187,189.",
+			"fix": "Export the frozen section fixture from tests/setup.ts."
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 7,
+			"file": "tests/src/core/conversations/JudgmentManager.test.ts",
+			"line": 246,
+			"verdict": "refuted",
+			"evidence": "The case checks manager independence and restored records; constructing conversations does not change its subject. tests.md:13.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 8,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 717,
+			"verdict": "refuted",
+			"evidence": "The assertion bounds extra framing cost and independently caps it at 8; over-framing can fail. tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 9,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 493,
+			"verdict": "refuted",
+			"evidence": "LATEST means the last saved snapshot, not documentation currency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[28], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 571,
+			"verdict": "covered",
+			"evidence": "confirmed[275,295]; phase 1 rewrites the exhaustion wording here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 578,
+			"verdict": "refuted",
+			"evidence": "The provider factory narrows its contract; createParser adapts a constructor to a callback. architecture.md:163; audit refuted[171,172].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 13,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 999,
+			"verdict": "refuted",
+			"evidence": "unrulable: original pre-fix/post-fix run records are not established by the regression title; tests.md:42.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:contract",
+			"index": 14,
+			"file": "tests/src/core/conversations",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "This directory-level entry is an audit scope note, not a code violation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 0,
+			"file": "tests/src/core/contexts",
+			"line": 0,
+			"verdict": "refuted",
+			"evidence": "This directory-level verdict summary names no additional code defect.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 1,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[2].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 961,
+			"verdict": "covered",
+			"evidence": "C1 and phase 1 rename loopTool to createLoopTool here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 542,
+			"verdict": "covered",
+			"evidence": "C1 and phase 1 rename turnParts to splitTurn here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 1987,
+			"verdict": "covered",
+			"evidence": "confirmed[261] and phase 1 rename domainArgument to returnDomain here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 1322,
+			"verdict": "covered",
+			"evidence": "C3 and phase 1 prescribe exerciseConversationStore* helpers.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 1305,
+			"verdict": "covered",
+			"evidence": "confirmed[292]; the renamed frozen constant is here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 490,
+			"verdict": "covered",
+			"evidence": "confirmed[291]; phase-1 DeltaFunction is here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 1267,
+			"verdict": "covered",
+			"evidence": "confirmed[291]; phase-1 function aliases are at setup.ts:1267,1270.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 9,
+			"file": "tests/setup.ts",
+			"line": 1587,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1587,1592-1593 flattens compound option keys; names.md:29,49.",
+			"fix": "Group manager.open/render and instruction.override; update consumers."
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 516,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:516 record and :1810 close are verb-named booleans; names.md:115,183.",
+			"fix": "Use assertion-style names such as recorded and closed, updating callers."
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 727,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[36].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 14,
+			"file": "tests/setup.ts",
+			"line": 238,
+			"verdict": "refuted",
+			"evidence": "Readonly literal fields already infer literal types; typescript.md:32 permits retaining as const, not universally adding it.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 494,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:494 calls defaults original, narrating history; writing.md:46.",
+			"fix": "Describe the defaults without original."
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 16,
+			"file": "tests/setup.ts",
+			"line": 505,
+			"verdict": "covered",
+			"evidence": "confirmed[275,295]; phase 1 replaces temporal once at setup.ts:505,571.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 17,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[28], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 18,
+			"file": "tests/setup.ts",
+			"line": 1983,
+			"verdict": "covered",
+			"evidence": "Remaining description defect is check:agent:naming-prose[32]; phase 1 covers the rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 19,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 36,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[6].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 20,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 354,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[6].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 21,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 139,
+			"verdict": "refuted",
+			"evidence": "New means a fresh message instance; writing.md:89; audit refuted[150].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 22,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 871,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[2], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 23,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1050,
+			"verdict": "confirmed",
+			"evidence": "AgentContext.test.ts:1050 claims ensured behavior; writing.md:21.",
+			"fix": "State that construction adds an active conversation."
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 24,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1087,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[3], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 25,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1167,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[4], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 26,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1181,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[5], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 27,
+			"file": "tests/src/core/contexts/scopes/Scope.test.ts",
+			"line": 131,
+			"verdict": "refuted",
+			"evidence": "NEW describes a distinct instance; writing.md:89; audit refuted[149].",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 28,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 797,
+			"verdict": "refuted",
+			"evidence": "Titles already name built-in, manager, and item precedence; labels supplement those names. AGENTS.md Writing.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 29,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 374,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:contract[0], which includes this expectation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 30,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 790,
+			"verdict": "confirmed",
+			"evidence": "AgentContext.test.ts:790,1015 uses bare build()/view() tokens; writing.md:27.",
+			"fix": "Backtick method tokens and follow them with method nouns."
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 31,
+			"file": "tests/src/core/contexts/scopes/Scope.test.ts",
+			"line": 126,
+			"verdict": "refuted",
+			"evidence": "The comments explain intersection inputs and semantics absent from the literal assertions; writing.md:46.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 32,
+			"file": "tests/src/core/contexts/instructions/InstructionManager.test.ts",
+			"line": 100,
+			"verdict": "refuted",
+			"evidence": "The comments explain an implicit default and override precedence, not merely the expressions; writing.md:46.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 33,
+			"file": "tests/src/core/contexts/factories.test.ts",
+			"line": 368,
+			"verdict": "refuted",
+			"evidence": "Line 368 declares cause, not a shared conversation table; the cited table is absent. tests.md:191.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 34,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 815,
+			"verdict": "refuted",
+			"evidence": "Below names cascade precedence, not a textual cross-reference; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 35,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1134,
+			"verdict": "refuted",
+			"evidence": "The title describes compatibility behavior; writing.md:46 specifically regulates comments.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 36,
+			"file": "tests/src/core/contexts/instructions/InstructionManager.test.ts",
+			"line": 49,
+			"verdict": "refuted",
+			"evidence": "Literal fixture identifiers are not example placeholders; writing.md:40 establishes no such ban.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 37,
+			"file": "tests/src/core/contexts/AgentContext.test.ts",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "The import uses @src/core, explicitly mapped to index.ts by tsconfig.json:24; workspace.md:61.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 38,
+			"file": "tests/setup.ts",
+			"line": 2012,
+			"verdict": "refuted",
+			"evidence": "Domain form fields differ from wire type fields; TEV1_REQUEST also documents a distinct request. Independent fixtures serve tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 39,
+			"file": "tests/src/core/contexts/instructions/InstructionManager.test.ts",
+			"line": 24,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json critic.missed[11] includes both event tables and types.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 40,
+			"file": "tests/src/core/contexts/instructions/Instruction.test.ts",
+			"line": 44,
+			"verdict": "refuted",
+			"evidence": "The test mutates its own input to prove ownership; typescript.md:39 bans mutation by the callee.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 41,
+			"file": "tests/setup.ts",
+			"line": 1902,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[35], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 42,
+			"file": "tests/setupLedger.ts",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "This is a scope referral without an alleged defect.",
+			"fix": ""
+		},
+		{
+			"lane": "check:contexts:naming-prose",
+			"index": 43,
+			"file": "tests/src/core/contexts",
+			"line": 0,
+			"verdict": "refuted",
+			"evidence": "This sweep record reports searches, not an additional violation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 0,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 1780,
+			"verdict": "confirmed",
+			"evidence": "Ledger.test.ts:1780 duplicates setupLedger.ts:21's handle pattern; tests.md:188.",
+			"fix": "Reuse the shared pattern; split the handle-word assertion and preserve regex lastIndex safety."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 1,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 302,
+			"verdict": "confirmed",
+			"evidence": "Ledger.test.ts:302,1346,1606 recomputes expected scale with the production estimator; tests.md:37.",
+			"fix": "Use independently calculated expected scales for the fixed fixtures."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 2,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 213,
+			"verdict": "refuted",
+			"evidence": "Lines 213,2350 measure emitted messages against independent capacity bounds; over-budget selection fails. tests.md:37,39.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:444-447 hand-rolls recording supplied by createRecorder; tests.md:181.",
+			"fix": "Back the judge's request log with createRecorder and expose a readonly view."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 993,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:993-999 hand-rolls the summarizer call log; tests.md:181.",
+			"fix": "Use createRecorder internally while preserving the summarizer and calls contract."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 1161,
+			"verdict": "refuted",
+			"evidence": "This is a boundary invocation recorder; Agent.test.ts:1598 checks yield calls, not scheduler timing. tests.md:30,32.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 754,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[37], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 7,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 1481,
+			"verdict": "confirmed",
+			"evidence": "Ledger.test.ts:1481,1538 repeats the filing response fixture; tests.md:187-194.",
+			"fix": "Extract one response builder, keeping the second test's abort hook explicit."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 8,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 392,
+			"verdict": "confirmed",
+			"evidence": "Ledger.test.ts:392 onward repeats judgment and lookup fixtures; tests.md:187,194.",
+			"fix": "Export configurable judgment and lookup-exchange builders from tests/setup.ts."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 9,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 226,
+			"verdict": "refuted",
+			"evidence": "Rest omission is one language operation, not duplicated helper logic; another wrapper adds no boundary. architecture.md:163-165.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 329,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:329 binds an arrow through ?? and a local object; architecture.md:175 admits neither position.",
+			"fix": "Move the default selector to an exported setup helper and reference it."
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 12,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 138,
+			"verdict": "refuted",
+			"evidence": "As const preserves literal-union inference, explicitly permitted by typescript.md:29-31.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:contract",
+			"index": 13,
+			"file": "tests/setupLedger.ts",
+			"line": 370,
+			"verdict": "refuted",
+			"evidence": "The oracle independently checks projection passes; shared tokenization has literal leaf tests in helpers.test.ts:156 onward. tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 0,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[2].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 1,
+			"file": "tests/setup.ts",
+			"line": 1322,
+			"verdict": "covered",
+			"evidence": "C3 and phase-1 exerciseConversationStore* renames.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 542,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 splitTurn rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 961,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 createAddTool/createLoopTool renames at setup.ts:950,961.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 1305,
+			"verdict": "covered",
+			"evidence": "confirmed[292]; phase-1 renamed frozen constant.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 1587,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:naming-prose[9].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 238,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:naming-prose[14], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 9,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 965,
+			"verdict": "refuted",
+			"evidence": "New describes a constructed section, not release recency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 10,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 432,
+			"verdict": "refuted",
+			"evidence": "New describes an added fold, not release recency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 11,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 493,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:contract[9], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[28], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 13,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 486,
+			"verdict": "refuted",
+			"evidence": "Latest names save ordering, not publication currency; writing.md:89.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 14,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 580,
+			"verdict": "covered",
+			"evidence": "U5 commit a2285b8 replaces the rollup title with appends a section each compaction.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 15,
+			"file": "tests/src/core/conversations/stores/DatabaseConversationStore.test.ts",
+			"line": 156,
+			"verdict": "confirmed",
+			"evidence": "DatabaseConversationStore.test.ts:156 calls the guard deepened, narrating change; writing.md:46.",
+			"fix": "Describe what the guard rejects without deepened."
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 16,
+			"file": "tests/src/core/conversations/validators.test.ts",
+			"line": 176,
+			"verdict": "confirmed",
+			"evidence": "validators.test.ts:176 still narrates deepening; writing.md:46. U5 removed the earlier helper comment.",
+			"fix": "Describe rejection of malformed calls without change history."
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 17,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 19,
+			"verdict": "covered",
+			"evidence": "U5 commit a2285b8 removes folded-in history; the header describes direct ownership.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 18,
+			"file": "tests/setup.ts",
+			"line": 1181,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1181 says promoted here, narrating relocation; writing.md:46.",
+			"fix": "State where the shared battery lives and why."
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 19,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 47,
+			"verdict": "confirmed",
+			"evidence": "Conversation.test.ts:47,83 restates add/clear operations; writing.md:46.",
+			"fix": "Delete redundant operation comments."
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 20,
+			"file": "tests/src/core/conversations/stores/DatabaseConversationStore.test.ts",
+			"line": 19,
+			"verdict": "confirmed",
+			"evidence": "DatabaseConversationStore.test.ts:19 cites nonexistent src/core/agents/conversations; writing.md:21.",
+			"fix": "Correct the path to src/core/conversations/stores/DatabaseConversationStore.ts."
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 21,
+			"file": "tests/src/core/conversations/stores/DatabaseConversationStore.test.ts",
+			"line": 42,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:contract[1].",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 22,
+			"file": "tests/src/core/conversations/Conversation.test.ts",
+			"line": 674,
+			"verdict": "refuted",
+			"evidence": "unrulable: the cited law governs comment history, not tracking labels in titles; missing applicable title rule.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 23,
+			"file": "tests/src/core/conversations/ConversationManager.test.ts",
+			"line": 47,
+			"verdict": "refuted",
+			"evidence": "Literal fixture identifiers are not example placeholders; writing.md:40 establishes no ban on these values.",
+			"fix": ""
+		},
+		{
+			"lane": "check:conversations:naming-prose",
+			"index": 24,
+			"file": "tests/setup.ts",
+			"line": 611,
+			"verdict": "refuted",
+			"evidence": "unrulable: no fleet-name collision is demonstrated; names.md:128 assigns detection to the surface instrument.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 0,
+			"file": "tests/src/core/ledgers/helpers.test.ts",
+			"line": 1031,
+			"verdict": "refuted",
+			"evidence": "Lines 1048-1052 assert literal cut text; measureRoom sizes input, not expected output. tests.md:37; audit refuted[139].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 1,
+			"file": "tests/src/core/ledgers/Gauge.test.ts",
+			"line": 11,
+			"verdict": "confirmed",
+			"evidence": "Gauge.test.ts:11-18 duplicates captureError's catch boundary; installed test declarations:52; tests.md:181.",
+			"fix": "Use captureError; retain only the ledger-code projection in an exported setup helper."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 2,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 34,
+			"verdict": "confirmed",
+			"evidence": "Classifier.test.ts:34 and sibling cases repeat substantial options fixtures; tests.md:187-194. confirmed[273] covers thresholds only.",
+			"fix": "Extract customizable classifier setup and reuse the already-owned threshold fixture."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 3,
+			"file": "tests/src/core/ledgers/factories.test.ts",
+			"line": 9,
+			"verdict": "confirmed",
+			"evidence": "ledgers/factories.test.ts:9-18 builds reusable options; tests.md:187,194.",
+			"fix": "Use an exported setup builder that creates a fresh judge and options."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 4,
+			"file": "tests/src/core/ledgers/factories.test.ts",
+			"line": 41,
+			"verdict": "confirmed",
+			"evidence": "ledgers/factories.test.ts:41 tests constructor-only refusals; tests.md:13-14.",
+			"fix": "Move constructor-only cases to Ledger.test.ts; retain factory-path cases."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 5,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 102,
+			"verdict": "confirmed",
+			"evidence": "Classifier.test.ts:102,440 duplicates request parsing and answering; tests.md:188.",
+			"fix": "Share the protocol response builder, accepting each case's answer selection."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 6,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 527,
+			"verdict": "confirmed",
+			"evidence": "Classifier.test.ts:527,573,601 repeats recording judge fixtures; tests.md:187-194.",
+			"fix": "Export a customizable recording judge fixture, preserving distinct result/error sequences."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 7,
+			"file": "tests/src/core/ledgers/Gauge.test.ts",
+			"line": 9,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json critic.missed[11] explicitly names SEED here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 8,
+			"file": "tests/setupLedger.ts",
+			"line": 214,
+			"verdict": "refuted",
+			"evidence": "The helper materializes any iterable before reversal, adding a nonmutating contract; architecture.md:163.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 9,
+			"file": "tests/setup.ts",
+			"line": 1162,
+			"verdict": "confirmed",
+			"evidence": "Judge/summarizer logs duplicate check:ledger:contract[3,4]; setup.ts:1162 additionally hand-rolls the scheduler tally; tests.md:181.",
+			"fix": "Use createRecorder for the scheduler's yield tally, preserving boundary-stub behavior."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 10,
+			"file": "tests/src/core/ledgers/factories.test.ts",
+			"line": 21,
+			"verdict": "refuted",
+			"evidence": "package.json check runs root tsc, including this expectTypeOf assertion; Vitest typecheck mode is unnecessary.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 11,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 485,
+			"verdict": "refuted",
+			"evidence": "The assertion checks retained partial progress; tests.md:36 concerns discovered/globbed membership and does not require exact equality here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 12,
+			"file": "tests/src/core/ledgers/helpers.test.ts",
+			"line": 956,
+			"verdict": "confirmed",
+			"evidence": "helpers.test.ts:956-974 asserts literal field types despite a declared LedgerRecord projection contract; typescript.md:29-32.",
+			"fix": "Annotate with Pick<LedgerRecord, 'title' | 'lines'> and remove field assertions."
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 13,
+			"file": "tests/src/core/ledgers/helpers.test.ts",
+			"line": 409,
+			"verdict": "refuted",
+			"evidence": "unrulable: labels do not establish absent historical run records; missing original regression evidence. tests.md:42.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 14,
+			"file": "tests/setupLedger.ts",
+			"line": 327,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[13], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 15,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 38,
+			"verdict": "refuted",
+			"evidence": "The wrapper varies boundary model identity while calling the real judge; cache identity is the subject. tests.md:32.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:contract",
+			"index": 16,
+			"file": "tests/setupLedger.ts",
+			"line": 218,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[263,286] owns export/fold decisions for these helpers.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 0,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[2].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 1,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 490,
+			"verdict": "covered",
+			"evidence": "confirmed[291] and phase-1 DeltaFunction rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 1267,
+			"verdict": "covered",
+			"evidence": "confirmed[291] and phase-1 ConversationStoreFunction rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 1270,
+			"verdict": "covered",
+			"evidence": "confirmed[291] and phase-1 ConversationSnapshotFunction rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 950,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 createAddTool rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 961,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 createLoopTool rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 9,
+			"file": "tests/setup.ts",
+			"line": 1305,
+			"verdict": "covered",
+			"evidence": "confirmed[292]; phase-1 constant rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 10,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 302,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[1].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 11,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 1346,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[1], which explicitly includes this site.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 2376,
+			"verdict": "refuted",
+			"evidence": "setup.ts:302-318 builds questions and supports responder/fallback behavior; :2383-2387 rejects absent probabilities. Different contracts; patterns.md:17-18.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 1660,
+			"verdict": "covered",
+			"evidence": "confirmed[289]; phase 1 adds compactSeedTurns at 1195 and reuses it at 1225,1664.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 14,
+			"file": "tests/setup.ts",
+			"line": 841,
+			"verdict": "covered",
+			"evidence": "confirmed[293]; phase 1 renames the getter to aborted here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 505,
+			"verdict": "covered",
+			"evidence": "confirmed[275,295]; phase-1 wording at setup.ts:505,571.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 16,
+			"file": "tests/setup.ts",
+			"line": 1262,
+			"verdict": "covered",
+			"evidence": "confirmed[276]; phase-1 wording at setup.ts:1262-1263.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 17,
+			"file": "tests/setup.ts",
+			"line": 1181,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:naming-prose[18].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 18,
+			"file": "tests/setup.ts",
+			"line": 1225,
+			"verdict": "covered",
+			"evidence": "confirmed[277]; phase 1 removes the redundant compact comment; the call is here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 19,
+			"file": "tests/setup.ts",
+			"line": 721,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:721 restates the fallback expression at 722; writing.md:46.",
+			"fix": "Delete the redundant chunk-selection comment."
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 20,
+			"file": "tests/setup.ts",
+			"line": 243,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[274] owns this selection-fixture history.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 21,
+			"file": "tests/setup.ts",
+			"line": 542,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 splitTurn rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 22,
+			"file": "tests/setup.ts",
+			"line": 1983,
+			"verdict": "covered",
+			"evidence": "Phase 1 covers the rename; remaining description is check:agent:naming-prose[32].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 23,
+			"file": "tests/setup.ts",
+			"line": 1322,
+			"verdict": "covered",
+			"evidence": "C3 and phase-1 exerciseConversationStore* renames.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 24,
+			"file": "tests/setup.ts",
+			"line": 529,
+			"verdict": "refuted",
+			"evidence": "Started coexists with distinct peak and recorded-call tallies; names.md:207 permits distinct tally names. It is not boolean.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 25,
+			"file": "tests/setup.ts",
+			"line": 1295,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1295-1297 retains compound public properties after U5 removes rollupSummary; names.md:27.",
+			"fix": "Group section.summary/messages and use tail; update fixture consumers."
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 26,
+			"file": "tests/setup.ts",
+			"line": 1047,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1047,2373 uses undeclared example bindings without omission markers; writing.md:42.",
+			"fix": "Declare the example inputs or explicitly mark omitted setup."
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 27,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 392,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 28,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 432,
+			"verdict": "refuted",
+			"evidence": "Public lookups select assertion subjects; repeated lookup expressions are not fixture factories. tests.md:194.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 29,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 25,
+			"verdict": "confirmed",
+			"evidence": "Ledger.test.ts:25-52 builds reusable options and lookup fixtures locally; tests.md:187,194.",
+			"fix": "Extract customizable ledger options and reuse the shared threshold constant."
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 30,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 570,
+			"verdict": "refuted",
+			"evidence": "unrulable: this is a title; the quoted comment-history law does not establish a title-label violation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 31,
+			"file": "tests/setup.ts",
+			"line": 1153,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[5], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 32,
+			"file": "tests/src/core/ledgers/Ledger.test.ts",
+			"line": 1408,
+			"verdict": "refuted",
+			"evidence": "The test injects a hostile input getter without replacing Ledger behavior; tests.md:31-32.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 33,
+			"file": "tests/setup.ts",
+			"line": 1217,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[297] settles TSDoc applicability to these setup exports.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledger:naming-prose",
+			"index": 34,
+			"file": "tests/setupLedger.ts",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "This is a read/scope record with no alleged code defect.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 0,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 1,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 1305,
+			"verdict": "covered",
+			"evidence": "confirmed[292]; phase-1 constant rename.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 3,
+			"file": "tests/src/core/ledgers/Gauge.test.ts",
+			"line": 9,
+			"verdict": "covered",
+			"evidence": "critic.missed[11] already requires a descriptive shared name for SEED.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 841,
+			"verdict": "covered",
+			"evidence": "confirmed[293]; phase 1 adds RecordedProvider.aborted here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 5,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 34,
+			"verdict": "covered",
+			"evidence": "Options duplicate check:ledgers:contract[2]; judgment fixtures duplicate check:ledger:contract[8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 302,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:naming-prose[12], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 1322,
+			"verdict": "covered",
+			"evidence": "C3 specifies exerciseConversationStore*; phase-1 definitions start here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 961,
+			"verdict": "covered",
+			"evidence": "C1 and phase 1 rename the helpers at setup.ts:961,542,1987.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 9,
+			"file": "tests/src/core/ledgers/Gauge.test.ts",
+			"line": 11,
+			"verdict": "confirmed",
+			"evidence": "Gauge.test.ts:11 maps errors; setupLedger.ts:260 normalizes identity. Neither matches read* semantics; names.md:97.",
+			"fix": "Rename to computeLedgerErrorCode and computeLedgerIdentity; reuse captureError in the former."
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 505,
+			"verdict": "covered",
+			"evidence": "confirmed[275,295]; phase-1 after wording at setup.ts:505,571.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 1263,
+			"verdict": "covered",
+			"evidence": "confirmed[276]; phase-1 because wording here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 570,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:570,1742,2076 uses cancel for signal abort; names.md:117,234; writing.md:92.",
+			"fix": "Use abort in lifecycle descriptions; preserve external ReadableStream.cancel terminology."
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 243,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[274] owns this prose.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 14,
+			"file": "tests/src/core/ledgers/helpers.test.ts",
+			"line": 142,
+			"verdict": "confirmed",
+			"evidence": "ledgers/helpers.test.ts:142 narrates the three fixes; writing.md:46.",
+			"fix": "Remove repair-history labels from the comment; retain behavioral descriptions."
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 15,
+			"file": "tests/setupLedger.ts",
+			"line": 316,
+			"verdict": "confirmed",
+			"evidence": "setupLedger.ts:316 names only three shared helpers, but :382 also calls collectNames; writing.md:21.",
+			"fix": "Include collectNames among shared primitives without claiming independent tokenization."
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 16,
+			"file": "tests/src/core/ledgers/helpers.test.ts",
+			"line": 500,
+			"verdict": "refuted",
+			"evidence": "One expression constructs a native index; extracting a rename-only Map wrapper is unsupported. architecture.md:163-165.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 17,
+			"file": "tests/setup.ts",
+			"line": 611,
+			"verdict": "covered",
+			"evidence": "confirmed[297] and phase 1 add function tags and type descriptions at setup.ts:611,1266-1270.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 18,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 19,
+			"file": "tests/setup.ts",
+			"line": 516,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:naming-prose[12].",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 20,
+			"file": "tests/setup.ts",
+			"line": 926,
+			"verdict": "refuted",
+			"evidence": "These create data fixtures, recognized as entity/value factories by architecture.md:29 and tests.md:194-195.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 21,
+			"file": "tests/setup.ts",
+			"line": 1295,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:naming-prose[25]; U5 removed only rollupSummary.",
+			"fix": ""
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 22,
+			"file": "tests/setup.ts",
+			"line": 916,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:916,1182 uses persuasive capitalized mock disclaimers; AGENTS.md Writing; writing.md:46.",
+			"fix": "Replace defensive banners with concise reasons for fixture boundaries."
+		},
+		{
+			"lane": "check:ledgers:naming-prose",
+			"index": 23,
+			"file": "tests/src/core/ledgers/Classifier.test.ts",
+			"line": 25,
+			"verdict": "refuted",
+			"evidence": "A/B are model identity values, not unexplained example placeholders; writing.md:40.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 0,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 321,
+			"verdict": "confirmed",
+			"evidence": "AgentJudge.test.ts:321-324 declares a response case matrix locally; tests.md:191.",
+			"fix": "Export the case matrix from tests/setup.ts and import it."
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 1,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 123,
+			"verdict": "confirmed",
+			"evidence": "RelayProvider.test.ts:123-128 duplicates installed captureError:52; tests.md:181.",
+			"fix": "Use captureError for the synchronous projection refusal."
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 2,
+			"file": "tests/src/core/providers/AgentProvider.test.ts",
+			"line": 452,
+			"verdict": "refuted",
+			"evidence": "This is a hook-entry handshake, not an abort/event subscription; tests.md:235-238 does not ban it.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 3,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 116,
+			"verdict": "refuted",
+			"evidence": "The sites test different default-global bindings; try/finally restoration is not a duplicate fixture factory.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 4,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 333,
+			"verdict": "refuted",
+			"evidence": "The callback is a native promise rejection projection, not duplicate helper logic; architecture.md:163-165.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 5,
+			"file": "tests/src/core/providers/AgentProvider.test.ts",
+			"line": 620,
+			"verdict": "refuted",
+			"evidence": "The test already uses shared RecordedBody; encoding literal chunks does not duplicate its implementation. tests.md:194.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 6,
+			"file": "tests/src/core/providers/SystemOneJudge.test.ts",
+			"line": 153,
+			"verdict": "confirmed",
+			"evidence": "SystemOneJudge.test.ts:153-158 declares a parameterized answer-case table locally; tests.md:191.",
+			"fix": "Export a probability-parameterized case-table builder from tests/setup.ts."
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 7,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 56,
+			"verdict": "confirmed",
+			"evidence": "RelayProvider.test.ts:56,82,109 compares wire output to the same body's encoder; tests.md:37.",
+			"fix": "Remove self-comparisons; retain and strengthen independent literal wire assertions."
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 1805,
+			"verdict": "refuted",
+			"evidence": "These expose fixture-owned pull/entry handshakes, not external-event subscriptions; tests.md:235-237; audit refuted[164].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 9,
+			"file": "tests/setup.ts",
+			"line": 961,
+			"verdict": "covered",
+			"evidence": "C1 and phase-1 renames at setup.ts:961,1987,542.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 11,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 116,
+			"verdict": "refuted",
+			"evidence": "The default-fetch test uses a protocol Response stub and finally restoration; tests.md:30-32; audit refuted[151].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 12,
+			"file": "tests/src/core/providers/AgentProvider.test.ts",
+			"line": 483,
+			"verdict": "refuted",
+			"evidence": "The observed signal is created inside the provider; createSignal only instruments signals it creates. Different contracts; tests.md:181.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 13,
+			"file": "tests/src/core/providers/AgentProvider.test.ts",
+			"line": 188,
+			"verdict": "confirmed",
+			"evidence": "Parser cleanup records are valid; RelayProvider.test.ts:33-35 instead asserts prototype layout, contrary to tests.md:35.",
+			"fix": "Remove RelayProvider prototype-layout assertions; retain public replay and cleanup checks."
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 14,
+			"file": "tests/src/core/providers/AgentProvider.test.ts",
+			"line": 744,
+			"verdict": "refuted",
+			"evidence": "unrulable: no contended-run evidence proves these real deadlines inadequate; tests.md:28.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 578,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:contract[12], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 16,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 170,
+			"verdict": "refuted",
+			"evidence": "unrulable: the case does not establish missing historical command/count evidence; tests.md:42.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:contract",
+			"index": 17,
+			"file": "tests/setupLedger.ts",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "This is a lane read/scope record, not a code defect.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 0,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 56,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:providers-a:contract[7].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 1,
+			"file": "tests/src/core/providers/RelayStream.test.ts",
+			"line": 185,
+			"verdict": "refuted",
+			"evidence": "The delay yields to same-process work; tests.md:226 prohibits waiting for another process, not this yield.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 1262,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1262 uses below as a textual cross-reference; writing.md:28,82.",
+			"fix": "Replace below with following."
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[28], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 4,
+			"file": "tests/src/core/providers/AgentJudge.test.ts",
+			"line": 321,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:providers-a:contract[0].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 5,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 33,
+			"verdict": "covered",
+			"evidence": "The prototype-layout defect is included in check:providers-a:contract[13].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 6,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 315,
+			"verdict": "refuted",
+			"evidence": "The test checks public frame isolation; frame/finish are extension contracts, not private internals. tests.md:35.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 7,
+			"file": "tests/setup.ts",
+			"line": 1181,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:naming-prose[18].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 721,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:naming-prose[19].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 9,
+			"file": "tests/setup.ts",
+			"line": 1295,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:naming-prose[25].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 2077,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 14,
+			"file": "tests/setup.ts",
+			"line": 1047,
+			"verdict": "covered",
+			"evidence": "Undeclared example bindings are check:ledger:naming-prose[26]; uppercase alone would not supply their values.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-a:naming-prose",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 1,
+			"verdict": "covered",
+			"evidence": "Phase 1 updated setup.test.ts imports; confirmed[280,291,292] owns renames. The remaining entry is a scope note.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 0,
+			"file": "tests/src/core/providers/factories.test.ts",
+			"line": 6,
+			"verdict": "covered",
+			"evidence": "confirmed[288] and S0 renames explicitly own this consumer update; the stale import remains.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 1,
+			"file": "tests/src/core/providers/contracts.test.ts",
+			"line": 10,
+			"verdict": "covered",
+			"evidence": "confirmed[261] and S0 renames explicitly own this consumer update; the stale import remains.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 2,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 160,
+			"verdict": "confirmed",
+			"evidence": "ThinkSplitter.test.ts:160 separately describes a factories.ts export; tests.md:13-14.",
+			"fix": "Move the factory-specific describe block into providers/factories.test.ts."
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 3,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 13,
+			"verdict": "confirmed",
+			"evidence": "ThinkSplitter.test.ts:13 declares the shared sequence driver locally; tests.md:187,189,195.",
+			"fix": "Export it from tests/setup.ts as driveThinkSplitter and import it."
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 4,
+			"file": "tests/src/core/providers/validators.test.ts",
+			"line": 70,
+			"verdict": "confirmed",
+			"evidence": "providers/validators.test.ts:71-86 recreates installed hostile proxies; tests.md:181; test declarations:104-110.",
+			"fix": "Reuse createHostileValues at appropriate root/nested inputs; retain the distinct misleading-every case."
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicates check:ledger:contract[3,4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 1805,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:providers-a:contract[8], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 7,
+			"file": "tests/src/core/providers/helpers.test.ts",
+			"line": 636,
+			"verdict": "confirmed",
+			"evidence": "providers/helpers.test.ts:636,648 repeats cancellation fixtures supplied by RecordedBody; tests.md:187,194.",
+			"fix": "Use RecordedBody with an open stream and cancellation error; retain lock assertions."
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 8,
+			"file": "tests/setup.ts",
+			"line": 1278,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1278-1289 reimplements the package's memory store for helper proofs; tests.md:29,32,193.",
+			"fix": "Use createMemoryConversationStore directly and remove the redundant fixture implementation."
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 9,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 9,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json critic.missed[8] explicitly covers this reference.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 1171,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[5], refuted; Agent.test.ts:1598 measures boundary invocations, not delay timing.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:contract",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 578,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:contract[12], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 0,
+			"file": "tests/src/core/providers/factories.test.ts",
+			"line": 6,
+			"verdict": "covered",
+			"evidence": "confirmed[288]; duplicate of check:providers-b:contract[0].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 1,
+			"file": "tests/src/core/providers/contracts.test.ts",
+			"line": 10,
+			"verdict": "covered",
+			"evidence": "confirmed[261]; duplicate of check:providers-b:contract[1].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 2,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[2].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 3,
+			"file": "tests/setup.ts",
+			"line": 1587,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:naming-prose[9].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 4,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "covered",
+			"evidence": "Duplicates check:agent:naming-prose[4,5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 5,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 1295,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:naming-prose[25].",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 7,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 13,
+			"verdict": "covered",
+			"evidence": "check:providers-b:contract[3] includes renaming and relocating this driver.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 8,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 5,
+			"verdict": "confirmed",
+			"evidence": "ThinkSplitter.test.ts:5 embeds an unexplained audit-history label; writing.md:46.",
+			"fix": "Remove H4 and state the separator behavior."
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 9,
+			"file": "tests/src/core/providers/ThinkSplitter.test.ts",
+			"line": 142,
+			"verdict": "confirmed",
+			"evidence": "ThinkSplitter.test.ts:142 uses cancel-partial for signal abort; names.md:117,229.",
+			"fix": "Use abort-partial terminology."
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 10,
+			"file": "tests/src/core/providers/helpers.test.ts",
+			"line": 93,
+			"verdict": "refuted",
+			"evidence": "The tests assert actual ReadableStream cancellation after abort; cancel names the external operation. names.md:120.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 1301,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:1146,1301,1303,1566 inflects code/link tokens possessively; writing.md:27.",
+			"fix": "Recast as noun phrases or of constructions."
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 1338,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[28], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 1902,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[35], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:providers-b:naming-prose",
+			"index": 14,
+			"file": "tests/src/core/providers/helpers.test.ts",
+			"line": 84,
+			"verdict": "confirmed",
+			"evidence": "providers/helpers.test.ts:84 introduces BOM without expansion; writing.md:41.",
+			"fix": "Write byte-order mark (BOM) at first use."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 0,
+			"file": "tests/src/core/contracts.test.ts",
+			"line": 5,
+			"verdict": "covered",
+			"evidence": "confirmed[261] and S0 renames own this domainArgument import update; it remains stale.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 1,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 24,
+			"verdict": "covered",
+			"evidence": "confirmed[291] owns DeltasOf consumer updates; phase 1 renamed the type. This import remains stale.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 2,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 150,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:150 derives expected wire bodies from the sender's body method; tests.md:37.",
+			"fix": "Assert independent wire bodies with declared messages, tools, and options."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 3,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 159,
+			"verdict": "covered",
+			"evidence": "Same wire-oracle defect as check:root:contract[2]; include this upstream projection assertion.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 4,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 26,
+			"verdict": "confirmed",
+			"evidence": "helpers.test.ts:26 declares a shared message matrix locally; tests.md:191.",
+			"fix": "Export the fixture table from tests/setup.ts."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 5,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 96,
+			"verdict": "confirmed",
+			"evidence": "helpers.test.ts:96 declares a shared filtering table locally; tests.md:191.",
+			"fix": "Export the fixture table from tests/setup.ts."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 6,
+			"file": "tests/setup.ts",
+			"line": 1902,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[35], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 7,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 291,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:291 attributes knowledge to software; writing.md:8.",
+			"fix": "Describe the provider boundary without knows."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 8,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 369,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:369 attributes sight to the runtime; writing.md:8.",
+			"fix": "State that the runtime depends on the abstract contract."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 9,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 199,
+			"verdict": "confirmed",
+			"evidence": "helpers.test.ts:199 narrates extraction from private methods; writing.md:46.",
+			"fix": "Remove extraction history; keep the reason for direct proofs."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 10,
+			"file": "tests/src/core/providers/contracts.test.ts",
+			"line": 10,
+			"verdict": "covered",
+			"evidence": "confirmed[261]; duplicate of check:providers-b:contract[1].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 11,
+			"file": "tests/src/core/providers/RelayProvider.test.ts",
+			"line": 56,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:providers-a:contract[7].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 857,
+			"verdict": "refuted",
+			"evidence": "architecture.md:175 admits returned-object methods; Symbol.asyncIterator is a method, not a function within a computed-key expression.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 14,
+			"file": "tests/src/core/validators.test.ts",
+			"line": 25,
+			"verdict": "confirmed",
+			"evidence": "validators.test.ts:25,81 recreates hostile proxies supplied by createHostileValues; tests.md:181.",
+			"fix": "Reuse the installed hostile corpus at relevant inputs; preserve shape-specific adversarial cases."
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 15,
+			"file": "tsconfig.json",
+			"line": 28,
+			"verdict": "refuted",
+			"evidence": "package.json:50 invokes root tsc; tsconfig.json:28 excludes no tests. A stale green report does not prove an unreachable gate.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:contract",
+			"index": 16,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 1,
+			"verdict": "refuted",
+			"evidence": "This entry records reading scope, not a violation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 0,
+			"file": "tests/src/core/contracts.test.ts",
+			"line": 5,
+			"verdict": "covered",
+			"evidence": "confirmed[261]; duplicate of check:root:contract[0].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 1,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 24,
+			"verdict": "covered",
+			"evidence": "confirmed[291]; duplicate of check:root:contract[1].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 2,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 26,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:root:contract[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 3,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 96,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:root:contract[5].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 4,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 96,
+			"verdict": "refuted",
+			"evidence": "Literal matching keys are not documentation placeholders; writing.md:40 establishes no alleged ban.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 5,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 163,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:163 calls signal propagation cancellation while sibling cases call it abort; names.md:117,229.",
+			"fix": "Use abort for the signal-propagation title."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 6,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 199,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:root:contract[9].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 7,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 317,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:317,329,332 repeats following assertions; writing.md:46.",
+			"fix": "Remove redundant assertion narration."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 8,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 235,
+			"verdict": "confirmed",
+			"evidence": "integration.test.ts:235-239 repeats the case inventory; writing.md:46.",
+			"fix": "Retain only why the provider-independence proof is needed."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 9,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 291,
+			"verdict": "covered",
+			"evidence": "Duplicates check:root:contract[7,8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 10,
+			"file": "tests/setup.ts",
+			"line": 514,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 516,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:contexts:naming-prose[12].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 527,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 709,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:709,758 calls ProviderStreamOptions run while sibling implementations use options; AGENTS.md One concept, one term.",
+			"fix": "Rename these parameters to options and update internal references."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 14,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 150,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:root:contract[2,3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 578,
+			"verdict": "refuted",
+			"evidence": "These scripted boundaries exercise agent/transport behavior, not a model implementation; tests.md:32.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 16,
+			"file": "tests/setup.ts",
+			"line": 1948,
+			"verdict": "refuted",
+			"evidence": "drainProvider retains the terminal result; installed collect:84 returns yielded values only. tests.md:181; patterns.md:17-18.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 17,
+			"file": "tests/setup.ts",
+			"line": 515,
+			"verdict": "confirmed",
+			"evidence": "setup.ts:515 selects repeat versus throw behavior with a literal union; names.md:75,119.",
+			"fix": "Replace the binary mode with a boolean such as repeat and update fixture consumers."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 18,
+			"file": "tests/src/core/integration.test.ts",
+			"line": 256,
+			"verdict": "refuted",
+			"evidence": "Alpha/beta distinguish identity; framed/plain names behavior. writing.md:40 does not require renaming these values.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 19,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 124,
+			"verdict": "confirmed",
+			"evidence": "helpers.test.ts:124,277,299 declares data tables; tests.md:191 explicitly applies at any size.",
+			"fix": "Export the tables or parameterized builders from tests/setup.ts."
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 20,
+			"file": "tests/src/core/helpers.test.ts",
+			"line": 97,
+			"verdict": "covered",
+			"evidence": "confirmed[158,159,224] covers the arrows; current sites are helpers.test.ts:97,249.",
+			"fix": ""
+		},
+		{
+			"lane": "check:root:naming-prose",
+			"index": 21,
+			"file": "tests/src/core/contracts.test.ts",
+			"line": 5,
+			"verdict": "covered",
+			"evidence": "confirmed[261,291] owns stale rename consumers; the remaining gate inference duplicates check:root:contract[15], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 0,
+			"file": "tests/guides.test.ts",
+			"line": 147,
+			"verdict": "refuted",
+			"evidence": "These are class declarations and fence transcriptions, not banned local function bindings. architecture.md:174; tests.md:75; audit refuted[177].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 1,
+			"file": "tests/guides.test.ts",
+			"line": 1426,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists fileCorrection here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 2,
+			"file": "tests/guides.test.ts",
+			"line": 1488,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists room here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 3,
+			"file": "tests/guides.test.ts",
+			"line": 1513,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists plan here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 4,
+			"file": "tests/guides.test.ts",
+			"line": 1610,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists brief here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 5,
+			"file": "tests/guides.test.ts",
+			"line": 1702,
+			"verdict": "covered",
+			"evidence": "confirmed[271,283] owns serveAmendedDesk and its captured setup values at 1702-1707.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 6,
+			"file": "tests/guides.test.ts",
+			"line": 2189,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists mark here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 7,
+			"file": "tests/guides.test.ts",
+			"line": 2435,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] lists narrated/noted at 2435-2436.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 8,
+			"file": "tests/guides.test.ts",
+			"line": 2780,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists keptThinking here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 9,
+			"file": "tests/guides.test.ts",
+			"line": 2802,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] lists run/thinking at 2802,2852.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 10,
+			"file": "tests/guides.test.ts",
+			"line": 3448,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[271] explicitly lists browserOf here.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 11,
+			"file": "tests/guides.test.ts",
+			"line": 1411,
+			"verdict": "covered",
+			"evidence": "confirmed[273] assigns shared orderLookup/refundsTopic exports when reused; the cited second uses establish reuse.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 12,
+			"file": "tests/guides.test.ts",
+			"line": 2265,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:2265-2282 repeats the projection fixture supplied by setupLedger.ts:77; tests.md:187-194.",
+			"fix": "Use buildLedgerInput/buildLedgerClassification, following their assigned move to setup.ts."
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 13,
+			"file": "tests/guides.test.ts",
+			"line": 3392,
+			"verdict": "covered",
+			"evidence": "confirmed[293] explicitly owns updating this consumer; the cancelled read remains stale.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 14,
+			"file": "tests/setup.ts",
+			"line": 993,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[4].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 15,
+			"file": "tests/setup.ts",
+			"line": 1278,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:providers-b:contract[8].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 16,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[3].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 17,
+			"file": "tests/setup.ts",
+			"line": 1162,
+			"verdict": "covered",
+			"evidence": "Duplicate scheduler-tally portion of check:ledgers:contract[9].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 18,
+			"file": "tests/guides.test.ts",
+			"line": 1603,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:1603 and listed harness-owned loops declare case matrices locally; tests.md:191.",
+			"fix": "Move harness-owned tables/builders to setup modules; retain genuine guide transcriptions."
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 19,
+			"file": "tests/guides.test.ts",
+			"line": 1271,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:1271,1282,2813,2950 repeats harness-owned provider/judge fixtures; tests.md:187-194.",
+			"fix": "Reuse createScriptedProvider and shared customizable judge fixtures; preserve distinct outcomes."
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 20,
+			"file": "tests/guides.test.ts",
+			"line": 1900,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:1900,2147,2945 hand-rolls harness call recording; tests.md:181,207.",
+			"fix": "Use shared recorders for harness-owned callbacks; preserve actual fence transcriptions."
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 21,
+			"file": "tests/guides.test.ts",
+			"line": 3322,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:3322 substitutes createParser for agent.md:1978,1986's createNDJSONParser; tests.md:75-77.",
+			"fix": "Align guide and executed parser integration: use the named real dependency when authorized, or revise both to the supported parser contract."
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 22,
+			"file": "tests/guides.test.ts",
+			"line": 1897,
+			"verdict": "refuted",
+			"evidence": "These are invocation handshakes; :3058 transcribes the guide's abort handshake. tests.md:235-238; audit refuted[158,159].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 23,
+			"file": "tests/guides.test.ts",
+			"line": 3404,
+			"verdict": "refuted",
+			"evidence": "The assertion specifies an upper-bound property, not an exact runtime reading; tests.md:39. No failure evidence establishes nondeterminism.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 24,
+			"file": "tests/setupLedger.ts",
+			"line": 316,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:ledger:contract[13], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 25,
+			"file": "tests/guides.test.ts",
+			"line": 1488,
+			"verdict": "refuted",
+			"evidence": "The bound follows the documented capacity/share contract and can disagree with selected tail size; tests.md:37.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 26,
+			"file": "tests/setup.ts",
+			"line": 1894,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:contract[29], refuted.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 27,
+			"file": "tests/setup.ts",
+			"line": 1948,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:root:naming-prose[16], refuted; terminal generator results distinguish this helper.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 28,
+			"file": "tests/guides.test.ts",
+			"line": 1002,
+			"verdict": "refuted",
+			"evidence": "The tables transcribe the MODES/POLICIES example at agent.md:2315-2327; tests.md:75-77.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:contract",
+			"index": 29,
+			"file": "tests/guides.test.ts",
+			"line": 33,
+			"verdict": "refuted",
+			"evidence": "These configure the package's GuideCommand inventory policy, not test-case fixtures; documentation.md:40-43.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 0,
+			"file": "tests/guides.test.ts",
+			"line": 3392,
+			"verdict": "covered",
+			"evidence": "confirmed[293]; duplicate of check:guides:contract[13].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 1,
+			"file": "tests/guides.test.ts",
+			"line": 4158,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:932,4158 calls signal abort cancellation; names.md:117,229. The binding at 3059 is transcribed.",
+			"fix": "Use abort in harness-authored signal titles; preserve the transcription unless its fence changes."
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 2,
+			"file": "tests/guides.test.ts",
+			"line": 1017,
+			"verdict": "refuted",
+			"evidence": "The ...data binding transcribes agent.md:2325; tests.md:75-77 requires paired fidelity.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 3,
+			"file": "tests/guides.test.ts",
+			"line": 562,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:562,647,1166,3546 repeats System One fixture-server setup; tests.md:187-194,200.",
+			"fix": "Export a customizable Node fixture-server builder from tests/setupServer.ts with explicit cleanup ownership."
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 4,
+			"file": "tests/guides.test.ts",
+			"line": 1282,
+			"verdict": "covered",
+			"evidence": "Judge-fixture duplication is included in check:guides:contract[19].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 5,
+			"file": "tests/guides.test.ts",
+			"line": 1271,
+			"verdict": "covered",
+			"evidence": "Provider-fixture duplication is included in check:guides:contract[19].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 6,
+			"file": "tests/guides.test.ts",
+			"line": 1297,
+			"verdict": "covered",
+			"evidence": "confirmed[273] owns shared orderLookup; duplicate of check:guides:contract[11].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 7,
+			"file": "tests/guides.test.ts",
+			"line": 1317,
+			"verdict": "covered",
+			"evidence": "confirmed[273] owns refundsTopic once reused; the cited sites establish reuse.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 8,
+			"file": "tests/guides.test.ts",
+			"line": 1472,
+			"verdict": "confirmed",
+			"evidence": "guides.test.ts:1472 and sibling cases repeat substantial ledger options; tests.md:187,194.",
+			"fix": "Use a customizable setup fixture and the assigned shared topic/threshold constants."
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 9,
+			"file": "tests/guides.test.ts",
+			"line": 1603,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:guides:contract[18].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 10,
+			"file": "tests/guides.test.ts",
+			"line": 1426,
+			"verdict": "covered",
+			"evidence": "confirmed[271,283] explicitly lists all cited bindings and requires verb-led setup helpers.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 11,
+			"file": "tests/setup.ts",
+			"line": 243,
+			"verdict": "covered",
+			"evidence": "compliance-audit.json confirmed[274] owns this fixture history.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 12,
+			"file": "tests/setup.ts",
+			"line": 1181,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:conversations:naming-prose[18].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 13,
+			"file": "tests/setup.ts",
+			"line": 444,
+			"verdict": "covered",
+			"evidence": "Duplicate of check:agent:naming-prose[2].",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 14,
+			"file": "tests/guides.test.ts",
+			"line": 3402,
+			"verdict": "refuted",
+			"evidence": "Seconds is a qualitative stall duration, not an uncited numerical measurement; writing.md:21 does not establish the alleged violation.",
+			"fix": ""
+		},
+		{
+			"lane": "check:guides:naming-prose",
+			"index": 15,
+			"file": "tests/setupLedger.ts",
+			"line": 260,
+			"verdict": "covered",
+			"evidence": "readShape naming is included in check:ledgers:naming-prose[9].",
+			"fix": ""
+		}
+	],
+	"summary": {
+		"confirmed": 101,
+		"refuted": 100,
+		"covered": 206,
+		"gone": 0
+	}
+}

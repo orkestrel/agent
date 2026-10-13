@@ -1,0 +1,161 @@
+{
+  "prepared": "2026-10-11T07:20:39.215Z",
+  "host": {
+    "platform": "win32",
+    "node": "v24.21.0"
+  },
+  "scope": "Within-candidate relation-deletion sensitivity only; no classifier-quality or adoption verdict.",
+  "packet": {
+    "path": "tmp/units/aggregate-judge-counterfactual/packet-final.json",
+    "hash": "438710a277663ca0c28a2b6bf3f6c47b354312c12ddb02d0cd697a212499c11f",
+    "bytes": 40965
+  },
+  "build": "09c7d936ffaec46ed9deb5bdd300deb0f9643ad639519762d8d84e38ef513ecf",
+  "operator": "33570ee0bb82af8786854543ab9edafcde11c5309fa2a684aa16b5e438fa6756",
+  "sequence": [
+    "original",
+    "repair-removed",
+    "cause-removed",
+    "both-removed",
+    "both-removed",
+    "cause-removed",
+    "repair-removed",
+    "original"
+  ],
+  "expectations": [
+    {
+      "name": "original",
+      "repair": false,
+      "cause": false,
+      "expectation": "unsupported"
+    },
+    {
+      "name": "repair-removed",
+      "repair": true,
+      "cause": false,
+      "expectation": "unsupported"
+    },
+    {
+      "name": "cause-removed",
+      "repair": false,
+      "cause": true,
+      "expectation": "unsupported"
+    },
+    {
+      "name": "both-removed",
+      "repair": true,
+      "cause": true,
+      "expectation": "supported"
+    }
+  ],
+  "original": {
+    "score": 0.842522895608751,
+    "label": {
+      "id": "fbb56761-030c-4056-bee5-e1def8cc9aba",
+      "item": "8a4dcaf39a0081bdabbaaaf83659fc3b28f80745d6d7353651e4526833e077aa",
+      "verdict": "unsupported",
+      "propositions": [
+        {
+          "text": "Grace Okafor still wants her own replacement duvet set as of 2026-10-10.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-09) user: Grace Okafor emailed again about her duvet.",
+            "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+            "(2026-10-10) user: Grace: She still wants her own replacement."
+          ]
+        },
+        {
+          "text": "The parcel from locker 14 contained a twin duvet addressed to someone else rather than Grace's queen set.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set."
+          ]
+        },
+        {
+          "text": "ESC-2219 is open again following the 2026-10-10 reopening instruction; 'remains open' is read as its resulting status, not a claim that it was never closed.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-09) user: Ticket ESC-2219 is resolved, close it.",
+            "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+          ]
+        },
+        {
+          "text": "The reason for reopening is Sigrid's report that two of the eight pendants have cracked glass.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass."
+          ]
+        },
+        {
+          "text": "An electrician must repair the pendants before replacement can proceed; the source only says the electrician discovered the damage while unpacking.",
+          "verdict": "unsupported",
+          "evidence": [
+            "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass.",
+            "(2026-10-10) user: Sigrid: Her electrician found it when unpacking this morning."
+          ]
+        },
+        {
+          "text": "Grace has not yet received her own replacement, consistent with receiving someone else's twin set and still requesting her own replacement.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+            "(2026-10-10) user: Grace: She still wants her own replacement."
+          ]
+        },
+        {
+          "text": "Owen Pritchard left Copperline yesterday, 2026-10-09.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-10) user: Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday."
+          ]
+        },
+        {
+          "text": "Hana Ikeda is Copperline's replacement buyer and has email-only contact information.",
+          "verdict": "supported",
+          "evidence": [
+            "(2026-10-10) user: Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+          ]
+        },
+        {
+          "text": "Grace's missing replacement is caused by Owen's departure and Hana's email-only contact; the sources provide no causal connection between Grace's duvet and Copperline's buyer change.",
+          "verdict": "unsupported",
+          "evidence": [
+            "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+            "(2026-10-10) user: Grace: She still wants her own replacement.",
+            "(2026-10-10) user: Forget everything I told you about reaching Copperline's buyer: Owen Pritchard left the company yesterday.",
+            "(2026-10-10) user: Owen Pritchard: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+          ]
+        }
+      ]
+    }
+  },
+  "absent": [
+    "historical wire/logprobs",
+    "historical installed superclass byte binding"
+  ],
+  "requests": {
+    "inference": 8,
+    "tags": 2
+  },
+  "execution": {
+    "explicit": true,
+    "sequential": true,
+    "retries": 0,
+    "directory": "An explicitly supplied vacant descendant of this unit directory"
+  },
+  "accounting": {
+    "sources": 21,
+    "variants": 4,
+    "retained": 29
+  },
+  "frozen": "2026-10-11T07:43:37.538Z",
+  "supersedes": {
+    "plan": {
+      "path": "tmp/units/aggregate-judge-counterfactual/plan-ready.json",
+      "hash": "1c0044b69cb29f66a86ffe86d7629dab611afd521be6f5de8604a565d90657e1",
+      "bytes": 6083
+    },
+    "operator": "1ef1d01af6d0daefe54131f7a6a7a567cc838e821f53414474ba37603053085b",
+    "reason": "Per-request completion persists actual result or unavailable/error status and independent explicit raw-field absence even when actual decoding rejects; packet, identities, settings, renderings, and sequence unchanged"
+  }
+}

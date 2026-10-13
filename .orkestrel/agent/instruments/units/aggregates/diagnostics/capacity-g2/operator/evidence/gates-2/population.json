@@ -1,0 +1,11 @@
+{
+  "executable": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "args": [
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\verify.ts"
+  ],
+  "exit": 0,
+  "signal": null,
+  "stdout": "{\"offline\":true,\"message\":\"No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.\",\"host\":\"Windows; controlled attached daemon; exclusive serial client; no other service requests\"}\n{\"offline\":true,\"message\":\"No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree.\"}\n{\"pass\":true,\"evidence\":{\"path\":\"tmp/units/aggregate-capacity-g2-control/evidence/population.json\",\"hash\":\"52dac23f45667a410a0d7f3fdf076d5346ac89ecb401d8fea17c2e82bb1aaef2\",\"bytes\":8129},\"inference\":2,\"metadata\":8,\"global\":0,\"native\":0}\n",
+  "stderr": "{\"name\":\"Error\",\"message\":\"Expected every named option exactly once\",\"stack\":\"Error: Expected every named option exactly once\\n    at readArguments (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/helpers.ts:146:46)\\n    at Driver.main (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/Driver.ts:25:17)\\n    at Offline.execute (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/Offline.ts:94:36)\\n    at async file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/verify.ts:3:1\",\"properties\":{}}\n",
+  "duration": 142.63880000000017
+}

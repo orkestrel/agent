@@ -1,0 +1,32 @@
+===== g2-records-v1 start 2026-10-10T07:15:44Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v1.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v1 end 2026-10-10T07:27:18Z exit 0
+===== g2-control-v1 start 2026-10-10T07:27:19Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v1.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v1 end 2026-10-10T07:30:52Z exit 0
+===== g2-records-v2 start 2026-10-10T07:31:34Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v2.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v2 end 2026-10-10T07:39:23Z exit 0
+===== g2-control-v2 start 2026-10-10T07:39:24Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v2.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v2 end 2026-10-10T07:42:14Z exit 0
+===== g2-records-v3 start 2026-10-10T07:42:14Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v3.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v3 end 2026-10-10T07:50:25Z exit 0
+===== g2-control-v3 start 2026-10-10T07:50:26Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v3.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v3 end 2026-10-10T07:53:32Z exit 0
+===== g2-records-v4 start 2026-10-10T07:53:32Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v4.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v4 end 2026-10-10T08:02:08Z exit 0
+===== g2-control-v4 start 2026-10-10T08:02:09Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v4.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v4 end 2026-10-10T08:05:34Z exit 0
+===== g2-records-v5 start 2026-10-10T08:05:35Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v5.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v5 end 2026-10-10T08:13:48Z exit 0
+===== g2-control-v5 start 2026-10-10T08:13:48Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v5.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v5 end 2026-10-10T08:17:02Z exit 0
+===== g2-records-v6 start 2026-10-10T08:17:02Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v6.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v6 end 2026-10-10T08:24:19Z exit 0
+===== g2-control-v6 start 2026-10-10T08:24:20Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v6.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v6 end 2026-10-10T08:27:24Z exit 0
+===== g2-records-v7 start 2026-10-10T08:27:25Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v7.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v7 end 2026-10-10T08:35:02Z exit 0
+===== g2-control-v7 start 2026-10-10T08:35:02Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v7.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v7 end 2026-10-10T08:38:24Z exit 0
+===== g2-records-v8 start 2026-10-10T08:38:25Z [bench3 --mode ledger --profile refined --scenario /home/user/agent/tmp/bench/variants/ledger/v8.json --ctx 3072 --judge mica --judge-ctx 4096 --tail 0.35 --judgments /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl --reply terminal --records on --model gemma4:e2b-it-q4_K_M] harness-sha256 67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611
+===== g2-records-v8 end 2026-10-10T08:46:29Z exit 0
+===== g2-control-v8 start 2026-10-10T08:46:30Z [bench --mode none --ctx 6144 --search words --reply terminal --scenario /home/user/agent/tmp/bench/variants/v8.json --model gemma4:e2b-it-q4_K_M] harness-sha256 b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5
+===== g2-control-v8 end 2026-10-10T08:50:04Z exit 0

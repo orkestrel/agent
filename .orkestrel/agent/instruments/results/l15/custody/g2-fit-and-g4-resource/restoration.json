@@ -1,0 +1,396 @@
+{
+  "head": "4acb51125833e96aa771574ce248f49cc9ebddc0",
+  "archive": ".orkestrel/agent/instruments/results/l15/custody/g2-fit-and-g4-resource",
+  "files": [
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err",
+      "archive": "g2-calibration-fit.err",
+      "bytes": 50,
+      "sha256": "96c591ccf6ee015504e88f87798ba57c52da241880fd42512b265436946140e6"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl",
+      "archive": "g2-calibration-fit.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.pid",
+      "archive": "g2-calibration-fit.jsonl.pid",
+      "bytes": 6,
+      "sha256": "aba793715d2161021f816999b9ae5816e1aa4a921fc1515a12499df048878262"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.status-after.txt",
+      "archive": "g2-calibration-fit.jsonl.status-after.txt",
+      "bytes": 455,
+      "sha256": "204e74dde3b81615cc3ab8072366a61698977db16078b5bbc371e65e1620bc2f"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.status-before.txt",
+      "archive": "g2-calibration-fit.jsonl.status-before.txt",
+      "bytes": 391,
+      "sha256": "4cb2b074b110d0e303b4ab4a940ca0eb0c71b11a79cc0e2d34c20e8feda96712"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g4-think0-resource.err",
+      "archive": "g4-think0-resource.err",
+      "bytes": 52,
+      "sha256": "f7b576d4360004722f11a816a1344897468c909a665df4c064d10f5624a403a0"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g4-think0-resource.jsonl",
+      "archive": "g4-think0-resource.jsonl",
+      "bytes": 1477,
+      "sha256": "3db46a980759486895c4a2b8bc6785183dd3da63b790f87bcf2943f7618842e0"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g4-think0-resource.jsonl.pid",
+      "archive": "g4-think0-resource.jsonl.pid",
+      "bytes": 6,
+      "sha256": "c820c251a253d2714a34704c5b8b6271f5b07bcedfa8b0d79f389bb142080a9e"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g4-think0-resource.jsonl.status-after.txt",
+      "archive": "g4-think0-resource.jsonl.status-after.txt",
+      "bytes": 391,
+      "sha256": "4cb2b074b110d0e303b4ab4a940ca0eb0c71b11a79cc0e2d34c20e8feda96712"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l15/logs/g4-think0-resource.jsonl.status-before.txt",
+      "archive": "g4-think0-resource.jsonl.status-before.txt",
+      "bytes": 102,
+      "sha256": "f92404fe0e35a222e37545ebc558f58e24f064f456a644d88f4a51d06bb412d6"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-adjudication-read.ts",
+      "archive": "aggregate-successor-g2-adjudication-read.ts",
+      "bytes": 2422,
+      "sha256": "b06f49ef83030c988f94d38b004782c6f8b2f6c1b359b953b35ea443a73613bc"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-adjudication.md",
+      "archive": "aggregate-successor-g2-adjudication.md",
+      "bytes": 3471,
+      "sha256": "01b0325547e717f3c83be65fedb9ebce948c60d469594f35b06a41c7b43d154d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-brief-prep.ts",
+      "archive": "aggregate-successor-g2-fit-brief-prep.ts",
+      "bytes": 2050,
+      "sha256": "4433207103c9f8a2c58e9e90d92d3dacf96d5b2ca47eaf49bdf3c40a246f5120"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-brief.md",
+      "archive": "aggregate-successor-g2-fit-brief.md",
+      "bytes": 5781,
+      "sha256": "b5107ee711cf4f4bafa1f2a1424166957478c293270ca74f79624445322f11f6"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-citation-check.txt",
+      "archive": "aggregate-successor-g2-fit-citation-check.txt",
+      "bytes": 85,
+      "sha256": "9c1834bcc0727c04029dacf822001b537a7afbf1b80cb577517ec1ae02cd9f27"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-command.txt",
+      "archive": "aggregate-successor-g2-fit-command.txt",
+      "bytes": 739,
+      "sha256": "34d9356a53614cfc4941c6b25a11ec70c47456a13ffeed381a7f0397ee43581b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-custody.txt",
+      "archive": "aggregate-successor-g2-fit-custody.txt",
+      "bytes": 2899,
+      "sha256": "e21755c7041855a0539e1a49dbe883070bd01b10fe728e0a7679887e9361be42"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-execution.txt",
+      "archive": "aggregate-successor-g2-fit-execution.txt",
+      "bytes": 1469,
+      "sha256": "086d0c6784898061464004a82c884ca8143c6be9744932b91cccfcae995f2e42"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-launch.stdout.txt",
+      "archive": "aggregate-successor-g2-fit-launch.stdout.txt",
+      "bytes": 410,
+      "sha256": "67dd2111bbfefb4db7ff6c0140a9e2d8ac4061f7d6e0049724019a71d42e589f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-launcher-stderr.txt",
+      "archive": "aggregate-successor-g2-fit-launcher-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-preflight.txt",
+      "archive": "aggregate-successor-g2-fit-preflight.txt",
+      "bytes": 3198,
+      "sha256": "d7c996bdbd14e584a5d05a5ee26221d5fa3c2d85490a6bf6313c5246dc773ba1"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-process-closure.txt",
+      "archive": "aggregate-successor-g2-fit-process-closure.txt",
+      "bytes": 37,
+      "sha256": "2d62708e147d9d834df5331b773cd3275ead8e1f971aff8f9ab64d28c0a24eae"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-read.ts",
+      "archive": "aggregate-successor-g2-fit-read.ts",
+      "bytes": 3201,
+      "sha256": "2b887cdcc108ff2488b4dc5081b9530d3a9c2f0dc88cd608332b4f643c432f0e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-reader-adaptation.diff",
+      "archive": "aggregate-successor-g2-fit-reader-adaptation.diff",
+      "bytes": 2647,
+      "sha256": "4ab3e25f934407927907197b3cfc43a01ab39b82dc0be9810c1034b19ef0f881"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-report.md",
+      "archive": "aggregate-successor-g2-fit-report.md",
+      "bytes": 9110,
+      "sha256": "867d33e830206459edbdde1fcce8b433eea6792664fac6349aab7f42ac261485"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-status-delta.txt",
+      "archive": "aggregate-successor-g2-fit-status-delta.txt",
+      "bytes": 241,
+      "sha256": "288a9b7fa1c0d1eb308923dc4e3877988fa6e48ee9a27833a1c00541a5e5d116"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-validation-execution.txt",
+      "archive": "aggregate-successor-g2-fit-validation-execution.txt",
+      "bytes": 72,
+      "sha256": "c13906b182825f1c37adb11649556d0f618b2ee0820de3e38eefc28308bc35d3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-validation.json",
+      "archive": "aggregate-successor-g2-fit-validation.json",
+      "bytes": 1822,
+      "sha256": "fc43bb75e3b72c85b86893ac7554c96a16eba3e44b50deb0206f95a0c95ac917"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-validation.stderr.txt",
+      "archive": "aggregate-successor-g2-fit-validation.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-validation.stdout.jsonl",
+      "archive": "aggregate-successor-g2-fit-validation.stdout.jsonl",
+      "bytes": 1822,
+      "sha256": "fc43bb75e3b72c85b86893ac7554c96a16eba3e44b50deb0206f95a0c95ac917"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-labels.ts",
+      "archive": "aggregate-successor-g2-labels.ts",
+      "bytes": 4539,
+      "sha256": "f6c54e8392891938cc69060f5a62a0627b60762eb30973e2583077431e5283f8"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-resource-brief.md",
+      "archive": "aggregate-successor-g4-think0-resource-brief.md",
+      "bytes": 6191,
+      "sha256": "b65f7def4e0139270f51ad82a4985d9055e7ebb7ecb299e84fabe878b640ff77"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-resource-read.stderr.txt",
+      "archive": "aggregate-successor-g4-think0-resource-read.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-resource-read.stdout.txt",
+      "archive": "aggregate-successor-g4-think0-resource-read.stdout.txt",
+      "bytes": 5754,
+      "sha256": "064e5ef1fd3ec923e9363bd7436ce40c2980fb4e03e10309a2456f4757ba9257"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-resource-read.ts",
+      "archive": "aggregate-successor-g4-think0-resource-read.ts",
+      "bytes": 1537,
+      "sha256": "ad014cb203e97cac840bbbf1e9f2c1e6014b7ffa62ff14b9085cfc2e513e7f5a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g4-think0-resource-report.md",
+      "archive": "aggregate-successor-g4-think0-resource-report.md",
+      "bytes": 3907,
+      "sha256": "821e1be1bb3117cb266ca7b55ee72f849be61fef691333c36a148baf02ba2721"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-brief.md",
+      "archive": "aggregate-successor-label-d-brief.md",
+      "bytes": 5117,
+      "sha256": "78ea1b4b1ef7e2264d663b2e760717fe0b77718415cbac4bcd751bfe549a7135"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-fragments-brief.md",
+      "archive": "aggregate-successor-label-d-fragments-brief.md",
+      "bytes": 4094,
+      "sha256": "c8468bc565de2cda778c416bab3f4e705b506c6b9dbb6c5579c64416fdb7f673"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-fragments-report.md",
+      "archive": "aggregate-successor-label-d-fragments-report.md",
+      "bytes": 11231,
+      "sha256": "775cbcea54d659018bc7867698774b632fb70a43269321c870a192dd226c7862"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-judgments.ts",
+      "archive": "aggregate-successor-label-d-judgments.ts",
+      "bytes": 23730,
+      "sha256": "fa339186b1c92ab3bb86324864542a3c8ad8aec8cc96ac6058fa59531f0be265"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-reader.ts",
+      "archive": "aggregate-successor-label-d-reader.ts",
+      "bytes": 3190,
+      "sha256": "f94ae1a7fa2edb48bfb78cd8983912136b1dacf49d4bcdc69bd2bb875ac70255"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-report.md",
+      "archive": "aggregate-successor-label-d-report.md",
+      "bytes": 31439,
+      "sha256": "6507a0d6d7399e38fe94d6c8dd79f280188c279cc11a7e7dc62f6bc3078b4029"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-serialize.ts",
+      "archive": "aggregate-successor-label-d-serialize.ts",
+      "bytes": 10582,
+      "sha256": "f383100546e1069702bf074d7fb67c231b41e0f63405bd4b36ecc22f26b349cb"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-types.ts",
+      "archive": "aggregate-successor-label-d-types.ts",
+      "bytes": 456,
+      "sha256": "0d125f7588c31e1f4dacbf78ea1b2fb43c208807ce69bed5ece1e40b6ae66a4e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-adaptation.diff",
+      "archive": "aggregate-successor-label-d-verifier-adaptation.diff",
+      "bytes": 3775,
+      "sha256": "4c5c0df701a4e6a79e18270dc7306a092bc2bce868917a03a80ecf55c55d8aea"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-brief.md",
+      "archive": "aggregate-successor-label-d-verifier-brief.md",
+      "bytes": 4857,
+      "sha256": "dabae3c354168dbf8bbdd40657c158ca6b53a5099be93aaa6e8fdc95fbdd4e00"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-check.ts",
+      "archive": "aggregate-successor-label-d-verifier-check.ts",
+      "bytes": 3827,
+      "sha256": "e99b3df765715179bcdee83a1acd47e9aed1301ac8d95e8452481531e7cd67e8"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-comparison.txt",
+      "archive": "aggregate-successor-label-d-verifier-comparison.txt",
+      "bytes": 1363,
+      "sha256": "e4d9d1d542eb3cd67627511b366941ec8f9941506a1227f80f568938d78dd3aa"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-execution.txt",
+      "archive": "aggregate-successor-label-d-verifier-execution.txt",
+      "bytes": 365,
+      "sha256": "491124b738e17e899435906bf920aed7d8add19d68cd665aec94ef32e2a301ca"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-launcher-stderr.txt",
+      "archive": "aggregate-successor-label-d-verifier-launcher-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-reader.ts",
+      "archive": "aggregate-successor-label-d-verifier-reader.ts",
+      "bytes": 3892,
+      "sha256": "eb3207b6d46bcb16bb159f55b04ce8045981c9bbd3569eaaeb7b740f69194341"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-report.md",
+      "archive": "aggregate-successor-label-d-verifier-report.md",
+      "bytes": 2771,
+      "sha256": "fcc3c2375fdc29ffc442e08da5d46cb5272654d7ce92cc91774881ff98925228"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-stderr.txt",
+      "archive": "aggregate-successor-label-d-verifier-stderr.txt",
+      "bytes": 49,
+      "sha256": "997efe6ec0e01cce68ea737bb426a8d0f555dfc272d56a7eb9660726a77b88af"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-stdout.jsonl",
+      "archive": "aggregate-successor-label-d-verifier-stdout.jsonl",
+      "bytes": 222,
+      "sha256": "c0cdb5a1cace31c2b87f40019a193501ed207c284796d0a7f51b9d93c36ae0c0"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d-verifier-stdout.jsonl.pid",
+      "archive": "aggregate-successor-label-d-verifier-stdout.jsonl.pid",
+      "bytes": 6,
+      "sha256": "d5f01bfa566e5a01c387206680f9cef74e402ecc756bf2b28c2720bf53e74d7d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-label-d.json",
+      "archive": "aggregate-successor-label-d.json",
+      "bytes": 250873,
+      "sha256": "5f2c0c2a781a9e3888b07e17ee9a3fd484984be9a0916c37d6514fcb7ce7a923"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-next-briefs-prep-2.ts",
+      "archive": "aggregate-successor-next-briefs-prep-2.ts",
+      "bytes": 3182,
+      "sha256": "0f7808bc92dfc85b64195561b245b5fdce868a4ae1a6f86036b28707d7f4f30d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-next-briefs-prep.ts",
+      "archive": "aggregate-successor-next-briefs-prep.ts",
+      "bytes": 3118,
+      "sha256": "a16dac9bb9c8dfd6bb02377ee9833d5359f015a2f1af02f136b2683a4d470bc9"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q2-exploratory-preparation-brief.md",
+      "archive": "aggregate-successor-q2-exploratory-preparation-brief.md",
+      "bytes": 5489,
+      "sha256": "f87c3324cfede9abe3081f060b1c4233085def484cf45455d0914ed4d9908ed5"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q2-exploratory-preparation-report.md",
+      "archive": "aggregate-successor-q2-exploratory-preparation-report.md",
+      "bytes": 6967,
+      "sha256": "ee9f96401b77ec090a1e2c937eaa2326e1bed15533f65058d44d04309137c51b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q2-exploratory-prepare.diff",
+      "archive": "aggregate-successor-q2-exploratory-prepare.diff",
+      "bytes": 4386,
+      "sha256": "5c24c798e9471b4f944b340718f4370d5176390a605a89948aa27fd4bab969be"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q2-exploratory-prepare.ts",
+      "archive": "aggregate-successor-q2-exploratory-prepare.ts",
+      "bytes": 7420,
+      "sha256": "b33662c6020f67feb528b8e73269435a88474ae8e20456e296ef4a04d69999c9"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-retain.diff",
+      "archive": "aggregate-successor-g2-fit-retain.diff",
+      "bytes": 29789,
+      "sha256": "ba1ff0af07c45b81527bf06a55def27a98a90c28bf05ebd559c7f39f4d5be2f4"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-retain-report.md",
+      "archive": "aggregate-successor-g2-fit-retain-report.md",
+      "bytes": 5181,
+      "sha256": "be96e594355ef0d821e394b940d0cbf38ea87769c08c0fabf600e6a413cfbc37"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-g2-fit-retain.ts",
+      "archive": "aggregate-successor-g2-fit-retain.ts",
+      "bytes": 23622,
+      "sha256": "a7a9250461b037e451342261aeb03a0791adef1d132e3e041fb9f2c05272f656"
+    }
+  ]
+}

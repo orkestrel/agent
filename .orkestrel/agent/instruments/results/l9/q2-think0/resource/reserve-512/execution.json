@@ -1,0 +1,18 @@
+{
+  "protocol": "l6",
+  "key": "q2",
+  "think": false,
+  "arm": "records",
+  "copy": 1,
+  "phase": "resource",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\freeze\\manifest.json",
+    "hash": "87c3b7b5b5756b0285f26302f3dbf4beb377e20f394973d011a7d192dc9df3ac"
+  },
+  "budget": {
+    "reserve": 512,
+    "window": 3072,
+    "ceiling": 3072,
+    "predict": 0
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "q2-generation",
+  "complete": true,
+  "breached": false,
+  "bytes": 2868,
+  "hash": "1416e7a102d42c9591e9366fbad379e88bbcab1719745caeb1fb720d6586dce3",
+  "status": 200,
+  "started": "2026-10-11T11:04:12.891Z",
+  "finished": "2026-10-11T11:04:35.473Z",
+  "duration": 22581.430500000002
+}

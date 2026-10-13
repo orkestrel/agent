@@ -1,0 +1,148 @@
+{
+  "started": "2026-10-11T11:03:48.910Z",
+  "host": "Windows; controlled attached daemon; exclusive serial client; no other service requests",
+  "platform": "win32",
+  "node": "v24.21.0",
+  "executable": {
+    "path": "../../scoop/apps/nodejs-lts/current/node.exe",
+    "hash": "ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32",
+    "bytes": 93580104
+  },
+  "packet": {
+    "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+    "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+    "bytes": 80122
+  },
+  "operator": "b054ebc86779435ff2935b9a1a669d9a7eac6f20b538ab5fe5d8d6dcce50aa6f",
+  "receipt": {
+    "path": "tmp/units/aggregate-capacity-probe/daemon-start.json",
+    "hash": "19c077e9190accb54e1e791d2be4493412431d22a86778a1b1e229255854a120",
+    "bytes": 449
+  },
+  "sources": [
+    {
+      "path": "tmp/units/aggregate-capacity-probe/types.ts",
+      "hash": "023f2eb80650fc927c34b71feefb8717ed17fe76558ef5bcafa439ae7857064e",
+      "bytes": 2392
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/constants.ts",
+      "hash": "08ea68139897ce904045e38320508d67db4c1a50823d46c28c3d9dc7b3dc7d28",
+      "bytes": 2570
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/helpers.ts",
+      "hash": "e910098e98024b82300101e59f2817a7a9fb9edd3cefc1933f7ec441dfe897fb",
+      "bytes": 11181
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/Driver.ts",
+      "hash": "3fb4f63cf7a7ac973932c7cd4d47d4c47ed85f9e6a714f1d1f41342bfcf7b15b",
+      "bytes": 10037
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/Daemon.ts",
+      "hash": "68db7adfa74a89b72cd213424bd7b5a941ac4dfd0f05bff16bbf124fa110f8de",
+      "bytes": 3985
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/main.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepare.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/execute.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/start.ts",
+      "hash": "1d9bfca5c85f61e26f7b5933da53d191e9dd30fe60e78d93ce43a8f53bd4c570",
+      "bytes": 104
+    },
+    {
+      "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-direction.md",
+      "hash": "e55224d7b9300739dc568f5f5e3601a541cec5a9ee293ba94b8172c4dfff9230",
+      "bytes": 3865
+    },
+    {
+      "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-clarification.md",
+      "hash": "a96a1d965fed096f13fa6e7fd1ffc1a6305f1532149e785af0cd8926b179bc31",
+      "bytes": 13178
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-startup-report.md",
+      "hash": "fd5a236913b56a9c360275249f529e7de08252fffc0033d842508c627614219a",
+      "bytes": 5612
+    },
+    {
+      "path": "tmp/units/aggregate-focused-screen/live-forward-reverse/01-statement-a.request.json",
+      "hash": "37430d08fd152afdd3a768029d3f34bed8bad426b5a873ef12cafc721dd76e28",
+      "bytes": 5775
+    },
+    {
+      "path": "tmp/units/aggregate-judge-counterfactual/helpers.ts",
+      "hash": "403a364d5f6974171b8116636ff0cbb372b95ad33cf2055f2b511c0e06d97bb5",
+      "bytes": 9454
+    },
+    {
+      "path": "tmp/units/aggregate-judge-counterfactual/constants.ts",
+      "hash": "0a4d866d8481755f6b4968f1295e280d8e2d982d47e1530051de074cfdebb046",
+      "bytes": 2326
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l7/q2-think0/freeze/manifest.json",
+      "hash": "026ae06de9f2d132d93b20f5077ce17f77898c241bc94a4fa071f6579166d172",
+      "bytes": 18935
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l7/q4-think0/freeze/manifest.json",
+      "hash": "e77d3b27a0a5b5dd6d17a998f4887e734061d5b8f1290f4b03e18c1eaa330656",
+      "bytes": 18935
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l7/g2-think0/freeze/manifest.json",
+      "hash": "04a1e41ae941899e6af64b3289b7e9604f64b508db86f376fc0bccc0403ef487",
+      "bytes": 18941
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l7/g4-think0/freeze/manifest.json",
+      "hash": "b8007bb044629362cabaf8626cd61d2e7657e717d59d083ea872bdf60f73da04",
+      "bytes": 18941
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepared/short.json",
+      "hash": "85616c62752eef54905ad4509a14f02bfd45c1864d98452c93f32919761b649a",
+      "bytes": 355
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepared/history.json",
+      "hash": "4c6ef90eead678cabdc269178b3bd5bc0b9694505e69b5d952dae2f35302f978",
+      "bytes": 5473
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepared/generation.json",
+      "hash": "9397686e3628da2b270235a5a08ec520c3687f9153b4905469b9630da0a129cb",
+      "bytes": 218
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepared/mica.txt",
+      "hash": "40391512abbc57aedf2771cb292a18491b60c0db96e18c8b61db5237400a665e",
+      "bytes": 5435
+    }
+  ],
+  "limits": {
+    "inference": 30,
+    "request": 32768,
+    "response": 262144,
+    "metadata": 1048576,
+    "timeout": 300000,
+    "snapshot": 30000,
+    "duration": 1200000
+  }
+}

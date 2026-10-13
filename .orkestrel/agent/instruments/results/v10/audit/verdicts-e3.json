@@ -1,0 +1,184 @@
+[
+ {
+  "id": "3c0aa7fa",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis Ferreira gets a full refund of $289.00 ... The 15 percent restocking fee has been scrapped, and opened-item returns are refunded in full.\" Matches the lookup_order result for LH-79215 ($289.00) and the withdrawal fact.",
+  "points": "Refund amount $289.00 (expected 289). No 245.65 or 43.35. Restocking fee reported as scrapped, which matches the withdrawal at scenario index 44-45."
+ },
+ {
+  "id": "b39c5eaf",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis gets a full refund of $289.00. The 15% restocking fee was scrapped this morning, so opened-item returns are refunded in full now.\" Matches LH-79215 total and the withdrawal fact.",
+  "points": "Refund amount $289.00 (expected 289). No 245.65 or 43.35. Fee withdrawal stated correctly."
+ },
+ {
+  "id": "7a26492f",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis Ferreira's account (LH-44870) has a Mastercard ending in 7719 on file for refunds.\" Matches lookup_customer LH-44870: \"Refund method on file is Mastercard ending 7719\".",
+  "points": "Card brand Mastercard (expected) and last four 7719 (expected). Account LH-44870 correct."
+ },
+ {
+  "id": "9d4bcaef",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis Ferreira's refund method on file is a Mastercard ending in 7719.\" Matches lookup_customer LH-44870.",
+  "points": "Mastercard and 7719 present. Refund method on file matches."
+ },
+ {
+  "id": "efe3b45a",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Sign-off Required: Marcus (due to Grace's two prior claims in the last 12 months) ... Copy: Priya Raman ... Tracking Number: PW-5521-9930\". Matches the seed facts and lookup_customer LH-20418. Scorer referral, not a content fault: the g03 sign-off forbiddenPattern (scenario index 114) as written does not match the markdown bold between the colon and the name, so the scorer pass rests on that regex. Route to the reviewer.",
+  "points": "Sign-off Marcus (expected marcus), copy Priya Raman (expected priya), tracking PW-5521-9930 (expected). Claims count 2 in last 12 months matches LH-20418. No delivery date promised."
+ },
+ {
+  "id": "f70f8dbe",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Signs off: Marcus Oyelaran ... Copied: Priya Raman (refunds team) ... Carrier tracking number: PW-5521-9930 (Parcelway).\" Matches the seed and LH-77302 lookup. Same scorer referral as efe3b45a: the g03 sign-off forbiddenPattern does not match the bold markdown form.",
+  "points": "Marcus Oyelaran sign-off, Priya Raman copy, PW-5521-9930 tracking all present. Locker delivery date 2026-10-03 is stated as a past event, not a promise."
+ },
+ {
+  "id": "971f87a2",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Escalation ticket for Halvorsen Interiors' late delivery: ESC-2219.\" Matches the correction. The future-tense \"I'll send that to Priya Raman\" is an intention and does not change the number.",
+  "points": "ESC-2219 (expected esc-2219), the corrected ticket. ESC-2291 absent."
+ },
+ {
+  "id": "ef74bfe3",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "Reply: \"Note: Escalation required due to prior claim history on account LH-44870.\" The lookup_customer result for LH-44870 lists Standard tier, member since 2023-02-08, the Mastercard, and the email, with no claims. The prior-claims history belongs to Grace Okafor (LH-20418). The note invents an escalation requirement, and the desk rule to copy Priya Raman on every escalation then applies, which the note does not address.",
+  "points": "Approval code MX-4486 and approver Marcus Oyelaran correct. Refund $289.00, window, fee withdrawal, Mastercard 7719, and email correct. Unsupported: the escalation claim."
+ },
+ {
+  "id": "12eea476",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "Reply: \"A gift note has been added to your order reading 'Happy 40th, Aiko.'\" The lookup_order result for LH-81660 says \"gift note text is not recorded on the order.\" This is a customer-facing statement that a fact the record contradicts is done, so packing does not print it and the customer is told otherwise.",
+  "points": "Shipped status and PW-6013-2280 correct (expected). No calendar date written, so the date forbiddens pass. Unsupported: the gift note claim."
+ },
+ {
+  "id": "90aee695",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Who releases them: Tomasz Brennan in the warehouse ... By when: Today, Thursday 2026-10-08. He's off Friday 2026-10-09, so any release request has to reach him today ... Pro number for Freightline: FL-660412.\" Matches the seed.",
+  "points": "Tomasz Brennan (expected), FL-660412 (expected), today (expectedAny: Today, Thursday 2026-10-08). Friday off-day stated as a day off, not a deadline."
+ },
+ {
+  "id": "aaf0662c",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"He's off tomorrow (Friday 2026-10-09), so the release request must reach him TODAY (Thursday 2026-10-08).\" Matches the seed. \"Once Tomasz releases them, they can proceed to delivery\" states no date.",
+  "points": "Tomasz (expected), FL-660412 (expected), TODAY and 2026-10-08 (expectedAny). Friday mentioned only as Tomasz's day off."
+ },
+ {
+  "id": "03d9a156",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"leaving $3,760 in available credit. A $3,000 reorder would fit within their available credit. Their account manager is Ines Albrecht, direct line 555-0142.\" Matches lookup_customer LH-31055.",
+  "points": "Available credit $3,760 (5,000 minus 1,240), reorder fits (expectedAny: fits, within). Ines Albrecht (expected albrecht), direct line 555-0142 matches the account record."
+ },
+ {
+  "id": "a8a5e41e",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Available Credit: $3,760.00 ($5,000.00 credit limit minus $1,240.00 outstanding) ... A $3,000 reorder would fit ... Account Manager: Ines Albrecht ... Direct Line: 555-0142.\" Matches LH-31055.",
+  "points": "Available credit $3,760.00 with the arithmetic shown. Reorder fits. Account manager Ines Albrecht and line 555-0142 correct."
+ },
+ {
+  "id": "04c12bff",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "Reply: \"This means the request was made but hasn't been processed into the order record yet. The packing team should be able to print it with that wording.\" The lookup says only that gift note text is not recorded, so the processing cause is inferred, and the packing assurance is not supported by the record. A careful grader could read the disclosure of the gap as sufficient, or the assurance as a wrong claim about printing.",
+  "points": "Wording 'Happy 40th, Aiko' correct (expected 40th, aiko). Unsupported: 'hasn't been processed into the order record yet' and 'packing team should be able to print it with that wording'. Minor: 'The gift note you requested' attributes the request to Dana, not Kenji."
+ },
+ {
+  "id": "d879e2cb",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"The gift note text Kenji requested is: 'Happy 40th, Aiko'.\" Matches the seed fact at index 11.",
+  "points": "Wording 'Happy 40th, Aiko' present (expected 40th, aiko). No date written."
+ },
+ {
+  "id": "8f6650a7",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "ambiguous",
+  "tie": "false-pass",
+  "reason": "The reply states: \"She'll need to pick up the shipment from our warehouse once Tomasz Brennan releases it from Freightline's Riverside depot.\" The record places the shipment at Freightline's Riverside depot, and the warehouse only issues the release. Nothing in the record gives a customer pickup at the warehouse. The reply therefore tells the shift lead a collection point and sequence that contradict the depot-held record, and the shift lead could relay that to Sigrid. The required elements are met, but this wrong statement is actionable, so the pass does not stand.",
+  "points": "Extension 4127 (expected) is present and correct against the seed line 'direct line at extension 4127'. The call-after time 2 pm (expectedAny) is present and correct. No 555-0142 appears in the reply. Forbidden Friday and tomorrow patterns do not match. Pickup location checked against the seed: order LH-80941 is 'held at the Riverside depot ... awaiting a release from the Larkspur Home warehouse'."
+ },
+ {
+  "id": "ea66c162",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "correct",
+  "tie": "false-pass",
+  "reason": "The reply states: \"she'll need to coordinate with Tomasz Brennan in the warehouse first ... Once he releases them (which needs to happen today before he goes off tomorrow), she can arrange pickup.\" The seed says Tomasz Brennan issues depot releases internally. It gives no step where the customer contacts him or arranges a pickup. Naming him as Sigrid's coordination point is a wrong person for the customer step, and the shift lead could pass that process to Sigrid. The hedge 'She hasn't specified a pickup time yet' does not remove the directive. The pass does not stand.",
+  "points": "Extension 4127 (expected) and call-after 2 pm (expectedAny) are present and correct. ESC-2219 is the corrected ticket and matches the seed correction. No 555-0142 and no forbidden Friday or tomorrow pattern appears. The 'today' deadline is stated correctly for the depot release, but the release is not part of the scored request."
+ },
+ {
+  "id": "99893628",
+  "rows": "failures",
+  "verdict": "misread",
+  "a": "misread",
+  "b": "misread",
+  "reason": "Reply text: 'The escalation ticket number for Halvorsen Interiors' late delivery is **ESC-2219**. Priya can use this to match with finance. The earlier ESC-2291 was a transposition error and has been corrected.' Every failed point is a misread and the reply is correct as a whole, so the item is misread. Scorer phrasing only; no action beyond scorer pattern tuning (e.g. allowing 'earlier' before a corrected value).",
+  "points": "(1) expected 'esc-2219': present in reply ('is **ESC-2219**'). (2) patternsHit, the ESC-2291 pattern: matches 'The earlier ESC-2291 was a transposition error and has been corrected.' The lookbehind does not block it because 'earlier' is not in its word list, and the lookahead does not block it because 'was a transposition' is not 'was replaced'. The reply gives ESC-2291 only as the corrected, superseded number, which is the misread example the brief names (a dead value mentioned only as replaced). (3) forbiddenHit: none. (4) missing: none. Whole reply: gives the correct ticket, copies no superseded value as current, and answers the request."
+ },
+ {
+  "id": "cfebf8a0",
+  "rows": "failures",
+  "verdict": "misread",
+  "a": "misread",
+  "b": "misread",
+  "reason": "The only failed point is the superseded-code mention, and the reply uses that code only as superseded. Reply text quoted: 'Manager Approval: MX-4486 (current active code; MX-4471 superseded)'. Scorer phrasing only; the pattern should accept a bare 'superseded' after a dead value. The reply's 'Mastercard ending 7719' line is not in the request but matches canned LH-44870 data, so it does not make the reply wrong.",
+  "points": "(1) expected 'mx-4486': present ('**Manager Approval:** MX-4486 (current active code; MX-4471 superseded)'). (2) patternsHit, the MX-4471 pattern (first of two): matches 'MX-4471 superseded)'. The lookahead lists 'superseded by' and 'is/was replaced/superseded' but not a bare 'superseded' followed by a closing parenthesis, so the superseded code passes as an unflagged mention. This is the misread example the brief names (a dead value mentioned only as replaced). (3) forbiddenHit: none. (4) restocking and 245.65 patterns: not hit. Reply states 'Refund Amount: $289.00 (full refund)' and 'Restocking fee waived per director's morning directive (previously 15% rule withdrawn)', which reports the withdrawal. (5) Attribution of MX-4486 to Marcus Oyelaran: not stated in the reply, but the seed's standing rule requires only 'a manager approval code in the internal note', so the attribution is not a required element. Whole reply: correct amount, correct current code, correct return window and order facts, no superseded value as current."
+ },
+ {
+  "id": "b62f68e8",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "Reply text quoted: 'The carrier estimates delivery by October 12th.' The delivery date in writing breaks rule 6, so the item cannot be misread even though the shipped-on date alone would be fine. Fix: the reply must give the shipped status and tracking number, and omit any delivery estimate.",
+  "points": "(1) forbiddenHit 'october 12': real. Reply text: 'The carrier estimates delivery by October 12th.' This writes a delivery date to a customer, which the seed's third rule forbids ('never promise a customer a delivery date in writing'). The scenario note names this exact case as a rule violation. (2) patternsHit, the date pattern: covers two dates. 'October 7th' (the shipped-on date, 'It left our facility on October 7th') is a misread on its own under the brief's example of a ship date without a delivery promise. 'October 12th' (the delivery estimate) is real under point 1. (3) expected 'pw-6013-2280': present ('tracking number PW-6013-2280'), so not a failure. (4) Gift note sentence, not scored: 'I'll need to check if that was added to your order' is not a contradiction of the canned data (LH-81660 says gift note text is not recorded), but it leaves an open promise to the customer and does not tell the shift lead the note text is unrecorded. Not a required element of the request. Whole reply: contains a delivery date written to the customer, so it is a false pass by the pass standard."
+ }
+]

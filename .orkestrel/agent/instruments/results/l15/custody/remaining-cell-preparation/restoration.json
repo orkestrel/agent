@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "original": "tmp\\units\\aggregate-successor-remaining-cell-run.ts",
+      "archive": "aggregate-successor-remaining-cell-run.ts",
+      "bytes": 12519,
+      "sha256": "04e4ca98e2a12cc6bee06a6c345a8581ea6260d9d4e9ad731732754188740c7c"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-remaining-cells-brief.md",
+      "archive": "aggregate-successor-remaining-cells-brief.md",
+      "bytes": 4389,
+      "sha256": "63e19e3af3fe1c48c300d24612e52d01c1b16e26beda01f1590b10c6dcf5f1d2"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-remaining-cells-report.md",
+      "archive": "aggregate-successor-remaining-cells-report.md",
+      "bytes": 4659,
+      "sha256": "f6b7c80d2440533c8d0e8dde8e4ec209f50fc82e46c0d55a4d7cacce0cfaa046"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-remaining-cells.diff",
+      "archive": "aggregate-successor-remaining-cells.diff",
+      "bytes": 3737,
+      "sha256": "ad9c0b2ccf11afa7fe038e55a2c510f4b23b25db091209f7beeacc84a067446f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-remaining-preparation-retain.ts",
+      "archive": "aggregate-successor-remaining-preparation-retain.ts",
+      "bytes": 1982,
+      "sha256": "4ad4ea715d0ac899552b6b5c76a5e3426635f7a2e1588bd93cb6c37e2a5a1cf9"
+    }
+  ]
+}

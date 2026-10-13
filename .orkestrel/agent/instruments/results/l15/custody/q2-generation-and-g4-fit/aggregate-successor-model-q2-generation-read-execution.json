@@ -1,0 +1,7 @@
+﻿{
+    "command":  "node tmp/units/aggregate-successor-model-q2-generation-read.ts",
+    "exit":  0,
+    "durationMs":  779,
+    "stdout":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-model-q2-generation-read.stdout.txt",
+    "stderr":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-model-q2-generation-read.stderr.txt"
+}

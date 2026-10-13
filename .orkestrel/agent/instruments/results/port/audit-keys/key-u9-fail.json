@@ -1,0 +1,254 @@
+[
+ {
+  "id": "ad4d6799",
+  "run": "p1-ledger-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "2683d3f9",
+  "run": "p1-ledger-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "be3730bf",
+  "run": "a5-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a693491e",
+  "run": "p1-ledger-v2",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "19d56ef6",
+  "run": "p1-ledger-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "6975b3ff",
+  "run": "p1-ledger-v2",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "9cbd7777",
+  "run": "a5-records-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "4a5574b7",
+  "run": "a5-records-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "23ed3419",
+  "run": "p1-ledger-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "507f8328",
+  "run": "p1-ledger-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "eb43028d",
+  "run": "a5-records-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "216eb2de",
+  "run": "a5-records-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "9c3ad020",
+  "run": "p1-ledger-v4",
+  "goal": "g04-halvorsen-ticket",
+  "passed": false
+ },
+ {
+  "id": "040c81f1",
+  "run": "p1-ledger-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a533d3ad",
+  "run": "p1-ledger-v4",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "b2b04911",
+  "run": "a5-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b98c975f",
+  "run": "a5-records-v4",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7e0c5b90",
+  "run": "p1-ledger-v5",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "191fe20a",
+  "run": "p1-ledger-v5",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "19798b54",
+  "run": "p1-ledger-v5",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "460ca53c",
+  "run": "p1-ledger-v5",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "8bba175e",
+  "run": "a5-records-v5",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7e2e299b",
+  "run": "p1-ledger-v6",
+  "goal": "g01-luis-refund-amount",
+  "passed": false
+ },
+ {
+  "id": "56dc866b",
+  "run": "p1-ledger-v6",
+  "goal": "g04-halvorsen-ticket",
+  "passed": false
+ },
+ {
+  "id": "1f5ba83c",
+  "run": "p1-ledger-v6",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "5d825df9",
+  "run": "p1-ledger-v6",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "efaa74da",
+  "run": "p1-ledger-v6",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "1818a184",
+  "run": "a5-records-v6",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "141f1d42",
+  "run": "a5-records-v6",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "6fea854d",
+  "run": "a5-records-v6",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "bb7db562",
+  "run": "p1-ledger-v7",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "1e555e66",
+  "run": "p1-ledger-v7",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a8219bbb",
+  "run": "a5-records-v7",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "7271bac0",
+  "run": "a5-records-v7",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "77be9acc",
+  "run": "a5-records-v7",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "e07db33f",
+  "run": "p1-ledger-v8",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "e64f5d5b",
+  "run": "p1-ledger-v8",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "5e0d0485",
+  "run": "p1-ledger-v8",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "3bf37302",
+  "run": "a5-records-v8",
+  "goal": "g04-halvorsen-ticket",
+  "passed": false
+ },
+ {
+  "id": "24e9d54f",
+  "run": "a5-records-v8",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "17cf5bfa",
+  "run": "a5-records-v8",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "8608607c",
+  "run": "a5-records-v8",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ }
+]

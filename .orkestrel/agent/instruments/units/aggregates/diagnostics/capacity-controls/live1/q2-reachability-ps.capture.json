@@ -1,0 +1,11 @@
+{
+  "id": "q2-reachability-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 424,
+  "hash": "e34a2e526eb5857fa1e3b45e1909f37a932f5aeaee158ac53335ff2886ed3339",
+  "status": 200,
+  "started": "2026-10-11T11:04:02.335Z",
+  "finished": "2026-10-11T11:04:02.338Z",
+  "duration": 2.732299999999668
+}

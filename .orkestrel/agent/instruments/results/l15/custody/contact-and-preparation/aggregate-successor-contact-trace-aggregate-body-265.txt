@@ -1,0 +1,10 @@
+{
+  "index": 0,
+  "role": "system",
+  "content": "Reply with one token."
+}
+{
+  "index": 1,
+  "role": "user",
+  "content": ""
+}

@@ -1,0 +1,223 @@
+{
+ "runs": {
+  "g2-records-v4": {
+   "scorer": 7,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 7
+  },
+  "g2-control-v3": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 3,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 7
+  },
+  "g2-records-v5": {
+   "scorer": 8,
+   "falsePass": 2,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 6
+  },
+  "g2-control-v2": {
+   "scorer": 8,
+   "falsePass": 2,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 6
+  },
+  "g2-records-v3": {
+   "scorer": 9,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 8,
+   "high": 9
+  },
+  "g2-records-v6": {
+   "scorer": 8,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 8
+  },
+  "g2-records-v1": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 6
+  },
+  "g2-control-v5": {
+   "scorer": 8,
+   "falsePass": 4,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 2,
+   "high": 4
+  },
+  "g2-control-v6": {
+   "scorer": 6,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 5
+  },
+  "g2-records-v2": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "g2-control-v1": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 7
+  },
+  "g2-control-v4": {
+   "scorer": 6,
+   "falsePass": 0,
+   "ambiguousPass": 1,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 5,
+   "high": 6
+  },
+  "g2-control-v7": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 6,
+   "high": 6
+  },
+  "g2-records-v8": {
+   "scorer": 8,
+   "falsePass": 2,
+   "ambiguousPass": 2,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 6
+  },
+  "g2-records-v7": {
+   "scorer": 7,
+   "falsePass": 1,
+   "ambiguousPass": 0,
+   "misread": 1,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 7,
+   "high": 7
+  },
+  "g2-control-v8": {
+   "scorer": 8,
+   "falsePass": 1,
+   "ambiguousPass": 3,
+   "misread": 0,
+   "ambiguousFail": 0,
+   "rows": 10,
+   "low": 4,
+   "high": 7
+  }
+ },
+ "bands": [
+  {
+   "left": "g2-records",
+   "right": "g2-control",
+   "range": "1-8",
+   "end": "low",
+   "d": [
+    -2,
+    -1,
+    4,
+    1,
+    4,
+    2,
+    1,
+    0
+   ],
+   "mean": 1.125,
+   "bound": -0.40738842520892393,
+   "clears": false
+  },
+  {
+   "left": "g2-records",
+   "right": "g2-control",
+   "range": "1-8",
+   "end": "high",
+   "d": [
+    -1,
+    0,
+    2,
+    1,
+    2,
+    3,
+    1,
+    -1
+   ],
+   "mean": 0.875,
+   "bound": -0.15577640640441515,
+   "clears": false
+  },
+  {
+   "left": "g2-records",
+   "right": "g2-control",
+   "range": "1-8",
+   "end": "across",
+   "d": [
+    -3,
+    -1,
+    1,
+    0,
+    2,
+    2,
+    1,
+    -3
+   ],
+   "mean": -0.125,
+   "bound": -1.5611406616345072,
+   "clears": false
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "g2-cache",
+  "complete": true,
+  "breached": false,
+  "bytes": 348,
+  "hash": "7a744b35ab93884d66370263242eb81d0537278157a1b18fa14a337d7b6bd5be",
+  "status": 200,
+  "started": "2026-10-11T11:05:58.787Z",
+  "finished": "2026-10-11T11:05:58.940Z",
+  "duration": 153.289300000004
+}

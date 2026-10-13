@@ -1,0 +1,21 @@
+{
+  "name": "boundary",
+  "cwd": "C:/Users/mikes/WebstormProjects/scaffold",
+  "argv": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l14-b-quality-boundary-check-2.ts"
+  ],
+  "exitCode": 0,
+  "signal": null,
+  "durationMs": 103.0718,
+  "stdout": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-final-blind-b-check-2-boundary.stdout.log",
+    "bytes": 866,
+    "sha256": "3da3ccad8721b31c36fe6a057cff9af91b0c3c16e0cd226ba97978209282eaf2"
+  },
+  "stderr": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-final-blind-b-check-2-boundary.stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

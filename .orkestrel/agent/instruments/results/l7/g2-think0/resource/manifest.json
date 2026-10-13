@@ -1,0 +1,68 @@
+{
+  "protocol": "l6",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\freeze\\manifest.json",
+    "hash": "04a1e41ae941899e6af64b3289b7e9604f64b508db86f376fc0bccc0403ef487"
+  },
+  "accepted": true,
+  "attempts": [
+    {
+      "execution": {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\execution.json",
+        "hash": "9c7af01239dddfd0f72ce71b82b3e0323c934a155d60a8d023f316c5bf557d07"
+      },
+      "run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1",
+      "budget": {
+        "reserve": 512,
+        "window": 3072,
+        "predict": 0
+      },
+      "accepted": true,
+      "failures": [],
+      "resource": false,
+      "files": [
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\run.json",
+          "hash": "347ed3f69c991e10bccdd426a18e1758cce62cf94c1b2ff9b7d6cc796d3d6334"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\rows.jsonl",
+          "hash": "ed00810cb171659386063adb2167dd1c80378a7c936c8449ffeab22099300598"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\selections.jsonl",
+          "hash": "f7944c5942a55bcb83ea09f9502bd644e1a25dfb16775e7d79ef16d6bcb2c1c5"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\requests.jsonl",
+          "hash": "f05d8476dc82e27e479edf9bf9a66084e03addb30409aadc275ea52d0e1782d1"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\turns.jsonl",
+          "hash": "d86f0c8fcfe2663df2b874746d90b8f9845ad00e3af1b939d37e5cb0554aa20d"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\calls.jsonl",
+          "hash": "ed7a83d5223bd86aa5fa91d7810d22c078331338f6c9fad03ef57fa733727217"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\messages.jsonl",
+          "hash": "4140b5a7f693b737a38ba02de1e653d39a00763d1b65ea8323d13a48b95a5d29"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\judgments.jsonl",
+          "hash": "4a7d2b8111ac5de2fa7fef64389f2daa41e7af207b1d22f881ea0e961bfad890"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\model-inventory.json",
+          "hash": "6fb04221184bcf46ef33dbb17c79bee4eb1fc2eb8c0fce74593f58c09a4ca986"
+        }
+      ]
+    }
+  ],
+  "budget": {
+    "reserve": 512,
+    "window": 3072,
+    "predict": 0
+  }
+}

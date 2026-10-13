@@ -1,0 +1,232 @@
+{
+	"capacity": 3072,
+	"allowance": 555,
+	"readings": [
+		{
+			"goal": "g01-luis-refund-amount",
+			"prompt": 1679,
+			"completion": 28,
+			"headroom": 1365,
+			"calls": [
+				{
+					"sequence": 4,
+					"prompt": 1489,
+					"completion": 28
+				},
+				{
+					"sequence": 5,
+					"prompt": 1679,
+					"completion": 27
+				}
+			]
+		},
+		{
+			"goal": "g02-luis-card",
+			"prompt": 1641,
+			"completion": 34,
+			"headroom": 1397,
+			"calls": [
+				{
+					"sequence": 7,
+					"prompt": 1542,
+					"completion": 34
+				},
+				{
+					"sequence": 8,
+					"prompt": 1641,
+					"completion": 29
+				}
+			]
+		},
+		{
+			"goal": "g03-grace-escalation",
+			"prompt": 2252,
+			"completion": 265,
+			"headroom": 555,
+			"calls": [
+				{
+					"sequence": 10,
+					"prompt": 1623,
+					"completion": 27
+				},
+				{
+					"sequence": 11,
+					"prompt": 1891,
+					"completion": 29
+				},
+				{
+					"sequence": 12,
+					"prompt": 2252,
+					"completion": 265
+				}
+			]
+		},
+		{
+			"goal": "g04-halvorsen-ticket",
+			"prompt": 1922,
+			"completion": 29,
+			"headroom": 1121,
+			"calls": [
+				{
+					"sequence": 14,
+					"prompt": 1609,
+					"completion": 28
+				},
+				{
+					"sequence": 15,
+					"prompt": 1922,
+					"completion": 29
+				}
+			]
+		},
+		{
+			"goal": "g05-luis-approval-note",
+			"prompt": 1937,
+			"completion": 216,
+			"headroom": 919,
+			"calls": [
+				{
+					"sequence": 17,
+					"prompt": 1546,
+					"completion": 27
+				},
+				{
+					"sequence": 18,
+					"prompt": 1814,
+					"completion": 26
+				},
+				{
+					"sequence": 19,
+					"prompt": 1880,
+					"completion": 26
+				},
+				{
+					"sequence": 20,
+					"prompt": 1937,
+					"completion": 216
+				}
+			]
+		},
+		{
+			"goal": "g06-kenji-shipping",
+			"prompt": 1632,
+			"completion": 120,
+			"headroom": 1320,
+			"calls": [
+				{
+					"sequence": 22,
+					"prompt": 1498,
+					"completion": 33
+				},
+				{
+					"sequence": 23,
+					"prompt": 1632,
+					"completion": 120
+				}
+			]
+		},
+		{
+			"goal": "g07-depot-release",
+			"prompt": 1630,
+			"completion": 73,
+			"headroom": 1369,
+			"calls": [
+				{
+					"sequence": 25,
+					"prompt": 1630,
+					"completion": 73
+				}
+			]
+		},
+		{
+			"goal": "g08-halvorsen-credit",
+			"prompt": 1698,
+			"completion": 80,
+			"headroom": 1294,
+			"calls": [
+				{
+					"sequence": 27,
+					"prompt": 1580,
+					"completion": 34
+				},
+				{
+					"sequence": 28,
+					"prompt": 1698,
+					"completion": 80
+				}
+			]
+		},
+		{
+			"goal": "g09-kenji-gift-note",
+			"prompt": 1571,
+			"completion": 32,
+			"headroom": 1469,
+			"calls": [
+				{
+					"sequence": 30,
+					"prompt": 1488,
+					"completion": 32
+				},
+				{
+					"sequence": 31,
+					"prompt": 1571,
+					"completion": 23
+				}
+			]
+		},
+		{
+			"goal": "g10-sigrid-callback",
+			"prompt": 1798,
+			"completion": 60,
+			"headroom": 1214,
+			"calls": [
+				{
+					"sequence": 33,
+					"prompt": 1655,
+					"completion": 26
+				},
+				{
+					"sequence": 34,
+					"prompt": 1798,
+					"completion": 60
+				}
+			]
+		},
+		{
+			"goal": "g11-grace-signoff-today",
+			"prompt": 2173,
+			"completion": 53,
+			"headroom": 846,
+			"calls": [
+				{
+					"sequence": 36,
+					"prompt": 1737,
+					"completion": 29
+				},
+				{
+					"sequence": 37,
+					"prompt": 2173,
+					"completion": 53
+				}
+			]
+		},
+		{
+			"goal": "g12-copperline-gesture",
+			"prompt": 2005,
+			"completion": 35,
+			"headroom": 1032,
+			"calls": [
+				{
+					"sequence": 39,
+					"prompt": 1659,
+					"completion": 30
+				},
+				{
+					"sequence": 40,
+					"prompt": 2005,
+					"completion": 35
+				}
+			]
+		}
+	]
+}

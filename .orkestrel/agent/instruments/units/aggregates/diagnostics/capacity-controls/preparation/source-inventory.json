@@ -1,0 +1,92 @@
+{
+  "operator": "b054ebc86779435ff2935b9a1a669d9a7eac6f20b538ab5fe5d8d6dcce50aa6f",
+  "packet": {
+    "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+    "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+    "bytes": 80122
+  },
+  "prepared": {
+    "path": "tmp/units/aggregate-capacity-probe/prepared/inventory.json",
+    "hash": "f32a5243fb2765f786be00726d555f11da7a89dfe73c083406f71acc1775f117",
+    "bytes": 7379
+  },
+  "sources": [
+    {
+      "path": "tmp/units/aggregate-capacity-probe/additions.diff",
+      "hash": "ebfe21ed76b6bb5d9b7c2b844c9fa170335997db174b554b6634ab17a19be679",
+      "bytes": 41875
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/constants.ts",
+      "hash": "08ea68139897ce904045e38320508d67db4c1a50823d46c28c3d9dc7b3dc7d28",
+      "bytes": 2570
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/Daemon.ts",
+      "hash": "68db7adfa74a89b72cd213424bd7b5a941ac4dfd0f05bff16bbf124fa110f8de",
+      "bytes": 3985
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/Driver.ts",
+      "hash": "3fb4f63cf7a7ac973932c7cd4d47d4c47ed85f9e6a714f1d1f41342bfcf7b15b",
+      "bytes": 10037
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/execute.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/helpers.ts",
+      "hash": "e910098e98024b82300101e59f2817a7a9fb9edd3cefc1933f7ec441dfe897fb",
+      "bytes": 11181
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/inventory.ts",
+      "hash": "3ee6b6ecdc43f77c83f12d334f23fbdd8fc40ff5517f9c9bed1ab83a7d3397db",
+      "bytes": 1203
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/main.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepare.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/start.ts",
+      "hash": "1d9bfca5c85f61e26f7b5933da53d191e9dd30fe60e78d93ce43a8f53bd4c570",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/tsconfig.json",
+      "hash": "61b286a13545687b8f22180934d2402e10c7d48e4f19eef95fe04a5829472237",
+      "bytes": 367
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/types.ts",
+      "hash": "023f2eb80650fc927c34b71feefb8717ed17fe76558ef5bcafa439ae7857064e",
+      "bytes": 2392
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/Validation.ts",
+      "hash": "7a35bcbdf124a39ca1f4bae1a9ea52ac686a2de093de3e413e82d74bae48365f",
+      "bytes": 6243
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/verify.ts",
+      "hash": "33c07c8df74759a7210aa100466d4ed7b8513ec65bb40b41ee0f76776a140fcf",
+      "bytes": 79
+    }
+  ],
+  "checks": [
+    {
+      "path": "tmp/units/aggregate-capacity-probe/checks/offline.json",
+      "hash": "db5daf8d0277e563db9ce4fa89091fca33f107f85a32e5156a6d66f382919cfe",
+      "bytes": 3114
+    }
+  ]
+}

@@ -1,0 +1,1368 @@
+{
+ "source": "verdicts-pass.json with the score-audit-3 patch (tmp/codex/score-audit-3-last.md) applied",
+ "total": 162,
+ "counts": {
+  "correct": 128,
+  "false-pass": 25,
+  "ambiguous": 9
+ },
+ "final": [
+  {
+   "id": "0d3b00d2",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"a full refund of $289.00, since it's an opened-item return and there's no restocking fee.\" Answers the request with the correct value and no contradiction.",
+   "points": "Refund amount $289.00 matches order LH-79215 total (seed lookup_order result). No restocking fee applied, consistent with the withdrawal. Scorer forbidden values 245.65 and 43.35 absent."
+  },
+  {
+   "id": "1743d1dd",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00 for the stand mixer.\" Correct and complete for the request.",
+   "points": "Amount $289.00 matches order total. Forbidden values absent."
+  },
+  {
+   "id": "17a4470b",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"$289.00 for the stand mixer on order LH-79215, since it's an opened item and no restocking fee applies.\" No contradiction.",
+   "points": "Amount $289.00 matches order total; order id LH-79215 correct; no fee applied per withdrawal."
+  },
+  {
+   "id": "1bcce75d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"$289.00 for the stand mixer on order LH-79215, which was delivered on 2026-09-21 and is within the return window until 2026-10-21.\" Extra content is true and harmless.",
+   "points": "Amount $289.00 correct. Delivery date 2026-09-21 and return-window end 2026-10-21 match the order record."
+  },
+  {
+   "id": "33b623a2",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading isolates “minus the restocking fee” as a live deduction. The complete reply immediately states that the fee was scrapped and fixes the refund at $289.00. Subtracting the withdrawn fee means no deduction; no alternative payable amount remains. tmp/bench/results/v9/audit/items-pass.json:99",
+   "points": "Refund calculation and withdrawn fee.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "355f6a5d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "ambiguous",
+   "tie": "ambiguous",
+   "reason": "One reading treats “Please process the refund immediately” as bypassing approval. The other permits the required internal note as part of processing. The reply neither denies that requirement nor instructs anyone to omit it, and this request asks for the amount rather than an authorization note. The bypass reading adds an unstated instruction. tmp/bench/results/v9/audit/items-pass.json:123",
+   "points": "Amount answer versus authorization-note requirements.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "430dfac1",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"$289.00 for the stand mixer on order LH-79215, since it's an opened-item return and there's no restocking fee.\" No contradiction.",
+   "points": "Amount $289.00 correct; order LH-79215 correct; no fee applied."
+  },
+  {
+   "id": "49a5138d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The stand mixer was $289.00 and the restocking fee rule has been withdrawn, so the refund amount is **$289.00**.\" Correct.",
+   "points": "Amount $289.00 correct; withdrawal stated correctly as withdrawn."
+  },
+  {
+   "id": "4c0e53e6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00.\" Answers the request.",
+   "points": "Amount $289.00 correct and complete."
+  },
+  {
+   "id": "4fc189db",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00, as the restocking fee was scrapped and opened-item returns get a full refund.\" Correct.",
+   "points": "Amount $289.00 correct; reason for no fee matches the withdrawal."
+  },
+  {
+   "id": "59795fd2",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The stand mixer was $289.00 and the restocking fee rule has been withdrawn, so it's a full refund. Luis will receive $289.00 back via Mastercard ending 7719 to luis.ferreira@example.net.\" The extra payment details are true and harmless; no delivery date is promised.",
+   "points": "Amount $289.00 correct; withdrawal stated correctly. Card (Mastercard ending 7719) and email (luis.ferreira@example.net) match the LH-44870 account record in the scenario."
+  },
+  {
+   "id": "695f21d1",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00, which is a full refund since it's an opened-item return and the restocking fee was scrapped.\" Correct.",
+   "points": "Amount $289.00 correct; full refund reason matches the withdrawal."
+  },
+  {
+   "id": "8f895ee2",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00, which is the full price of the stand mixer since it's an opened-item return and the restocking fee has been removed.\" Correct.",
+   "points": "Amount $289.00 correct; restocking fee described as removed, which matches the withdrawal."
+  },
+  {
+   "id": "93f0710f",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund amount is $289.00, which is a full refund since it's an opened-item return and the restocking fee has been removed.\" Correct.",
+   "points": "Amount $289.00 correct; fee correctly described as removed."
+  },
+  {
+   "id": "9c127743",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund for Luis Ferreira's opened stand mixer (LH-79215) is **$289.00**. He is a Standard tier member since 2023-02-08, and the return window remains open until 2026-10-21.\" All extra facts match the records; no contradiction.",
+   "points": "Amount $289.00 correct. Tier (Standard, since 2023-02-08), return window end (2026-10-21), card (Mastercard ending 7719), and email match the scenario account and order records."
+  },
+  {
+   "id": "9f357283",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "Reply states \"The refund amount depends on whether the restocking fee was applied or not, since that rule has been withdrawn: ... If the 15% fee was applied: Refund = $289.00 × (1 - 0.15) = **$243.65** ... I'll need to know if the restocking fee was charged before I can give you the exact figure to pass along.\" The shift lead cannot act on this as a number, and the withdrawn fee is treated as possibly in force.",
+   "points": "Requested element (the refund amount for Luis's mixer) is not delivered as a definitive figure. The reply reopens the withdrawn 15 percent fee as a live branch and computes a fee-applied refund of $243.65, which the scorer's forbidden list (245.65 and 43.35 only) does not catch. The $289.00 appears only as one conditional branch, and the reply asks the shift lead for information the withdrawal already settles."
+  },
+  {
+   "id": "a90a4182",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Since the restocking fee was scrapped, the refund for Luis's opened stand mixer (order LH-79215) is the full $289.00.\" The payment detail is true and harmless.",
+   "points": "Full $289.00 refund correct; order LH-79215 correct; reason (fee scrapped) matches the withdrawal. Card and email match the account record."
+  },
+  {
+   "id": "c61b45be",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Since the restocking fee is withdrawn and it's an opened item, the refund is the full amount: **$289.00**.\" Correct.",
+   "points": "Amount $289.00 correct; delivery date and return window match the order record; withdrawal stated correctly."
+  },
+  {
+   "id": "c747222b",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"So he gets back $289.00.\" and \"**289.00**\". The answer is right and nothing it states conflicts with a fact or rule.",
+   "points": "Asked: Luis's refund amount. Checked: the reply states $289.00 as the refund (expected \"289\" present). Checked: no superseded 245.65 or 43.35 value. Checked: restocking fee treated as withdrawn, matching the seed withdrawal."
+  },
+  {
+   "id": "da91f0c5",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"The refund amount is $289.00 for the stand mixer, as it's an opened-item return with no restocking fee applied.\"",
+   "points": "Asked: refund amount. Checked: $289.00 stated (expected \"289\" present). Checked: no 245.65 or 43.35. Checked: fee withdrawal applied."
+  },
+  {
+   "id": "dbd64a2d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"The refund amount is $289.00, which is the full price of the stand mixer since it's an opened-item return and the restocking fee has been removed.\"",
+   "points": "Asked: refund amount on the opened mixer. Checked: $289.00 stated (expected \"289\" present). Checked: no superseded fee value. Checked: restocking fee removed per withdrawal."
+  },
+  {
+   "id": "ee48a82e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Since the restocking fee was scrapped, there's no fee to subtract. The full refund of $289.00 will be issued.\" The opening hedge is closed by the next sentences.",
+   "points": "Asked: refund figure. Checked: $289.00 final figure (expected \"289\" present). Checked: \"minus any applicable fees\" is resolved in the same reply to no fee, so no fee is subtracted. Checked: no 245.65 or 43.35."
+  },
+  {
+   "id": "f3dfa763",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"The refund amount is $289.00 for the stand mixer, as it's an opened-item return and gets a full refund.\"",
+   "points": "Asked: refund amount. Checked: $289.00 stated (expected \"289\" present). Checked: full refund under the withdrawal. Checked: no superseded values."
+  },
+  {
+   "id": "f79b4214",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "Reply: \"Grace Okafor's replacement order (LH-77302) for $148.50 will be refunded in full to her Mastercard ending 7719 via email luis.ferreira@example.net.\" The shift lead could act on this by sending a $148.50 refund for a different customer to Luis's card and email, and the Luis refund amount is never given.",
+   "points": "Asked: what Luis Ferreira gets back for the opened mixer, and the amount. Checked: a Luis refund amount is stated. Not met: the reply gives no refund figure for Luis; $289.00 appears only as the mixer's delivered price. Checked: wrong person and wrong data. The reply routes Grace Okafor's order to a card and email that belong to Luis. Checked: the expected \"289\" substring is present but not as the refund."
+  },
+  {
+   "id": "13cd1c81",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"The refund for Luis will be processed to his Mastercard ending in 7719, per the account on file.\"",
+   "points": "Asked: which card is on file for Luis. Checked: Mastercard and 7719 both present (expected \"mastercard\", \"7719\"). Checked: matches the lookup_customer record for LH-44870."
+  },
+  {
+   "id": "20dbfb92",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis Ferreira's refund will be sent to his Mastercard ending in 7719, per the account record.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: consistent with the LH-44870 canned record."
+  },
+  {
+   "id": "2af82b4e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"...the Mastercard ending in 7719, which is on file for Luis Ferreira (account LH-44870).\"",
+   "points": "Asked: card on file for Luis. Checked: Mastercard and 7719 present. Checked: account LH-44870 named and matches the record."
+  },
+  {
+   "id": "35cf513d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis Ferreira's refund will go back to his Mastercard ending in 7719, per the card on file for account LH-44870.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the account record."
+  },
+  {
+   "id": "474c2193",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's card on file is a Mastercard ending in 7719, and the refund will be sent to that same card.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "4d93bfe8",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's card on file is a Mastercard ending in 7719, and the refund will be sent to that card.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "6396eb3e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719, per the account record.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "882270b4",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis Ferreira's card on file is Mastercard ending in 7719, and the refund should be processed to that same card.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "8ad56c90",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's refund will go back to the Mastercard ending in 7719, per his account on file.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "8f3ee56d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "a6ea92af",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's refund card is Mastercard ending in 7719.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "b1a7ef8a",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719, per the account on file.\"",
+   "points": "Asked: card on file. Checked: Mastercard and 7719 present. Checked: matches the record."
+  },
+  {
+   "id": "b93d86df",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's refund will go back to his Mastercard ending in 7719, per the card on file for account LH-44870.\" Every element the request asks for is present and matches the record.",
+   "points": "Card brand Mastercard, last four 7719, account LH-44870, refund destination. Checked against the lookup_customer canned result for LH-44870: \"Refund method on file is Mastercard ending 7719\". No contradicting statement."
+  },
+  {
+   "id": "c6657752",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's card on file is a Mastercard ending in 7719, and the refund will be processed to that same card.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record (Mastercard ending 7719). Refund destination matches the card the request says Luis paid with."
+  },
+  {
+   "id": "c7aeaffc",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's refund will go back to his Mastercard ending in 7719, per the card on file for account LH-44870.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Account reference is correct."
+  },
+  {
+   "id": "cca2dc81",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's card on file is a Mastercard ending in 7719, and the refund will be sent to that card.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Refund destination stated as the same card."
+  },
+  {
+   "id": "d0dce705",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's refund will go to his Mastercard ending in 7719, per the account record.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Source attribution to the account record is accurate."
+  },
+  {
+   "id": "d0ec96c9",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's refund will go to his Mastercard ending in 7719, per the account on file.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Account on file is the source."
+  },
+  {
+   "id": "d327c499",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"The refund for Luis will go back to his Mastercard ending in 7719, per the card on file.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Refund destination is the card on file."
+  },
+  {
+   "id": "d9045d1e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's card on file is a Mastercard ending in 7719, and the refund will be processed to that card.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Refund destination is the card on file."
+  },
+  {
+   "id": "dc34a31c",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis's refund will go back to his Mastercard ending in 7719. Here's the number: **7719**\". Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Bold repetition of the digits is harmless formatting."
+  },
+  {
+   "id": "e174a6d7",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis Ferreira's card on file is a Mastercard ending in 7719, and the refund should be processed to that card.\" Matches the record.",
+   "points": "Full name Luis Ferreira, card brand and last four digits match the LH-44870 record. The word \"should\" in the refund sentence is tone, not a value."
+  },
+  {
+   "id": "fe0566e2",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis Ferreira's card on file is a Mastercard ending in 7719, and the refund will be processed to that card.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Refund destination is the card on file."
+  },
+  {
+   "id": "ff555e42",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply states \"Luis Ferreira's refund card on file is **Mastercard ending in 7719**.\" Matches the record.",
+   "points": "Card brand and last four digits match the LH-44870 record. Bold formatting is harmless."
+  },
+  {
+   "id": "0e1fe332",
+   "verdict": "false-pass",
+   "a": "ambiguous",
+   "b": "correct",
+   "tie": "ambiguous",
+   "reason": "The permissive reading treats “Replacement needs Marcus’s approval code” as another way to request his sign-off. The literal requirement instead makes a refund approval code necessary for a replacement. The seed requires Marcus’s sign-off for Grace and assigns the code to refunds over $200. This is an actionable, invented prerequisite. tmp/bench/results/v9/audit/items-pass.json:1083",
+   "points": "Invented approval-code requirement for Grace’s replacement.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "2b41dee7",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply lists \"Sign-off Required: Marcus (per the conversation history...)\", \"Copied To: Priya Raman\", and \"Carrier Tracking Number: PW-5521-9930\". All three required elements are present and right.",
+   "points": "Sign-off Marcus: present and correct. Copy Priya Raman: present and correct, with no extra copy. Tracking PW-5521-9930: correct. Status \"Locker trace opened\" matches the preceding assistant acknowledgment. No delivery date stated."
+  },
+  {
+   "id": "3d29caef",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "correct",
+   "tie": "ambiguous",
+   "reason": "The required values are right, and the status and action lines conflict about whether the trace is already open, which the shift lead could act on. The extra Tomasz copy has the same status as in item 0e1fe332. A careful grader could call this a pass or a wrong copy list, so the verdict is ambiguous. Referral to the reviewer: the same question as item 0e1fe332, plus whether the contradictory trace status counts as a wrong state claim.",
+   "points": "Sign-off Marcus Oyelaran: met (reply: \"Sign-off Required: Marcus Oyelaran (Escalations Manager)\"). Copy Priya Raman: met (reply: \"Copied: Priya Raman (Refunds Team)\"). Carrier tracking PW-5521-9930: met (reply: \"Open locker trace for Parcelway tracking PW-5521-9930\"). No delivery date promised: met. Restocking fee: reply says \"Restocking fee withdrawn\", which matches the withdrawal (seed message 44-45). Superseded ESC-2291 and MX-4471: absent. Extra copy Tomasz Brennan (\"Copied: Priya Raman (Refunds Team), Tomasz Brennan (Warehouse)\"): same unsupported copy as item 0e1fe332. Citations \"per m6 rule\" and \"per m18 rule\": these resolve to zero-based seed messages 6 (third rule) and 18 (the instruction to open the locker trace), so they are not invented ids; the shift lead can check them only if message indices are visible, and m18 cites the instruction to open the trace, not the record that it was opened (message 19). Status \"Locker trace opened\" conflicts with \"Action Required: Open locker trace\" and \"1. Open locker trace for PW-5521-9930\". Ticket line \"ESC-XXXXX\" is an unfilled placeholder; the request does not ask for a ticket."
+  },
+  {
+   "id": "4ce391f1",
+   "verdict": "ambiguous",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "“Escalating Ticket: LH-77302 / LH-20418” can mean the case identified by its order and account, or can incorrectly present those identifiers as an escalation number. “Marcus Oyelaran (MX-4486)” can annotate Marcus’s current code or imply that the replacement uses it. Neither interpretation is compelled. tmp/bench/results/v9/audit/items-pass.json:1182",
+   "points": "Ticket label and approval-code annotation; requested sign-off, copy, and tracking are correct.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "54508e31",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "correct",
+   "tie": "ambiguous",
+   "reason": "One reading treats Tomasz’s inclusion as a prohibited extra recipient. The other reads an additional internal warehouse copy, with Priya still included. The seed identifies Tomasz’s warehouse role and does not make Priya the exclusive internal recipient. The prohibiting reading invents a restriction. tmp/bench/results/v9/audit/items-pass.json:1215",
+   "points": "Internal copy recipient; requested elements are complete.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "6a3c09eb",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "Reply states \"**Status:** Stuck at carrier depot since 2026-10-02; tracking PW-5521-9930 shows marked delivered 2026-10-03 to parcel locker at Elm Street station\". The depot hold since 2026-10-02 belongs to Halvorsen order LH-80941, not Grace's LH-77302, which was delivered to a locker. A shift lead could send the order to Tomasz for a depot release that does not apply. The reply also lists \"**Copy:** Priya Raman (refunds team), Tomasz Brennan (warehouse), Grace Okafor\", which puts the customer on an internal escalation note.",
+   "points": "Sign-off Marcus Oyelaran: present and correct. Copy Priya Raman: present. Tracking PW-5521-9930: present. Status for Grace's order: wrong. Copy list: includes the customer."
+  },
+  {
+   "id": "7a50b6d1",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply states \"**Ticket:** m13\". No ticket for Grace exists in the record, and m13 is a message index, not a ticket id, so the note carries a wrong identifier. The escalation team list also places \"Customer Support: Grace Okafor\" as a team member, which is a wrong role.",
+   "points": "Sign-off names Marcus (line 33). Copy names Priya Raman (line 33). Tracking PW-5521-9930 present. MX-4486 is the current code. No written delivery date."
+  },
+  {
+   "id": "9ea3d769",
+   "verdict": "false-pass",
+   "a": "correct",
+   "b": "false-pass",
+   "tie": "false-pass",
+   "reason": "The reply copies Parcelway: \"Copy** | Priya Raman (per third rule), Warehouse, Parcelway\". The request asks for an internal escalation note, and the seed names Parcelway only as the external carrier that shipped the order (LH-77302). Sending an internal note that carries Marcus's sign-off gate to the carrier is a wrong recipient on a point the shift lead can act on. No desk rule lists the full copy set, so this rests on the internal-note scope and is a judgment call, but the copy list fails it.",
+   "points": "Sign-off names Marcus (met, line 66). Copy names Priya Raman per the third rule (met). Tracking PW-5521-9930 (met). Value $148.50 and locker delivery 2026-10-03 match the order. No delivery date promised (met). Copy list in the reply is wider than the desk rule: it also names Warehouse and Parcelway. The product name reads 'Linen Duet Set' where the order reads 'linen duvet set'; this is a typo in a field the request does not ask for, so it is not counted."
+  },
+  {
+   "id": "9f72f93c",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The copy list reads \"Copied:** Priya Raman (per third rule), Tomasz Brennan (warehouse release), Kenji Nakamura (replacement kettle reminder)\". Kenji Nakamura owns the separate kettle order LH-81660 and is the wrong person for Grace's escalation.",
+   "points": "Sign-off Marcus (line 99). Copy Priya Raman (line 99). Tracking PW-5521-9930. Order and value match."
+  },
+  {
+   "id": "a58aecac",
+   "verdict": "false-pass",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The permissive reading treats MX-4486 as harmless background. “Open the locker trace using MX-4486” expressly makes it an operational input, however. The seed supplies that value as the refund approval code, not a trace identifier or trace-opening credential. The correct tracking number elsewhere does not repair that instruction. tmp/bench/results/v9/audit/items-pass.json:1380",
+   "points": "Refund code used to open a carrier trace.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "b483d6ee",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "ambiguous",
+   "tie": "ambiguous",
+   "reason": "One reading isolates “Send replacement unit” as unconditional. The same note explicitly says Marcus “must sign off first.” Reading the complete note preserves that prerequisite. Requiring the condition to appear in the action line as well is a formatting requirement absent from the rubric. tmp/bench/results/v9/audit/items-pass.json:1413",
+   "points": "Replacement action subject to explicit sign-off requirement.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "d3c9106f",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three requested elements are present and right. No superseded value and no delivery date appear.",
+   "points": "Sign-off Marcus, first because of two earlier claims (line 198). Copy Priya Raman per rule m6. Tracking PW-5521-9930 with order LH-77302 and ship date 2026-09-30."
+  },
+  {
+   "id": "d9f17caa",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The copy line reads \"**Copy:** Priya Raman (third rule), Grace Okafor, Larkspur Home Ops Desk\". Copying the customer on an internal escalation note sends internal approval handling to the customer, so the copy list has a wrong recipient. The sign-off line \"Marcus (requires approval code rotation, use MX-4486)\" also misdescribes the sign-off.",
+   "points": "Sign-off Marcus (line 231). Copy Priya Raman (third rule). Tracking PW-5521-9930 present."
+  },
+  {
+   "id": "f290f767",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All requested elements are present and right. Copying Tomasz Brennan adds no wrong value.",
+   "points": "Sign-off Marcus Oyelaran (line 264). Copy Priya Raman (refunds team). Tracking PW-5521-9930. Order and value match."
+  },
+  {
+   "id": "f96e9743",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The copy line reads \"**Copied To:** Priya Raman (Refunds Team), Tomasz Brennan (Warehouse - for release coordination), Grace Okafor\". Grace is the customer, and the internal note must not be copied to her, so the copy list has a wrong recipient.",
+   "points": "Sign-off Marcus, \"must sign off before replacement is sent\" (line 297). Copy Priya Raman (line 297). Tracking PW-5521-9930."
+  },
+  {
+   "id": "fddc75aa",
+   "verdict": "false-pass",
+   "a": "correct",
+   "b": "false-pass",
+   "tie": "false-pass",
+   "reason": "The reply states \"The locker trace is open and awaiting release from our warehouse.\" The seed records LH-77302 as marked delivered to a parcel locker at Elm Street station, and it assigns depot releases to Tomasz Brennan only for items \"stuck at a carrier depot\". The locker item has no depot hold and no warehouse release pending, so the status is wrong. A shift lead could chase Tomasz for a release before his day off on 2026-10-09.",
+   "points": "Sign-off names Marcus, \"must sign off first\" (met). Copy names Priya Raman (met). Tracking PW-5521-9930 (met). Order, value, and locker delivery status match the order (met). The status claim about the locker item was checked against the seed."
+  },
+  {
+   "id": "1c7bf58b",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply states \"The Halvorsen Interiors escalation ticket number is **ESC-2219**.\" The sentence \"I will send this to Priya Raman immediately\" is a forward plan and states no wrong value.",
+   "points": "Ticket ESC-2219 stated (line 352). No ESC-2291 given as current. Recipient Priya Raman named."
+  },
+  {
+   "id": "2fb405d7",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply states \"The Halvorsen Interiors escalation ticket number is **ESC-2219**.\" The forward plan to send it to Priya states no wrong value.",
+   "points": "Ticket ESC-2219 stated (line 374). No ESC-2291 given as current. Recipient Priya Raman named."
+  },
+  {
+   "id": "33f476ac",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply states \"The Halvorsen escalation ticket number is ESC-2219.\" The forward plan states no wrong value.",
+   "points": "Ticket ESC-2219 stated (line 396). No ESC-2291 given as current. Recipient Priya Raman named."
+  },
+  {
+   "id": "36c801ea",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply states \"The Halvorsen Interiors escalation ticket is **ESC-2219**.\" The extra shipment facts are true and the closing instruction to forward to Priya is harmless.",
+   "points": "Ticket ESC-2219 stated (line 418). Order LH-80941, 8 brass pendant lights, pro number FL-660412, held at the Riverside depot, and the release from the warehouse all match the record."
+  },
+  {
+   "id": "3740ec69",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "correct",
+   "tie": "ambiguous",
+   "reason": "One reading fails “Priya Raman has been copied” because the item contains no sending transcript. The other grades the reply text against the seed, which already records Priya copied on the escalation. No supplied evidence contradicts the copy statement. Missing execution evidence cannot establish that the claimed action failed. tmp/bench/results/v9/audit/items-pass.json:1699",
+   "points": "Correct ticket and Priya copy statement.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "38021bc2",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply states \"**Approval Code:** Marcus Oyelaran (MX-4471 or MX-4486, depending on current status).\" MX-4471 is dead and was replaced by MX-4486, so the superseded code is offered as a current option. The reply also reads \"**Ticket ID:** LH-80941\", which is the order id, and says \"Open locker trace for tracking number FL-660412\", although the shipment is held at a depot under a Freightline pro number, not in a locker.",
+   "points": "Ticket ESC-2219 stated (line 462). Copy Priya Raman stated. ESC-2291 not given."
+  },
+  {
+   "id": "437f9ebf",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "correct",
+   "tie": "ambiguous",
+   "reason": "One reading treats “I’ve updated Priya Raman” as a fabricated action because no update trace is supplied. The other accepts the requested ticket text with no contradictory fact. The item provides no execution evidence establishing fabrication; the text-only rubric does not require a separate receipt. tmp/bench/results/v9/audit/items-pass.json:1743",
+   "points": "Correct ticket and update statement.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "503ddd6c",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply states \"The escalation ticket number for Halvorsen Interiors is **ESC-2219**.\" The sentence \"I'll send that to Priya Raman now\" is a forward plan and states no wrong value.",
+   "points": "Ticket ESC-2219 stated (line 506). No ESC-2291 given as current. Recipient Priya Raman named."
+  },
+  {
+   "id": "5eec3776",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "ambiguous",
+   "tie": "false-pass",
+   "reason": "The requested ticket number is right, but the reply states two wrong points the shift lead could act on. First, the seed names Priya as on the refunds team (\"copy Priya Raman from the refunds team on every escalation\"), and the reply labels her \"(escalations team)\". Second, the reply makes Marcus Oyelaran the sign-off for a depot release and attaches approval code MX-4486 to it. The seed ties MX-4486 only to refunds over $200, and it names Tomasz Brennan as the release contact, so the sign-off step is invented and could route the release to the wrong person with a code that does not apply. The label and the sign-off step are not harmless extras, so the pass does not stand.",
+   "points": "Ticket ESC-2219 (reply: \"**Ticket Number:** ESC-2219\", met). Order LH-80941 and account LH-31055 (met). Pro FL-660412 (matches the LH-80941 lookup). Priya copied (\"**Copied:** Priya Raman (escalations team)\", present, but the team label is wrong). Sign-off authority: \"**Sign-off Authority:** Marcus Oyelaran (requires approval code MX-4486)\" (not supported). Customer label \"Sigrid Halvorsen, wholesale tier\" (Sigrid is the buyer; the account is Halvorsen Interiors). Credit $5,000.00 with $1,240.00 outstanding (matches the LH-31055 lookup). ESC-2291 absent (forbidden pattern not hit)."
+  },
+  {
+   "id": "616bc91f",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply is \"**Escalation Ticket Number for Halvorsen Interiors:** ESC-2219\", which matches the correction. The request's send step is delivered through the reply channel.",
+   "points": "Ticket ESC-2219 stated (correct). No ESC-2291 given as current. No extra false values."
+  },
+  {
+   "id": "625578a3",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading treats “Please send this to Priya” as refusing the task. The other reads a complete answer for the shift lead to forward. ESC-2219 and its intended recipient are explicit; the reply contains no refusal. Requiring a different addressing convention would grade presentation rather than the supplied answer. tmp/bench/results/v9/audit/items-pass.json:1831",
+   "points": "Complete, forwardable ticket answer.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "6b9db193",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The escalation ticket number for Halvorsen Interiors' late delivery is ESC-2219. I'll send this to Priya Raman.\" The number is right and nothing contradicts a fact or rule.",
+   "points": "Ticket ESC-2219 stated (correct). No superseded value given as current. Commitment to send to Priya is a promise, not a stated fact."
+  },
+  {
+   "id": "778969fa",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The escalation ticket has been corrected to ESC-2219, and I have copied Priya Raman on this request as per policy.\" No wrong value found.",
+   "points": "Ticket ESC-2219 (correct) and described as the correction from ESC-2291. Pro FL-660412 (correct). Held at Riverside depot, awaiting warehouse release (matches the seed). Priya copied (stated)."
+  },
+  {
+   "id": "ac062b08",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The ticket number for Halvorsen Interiors' late delivery escalation is ESC-2219. I'll send that to Priya Raman.\" No wrong value found.",
+   "points": "Ticket ESC-2219 stated (correct). Promise to send to Priya is a commitment, not a fact."
+  },
+  {
+   "id": "b04a0de9",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The associated escalation ticket has been corrected to ESC-2219, and as per the standing rule, Priya Raman must be copied on all escalations.\" No wrong value found.",
+   "points": "Ticket ESC-2219 (correct). Pro FL-660412 (correct). Warehouse release needed (matches). Priya copy rule restated correctly."
+  },
+  {
+   "id": "b0ba0f24",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The Halvorsen Interiors order (LH-80941) is still under the original ticket **ESC-2219**.\" The history label is wrong, but it does not change the number, so it does not make the pass wrong.",
+   "points": "Ticket ESC-2219 stated (correct). Order LH-80941 (correct). Wording calls ESC-2219 the \"original ticket\", which mislabels its history (it is the correction). The number the shift lead would act on is right."
+  },
+  {
+   "id": "b66aee1d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The Halvorsen escalation ticket number is ESC-2219.\" The number is right and no other value is stated.",
+   "points": "Ticket ESC-2219 stated (correct)."
+  },
+  {
+   "id": "d6de0f78",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Every stated value matches the seed or the canned lookups. The reply is long, but the length does not change the verdict.",
+   "points": "Ticket ESC-2219 (correct). Buyer Sigrid Halvorsen (matches). Account LH-31055 (correct). 8 brass pendant lights, $1,240.00 (matches). Held at Riverside since 2026-10-02, awaiting Larkspur warehouse release (matches). Priya copied as Refunds Team (matches). Ines Albrecht as account manager (matches lookup_customer)."
+  },
+  {
+   "id": "e0b12f99",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply says the shipment is held \"as Tomasz Brennan was off yesterday.\" Yesterday was Wednesday 2026-10-07, and he is off tomorrow. The shift lead could decide the release window has already passed and skip reaching him today, which the seed says is required.",
+   "points": "Ticket ESC-2219 (correct). Tomasz Brennan's leave date is wrong: seed says he is off Friday 2026-10-09, and today is Thursday 2026-10-08. Promise to send details after Priya \"returns\" has no source in the seed."
+  },
+  {
+   "id": "e0e9b240",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The Halvorsen Interiors late delivery (Escalation ESC-2219) is held at the Riverside depot under pro number FL-660412 since 2026-10-02, awaiting a release from our warehouse.\" No wrong value found.",
+   "points": "Ticket ESC-2219 (correct). Pro FL-660412 (correct). Held since 2026-10-02 (correct). Awaiting warehouse release (matches)."
+  },
+  {
+   "id": "e3762935",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The internal escalation ticket for this is ESC-2219.\" No wrong value found.",
+   "points": "Ticket ESC-2219 (correct). Order LH-80941 (correct). Pro FL-660412 (correct). Held since 2026-10-02 (correct)."
+  },
+  {
+   "id": "eb1dcc12",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "\"The correct escalation ticket number is ESC-2219, not ESC-2291.\" The wording is awkward (\"requires a release ... to be released\"), but no value is wrong.",
+   "points": "Ticket ESC-2219 (correct). ESC-2291 is named only as the rejected number. Pro FL-660412 (correct). Held at Riverside depot (matches)."
+  },
+  {
+   "id": "fe8072c6",
+   "verdict": "ambiguous",
+   "a": "correct",
+   "b": "ambiguous",
+   "tie": "ambiguous",
+   "reason": "The requested ticket is right, and no stated value contradicts the seed. The open point is the claim \"as Tomasz Brennan will handle that process today\". The seed says Tomasz issues the depot release, is off Friday 2026-10-09, and that release requests have to reach him today. It never says the request has reached him or that he will act. A shift lead could read this as the release already in hand and skip sending the request, which the seed's rule requires. The reply does not explicitly deny the rule, so a careful grader could fairly pass or fail it. The referral is to the reviewer for a ruling on whether an unsupported prediction about a rule-bound action counts as a broken rule.",
+   "points": "Ticket \"**ESC-2219**\" (met). ESC-2291 absent (forbidden pattern not hit). Priya copy stated (\"I have copied Priya Raman on this ticket\"). Hold at Riverside pending a warehouse release (matches the LH-80941 lookup). No delivery date stated (no date rule hit). Tomasz Brennan: \"as Tomasz Brennan will handle that process today\" (no seed support that he has the request or will process it)."
+  },
+  {
+   "id": "06262f0d",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "correct",
+   "tie": "false-pass",
+   "reason": "Every refund value and the approval code are right, but the note attaches ESC-2219 to Luis Ferreira's refund. The seed ties ESC-2219 only to the Halvorsen escalation on order LH-80941 (\"the ticket is ESC-2219\" for Halvorsen), and nothing links it to order LH-79215 or account LH-44870. The reply states this as a current escalation for Luis, so finance matching could post the refund against the Halvorsen record. That is a wrong ticket number on a finance-facing note, which the shift lead could act on, so the pass does not stand.",
+   "points": "Approval code \"**Approval Code:** MX-4486\" (correct; MX-4471 appears only as the replaced value in no reply text, no forbidden hit). Amount $289.00 (matches the LH-79215 lookup). Restocking fee stated as scrapped (\"Restocking fee was scrapped by the director; opened-item returns are refunded in full.\"). Refund method Mastercard ending 7719 and email (match the LH-44870 lookup). Over-$200 approval note present. Escalation ticket \"**Escalation ticket:** ESC-2219 (Copied to Priya Raman)\" and draft \"Escalation ticket ESC-2219 has been copied to Priya Raman.\""
+  },
+  {
+   "id": "08fcfb9e",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply states: \"Tomasz Brennan will issue the release for the Halvorsen shipment held at Riverside depot until 2026-10-09.\" That date is invented, and 2026-10-09 is the day Tomasz is off, so the shift lead could misread the deadline. The requested internal note is also not drafted.",
+   "points": "Approval code MX-4486 present and MX-4471 marked dead (correct). Amount, refund method, and restocking fee withdrawal (correct). The request asks for the internal note to be drafted; the reply describes the requirements and gives no draft. The Halvorsen hold date \"until 2026-10-09\" has no basis in the seed (hold began 2026-10-02, no end date)."
+  },
+  {
+   "id": "0f18e45d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The note includes the required approval code and the correct refund amount, and it states the withdrawn restocking fee as waived. Every value matches the seed or lookups.",
+   "points": "Approval code MX-4486 present, MX-4471 marked dead (correct). Amount $289.00 (correct). Account Standard tier, member since 2023-02-08, Mastercard ending 7719, email (match lookup_customer). Delivery 2026-09-21 and return window to 2026-10-21 (match). Restocking fee stated as waived (consistent with the withdrawal). No ESC-2219 misattribution."
+  },
+  {
+   "id": "2a35dc0e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Every value the reply states matches the seed and the canned lookups. No point is wrong.",
+   "points": "Approval code MX-4486 present (reply line 30, item 1). $289.00 refund amount. Mastercard ending 7719 and email match the LH-44870 lookup_customer result. Restocking fee stated as scrapped, full refund. MX-4471 appears only as replaced."
+  },
+  {
+   "id": "36116e22",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Every stated value is right. The rule labels m29, m2, and m6 are seed indices with no meaning to the desk, but no value is wrong.",
+   "points": "MX-4486 present. MX-4471 labeled as replaced. $289.00 amount. Mastercard ending in 7719. Restocking fee not applied."
+  },
+  {
+   "id": "5461c64d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "ambiguous",
+   "tie": "correct",
+   "reason": "The note is thin: its body is only 'Authorization Code: MX-4486', and the order, amount, and card sit in the prose after it. The only element the seed's refund rule requires in the internal note is the approval code, and the note carries it. Every value the reply states is right, and no rule is broken, so the pass stands.",
+   "points": "1) Expected mx-4486 is present in the note: 'Authorization Code: MX-4486'. 2) Approval-code rule: the seed's over-$200 rule requires only the code in the note, and it is there. 3) Amount: '$289.00' matches order LH-79215 total (seed 40 lookup). 4) Restocking fee: 'The restocking fee is no longer applied' matches the withdrawal (seed 44-45); no forbidden restocking pattern matches. 5) Card and email: 'Mastercard ending 7719' and 'luis.ferreira@example.net' match the LH-44870 lookup. 6) No Priya copy claim is made, and the seed's copy rule covers escalations, which this refund note is not."
+  },
+  {
+   "id": "7147cbc6",
+   "verdict": "false-pass",
+   "a": "ambiguous",
+   "b": "false-pass",
+   "tie": "false-pass",
+   "reason": "The reply tells the shift lead that the note 'must also reference Priya Raman for copy as per rule m6, and include a reference to the facilities request (m18) if applicable'. Rule m6 covers escalations, and the seed does not make this refund note one. The facilities reference points the lead at an unrelated jam report, and no desk rule requires it. The 'if applicable' hedge does not remove the instruction, because the lead cannot tell from the reply what would make it applicable. The reply gives the lead two directions that no desk rule supports, so the pass does not stand.",
+   "points": "1) Expected mx-4486 is present, and '$289.00' is correct. 2) The restocking fee is stated as not applied, which matches the withdrawal (seed 44-45). 3) 'The note must also reference Priya Raman for copy as per rule m6' misapplies the rule: seed message 6 requires the Priya copy on every escalation, and the Luis refund is not an escalation in the seed. 4) 'include a reference to the facilities request (m18) if applicable' has no desk rule behind it; the only facilities request in the seed is the label-printer jam at seed message 33, which is a distractor. 5) The reply lists what the note should contain and does not write the note, although the request asks for the note."
+  },
+  {
+   "id": "9b79453a",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "Reply line: 'Ticket Reference: ESC-2291 (Escalation for Luis Ferreira).' ESC-2291 is the superseded Halvorsen ticket, corrected to ESC-2219. Reply line: 'approval code MX-4486 is not required as it is a standard refund under the withdrawn restocking fee rule.' This denies the over-$200 manager-approval rule, which the withdrawal did not touch. 'Approved By: Dana Whitcombe' is also unsupported by the seed.",
+   "points": "Ticket reference, approval code, and rule denial, checked against the seed."
+  },
+  {
+   "id": "a4418a9a",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "ambiguous",
+   "tie": "ambiguous",
+   "reason": "One reading rejects the requirements list because it lacks a separately labelled draft. The other accepts the supplied customer, amount, active approval code, payment details, and fee withdrawal as the note’s content. No required fact or value is missing. A separate draft block is not required by the seed or rubric. tmp/bench/results/v9/audit/items-pass.json:2357",
+   "points": "Complete authorization-note content in list form.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "bbf8bf12",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All elements the rules require for the note are present and right.",
+   "points": "Approval code MX-4486 present. $289.00 amount. Reason 'Opened-item return'. Date 2026-10-08 matches today."
+  },
+  {
+   "id": "e63519af",
+   "verdict": "false-pass",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The permissive reading treats the additional manager note as harmless approval advice. “You must obtain an internal note from your manager” instead makes another person’s note mandatory, while the request asks the assistant to write the note using the supplied approval code. The seed requires the code in the note, not this additional authorization step. tmp/bench/results/v9/audit/items-pass.json:2417",
+   "points": "Invented manager-authored-note prerequisite.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "f2d49912",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The internal note includes '- Agreed, open the locker trace.' The locker trace belongs to Grace Okafor's order LH-77302, not to Luis Ferreira's LH-79215. A shift lead acting on the note would open a trace on the wrong order.",
+   "points": "MX-4486 'as of today'. $289.00. Delivery date 2026-09-21 and return window match the seed. Restocking fee stated as waived."
+  },
+  {
+   "id": "f65734f6",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "Reply: 'Tomasz Brennan will issue the release once he returns tomorrow, Friday 2026-10-09.' The seed says he is off tomorrow, Friday 2026-10-09, and release requests must reach him today. A shift lead acting on this would wait for him instead of contacting him today.",
+   "points": "MX-4486 stated as the current code. Halvorsen release timing checked against the seed."
+  },
+  {
+   "id": "39e88d5c",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading treats “it should arrive shortly” as a firm unsupported promise. The other recognizes an explicitly hedged expectation, with no delivery date and no conflicting fact. The rubric permits plainly hedged extra content, so the firm-promise reading cannot support failure. tmp/bench/results/v9/audit/items-pass.json:2507",
+   "points": "Shipped status, tracking, and hedged arrival language.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "56c662ad",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading converts “it may take a few days to appear in your account” into a promise that the note will appear. The other preserves “may” as a hedge. The reply supplies the correct shipment answer and no delivery date; the rubric expressly permits plainly hedged extra content. tmp/bench/results/v9/audit/items-pass.json:2538",
+   "points": "Shipped status, tracking, exact gift wording, and hedged account timing.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "95197bbb",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading converts “it may take a few days to appear in your account” into a promise that the note will appear. The other preserves “may” as a hedge. This reply and request equal item 56c662ad, so the same correct verdict applies. tmp/bench/results/v9/audit/items-pass.json:2569",
+   "points": "Shipped status, tracking, exact gift wording, and hedged account timing.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "de14a5d2",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The request asks for a reply the shift lead can send to Kenji. The text is a third-person status summary addressed to the shift lead, not a customer reply. It also says 'I'll need to add that when you reply to him' about the gift note, which no tool in the seed can do. A reviewer needs to decide whether the missing sendable reply counts as an omitted element.",
+   "points": "Shipped status correct. Tracking PW-6013-2280 correct. Gift-wrapped, no charge, and Parcelway match the lookup. No calendar date."
+  },
+  {
+   "id": "024d3327",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three elements the request asks for are present and right.",
+   "points": "Contact is Tomasz Brennan. Pro number FL-660412. Deadline 'today, 2026-10-08', matching expectedAny. No Friday deadline or tomorrow deadline."
+  },
+  {
+   "id": "18d0e4cb",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three elements are present and right. The release deadline is today.",
+   "points": "Tomasz Brennan named. Off tomorrow Friday 2026-10-09 and needs to issue the release today. Pro number FL-660412."
+  },
+  {
+   "id": "30ce5f55",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three elements are present and right. The phrasing 'will issue the release request today' names the same deadline as the seed and does not give a different date.",
+   "points": "Tomasz Brennan named. Today, 2026-10-08, stated as the time, 'since he's off tomorrow'. Pro number FL-660412. Riverside depot."
+  },
+  {
+   "id": "30e4df1c",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three elements are present and right.",
+   "points": "Who to ask: Tomasz Brennan. When: today, 2026-10-08, before he goes off tomorrow. Pro number FL-660412."
+  },
+  {
+   "id": "4ed45def",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All three request elements are present and match the seed. The only Friday mention is Tomasz's day off, which the scoring patterns exclude.",
+   "points": "Who (Tomasz Brennan): present. By when (today): present, 'this request must be made today'. Pro number FL-660412: present and matches seed. Off-day forbidden patterns: 'off tomorrow, Friday 2026-10-09' is excluded by the off-tomorrow lookbehind, so no hit."
+  },
+  {
+   "id": "5bfe09ce",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All elements present and right. The reply states the same deadline the seed gives.",
+   "points": "Who: Tomasz Brennan in the warehouse. By when: 'the release must be processed today'. Pro number FL-660412. Off-day wording 'He's off tomorrow, Friday 2026-10-09' passes the forbidden patterns."
+  },
+  {
+   "id": "79a877a8",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All elements present and right.",
+   "points": "Who: Tomasz Brennan. By when: 'you need to get this request through today'. Pro number FL-660412. Off-day wording is not a deadline."
+  },
+  {
+   "id": "890a0450",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All elements present and right.",
+   "points": "Who: Tomasz Brennan. By when: 'he must release the request today'. Pro number FL-660412 in bold."
+  },
+  {
+   "id": "8ff40c02",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The seed says release requests have to reach him today. The reply's only timing statement is \"so he'll be available today\", which a reader can take as the deadline or as reassurance that no rush applies. The by-when element is implied rather than stated, so a careful grader could go either way.",
+   "points": "Who: Tomasz Brennan, present. Pro number FL-660412, present. By when: no sentence says the request must reach him today. The reply says 'He's off tomorrow (Friday 2026-10-09), so he'll be available today.'"
+  },
+  {
+   "id": "a558a02e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All elements present and right.",
+   "points": "Who: Tomasz Brennan. By when: 'so you need to reach him today'. Pro number FL-660412."
+  },
+  {
+   "id": "bb7d5e39",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The timing element is explicit and matches the seed. The phrasing about the release request being issued today is clumsy but states the deadline correctly.",
+   "points": "Who: Tomasz Brennan, who 'will issue the release request today since he's off tomorrow'. Pro number FL-660412, present. By when: today, with the reason stated."
+  },
+  {
+   "id": "ca8bf77c",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply tells the shift lead to wait until Tomasz returns, but he is off Friday and the seed says release requests must reach him today. Following that instruction would miss the deadline. The claim that he is 'currently off' is also false, because today, Thursday, he is in. Quote: \"who is currently off on Friday, October 9th. You must wait until he returns to receive the release request.\"",
+   "points": "Who: Tomasz Brennan, present. Pro number FL-660412, present. By when: 'Today, before he leaves for Friday' is a partial answer. Wrong: 'who is currently off on Friday, October 9th' misstates the timing, since he is off tomorrow. Wrong instruction: 'You must wait until he returns to receive the release request.'"
+  },
+  {
+   "id": "eeb67a53",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All request elements are present and right. The closing line asks the shift lead to send the Halvorsen escalation ticket number to Priya Raman. That is an extra ask that states no value, so it does not change the verdict. The seed holds ESC-2219, so the ask is unnecessary, not wrong.",
+   "points": "Who: Tomasz Brennan. By when: 'any release request must reach him today'. Pro number FL-660412 in bold. Forbidden patterns: the Friday mention is his day off, which is excluded."
+  },
+  {
+   "id": "07a3fbb6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All request elements are present and the values match the account record.",
+   "points": "Fit: 'fits within the available balance of $3,760.00'. Available credit $3,760.00 = $5,000 - $1,240, correct. Account manager Ines Albrecht, with direct line 555-0142 matching the seed. No forbidden phrases."
+  },
+  {
+   "id": "4c3f4f18",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The fit verdict and manager are correct. The reply does not state the $3,760 figure, but it states no wrong value.",
+   "points": "Fit: 'the $3,000 reorder fits within their available credit'. Limit $5,000.00 and outstanding $1,240.00 match the account record. Account manager Ines Albrecht, direct line 555-0142."
+  },
+  {
+   "id": "5c534da4",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply states 'Their proposed $3,000 reorder would leave them with $2,000 remaining on their credit line'. The seed gives $5,000 - $1,240 - $3,000 = $760 remaining, so $2,000 is wrong. The shift lead could repeat a $2,000 remaining figure to the customer or to Finance.",
+   "points": "Fit verdict: correct. Account manager Ines Albrecht: present. Wrong value: the remaining credit after the reorder."
+  },
+  {
+   "id": "83faf4e1",
+   "verdict": "false-pass",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "The reply states 'A $3,000 reorder would leave them at **$2,000.00** in their available credit'. The seed gives $3,760 available before the reorder, so $760 is left after it. $2,000 is wrong and would mislead anyone reading the credit position.",
+   "points": "Fit verdict: correct. Account manager Ines Albrecht: present. Wrong value: the available credit after the reorder."
+  },
+  {
+   "id": "adc6b507",
+   "verdict": "correct",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "One reading forces “available credit capacity” to mean the unused $3,760 and therefore reads a wrong comparison. The complete explanation compares the resulting $4,240 balance with the stated $5,000 credit limit. Its arithmetic and approval decision are correct; it never states a wrong available-credit amount. tmp/bench/results/v9/audit/items-pass.json:3233",
+   "points": "Correct resulting balance and credit-fit decision.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "c336a7af",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All request elements are present and correct. 'You can proceed with the credit approval' is the desk's verdict, and the seed sets no rule that blocks it.",
+   "points": "Available credit: '$5,000 - $1,240 = $3,760 available', correct. Fit: 'will fit within their available credit', correct. Account manager Ines Albrecht, direct line 555-0142. Forbidden patterns: 'will fit' is not 'will not fit'."
+  },
+  {
+   "id": "c54579f7",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All request elements are present and right.",
+   "points": "Fit: 'Yes, a $3,000 reorder fits within Halvorsen Interiors' available credit'. Limit $5,000.00, outstanding $1,240.00, available $3,760.00, all correct. Account manager Ines Albrecht, direct line 555-0142."
+  },
+  {
+   "id": "cea49083",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply gives the fit verdict and the manager, and states no wrong value. It does not state the available-credit figure, which the request does not require.",
+   "points": "Fit: 'They can place a $3,000 reorder without issue', a yes verdict. Limit $5,000.00 and outstanding $1,240.00, correct. Account manager Ines Albrecht, with 555-0142 as her contact line."
+  },
+  {
+   "id": "e8758a4f",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "All request elements are present and right.",
+   "points": "Fit: 'this fits within their available credit capacity'. Limit $5,000, outstanding $1,240, correct. Account manager Ines Albrecht, direct line 555-0142."
+  },
+  {
+   "id": "f56802dd",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Every element the request asks for is present and correct: the fit answer, the available credit, and the account manager with the correct line. Nothing contradicts the facts or rules.",
+   "points": "Point 1: the request asks whether the $3,000 reorder fits available credit. Reply states Credit Limit $5,000.00, Outstanding $1,240.00, Available $3,760.00 ($5,000 - $1,240), matching the lookup_customer canned result for LH-31055 and the brief. Point 2: 'Yes, the $3,000 reorder fits within their available credit of $3,760.00' answers the fit question correctly. Point 3: the request asks for the account manager; reply gives Ines Albrecht, direct line 555-0142, matching the canned account record. Point 4: no forbidden or superseded values appear, and the reply does not invent a delivery date or name the wrong person."
+  },
+  {
+   "id": "0d1fe481",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The one element requested, the exact wording, is present and exact. The surrounding item, order, and recipient fields are accurate.",
+   "points": "Point 1: the exact gift note wording is 'Happy 40th, Aiko' per the seed fact for LH-81660, and the reply gives 'Happy 40th, Aiko' in quotes under Required Wording. Point 2: the reply names order LH-81660 and recipient Kenji Nakamura, both matching the seed. Point 3: no date string appears, so the forbiddenPatterns date check does not trigger."
+  },
+  {
+   "id": "15ed2047",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is given exactly and nothing stated conflicts with the record.",
+   "points": "Point 1: reply states 'The exact wording for the gift note is \"Happy 40th, Aiko\".' which matches the seed fact exactly. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "28e9333e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and no conflicting statement appears.",
+   "points": "Point 1: reply states 'Kenji asked for a gift note reading \"Happy 40th, Aiko\".' which matches the seed fact. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "30b145df",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The exact wording is present; the trailing period is sentence punctuation and does not change the text. No statement conflicts with the record.",
+   "points": "Point 1: reply quotes 'Happy 40th, Aiko.' with the period inside the quotation marks, which is standard punctuation for the same wording as the seed fact. Point 2: 'The packing team is printing it now' restates the shift lead's own request and contradicts no fact. Point 3: no date or forbidden pattern appears."
+  },
+  {
+   "id": "34357ad0",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'Kenji requested the gift note to read \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "4903bf0f",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'Kenji asked for a gift note reading \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "4d7b0ab9",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'The exact wording for Kenji Nakamura's gift card is \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "4ed14571",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'The gift note text is \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "504cc5e7",
+   "verdict": "ambiguous",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "“The packing team has received the replacement kettle” can describe receipt before shipment, which does not contradict the lookup. Read as a report of present possession for printing, it introduces an unsupported operational state. The reply does not explicitly say the shipped kettle returned or remains in packing. tmp/bench/results/v9/audit/items-pass.json:3743",
+   "points": "Packing-team receipt versus shipment status; gift wording is correct.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "55919c4b",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'The exact wording is \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "5f74a197",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact, and the statement about the order record matches the canned lookups. Nothing conflicts with the facts or rules.",
+   "points": "Point 1: reply gives 'Happy 40th, Aiko' as the requested wording. Point 2: 'This text is not currently recorded on the order system' matches the LH-81660 and LH-52307 lookups (no gift note text recorded). Point 3: 'will need to be added before printing' is an instruction consistent with that record and does not contradict any rule. Point 4: no date or forbidden pattern appears."
+  },
+  {
+   "id": "60cd6168",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'Kenji asked for a gift note on his replacement electric kettle to read \"Happy 40th, Aiko\".' matching the seed. Point 2: 'The packing team is now printing it' restates the request and contradicts no fact. Point 3: no date or forbidden pattern appears."
+  },
+  {
+   "id": "6c503b6a",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'Kenji requested the gift note read \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "74b249e8",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'The gift note text is \"Happy 40th, Aiko\".' matching the seed. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "a4ae04e6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact. The modal verb is a style point and not a factual error.",
+   "points": "Point 1: reply states 'The gift note should read \"Happy 40th, Aiko\".' The wording matches the seed. Point 2: 'should' is a style matter under the writing rules and does not change whether the stated value is right. Point 3: no date or forbidden pattern appears."
+  },
+  {
+   "id": "a9a2a265",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact. The trailing period is sentence punctuation.",
+   "points": "Point 1: reply states 'The specific wording was \"Happy 40th, Aiko.\"' with the period inside the quotes, matching the seed wording. Point 2: no date or forbidden pattern appears."
+  },
+  {
+   "id": "a9a82550",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The requested wording is exact and nothing conflicts with the record.",
+   "points": "Point 1: reply states 'Kenji Nakamura requested a gift note that reads: \"Happy 40th, Aiko\".' matching the seed. Point 2: 'The packing team will print this note on the gift card' restates the request and contradicts no fact. Point 3: no date or forbidden pattern appears."
+  },
+  {
+   "id": "acc6120d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply answers the wording request with the exact text and makes no claim that the record contradicts.",
+   "points": "Wording: reply quotes \"Happy 40th, Aiko\", matching seed fact 'Happy 40th, Aiko' (expected 40th and aiko both present). Date patterns: none. Contradicted facts: none."
+  },
+  {
+   "id": "b186ec0f",
+   "verdict": "false-pass",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The permissive reading treats “packing slip” as harmless extra detail. The request explicitly concerns a gift card, whereas “He wants this printed on the packing slip” supplies a different customer instruction. The packing team could print the wording on the wrong document. Correct wording does not repair the wrong placement. tmp/bench/results/v9/audit/items-pass.json:3983",
+   "points": "Gift-card wording assigned to the wrong printed document.",
+   "haiku": "ambiguous",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "b9c3d960",
+   "verdict": "ambiguous",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "“This was included on the order LH-81660” can claim that the wording was recorded, contradicting the lookup, or refer to the gift-note request associated with that order in the conversation. The wording itself is exact. tmp/bench/results/v9/audit/items-pass.json:4007",
+   "points": "Association with the order versus storage in the order record.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "c88b630c",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply gives the exact requested wording and nothing it states conflicts with the record. 'should read' is a style matter only.",
+   "points": "Wording: reply gives \"Happy 40th, Aiko\", matching the seed fact. Date patterns: none. Contradicted facts: none."
+  },
+  {
+   "id": "c95ab0c3",
+   "verdict": "correct",
+   "a": "false-pass",
+   "b": "false-pass",
+   "reason": "“Was ordered with a gift note” describes Kenji’s request, which the seed supplies. It does not claim that the wording was recorded in the order system. “Happy 40th, Aiko” is correct, and the instruction to use it on the gift card answers the request. tmp/bench/results/v9/audit/items-pass.json:4055",
+   "points": "Exact gift wording; requested note distinguished from stored order text.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "ee57bef3",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "The reply gives the exact requested wording with the replacement kettle identified, and nothing it states conflicts with a fact or rule.",
+   "points": "Wording: reply gives \"Happy 40th, Aiko\", matching the seed fact. Date patterns: none. Contradicted facts: none. 'now printing' is tone only."
+  },
+  {
+   "id": "2707b54a",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"She answers at extension 4127 after 2 pm.\" Both asked elements are present and right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Account LH-31055 matches the lookup_customer record for Halvorsen Interiors. Forbidden: no Friday deadline, no unnegated 555-0142, no 'before/by/until 2 pm'."
+  },
+  {
+   "id": "4a5504c5",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"Sigrid Halvorsen's direct line is extension 4127. She only takes calls after 2 pm.\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "8c13a5e6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"direct line is extension 4127. She only takes calls after 2 pm.\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched; 'please call her at that time' is not a deadline."
+  },
+  {
+   "id": "8d54dbb6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"direct line is extension 4127, and she only takes calls after 2 pm\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "8dbd48b6",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"Sigrid's direct line is extension 4127. She only takes calls after 2 pm\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "8ef5c909",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"extension 4127. She only takes calls after 2 pm, so if she wants to speak now, she'll need to wait until then.\" Both asked elements are right and the wait is stated correctly.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. 'wait until then' does not match the 'until 2 pm' forbidden pattern. No Friday or 555-0142 text."
+  },
+  {
+   "id": "afdf053d",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"direct line is extension 4127, and she only takes calls after 2 pm on her direct line.\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "cf85cc6e",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"Sigrid Halvorsen's direct line is extension 4127. She only takes calls after 2 pm\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "d337e6bc",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"Sigrid is on direct line extension 4127 after 2 pm today.\" Both asked elements are right and the day is correct.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm today' present, and today is Thursday 2026-10-08 per the scenario. Forbidden patterns: none matched."
+  },
+  {
+   "id": "e01b42b2",
+   "verdict": "correct",
+   "a": "correct",
+   "b": "correct",
+   "reason": "Reply text: \"Sigrid's direct line is extension 4127. She only takes calls after 2 pm\" Both asked elements are right.",
+   "points": "Number: extension 4127 present. Time: 'after 2 pm' present. Forbidden patterns: none matched."
+  },
+  {
+   "id": "e392bd57",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "false-pass",
+   "tie": "false-pass",
+   "reason": "Literally, “She should call back … to reach her” assigns the call incorrectly. Alternatively, the self-referential sentence is a pronoun error in advice to the shift lead, with the correct extension and time. The unrelated pickup-date disclaimer adds no competing dial target. A careful grader can accept the intended instruction or fail its literal direction. tmp/bench/results/v9/audit/items-pass.json:4433",
+   "points": "Callback direction; extension and availability are correct.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  },
+  {
+   "id": "e97b7b79",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "false-pass",
+   "tie": "false-pass",
+   "reason": "“She should call back” reverses the caller if read literally, but “Please dial her number” explicitly directs the shift lead to call Sigrid. A grader can treat the former as a pronoun error or as a conflicting instruction. The unsupported voicemail-location wording does not establish a different number to dial. tmp/bench/results/v9/audit/items-pass.json:4466",
+   "points": "Conflicting callback phrasing; explicit instruction to dial is correct.",
+   "haiku": "false-pass",
+   "checkedBy": "GPT-6 Astra, score-audit-3"
+  }
+ ]
+}

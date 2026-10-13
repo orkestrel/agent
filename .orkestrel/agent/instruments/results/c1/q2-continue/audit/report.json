@@ -1,0 +1,853 @@
+{
+  "protocol": "c1",
+  "manifest": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\results\\c1\\q2\\freeze-continue\\manifest.json",
+    "hash": "eeaf6c7e0acd37fae24ee8781a7aee60e2b3328e4e330092375ad8ac84259d0f"
+  },
+  "packet": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\c1\\q2-continue\\audit\\packet.json",
+    "hash": "212abdc2bd5ee66f02854c423ba91a585e348b3adb3e7a04fb0c3bdf2836f211"
+  },
+  "labels": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\c1\\q2-continue\\audit\\labels.json",
+    "hash": "630873a9aba2da097ff119d4fe9bc35dd6b3e9c65eef9d13e756eb82292ae389"
+  },
+  "valid": true,
+  "failures": [],
+  "batches": [
+    {
+      "id": "be630aa8ddcf3348002555f806db8cc683d7f808a2c3930cdc33c953b9c43513",
+      "valid": false,
+      "failures": [
+        "missed ambiguous control ev-control-ambiguous"
+      ]
+    }
+  ],
+  "audit": {
+    "leaks": {},
+    "foreign": [],
+    "controls": [
+      "missed ambiguous control ev-control-ambiguous"
+    ]
+  },
+  "status": {
+    "compaction": "complete"
+  },
+  "served": {
+    "compaction": 96
+  },
+  "common": 0,
+  "checkpoints": [],
+  "intervals": [
+    {
+      "from": 1,
+      "through": 4,
+      "goals": [
+        "ev-01-1",
+        "ev-01-2",
+        "ev-01-3",
+        "ev-01-4",
+        "ev-02-1",
+        "ev-02-2",
+        "ev-02-3",
+        "ev-02-4",
+        "ev-03-1",
+        "ev-03-2",
+        "ev-03-3",
+        "ev-03-4",
+        "ev-04-1",
+        "ev-04-2",
+        "ev-04-3",
+        "ev-04-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 15,
+          "judged": 15,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 9,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 17,
+              "total": 62,
+              "ambiguous": 1
+            },
+            "work": {
+              "passed": 5,
+              "total": 48,
+              "ambiguous": 0
+            },
+            "obligations": {
+              "passed": 15,
+              "total": 65,
+              "ambiguous": 2
+            },
+            "revision": {
+              "passed": 5,
+              "total": 26,
+              "ambiguous": 0
+            },
+            "evidence": {
+              "passed": 6,
+              "total": 30,
+              "ambiguous": 3
+            }
+          },
+          "folded": 14,
+          "omitted": 4,
+          "downstream": []
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    },
+    {
+      "from": 5,
+      "through": 8,
+      "goals": [
+        "ev-05-1",
+        "ev-05-2",
+        "ev-05-3",
+        "ev-05-4",
+        "ev-06-1",
+        "ev-06-2",
+        "ev-06-3",
+        "ev-06-4",
+        "ev-07-1",
+        "ev-07-2",
+        "ev-07-3",
+        "ev-07-4",
+        "ev-08-1",
+        "ev-08-2",
+        "ev-08-3",
+        "ev-08-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 16,
+          "judged": 16,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 16,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 10,
+              "total": 50,
+              "ambiguous": 2
+            },
+            "work": {
+              "passed": 9,
+              "total": 48,
+              "ambiguous": 1
+            },
+            "obligations": {
+              "passed": 5,
+              "total": 56,
+              "ambiguous": 6
+            },
+            "revision": {
+              "passed": 2,
+              "total": 50,
+              "ambiguous": 0
+            },
+            "evidence": {
+              "passed": 6,
+              "total": 32,
+              "ambiguous": 0
+            }
+          },
+          "folded": 16,
+          "omitted": 4,
+          "downstream": []
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    },
+    {
+      "from": 9,
+      "through": 12,
+      "goals": [
+        "ev-09-1",
+        "ev-09-2",
+        "ev-09-3",
+        "ev-09-4",
+        "ev-10-1",
+        "ev-10-2",
+        "ev-10-3",
+        "ev-10-4",
+        "ev-11-1",
+        "ev-11-2",
+        "ev-11-3",
+        "ev-11-4",
+        "ev-12-1",
+        "ev-12-2",
+        "ev-12-3",
+        "ev-12-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 16,
+          "judged": 16,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 10,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 23,
+              "total": 72,
+              "ambiguous": 0
+            },
+            "work": {
+              "passed": 1,
+              "total": 44,
+              "ambiguous": 0
+            },
+            "obligations": {
+              "passed": 6,
+              "total": 52,
+              "ambiguous": 0
+            },
+            "revision": {
+              "passed": 5,
+              "total": 38,
+              "ambiguous": 0
+            },
+            "evidence": {
+              "passed": 16,
+              "total": 32,
+              "ambiguous": 0
+            }
+          },
+          "folded": 16,
+          "omitted": 4,
+          "downstream": []
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    },
+    {
+      "from": 13,
+      "through": 16,
+      "goals": [
+        "ev-13-1",
+        "ev-13-2",
+        "ev-13-3",
+        "ev-13-4",
+        "ev-14-1",
+        "ev-14-2",
+        "ev-14-3",
+        "ev-14-4",
+        "ev-15-1",
+        "ev-15-2",
+        "ev-15-3",
+        "ev-15-4",
+        "ev-16-1",
+        "ev-16-2",
+        "ev-16-3",
+        "ev-16-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 11,
+          "judged": 11,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 3,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 12,
+              "total": 47,
+              "ambiguous": 0
+            },
+            "work": {
+              "passed": 5,
+              "total": 41,
+              "ambiguous": 1
+            },
+            "obligations": {
+              "passed": 10,
+              "total": 53,
+              "ambiguous": 0
+            },
+            "revision": {
+              "passed": 3,
+              "total": 33,
+              "ambiguous": 0
+            },
+            "evidence": {
+              "passed": 6,
+              "total": 22,
+              "ambiguous": 1
+            }
+          },
+          "folded": 11,
+          "omitted": 3,
+          "downstream": []
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    },
+    {
+      "from": 17,
+      "through": 20,
+      "goals": [
+        "ev-17-1",
+        "ev-17-2",
+        "ev-17-3",
+        "ev-17-4",
+        "ev-18-1",
+        "ev-18-2",
+        "ev-18-3",
+        "ev-18-4",
+        "ev-19-1",
+        "ev-19-2",
+        "ev-19-3",
+        "ev-19-4",
+        "ev-20-1",
+        "ev-20-2",
+        "ev-20-3",
+        "ev-20-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 16,
+          "judged": 16,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 17,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 34,
+              "total": 72,
+              "ambiguous": 0
+            },
+            "work": {
+              "passed": 10,
+              "total": 56,
+              "ambiguous": 2
+            },
+            "obligations": {
+              "passed": 16,
+              "total": 52,
+              "ambiguous": 1
+            },
+            "revision": {
+              "passed": 11,
+              "total": 32,
+              "ambiguous": 3
+            },
+            "evidence": {
+              "passed": 14,
+              "total": 32,
+              "ambiguous": 1
+            }
+          },
+          "folded": 16,
+          "omitted": 4,
+          "downstream": []
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    },
+    {
+      "from": 21,
+      "through": 24,
+      "goals": [
+        "ev-21-1",
+        "ev-21-2",
+        "ev-21-3",
+        "ev-21-4",
+        "ev-22-1",
+        "ev-22-2",
+        "ev-22-3",
+        "ev-22-4",
+        "ev-23-1",
+        "ev-23-2",
+        "ev-23-3",
+        "ev-23-4",
+        "ev-24-1",
+        "ev-24-2",
+        "ev-24-3",
+        "ev-24-4"
+      ],
+      "valid": true,
+      "failures": [],
+      "arms": [
+        {
+          "arm": "compaction",
+          "served": 15,
+          "judged": 15,
+          "acceptable": {
+            "low": 0,
+            "high": 0
+          },
+          "critical": 12,
+          "ambiguous": 0,
+          "dimensions": {
+            "facts": {
+              "passed": 17,
+              "total": 66,
+              "ambiguous": 1
+            },
+            "work": {
+              "passed": 7,
+              "total": 45,
+              "ambiguous": 0
+            },
+            "obligations": {
+              "passed": 11,
+              "total": 48,
+              "ambiguous": 0
+            },
+            "revision": {
+              "passed": 4,
+              "total": 27,
+              "ambiguous": 0
+            },
+            "evidence": {
+              "passed": 13,
+              "total": 30,
+              "ambiguous": 0
+            }
+          },
+          "folded": 15,
+          "omitted": 4,
+          "downstream": [
+            "ev-24-1:BC-7312.work:repaired"
+          ]
+        }
+      ],
+      "pairs": [
+        {
+          "arm": "compaction",
+          "goals": 0,
+          "wins": 0,
+          "losses": 0,
+          "ties": 0,
+          "ambiguous": 0,
+          "gain": {
+            "low": 0,
+            "high": 0
+          },
+          "regressions": []
+        }
+      ]
+    }
+  ],
+  "overall": {
+    "from": 1,
+    "through": 24,
+    "goals": [
+      "ev-01-1",
+      "ev-01-2",
+      "ev-01-3",
+      "ev-01-4",
+      "ev-02-1",
+      "ev-02-2",
+      "ev-02-3",
+      "ev-02-4",
+      "ev-03-1",
+      "ev-03-2",
+      "ev-03-3",
+      "ev-03-4",
+      "ev-04-1",
+      "ev-04-2",
+      "ev-04-3",
+      "ev-04-4",
+      "ev-05-1",
+      "ev-05-2",
+      "ev-05-3",
+      "ev-05-4",
+      "ev-06-1",
+      "ev-06-2",
+      "ev-06-3",
+      "ev-06-4",
+      "ev-07-1",
+      "ev-07-2",
+      "ev-07-3",
+      "ev-07-4",
+      "ev-08-1",
+      "ev-08-2",
+      "ev-08-3",
+      "ev-08-4",
+      "ev-09-1",
+      "ev-09-2",
+      "ev-09-3",
+      "ev-09-4",
+      "ev-10-1",
+      "ev-10-2",
+      "ev-10-3",
+      "ev-10-4",
+      "ev-11-1",
+      "ev-11-2",
+      "ev-11-3",
+      "ev-11-4",
+      "ev-12-1",
+      "ev-12-2",
+      "ev-12-3",
+      "ev-12-4",
+      "ev-13-1",
+      "ev-13-2",
+      "ev-13-3",
+      "ev-13-4",
+      "ev-14-1",
+      "ev-14-2",
+      "ev-14-3",
+      "ev-14-4",
+      "ev-15-1",
+      "ev-15-2",
+      "ev-15-3",
+      "ev-15-4",
+      "ev-16-1",
+      "ev-16-2",
+      "ev-16-3",
+      "ev-16-4",
+      "ev-17-1",
+      "ev-17-2",
+      "ev-17-3",
+      "ev-17-4",
+      "ev-18-1",
+      "ev-18-2",
+      "ev-18-3",
+      "ev-18-4",
+      "ev-19-1",
+      "ev-19-2",
+      "ev-19-3",
+      "ev-19-4",
+      "ev-20-1",
+      "ev-20-2",
+      "ev-20-3",
+      "ev-20-4",
+      "ev-21-1",
+      "ev-21-2",
+      "ev-21-3",
+      "ev-21-4",
+      "ev-22-1",
+      "ev-22-2",
+      "ev-22-3",
+      "ev-22-4",
+      "ev-23-1",
+      "ev-23-2",
+      "ev-23-3",
+      "ev-23-4",
+      "ev-24-1",
+      "ev-24-2",
+      "ev-24-3",
+      "ev-24-4"
+    ],
+    "valid": true,
+    "failures": [],
+    "arms": [
+      {
+        "arm": "compaction",
+        "served": 89,
+        "judged": 89,
+        "acceptable": {
+          "low": 0,
+          "high": 0
+        },
+        "critical": 67,
+        "ambiguous": 0,
+        "dimensions": {
+          "facts": {
+            "passed": 113,
+            "total": 369,
+            "ambiguous": 4
+          },
+          "work": {
+            "passed": 37,
+            "total": 282,
+            "ambiguous": 4
+          },
+          "obligations": {
+            "passed": 63,
+            "total": 326,
+            "ambiguous": 9
+          },
+          "revision": {
+            "passed": 30,
+            "total": 206,
+            "ambiguous": 3
+          },
+          "evidence": {
+            "passed": 61,
+            "total": 178,
+            "ambiguous": 5
+          }
+        },
+        "folded": 88,
+        "omitted": 23,
+        "downstream": [
+          "ev-24-1:BC-7312.work:repaired"
+        ]
+      }
+    ],
+    "pairs": [
+      {
+        "arm": "compaction",
+        "goals": 0,
+        "wins": 0,
+        "losses": 0,
+        "ties": 0,
+        "ambiguous": 0,
+        "gain": {
+          "low": 0,
+          "high": 0
+        },
+        "regressions": []
+      }
+    ]
+  },
+  "final": {
+    "from": 21,
+    "through": 24,
+    "goals": [
+      "ev-21-1",
+      "ev-21-2",
+      "ev-21-3",
+      "ev-21-4",
+      "ev-22-1",
+      "ev-22-2",
+      "ev-22-3",
+      "ev-22-4",
+      "ev-23-1",
+      "ev-23-2",
+      "ev-23-3",
+      "ev-23-4",
+      "ev-24-1",
+      "ev-24-2",
+      "ev-24-3",
+      "ev-24-4"
+    ],
+    "valid": true,
+    "failures": [],
+    "arms": [
+      {
+        "arm": "compaction",
+        "served": 15,
+        "judged": 15,
+        "acceptable": {
+          "low": 0,
+          "high": 0
+        },
+        "critical": 12,
+        "ambiguous": 0,
+        "dimensions": {
+          "facts": {
+            "passed": 17,
+            "total": 66,
+            "ambiguous": 1
+          },
+          "work": {
+            "passed": 7,
+            "total": 45,
+            "ambiguous": 0
+          },
+          "obligations": {
+            "passed": 11,
+            "total": 48,
+            "ambiguous": 0
+          },
+          "revision": {
+            "passed": 4,
+            "total": 27,
+            "ambiguous": 0
+          },
+          "evidence": {
+            "passed": 13,
+            "total": 30,
+            "ambiguous": 0
+          }
+        },
+        "folded": 15,
+        "omitted": 4,
+        "downstream": [
+          "ev-24-1:BC-7312.work:repaired"
+        ]
+      }
+    ],
+    "pairs": [
+      {
+        "arm": "compaction",
+        "goals": 0,
+        "wins": 0,
+        "losses": 0,
+        "ties": 0,
+        "ambiguous": 0,
+        "gain": {
+          "low": 0,
+          "high": 0
+        },
+        "regressions": []
+      }
+    ]
+  },
+  "costs": [
+    {
+      "arm": "compaction",
+      "status": "complete",
+      "served": 96,
+      "truncated": 68,
+      "reading": {
+        "wire": [
+          {
+            "role": "agent",
+            "phase": "calibration",
+            "requests": 2,
+            "wall": 11470,
+            "prompt": 3207,
+            "completion": 2,
+            "missing": 0
+          },
+          {
+            "role": "agent",
+            "phase": "trajectory",
+            "requests": 174,
+            "wall": 1256428,
+            "prompt": 321554,
+            "completion": 48632,
+            "missing": 0
+          },
+          {
+            "role": "summarizer",
+            "phase": "trajectory",
+            "requests": 103,
+            "wall": 447629,
+            "prompt": 112825,
+            "completion": 25054,
+            "missing": 0
+          },
+          {
+            "role": "flush",
+            "phase": "trajectory",
+            "requests": 96,
+            "wall": 463908,
+            "prompt": 2112,
+            "completion": 96,
+            "missing": 0
+          }
+        ],
+        "elapsed": 2180917,
+        "flush": 463975.2963
+      },
+      "total": {
+        "prompt": 439698,
+        "completion": 73784,
+        "missing": 0
+      },
+      "judge": {
+        "requests": 0,
+        "prompt": 0,
+        "completion": 0
+      },
+      "summarizer": {
+        "requests": 103,
+        "prompt": 112825,
+        "completion": 25054
+      }
+    }
+  ],
+  "verdict": "inconclusive",
+  "reasons": [],
+  "limitation": "Dependent trajectory evidence: one serial run per arm and model, not independent trials or model superiority. Each arm served the same external arrivals, requests, tools, sampler, window, and reserve; the records arm also paid the judge filing inside its trajectory. A prompt that carried a source only through a recap is counted as folded, not selected. Wire, flush, and elapsed intervals overlap and are never summed. Shared-GPU load and the serial arm order limit timing attribution. Each item was adjudicated by its own blind adjudicator; a leak an adjudicator recorded in a product's own text is counted per arm and does not void the batch, and a missed ambiguous control marks that one adjudicator. No user utility ceiling is assumed."
+}

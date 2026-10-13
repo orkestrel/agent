@@ -1,0 +1,1631 @@
+[
+  {
+    "id": "02ba8f2869ba1ec9fecfcf015b8dc1d3",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Asserts that the lights remain held awaiting release despite their delivery; omits cracked glass and the 2026-10-16 claim deadline. Only recall was called; no fresh order/account lookup.",
+    "eligibleSource": {
+      "through": 149,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/0/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/148",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/lookups/0"
+      ]
+    }
+  },
+  {
+    "id": "0c1b8417c0c4523c920f726fbcdf25cb",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Identifies the wrong twin parcel and Marcus, but omits PW-5521-9930 and invents a condition that the correct item must be located before replacement. No fresh lookup.",
+    "eligibleSource": {
+      "through": 145,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/1/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/56",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/144",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/145"
+      ]
+    }
+  },
+  {
+    "id": "1312793f4b4d406f7e194460938cc89b",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correct Mastercard ending 7719, with a fresh lookup_customer for LH-44870 returning that card.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/2/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "1cf41e8dc2654ec975ac9acf5d75cccb",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Reverses the correction: recommends the withdrawn $50 credit instead of free freight on the next order. No fresh Copperline lookup.",
+    "eligibleSource": {
+      "through": 95,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/3/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/94"
+      ]
+    }
+  },
+  {
+    "id": "1e2a2bf1f4738b9029d613740c2a14ca",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Gives FL-660412 and the correct claim deadline, but asserts a depot hold, omits cracked glass, and invents a required $1,240 refund. No fresh lookup.",
+    "eligibleSource": {
+      "through": 149,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/4/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/23/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/148",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/lookups/0"
+      ]
+    }
+  },
+  {
+    "id": "1f3102671020f5d5867d6b245bbfc35f",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct ticket ESC-2219. The copied-Priya statement can describe seed[23], but does not prove delivery of this requested message. No fresh Halvorsen lookup; only recall.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/5/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/23",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27"
+      ]
+    },
+    "delivery": {
+      "verdict": "unproved",
+      "reason": "The final message reaches the shift lead under ledger.system. Neither recall nor lookup can establish delivery of this message to Priya.",
+      "draftBound": "pass"
+    }
+  },
+  {
+    "id": "1f9cb9195abfb9b9907be192d576c260",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct $289, card ending 7719, and return date, but says the refund appears on the card although the request says it has not appeared. No fresh lookup_customer.",
+    "eligibleSource": {
+      "through": 115,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/6/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "2a4ccb31c17569e62c34d8c6ed8ebb60",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Includes Dalia and 555-0175, but adds stale Grace replacement work, Owen's superseded extension 4301, and Sigrid despite her after-2-pm restriction to a morning list. No fresh lookup for the account/order work.",
+    "eligibleSource": {
+      "through": 127,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/7/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/90",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/124",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/126"
+      ]
+    }
+  },
+  {
+    "id": "2a784ae9a3ceb754b9837b1ea395bb62",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct sage exchange and PW-7042-1185, but changes the chase endpoint to arrival at the delivery depot rather than delivery of the rug. Also labels the tracking identifier an order. No fresh lookup.",
+    "eligibleSource": {
+      "through": 111,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/8/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/71",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/108",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/110"
+      ]
+    }
+  },
+  {
+    "id": "2cb9bb37a8a024821ad72b3fcf0c880c",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct street address 91 Quarry Lane; mentions 19 only to correct it. Ashby is optional for the requested street-address change. No fresh Farah lookup.",
+    "eligibleSource": {
+      "through": 105,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/9/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/103"
+      ]
+    }
+  },
+  {
+    "id": "2ea32b8bec9aa1b512db3ae9762042ce",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh LH-31055 account lookup supports $5,000 less $1,240, sufficient for $3,000, and Ines Albrecht. Explicit arithmetic of $3,760 available is optional.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/10/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "31013bc5405879bffc3cc4024fef8eea",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh LH-81660 lookup and correct shipped status/tracking in the body, but the customer-facing subject asserts that the kettle has arrived. That contradicts the eligible shipping evidence. A draft is the requested deliverable; external sending is not required.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/11/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/7",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    },
+    "delivery": {
+      "verdict": "not-required",
+      "reason": "The original request asks for a reply the shift lead can send. Drafting is representable by the final message."
+    }
+  },
+  {
+    "id": "3d73c0f72a501daeb9f1e15685152ab8",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct full $289 refund and MX-4486, explicitly retires MX-4471 and the fee. Card/email additions agree with the permitted account source. Only recalls; required fresh lookup_order is absent.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/12/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "42120b7ab92b5b6cefc2a5557718f1f2",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct amount, card, and return date, but adds unsupported 3-5-business-day posting, immediate-processing policy, and a conflicting 3-day follow-up rule; leaves an initiation-date placeholder. Recalled customer result is not the required fresh lookup_customer.",
+    "eligibleSource": {
+      "through": 115,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/13/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/14/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "4daedcac21dc6eb5810edd444a599057",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fails to supply 'Happy 40th, Aiko' and needlessly asks Kenji; gift wrapping does not establish a note was shipped. Fresh order lookup exists. A recall call satisfies the narrow tool-name list, but its refunds topic does not seek the admitted missing gift wording, contrary to the system's conditional recovery requirement.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/14/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "5373fad866159e944aca7fe8aab37ff0",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct redirect to 91 Quarry Lane, Ashby. No fresh Farah order/account lookup.",
+    "eligibleSource": {
+      "through": 105,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/15/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/12/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/103"
+      ]
+    }
+  },
+  {
+    "id": "55ba4bfc8fe74e5710ed76e2552e7622",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correctly assigns today's actual approval to Ruth as Marcus's cover; opening reference to Marcus's sign-off is resolved by that delegation, not a contradictory final assignment. No fresh lookup.",
+    "eligibleSource": {
+      "through": 89,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/16/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/88"
+      ]
+    }
+  },
+  {
+    "id": "55f1ee9a29e6edf588e93b2785599f11",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Answers all substantive parts: Tomasz Brennan, today before his Friday absence, and FL-660412. No required fresh lookup_order.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/17/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36"
+      ]
+    }
+  },
+  {
+    "id": "5d5cef316d785003731b863bf74071d3",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correct Mastercard ending 7719, verified by fresh lookup_customer for LH-44870.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/18/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/1/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    }
+  },
+  {
+    "id": "6914bc6fe0282c8b9e43dfa8435531fe",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh order lookup and correct FL-660412, but 'warehouse team' does not identify Tomasz and the reply omits the today deadline. The substantive who/by-when questions remain unanswered.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/19/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/6/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36"
+      ]
+    }
+  },
+  {
+    "id": "6d1d5a72bd2baecee6af4e5fb65489d9",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Clearly refuses today's walk-in return and says Monday because of floor work. This generic counter-policy question concerns no order/account and requires no fresh lookup.",
+    "eligibleSource": {
+      "through": 123,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/20/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/112",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/122"
+      ]
+    }
+  },
+  {
+    "id": "6d4886ce285777ee608debd15a9f24d8",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct free freight on the next order; old $50 credit appears only as the replaced preference. Only recall, no fresh Copperline lookup.",
+    "eligibleSource": {
+      "through": 95,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/21/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/11/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/94"
+      ]
+    }
+  },
+  {
+    "id": "6e20e1e93420b702401571228fbafbe9",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Fresh account lookup supports sufficient available credit for $3,000 and manager Ines Albrecht. No requirement to state the remaining-credit arithmetic explicitly.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/22/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/7/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "6ef745bf866490210f01ea6449a8a850",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "Correct full $289 refund without the withdrawn fee, supported by fresh lookup_order for LH-79215.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/23/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44"
+      ]
+    }
+  },
+  {
+    "id": "7058cf269d7504d17cae089d06527a0e",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct Marcus, Priya, and tracking, but assigns Grace the obsolete Halvorsen ticket ESC-2291 and asserts tracking proves a parcel is still held at the locker. No fresh required lookup_order.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/24/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/19",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27"
+      ]
+    }
+  },
+  {
+    "id": "710453ca13b5fb4b4ddbca4dd735ffa5",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "pass",
+    "reason": "The awkward opening repeats former hours, but the same sentence explicitly overrides them with all-day closure and Monday. Read as a correction, the actionable answer is clear. Generic desk policy needs no fresh lookup.",
+    "eligibleSource": {
+      "through": 123,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/25/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/15/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/112",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/122"
+      ]
+    }
+  },
+  {
+    "id": "7bd35f6aead62e686198411b5885fd16",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct signer, copy, and tracking, but falsely turns Grace's locker case into a depot hold awaiting warehouse release and imposes a refund approval code on the replacement. No fresh lookup_order.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/26/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/2/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/13",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/19",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/36"
+      ]
+    }
+  },
+  {
+    "id": "82c4d203da3da24fc48b62e3ceead6e3",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct ticket and historically supported Priya copy, but imposes an approval-code note on a late-delivery escalation without a refund authorization. Only recall; no fresh Halvorsen lookup and no proof that this message reached Priya.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/27/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/3/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/23",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/27",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29"
+      ]
+    },
+    "delivery": {
+      "verdict": "unproved",
+      "reason": "The final message reaches the shift lead under ledger.system. Neither recall nor lookup can establish delivery of this message to Priya.",
+      "draftBound": "fail"
+    }
+  },
+  {
+    "id": "83f816b3ab624eb388164ec85c564b74",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct gift text, but reuses the first replacement's tracking as if it established the second kettle's shipment, tells Kenji to add the note himself, and does not answer his arrival question with the permitted uncertainty. No fresh lookup.",
+    "eligibleSource": {
+      "through": 143,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/28/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/7",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/142",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/143",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "879fb9fc7c7e27abec7020b3861bd4f1",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Gives the main switchboard 555-0142 but omits Sigrid's required direct extension 4127, despite recall returning it. After 2 pm is correct. Recall satisfies the explicit list; fresh Halvorsen lookup is absent.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/29/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "8824924c415a31102f5533649c3beb09",
+    "status": "failed",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Retained status is failed and reply is empty. No refund note was delivered and no fresh lookup_order occurred. Recall retrieved useful rules, but tool results are not a completed answer.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/30/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/4/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/2",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/29",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-44870"
+      ]
+    },
+    "usefulReplyContent": "none; the retained reply is empty",
+    "operationalCompletion": "failed"
+  },
+  {
+    "id": "8c1ac1c29d3ad358115f3d38be9ef6bf",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Farah tracking, but still chases Copperline FL-661978 after all chairs arrived. No fresh lookup for shipments on the list.",
+    "eligibleSource": {
+      "through": 132,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/31/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/64",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/67",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/96",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/101",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/105",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/130"
+      ]
+    }
+  },
+  {
+    "id": "8da493730234796204b3e39d08832cd3",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Names Ines instead of Tobias Lindqvist despite recall returning the revised account result. Owen remains the eligible buyer before seed[138], so that name is not itself penalized. No fresh account lookup.",
+    "eligibleSource": {
+      "through": 137,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/32/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/65",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/134",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/136",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/lookups/1",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "a3589ee041cda87db13f38c7d364532d",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Omits Dalia and 555-0175, revives the closed Halvorsen morning chase, misattributes Freightline's 555-0188 to Tomasz, and invents a Dana direct-line instruction. No fresh lookup.",
+    "eligibleSource": {
+      "through": 127,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/33/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/16/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/58",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/80",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/124",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/126"
+      ]
+    }
+  },
+  {
+    "id": "a4ecab1742aa5e69822c45344dcb8807",
+    "status": "served",
+    "semantic": "ambiguous",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct extension 4127 and explicitly says she takes calls after 2 pm. 'Voicemail is at 2 pm' can be malformed availability wording (semantic pass) or an invented voicemail timestamp (semantic fail). Preserve that wording ambiguity; fresh Halvorsen lookup is absent.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/34/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/9/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/24",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    },
+    "alternatives": [
+      {
+        "semantic": "pass",
+        "reading": "The malformed voicemail sentence describes the supplied after-2-pm availability; the next sentence makes the restriction explicit."
+      },
+      {
+        "semantic": "fail",
+        "reading": "The first sentence asserts an unsupported voicemail time of 2 pm."
+      }
+    ]
+  },
+  {
+    "id": "ad1778b0ed22ee376f0536e4405f4de4",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct gift wording and planned second replacement, but invents that the damaged kettle arrived yesterday and does not address when the second will arrive. The quoted third-person text is not a complete reply to Kenji. Only recall; no fresh lookup.",
+    "eligibleSource": {
+      "through": 143,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/35/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/21/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/7",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/142",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "af12a08c6475ae598cdffafd6d980b45",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Tobias Lindqvist, but assigns him 555-0142, which the allowed lookup source identifies as Halvorsen's switchboard, not Copperline's. No fresh lookup.",
+    "eligibleSource": {
+      "through": 137,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/36/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/19/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/22",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/136",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/lookups/1",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_customer/LH-31055"
+      ]
+    }
+  },
+  {
+    "id": "b0c7a0e783807ddf18f2d3531b1dadf7",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct Hana Ikeda and hana.ikeda@copperline.example; supplying email meets the contact request without repeating 'email only'. No fresh Copperline lookup.",
+    "eligibleSource": {
+      "through": 139,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/37/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/138"
+      ]
+    }
+  },
+  {
+    "id": "b2a7f32abdabe2f78f9b35df8be0a6c2",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Omits Farah PW-7120-4466, revives delivered Halvorsen and Beatriz shipments, and shifts Tomasz's past Friday absence into tomorrow. Recalled historical warehouse text is not a fresh lookup.",
+    "eligibleSource": {
+      "through": 132,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/38/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/17/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/82",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/84",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/101",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/105",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/130"
+      ]
+    }
+  },
+  {
+    "id": "b88e8209190e1680aff191bfad5744aa",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh Grace order lookup satisfies the system action requirement, but Marcus is wrong for today's actual signer: Ruth covers him through 2026-10-09.",
+    "eligibleSource": {
+      "through": 89,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/39/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/10/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/54",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/78",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/88"
+      ]
+    }
+  },
+  {
+    "id": "cadf8e2d964c42c708e839107abe1aa7",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Exact gift wording recovered by relevant recall. The original explicit list also requires lookup_order, and no fresh lookup was made.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/40/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/8/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    }
+  },
+  {
+    "id": "ce92e9422be6dac5fb7b9389224cd0f9",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Lists WKND15 and its dates but incorrectly denies that it applies to Farah's late curtains. No fresh Farah lookup.",
+    "eligibleSource": {
+      "through": 133,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/41/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/114",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/133"
+      ]
+    }
+  },
+  {
+    "id": "d64efdac67a45a6f61b7653d8e1ca34f",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "pass",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Fresh LH-81660 lookup and correct tracking, but puts the carrier's October 12 delivery estimate in the customer draft despite the no-written-delivery-date rule. This is a requested draft, not a request for external delivery.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/42/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/5/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/7",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/11",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/tools/lookup_order/LH-81660"
+      ]
+    },
+    "delivery": {
+      "verdict": "not-required",
+      "reason": "The original request asks for a reply the shift lead can send. Drafting is representable by the final message."
+    }
+  },
+  {
+    "id": "d90458a3f692246c72fdcd38395378c6",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "fail",
+    "completeWork": "fail",
+    "reason": "Correct full $289 refund and withdrawn fee. Only recall of an old lookup result; the required fresh lookup_order is missing.",
+    "eligibleSource": {
+      "through": 47,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/43/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/0/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/40",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/42",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/44"
+      ]
+    }
+  },
+  {
+    "id": "eae9697851bcb873d3f67bed454f55b5",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct signer, trace, and tracking, but says the trace is closed, omits the twin parcel addressed to someone else, and gives the wrong reason for today's replacement. Only recalls; no fresh lookup.",
+    "eligibleSource": {
+      "through": 145,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/44/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/22/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/6",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/15",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/18",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/56",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/90",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/144",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/145"
+      ]
+    }
+  },
+  {
+    "id": "f44f0c31440b32417418570d04fac302",
+    "status": "served",
+    "semantic": "pass",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct WKND15, 15 percent, and October 10-11 validity. Only recalls, with no fresh lookup for Farah's order/account.",
+    "eligibleSource": {
+      "through": 133,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/45/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/18/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/99",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/114",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/120",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/133"
+      ]
+    }
+  },
+  {
+    "id": "fb72d0bfd0bdc528bd5759bdc4c0c7e2",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Correct exchange and tracking, but directs an immediate release of an already-shipped rug through Tomasz on his stated day off; turns the instruction to chase Parcelway into a carrier-status assertion. No fresh lookup.",
+    "eligibleSource": {
+      "through": 111,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/46/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/13/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/8",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/71",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/108",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/110"
+      ]
+    }
+  },
+  {
+    "id": "ff73f41b27f5bae52fce64b8d2fbf982",
+    "status": "served",
+    "semantic": "fail",
+    "systemTool": "fail",
+    "listedTool": "pass",
+    "completeWork": "fail",
+    "reason": "Names Hana and her email but still directs today's contact to departed Owen at superseded extension 4301. The correction is not applied. Only recall, no fresh lookup.",
+    "eligibleSource": {
+      "through": 139,
+      "goal": ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20"
+    },
+    "references": {
+      "packet": [
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/id",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/status",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/request",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/eligibleSource",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/reply",
+        "tmp/units/aggregate-development-blind-packet-l11-baselines/packet.json#/goals/47/actions"
+      ],
+      "scenario": [
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/ledger/system",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/request",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/after",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/goals/20/tools",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/62",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/68",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/92",
+        ".orkestrel/agent/instruments/harness/bench/variants/long/v1.json#/seed/138"
+      ]
+    }
+  }
+]

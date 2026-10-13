@@ -1,0 +1,12 @@
+[
+  {
+    "line": 32,
+    "raw": "{\"turn\":32,\"goal\":\"g20-copperline-manager\",\"estimate\":1162,\"scope\":\"aggregate\"}",
+    "value": {
+      "turn": 32,
+      "goal": "g20-copperline-manager",
+      "estimate": 1162,
+      "scope": "aggregate"
+    }
+  }
+]

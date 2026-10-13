@@ -1,0 +1,22 @@
+{
+  "protocol": "l6",
+  "key": "q4",
+  "think": false,
+  "arm": "full",
+  "copy": 1,
+  "phase": "full",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\q4-think0\\freeze\\manifest.json",
+    "hash": "2eaffe7d6c4b8f3fc83802130b8b0be18778abb5b4362a154157bcbcab41d831"
+  },
+  "resource": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\q4-think0\\resource\\manifest.json",
+    "hash": "63195146d3ec631b50ca7a00dc7b74b3aabb5ed13bc32fbd370f47fd197ae683"
+  },
+  "budget": {
+    "reserve": 512,
+    "window": 1068374,
+    "ceiling": 262144,
+    "predict": 0
+  }
+}

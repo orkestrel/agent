@@ -1,0 +1,24 @@
+cwd=C:\Users\mikes\WebstormProjects\scaffold
+HEAD=4acb51125833e96aa771574ce248f49cc9ebddc0 expected=4acb51125833e96aa771574ce248f49cc9ebddc0 equal=true
+plan=.orkestrel/agent/instruments/results/l15/custody/g2-generation/aggregate-successor-model-g2-plan.json sha256=4f875648d30934971697bd0959cc148ac32b5ddbb7b431dc3f672177a82c2619
+plan fit model=gemma4:e2b-it-q4_K_M; sequence=5; capSeconds=240
+sealed input .orkestrel/agent/instruments/harness/.build/build-manifest.json sha256=0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc expected=0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc equal=true
+sealed input .orkestrel/agent/instruments/results/l15/g2-think0/freeze/manifest.json sha256=470d01c30a1a91e87f6bfd022508487bce1574fb7f31e44229298cbbcc8ec9b9 expected=470d01c30a1a91e87f6bfd022508487bce1574fb7f31e44229298cbbcc8ec9b9 equal=true
+sealed input .orkestrel/agent/instruments/results/l15/calibration/g2/labels.json sha256=d4c33651a0db676d2b1498224e93613ece7b11b654814f6922c75c3ccd88fa10 expected=d4c33651a0db676d2b1498224e93613ece7b11b654814f6922c75c3ccd88fa10 equal=true
+input .orkestrel/agent/instruments/results/l15/calibration/g2/corpus/corpus.json bytes=3124729 sha256=e930cdf16315d8bafc3503d1e4a3532ef09aeba0d863fd3f0e0d76914cca3c8c
+input .orkestrel/agent/instruments/results/l15/calibration/g2/corpus/manifest.json bytes=551 sha256=60b67f7b8b9950b94b0dc779f7934d653a1d6e61383e12bc0e16059b45c2e5c3
+input .orkestrel/agent/instruments/results/l15/calibration/g2/generation/attempts.jsonl bytes=3783560 sha256=ab7dae4f7a614a412945268f3f5d5f6d8891672b868724d782e0d16090b9bb97
+input .orkestrel/agent/instruments/results/l15/calibration/g2/generation/packet.jsonl bytes=3208183 sha256=9ae5f8622b50bfd09672c243499fccf01b775451cba03671a33c46755025cb2d
+input .orkestrel/agent/instruments/results/l15/calibration/g2/generation/manifest.json bytes=39244 sha256=916567ee5a07a9db92ba7fed2007809801ab03d0c67d0b0369c46fb479d13c66
+input tmp/units/aggregate-successor-g2-labels.ts bytes=4539 sha256=f6c54e8392891938cc69060f5a62a0627b60762eb30973e2583077431e5283f8
+input .orkestrel/agent/instruments/results/l15/custody/q2-generation-and-g4-fit/aggregate-successor-g4-fit-read.ts bytes=3201 sha256=889e7d984e3e791f1da1f5589df265f019603ba74098180687cd2a5e57c8aaf3
+absent destination .orkestrel/agent/instruments/results/l15/calibration/g2/fit
+absent destination .orkestrel/agent/instruments/results/l15/calibration/g2/fit/fit.json
+absent destination .orkestrel/agent/instruments/results/l15/calibration/g2/fit/diagnosis.json
+absent destination .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl
+absent destination .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err
+absent destination .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.pid
+absent destination .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.status-before.txt
+absent destination .orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl.status-after.txt
+absent destination tmp/units/aggregate-successor-g2-fit-validation.json
+absent destination tmp/units/aggregate-successor-g2-fit-report.md

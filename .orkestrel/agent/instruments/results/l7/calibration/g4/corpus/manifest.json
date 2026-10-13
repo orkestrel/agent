@@ -1,0 +1,17 @@
+{
+  "corpus": "676576f4eebac6ad523671dadf53f4cc22eb00ca6d437e6e5194820d6d5a8821",
+  "requests": 24,
+  "occurrences": 162,
+  "initial": 49,
+  "stats": {
+    "hits": {
+      "category": 89,
+      "topic": 540,
+      "amends": 112,
+      "supersedes": 15
+    },
+    "misses": {},
+    "transient": 0
+  },
+  "limitation": "Cold-build and lexical-retry candidates on copy-1 seed-only runtime projections. Later states do not reproduce diverged live histories. CHANGE 0.56 is retained; its old calibration does not certify repaired future summary states."
+}

@@ -1,0 +1,21 @@
+{
+  "model": "gemma4:e4b-it-q4_K_M",
+  "think": false,
+  "stream": false,
+  "keep_alive": 0,
+  "messages": [
+    {
+      "role": "user",
+      "content": "A desk has 17 boxes containing 24 cards each. It gives 138 cards to one team and 97 cards to another. How many cards remain? Give the total and a brief calculation."
+    }
+  ],
+  "options": {
+    "temperature": 0,
+    "seed": 7,
+    "presence_penalty": 1.5,
+    "top_k": 20,
+    "top_p": 0.95,
+    "num_ctx": 3072,
+    "num_predict": 1024
+  }
+}

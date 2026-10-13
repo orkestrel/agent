@@ -1,0 +1,34 @@
+{
+  "cwd": "C:/Users/mikes/WebstormProjects/scaffold",
+  "argv": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-label-a-verifier-check.ts"
+  ],
+  "child": {
+    "pid": 60076,
+    "exitCode": 0,
+    "signal": null
+  },
+  "durationMs": 208.52,
+  "stdout": {
+    "path": "tmp/units/aggregate-successor-label-a-verifier.stdout.log",
+    "bytes": 222,
+    "sha256": "e4b082077714276400957bbb9333993c7556c8fcb4bfcbff72d48dc6daec3cb0"
+  },
+  "stderr": {
+    "path": "tmp/units/aggregate-successor-label-a-verifier.stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputsBefore": {
+    "packet": "0e3eaecbf38d7dad2450fb2748db860aeb8117679f06f8a7bf27ea93ad5f9541",
+    "labels": "532865b974936adafddbba040b38a54224b08ba6060c5c4cad5ce652d488adae",
+    "report": "867f5c34f765d280f268cca403e8ce63f5d0e3f2acf9e621704a150dae0560b0"
+  },
+  "inputsAfter": {
+    "packet": "0e3eaecbf38d7dad2450fb2748db860aeb8117679f06f8a7bf27ea93ad5f9541",
+    "labels": "532865b974936adafddbba040b38a54224b08ba6060c5c4cad5ce652d488adae",
+    "report": "867f5c34f765d280f268cca403e8ce63f5d0e3f2acf9e621704a150dae0560b0"
+  },
+  "inputsUnchanged": true
+}

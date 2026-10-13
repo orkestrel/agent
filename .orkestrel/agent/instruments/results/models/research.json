@@ -1,0 +1,1125 @@
+{
+ "ranking": {
+  "ranked": [
+   {
+    "rank": 1,
+    "slot": "small (counterpart to qwen3.5:2b-q4_K_M; rank is within slot)",
+    "name": "Granite 4.0 H-Tiny (7B total, about 1B active, Mamba-2 hybrid MoE)",
+    "ollamaTag": "granite4:tiny-h",
+    "sizeQ4": "4.2 GB (Ollama tags page; quant label not shown)",
+    "why": "It ranks first on criterion 1. No Ollama tool-parsing defect is reported for any Granite 4.x tag (fit R1). The only Granite tool issue is #7544, on granite3-dense, closed 2025-01-13. On criterion 2, IBM reports BFCL v3 57.65 on the H-Tiny card. Qwen publishes only BFCL-V4, so no same-version comparison exists. The model carries Granite's OpenAI-schema tool format. On criterion 3, about 1B active parameters put its per-token compute under the 2B dense load of qwen3.5:2b. It loses on criterion 4: neither the Ollama page nor the card documents thinking. Only the library researcher read the HF card; the speed researcher confirms the 7b-a1b-h alias.",
+    "risk": "The first risk is CPU speed of the Mamba-2 hybrid MoE. IBM lists the non-hybrid tags as the option 'when Mamba2 support is not yet optimized (e.g. llama.cpp)'. The author of llama.cpp PR #13550 saw slower prompt processing after a Mamba conv change. Two checks come first. Run `ollama show granite4:tiny-h` and confirm that `tools` appears in its capabilities, because the tools tag sits on the granite4 family page, not on this tag. Then compare its warm prompt rate on the 4,000-token request with qwen3.5:2b.",
+    "sources": [
+     "https://ollama.com/library/granite4/tags",
+     "https://huggingface.co/ibm-granite/granite-4.0-h-tiny",
+     "https://www.ibm.com/granite/docs/models/granite4-0",
+     "https://github.com/ggml-org/llama.cpp/pull/13550",
+     "https://github.com/ollama/ollama/issues/7544"
+    ]
+   },
+   {
+    "rank": 2,
+    "slot": "small (counterpart to qwen3.5:2b-q4_K_M; rank is within slot)",
+    "name": "LFM2.5 1.2B Thinking (Liquid AI, hybrid conv + GQA, 1.17B)",
+    "ollamaTag": "lfm2.5-thinking:1.2b",
+    "sizeQ4": "731 MB (Ollama; quant label not shown)",
+    "why": "This is the smallest candidate (731 MB) and probably the fastest. The only controlled CPU comparison is the LFM2 report: LFM2-1.2B decodes at 99.7 tok/s against Qwen3-1.7B at 60.8 on an HX 370 with llama.cpp Q4_0. That run is vendor-run, on LFM2 rather than LFM2.5, and against Qwen3 rather than Qwen3.5. Liquid's card reports BFCLv3 56.97 against Qwen3-1.7B thinking at 55.41 on the same card, through a custom Liquid handler. The tag carries tools and thinking. It ranks second on criterion 1: the closed issues #14742 ('lfm2.5-thinking cannot run tools') and #15953 have fixes nobody read, and the model emits Pythonic calls by default. On criterion 4 the card says it always reasons, so it has no toggle.",
+    "risk": "With think set to false the model still reasons. That reasoning can use up the generation budget before the tool call, or leak into message.content. Check first that the cold call at think false returns a parsed lookup_order call in tool_calls, not Pythonic text in content. Also check that content carries no reasoning text. The card gives 32,768 tokens of context against 125K on Ollama, so num_ctx must stay at or under 32,768.",
+    "sources": [
+     "https://ollama.com/library/lfm2.5-thinking",
+     "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking",
+     "https://arxiv.org/html/2511.23404v1",
+     "https://github.com/ollama/ollama/issues/14742",
+     "https://github.com/ollama/ollama/issues/15953"
+    ]
+   },
+   {
+    "rank": 3,
+    "slot": "small (counterpart to qwen3.5:2b-q4_K_M; rank is within slot)",
+    "name": "Gemma 4 E2B instruct (2.3B effective, 5.1B with Per-Layer Embeddings)",
+    "ollamaTag": "gemma4:e2b-it-q4_K_M",
+    "sizeQ4": "4.6 GB (Ollama tags page, explicit q4_K_M; the untagged range of 4.6 to 7.5 GB spans other quants)",
+    "why": "It is the only small candidate with a documented thinking toggle. It scores MMLU-Pro 60.0 against 55.3 for qwen3.5:2b with thinking off and 66.5 with it on. It ranks third on criterion 1. Five gemma4 parser defects are open (#18649, #18390, #18275, #18354, #18468), and none names e2b. Issue #18861 was reproduced on 0.40.0 with gemma4:26b: think false after a tool response returns an empty reply, and that is the harness reply step. On criterion 2 it scores Tau2 24.5 against 48.8 for qwen3.5:2b (thinking). On criterion 3 it is 4.6 GB against 1.95 GB.",
+    "risk": "Issue #18861 hits the reply step. Google recommends temperature 1.0, top_p 0.95, and top_k 64, so temperature 0 is outside that recommendation, and loops are reported in #18275 and #18220. Check first that the reply after the lookup_order result is not empty at think false.",
+    "sources": [
+     "https://ollama.com/library/gemma4/tags",
+     "https://huggingface.co/google/gemma-4-E2B-it",
+     "https://github.com/ollama/ollama/issues/18861",
+     "https://github.com/ollama/ollama/issues/18649",
+     "https://github.com/ollama/ollama/issues/18275"
+    ]
+   },
+   {
+    "rank": 4,
+    "slot": "small (counterpart to qwen3.5:2b-q4_K_M; rank is within slot)",
+    "name": "Granite 3.3 2B instruct",
+    "ollamaTag": "granite3.3:2b",
+    "sizeQ4": "1.5 GB (Ollama)",
+    "why": "It is a 2B dense model at 1.5 GB with the tools tag. Thinking is documented, but it is switched on by a role 'control' message, not by the Ollama think field. It has no Granite 4.x tool defect against it. It ranks under the Granite 4 tags because no researcher found a BFCL or IFEval score, and it is from 2025-04-16. Only the library researcher covered it; that researcher cited the Ollama page and the HF card.",
+    "risk": "The harness think field might be ignored or refused. The model has no capability figure. Check first that `ollama show` lists `tools` and that the call parses into tool_calls.",
+    "sources": [
+     "https://ollama.com/library/granite3.3",
+     "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct"
+    ]
+   },
+   {
+    "rank": 5,
+    "slot": "small (counterpart to qwen3.5:2b-q4_K_M; rank is within slot)",
+    "name": "Llama 3.2 3B instruct",
+    "ollamaTag": "llama3.2:3b",
+    "sizeQ4": "2.0 GB (Ollama)",
+    "why": "It is 2.0 GB with the tools tag. Meta reports BFCL V2 67.0 (V2 is a different version from V3 and V4) and IFEval 77.4, the latter against 61.2 for qwen3.5:2b with thinking off. It is the only candidate with any third-party CPU reading: 4.6 to 4.7 tok/s on a Pi 5 under Ollama. It ranks last because open issue #10552 (a JSON SyntaxError on tool_calls for llama3.2 and phi4-mini, filed on Ollama 0.6.6) shows no fix. It is also from 2024-09-25 and has no thinking.",
+    "risk": "Issue #10552 might reproduce on 0.40.0. Check first that tool_calls parse on all three requests.",
+    "sources": [
+     "https://ollama.com/library/llama3.2",
+     "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+     "https://github.com/ollama/ollama/issues/10552",
+     "https://stratospherelinuxips.readthedocs.io/en/develop/immune/research_rpi_llm_performance.html"
+    ]
+   },
+   {
+    "rank": 1,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "Granite 4.2 3B instruct (dense)",
+    "ollamaTag": "granite4.2:3b",
+    "sizeQ4": "2.2 GB (Ollama; quant label not shown)",
+    "why": "It leads on criterion 1. It uses IBM's OpenAI-schema tool format, and no Granite 4.x tool-parsing defect is reported. On criterion 2, BenchLM lists BFCL v4 52.4 against 50.3 for qwen3.5:4b. That is one of only two same-version function-calling comparisons available for the large slot. On criterion 3 it is a dense 3B at 2.2 GB, smaller than the 3.32 GB of qwen3.5:4b. Generation on this host scales with the bytes read per token, so it is expected to run faster; this is an inference, not a reading. On criterion 4, the Ollama page documents thinking controlled by enable_thinking and reasoning_effort. It was released 2026-08-25 under Apache 2.0. Flag: only the fit researcher reported Granite 4.2. Its Ollama page and HF card were cited, but its BFCL figure comes only from a secondary aggregator.",
+    "risk": "The tag's existence, and whether the Ollama think field maps to enable_thinking, both rest on one researcher. Check first that `ollama pull granite4.2:3b` succeeds and that `ollama show` lists `tools` and `thinking`. Then check that think true returns a non-empty message.thinking and that think false returns none. Closed issue #18074 (context defaults and OOM kills on Granite 4.2) means you must set num_ctx explicitly.",
+    "sources": [
+     "https://ollama.com/library/granite4.2",
+     "https://huggingface.co/ibm-granite/granite-4.2-3b",
+     "https://benchlm.ai/md/benchmarks/bfcl-v4.md",
+     "https://github.com/ollama/ollama/issues/18074"
+    ]
+   },
+   {
+    "rank": 2,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "LFM2.5 8B-A1B (8.3B total, 1.5B active MoE)",
+    "ollamaTag": "lfm2.5:8b-a1b-q4_K_M (alias lfm2.5:8b, same 5.2 GB)",
+    "sizeQ4": "5.2 GB (Ollama)",
+    "why": "It is the strongest candidate on criterion 2. Liquid reports IFEval 91.84 against 89.8 for qwen3.5:4b, BFCL v4 of 48.50 or 49.73 against 50.3, and Tau2 Telecom 88.07; all are vendor figures. The Ollama page says it is 'built for fast, reliable tool calling on consumer hardware', and the tag carries tools and thinking. On criterion 3, its 1.5B active parameters mean less compute per token than the 4B dense load of qwen3.5:4b. It ranks second on criterion 1. Its calls are Pythonic by default, and no source confirms that Ollama parses them. Sibling issues #14742 and #15953 were closed with fixes nobody read, and #14928 on lfm2:24b closed with 'It can call tools, it's just not very good at it.'",
+    "risk": "The tool-call parse comes first: the cold call must return tool_calls, not Pythonic text in content. Second, MoE prompt processing on 4 cores; the 'large room for CPU improvement' quote is a snippet nobody fetched. Third, whether think false suppresses its reasoning. Check first that the lookup_order call parses on all three requests and that the warm prompt rate beats qwen3.5:4b on the 4,000-token request.",
+    "sources": [
+     "https://ollama.com/library/lfm2.5",
+     "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B",
+     "https://docs.liquid.ai/lfm/models/lfm25-8b-a1b.md",
+     "https://github.com/ollama/ollama/issues/14928"
+    ]
+   },
+   {
+    "rank": 3,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "Granite 4.1 3B instruct (dense)",
+    "ollamaTag": "granite4.1:3b",
+    "sizeQ4": "2.1 GB (Ollama; quant label not shown)",
+    "why": "It is the best-attested candidate: three researchers agree. It has the tools tag and OpenAI-schema tools in <tool_call> tags, and no tool defect was found. IBM reports BFCL v3 60.80 and IFEval 82.30 against 89.8 for qwen3.5:4b. It is 2.1 GB and was released 2026-04-29. It ranks under granite4.2:3b because it has no thinking and shares granite4.2's family, size, and template. It is the large-slot fallback if the granite4.2 tag or its think mapping fails.",
+    "risk": "Expect think true to be refused, because the model has no thinking. Its IFEval is under qwen3.5:4b's. Check first that tool_calls parse and that its speed beats qwen3.5:4b.",
+    "sources": [
+     "https://ollama.com/library/granite4.1",
+     "https://huggingface.co/ibm-granite/granite-4.1-3b"
+    ]
+   },
+   {
+    "rank": 4,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "Ministral 3 3B instruct 2512 (3.4B language model plus 0.4B vision encoder)",
+    "ollamaTag": "ministral-3:3b-instruct-2512-q4_K_M (alias ministral-3:3b)",
+    "sizeQ4": "3.0 GB (Ollama, Q4_K_M)",
+    "why": "It has native function calling and JSON output, a 256K context, and an Apache 2.0 license. It requires Ollama 0.13.1, and 0.40.0 meets that. It ranks fourth on criterion 1: closed issue #13328, 'Tool calling doesn't work if more than 2 tools attached', describes the harness exactly, because the harness sends three tools. Issues #13334 and #13705 add multi-call and nested-object parser failures. No source confirms that closing these issues fixed them. No researcher found a capability score, and the instruct checkpoint has no thinking.",
+    "risk": "The call with three tools attached. Check first that the cold call with lookup_order, lookup_customer, and recall attached returns a parsed call.",
+    "sources": [
+     "https://ollama.com/library/ministral-3",
+     "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
+     "https://github.com/ollama/ollama/issues/13328",
+     "https://github.com/ollama/ollama/issues/13705"
+    ]
+   },
+   {
+    "rank": 5,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "Gemma 4 E4B instruct (4.5B effective, 8B with embeddings)",
+    "ollamaTag": "gemma4:e4b-it-q4_K_M",
+    "sizeQ4": "6.6 GB (Ollama tags page, explicit q4_K_M)",
+    "why": "It has a documented thinking toggle and strong knowledge scores: MMLU-Pro 69.4 and GPQA Diamond 58.6. It ranks fifth because it has the same gemma4 defects as E2B, including #18861, which was reproduced on 0.40.0 on the harness reply path. On criterion 2 it scores Tau2 42.2 against 79.9 for qwen3.5:4b. On criterion 3, at twice the disk size of qwen3.5:4b, its generation on this host is expected to be slower (an inference from bytes read per token).",
+    "risk": "Issue #18861 and speed. Check first that the reply after the tool result is not empty at think false, then compare its generation rate with qwen3.5:4b.",
+    "sources": [
+     "https://ollama.com/library/gemma4/tags",
+     "https://huggingface.co/google/gemma-4-E4B-it",
+     "https://github.com/ollama/ollama/issues/18861"
+    ]
+   },
+   {
+    "rank": 6,
+    "slot": "large (counterpart to qwen3.5:4b-q4_K_M; rank is within slot)",
+    "name": "Phi-4-mini instruct 3.8B",
+    "ollamaTag": "phi4-mini:3.8b",
+    "sizeQ4": "2.5 GB (Ollama)",
+    "why": "It has the tools tag and an MIT license, and it is 2.5 GB. It ranks last. Open issue #10552 (a JSON SyntaxError on tool_calls) names phi4-mini. The card warns that the model 'could sometimes hallucinate function names'. The card names BFCL and IFEval but gives no score for either. It is from 2025-02 and has no thinking.",
+    "risk": "Issue #10552 and hallucinated function names. Check first that the call name is lookup_order on every request.",
+    "sources": [
+     "https://ollama.com/library/phi4-mini",
+     "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+     "https://github.com/ollama/ollama/issues/10552"
+    ]
+   }
+  ],
+  "top": {
+   "small": [
+    "granite4:tiny-h",
+    "lfm2.5-thinking:1.2b"
+   ],
+   "large": [
+    "granite4.2:3b",
+    "lfm2.5:8b-a1b-q4_K_M"
+   ]
+  },
+  "pilot": "This lane is objective: it rules on what the evidence permits. This lane sent nothing to the daemon; the executor runs the pilot.\n\nUse the existing tool, /home/user/agent/tmp/bench/models/pilot.mjs. It swaps the model into a recorded g06 wire request and keeps every other field. It records the cold load, the cold and warm prompt rates, the generation rate, the lookup_order call (expecting id LH-81660), the tool round trip, and with --think, the thinking toggle.\n\nThe Qwen readings supplied are in /home/user/agent/tmp/bench/models/pilot.jsonl, from the 2026-10-09 g06 requests at 1,505 and 2,549 prompt tokens:\n- qwen3.5:2b-q4_K_M: prompt rate 147.5 to 162.5 tok/s cold and 152.0 to 167.3 warm; generation 10.9 to 13.5 tok/s.\n- qwen3.5:4b-q4_K_M: prompt rate 67.9 to 70.9 tok/s; generation 6.0 to 6.6 tok/s.\n- Both tags called lookup_order {\"id\":\"LH-81660\"} with thinking off and on.\n- The first cold load of the 4B took 237,108 ms and the second took 6,451 ms. The first is a disk-cold outlier.\n- Ignore the prompt rates on the reply and think steps (1,536 to 18,388 tok/s), because those steps reuse the prompt cache. Read prompt speed only from the cold and warm steps.\n\nThese readings are missing:\n- A 4,000-token prompt: the recorded g06 requests stop at 2,549 tokens.\n- A non-Qwen reading of any kind on this host.\n- The harness's own num_predict: pilot.mjs line 65 overrides it to 256, or 1,024 under --think.\n\nRun the pilot in these steps:\n0. Pick or record a g06 wire request whose prompt_eval_count is near 4,000, for example a fuller-history arm. Rerun both Qwen tags on that request with --think, so that every comparison uses the same request in the same session.\n1. Check the disk. 16 GB is free, and the first wave takes 2.2 + 5.2 + 4.2 + 0.73, about 12.3 GB. Pull granite4.2:3b, lfm2.5:8b-a1b-q4_K_M, granite4:tiny-h, and lfm2.5-thinking:1.2b. Remove a ruled-out tag before pulling a fallback.\n2. For each tag, run `ollama show TAG` and record the quantization, the parameter count, and the capabilities. A tag without `tools` is out before any run.\n3. Run `node pilot.mjs --model TAG --think --out pilot.jsonl` on the two g06 requests and the 4,000-token request.\n4. When one is ruled out, use these fallbacks in order. For the large slot: granite4.1:3b, then ministral-3:3b, then gemma4:e4b-it-q4_K_M. For the small slot: gemma4:e2b-it-q4_K_M, then granite3.3:2b, then llama3.2:3b.\n5. Admit to the series the highest-ranked candidate in each slot that passes. A pair from one family (Granite at both sizes) mirrors the Qwen pair and isolates the family effect. A mixed pair isolates the model effect.\n\nAny one of these results disqualifies a candidate:\n- The cold or warm status is not 200. That covers a refusal of tools, of think false, or of the architecture, and a failed load.\n- At think false on any request, toolCall is 'none' or 'other', or the arguments do not carry LH-81660.\n- The call appears as text in message.content instead of in tool_calls, which is a parser miss.\n- The reply after the tool result is empty, or the model repeats the tool call on every request (the #18861 path).\n- At think false, reasoning text lands in message.content.\n- On the 4,000-token request, the warm prompt rate or the generation rate falls under the same-slot Qwen reading on that request. The small slot compares with qwen3.5:2b and the large slot with qwen3.5:4b.\n- A small-slot candidate that loses to qwen3.5:2b but beats qwen3.5:4b moves to the large slot instead of out.\n\nThese results do not disqualify a candidate:\n- Think true is refused, or it returns no thinking field. Record that as no toggle.\n- The reply misses the tracking number or the delivery estimate. That is capability, which the series scores.\n- The reply invents an action. Both Qwen tags did so: the 4B claimed to have added a gift note on both requests.\n\nBefore ruling out a candidate whose cold generated count equals the 256 cap with no call, rerun that request with the recorded num_predict. This matters most for lfm2.5-thinking:1.2b, which always reasons.",
+  "excluded": "Each excluded candidate fails on one of these grounds.\n\nNo tools tag on Ollama, so the benchmark cannot run:\n- gemma3:4b and gemma3:1b (vision tag only).\n- gemma3n:e2b and gemma3n:e4b (no tools tag, 32K context, 5.6 to 7.5 GB; #18357 shows empty tool_calls on a community build).\n- falcon3, exaone3.5, exaone-deep, and olmo2 (olmo2 also has a 4K context).\n- phi4-mini-reasoning.\n\nContext too short for prompts of 2,000 to 7,000 tokens:\n- nemotron-mini:4b (4,096 tokens).\n- smollm2:1.7b (8K tokens; its card also reports BFCL 27%).\n\nNo official Ollama tag:\n- SmolLM3 3B (HTTP 404 on its library page; community uploads only).\n- LFM2-2.6B and LFM2.5-2.6B. BenchLM lists BFCL v4 56.9 for LFM2.5-2.6B, but only the fit researcher reported it, from that secondary source.\n- MiniCPM5-1B (404, and its card has no numeric score).\n- Falcon-H1 and EXAONE 4.0 (community uploads only).\n\nToo large or too slow for 15 GB of RAM and 4 cores:\n- lfm2:24b (14 GB, and #14928 says 'not very good at it').\n- gpt-oss:20b (14 GB).\n- The 30B to 33B MoE models: north-mini-code, laguna-xs-2.1, nemotron-3.5-lightning, and nemotron3 (19 to 28 GB).\n- olmo3 (7B minimum).\n- ornith (9B; its base model is unconfirmed).\n- The untagged gemma4 default (6.6 to 9.5 GB, not Q4).\n\nQwen-based, excluded by the owner's rule:\n- tev1 and nimble (both fine-tuned from Qwen3.5).\n- DeepSeek-R1-Distill-Qwen-1.5B.\n- Salesforce xLAM-2-3b-fc-r (Qwen-2.5-based, and its license is non-commercial).\n\nUnder 1B or not a dialogue model:\n- functiongemma (270M).\n- granite4:350m-h.\n\nDominated by a ranked tag:\n- granite4:micro and granite4:3b (dense 3B, BFCL v3 59.98): same size and family as granite4.1:3b, one release older.\n- granite4:micro-h and granite4:3b-h: carry the Mamba-2 risk of tiny-h with no capability figure.\n- granite4:1b: 3.3 GB on disk, quant unknown.\n- granite3.2:2b: dominated by granite3.3:2b, and its HF card was not fetched.\n- cogito:3b and hermes3:3b: Llama 3.2 3B fine-tunes that carry #10552's template risk and have no score. cogito's hybrid thinking appears only on its HF card, not on Ollama.\n- llama3.2:1b: weaker sibling of the ranked 3B.",
+  "conflicts": "Each conflict is resolved by its primary source where one exists, and flagged where none does.\n\nSizes and tags:\n- Gemma 4 E2B size: the library researcher read 4.6 GB for the explicit e2b-it-q4_K_M tag on the tags page, while the benchmarks and fit researchers gave the untagged range of 4.6 to 7.5 GB. Resolved by the tags page: pull the explicit q4_K_M tags (e2b 4.6 GB, e4b 6.6 GB).\n- Qwen3.5 sizes: the brief gives qwen3.5:2b-q4_K_M at 1.95 GB and qwen3.5:4b-q4_K_M at 3.32 GB, while the benchmarks researcher gave untagged ranges of 2.7 to 3.1 GB and 3.3 to 4.0 GB. The brief names the exact tags in use, so its figures stand.\n- LFM2.5 8B on Ollama: the benchmarks researcher marked the tag 'unconfirmed, not checked', while the library and fit researchers both read lfm2.5:8b at 5.2 GB on the library page. The page wins.\n- Granite H-Tiny tag: granite4:tiny-h (library researcher, tags page) and granite4:7b-a1b-h (speed researcher, readme only) are one model. Pull tiny-h. Its tools support is inferred from the family page, so `ollama show` must confirm it.\n- Ministral 3 requires Ollama 0.13.1, and the library researcher did not compare that with the host. 0.40.0 is later than 0.13.1, so the requirement is met.\n- Ollama 0.40.0 release body: the fit researcher's fetch returned unrelated text, so the release body is unconfirmed. v0.40.2 (2026-10-08) lists no tool, template, parser, or think change.\n\nParameter counts and context:\n- LFM2.5 8B active parameters: Liquid's docs and HF card say 1.5B, and Together.ai and the vLLM recipe say about 1B. Resolved by the primary source: 1.5B active, 8.3B total.\n- LFM2.5 1.2B Thinking context: the HF card says 32,768 tokens and Ollama says 125K. Resolved by the card: keep num_ctx at or under 32,768.\n- Granite 4.0 H-Tiny context: Ollama says 1M and the card says 128K. Resolved by the card.\n\nScores:\n- LFM2.5 8B BFCL: two tables on the same Liquid card give 64.36 and 64.79 for v3, and 48.50 and 49.73 for v4. BenchLM's 49.7 matches the second table. No primary source rules on the two tables, so the ranking quotes both.\n- Benchmark versions: no same-version function-calling pair from one publisher exists. Qwen3.5 reports only BFCL-V4; Granite 4.0 and 4.1 report v3, and Llama 3.2 reports V2. Every capability comparison in the ranking is cross-publisher and vendor-reported.\n\nThinking:\n- LFM2.5 1.2B Thinking: the library researcher reported a thinking tag, and the fit researcher found that the card describes always-on reasoning with no toggle. Resolved by the card: no toggle.\n- Granite 4.1 thinking: no researcher found any, so the ranking treats it as absent.\n\nRelease dates:\n- Gemma 4: the Google release log says 2026-03-31 and the Google blog says 2026-04-02. arXiv 2607.02770 dates the technical report, not the release. This does not affect the ranking.\n- Granite 4.1: the HF card says 2026-04-29 and the Ollama readme says 2026-04-28. The card stands, and the date does not affect the ranking.\n\nClaims from one researcher, with citations:\n- Granite 4.2 3B exists, documents thinking, and scores BFCL v4 52.4 (fit researcher; Ollama page and HF card cited, but the score is BenchLM, a secondary source). This claim carries the large-slot first rank, so the pilot confirms the tag first.\n- #18861, think false giving an empty reply after a tool response on 0.40.0 (fit researcher; the issue is cited).\n- The Ministral issues #13328, #13334, and #13705 (fit researcher; titles only).\n- Granite 3.3 thinking through a 'control' message (library researcher).\n- Cogito hybrid thinking (library researcher; HF card only).\n\nClaims from one researcher that nobody cited as a primary source:\n- 'LFM2 2x faster than Qwen3 on CPU' is vendor-run, on LFM2 rather than LFM2.5, and against Qwen3 rather than Qwen3.5. Qwen3.5 2B is itself a hybrid with 18 linear-attention layers out of 24.\n- The 'large room for CPU improvement' MoE quote is a search snippet nobody fetched.\n- Phi-4-mini at about 12 tok/s comes from an aggregator snippet.\n- SmolLM3 at 6.92 tok/s comes from a blog with no hardware named.\n- SmolLM3's BFCL 92.3 has no version and is HF-run.\n- MiniCPM5's BFCL figures come only from a derivative fine-tune card.\nNone of these claims moves a rank.\n\nJudgment calls for the Orchestrator:\n- Slot assignment of the dense Granite 3B: by disk size (2.2 GB against 1.95 GB) it is a 2B-class model, and by capability it is 4B-class. This design slots it large. The pilot's speed reading on the 4,000-token request can move it.\n- Vendor diversity in the top two: this design ranks lfm2.5:8b over granite4.1:3b for the large slot. Neither has a reported tool defect, so the tie on criterion 1 goes to lfm2.5:8b on criterion 2 (IFEval 91.84 against 82.30 and BFCL v3 64.79 against 60.80, all vendor-reported). The Pythonic-format risk is its first pilot check.\n- The pilot's 256-token generation cap differs from the harness budget."
+ },
+ "research": [
+  {
+   "angle": "library",
+   "result": {
+    "candidates": [
+     {
+      "name": "Gemma 4 E2B (instruct, q4_K_M)",
+      "ollamaTag": "gemma4:e2b-it-q4_K_M",
+      "vendor": "Google",
+      "parameters": "2.3B effective, 5.1B with embeddings, dense with Per-Layer Embeddings. Ollama on-disk 4.6GB (q4_K_M).",
+      "tools": "Yes. Ollama tag 'tools' (https://ollama.com/library/gemma4). HF: 'Native support for structured tool use, enabling agentic workflows.' (https://huggingface.co/google/gemma-4-E2B-it)",
+      "thinking": "Yes. Ollama tag 'thinking'. HF: thinking enabled by including the '<|think|>' token at the start of the system prompt (https://huggingface.co/google/gemma-4-E2B-it).",
+      "benchmarks": "Not researched in this angle; no benchmark source fetched.",
+      "cpuSpeed": "Not measured; no source for CPU speed.",
+      "knownIssues": "Release date conflict: Google release log lists 'March 31, 2026' (https://ai.google.dev/gemma/docs/releases); Google blog and Wikipedia state April 2, 2026 (https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/). Ollama 'latest' tag is 6.6-9.5GB, so only the explicit q4_K_M tag is under 6GB. Input includes image and audio on the Ollama tag. Ollama version requirement not shown on the library page. Thinking disabled behaves differently on E2B/E4B per Ollama page.",
+      "sources": [
+       "https://ollama.com/library/gemma4",
+       "https://ollama.com/library/gemma4/tags",
+       "https://huggingface.co/google/gemma-4-E2B-it",
+       "https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/",
+       "https://ai.google.dev/gemma/docs/releases"
+      ],
+      "architecture": "Dense, PLE",
+      "context": "128K",
+      "released": "Apr 2, 2026 (blog) or Mar 31, 2026 (release log) - conflict",
+      "sizeQ4": "4.6GB"
+     },
+     {
+      "name": "LFM2.5 8B-A1B (Ollama lfm2.5:8b)",
+      "ollamaTag": "lfm2.5:8b-a1b-q4_K_M (also lfm2.5:8b / latest)",
+      "vendor": "Liquid AI",
+      "parameters": "8B total, 1.5B active per forward pass, Mixture-of-Experts (Liquid AI docs). Together.ai and vLLM recipe say about 1B active.",
+      "tools": "Yes. Ollama tag 'tools' and 'built for fast, reliable tool calling on consumer hardware' (https://ollama.com/library/lfm2.5). Liquid docs: 'delivers exceptional performance in tool calling and agentic tasks.' (https://docs.liquid.ai/lfm/models/lfm25-8b-a1b.md)",
+      "thinking": "Yes. Ollama tag 'thinking'. Liquid docs cite 'chain of thought reasoning' without stating whether output is separable or toggleable.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured; active-parameter count (1.5B vs 1B) is the main speed-relevant uncertainty.",
+      "knownIssues": "Active parameter count differs across sources (1.5B Liquid docs vs 1B Together.ai, vLLM). Release date not stated on primary pages. License not stated on Liquid docs page. Context 125K on Ollama vs 128K in Liquid docs. HF card not opened; total and active counts from Liquid docs only.",
+      "sources": [
+       "https://ollama.com/library/lfm2.5",
+       "https://ollama.com/library/lfm2.5/tags",
+       "https://docs.liquid.ai/lfm/models/lfm25-8b-a1b.md"
+      ],
+      "architecture": "MoE, hybrid LFM2 family",
+      "context": "128K (Liquid docs); 125K (Ollama)",
+      "released": "Not confirmed from primary source (Ollama shows 'Updated 4 months ago')",
+      "sizeQ4": "5.2GB"
+     },
+     {
+      "name": "LFM2.5 1.2B Thinking",
+      "ollamaTag": "lfm2.5-thinking:1.2b",
+      "vendor": "Liquid AI",
+      "parameters": "1.17B per HF model card. Hybrid layers: 10 double-gated convolution blocks + 6 GQA blocks (non-MoE per page text).",
+      "tools": "Yes. Ollama tag 'tools'. HF: 'LFM2.5 supports function calling as follows:' with Pythonic function calls by default, JSON optional (https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking).",
+      "thinking": "Yes. Ollama tag 'thinking'. HF calls it a 'General-purpose reasoning model'; output format for reasoning traces not specified.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured; smallest candidate (731MB).",
+      "knownIssues": "Context conflict: Ollama lists 125K, HF lists 32,768 tokens. Ollama page says 'Updated 8 months ago' without release date. License metadata 'lfm1.0' with license text not on page. Model described as text-only. Reasoning trace format unspecified, which matters for parsing.",
+      "sources": [
+       "https://ollama.com/library/lfm2.5-thinking",
+       "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking"
+      ],
+      "architecture": "Dense hybrid conv + GQA (non-MoE per page text)",
+      "context": "32,768 (HF) vs 125K (Ollama)",
+      "released": "Not confirmed (HF cites LFM2 tech report Nov 28, 2025 for the paper, not the model)",
+      "sizeQ4": "731MB (Ollama tag, quant not labeled)"
+     },
+     {
+      "name": "Granite 4.1 3B",
+      "ollamaTag": "granite4.1:3b",
+      "vendor": "IBM",
+      "parameters": "3B dense decoder-only transformer (HF card).",
+      "tools": "Yes. Ollama tag 'tools'. HF: 'enhanced tool calling capabilities' and tools defined in OpenAI function schema (https://huggingface.co/ibm-granite/granite-4.1-3b).",
+      "thinking": "No tag on Ollama page; HF card does not mention thinking or reasoning mode.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "No thinking support documented. Release date conflict: HF says April 29, 2026; Ollama readme says April 28th, 2026. Context 128K on Ollama vs 131,072 on HF.",
+      "sources": [
+       "https://ollama.com/library/granite4.1",
+       "https://huggingface.co/ibm-granite/granite-4.1-3b"
+      ],
+      "architecture": "Dense",
+      "context": "128K / 131,072",
+      "released": "Apr 29, 2026 (HF) vs Apr 28, 2026 (Ollama readme)",
+      "sizeQ4": "2.1GB (3b tag; quant not labeled)"
+     },
+     {
+      "name": "Granite 4.0 H-Tiny (Ollama granite4:tiny-h)",
+      "ollamaTag": "granite4:tiny-h",
+      "vendor": "IBM",
+      "parameters": "7B total, 1B active, decoder-only MoE with attention and Mamba2 layers (HF card for granite-4.0-h-tiny).",
+      "tools": "Yes. Ollama granite4 page tag 'tools'. HF: 'enhanced tool calling capabilities'; BFCL v3 score 57.65 reported (https://huggingface.co/ibm-granite/granite-4.0-h-tiny).",
+      "thinking": "No tag. HF card does not mention thinking or reasoning modes.",
+      "benchmarks": "BFCL v3 57.65 (HF card, vendor-reported).",
+      "cpuSpeed": "Not measured; 1B active is the speed-relevant claim.",
+      "knownIssues": "Ollama tags page gives no capability tags per tag; 'tools' applies to the granite4 family page, so tag-level tools support is inferred. 1M context on Ollama tag. Hybrid -h variants are distinct tags from the base granite4 tags.",
+      "sources": [
+       "https://ollama.com/library/granite4",
+       "https://ollama.com/library/granite4/tags",
+       "https://huggingface.co/ibm-granite/granite-4.0-h-tiny"
+      ],
+      "architecture": "MoE hybrid Mamba2 + attention",
+      "context": "1M (Ollama tag); 128K sequence (HF card)",
+      "released": "Oct 2, 2025 (HF card)",
+      "sizeQ4": "4.2GB"
+     },
+     {
+      "name": "Ministral 3 3B",
+      "ollamaTag": "ministral-3:3b",
+      "vendor": "Mistral AI",
+      "parameters": "3.4B language model plus 0.4B vision encoder (about 4B total), dense per Mistral blog.",
+      "tools": "Yes. Ollama tag 'tools'. Ollama page: 'native function calling and JSON outputting'. HF card: same phrase (https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512).",
+      "thinking": "No tag on Ollama. HF card describes no thinking mode for the instruct checkpoint; a separate Reasoning 2512 variant exists.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Ollama page says 'This model requires Ollama 0.13.1, which is currently in pre-release.' Host Ollama version per task is 0.40.0; comparison not performed here. Vision tag present. Quant of the 3b tag not labeled on page. Released Dec 2, 2025 (Mistral blog).",
+      "sources": [
+       "https://ollama.com/library/ministral-3",
+       "https://mistral.ai/news/mistral-3",
+       "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512"
+      ],
+      "architecture": "Dense",
+      "context": "256K",
+      "released": "Dec 2, 2025 (Mistral blog)",
+      "sizeQ4": "3.0GB (3b tag; quant not labeled)"
+     },
+     {
+      "name": "Llama 3.2 3B",
+      "ollamaTag": "llama3.2:3b (also llama3.2:1b 1.3GB)",
+      "vendor": "Meta",
+      "parameters": "3B dense (1B and 3B family).",
+      "tools": "Yes. Ollama tag 'tools'. Meta blog: 'highly capable with multilingual text generation and tool calling abilities' (https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/).",
+      "thinking": "No tag; no thinking statement on Ollama page.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "No thinking support documented. Meta blog does not use 'zero-shot tool use' phrasing. Old model: Meta post dated Sep 25, 2024.",
+      "sources": [
+       "https://ollama.com/library/llama3.2",
+       "https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/"
+      ],
+      "architecture": "Dense",
+      "context": "128K",
+      "released": "Sep 25, 2024",
+      "sizeQ4": "2.0GB (3b); 1.3GB (1b)"
+     },
+     {
+      "name": "Phi-4-mini 3.8B",
+      "ollamaTag": "phi4-mini (3.8b)",
+      "vendor": "Microsoft",
+      "parameters": "3.8B per HF card.",
+      "tools": "Yes. Ollama tag 'tools' and 'the long-awaited function calling feature is finally supported' (https://ollama.com/library/phi4-mini). HF: tools go in system prompt wrapped by <|tool|> tokens; model 'could sometimes hallucinate function names or URL's' (https://huggingface.co/microsoft/Phi-4-mini-instruct).",
+      "thinking": "No tag; HF card lists no thinking toggle. Separate phi4-mini-reasoning exists with no tools/thinking tags on Ollama.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Function-name hallucination caveat on HF card. No thinking mode.",
+      "sources": [
+       "https://ollama.com/library/phi4-mini",
+       "https://huggingface.co/microsoft/Phi-4-mini-instruct"
+      ],
+      "architecture": "Dense",
+      "context": "128K",
+      "released": "Feb 2025 (HF Training section)",
+      "sizeQ4": "2.5GB"
+     },
+     {
+      "name": "Cogito v1 Preview 3B",
+      "ollamaTag": "cogito:3b",
+      "vendor": "Deep Cogito",
+      "parameters": "3B per title; HF file metadata lists 4B params. Fine-tuned from Llama 3.2 3B.",
+      "tools": "Yes. Ollama tag 'tools'. HF: 'Cogito models support tool calling (single, parallel, multiple and parallel_multiple)' (https://huggingface.co/deepcogito/cogito-v1-preview-llama-3B).",
+      "thinking": "Hybrid. HF: 'self-reflect before answering'; enabled via system prompt or enable_thinking=True in chat template. No thinking tag on Ollama page.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Ollama page lacks thinking tag despite HF hybrid thinking. HF card gives no release date (only 'Updated Apr 8, 2025'). Parameter count conflict (3B vs 4B metadata). Llama 3.2 Community License.",
+      "sources": [
+       "https://ollama.com/library/cogito",
+       "https://huggingface.co/deepcogito/cogito-v1-preview-llama-3B"
+      ],
+      "architecture": "Dense, fine-tune of Llama 3.2 3B",
+      "context": "128K",
+      "released": "Not stated on primary page",
+      "sizeQ4": "2.2GB (3b tag)"
+     },
+     {
+      "name": "Granite 3.3 2B",
+      "ollamaTag": "granite3.3:2b",
+      "vendor": "IBM",
+      "parameters": "2B per HF summary (safetensors metadata 3B).",
+      "tools": "Yes. Ollama tag 'tools'; HF: 'Function-calling tasks' (https://huggingface.co/ibm-granite/granite-3.3-2b-instruct).",
+      "thinking": "Yes. HF: 'supports structured reasoning through <think></think> and <response></response> tags', enabled via thinking=True in apply_chat_template. Ollama readme: enabled by a role 'control' message (https://ollama.com/library/granite3.3).",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Ollama page does not carry a thinking tag. Release date April 16, 2025 (HF). Parameter count conflict (2B vs 3B metadata).",
+      "sources": [
+       "https://ollama.com/library/granite3.3",
+       "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct"
+      ],
+      "architecture": "Dense",
+      "context": "128K",
+      "released": "Apr 16, 2025",
+      "sizeQ4": "1.5GB"
+     },
+     {
+      "name": "Granite 3.2 2B",
+      "ollamaTag": "granite3.2:2b",
+      "vendor": "IBM",
+      "parameters": "2B per Ollama tag (no primary card fetched).",
+      "tools": "Yes. Ollama tag 'tools'; 'Function-calling tasks' listed.",
+      "thinking": "Yes per Ollama readme: 'allow controllability of its thinking capability'; enabled via role 'control' message.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Older release. Primary HF card not fetched in this run; facts from Ollama page only.",
+      "sources": [
+       "https://ollama.com/library/granite3.2"
+      ],
+      "architecture": "Dense (assumed; not confirmed on primary)",
+      "context": "128K",
+      "released": "Feb 26, 2025 (Ollama readme)",
+      "sizeQ4": "1.5GB"
+     },
+     {
+      "name": "Hermes 3 Llama 3.2 3B",
+      "ollamaTag": "hermes3:3b",
+      "vendor": "Nous Research",
+      "parameters": "3B, full fine-tune of Llama-3.2 3B (HF card).",
+      "tools": "Yes. Ollama tag 'tools'. HF: 'more powerful and reliable function calling and structured output capabilities' and 'trained on specific system prompts and structures for Function Calling' (https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B).",
+      "thinking": "No tag; HF describes no thinking or reasoning mode.",
+      "benchmarks": "Not researched in this angle.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "HF card gives no context length (Ollama says 128K). Hermes 8B (4.7GB) is outside the 1-5B range. Llama 3 license per HF metadata.",
+      "sources": [
+       "https://ollama.com/library/hermes3",
+       "https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B"
+      ],
+      "architecture": "Dense, Llama-3.2-3B fine-tune",
+      "context": "128K (Ollama)",
+      "released": "Hermes 3 tech report Aug 15, 2024 (HF link text); model date not stated",
+      "sizeQ4": "2.0GB"
+     },
+     {
+      "name": "SmolLM2 1.7B",
+      "ollamaTag": "smollm2:1.7b",
+      "vendor": "Hugging Face (SmolLM)",
+      "parameters": "About 1.7B (family 135M, 360M, 1.7B per HF).",
+      "tools": "Yes. Ollama tag 'tools'. HF: 'SmolLM2-1.7B-Instruct can handle function calling, it scores 27% on the BFCL Leaderboard' (https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct).",
+      "thinking": "No tag; HF describes no dedicated reasoning mode.",
+      "benchmarks": "BFCL 27% (HF card, vendor-reported).",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Ollama context is 8K, which is tight for the 2,000-7,000 token prompts in the benchmark. BFCL 27% is weak. Model is not Qwen-based per HF card (not separately verified beyond card).",
+      "sources": [
+       "https://ollama.com/library/smollm2",
+       "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct"
+      ],
+      "architecture": "Dense",
+      "context": "8K (Ollama)",
+      "released": "Paper published Feb 4, 2025 (HF)",
+      "sizeQ4": "1.8GB"
+     }
+    ],
+    "notes": "Question: Which non-Qwen models from 1B to 5B (dense, or at most about 3B active MoE/hybrid) with Q4 under 6GB does the Ollama library serve with the tools capability, and which also carry thinking. Ollama 0.40.0 host version is from the task text, not verified by me.\n\nFacts (short form; each has a URL in the candidate rows or below):\n- Ollama tools search lists 20 of 245 models; page=2 returned the same first set, so the full tools set could not be enumerated. https://ollama.com/search?c=tools ; https://ollama.com/search?c=tools&o=newest\n- Ollama thinking search: 20 of 245 shown. https://ollama.com/search?c=thinking\n- Gemma 3 (1b, 4b, 12b, 27b) tags show only 'vision', no tools tag. https://ollama.com/library/gemma3\n- Gemma 3n (e2b, e4b) shows no tools, thinking or vision tag; e4b about 7.5GB. https://ollama.com/library/gemma3n\n- Gemma 4 e2b-it-q4_K_M 4.6GB; e4b-it-q4_K_M 6.6GB (fails the under-6GB rule). https://ollama.com/library/gemma4/tags\n- Falcon3 (1b, 3b): no tools tag. https://ollama.com/library/falcon3\n- EXAONE 3.5 and EXAONE Deep: no tools or thinking tag. https://ollama.com/library/exaone3.5 ; https://ollama.com/library/exaone-deep\n- OLMo 2 (7b, 13b): no tools tag; 4K context ('4K context window'). https://ollama.com/library/olmo2\n- OLMo 3 (7b, 32b) and OLMo 3.1 (32b) carry tools and thinking tags; smallest size is 7B, outside range. https://ollama.com/search?q=olmo\n- SmolLM3: no official Ollama library page (HTTP 404 at https://ollama.com/library/smollm3); only community uploads found at https://ollama.com/search?q=smollm3 (not official, not evaluated).\n- Falcon-H1: no official library page (https://ollama.com/library/falcon-h1 returned 404); only community sam860/falcon-h1 1.5b at https://ollama.com/search?q=falcon.\n- EXAONE 4.0: no official library page (https://ollama.com/library/exaone4 and exaone4.0 both 404); community ingu627/exaone4.0 1.2b and sam860/exaone-4.0 1.2b at https://ollama.com/search?q=exaone, not official.\n- Ollama version requirements found: gemma3 'requires Ollama 0.6 or later' (https://ollama.com/library/gemma3); olmo2 'requires Ollama 0.5.5' (https://ollama.com/library/olmo2); ministral-3 'requires Ollama 0.13.1' (https://ollama.com/library/ministral-3); functiongemma 'Requires Ollama v0.13.5 or later' (https://ollama.com/library/functiongemma). Gemma 4, LFM2.5, LFM2.5-Thinking and Granite 4 pages show no version requirement.\n- Tev1 (0.8b, 4b; tools, thinking): 'fine-tuned from Qwen3.5 in 4B and 0.8B sizes' (https://ollama.com/library/tev1). Excluded as Qwen-based.\n- Nimble (9b): 'fine-tuned from Qwen3.5-9B' (https://ollama.com/library/nimble). Excluded as Qwen-based and 9B.\n- DeepSeek-R1-Distill-Qwen-1.5B: base 'Qwen2.5-Math-1.5B' (https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B). Excluded.\n- Ornith (9b 5.6GB, 35b; tools, thinking): base model not stated on page; 9B is outside range (https://ollama.com/library/ornith). Excluded on size; base unconfirmed.\n- FunctionGemma 270m (301MB, tools, 32K): below 1B; 'not intended for use as a direct dialogue model' (https://ollama.com/library/functiongemma). Excluded on size.\n- Nemotron-mini 4b (2.7GB, tools): 4K context ('supports a context length of 4,096 tokens') (https://ollama.com/library/nemotron-mini). Excluded because benchmark prompts run 2,000 to 7,000 tokens.\n- Falcon3 1b: 8K context (https://ollama.com/library/falcon3). No tools tag either.\n- LFM2 24B-A2B: 14GB Q4 (https://ollama.com/library/lfm2/tags). Excluded on size.\n- gpt-oss 20b: 14GB, tools and thinking tags; active count not stated (https://ollama.com/library/gpt-oss). Excluded on size.\n- North Mini Code (30B, 3B active, 19GB q4_K_M) (https://ollama.com/library/north-mini-code-1.0). Excluded on size.\n- Laguna-XS-2.1 (33B total, 3B active, 20GB q4_K_M) (https://ollama.com/library/laguna-xs-2.1). Excluded on size.\n- Nemotron 3.5 Lightning (30B, 3B active, 25GB) (https://ollama.com/library/nemotron-3.5-lightning). Excluded on size.\n- NVIDIA nemotron3:33b 28GB (https://ollama.com/library/nemotron3). Excluded on size.\n- Phi-4-mini-reasoning (3.8b, 3.2GB): no tools or thinking tag (https://ollama.com/library/phi4-mini-reasoning).\n- Granite 4 hybrid tags: 350m-h, 1b-h, 3b-h (1.9GB, 1M context), micro-h (1.9GB), tiny-h (4.2GB), small-h (19GB) (https://ollama.com/library/granite4/tags). Only tiny-h, 3b-h and micro-h fit the size rule; no per-tag tools tag shown.\n- Gemma 4 release date: Google release log 'March 31, 2026' (https://ai.google.dev/gemma/docs/releases) vs Google blog 'Apr 02, 2026' (https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/).\n\nMatrix (for orchestrator ruling). Candidates meeting all stated criteria (non-Qwen, 1-5B or <=3B active, Q4 under 6GB, tools tag): gemma4:e2b (thinking yes); lfm2.5:8b-a1b (thinking yes, 1.5B active per Liquid docs); lfm2.5-thinking:1.2b (thinking yes); granite4:tiny-h (thinking no tag; 1B active); granite4.1:3b (no thinking); granite3.3:2b (thinking yes via control, 2B); granite3.2:2b (thinking via control); ministral-3:3b (no thinking; needs Ollama 0.13.1); llama3.2:3b and 1b (no thinking); phi4-mini (no thinking); cogito:3b (hybrid thinking per HF, no thinking tag on Ollama); hermes3:3b (no thinking); smollm2:1.7b (8K context, no thinking).\n\nMatrix rows that fail the criteria: gemma4:e4b (Q4 6.6GB over 6GB); gemma3, gemma3n, falcon3, exaone3.5, exaone-deep, olmo2 (no tools tag); nemotron-mini (4K context); olmo-3 (7B minimum); lfm2 24B (14GB); gpt-oss 20b (14GB); MoE 30-33B total models (19-28GB); qwen-based models including tev1, nimble, deepseek-r1 distills, and qwen3.x families (excluded by the user rule).\n\nBenchmarks and CPU speed: not measured in this angle; no benchmark leaderboard source was read, and no CPU or token-per-second data was found in any primary source."
+   }
+  },
+  {
+   "angle": "benchmarks",
+   "result": {
+    "candidates": [
+     {
+      "name": "Granite 4.1 3B (dense, instruct)",
+      "ollamaTag": "granite4.1:3b",
+      "vendor": "IBM",
+      "parameters": "3B dense (HF card: '3B Dense'); Apache 2.0",
+      "tools": "Ollama family header lists 'tools' (https://ollama.com/library/granite4.1). Native tool-call format not checked on HF card.",
+      "thinking": "Unconfirmed. Ollama page shows no thinking tag; HF card thinking support not checked.",
+      "benchmarks": "Self-reported by IBM (HF card table, 3B Dense column): BFCL v3 60.80 ('BFCL v3 | (not stated) | 60.80'); IFEval Avg 82.30; MMLU-Pro 49.83 (5-shot CoT); GPQA 31.70 (0-shot CoT); GSM8K 86.88 (8-shot); Minerva Math 67.94; MMLU 67.02; BBH 75.83. Absent from card: BFCL v4, tau-bench, RULER, any long-context benchmark.",
+      "cpuSpeed": "Not measured in any primary source. Ollama size only: 2.1GB (granite4.1:3b).",
+      "knownIssues": "Release date conflict: HF card says April 29th, 2026; Ollama readme says April 28th, 2026. BFCL is v3 only, not comparable to Qwen3.5 BFCL-V4 figures. Scores are IBM self-reported. No RULER or 4K-8K needle result.",
+      "architecture": "Dense decoder-only, GQA, RoPE, SwiGLU; 40 layers; 8 KV heads",
+      "context": "131072 tokens ('Sequence length of 131072' on HF card)",
+      "released": "2026-04-29 (HF card)",
+      "sizeQ4": "2.1GB (Ollama, granite4.1:3b)",
+      "sources": [
+       "https://huggingface.co/ibm-granite/granite-4.1-3b",
+       "https://ollama.com/library/granite4.1"
+      ]
+     },
+     {
+      "name": "Granite 4.0 Micro (dense, 3B)",
+      "ollamaTag": "granite4:3b (Ollama readme maps granite4:micro to 3b)",
+      "vendor": "IBM",
+      "parameters": "3B total, 3B active, dense; Apache 2.0",
+      "tools": "Ollama granite4 page header lists 'tools' (https://ollama.com/library/granite4).",
+      "thinking": "Not listed on Ollama page; not confirmed on HF card.",
+      "benchmarks": "Self-reported by IBM, 'Micro Dense' column: BFCL v3 59.98; IFEval Average 82.31 (Instruct strict 85.5, Prompt strict 79.12); MMLU 65.98 (5-shot); MMLU-Pro 44.5 (5-shot CoT); GPQA 30.14 (0-shot CoT); GSM8K 85.45 (8-shot); Minerva Math 62.06. Absent: BFCL v4, RULER, long-context evals beyond 128K sequence length spec.",
+      "cpuSpeed": "Not measured. Ollama granite4:3b size 2.1GB.",
+      "knownIssues": "Ollama readme maps 'granite4:micro' to 3b; the Ollama page does not show a micro-specific size or dense/MoE label. BFCL v3 only.",
+      "architecture": "Dense decoder-only, GQA, RoPE, SwiGLU, RMSNorm; 40 attention layers",
+      "context": "128K (HF card 'Sequence length' row)",
+      "released": "2025-10-02 (HF card 'Release Date: October 2nd, 2025')",
+      "sizeQ4": "2.1GB (Ollama granite4:3b)",
+      "sources": [
+       "https://huggingface.co/ibm-granite/granite-4.0-micro",
+       "https://ollama.com/library/granite4"
+      ]
+     },
+     {
+      "name": "Gemma 4 E4B (instruct)",
+      "ollamaTag": "gemma4:e4b",
+      "vendor": "Google",
+      "parameters": "4.5B effective, 8B including embeddings (HF Safetensors shows 8B); Apache 2.0",
+      "tools": "Yes. Ollama header lists 'tools'; HF card: 'Native support for structured tool use.'",
+      "thinking": "Yes. HF card: built-in reasoning mode enabled with the <|think|> token. Ollama header lists 'thinking'.",
+      "benchmarks": "Self-reported by Google (HF card, Gemma 4 E4B column): MMLU Pro 69.4%; GPQA Diamond 58.6%; Tau2 (average over 3) 42.2%; MRCR v2 8-needle 128k avg 25.4%; MMMLU 76.6%. Absent from card: BFCL, tau-bench (only Tau2), IFEval, MATH, GSM8K, RULER.",
+      "cpuSpeed": "Not measured in any primary source. Ollama size 6.6GB-9.5GB for gemma4:e4b, about twice the Qwen3.5-4B tag size (3.3GB-4.0GB). Size is larger than other candidates here.",
+      "knownIssues": "Model card has no release date; technical report arXiv 2607.02770 submitted 2 July 2026. Third-party guide says April 2, 2026 (unconfirmed). Audio input supported per Ollama. Tau2 is not BFCL. No function-calling score.",
+      "architecture": "Dense, 42 layers, Per-Layer Embeddings, 512-token sliding window with interleaved global attention, 262K vocab",
+      "context": "128K tokens",
+      "released": "Model card gives no date; tech report submitted 2026-07-02 (arXiv 2607.02770)",
+      "sizeQ4": "6.6GB-9.5GB (Ollama range, gemma4:e4b; quant not specified)",
+      "sources": [
+       "https://huggingface.co/google/gemma-4-E4B-it",
+       "https://ollama.com/library/gemma4",
+       "https://arxiv.org/abs/2607.02770"
+      ]
+     },
+     {
+      "name": "Gemma 4 E2B (instruct)",
+      "ollamaTag": "gemma4:e2b",
+      "vendor": "Google",
+      "parameters": "2.3B effective, 5.1B including embeddings; Apache 2.0",
+      "tools": "Yes. HF card: 'Native support for structured tool use.' Ollama header lists 'tools'.",
+      "thinking": "Yes, configurable. HF card: E2B and E4B do not emit an empty thought block when thinking is disabled.",
+      "benchmarks": "Self-reported by Google (HF card): MMLU Pro 60.0%; GPQA Diamond 43.4%; Tau2 (average over 3) 24.5%; LiveCodeBench v6 44.0%; AIME 2026 no tools 37.5%; MRCR v2 8-needle 128k 19.1%. Absent: BFCL, IFEval, MATH, RULER.",
+      "cpuSpeed": "Not measured. Ollama size 4.6GB-7.5GB for gemma4:e2b; larger than Qwen3.5-2B (2.7GB-3.1GB).",
+      "knownIssues": "No BFCL, IFEval, or RULER values. Ollama range spans multiple quants; Q4_K_M not confirmed. Release date same gap as E4B.",
+      "architecture": "Dense with Per-Layer Embeddings (E-series)",
+      "context": "128K tokens",
+      "released": "Not on card; tech report submitted 2026-07-02 (arXiv 2607.02770)",
+      "sizeQ4": "4.6GB-7.5GB (Ollama range, gemma4:e2b; quant not specified)",
+      "sources": [
+       "https://huggingface.co/google/gemma-4-E2B-it",
+       "https://ollama.com/library/gemma4",
+       "https://arxiv.org/abs/2607.02770"
+      ]
+     },
+     {
+      "name": "LFM2.5-8B-A1B (MoE, 1.5B active)",
+      "ollamaTag": "Unconfirmed; Ollama library not checked",
+      "vendor": "Liquid AI",
+      "parameters": "8.3B total, 1.5B active (mixture-of-experts; tag lfm2_moe); license tag 'lfm1.0'",
+      "tools": "Unconfirmed. Tool-use benchmarks are reported (BFCL, tau-bench) but the native tool-call template was not checked.",
+      "thinking": "Unconfirmed; not checked.",
+      "benchmarks": "Self-reported by Liquid (improvements table): IFEval 91.84; IFBench 56.47; Multi-IF 79.93; MATH500 88.76; AIME25 42.53; BFCLv3 64.36; BFCLv4 48.50; Tau2 Retail 39.82; Tau2 Telecom 88.07. A second table on the same card gives BFCLv3 64.79 and BFCLv4 49.73. Absent from card: MMLU-Pro, GPQA, RULER, GSM8K.",
+      "cpuSpeed": "Not measured. 1.5B active parameters per card, but no throughput number.",
+      "knownIssues": "Two tables on the same page disagree on BFCL v3 (64.36 vs 64.79) and v4 (48.50 vs 49.73); unexplained. BFCL v4 49.73 is close to Qwen3.5-4B BFCL-V4 50.3, but the two numbers come from different publishers and are not confirmed to use the same settings. Release year only (2026), no exact date. Not Qwen-based per card (Liquid architecture; base is LFM2.5-8B-A1B-Base).",
+      "architecture": "Mixture-of-experts, lfm2_moe, post-trained from LFM2.5-8B-A1B-Base",
+      "context": "128,000 tokens",
+      "released": "2026 (year only; exact date not stated)",
+      "sizeQ4": "Unconfirmed (no Ollama check)",
+      "sources": [
+       "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B"
+      ]
+     },
+     {
+      "name": "LFM2-2.6B (hybrid conv+attention)",
+      "ollamaTag": "Unconfirmed; Ollama library not checked",
+      "vendor": "Liquid AI",
+      "parameters": "2,569,272,320 (about 2.6B); hybrid: 10 gated short-conv blocks and 6 GQA blocks per card text; card table lists 30 layers (22 conv + 8 attn)",
+      "tools": "Unconfirmed. Card describes tool use qualitatively; no score.",
+      "thinking": "Unconfirmed; not checked.",
+      "benchmarks": "Liquid comparison table (non-thinking instruct): MMLU 64.42; GPQA 26.57; IFEval 79.56; IFBench 22.19; GSM8K 82.41; MGSM 74.32. Absent: MMLU-Pro, MATH, BFCL (any version), tau-bench, RULER.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Only Liquid-run numbers. Layer count on card is internally inconsistent (text vs table). No tool-calling score. Context 32K is shorter than the 128K candidates.",
+      "architecture": "Hybrid conv/attention",
+      "context": "32,768 tokens",
+      "released": "Not stated on card; cited technical report arXiv 2511.23404 (published 2025-11-28 per the Liquid card)",
+      "sizeQ4": "Unconfirmed",
+      "sources": [
+       "https://huggingface.co/LiquidAI/LFM2-2.6B"
+      ]
+     },
+     {
+      "name": "Phi-4-mini-instruct (3.8B)",
+      "ollamaTag": "phi4-mini (3.8b)",
+      "vendor": "Microsoft",
+      "parameters": "3.8B dense (card); HF metadata shows 4B; MIT license",
+      "tools": "Yes. Ollama header lists 'tools' (https://ollama.com/library/phi4-mini).",
+      "thinking": "Not listed on Ollama page.",
+      "benchmarks": "Self-reported by Microsoft (main table, Phi-4 mini-Ins): MMLU 67.3 (5-shot); MMLU-Pro 52.8 (0-shot CoT); GPQA 25.2; MATH 64.0; GSM8K 88.6 (8-shot CoT); BigBench Hard 70.4; Arena Hard 32.8. BFCL is named ('Berkeley function calling') with no score. IFEval named in methodology with no score. Absent: RULER and any long-context benchmark.",
+      "cpuSpeed": "Not measured. Ollama size 2.5GB.",
+      "knownIssues": "Vendor card gives no BFCL or IFEval number, so tool-calling capability is not quantified by the vendor. Release Feb 2025 (tech report March 3, 2025). Oldest candidate on the list.",
+      "architecture": "Dense decoder-only transformer, GQA, shared input/output embeddings, 200K vocab",
+      "context": "128K tokens",
+      "released": "2025-02 (card); tech report 2025-03-03",
+      "sizeQ4": "2.5GB (Ollama)",
+      "sources": [
+       "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+       "https://ollama.com/library/phi4-mini"
+      ]
+     },
+     {
+      "name": "Llama 3.2 3B Instruct",
+      "ollamaTag": "llama3.2:3b",
+      "vendor": "Meta",
+      "parameters": "3.21B dense; Llama 3.2 Community License",
+      "tools": "Yes. Ollama header lists 'tools' (https://ollama.com/library/llama3.2).",
+      "thinking": "Not listed.",
+      "benchmarks": "Self-reported by Meta (instruct, bf16 column): IFEval 77.4; BFCL V2 67.0 (V2, not V3 or V4); Nexus 34.3; MMLU 63.4 (5-shot); GSM8K 77.7 (8-shot CoT); MATH 48.0 (CoT); GPQA 32.8; NIH multi-needle recall 84.7. Absent: MMLU-Pro, tau-bench, RULER.",
+      "cpuSpeed": "Not measured. Ollama size 2.0GB (llama3.2:3b).",
+      "knownIssues": "BFCL V2 is a different benchmark version and not comparable to the V3/V4 figures on other cards. Oldest instruct model on the list (Sept 2024). NIH multi-needle context length not stated on card.",
+      "architecture": "Dense decoder-only transformer (Llama 3.2)",
+      "context": "128K (Ollama and card); 8K for quantized variants per card",
+      "released": "2024-09-25 (HF card)",
+      "sizeQ4": "2.0GB (Ollama)",
+      "sources": [
+       "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+       "https://ollama.com/library/llama3.2"
+      ]
+     },
+     {
+      "name": "SmolLM3-3B (instruct, base lineage SmolLM3-3B-Base)",
+      "ollamaTag": "Not found (https://ollama.com/library/smollm3 returned HTTP 404)",
+      "vendor": "Hugging Face",
+      "parameters": "3B; Apache 2.0",
+      "tools": "Yes per card: tool calling via xml_tools (JSON in <tool_call> tags) or python_tools (code snippets). Ollama tag not confirmed.",
+      "thinking": "Yes per card: extended-thinking table present. Default mode not checked.",
+      "benchmarks": "Self-reported by Hugging Face, instruct without extended thinking: BFCL 92.3 (version not stated); IFEval 76.7; GPQA Diamond 35.7; GSM-Plus 72.8; AIME 2025 9.3; Global MMLU 53.5. Base model: RULER 32k 76.35, 64k 67.85, 128k 61.03; MATH (4-shot) 46.10. Absent: needle-in-haystack (card says RULER only), BFCL v4, plain MMLU, MMLU-Pro (CF/MCF only).",
+      "cpuSpeed": "Not measured. No Ollama size.",
+      "knownIssues": "BFCL 92.3 has no stated version and is HF-run; the same table gives Llama3.1-3B 92.3 with footnote 'a tool calling finetune'. Treat as unconfirmed. Context in config is 65,536 (up to 128K via YaRN). Card does not name Qwen lineage; base is HuggingFaceTB/SmolLM3-3B-Base.",
+      "architecture": "Decoder-only transformer, GQA and NoPE (3:1 ratio)",
+      "context": "65,536 native (config); up to 128K with YaRN extrapolation",
+      "released": "Not stated in fetched content",
+      "sizeQ4": "Unconfirmed (no Ollama page)",
+      "sources": [
+       "https://huggingface.co/HuggingFaceTB/SmolLM3-3B"
+      ]
+     },
+     {
+      "name": "Gemma 3 4B and 1B (pretrained numbers only on card)",
+      "ollamaTag": "gemma3:4b (3.4GB, 128K, Text and Image); gemma3:1b (806MB, 32K, Text)",
+      "vendor": "Google",
+      "parameters": "4B and 1B; Gemma terms license",
+      "tools": "NO. Ollama page lists 'vision' only; no 'tools' capability for gemma3 (https://ollama.com/library/gemma3).",
+      "thinking": "No thinking tag on Ollama page.",
+      "benchmarks": "Model card gives only pretrained (PT) numbers: 4B PT MMLU 59.6; MMLU (Pro COT) 29.2; MATH 24.2; GSM8K 38.4; GPQA 15.0; MBPP 46.0. IFEval, BFCL, tau-bench, RULER absent. 1B PT has no STEM column. Instruct-tuned IFEval not on primary card. A Liquid-run comparison (on LFM2-2.6B card, not Google) gives gemma-3-4b-it IFEval 76.85, GPQA 29.51, GSM8K 89.92.",
+      "cpuSpeed": "Not measured. Ollama sizes: gemma3:4b 3.4GB; gemma3:1b 806MB.",
+      "knownIssues": "Gemma 3 is not tagged for tool use on Ollama, and the card has no tool-calling benchmark. The 1B has 32K context. Tech report abstract (arXiv 2503.19786) fetched without tables; instruct-tuned tables not retrieved.",
+      "architecture": "Dense decoder-only (Gemma 3)",
+      "context": "4B: 128K input, 8192 output; 1B: 32K input",
+      "released": "Not stated on card; tech report submitted 2025-03-25 (arXiv 2503.19786)",
+      "sizeQ4": "gemma3:4b 3.4GB; gemma3:1b 806MB (Ollama)",
+      "sources": [
+       "https://huggingface.co/google/gemma-3-4b-it",
+       "https://huggingface.co/google/gemma-3-1b-it",
+       "https://ollama.com/library/gemma3",
+       "https://arxiv.org/abs/2503.19786"
+      ]
+     },
+     {
+      "name": "MiniCPM5-1B (dense, 1B) [benchmarks unconfirmed]",
+      "ollamaTag": "Unconfirmed; https://ollama.com/library/minicpm5 returned HTTP 404",
+      "vendor": "OpenBMB",
+      "parameters": "1,080,632,832 total; 679,552,512 non-embedding; dense; Apache-2.0",
+      "tools": "Card says advantage is 'most visible in agentic tool use'; XML tool-call format is in the derivative card, not the official card. No numeric tool score in official card text.",
+      "thinking": "Unconfirmed on official card text.",
+      "benchmarks": "Official card text has no numeric benchmark scores (leaderboard and radar charts are images). BFCL absent from text. Only numbers: RL+OPD gain 'raises the average score by ↑16 points' (no baseline or benchmark named). Secondary-only: a fine-tune card (GnLOLot/MiniCPM5-1B-Claude-Opus-Fable5-V2-Thinking) quotes base BFCL non-live 41.51 and live 60.24; not a primary source.",
+      "cpuSpeed": "Not measured.",
+      "knownIssues": "Official card gives no BFCL, IFEval, or other numeric score in text, so capability is unconfirmed. Base lineage not stated (card uses LlamaForCausalLM as the code architecture class; that is not a lineage claim). Qwen3-0.6B and Qwen3.5-0.8B appear only as comparison baselines. Release date not stated; collection updated '25 days ago'.",
+      "architecture": "Dense Transformer, 24 layers, GQA (16 Q heads, 2 KV heads); LlamaForCausalLM code class",
+      "context": "131072",
+      "released": "Not stated",
+      "sizeQ4": "Unconfirmed",
+      "sources": [
+       "https://huggingface.co/openbmb/MiniCPM5-1B"
+      ]
+     },
+     {
+      "name": "Qwen3.5-4B (COMPARATOR ONLY, Qwen-based; not a candidate)",
+      "ollamaTag": "qwen3.5:4b (3.3GB-4.0GB, 256K, Text and Image, per Ollama page)",
+      "vendor": "Alibaba Qwen",
+      "parameters": "4B (card); HF metadata shows 5B including vision encoder",
+      "tools": "Ollama family line lists 'vision tools thinking' for 0.8b to 122b; per-tag tools/thinking not confirmed.",
+      "thinking": "Yes; card: 'operate in thinking mode by default'.",
+      "benchmarks": "Self-reported by Qwen (card): IFEval 89.8; IFBench 59.2; BFCL-V4 50.3; TAU2-Bench 79.9; MMLU-Pro 79.1; GPQA Diamond 76.2; AA-LCR 57.0; LongBench v2 50.0. Absent: MATH, GSM8K, RULER, BFCL v3.",
+      "cpuSpeed": "Not measured. Ollama size 3.3GB-4.0GB.",
+      "knownIssues": "Release Feb 2026 (citation only, no exact date). Card gives no RULER or MATH/GSM8K. Scores are Qwen self-reported.",
+      "architecture": "Not extracted beyond parameter count",
+      "context": "262,144 native; extensible to 1,010,000 (card)",
+      "released": "February 2026 (card citation month and year)",
+      "sizeQ4": "3.3GB-4.0GB (Ollama range)",
+      "sources": [
+       "https://huggingface.co/Qwen/Qwen3.5-4B",
+       "https://ollama.com/library/qwen3.5"
+      ]
+     },
+     {
+      "name": "Qwen3.5-2B (COMPARATOR ONLY, Qwen-based; not a candidate)",
+      "ollamaTag": "qwen3.5:2b (2.7GB-3.1GB, 256K, Text and Image, per Ollama page)",
+      "vendor": "Alibaba Qwen",
+      "parameters": "2B (card)",
+      "tools": "Ollama family line lists tools; per-tag not confirmed.",
+      "thinking": "Yes, non-thinking by default; card: 'operates in non-thinking mode by default'.",
+      "benchmarks": "Self-reported by Qwen (card): IFEval 61.2 non-thinking / 78.6 thinking; IFBench 41.3 (thinking); BFCL-V4 43.6 (thinking); TAU2-Bench 48.8 (thinking); MMLU-Pro 55.3 non-thinking / 66.5 thinking; GPQA 51.6 (thinking); AA-LCR 25.6; LongBench v2 38.7. Absent: BFCL v3, MATH, GSM8K, RULER. Note the IFEval row values were extracted by tool; verify against card table.",
+      "cpuSpeed": "Not measured. Ollama size 2.7GB-3.1GB.",
+      "knownIssues": "Mode-dependent numbers; card does not state exact release date. Thinking vs non-thinking mismatch must be matched when comparing with non-Qwen candidates.",
+      "architecture": "Not extracted beyond parameter count",
+      "context": "262,144 native (card)",
+      "released": "February 2026 (citation only)",
+      "sizeQ4": "2.7GB-3.1GB (Ollama range)",
+      "sources": [
+       "https://huggingface.co/Qwen/Qwen3.5-2B",
+       "https://ollama.com/library/qwen3.5"
+      ]
+     }
+    ],
+    "notes": "Question: Which non-Qwen models in the 1B-5B range (dense, or MoE with about 3B active or fewer) have published scores on function calling, instruction following, long-context recall, and knowledge/reasoning, and how do they compare with Qwen3.5 2B and 4B?\n\nScope: capability angle only. The other user questions (g06 goal count, harness location) are outside this task.\n\nExcluded: Salesforce xLAM-2-3b-fc-r (https://huggingface.co/Salesforce/xLAM-2-3b-fc-r). Qwen-based: page tagged qwen2/qwen and card note on \"Qwen-2.5-based models\"; also cc-by-nc-4.0, \"research purposes only.\" Qwen-based distills were not searched for.\n\nMatrix (evidence for and against per row; no ruling made):\n- Function calling, same benchmark version: no same-version pair exists. Qwen3.5 reports BFCL-V4 only (2B 43.6 thinking; 4B 50.3). Granite 4.1 3B reports BFCL v3 60.80; Granite 4.0 Micro v3 59.98; Llama 3.2 3B V2 67.0; LFM2.5-8B-A1B v3 64.36 or 64.79 and v4 48.50 or 49.73. The only cross-model V4 pair is LFM2.5-8B-A1B (49.73) vs Qwen3.5-4B (50.3), from different publishers.\n- Tool use, agentic: Tau2 is reported for Qwen3.5 (2B 48.8 thinking; 4B 79.9), Gemma 4 E4B (42.2) and E2B (24.5), and LFM2.5 (Retail 39.82, Telecom 88.07). No tau-bench for Granite, Phi-4-mini, Llama 3.2, Gemma 3, SmolLM3.\n- Instruction following (IFEval): Granite 4.0 Micro 82.31 avg; Granite 4.1 3B 82.30 avg; LFM2.5 91.84; Llama 3.2 3B 77.4; SmolLM3 76.7 (no thinking); Qwen3.5-4B 89.8; Qwen3.5-2B 61.2 non-thinking, 78.6 thinking. Gemma 3 and Phi-4-mini cards give no IFEval number; Gemma 4 cards give none.\n- Knowledge/reasoning (MMLU-Pro, GPQA): Granite 4.1 3B MMLU-Pro 49.83, GPQA 31.70; Gemma 4 E4B 69.4, 58.6; Gemma 4 E2B 60.0, 43.4; Phi-4-mini 52.8, 25.2; Qwen3.5-4B 79.1, 76.2; Qwen3.5-2B 66.5 thinking (55.3 non-thinking), 51.6.\n- Long-context recall at 4K-8K: no primary source reports a 4K-8K needle score. Available: SmolLM3 base RULER 32k/64k/128k; Gemma 4 E4B MRCR v2 8-needle at 128k (25.4); Gemma 4 E2B (19.1); Llama 3.2 NIH multi-needle recall 84.7 (length unstated). Qwen3.5 cards: AA-LCR and LongBench v2 only, no RULER.\n- Speed proxy (file size only, no throughput data from any primary source): Qwen3.5-2B 2.7-3.1GB; Qwen3.5-4B 3.3-4.0GB; Granite 4.1 3B 2.1GB; Llama 3.2 3B 2.0GB; Phi-4-mini 2.5GB; gemma3:4b 3.4GB; gemma4:e2b 4.6-7.5GB; gemma4:e4b 6.6-9.5GB. Gemma 4 ranges are larger than Qwen3.5 at the same class; quant not specified.\n- Tools tag on Ollama: yes for granite4, granite4.1, gemma4, llama3.2, phi4-mini; no for gemma3 (vision only). Not checked for lfm2, lfm2.5, smollm3 (404), minicpm5 (404).\n\nUnknowns:\n- Official BFCL leaderboard rows were not retrievable. The gorilla leaderboard page shows \"Last Updated: 2026-04-12\" but no rows in static HTML, and the raw CSV path returned 404. Independent BFCL numbers for any candidate remain unconfirmed.\n- No primary-source needle or RULER result at 4K to 8K for any candidate or Qwen3.5 2B/4B.\n- No primary-source throughput or CPU speed for any model. Ollama size is the only speed-adjacent fact.\n- Thinking support unconfirmed for Granite 4.1, Granite 4.0, LFM2.5, LFM2-2.6B, SmolLM3 default mode, MiniCPM5.\n- Ollama tag availability unconfirmed for LFM2.5-8B-A1B, LFM2-2.6B, SmolLM3, MiniCPM5 (404 on the guessed Ollama names).\n- Llama 3.2 1B card not fetched.\n- Gemma 4 release date: arXiv 2607.02770 submitted 2026-07-02; a third-party guide says April 2, 2026 (unconfirmed).\n- Granite 4.1 release date: HF card April 29, 2026 vs Ollama readme April 28, 2026.\n- Qwen3.5 per-tag Ollama tools/thinking not confirmed (family line only). Qwen3.5-2B IFEval row mapping was extracted by tool; verify against the card.\n- Gemma 3 instruct-tuned tables not retrieved (only PT tables on card; tech report abstract only).\n- MiniCPM5-1B BFCL numbers exist only on a derivative fine-tune card (secondary, not a primary source); the official card has no numeric BFCL in text.\n- Vendor self-reported for all candidates; no independent evaluation found except the Liquid-run Gemma 3 comparison on the LFM2 card."
+   }
+  },
+  {
+   "angle": "speed",
+   "result": {
+    "candidates": [
+     {
+      "name": "LFM2 (Liquid AI), hybrid short-conv + GQA",
+      "ollamaTag": "lfm2:24b-a2b (only LFM2 tags on the Ollama library page are 24B MoE; no 1.2B or 2.6B Ollama tag was seen)",
+      "vendor": "Liquid AI",
+      "parameters": "LFM2-1.2B: 1.17B dense (HF card). Ollama lfm2:24b: 24B MoE with 2B active (Ollama page quote: 'A 24B MoE model with only 2B active parameters per token').",
+      "tools": "Ollama lfm2 page labels the model 'tools 24b'. Small LFM2 tool support unconfirmed.",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "LFM2-1.2B: 16 layers, 10 double-gated short-range conv blocks + 6 GQA blocks, vocab 65,536, context 32,768 (https://huggingface.co/LiquidAI/LFM2-1.2B). Hybrid: quote 'a hybrid model with multiplicative gates and short convolutions'.",
+      "benchmarks": "Vendor-run, llama.cpp, Q4_0, batch size 1 (LFM2 tech report, arXiv 2511.23404, submitted 28 Nov 2025, https://arxiv.org/html/2511.23404v1). Section 2.4 quote: 'All models are run with llama.cpp using the Q4_0 quantization format.' Table 3 caption 'Prefill and decode throughput on HX 370 CPU (batch size 1).' Rows (prefill 1K / prefill 4K / decode 1K / decode 4K, tok/s): LFM2-1.2B 2,784 / 2,302 / 99.7 / 89.0; Qwen3-1.7B 2,019 / 1,491 / 60.8 / 38.5; LFM2-2.6B 1,335 / 1,171 / 50.3 / 46.8; Qwen3-4B 861 / 628 / 31.0 / 22.2; Granite-4.0-1B 1,823 / 1,256 / 64.5 / 43.6. Table 2 (Samsung Galaxy S25, Snapdragon 8 Elite): LFM2-1.2B 335 / 222 / 69.8 / 55.5; Qwen3-1.7B 140 / 98 / 39.7 / 26.9; LFM2-2.6B 143 / 116 / 33.8 / 30.0; Qwen3-4B 57 / 35 / 17.2 / 11.4; Granite-4.0-1B 147 / 79 / 41.3 / 25.0. Vendor blog (10 Jul 2025, https://www.liquid.ai/blog/liquid-foundation-models-v2-our-second-series-of-generative-ai-models) quote: 'LFM2 delivers 2x faster decode and prefill performance than Qwen3 on CPU.'",
+      "cpuSpeed": "Fastest measured per parameter in the sources found, but only in vendor-run tests on a 12-core-class laptop CPU (HX 370; core count from third-party sites only) and a phone. No 4-core host measurement found. Laptop speeds are roughly 2-3x Qwen3-4B decode at equal prefill size (paper figures).",
+      "knownIssues": "(1) Ollama-published weights are 24B: lfm2:24b-q4_K_M 14GB, lfm2:24b-q8_0 25GB (Ollama tags page), which is near the 15 GB RAM limit of the host. (2) All speed numbers are vendor-run. (3) Snippet only, not in fetched text: the paper says MoE CPU kernels have 'large room for CPU improvement'. (4) Ollama 0.40.0 support for the LFM2 architecture not checked.",
+      "sources": [
+       "https://arxiv.org/html/2511.23404v1",
+       "https://arxiv.org/abs/2511.23404",
+       "https://www.liquid.ai/blog/liquid-foundation-models-v2-our-second-series-of-generative-ai-models",
+       "https://ollama.com/library/lfm2",
+       "https://ollama.com/library/lfm2/tags",
+       "https://huggingface.co/LiquidAI/LFM2-1.2B"
+      ],
+      "sizeQ4": "lfm2:24b-q4_K_M 14GB (Ollama)",
+      "released": "LFM2 blog post dated 10 Jul 2025"
+     },
+     {
+      "name": "Granite 4.0 hybrid H-Tiny (Mamba-2 + MoE)",
+      "ollamaTag": "granite4:7b-a1b-h (readme lists it as 'tiny-h'; tag page not checked)",
+      "vendor": "IBM",
+      "parameters": "7B total, about 1B active, inferred from the '7b-a1b' tag name (not stated in fetched text)",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Ollama readme quote: 'Models denoted -h use the hybrid mamba-2 architecture.' IBM quote: 'Granite 4.0 introduces a hybrid Mamba-2/transformer architecture.' (https://www.ibm.com/granite/docs/models/granite4-0)",
+      "benchmarks": "No CPU tokens/s found for any -h Granite 4.0 model. IBM's '2x faster inference' claim names no hardware or runtime (https://www.ibm.com/granite/docs/models/granite4-0). A search snippet (not fetched) reports phone llama.cpp response rates for Granite-4.0-Micro, which is non-hybrid, so it does not apply here.",
+      "cpuSpeed": "Unmeasured.",
+      "knownIssues": "(1) IBM quote: non-hybrid 1B/350M/Micro models are an 'Alternative option for users when Mamba2 support is not yet optimized (e.g. llama.cpp, PEFT, etc)'. (2) llama.cpp support landed in PR #13550, 'Granite Four', merged 11 Jul 2025 (https://github.com/ggml-org/llama.cpp/pull/13550). In that thread the author wrote 'performance seems slighly worse on my system, especially for prompt processing' after a Mamba conv change (single system, undated comment). The PR description also notes numerical differences still under investigation. (3) Ollama 0.40.0 support not checked.",
+      "sources": [
+       "https://ollama.com/library/granite4",
+       "https://www.ibm.com/granite/docs/models/granite4-0",
+       "https://github.com/ggml-org/llama.cpp/pull/13550"
+      ]
+     },
+     {
+      "name": "Granite 4.0 1B (non-hybrid)",
+      "ollamaTag": "granite4:1b (3.3GB, 128K context; quant not stated on tag page)",
+      "vendor": "IBM",
+      "parameters": "1B (tag name)",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Non-hybrid per tag naming: Ollama readme lists 350m, 1b, 3b (micro) as non-'-h' tags and the -h tags as hybrid (https://ollama.com/library/granite4).",
+      "benchmarks": "Measured only in the LFM2 tech report as a comparator (llama.cpp, Q4_0, batch 1; https://arxiv.org/html/2511.23404v1). HX 370 CPU (Table 3): prefill 1K 1,823 tok/s, decode 1K 64.5 tok/s; 4K prefill 1,256, decode 43.6. Galaxy S25 (Table 2): prefill 1K 147, decode 1K 41.3; 4K 79 / 25.0. Granite build and Granite version used by the paper are not stated in the fetched text.",
+      "cpuSpeed": "Measured by a competitor (Liquid) on the HX 370 CPU, as above. 4-core result not found.",
+      "knownIssues": "Comparator numbers come from a competing vendor's paper. Quantization format and conversion source for the Granite run are not given in the fetched text beyond Q4_0 for all models.",
+      "sources": [
+       "https://arxiv.org/html/2511.23404v1",
+       "https://ollama.com/library/granite4",
+       "https://www.ibm.com/granite/docs/models/granite4-0"
+      ],
+      "sizeQ4": "granite4:1b 3.3GB on Ollama (quant not stated)"
+     },
+     {
+      "name": "Llama 3.2 3B (Meta)",
+      "ollamaTag": "llama3.2:3b",
+      "vendor": "Meta",
+      "parameters": "3B",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Not checked in this session.",
+      "benchmarks": "(a) Raspberry Pi 5, Ollama, Q4_K_M, 'simple prompt', single tok/s value: llama3.2:3b 4.69 tok/s, RAM 4659.3 MB (Stratosphere study, undated, https://stratospherelinuxips.readthedocs.io/en/develop/immune/research_rpi_llm_performance.html; RAM variant of Pi 5 not stated). Same study rows: granite3.1-dense:2b 5.81; gemma3:1b 11.53; qwen2.5:3b 5.2; qwen2.5:1.5b 9.97. (b) Geerlingguy ai-benchmarks: 'Pi 5 - 8GB' Llama 3.2:3b eval rate 4.61 tok/s, CPU only, runtime not stated per row (https://github.com/geerlingguy/ai-benchmarks). (c) Turing Pi RK3588 (4 Cortex-A76 threads, CPU only, llama.cpp build 10134 commit 42fc24306, page dated 2026-07-29), Q4_K_M: generation 11.25 tok/s; prompt processing 40.09 s for a ~1024-token prompt, which the fetch tool derived as about 25.5 tok/s (derivation unconfirmed). Source https://turingpi.com/llm-inference-benchmarks-rk3588-gguf-quantization/. The same article states 'four Cortex-A76 performance cores' gave better generation than eight threads.",
+      "cpuSpeed": "Generation about 4.6-4.7 tok/s on Pi 5 under Ollama, about 11.25 tok/s on RK3588 under llama.cpp. The gap mixes runtime and board differences and is not a controlled comparison. No llama-bench pp512 on a 4-core host found.",
+      "knownIssues": "Pi 5 runs use a simple prompt, not a 2,000-7,000-token prompt. No primary-source pp512 for this model on 4-core hardware found.",
+      "sources": [
+       "https://stratospherelinuxips.readthedocs.io/en/develop/immune/research_rpi_llm_performance.html",
+       "https://github.com/geerlingguy/ai-benchmarks",
+       "https://turingpi.com/llm-inference-benchmarks-rk3588-gguf-quantization/"
+      ],
+      "sizeQ4": "Not checked on tag page"
+     },
+     {
+      "name": "Gemma 3n E2B / E4B (MatFormer)",
+      "ollamaTag": "gemma3n:e2b-it-q4_K_M (5.6GB); gemma3n:e4b-it-q4_K_M (7.5GB); 32K context on all tags",
+      "vendor": "Google DeepMind",
+      "parameters": "E2B: 2B effective; E4B: 4B effective. Model card text: 'the raw parameter count of this model is 6B' (card covers E2B and E4B).",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Model card quote: 'They use a MatFormer architecture that allows nesting sub-models within the E4B model.' Memory claim quote: 'comparable to a traditional 2B model by offloading low-utilization matrices from the accelerator.' Per-layer embeddings are not named. Layer and sliding-window structure not stated in the fetched text (https://huggingface.co/google/gemma-3n-E2B-it).",
+      "benchmarks": "None on CPU found for Gemma 3n. Gemma 3 1B (not 3n) is 11.53 tok/s on Pi 5 under Ollama (Stratosphere study).",
+      "cpuSpeed": "Unmeasured for 3n.",
+      "knownIssues": "(1) Model card has no CPU or hardware speed figures and its benchmark tables are reported at float32 without hardware named. (2) Disk size (5.6GB for E2B) exceeds the 2B effective size. Whether the extra stored parameters cost time per token on CPU is inference, not sourced. (3) Ollama 0.40.0 support not checked.",
+      "sources": [
+       "https://huggingface.co/google/gemma-3n-E2B-it",
+       "https://ollama.com/library/gemma3n/tags",
+       "https://stratospherelinuxips.readthedocs.io/en/develop/immune/research_rpi_llm_performance.html"
+      ],
+      "sizeQ4": "E2B 5.6GB; E4B 7.5GB (Ollama)"
+     },
+     {
+      "name": "Phi-4-mini (3.8B)",
+      "ollamaTag": "phi4-mini (phi4-mini:3.8b, 2.5GB, 128K context)",
+      "vendor": "Microsoft",
+      "parameters": "3.8B (inferred on the Ollama page; the latest row shows no parameter count)",
+      "tools": "Ollama page lists 'tools 3.8b'.",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Ollama page quote: 'belongs to the Phi-4 model family and supports 128K token context length.' Architecture details not given. License not stated on the Ollama page.",
+      "benchmarks": "No primary CPU measurement found. Aggregator table (not fetched; search snippet only) claims about 12 tok/s generation for Q4_K_M on a modern 8-core CPU and 4-8 tok/s on other CPUs, labeled as community estimates.",
+      "cpuSpeed": "Unconfirmed; no measured number.",
+      "knownIssues": "No measured CPU prompt or generation speed from a primary source. Treat aggregator figures as estimates only.",
+      "sources": [
+       "https://ollama.com/library/phi4-mini"
+      ],
+      "sizeQ4": "2.5GB (Ollama)"
+     },
+     {
+      "name": "Ministral 3 3B (Mistral)",
+      "ollamaTag": "ministral-3:3b-instruct-2512-q4_K_M (3.0GB, 256K context, text and image input)",
+      "vendor": "Mistral AI",
+      "parameters": "3B (tag name)",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Ollama page quote: 'The Ministral 3 family is designed for edge deployment, capable of running on a wide range of hardware.' The page lists image input, so the model includes a vision path; its CPU cost was not measured.",
+      "benchmarks": "None found for CPU.",
+      "cpuSpeed": "Unmeasured.",
+      "knownIssues": "No measured CPU speed found. Vision input adds an unmeasured cost. The 256K context KV-cache cost on CPU is not measured in any source found.",
+      "sources": [
+       "https://ollama.com/library/ministral-3/tags"
+      ],
+      "sizeQ4": "3.0GB (Ollama, Q4_K_M)"
+     },
+     {
+      "name": "SmolLM3 3B (Hugging Face)",
+      "ollamaTag": "Not confirmed. ollama.com/library/smollm3 returned HTTP 404.",
+      "vendor": "Hugging Face (HuggingFaceTB)",
+      "parameters": "3B ('SmolLM3 is a 3B parameter language model', model card)",
+      "tools": "Unconfirmed (not checked).",
+      "thinking": "Unconfirmed (not checked).",
+      "architecture": "Model card quote: 'The model is a decoder-only transformer using GQA and NoPE (with 3:1 ratio).' Context: 'Trained on 64k context and supports up to 128k tokens using YARN extrapolation.' Layer count and vocab size not stated (https://huggingface.co/HuggingFaceTB/SmolLM3-3B). The card names llama.cpp as a local runtime.",
+      "benchmarks": "One search result (a Japanese blog, URL not retained in the search output, undated) reports llama-cli, Q4_K_M, eval 6.92 tok/s (144.45 ms per token) and prompt eval about 18.91 tok/s, but gives no CPU, RAM, or thread count. Not reproducible and not usable as a primary fact.",
+      "cpuSpeed": "Unknown.",
+      "knownIssues": "No primary-source CPU measurement. The blog figure cannot be tied to hardware. Ollama availability unconfirmed.",
+      "sources": [
+       "https://huggingface.co/HuggingFaceTB/SmolLM3-3B"
+      ]
+     }
+    ],
+    "notes": "Question: Which non-Qwen models in the 1B to 5B range, or small MoE or hybrid models, have measured CPU prompt-processing and generation speed at Q4 with llama.cpp or Ollama on 4 to 8 cores, and how do they compare with Qwen3 or Qwen3.5 at 2B to 4B on similar hardware? Scope note: this researcher angle covers CPU speed only. Model quality ('as smart') and the user's other questions (goal count per benchmark g01 to g10, and where the harness lives) were not researched.\n\nBottom line: no source found gives measured 4-core CPU prompt and generation speed for a non-Qwen candidate at 2B to 4B and for a Qwen3 or Qwen3.5 model at 2B to 4B on the same hardware. The only primary, controlled, same-test CPU comparison is the LFM2 technical report (vendor-run, llama.cpp Q4_0, HX 370 and Galaxy S25). Other rows come from community or single-board runs with different runtimes.\n\nBaseline facts (Qwen, comparator only, not candidates):\n- Qwen3-4B, llama-bench, Q4_K_M, CPU only, 16 threads, 16-core x86 with AVX-512 and VNNI, 61.6 GB RAM, llama.cpp build 10516 commit b95502ba9: pp512 2064.8 t/s, tg128 6.50 t/s. Source https://huggingface.co/b4ph/qwen3-4b-lowram-bench (undated). CPU model not named. Its F16 row shows pp512 357.6, which is lower than Q4_K_M by about 6x; treat with caution. The fetched text gives no other run detail.\n- Qwen3.5 2B architecture (official card, https://huggingface.co/Qwen/Qwen3.5-2B): 24 layers, 'Hidden Layout: 6 × (3 × (Gated DeltaNet → FFN) → 1 × (Gated Attention → FFN))', i.e. 18 linear-attention and 6 full-attention layers; hidden 2048; vocab 248,320; native context 262,144; Apache-2.0. The card is inconsistent on dense vs MoE. A third-party Aria card calls it a 'dense transformer', which the primary card contradicts. Qwen3.5 2B is therefore itself hybrid, which weakens a simple 'hybrid is faster' story. No CPU speed for Qwen3.5 2B or 4B was found in any primary source.\n- Same-hardware Pi 5 (4-core Cortex-A76) under Ollama, Q4_K_M, simple prompt (Stratosphere study): llama3.2:3b 4.69 tok/s; granite3.1-dense:2b 5.81; gemma3:1b 11.53; qwen2.5:3b 5.2 (Qwen2.5, not Qwen3); qwen2.5:1.5b 9.97. Only generation speed is reported.\n\nMatrix (capability or defect rows; the Orchestrator rules on each):\nRow A, 'Hybrid conv or SSM layers run faster on CPU per parameter than attention-only models at equal size':\n- For: LFM2 report, HX 370: LFM2-1.2B decode 99.7 vs Qwen3-1.7B 60.8 tok/s; prefill 2,784 vs 2,019. Galaxy S25: 69.8 vs 39.7 decode. Vendor-run, llama.cpp Q4_0, batch 1. https://arxiv.org/html/2511.23404v1 (submitted 28 Nov 2025).\n- Against: no independent measurement. Qwen3.5 2B is itself hybrid (18 of 24 layers linear attention), so the Qwen baseline is not attention-only. LFM2 1.2B is compared with Qwen3 1.7B (different sizes). Dense Granite-4.0-1B decode 64.5 is above Qwen3-1.7B 60.8 on HX 370, but its prefill (1,823) is below Qwen3-1.7B (2,019). No CPU measurement of a Granite -h hybrid exists.\n- Verdict needed: supported only by vendor data on LFM2.\n\nRow B, 'MoE is faster per active parameter on CPU':\n- For: Granite H-Tiny is 7B-A1B by tag name; LFM2 24B is '24B MoE with 2B active' (Ollama).\n- Against: no measured CPU speed for either. LFM2 paper snippet says MoE CPU kernels still have 'large room for CPU improvement' (not in fetched text). The 24B LFM2 weights are 14GB at Q4_K_M, close to the host's 15 GB RAM.\n- Verdict needed: unconfirmed.\n\nRow C, 'Large vocabulary slows CPU decode or prefill':\n- Evidence: Qwen3.5 vocab 248,320 (card); LFM2-1.2B vocab 65,536 (card). No primary source isolates the vocab or LM-head cost in CPU speed.\n- Inference only (not sourced): the LM-head matmul per generated token scales with vocab size.\n- Verdict needed: unconfirmed.\n\nRow D, 'Sliding-window attention quirks on CPU':\n- Gemma 3n card: layer structure and window size not stated in the fetched text. No CPU data found for any sliding-window model.\n- Verdict needed: unconfirmed.\n\nRow E, 'llama.cpp runs Granite hybrid models correctly and fast':\n- For: PR #13550 'Granite Four' merged 11 Jul 2025 (https://github.com/ggml-org/llama.cpp/pull/13550).\n- Against: IBM docs list non-hybrid models as an 'Alternative option... (e.g. llama.cpp, PEFT, etc)' while Mamba-2 support is not yet optimized (https://www.ibm.com/granite/docs/models/granite4-0). In the PR thread the author reports prompt processing 'slighly worse' after a Mamba conv change on one system, and numerical differences from an attention-output comparison were still open in the PR description.\n- Verdict needed: functional support in the merged PR, performance unconfirmed.\n\nRow F, 'Four threads beat eight on a 4-core-class ARM host':\n- For: Turing Pi RK3588 (4 Cortex-A76 performance cores): 'four Cortex-A76 performance cores' gave better generation than eight threads (https://turingpi.com/llm-inference-benchmarks-rk3588-gguf-quantization/, dated 2026-07-29 in the fetch).\n- Against: one board only, and generation only.\n- Verdict needed: plausible for this host class, one data point.\n\nUnknowns:\n1. No measured CPU prompt-processing or generation speed for any hybrid Granite (-h) model.\n2. No measured CPU speed for Gemma 3n E2B or E4B, Phi-4-mini, Ministral 3 3B, or SmolLM3 3B from a primary source. The SmolLM3 figure has no hardware.\n3. No measured CPU speed for LFM2 1.2B or 2.6B on any 4-core host. Only the 24B MoE is on Ollama, at 14GB.\n4. No measured Qwen3 or Qwen3.5 at 2B to 4B on a 4-core host. The Qwen3-4B figure is for a 16-core host. The Pi 5 comparisons use Qwen2.5, not Qwen3.\n5. No llama-bench prompt-processing (pp512) number for any candidate on a 4-core host. The RK3588 Llama 3.2 3B prompt rate (about 25.5 tok/s) is derived by the fetch tool from a stated time and was not reported directly by the source.\n6. HX 370 core count (12 cores, 24 threads) comes from third-party sites only. AMD's page was not reached. The LFM2 paper does not state it.\n7. Ollama 0.40.0 support is unverified for every candidate architecture (LFM2, Granite hybrid, Gemma 3n, Ministral 3, SmolLM3, Phi-4-mini). Check against the release notes before benchmarking, since older Ollama builds may not load newer architectures.\n8. Tool-calling and thinking-toggle support is unconfirmed for every candidate except the 'tools' labels on the Ollama LFM2 and Phi-4-mini pages.\n9. The Ollama tag for SmolLM3 is unconfirmed (404 on the library path). The Ollama tag for small LFM2 is unconfirmed. The Granite -h tag '7b-a1b-h' is from the readme and was not checked on a tag page.\n10. Ollama versus llama.cpp throughput difference on Pi 5 (about 10 to 20 percent, per a search snippet from a Medium article, not fetched) is not confirmed.\n11. The Gemma 3n Ollama-page 'latest' tag and the Ministral 3 'latest' tag were inferred. Their parameter counts were not stated.\n12. The b4ph Qwen3-4B table shows Q4_K_M prefill (2064.8) far above F16 (357.6). Its cause is not explained and is unconfirmed."
+   }
+  },
+  {
+   "angle": "fit",
+   "result": {
+    "candidates": [
+     {
+      "name": "Gemma 4 E4B (E2B sibling)",
+      "ollamaTag": "gemma4:e4b (also gemma4:e2b)",
+      "vendor": "Google",
+      "parameters": "E4B: 4.5B effective, 8B total incl. embeddings (HF card). E2B size not fetched.",
+      "tools": "Ollama library shows a tools capability tag and 'native function-calling support'. Google card: 'Native support for structured tool use'. Open Ollama parser defects exist (see knownIssues); none of the quoted reports names e2b or e4b.",
+      "thinking": "Ollama library: 'configurable thinking modes'. Google card: thinking is enabled by putting the <|think|> token at the start of the system prompt. Whether Ollama's think field maps to this for e2b/e4b is unconfirmed. Issue #18861 reports think:false failing after a tool response on gemma4:26b, reproduced on Ollama 0.40.0.",
+      "benchmarks": "No BFCL or other tool-calling score for E2B/E4B found on a primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama lists gemma4:e2b at 4.6GB-7.5GB and gemma4:e4b at 6.6GB-9.5GB (range, quant not specified per tag).",
+      "knownIssues": "Open Ollama issues, none naming e2b or e4b: #18649 valid tool call rejected for trailing tokens (gemma4:latest imported GGUF, Ollama 0.34.x); #18390 keys with spaces unquoted (gemma4:31b-cloud, 0.33.2); #18275 BEGIN_ARG/END_ARG unparseable, blank response (gemma4:12b, 0.33.3); #18354 string placeholder collision drops calls (gemma4:cloud); #18468 renderer drops parameters named description/type/properties/required/nullable (title only read). #18861 (open, Oct 8 2026): think:false gives empty reply after tool response, reproduced on 0.40.0 (gemma4:26b). Closed #18220: 26B enters reasoning loop instead of tool call after 0.33.3, workaround only. Google recommends temperature 1.0, top_p 0.95, top_k 64, so temperature 0 is off-recommendation. Repetition loops seen in #18275 and #18442 (titles only).",
+      "sources": [
+       "https://ollama.com/library/gemma4 | page | tags, sizes, 'native function-calling support', 'configurable thinking modes'",
+       "https://huggingface.co/google/gemma-4-E4B-it | card, last updated 2026-07-30 | 'Thinking is enabled by including the <|think|> token at the start of the system prompt.' ; Apache 2.0; temperature 1.0 top_p 0.95 top_k 64",
+       "https://github.com/ollama/ollama/issues/18861 | opened 2026-10-08 | 'After a tool response with thinking off, gemma4 still opens a thought channel'",
+       "https://github.com/ollama/ollama/issues/18649 | opened 2026-09-25 | 'the whole tool call is discarded and the caller silently receives nothing'",
+       "https://github.com/ollama/ollama/issues/18275 | opened 2026-09-06 | 'The user sees a blank response.'",
+       "https://github.com/ollama/ollama/issues/18220 | closed 2026-09-04 | regression text and workaround"
+      ],
+      "sizeQ4": "gemma4:e2b 4.6GB-7.5GB; gemma4:e4b 6.6GB-9.5GB (Ollama library range)",
+      "released": "Google card last updated 2026-07-30; release date not stated on fetched pages",
+      "architecture": "Gemma 4 E-series, multimodal text+image (per Ollama library)",
+      "context": "128K (Ollama library)",
+      "license": "Apache 2.0 (HF card header)"
+     },
+     {
+      "name": "Granite 4.2 3B",
+      "ollamaTag": "granite4.2:3b",
+      "vendor": "IBM",
+      "parameters": "3B per HF card text; HF page also shows '4B params' in the Safetensors section (inconsistent).",
+      "tools": "HF card: tools passed as a tools argument to apply_chat_template using OpenAI function-definition schema. Ollama library: 'Function-calling tasks' listed and 'tool use' in description; tools badge not separately confirmed on fetched text.",
+      "thinking": "Ollama library: built-in thinking mode 'controlled by the enable_thinking and reasoning_effort parameters'. HF card (Transformers): enable_thinking=True or False. Mapping to Ollama's think field is not confirmed.",
+      "benchmarks": "BenchLM (secondary aggregator, list updated 2026-10-10): Granite 4.2 3B 52.4% BFCL v4. Not verified against the official Berkeley leaderboard, which did not expose its table.",
+      "cpuSpeed": "Not measured. Ollama size 2.2GB.",
+      "knownIssues": "No granite4.2 tool-calling or template issue found. Open/closed #18074 (Granite 4.2 8B/3B context defaults and OOM kills, closed 2026-09-04) concerns memory, not tools. Pattern search did not return a Granite tool-parsing defect for 4.x.",
+      "sources": [
+       "https://ollama.com/library/granite4.2 | page | granite4.2:3b 2.2GB, 128K; 'Apache 2.0'; enable_thinking / reasoning_effort",
+       "https://huggingface.co/ibm-granite/granite-4.2-3b | card | 'Release Date: August 25, 2026'; 'apply_chat_template(messages, tokenize=False, tools=tools,'; Apache 2.0",
+       "https://benchlm.ai/md/benchmarks/bfcl-v4.md | updated 2026-10-10 | 'Granite 4.2 3B | IBM | 52.4%' (secondary)",
+       "https://github.com/ollama/ollama/issues/18074 | closed 2026-09-04 | context defaults, OOM"
+      ],
+      "sizeQ4": "granite4.2:3b 2.2GB (Ollama)",
+      "released": "2026-08-25 (HF card)",
+      "architecture": "Granite 4.2 dense 3B instruct",
+      "context": "128K (Ollama); card says 128K native, 512K with extension",
+      "license": "Apache 2.0"
+     },
+     {
+      "name": "Granite 4.1 3B",
+      "ollamaTag": "granite4.1:3b",
+      "vendor": "IBM",
+      "parameters": "3B (HF card)",
+      "tools": "Ollama library tools badge; readme lists function-calling tasks and tool usage. HF card: 'enhanced tool calling capabilities'; OpenAI function-definition schema.",
+      "thinking": "Not stated on Ollama library or HF card.",
+      "benchmarks": "None found on a primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama size 2.1GB.",
+      "knownIssues": "No granite4.1 tool-calling issue found in Ollama issue search.",
+      "sources": [
+       "https://ollama.com/library/granite4.1 | page | granite4.1:3b 2.1GB, 128K; Apache 2.0; 'tools' badge",
+       "https://huggingface.co/ibm-granite/granite-4.1-3b | card | 'Release Date: April 29th, 2026'; 'enhanced tool calling capabilities'; apache-2.0"
+      ],
+      "sizeQ4": "granite4.1:3b 2.1GB (Ollama)",
+      "released": "2026-04-29 (HF card)",
+      "architecture": "Granite 4.1 dense 3B",
+      "context": "128K (Ollama); HF architecture table 131072",
+      "license": "Apache 2.0"
+     },
+     {
+      "name": "Granite 4.0 Micro (and micro-h hybrid)",
+      "ollamaTag": "granite4:micro (dense) or granite4:micro-h (hybrid)",
+      "vendor": "IBM",
+      "parameters": "3B (HF granite-4.0-micro card)",
+      "tools": "HF card: tool-calling supported with OpenAI-style function definitions; default system prompt added to the chat template. Ollama library: 'tool-calling capabilities' and 'Function-calling tasks'.",
+      "thinking": "Not mentioned on HF card or Ollama library.",
+      "benchmarks": "None found on a primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama sizes: granite4:micro 2.1GB (128K); granite4:micro-h 1.9GB (1M).",
+      "knownIssues": "No granite4 tool-calling defect found. Only closed granite tool issue found is #7544 on granite3-dense (old, Jan 2025, 'does not seem to support tools').",
+      "sources": [
+       "https://huggingface.co/ibm-granite/granite-4.0-micro | card | 'Tool-calling'; 'a default system prompt was added to the chat template'; apache-2.0; 3B",
+       "https://ollama.com/library/granite4 | page | granite4:micro 2.1GB 128K; granite4:micro-h 1.9GB 1M (tags page)",
+       "https://github.com/ollama/ollama/issues/7544 | closed 2025-01-13 | 'Despite advertised, granite3-dense does not seem to support tools.'"
+      ],
+      "sizeQ4": "granite4:micro 2.1GB; granite4:micro-h 1.9GB",
+      "released": "Not captured",
+      "architecture": "Dense 3B (micro) and hybrid Mamba-attention 3B (micro-h), per tag names",
+      "context": "128K (micro) / 1M (micro-h) per Ollama",
+      "license": "Apache 2.0"
+     },
+     {
+      "name": "Ministral 3 3B",
+      "ollamaTag": "ministral-3:3b",
+      "vendor": "Mistral AI",
+      "parameters": "About 4B total: 3.4B language model plus 0.4B vision encoder (HF card)",
+      "tools": "HF card: 'native function calling and JSON outputting'. Ollama library: tools tag; readme describes native function calling.",
+      "thinking": "Not in the instruct card. A separate 'Ministral 3 3B Reasoning 2512' variant exists (HF card); Ollama tag for it not checked.",
+      "benchmarks": "None found on a primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama ministral-3:3b 3.0GB, 256K context.",
+      "knownIssues": "Closed Ollama issues on Ministral tool calls: #13328 'Ministral Tool calling doesn't work if more than 2 tools attached' (closed 2025-12-10); #13334 'ministral template doesn't handle multiple tool calls' (closed 2025-12-10); #13705 'Ministral tool call parser can't deal with nested objects and results in 500' (closed 2026-01-26). Closure does not confirm the fix; not verified.",
+      "sources": [
+       "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512 | card | 'native function calling and JSON outputting'; 'Supports a 256k context window.'; Apache 2.0",
+       "https://ollama.com/library/ministral-3 | page | ministral-3:3b 3.0GB, 256K; Apache 2.0; tools",
+       "https://github.com/ollama/ollama/issues/13328 | closed 2025-12-10 | title",
+       "https://github.com/ollama/ollama/issues/13334 | closed 2025-12-10 | title",
+       "https://github.com/ollama/ollama/issues/13705 | closed 2026-01-26 | title"
+      ],
+      "sizeQ4": "ministral-3:3b 3.0GB (Ollama)",
+      "released": "Card paper marked Jan 13 (year not shown); release date not confirmed",
+      "architecture": "3.4B LM + 0.4B vision encoder",
+      "context": "256K",
+      "license": "Apache 2.0"
+     },
+     {
+      "name": "Phi-4-mini",
+      "ollamaTag": "phi4-mini:3.8b (also latest)",
+      "vendor": "Microsoft",
+      "parameters": "3.8B (HF card)",
+      "tools": "HF card: function calling via a dedicated format; warns the model 'could sometimes hallucinate function names'. Ollama library: 'function calling feature is finally supported'; tools tag.",
+      "thinking": "Not mentioned on the HF card.",
+      "benchmarks": "None found on a primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama 2.5GB, 128K.",
+      "knownIssues": "Open #10552 (opened 2025-05-03, Ollama 0.6.6, still open on fetch): 'JSON SyntaxError with tool_calls on llama3.2 (and Phi4-mini)'; no fix or PR shown. Closed #11079, #10981, #9437, #9602 (titles only read).",
+      "sources": [
+       "https://huggingface.co/microsoft/Phi-4-mini-instruct | card | 'The model is licensed under the MIT license.'; 'could sometimes hallucinate function names'; 128K",
+       "https://ollama.com/library/phi4-mini | page | phi4-mini:3.8b 2.5GB, 128K; 'function calling feature is finally supported'",
+       "https://github.com/ollama/ollama/issues/10552 | opened 2025-05-03 | title and maintainer note"
+      ],
+      "sizeQ4": "phi4-mini:3.8b 2.5GB (Ollama)",
+      "released": "Not captured",
+      "architecture": "Dense 3.8B",
+      "context": "128K",
+      "license": "MIT"
+     },
+     {
+      "name": "Llama 3.2 3B Instruct",
+      "ollamaTag": "llama3.2:3b",
+      "vendor": "Meta",
+      "parameters": "3.21B (HF card)",
+      "tools": "Ollama library tools tag ('tools 1b 3b'). Meta card reports 'Tool Use' benchmarks (BFCL V2 67.0 for bf16 3B) but does not describe a tool-call format.",
+      "thinking": "None mentioned.",
+      "benchmarks": "Meta card: BFCL V2 67.0, Nexus 34.3 (vendor-reported, bf16 3B).",
+      "cpuSpeed": "Not measured. Ollama 2.0GB.",
+      "knownIssues": "Open #10552 (same as phi4-mini; names llama3.2 too) with no fix shown.",
+      "sources": [
+       "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct | card | 'License: llama3.2'; 'BFCL V2 at 67.0'; 128k context",
+       "https://ollama.com/library/llama3.2 | page | llama3.2:3b 2.0GB; tools tag",
+       "https://github.com/ollama/ollama/issues/10552 | open | JSON SyntaxError on llama3.2"
+      ],
+      "sizeQ4": "llama3.2:3b 2.0GB (Ollama)",
+      "released": "Not captured on fetched pages",
+      "architecture": "Dense 3.21B",
+      "context": "128K (quant variant 8k per card)",
+      "license": "Llama 3.2 Community License"
+     },
+     {
+      "name": "LFM2.5-1.2B-Thinking",
+      "ollamaTag": "lfm2.5-thinking:1.2b (also latest)",
+      "vendor": "Liquid AI",
+      "parameters": "1.17B (HF card)",
+      "tools": "HF card: tool use supported; Pythonic calls by default between <|tool_call_start|> and <|tool_call_end|>; JSON can be requested in the system prompt; tool results go under the tool role. Ollama: 'tools thinking 1.2b' badge. Ollama parser support for the Pythonic format is unconfirmed.",
+      "thinking": "HF card: always reasoning, no toggle described. Ollama: thinking badge. The think field is therefore not a switch for this model per the card.",
+      "benchmarks": "Liquid card (vendor-reported): BFCLv3 56.97 +/-0.30, with a custom Liquid handler; compared with Qwen3-1.7B thinking at 55.41 (reference only).",
+      "cpuSpeed": "Not measured. Ollama 731MB.",
+      "knownIssues": "#14742 'lfm2.5-thinking cannot run tools' (closed 2026-03-09; fix not read). #15953 'LiquidAI/lfm2.5-1.2b-instruct and LiquidAI/lfm2.5-350m don't accept tool calling even though they support it' (closed 2026-05-04). Ollama context shows 125K while card says 32,768 tokens.",
+      "sources": [
+       "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking | card | 'License: lfm1.0'; 'Context length: 32,768 tokens'; BFCLv3 56.97",
+       "https://ollama.com/library/lfm2.5-thinking | page | 731MB; 125K; tools thinking badge",
+       "https://github.com/ollama/ollama/issues/14742 | closed 2026-03-09 | title",
+       "https://github.com/ollama/ollama/issues/15953 | closed 2026-05-04 | title"
+      ],
+      "sizeQ4": "lfm2.5-thinking:1.2b 731MB (Ollama)",
+      "released": "Not captured",
+      "architecture": "1.17B hybrid LFM2.5 (per card)",
+      "context": "32,768 per card; 125K per Ollama (discrepancy)",
+      "license": "LFM Open License v1.0 (commercial use requires annual revenue under USD 10M, per LICENSE file)"
+     },
+     {
+      "name": "LFM2.5 8B (Ollama tag lfm2.5:8b)",
+      "ollamaTag": "lfm2.5:8b (also latest)",
+      "vendor": "Liquid AI",
+      "parameters": "Not verified on a primary card (BenchLM lists an LFM2.5-8B-A1B row, mapping to this tag unconfirmed)",
+      "tools": "Ollama: 'built for fast, reliable tool calling on consumer hardware'; tools badge.",
+      "thinking": "Ollama: thinking badge; no toggle detail.",
+      "benchmarks": "BenchLM (secondary) LFM2.5-8B-A1B 49.7% BFCL v4; mapping to lfm2.5:8b unconfirmed.",
+      "cpuSpeed": "Not measured. Ollama 5.2GB, 125K.",
+      "knownIssues": "No LFM2.5 8B-specific issue found.",
+      "sources": [
+       "https://ollama.com/library/lfm2.5 | page | lfm2.5:8b 5.2GB, 125K; 'built for fast, reliable tool calling on consumer hardware'",
+       "https://benchlm.ai/md/benchmarks/bfcl-v4.md | 2026-10-10 | 'LFM2.5-8B-A1B | LiquidAI | 49.7%'"
+      ],
+      "sizeQ4": "lfm2.5:8b 5.2GB (Ollama)",
+      "released": "Not captured",
+      "architecture": "Unverified (A1B name suggests MoE)",
+      "context": "125K per Ollama",
+      "license": "Not stated on Ollama page; not checked on HF"
+     },
+     {
+      "name": "LFM2 24B-A2B",
+      "ollamaTag": "lfm2:24b",
+      "vendor": "Liquid AI",
+      "parameters": "24B total, about 2.3B active (HF card table)",
+      "tools": "HF card: tools supported; Pythonic default; 'Tool results return under the \"tool\" role'. Ollama: tools badge.",
+      "thinking": "HF card: 'general-purpose instruct model (without reasoning traces)'. No toggle.",
+      "benchmarks": "None found on primary leaderboard.",
+      "cpuSpeed": "Not measured. Ollama 14GB, 32K. Size is close to the host's 15GB RAM.",
+      "knownIssues": "#14928 'lfm2:24b cannot call tools' closed 2026-03-18 with the comment 'It can call tools, it's just not very good at it.' No fix or PR.",
+      "sources": [
+       "https://huggingface.co/LiquidAI/LFM2-24B-A2B | card | 'LFM Open License v1.0'; 32,768 tokens; Pythonic tool calls",
+       "https://ollama.com/library/lfm2 | page | lfm2:24b 14GB, 32K",
+       "https://github.com/ollama/ollama/issues/14928 | closed 2026-03-18 | quote"
+      ],
+      "sizeQ4": "lfm2:24b 14GB (Ollama)",
+      "released": "Not captured (Ollama '7 months ago' on page)",
+      "architecture": "Sparse MoE 24B total / ~2.3B active",
+      "context": "32K",
+      "license": "LFM Open License v1.0"
+     },
+     {
+      "name": "Gemma 3 4B",
+      "ollamaTag": "gemma3:4b",
+      "vendor": "Google",
+      "parameters": "4B (HF card)",
+      "tools": "Not documented on HF card and not listed on Ollama library page. Failure on the tool criterion per primary sources.",
+      "thinking": "Not documented.",
+      "benchmarks": "None relevant.",
+      "cpuSpeed": "Not measured. Ollama 3.4GB, 128K.",
+      "knownIssues": "No tool issue checked. Included for completeness; primary sources do not document tool use.",
+      "sources": [
+       "https://huggingface.co/google/gemma-3-4b-it | card | 'License: gemma'; 4B; 128K input; function calling and reasoning toggle not mentioned",
+       "https://ollama.com/library/gemma3 | page | gemma3:4b 3.4GB, 128K; tools not stated"
+      ],
+      "sizeQ4": "gemma3:4b 3.4GB (Ollama)",
+      "released": "Not captured",
+      "architecture": "Dense 4B multimodal",
+      "context": "128K",
+      "license": "Gemma license"
+     },
+     {
+      "name": "Gemma 3n E4B",
+      "ollamaTag": "gemma3n:e4b",
+      "vendor": "Google",
+      "parameters": "Effective 4B, raw 8B (HF card)",
+      "tools": "Not documented on HF card or Ollama library page.",
+      "thinking": "Not documented.",
+      "benchmarks": "None relevant.",
+      "cpuSpeed": "Not measured. Ollama 7.5GB, 32K.",
+      "knownIssues": "Open #18357 (opened 2026-09-10, Ollama 0.33.3): 'Gemma3n tool model returns empty tool_calls via /v1 despite tools capability', on community build mashriram/gemma3nTools:e4b, no maintainer reply shown. Not the official tag.",
+      "sources": [
+       "https://huggingface.co/google/gemma-3n-E4B-it | card | 'License: gemma'; 32K; function calling and thinking not mentioned",
+       "https://ollama.com/library/gemma3n | page | gemma3n:e4b 7.5GB, 32K; no tools mention",
+       "https://github.com/ollama/ollama/issues/18357 | open, opened 2026-09-10 | title and body"
+      ],
+      "sizeQ4": "gemma3n:e4b 7.5GB (Ollama)",
+      "released": "Not captured",
+      "architecture": "Effective 4B / raw 8B MatFormer-style (card)",
+      "context": "32K",
+      "license": "Gemma license"
+     },
+     {
+      "name": "SmolLM3 3B",
+      "ollamaTag": "none official found (Ollama search for smollm3 returned only community uploads)",
+      "vendor": "Hugging Face",
+      "parameters": "3B (HF card)",
+      "tools": "HF card: 'SmolLM3 supports tool calling! Just pass your list of tools.' Formats: xml_tools or python_tools.",
+      "thinking": "Extended thinking on by default; disable with /no_think in the system prompt or enable_thinking=False in apply_chat_template. Mapping to Ollama think field not confirmed.",
+      "benchmarks": "None found on primary leaderboard.",
+      "cpuSpeed": "Not measured. No official Ollama size.",
+      "knownIssues": "No official Ollama entry, so no tag to pilot. Community uploads exist (for example Impulse2000/smollm3:thinking, unverified).",
+      "sources": [
+       "https://huggingface.co/HuggingFaceTB/SmolLM3-3B | card | 'SmolLM3 supports tool calling!'; '/no_think'; Apache 2.0; up to 128k with YaRN",
+       "https://ollama.com/search?q=smollm3 | fetched | official results only smollm2 and smollm; smollm3 results all community"
+      ]
+     }
+    ],
+    "notes": "Question: For non-Qwen small models (Gemma 3 4B and Gemma 3n, Llama 3.2 3B, Phi-4-mini, Granite 4 micro and hybrid tiers, LFM2, SmolLM3, Ministral 3 3B, and 2026 models), what is fitness for the harness on Ollama 0.40.0 (tool-call parsing, think field, system plus multi-turn tool results, license, temperature 0 and repetition or long-prompt problems), and which exact Ollama tag should a pilot pull? Qwen-based models are excluded.\n\nHost version: Ollama v0.40.0 is dated 25 Sep (2026; the v0.40.2 asset timestamps read 2026-10-08). Latest as of 2026-10-10 is v0.40.2 (08 Oct). Neither release body lists any tool, template, parser, or think change (https://github.com/ollama/ollama/releases/tag/v0.40.2). Sources: https://github.com/ollama/ollama/releases, https://github.com/ollama/ollama/releases/tag/v0.40.2. Caveat: the fetch of the v0.40.0 tag page returned unrelated release text (gemma4, MLX), so the v0.40.0 body itself was not confirmed.\n\nOllama API: https://github.com/ollama/ollama/blob/main/docs/api.md documents think ('should the model think before responding?') and tools ('Tool calling is supported by providing a list of tools in the tools parameter'), with streaming tool-call examples. It does not list which models honor think. https://docs.ollama.com/capabilities/thinking says think is 'A string: select a supported level from thinking.values' and links to a model search rather than listing families. https://ollama.com/search?c=thinking shows 20 of 245 thinking models (incomplete), with no gemma, granite, ministral, phi, llama, smollm, or lfm entries in the visible 20, though the library pages for gemma4 and lfm2.5 list a thinking badge or text. So the think-field behaviour per family is unconfirmed for every candidate.\n\nMatrix (rows are capability/defect; evidence for and against; the Orchestrator rules):\nR1 Tool-call parser reliability on Ollama 0.40.x.\n  Gemma 4 E2B/E4B: for = tools badge, Google card native tool use. Against = several open parser defects (#18649, #18390, #18275, #18354, #18468), none naming e2b or e4b; #18861 reproduced on 0.40.0.\n  Granite 4.0 micro / 4.1 3B / 4.2 3B: for = tools badge and HF tool-calling docs, no open granite4 tool-parsing issue found. Against = search limited to first page; #7544 is granite3-dense, closed 2025.\n  Ministral 3 3B: for = tools badge, native function calling per card. Against = three closed issues on multi-tool and nested-object parsing (#13328, #13334, #13705); closure not verified as fix.\n  Phi-4-mini: for = 'function calling feature is finally supported' on Ollama. Against = #10552 open (llama3.2 and phi4-mini JSON error, Ollama 0.6.6); card warns of hallucinated function names.\n  Llama 3.2 3B: for = tools badge. Against = #10552 open.\n  LFM2.5-1.2B-Thinking and LFM2.5 8B: for = tools badge, card documents tool use. Against = Pythonic default format, parser support for that format not confirmed; #14742 and #15953 closed (fix not read).\n  LFM2 24B: for = tools badge. Against = #14928 'not very good at it'; 14GB on a 15GB host.\n  Gemma 3 4B and Gemma 3n: against = no tool use documented on any primary source; #18357 empty tool_calls on a community gemma3n build.\n  SmolLM3: no official Ollama tag, so no parser evidence.\nR2 think field honoured on 0.40.0.\n  Gemma 4: for = library 'configurable thinking modes'. Against = #18861 think:false yields empty reply after tool response, reproduced on 0.40.0 (gemma4:26b, Q4_K_M); #18220 closed loop regression. Google's own toggle is the system-prompt token, not the Ollama field.\n  Granite 4.2 3B: for = Ollama page describes enable_thinking / reasoning_effort. Against = those are Transformers parameters; the think field mapping is not shown.\n  LFM2.5-1.2B-Thinking: against = card says always reasoning, no toggle, so think:false has no documented effect.\n  Ministral 3 3B instruct, Llama 3.2 3B, Phi-4-mini, Granite 4.0/4.1 micro: no thinking documented, so a think toggle is not expected to change output.\n  SmolLM3: for = /no_think system toggle on card. Against = Ollama field mapping unconfirmed; no official Ollama tag.\nR3 System message plus multi-turn tool results.\n  Only partial evidence: LFM2.5 card says tool results go under the tool role then the model answers in plain text. Granite 4.1 template places tools in a system message (<tools> tags) with calls in <tool_call> tags. Gemma 4 and Phi-4-mini multi-turn handling not verified on a primary source.\nR4 Temperature 0, repetition, long prompts.\n  Gemma 4: against = Google recommends temperature 1.0, top_p 0.95, top_k 64; Ollama loops reported (#18275 degenerate thought loop to token cap; #18220 reasoning loop; #18442 EOS lost at num_predict; #18359 repeated tokens) with no temperature link found.\n  Ollama-wide: #17910 'Regression 0.32.11-0.32.15: long completions never stop' (closed 2026-09-07), #18681 'parsers: tool-call opening tags can be lost across chunk boundaries' (open, 2026-09-27, general), #18074 Granite 4.2 context defaults and OOM (closed).\n  No candidate-specific temperature-0 defect found.\nR5 Fit on 15 GB RAM, 4 CPU cores, no GPU. Sizes only (no tokens/sec measured for any candidate): lfm2.5-thinking 731MB; granite4.1:3b 2.1GB; granite4.2:3b 2.2GB; granite4:micro 2.1GB; granite4:micro-h 1.9GB; llama3.2:3b 2.0GB; phi4-mini:3.8b 2.5GB; ministral-3:3b 3.0GB; gemma3:4b 3.4GB; gemma4:e2b 4.6-7.5GB; gemma4:e4b 6.6-9.5GB; gemma3n:e4b 7.5GB; lfm2.5:8b 5.2GB; lfm2:24b 14GB. The qwen3.5:4b baseline is 3.32GB, so the Gemma 4 E-series and Gemma 3n are heavier than the current pair; Granite and Ministral are closest in size.\n\nExact Ollama tags for a pilot (no ruling made): gemma4:e4b, gemma4:e2b, granite4.2:3b, granite4.1:3b, granite4:micro, granite4:micro-h, ministral-3:3b, phi4-mini:3.8b, llama3.2:3b, lfm2.5-thinking:1.2b, lfm2.5:8b. No official smollm3 tag exists. lfm2:24b is listed for completeness but is near host RAM limits.\n\nBenchmarks: the official Berkeley BFCL leaderboard page did not expose its table, and the raw score CSV path returned 404. The only per-model BFCL numbers are from BenchLM (secondary, https://benchlm.ai/md/benchmarks/bfcl-v4.md, updated 2026-10-10: Granite 4.2 3B 52.4, Granite 4.2 8B 52.4, LFM2.5-2.6B 56.9, LFM2.5-8B-A1B 49.7) and from vendor cards (Liquid LFM2.5-1.2B-Thinking BFCLv3 56.97; Meta Llama 3.2 3B BFCL V2 67.0). These are not comparable to each other or to a Qwen run.\n\nLicense summary: Apache 2.0 for Gemma 4 E4B, Granite 4.0/4.1/4.2, Ministral 3 3B, SmolLM3; MIT for Phi-4-mini; Gemma license for Gemma 3 and Gemma 3n; Llama 3.2 Community License for Llama 3.2; LFM Open License v1.0 for LFM2 and LFM2.5 (commercial use requires annual revenue under USD 10M per LICENSE file, https://huggingface.co/LiquidAI/LFM2-24B-A2B/blob/main/LICENSE). LFM2.5 8B license was not checked.\n\nOut of scope for this bounded question and not researched: whether other benchmark runs have more than one goal (the g06 question), and where the harness lives. The Orchestrator should route those separately."
+   }
+  }
+ ]
+}

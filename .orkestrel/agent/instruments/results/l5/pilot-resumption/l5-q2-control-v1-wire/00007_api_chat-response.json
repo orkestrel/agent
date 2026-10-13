@@ -1,0 +1,5 @@
+{
+ "status": 200,
+ "ms": 2775,
+ "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:27:36.7962161Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_1tsiy6xk\",\"function\":{\"index\":0,\"name\":\"lookup_customer\",\"arguments\":{\"account\":\"LH-44870\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:27:36.8061944Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":2772621800,\"load_duration\":10411400,\"prompt_eval_count\":1542,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":2389624000,\"eval_count\":34,\"eval_duration\":334480000}\n"
+}

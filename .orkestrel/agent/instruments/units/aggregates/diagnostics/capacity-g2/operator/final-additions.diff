@@ -1,0 +1,922 @@
+diff --git a/tmp/units/aggregate-capacity-g2-control/Daemon.ts b/tmp/units/aggregate-capacity-g2-control/Daemon.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Daemon.ts
+@@ -0,0 +1,67 @@
++import type { ChildProcess } from 'node:child_process'
++import { spawn, spawnSync } from 'node:child_process'
++import { existsSync, openSync, closeSync, writeSync } from 'node:fs'
++import { dirname, resolve } from 'node:path'
++import { readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { CHILD_VALUES, UNIT } from './constants.ts'
++import { computeOperator, describeError, readArguments, readFileBinding, validateOutput } from './helpers.ts'
++
++/** Starts only an explicitly authorized attached Windows daemon under the canonical launcher. */
++export class Daemon {
++	#child: ChildProcess | undefined
++
++	/** Refuses default startup and retains an immutable nonsecret start receipt.
++	 * @param argv - Explicit start, receipt, and operator arguments
++	 * @returns The native child exit code or a usage refusal
++	 * @remarks Windows process-tree termination is platform-defined; forced outer termination can prevent a terminal artifact.
++	 */
++	async main(argv: readonly string[]): Promise<number> {
++		try {
++			if (argv[0] !== '--start') {
++				console.log(JSON.stringify({ offline: true, message: 'No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree.' }))
++				return argv.length === 0 ? 0 : 64
++			}
++			if (process.platform !== 'win32') throw new Error('Controlled daemon entry requires Windows')
++			const args = readArguments(argv.slice(1), ['--receipt', '--operator'])
++			const receipt = validateOutput(readString(args['--receipt']))
++			if (computeOperator() !== readString(args['--operator'])) throw new Error('Operator hash mismatch before spawn')
++			if (!existsSync(dirname(receipt)) || existsSync(`${receipt}.exit.json`)) throw new Error('Receipt parent must exist and terminal artifact must be vacant')
++			const executable = readFileBinding(resolve('C:/Users/mikes/scoop/apps/ollama-full/current/ollama.exe'))
++			const environment = { ...process.env }
++			// Only the named nonsecret overrides enter artifacts; inherited values remain unprinted.
++			for (const name of Object.keys(environment)) if (Object.keys(CHILD_VALUES).some(declared => declared.toLowerCase() === name.toLowerCase())) delete environment[name]
++			Object.assign(environment, CHILD_VALUES)
++			const started = new Date().toISOString()
++			const file = openSync(receipt, 'wx')
++			try {
++				this.#child = spawn(resolve('C:/Users/mikes/scoop/apps/ollama-full/current/ollama.exe'), ['serve'], { cwd: UNIT, env: environment, shell: false, windowsHide: true, detached: false, stdio: ['ignore', 'pipe', 'pipe'] })
++				writeSync(file, `${JSON.stringify({ executable, values: CHILD_VALUES, pid: this.#child.pid, started }, null, 2)}\n`)
++			} finally { closeSync(file) }
++			const child = this.#child
++			if (child === undefined) throw new Error('Daemon spawn produced no child')
++			process.on('SIGINT', () => this.#terminate())
++			process.on('SIGTERM', () => this.#terminate())
++			process.on('SIGHUP', () => this.#terminate())
++			child.stdout?.pipe(process.stdout)
++			child.stderr?.pipe(process.stderr)
++			console.log(JSON.stringify({ receipt: readFileBinding(receipt), pid: child.pid }))
++			return await new Promise<number>(settle => {
++				child.on('error', error => {
++					writeArtifact(`${receipt}.exit.json`, { finished: new Date().toISOString(), error: describeError(error) })
++					settle(127)
++				})
++				child.on('close', (code, signal) => {
++					if (!existsSync(`${receipt}.exit.json`)) writeArtifact(`${receipt}.exit.json`, { pid: child.pid, finished: new Date().toISOString(), exit: code, signal })
++					settle(code ?? 3)
++				})
++			})
++		} catch (error) { console.error(JSON.stringify(describeError(error))); return 64 }
++	}
++
++	#terminate(): void {
++		const pid = this.#child?.pid
++		if (pid === undefined) return
++		// Windows has no cooperative SIGTERM handler; the recorded child tree is the termination boundary.
++		spawnSync('taskkill.exe', ['/pid', String(pid), '/T', '/F'], { shell: false, windowsHide: true, stdio: 'ignore' })
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/Driver.ts b/tmp/units/aggregate-capacity-g2-control/Driver.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Driver.ts
+@@ -0,0 +1,147 @@
++import type { Capture, ExecutionOptions, Packet } from './types.ts'
++import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { computeHash, readArray, readObject, readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { DAEMON, HOST, INPUT_FILES, LIMITS, ORIGINAL_REQUEST, PACKET, PREPARED } from './constants.ts'
++import { buildPacket, computeOperator, describeError, readArguments, readFileBinding, scanInventory, validateExecution } from './helpers.ts'
++
++/** Prepares offline inputs and records an explicitly admitted serial diagnostic run. */
++export class Driver {
++	#output: string | undefined
++	#signal: AbortSignal | undefined
++	#captures: Capture[] = []
++
++	/** Dispatches explicit preparation or execution and defaults to an offline refusal.
++	 * @param argv - The entry arguments
++	 * @returns The entry exit code
++	 */
++	async main(argv: readonly string[]): Promise<number> {
++		try {
++			if (argv.length === 1 && argv[0] === '--prepare') { this.prepare(); return 0 }
++			if (argv[0] !== '--execute') {
++				console.log(JSON.stringify({ offline: true, message: 'No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.', host: HOST }))
++				return argv.length === 0 ? 0 : 64
++			}
++			const args = readArguments(argv.slice(1), ['--packet', '--operator', '--receipt', '--custody', '--output', '--host'])
++			return await this.execute({ packet: readString(args['--packet']), operator: readString(args['--operator']), receipt: readString(args['--receipt']), custody: readString(args['--custody']), output: readString(args['--output']), host: readString(args['--host']) })
++		} catch (error) { console.error(JSON.stringify(describeError(error))); return 64 }
++	}
++
++	/** Writes create-only diagnostic inputs and their request plan without HTTP.
++	 * @returns Nothing after retaining the packet and inventory
++	 */
++	prepare(): void {
++		mkdirSync(PREPARED)
++		const original = readObject(JSON.parse(readFileSync(ORIGINAL_REQUEST, 'utf8')))
++		const messages = readArray(original.messages)
++		writeArtifact(resolve(PREPARED, 'generation.json'), [
++			{ role: 'system', content: readString(readObject(messages[0]).content) },
++			{ role: 'user', content: ' 1'.repeat(400) },
++			{ role: 'assistant', content: 'Acknowledged the older content.' },
++			{ role: 'user', content: readString(readObject(messages[1]).content) },
++		])
++		const packet = buildPacket()
++		writeArtifact(PACKET, packet)
++		for (const vector of packet.vectors) writeFileSync(resolve(PREPARED, `${vector.id}.request.bin`), vector.body, { flag: 'wx' })
++		writeArtifact(resolve(PREPARED, 'inventory.json'), { packet: readFileBinding(PACKET), operator: computeOperator(), files: scanInventory(PREPARED), inputs: INPUT_FILES, inference: packet.vectors.length, maximum: Math.max(...packet.vectors.map(vector => vector.bytes)), offline: true })
++		console.log(JSON.stringify({ packet: readFileBinding(PACKET), operator: packet.operator, inventory: readFileBinding(resolve(PREPARED, 'inventory.json')), inference: packet.vectors.length, maximum: Math.max(...packet.vectors.map(vector => vector.bytes)), offline: true }))
++	}
++
++	/** Executes an admitted packet and preserves complete or incomplete raw custody.
++	 * @param options - Explicit exact-hash authorization
++	 * @returns Zero for completed transport custody, or three for incomplete custody
++	 */
++	async execute(options: ExecutionOptions): Promise<number> {
++		const admission = validateExecution(options)
++		mkdirSync(admission.output)
++		this.#output = admission.output
++		this.#signal = AbortSignal.timeout(LIMITS.duration)
++		const started = new Date().toISOString()
++		let complete = false
++		let error: unknown
++		writeFileSync(resolve(admission.output, 'packet.json'), readFileSync(PACKET), { flag: 'wx' })
++		writeFileSync(resolve(admission.output, 'daemon-start.bin'), readFileSync(resolve(options.receipt)), { flag: 'wx' })
++		writeArtifact(resolve(admission.output, 'runtime.json'), { started, host: options.host, platform: process.platform, node: process.version, executable: readFileBinding(process.execPath), packet: readFileBinding(PACKET), operator: computeOperator(), receipt: admission.binding, sources: admission.packet.bindings, limits: LIMITS })
++		try {
++			await this.#metadata(admission.packet, 'initial')
++			for (const vector of admission.packet.vectors) {
++				this.#signal.throwIfAborted()
++				const response = await this.#capture(vector.id, vector.route, 'POST', vector.body, LIMITS.response, LIMITS.timeout)
++				// The snapshot is attempted even when inference transport failed or exceeded its limit.
++				const snapshot = await this.#capture(`${vector.id}-ps`, '/api/ps', 'GET', undefined, LIMITS.metadata, LIMITS.snapshot)
++				if (response.breached || snapshot.breached || !response.complete || !snapshot.complete) throw new Error(`Incomplete transport custody: ${vector.id}`)
++			}
++			await this.#metadata(admission.packet, 'final')
++			complete = true
++		} catch (failure) { error = describeError(failure) }
++		finally {
++			writeArtifact(resolve(admission.output, 'inventory.json'), { complete, started, finished: new Date().toISOString(), planned: admission.packet.vectors.map(vector => vector.id), captures: this.#captures, files: scanInventory(admission.output), ...(error === undefined ? {} : { error }) })
++		}
++		console.log(JSON.stringify({ output: admission.output, complete, inventory: readFileBinding(resolve(admission.output, 'inventory.json')) }))
++		return complete ? 0 : 3
++	}
++
++	async #metadata(packet: Packet, phase: 'initial' | 'final'): Promise<void> {
++		for (const route of phase === 'initial' ? ['/api/version', '/api/tags', '/api/ps'] : ['/api/tags', '/api/ps']) {
++			const capture = await this.#capture(`${phase}-${route.slice(5)}`, route, 'GET', undefined, LIMITS.metadata, LIMITS.snapshot)
++			if (!capture.complete || capture.breached) throw new Error(`Incomplete metadata: ${route}`)
++		}
++		if (phase === 'initial') for (const model of packet.models) {
++			const capture = await this.#capture(`initial-show-${model.key}`, '/api/show', 'POST', JSON.stringify({ model: model.tag, verbose: false }), LIMITS.metadata, LIMITS.snapshot)
++			if (!capture.complete || capture.breached) throw new Error(`Incomplete model metadata: ${model.key}`)
++		}
++	}
++
++	async #capture(id: string, route: string, method: 'GET' | 'POST', body: string | undefined, limit: number, timeout: number): Promise<Capture> {
++		const output = this.#output
++		const outer = this.#signal
++		if (output === undefined || outer === undefined) throw new Error('Capture requires admitted execution')
++		const started = new Date().toISOString()
++		const clock = performance.now()
++		const controller = new AbortController()
++		const signal = AbortSignal.any([outer, AbortSignal.timeout(timeout), controller.signal])
++		let complete = false
++		let breached = false
++		let bytes = 0
++		let status: number | undefined
++		let error: unknown
++		let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
++		writeFileSync(resolve(output, `${id}.request.bin`), body ?? '', { flag: 'wx' })
++		writeArtifact(resolve(output, `${id}.request.json`), { url: `${DAEMON}${route}`, method, body: body === undefined ? undefined : { hash: computeHash(body), bytes: Buffer.byteLength(body) }, headers: method === 'POST' ? { 'content-type': 'application/json' } : {}, started, timeout, limit })
++		const file = openSync(resolve(output, `${id}.response.bin`), 'wx')
++		try {
++			if (body !== undefined && Buffer.byteLength(body) > LIMITS.request) throw new Error('Request byte ceiling breach before fetch')
++			const response = await fetch(`${DAEMON}${route}`, { method, ...(body === undefined ? {} : { body }), headers: method === 'POST' ? { 'content-type': 'application/json' } : {}, redirect: 'error', signal })
++			status = response.status
++			writeArtifact(resolve(output, `${id}.response-head.json`), { status, text: response.statusText, url: response.url, redirected: response.redirected, headers: Array.from(response.headers.entries()), at: new Date().toISOString(), duration: performance.now() - clock })
++			if (response.body === null) complete = true
++			else {
++				reader = response.body.getReader()
++				while (true) {
++					const chunk = await reader.read()
++					if (chunk.done) { complete = true; break }
++					const remaining = limit - bytes
++					const retained = chunk.value.subarray(0, remaining)
++					writeSync(file, retained)
++					bytes += retained.byteLength
++					if (chunk.value.byteLength > remaining) {
++						breached = true
++						controller.abort(new Error(`Response byte ceiling breach: ${id}`))
++						throw new Error(`Response byte ceiling breach: ${id}`)
++					}
++				}
++			}
++		} catch (failure) { error = describeError(failure) }
++		finally {
++			closeSync(file)
++			if (reader !== undefined) {
++				if (!complete) await reader.cancel().catch(() => undefined)
++				reader.releaseLock()
++			}
++		}
++		const capture: Capture = { id, complete, breached, bytes, hash: computeHash(readFileSync(resolve(output, `${id}.response.bin`))), ...(status === undefined ? {} : { status }), started, finished: new Date().toISOString(), duration: performance.now() - clock, ...(error === undefined ? {} : { error }) }
++		writeArtifact(resolve(output, `${id}.capture.json`), capture)
++		this.#captures.push(capture)
++		return capture
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/Gates.ts b/tmp/units/aggregate-capacity-g2-control/Gates.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Gates.ts
+@@ -0,0 +1,43 @@
++import { strict as assert } from 'node:assert'
++import { spawnSync } from 'node:child_process'
++import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { readObject, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { ROOT, UNIT } from './constants.ts'
++
++/** Records scoped offline commands with complete unfiltered output. */
++export class Gates {
++	/** Checks types and syntax before guarded preparation and population proof.
++	 * @returns Nothing when every expected exit and witness count matches
++	 */
++	execute(): void {
++		mkdirSync(resolve(UNIT, 'evidence/gates-2'))
++		this.#run('types', [resolve(ROOT, 'node_modules/typescript/bin/tsc'), '-p', resolve(UNIT, 'tsconfig.json')], 0)
++		for (const name of readdirSync(UNIT).filter(name => name.endsWith('.ts')).sort()) this.#run(`syntax-${name}`, ['--check', resolve(UNIT, name)], 0)
++		const control = this.#run('witness-negative', [resolve(UNIT, 'witness-negative.ts')], 3)
++		assert.match(control.stderr, /Offline witness refuses fetch before native dispatch/)
++		assert.match(control.stdout, /"global":1,"native":0/)
++		for (const entry of ['main.ts', 'prepare.ts', 'execute.ts', 'start.ts']) {
++			const result = this.#run(`default-${entry}`, ['--import', pathToFileURL(resolve(UNIT, 'witness.ts')).href, resolve(UNIT, entry)], 0)
++			const lines = result.stdout.trim().split(/\r\n|\n/)
++			assert.equal(readObject(JSON.parse(lines[0] ?? '')).offline, true)
++			assert.deepEqual(readObject(JSON.parse(lines[1] ?? '')), { witness: true, global: 0, native: 0 })
++		}
++		this.#run('prepare', [resolve(UNIT, 'prepare-offline.ts')], 0)
++		this.#run('population', [resolve(UNIT, 'verify.ts')], 0)
++		assert.equal(readObject(JSON.parse(readFileSync(resolve(UNIT, 'evidence/population.json'), 'utf8'))).passed, true)
++		console.log(JSON.stringify({ gates: true, service: false }))
++	}
++
++	#run(name: string, args: readonly string[], expected: number): { readonly stdout: string; readonly stderr: string } {
++		const started = performance.now()
++		const result = spawnSync(process.execPath, [...args], { cwd: ROOT, encoding: 'utf8', shell: false, windowsHide: true, timeout: 30000 })
++		writeArtifact(resolve(UNIT, `evidence/gates-2/${name}.json`), { executable: process.execPath, args, exit: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, duration: performance.now() - started })
++		console.log(JSON.stringify({ command: [process.execPath, ...args], exit: result.status }))
++		process.stdout.write(result.stdout)
++		process.stderr.write(result.stderr)
++		assert.equal(result.status, expected, result.stderr)
++		return { stdout: result.stdout, stderr: result.stderr }
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/Guard.ts b/tmp/units/aggregate-capacity-g2-control/Guard.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Guard.ts
+@@ -0,0 +1,23 @@
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++
++/** Installs the established refusing fetch witness for an offline child entry. */
++export class Guard {
++	#native = new NetworkWitness()
++	#dispatches = 0
++
++	constructor() {
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		process.on('exit', this.#report.bind(this))
++	}
++
++	#refuseFetch(): Promise<Response> {
++		this.#dispatches += 1
++		throw new Error('Offline witness refuses fetch before native dispatch')
++	}
++
++	#report(): void {
++		console.log(JSON.stringify({ witness: true, global: this.#dispatches, native: this.#native.count }))
++		if (this.#dispatches !== 0 || this.#native.count !== 0) process.exitCode = 3
++		this.#native.close()
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/Inventory.ts b/tmp/units/aggregate-capacity-g2-control/Inventory.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Inventory.ts
+@@ -0,0 +1,48 @@
++import { strict as assert } from 'node:assert'
++import { spawnSync } from 'node:child_process'
++import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { relative, resolve, sep } from 'node:path'
++import { computeHash, readArray, readObject, readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { INPUT_FILES, OPERATOR_FILES, PACKET, PREPARED, ROOT, UNIT } from './constants.ts'
++import { computeOperator, readFileBinding, scanInventory } from './helpers.ts'
++
++/** Retains exact predecessor comparisons and the completed source/input identities. */
++export class Inventory {
++	/** Freezes the source diffs and inventories without overwriting any packet.
++	 * @returns Nothing after retaining final identities
++	 */
++	execute(): void {
++		const predecessor = resolve(ROOT, 'tmp/units/aggregate-capacity-probe')
++		const before = readArray(JSON.parse(readFileSync(resolve(UNIT, 'predecessor-before.json'), 'utf8')))
++		const after = readdirSync(predecessor, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => {
++			const path = resolve(entry.parentPath, entry.name)
++			const bytes = readFileSync(path)
++			return { path: relative(predecessor, path).split(sep).join('/'), hash: computeHash(bytes), bytes: bytes.length }
++		}).sort((left, right) => left.path.localeCompare(right.path))
++		assert.deepEqual(after, before)
++		writeArtifact(resolve(UNIT, 'predecessor-after.json'), after)
++		const outcomes = OPERATOR_FILES.map(name => {
++			const result = spawnSync('git', ['diff', '--no-index', '--no-ext-diff', '--', resolve(predecessor, name), resolve(UNIT, name)], { cwd: ROOT, encoding: 'utf8', shell: false, windowsHide: true })
++			assert.ok(result.status === 0 || result.status === 1, result.stderr)
++			return { name, exit: result.status, stdout: result.stdout, stderr: result.stderr }
++		})
++		writeArtifact(resolve(UNIT, 'evidence/source-diff-commands.json'), outcomes)
++		writeFileSync(resolve(UNIT, 'predecessor-source.diff'), outcomes.map(result => result.stdout).join(''), { flag: 'wx' })
++		const sources = readdirSync(UNIT).filter(name => name.endsWith('.ts') || name === 'tsconfig.json').sort().map(name => readFileBinding(resolve(UNIT, name)))
++		writeFileSync(resolve(UNIT, 'final-additions.diff'), sources.map(binding => {
++			const lines = readFileSync(resolve(ROOT, binding.path), 'utf8').replace(/\n$/, '').split(/\r\n|\n/)
++			return `diff --git a/${binding.path} b/${binding.path}\nnew file mode 100644\n--- /dev/null\n+++ b/${binding.path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join('\n')}\n`
++		}).join(''), { flag: 'wx' })
++		const status = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8', shell: false, windowsHide: true })
++		assert.equal(status.status, 0, status.stderr)
++		writeArtifact(resolve(UNIT, 'evidence/git-status.json'), { exit: status.status, stdout: status.stdout, stderr: status.stderr })
++		const packet = readObject(JSON.parse(readFileSync(PACKET, 'utf8')))
++		const inputs = INPUT_FILES.map(name => readFileBinding(resolve(PREPARED, name)))
++		const operator = OPERATOR_FILES.map(name => readFileBinding(resolve(UNIT, name)))
++		const operatorBytes = Buffer.byteLength(JSON.stringify(operator))
++		assert.equal(computeOperator(), readString(packet.operator))
++		const evidence = readdirSync(resolve(UNIT, 'evidence'), { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => readFileBinding(resolve(entry.parentPath, entry.name)))
++		writeArtifact(resolve(UNIT, 'final-source-inventory.json'), { packet: readFileBinding(PACKET), operator: { hash: computeOperator(), bytes: operatorBytes, encoding: 'JSON.stringify of ordered OPERATOR_FILES bindings' }, sources, inputs, bindings: packet.bindings, prepared: scanInventory(PREPARED), evidence, predecessor: { before: readFileBinding(resolve(UNIT, 'predecessor-before.json')), after: readFileBinding(resolve(UNIT, 'predecessor-after.json')), unchanged: true }, diff: readFileBinding(resolve(UNIT, 'predecessor-source.diff')), additions: readFileBinding(resolve(UNIT, 'final-additions.diff')), node: process.version, platform: process.platform })
++		console.log(JSON.stringify({ inventory: readFileBinding(resolve(UNIT, 'final-source-inventory.json')), packet: readFileBinding(PACKET), operator: computeOperator(), operatorBytes, inputs, predecessor: 'unchanged', diff: readFileBinding(resolve(UNIT, 'predecessor-source.diff')), status: status.stdout }))
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/Offline.ts b/tmp/units/aggregate-capacity-g2-control/Offline.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/Offline.ts
+@@ -0,0 +1,108 @@
++import type { ExecutionOptions } from './types.ts'
++import { strict as assert } from 'node:assert'
++import { existsSync, readFileSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { readArray, readObject, readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++import { HOST, INPUT_FILES, LIMITS, OPERATOR_FILES, ORIGINAL_REQUEST, PACKET, PREPARED, ROOT, SAMPLER, UNIT, WORKLOADS } from './constants.ts'
++import { Driver } from './Driver.ts'
++import { Daemon } from './Daemon.ts'
++import { buildPacket, computeOperator, readFileBinding } from './helpers.ts'
++
++/** Guards offline preparation and population checks with the established refusing witness. */
++export class Offline {
++	#dispatches = 0
++
++	/** Freezes the completed runtime's packet while refusing HTTP dispatch.
++	 * @returns Nothing after create-only preparation
++	 */
++	prepare(): void {
++		const native = new NetworkWitness()
++		const fetch = globalThis.fetch
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		try {
++			new Driver().prepare()
++			assert.equal(this.#dispatches, 0)
++			assert.equal(native.count, 0)
++			writeArtifact(resolve(UNIT, 'evidence/preparation.json'), { packet: readFileBinding(PACKET), operator: computeOperator(), dispatches: { global: this.#dispatches, native: native.count } })
++			console.log(JSON.stringify({ preparation: true, global: this.#dispatches, native: native.count }))
++		} finally { globalThis.fetch = fetch; native.close() }
++	}
++
++	/** Compares the fixed population and exercises real admission refusals offline.
++	 * @returns Nothing when the population and negative controls pass
++	 */
++	async execute(): Promise<void> {
++		const native = new NetworkWitness()
++		const fetch = globalThis.fetch
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		try {
++			const packet = buildPacket()
++			assert.equal(readFileSync(PACKET, 'utf8'), `${JSON.stringify(packet, null, 2)}\n`)
++			assert.deepEqual(WORKLOADS, ['g2'])
++			assert.deepEqual(INPUT_FILES, ['generation.json'])
++			assert.deepEqual(LIMITS, { inference: 2, request: 32768, response: 262144, metadata: 1048576, timeout: 60000, snapshot: 30000, duration: 180000 })
++			const predecessor = readObject(JSON.parse(readFileSync(resolve(ROOT, 'tmp/units/aggregate-capacity-probe/prepared/packet.json'), 'utf8')))
++			const frozen = readArray(predecessor.models).map(readObject).filter(model => model.key === 'g2')
++			assert.deepEqual(packet.models, frozen)
++			assert.deepEqual(packet.models.map(model => ({ key: model.key, tag: model.tag, route: model.route })), [{ key: 'g2', tag: 'gemma4:e2b-it-q4_K_M', route: '/api/chat' }])
++			const original = readObject(JSON.parse(readFileSync(ORIGINAL_REQUEST, 'utf8')))
++			const prior = readArray(original.messages)
++			assert.equal(prior.length, 2)
++			assert.deepEqual(prior.map(message => readObject(message).role), ['system', 'user'])
++			assert.equal(readObject(prior[0]).content, 'Provide direct output only.')
++			assert.equal(readObject(prior[1]).content, 'Output every integer from 1 through 5000, one per line, without commentary or an early stop.')
++			const messages = readArray(JSON.parse(readFileSync(resolve(PREPARED, 'generation.json'), 'utf8')))
++			assert.deepEqual(messages, [prior[0], { role: 'user', content: ' 1'.repeat(400) }, { role: 'assistant', content: 'Acknowledged the older content.' }, prior[1]])
++			assert.deepEqual(packet.vectors.map(vector => ({ id: vector.id, model: vector.model, route: vector.route })), [{ id: 'g2-reachability', model: 'g2', route: '/api/chat' }, { id: 'g2-generation', model: 'g2', route: '/api/chat' }])
++			const reachability = packet.vectors[0]
++			const generation = packet.vectors[1]
++			if (reachability === undefined || generation === undefined) throw new Error('Missing fixed population')
++			const first = readObject(JSON.parse(reachability.body))
++			const second = readObject(JSON.parse(generation.body))
++			assert.deepEqual({ ...first, options: { ...readObject(first.options), num_predict: 4096 } }, second)
++			assert.deepEqual(second, { ...original, messages })
++			assert.deepEqual(SAMPLER, { temperature: 0, seed: 7, presence_penalty: 1.5, top_k: 20, top_p: 0.95 })
++			assert.equal(readObject(first.options).num_predict, 1)
++			for (const vector of packet.vectors) {
++				assert.equal(readFileSync(resolve(PREPARED, `${vector.id}.request.bin`), 'utf8'), vector.body)
++				assert.equal(vector.hash, readFileBinding(resolve(PREPARED, `${vector.id}.request.bin`)).hash)
++				assert.equal(vector.bytes, Buffer.byteLength(vector.body))
++				assert.ok(vector.bytes <= LIMITS.request)
++			}
++			const driver = readFileSync(resolve(UNIT, 'Driver.ts'), 'utf8')
++			const previous = readFileSync(resolve(ROOT, 'tmp/units/aggregate-capacity-probe/Driver.ts'), 'utf8')
++			assert.equal(driver.slice(driver.indexOf('\tasync execute(')), previous.slice(previous.indexOf('\tasync execute(')))
++			assert.equal(driver.slice(driver.indexOf('\tasync main('), driver.indexOf('\t/** Writes')), previous.slice(previous.indexOf('\tasync main('), previous.indexOf('\t/** Writes')))
++			const helpers = readFileSync(resolve(UNIT, 'helpers.ts'), 'utf8')
++			const oldhelpers = readFileSync(resolve(ROOT, 'tmp/units/aggregate-capacity-probe/helpers.ts'), 'utf8')
++			assert.equal(helpers.slice(helpers.indexOf('/** Refuses inference')), oldhelpers.slice(oldhelpers.indexOf('/** Refuses inference')))
++			assert.equal(helpers.slice(helpers.indexOf('/** Reads exact bytes'), helpers.indexOf('/** Reads declared model')), oldhelpers.slice(oldhelpers.indexOf('/** Reads exact bytes'), oldhelpers.indexOf('/** Reads declared model')))
++			for (const name of OPERATOR_FILES.filter(name => !['constants.ts', 'helpers.ts', 'Driver.ts'].includes(name))) assert.deepEqual(readFileSync(resolve(UNIT, name)), readFileSync(resolve(ROOT, 'tmp/units/aggregate-capacity-probe', name)))
++			assert.ok(driver.includes("phase === 'initial' ? ['/api/version', '/api/tags', '/api/ps'] : ['/api/tags', '/api/ps']"))
++			assert.ok(driver.includes("`initial-show-${model.key}`, '/api/show'"))
++			assert.ok(driver.includes("const snapshot = await this.#capture(`${vector.id}-ps`, '/api/ps'"))
++			const sequence = ['initial-version', 'initial-tags', 'initial-ps', 'initial-show-g2', 'g2-reachability', 'g2-reachability-ps', 'g2-generation', 'g2-generation-ps', 'final-tags', 'final-ps']
++			const metadata = sequence.filter(id => !packet.vectors.some(vector => vector.id === id))
++			assert.equal(metadata.length, 8)
++			assert.equal(await new Driver().main([]), 0)
++			assert.equal(await new Daemon().main([]), 0)
++			const options: ExecutionOptions = { packet: readFileBinding(PACKET).hash, operator: computeOperator(), receipt: resolve(UNIT, 'evidence/missing-receipt.json'), custody: '0'.repeat(64), output: resolve(UNIT, 'evidence/never-created'), host: HOST }
++			await assert.rejects(new Driver().execute({ ...options, packet: readFileBinding(resolve(ROOT, 'tmp/units/aggregate-capacity-probe/prepared/packet.json')).hash }), /Hash mismatch/)
++			await assert.rejects(new Driver().execute({ ...options, operator: readString(predecessor.operator) }), /Operator hash mismatch/)
++			await assert.rejects(new Driver().execute(options), /ENOENT/)
++			assert.equal(await new Driver().main(['--execute']), 64)
++			assert.equal(existsSync(options.output), false)
++			assert.equal(existsSync(options.receipt), false)
++			assert.equal(this.#dispatches, 0)
++			assert.equal(native.count, 0)
++			writeArtifact(resolve(UNIT, 'evidence/population.json'), { passed: true, packet: readFileBinding(PACKET), operator: computeOperator(), models: packet.models, inputs: packet.bindings, bodies: packet.vectors, sequence, inference: packet.vectors.length, metadata: metadata.length, dispatches: { global: this.#dispatches, native: native.count }, controls: ['predecessor-packet-identity', 'predecessor-operator-identity', 'missing-receipt', 'explicit-execute-missing-options'], output: { path: options.output, exists: existsSync(options.output) }, coverage: 'Fixed population and unchanged sequencing/capture/admission source comparison; no inference or capture replay.' })
++			console.log(JSON.stringify({ pass: true, evidence: readFileBinding(resolve(UNIT, 'evidence/population.json')), inference: packet.vectors.length, metadata: metadata.length, global: this.#dispatches, native: native.count }))
++		} finally { globalThis.fetch = fetch; native.close() }
++	}
++
++	#refuseFetch(): Promise<Response> {
++		this.#dispatches += 1
++		throw new Error('Offline witness refuses fetch before native dispatch')
++	}
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/check.ts b/tmp/units/aggregate-capacity-g2-control/check.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/check.ts
+@@ -0,0 +1,3 @@
++import { Gates } from './Gates.ts'
++
++new Gates().execute()
+diff --git a/tmp/units/aggregate-capacity-g2-control/constants.ts b/tmp/units/aggregate-capacity-g2-control/constants.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/constants.ts
+@@ -0,0 +1,41 @@
++import type { Limits } from './types.ts'
++import { dirname, resolve } from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++/** Locates the assigned instrument directory. */
++export const UNIT = dirname(fileURLToPath(import.meta.url))
++/** Locates the scaffold checkout. */
++export const ROOT = resolve(UNIT, '../../..')
++/** Locates the create-only prepared packet directory. */
++export const PREPARED = resolve(UNIT, 'prepared')
++/** Locates the frozen packet. */
++export const PACKET = resolve(PREPARED, 'packet.json')
++/** Names the exclusively controlled local endpoint. */
++export const DAEMON = 'http://127.0.0.1:11434'
++/** Names the explicit execution host condition. */
++export const HOST = 'Windows; controlled attached daemon; exclusive serial client; no other service requests'
++/** Freezes diagnostic operational ceilings. */
++export const LIMITS: Limits = Object.freeze({ inference: 2, request: 32768, response: 262144, metadata: 1048576, timeout: 60000, snapshot: 30000, duration: 180000 })
++/** Names the fixed workload order. */
++export const WORKLOADS: readonly string[] = Object.freeze(['g2'])
++/** Names every runtime operator file. */
++export const OPERATOR_FILES: readonly string[] = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Driver.ts', 'Daemon.ts', 'main.ts', 'prepare.ts', 'execute.ts', 'start.ts'])
++/** Names retained evidence inputs whose bytes the packet binds. */
++export const EVIDENCE_FILES: readonly string[] = Object.freeze([
++	'.orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-direction.md',
++	'.orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-clarification.md',
++	'tmp/units/aggregate-capacity-startup-report.md',
++	'tmp/units/aggregate-focused-screen/live-forward-reverse/01-statement-a.request.json',
++	'tmp/units/aggregate-judge-counterfactual/helpers.ts',
++	'tmp/units/aggregate-judge-counterfactual/constants.ts',
++	'tmp/units/aggregate-capacity-probe/live1/g2-generation.request.bin',
++	'tmp/units/aggregate-capacity-probe/prepared/packet.json',
++])
++/** Names created diagnostic input artifacts. */
++export const INPUT_FILES: readonly string[] = Object.freeze(['generation.json'])
++/** Locates the retained generation request whose strings remain unchanged. */
++export const ORIGINAL_REQUEST = resolve(ROOT, 'tmp/units/aggregate-capacity-probe/live1/g2-generation.request.bin')
++/** Declares only the nonsecret child-launch overrides the receipt retains. */
++export const CHILD_VALUES: Readonly<Record<string, string>> = Object.freeze({ OLLAMA_HOST: DAEMON, OLLAMA_NUM_PARALLEL: '1', OLLAMA_MAX_LOADED_MODELS: '0', LLAMA_ARG_CONTEXT_SHIFT: '0', LLAMA_ARG_N_PARALLEL: '1' })
++/** Freezes the specified diagnostic chat sampler. */
++export const SAMPLER = Object.freeze({ temperature: 0, seed: 7, presence_penalty: 1.5, top_k: 20, top_p: 0.95 })
+diff --git a/tmp/units/aggregate-capacity-g2-control/copy.ts b/tmp/units/aggregate-capacity-g2-control/copy.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/copy.ts
+@@ -0,0 +1,23 @@
++import { strict as assert } from 'node:assert'
++import { copyFileSync, constants, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { resolve, relative, sep } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { computeHash } from '../aggregate-judge-counterfactual/helpers.ts'
++
++// This offline setup retains the predecessor baseline before copying its runtime.
++const destination = fileURLToPath(new URL('.', import.meta.url))
++const predecessor = resolve(destination, '../aggregate-capacity-probe')
++const entries = readdirSync(predecessor, { recursive: true, withFileTypes: true })
++const bindings = entries.filter(entry => entry.isFile()).map(entry => {
++	const path = resolve(entry.parentPath, entry.name)
++	const bytes = readFileSync(path)
++	return { path: relative(predecessor, path).split(sep).join('/'), hash: computeHash(bytes), bytes: bytes.length }
++}).sort((left, right) => left.path.localeCompare(right.path))
++assert.ok(bindings.some(binding => binding.path === 'Driver.ts'))
++assert.ok(bindings.some(binding => binding.path === 'live1/g2-generation.request.bin'))
++writeFileSync(resolve(destination, 'predecessor-before.json'), `${JSON.stringify(bindings, null, 2)}\n`, { flag: 'wx' })
++for (const name of ['types.ts', 'constants.ts', 'helpers.ts', 'Driver.ts', 'Daemon.ts', 'main.ts', 'prepare.ts', 'execute.ts', 'start.ts', 'index.ts', 'tsconfig.json']) {
++	copyFileSync(resolve(predecessor, name), resolve(destination, name), constants.COPYFILE_EXCL)
++}
++mkdirSync(resolve(destination, 'evidence'))
++console.log(JSON.stringify({ copied: true, predecessor: bindings.length, network: false }))
+diff --git a/tmp/units/aggregate-capacity-g2-control/execute.ts b/tmp/units/aggregate-capacity-g2-control/execute.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/execute.ts
+@@ -0,0 +1,3 @@
++import { Driver } from './Driver.ts'
++
++process.exitCode = await new Driver().main(process.argv.slice(2))
+diff --git a/tmp/units/aggregate-capacity-g2-control/finalize.ts b/tmp/units/aggregate-capacity-g2-control/finalize.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/finalize.ts
+@@ -0,0 +1,3 @@
++import { Inventory } from './Inventory.ts'
++
++new Inventory().execute()
+diff --git a/tmp/units/aggregate-capacity-g2-control/helpers.ts b/tmp/units/aggregate-capacity-g2-control/helpers.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/helpers.ts
+@@ -0,0 +1,171 @@
++import type { Admission, Binding, DaemonReceipt, ExecutionOptions, Model, Packet, Vector } from './types.ts'
++import { existsSync, lstatSync, readFileSync, realpathSync, readdirSync } from 'node:fs'
++import { isAbsolute, relative, resolve, sep } from 'node:path'
++import { computeHash, readArray, readNumber, readObject, readString } from '../aggregate-judge-counterfactual/helpers.ts'
++import { CHILD_VALUES, DAEMON, EVIDENCE_FILES, HOST, INPUT_FILES, LIMITS, OPERATOR_FILES, PACKET, PREPARED, ROOT, SAMPLER, UNIT, WORKLOADS } from './constants.ts'
++
++/** Reads exact bytes and optionally verifies their custody hash.
++ * @param path - The file to bind
++ * @param expected - The required SHA-256 hash when supplied
++ * @returns The exact file identity
++ */
++export function readFileBinding(path: string, expected?: string): Binding {
++	if (!lstatSync(path).isFile()) throw new Error(`Not a regular file: ${path}`)
++	const bytes = readFileSync(path)
++	const hash = computeHash(bytes)
++	if (expected !== undefined && hash !== expected) throw new Error(`Hash mismatch: ${path}`)
++	return { path: relative(ROOT, path).split(sep).join('/'), hash, bytes: bytes.length }
++}
++
++/** Computes the runtime operator custody digest.
++ * @returns The ordered source binding digest
++ */
++export function computeOperator(): string {
++	return computeHash(JSON.stringify(OPERATOR_FILES.map(name => readFileBinding(resolve(UNIT, name)))))
++}
++
++/** Reads declared model identities without loading evaluation data.
++ * @returns The frozen Gemma workload identity
++ */
++export function readModels(): readonly Model[] {
++	const models: Model[] = []
++	for (const key of WORKLOADS) {
++		const manifest = readObject(JSON.parse(readFileSync(resolve(ROOT, `.orkestrel/agent/instruments/results/l7/${key}-think0/freeze/manifest.json`), 'utf8')))
++		const decision = readObject(manifest.decision)
++		const summarizer = readObject(manifest.summarizer)
++		const tag = readString(decision.model)
++		const digest = readString(decision.digest)
++		if (!/^[a-f0-9]{64}$/.test(digest) || tag !== summarizer.model || digest !== summarizer.digest) throw new Error(`Missing or conflicting workload identity: ${key}`)
++		models.push({ key, tag, digest, route: '/api/chat' })
++	}
++	const predecessor = readObject(JSON.parse(readFileSync(resolve(ROOT, 'tmp/units/aggregate-capacity-probe/prepared/packet.json'), 'utf8')))
++	const retained = readArray(predecessor.models).map(readObject).filter(model => model.key === 'g2')
++	if (retained.length !== 1 || JSON.stringify(models) !== JSON.stringify(retained)) throw new Error('Frozen Gemma identity mismatch')
++	return models
++}
++
++/** Builds the exact diagnostic packet from retained inputs.
++ * @returns The frozen request plan with source identities and limits
++ */
++export function buildPacket(): Packet {
++	const models = readModels()
++	const vectors: Vector[] = []
++	for (const model of models) {
++		for (const [name, input, context, predict] of [
++			['reachability', 'generation.json', 2048, 1],
++			['generation', 'generation.json', 2048, 4096],
++		] as const) {
++			const messages: unknown = JSON.parse(readFileSync(resolve(PREPARED, input), 'utf8'))
++			readArray(messages)
++			const body = JSON.stringify({ model: model.tag, messages, truncate: false, shift: false, stream: false, keep_alive: '5m', think: false, options: { ...SAMPLER, num_ctx: context, num_predict: predict } })
++			vectors.push({ id: `${model.key}-${name}`, model: model.key, route: model.route, body, hash: computeHash(body), bytes: Buffer.byteLength(body) })
++		}
++	}
++	const bindings = [
++		...OPERATOR_FILES.map(name => readFileBinding(resolve(UNIT, name))),
++		...EVIDENCE_FILES.map(name => readFileBinding(resolve(ROOT, name))),
++		...WORKLOADS.map(key => readFileBinding(resolve(ROOT, `.orkestrel/agent/instruments/results/l7/${key}-think0/freeze/manifest.json`))),
++		...INPUT_FILES.map(name => readFileBinding(resolve(PREPARED, name))),
++	]
++	validateBounds(vectors)
++	return { version: 1, daemon: DAEMON, models, bindings, operator: computeOperator(), limits: LIMITS, vectors }
++}
++
++/** Refuses inference plans beyond their declared request or byte ceilings.
++ * @param vectors - The diagnostic requests
++ * @returns Nothing when the plan fits
++ */
++export function validateBounds(vectors: readonly Vector[]): void {
++	if (vectors.length === 0 || vectors.length > LIMITS.inference) throw new Error('Inference ceiling breach')
++	for (const vector of vectors) {
++		if (Buffer.byteLength(vector.body) > LIMITS.request || vector.bytes !== Buffer.byteLength(vector.body) || vector.hash !== computeHash(vector.body)) throw new Error(`Request byte/hash ceiling breach: ${vector.id}`)
++	}
++}
++
++/** Refuses occupied or escaped output paths before creating artifacts.
++ * @param path - The prospective output
++ * @returns The normalized vacant descendant
++ */
++export function validateOutput(path: string): string {
++	const output = resolve(path)
++	const base = realpathSync(UNIT)
++	const descendant = relative(base, output)
++	if (descendant === '' || descendant === '..' || descendant.startsWith(`..${sep}`) || isAbsolute(descendant)) throw new Error('Output must remain within the assigned directory')
++	let cursor = base
++	for (const segment of descendant.split(sep)) {
++		if (!/^[A-Za-z0-9._-]+$/.test(segment) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(segment) || /[. ]$/.test(segment)) throw new Error('Unsafe output segment')
++		cursor = resolve(cursor, segment)
++		if (existsSync(cursor) && (!lstatSync(cursor).isDirectory() || lstatSync(cursor).isSymbolicLink())) throw new Error('Output crosses a non-directory or symbolic link')
++	}
++	if (existsSync(output)) throw new Error('Output is occupied')
++	return output
++}
++
++/** Reads a controlled daemon receipt without inventing process attestation.
++ * @param value - The untrusted receipt
++ * @returns Declared nonsecret launch facts
++ */
++export function readReceipt(value: unknown): DaemonReceipt {
++	const receipt = readObject(value)
++	const executable = readObject(receipt.executable)
++	const values = readObject(receipt.values)
++	if (JSON.stringify(values) !== JSON.stringify(CHILD_VALUES) || receipt.finished !== undefined || receipt.exit !== undefined) throw new Error('Receipt is not an active controlled launch')
++	const pid = readNumber(receipt.pid)
++	if (!Number.isSafeInteger(pid) || pid <= 0 || typeof receipt.started !== 'string' || !Number.isFinite(Date.parse(receipt.started))) throw new Error('Receipt has no valid launch identity')
++	const binding = { path: readString(executable.path), hash: readString(executable.hash), bytes: readNumber(executable.bytes) }
++	if (process.platform !== 'win32' || resolve(ROOT, binding.path) !== resolve('C:/Users/mikes/scoop/apps/ollama-full/current/ollama.exe')) throw new Error('Receipt executable or Windows host mismatch')
++	readFileBinding(resolve(ROOT, binding.path), binding.hash)
++	return { executable: binding, values: CHILD_VALUES, pid, started: receipt.started }
++}
++
++/** Admits only the exact packet and explicit operator/receipt custody before HTTP.
++ * @param options - Exact execution arguments
++ * @returns Verified offline admission facts
++ */
++export function validateExecution(options: ExecutionOptions): Admission {
++	for (const hash of [options.packet, options.operator, options.custody]) if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Expected exact SHA-256 arguments')
++	if (options.host !== HOST) throw new Error('Missing explicit exclusive host condition')
++	const output = validateOutput(options.output)
++	readFileBinding(PACKET, options.packet)
++	if (computeOperator() !== options.operator) throw new Error('Operator hash mismatch')
++	const packet = buildPacket()
++	if (readFileSync(PACKET, 'utf8') !== `${JSON.stringify(packet, null, 2)}\n`) throw new Error('Packet or bound source changed after preparation')
++	const binding = readFileBinding(resolve(options.receipt), options.custody)
++	if (binding.bytes > LIMITS.metadata) throw new Error('Receipt exceeds metadata ceiling')
++	const receipt = readReceipt(JSON.parse(readFileSync(resolve(options.receipt), 'utf8')))
++	return { packet, output, receipt, binding }
++}
++
++/** Reads exact named option pairs and refuses ambiguous arguments.
++ * @param argv - Arguments following the explicit entry flag
++ * @param names - Permitted required option names
++ * @returns The validated argument map
++ */
++export function readArguments(argv: readonly string[], names: readonly string[]): Readonly<Record<string, string>> {
++	const options: Record<string, string> = {}
++	if (argv.length !== names.length * 2) throw new Error('Expected every named option exactly once')
++	for (let index = 0; index < argv.length; index += 2) {
++		const name = argv[index]
++		const value = argv[index + 1]
++		if (name === undefined || value === undefined || !names.includes(name) || options[name] !== undefined || value === '') throw new Error('Unknown, missing, or repeated argument')
++		options[name] = value
++	}
++	return options
++}
++
++/** Retains native error properties, nested causes, and aggregate members.
++ * @param error - The caught transport failure
++ * @returns A JSON-safe error description
++ */
++export function describeError(error: unknown): unknown {
++	if (!(error instanceof Error)) return { thrown: String(error) }
++	return { name: error.name, message: error.message, stack: error.stack, properties: Object.fromEntries(Object.getOwnPropertyNames(error).filter(name => !['name', 'message', 'stack', 'cause', 'errors'].includes(name)).map(name => [name, String(Reflect.get(error, name))])), ...(error.cause === undefined ? {} : { cause: describeError(error.cause) }), ...(error instanceof AggregateError ? { errors: Array.from(error.errors, describeError) } : {}) }
++}
++
++/** Scans exact output file bytes for final custody inventory.
++ * @param directory - The owned capture directory
++ * @returns Ordered relative file identities
++ */
++export function scanInventory(directory: string): readonly Binding[] {
++	return readdirSync(directory, { withFileTypes: true }).filter(entry => entry.isFile()).map(entry => readFileBinding(resolve(directory, entry.name))).sort((left, right) => left.path.localeCompare(right.path))
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/index.ts b/tmp/units/aggregate-capacity-g2-control/index.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/index.ts
+@@ -0,0 +1,5 @@
++export * from './types.ts'
++export * from './constants.ts'
++export * from './helpers.ts'
++export * from './Driver.ts'
++export * from './Daemon.ts'
+diff --git a/tmp/units/aggregate-capacity-g2-control/main.ts b/tmp/units/aggregate-capacity-g2-control/main.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/main.ts
+@@ -0,0 +1,3 @@
++import { Driver } from './Driver.ts'
++
++process.exitCode = await new Driver().main(process.argv.slice(2))
+diff --git a/tmp/units/aggregate-capacity-g2-control/prepare-offline.ts b/tmp/units/aggregate-capacity-g2-control/prepare-offline.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/prepare-offline.ts
+@@ -0,0 +1,3 @@
++import { Offline } from './Offline.ts'
++
++new Offline().prepare()
+diff --git a/tmp/units/aggregate-capacity-g2-control/prepare.ts b/tmp/units/aggregate-capacity-g2-control/prepare.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/prepare.ts
+@@ -0,0 +1,3 @@
++import { Driver } from './Driver.ts'
++
++process.exitCode = await new Driver().main(process.argv.slice(2))
+diff --git a/tmp/units/aggregate-capacity-g2-control/start.ts b/tmp/units/aggregate-capacity-g2-control/start.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/start.ts
+@@ -0,0 +1,3 @@
++import { Daemon } from './Daemon.ts'
++
++process.exitCode = await new Daemon().main(process.argv.slice(2))
+diff --git a/tmp/units/aggregate-capacity-g2-control/tsconfig.json b/tmp/units/aggregate-capacity-g2-control/tsconfig.json
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/tsconfig.json
+@@ -0,0 +1,16 @@
++{
++	"compilerOptions": {
++		"target": "ES2024",
++		"module": "NodeNext",
++		"moduleResolution": "NodeNext",
++		"strict": true,
++		"noUncheckedIndexedAccess": true,
++		"exactOptionalPropertyTypes": true,
++		"allowImportingTsExtensions": true,
++		"noEmit": true,
++		"skipLibCheck": true,
++		"types": ["node"],
++		"lib": ["ES2024", "DOM", "DOM.Iterable"]
++	},
++	"include": ["*.ts"]
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/types.ts b/tmp/units/aggregate-capacity-g2-control/types.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/types.ts
+@@ -0,0 +1,89 @@
++/** Describes an exact retained file binding. */
++export interface Binding {
++	readonly path: string
++	readonly hash: string
++	readonly bytes: number
++}
++
++/** Describes a frozen deployed model identity. */
++export interface Model {
++	readonly key: string
++	readonly tag: string
++	readonly digest: string
++	readonly route: '/api/chat' | '/api/generate'
++}
++
++/** Describes a diagnostic request in serial execution order. */
++export interface Vector {
++	readonly id: string
++	readonly model: string
++	readonly route: '/api/chat' | '/api/generate'
++	readonly body: string
++	readonly hash: string
++	readonly bytes: number
++}
++
++/** Describes the offline packet without certifying service behavior. */
++export interface Packet {
++	readonly version: 1
++	readonly daemon: string
++	readonly models: readonly Model[]
++	readonly bindings: readonly Binding[]
++	readonly operator: string
++	readonly limits: Limits
++	readonly vectors: readonly Vector[]
++}
++
++/** Describes operational ceilings rather than experimental resource settings. */
++export interface Limits {
++	readonly inference: number
++	readonly request: number
++	readonly response: number
++	readonly metadata: number
++	readonly timeout: number
++	readonly snapshot: number
++	readonly duration: number
++}
++
++/** Describes exact operator authorization supplied before HTTP. */
++export interface ExecutionOptions {
++	readonly packet: string
++	readonly operator: string
++	readonly receipt: string
++	readonly custody: string
++	readonly output: string
++	readonly host: string
++}
++
++/** Describes an attached controlled daemon's retained nonsecret launch facts. */
++export interface DaemonReceipt {
++	readonly executable: Binding
++	readonly values: Readonly<Record<string, string>>
++	readonly pid?: number
++	readonly started: string
++	readonly finished?: string
++	readonly exit?: number | null
++	readonly signal?: NodeJS.Signals | null
++}
++
++/** Describes raw HTTP custody independently of response semantics. */
++export interface Capture {
++	readonly id: string
++	readonly complete: boolean
++	readonly breached: boolean
++	readonly bytes: number
++	readonly hash: string
++	readonly status?: number
++	readonly started: string
++	readonly finished: string
++	readonly duration: number
++	readonly error?: unknown
++}
++
++/** Describes preflight results before an execution directory is created. */
++export interface Admission {
++	readonly packet: Packet
++	readonly output: string
++	readonly receipt: DaemonReceipt
++	readonly binding: Binding
++}
+diff --git a/tmp/units/aggregate-capacity-g2-control/verify.ts b/tmp/units/aggregate-capacity-g2-control/verify.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/verify.ts
+@@ -0,0 +1,3 @@
++import { Offline } from './Offline.ts'
++
++await new Offline().execute()
+diff --git a/tmp/units/aggregate-capacity-g2-control/witness-negative.ts b/tmp/units/aggregate-capacity-g2-control/witness-negative.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/witness-negative.ts
+@@ -0,0 +1,4 @@
++import { Guard } from './Guard.ts'
++
++new Guard()
++await fetch('http://127.0.0.1:11434/api/version')
+diff --git a/tmp/units/aggregate-capacity-g2-control/witness.ts b/tmp/units/aggregate-capacity-g2-control/witness.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-capacity-g2-control/witness.ts
+@@ -0,0 +1,3 @@
++import { Guard } from './Guard.ts'
++
++new Guard()

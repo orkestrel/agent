@@ -1,0 +1,24 @@
+{
+  "name": "lint",
+  "args": [
+    "node_modules/oxlint/bin/oxlint",
+    "--config",
+    "tmp/units/aggregate-l12-maintenance-verifier-lint.json",
+    "--no-ignore",
+    "--deny-warnings",
+    ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/types.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/validators.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/refit/helpers.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/tests/capacity.test.ts"
+  ],
+  "expected": 0,
+  "code": 0,
+  "pid": 59216,
+  "durationMs": 302,
+  "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\lint.stdout.log",
+  "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\lint.stderr.log"
+}

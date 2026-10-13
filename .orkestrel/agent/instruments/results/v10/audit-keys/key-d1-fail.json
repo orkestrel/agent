@@ -1,0 +1,74 @@
+[
+ {
+  "id": "04cf9007",
+  "run": "f4-records-v5",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a4c68f9d",
+  "run": "f4-records-v5",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7ef7fa10",
+  "run": "f4-records-v6",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "cf67ecf1",
+  "run": "f4-records-v7",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "c5150b2e",
+  "run": "f4-records-v7",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "f4c46073",
+  "run": "f4-control-v5",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "93e4b270",
+  "run": "f4-control-v5",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "d17c2d57",
+  "run": "f4-control-v6",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "c4cc0d15",
+  "run": "f4-control-v7",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "7f6e9175",
+  "run": "f4-control-v7",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b46f4364",
+  "run": "f4-control-v7",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "07b32616",
+  "run": "f4-control-v7",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ }
+]

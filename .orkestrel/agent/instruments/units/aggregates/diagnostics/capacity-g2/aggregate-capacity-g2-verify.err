@@ -1,0 +1,13 @@
+file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:108
+if (restoreProof(adaptedProof) !== originalProof) throw new Error('Proof adaptation changed content outside imports and owned evidence/scratch paths')
+                                                        ^
+
+Error: Proof adaptation changed content outside imports and owned evidence/scratch paths
+    at file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:108:57
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.21.0
+
+exit=1 signal=none capped=false duration_ms=111

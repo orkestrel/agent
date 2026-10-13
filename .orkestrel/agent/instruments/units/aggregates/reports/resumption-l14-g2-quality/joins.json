@@ -1,0 +1,449 @@
+{
+	"salt": "0daa8fa2a032c1bcd786942294a840537213f78abbf23f4a22b49561c8a994f5",
+	"joins": [
+		{
+			"opaque": "1fe60c2de52deacbbfa50a59c0c3370a",
+			"goal": "g01-luis-refund-amount",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "efdc6435a3335649c9e3946c094d49c0",
+			"goal": "g02-luis-card",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "6b4423763b59bd9ab94fce003667d5ff",
+			"goal": "g03-grace-escalation",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "5ac8817ab9804de66437bf28a118b864",
+			"goal": "g04-halvorsen-ticket",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "14e51e43b3c0baa7f10611c156c913ca",
+			"goal": "g05-luis-approval-note",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "b32d55168938d2218db6fbcb66358117",
+			"goal": "g06-kenji-shipping",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "5d387189fc8e7bfaf5ffb973e7f1cb7d",
+			"goal": "g07-depot-release",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "87fab68bb3d4eb3802a9e4c72cf76dd5",
+			"goal": "g08-halvorsen-credit",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "f3270616a75d05e4269f41d95826fc76",
+			"goal": "g09-kenji-gift-note",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "7528e2e5b67442b5e6a8f665d166f28a",
+			"goal": "g10-sigrid-callback",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "e571a01bcce6047459af80dffc1b0705",
+			"goal": "g11-grace-signoff-today",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "f79d49607c609fd3da3c636f1791fade",
+			"goal": "g12-copperline-gesture",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "40ceda1187e76005e29b9e21f1cd3850",
+			"goal": "g13-farah-address",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "deb7885574f8bbceffb5e85f67ffd0cd",
+			"goal": "g14-beatriz-remedy",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "c6f5cd30e567e17f19c1cf16819e0964",
+			"goal": "g15-luis-returns",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "3ed666f5d0ae2eeb5cd1e7eb9196937b",
+			"goal": "g16-walk-in-return",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "9d6d662dc25a5e14ebc9da61942473c0",
+			"goal": "g17-phone-list",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "3eef532751c3ea3e7a42f7a8a20ed47a",
+			"goal": "g18-chase-list",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "3847b5ac71b02991459d6e1f489daf30",
+			"goal": "g19-farah-code",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "1bf0a2949f66f88bb3a923acc50439a9",
+			"goal": "g20-copperline-manager",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "0c0aeab03967be2e6402e629a0774c64",
+			"goal": "g21-copperline-buyer",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "c8669c5f89a5a2b2f4d7acfd17822825",
+			"goal": "g22-kenji-returns",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "d5f553a8bbde5e4e5c9ba4e4b4d5db19",
+			"goal": "g23-grace-reopened",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "04af00e1cbbeec485b3e48cef4c56ee5",
+			"goal": "g24-halvorsen-claim",
+			"runIdentity": "49a605cc241d6dfd8d325e92704f7de3b609075b9b8aee4056923578f41b2ed7",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1"
+		},
+		{
+			"opaque": "4ced787aaaedd0e899e68cb89b84981c",
+			"goal": "g01-luis-refund-amount",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "aea393d2177e5fbbdd631149b654e76c",
+			"goal": "g02-luis-card",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "536a5b3729bbae45552cb08f8f8c3c3a",
+			"goal": "g03-grace-escalation",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "3af82b5a2b9df61b8ac64e82e2d87d6b",
+			"goal": "g04-halvorsen-ticket",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "eae48d3096559cdb437d76ccb42ace4b",
+			"goal": "g05-luis-approval-note",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "b91a316dcecad8590e8e5d320b893863",
+			"goal": "g06-kenji-shipping",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "3ba77fd13c8d456cbd98a0fb7fc8e633",
+			"goal": "g07-depot-release",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "b3a9b315d2696f97bad509167376fe88",
+			"goal": "g08-halvorsen-credit",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "89dea0cb91561df4f030f2b0206d5a9e",
+			"goal": "g09-kenji-gift-note",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "54fecfe36bdd67090d512f39a664c64f",
+			"goal": "g10-sigrid-callback",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "a15b77f97fcd636fff7a39921c666c3f",
+			"goal": "g11-grace-signoff-today",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "5cca62e09035d17daf5c4408db1ace5f",
+			"goal": "g12-copperline-gesture",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "d0556825081a6c0c80cb28e7df045338",
+			"goal": "g13-farah-address",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "6bc191022f8a9df16e79b37284c8591a",
+			"goal": "g14-beatriz-remedy",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "28b3d4b184595c2f22416e1f2c81acd0",
+			"goal": "g15-luis-returns",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "e6640caa0f8dc45390e7373ce02e536b",
+			"goal": "g16-walk-in-return",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "91d8a8c470543e300a1afd720ebaf2d7",
+			"goal": "g17-phone-list",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "39f6116be3acca9f524ee6e7392f86ce",
+			"goal": "g18-chase-list",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "384e5daadd33c4f516d9609dde6170e7",
+			"goal": "g19-farah-code",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "88c4e93f0c15c36b48ae53f6b38db39f",
+			"goal": "g20-copperline-manager",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "350833c428fa15ed861efac656f98f88",
+			"goal": "g21-copperline-buyer",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "76a9522c19eabcebb8ec39724ad3a773",
+			"goal": "g22-kenji-returns",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "6be23868de82b592dbd4188614f1d5d8",
+			"goal": "g23-grace-reopened",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "e55e9ec04ced0fd3a19107ce44de5ca7",
+			"goal": "g24-halvorsen-claim",
+			"runIdentity": "8bc3dce9b2b4fed860c340653c540ecf22f9dbbecfaf8e567cbef374fcfda491",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1"
+		},
+		{
+			"opaque": "03799f36855691e564ac02d8408bc4d4",
+			"goal": "g01-luis-refund-amount",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "d8947b08487a41c2941e1f49d112c282",
+			"goal": "g02-luis-card",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "fbc54a8cb96febe6c813424f2ef6001b",
+			"goal": "g03-grace-escalation",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "02fa35e2a93893af797dc379e78ce9aa",
+			"goal": "g04-halvorsen-ticket",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "3c95d3719ac9e027c1cd64f164982bdd",
+			"goal": "g05-luis-approval-note",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "5e8e2c3650a986dd5b32b53cc5c3fa21",
+			"goal": "g06-kenji-shipping",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "9a17c1a9a221c662ae9655a1f7d32d5d",
+			"goal": "g07-depot-release",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "819956db88a7659cc57665f4bcfdece4",
+			"goal": "g08-halvorsen-credit",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "67d213b90f3f729398d7fcd50eb418b7",
+			"goal": "g09-kenji-gift-note",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "8bdda455096c9b38f01edc6499f12d14",
+			"goal": "g10-sigrid-callback",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "07000f2a6ad55d1a13ca7056f0af24aa",
+			"goal": "g11-grace-signoff-today",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "21c2785246b2e52f6edffd25e3b229fc",
+			"goal": "g12-copperline-gesture",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "443006cff14f13ac2e8cc77a8a298080",
+			"goal": "g13-farah-address",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "7f3b3e60cb304d6dbd98f89f5f2a5bd8",
+			"goal": "g14-beatriz-remedy",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "97a52239b9916690f1f829d8dd443617",
+			"goal": "g15-luis-returns",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "0b66f0eaeebb053eb4d45a45aebf5461",
+			"goal": "g16-walk-in-return",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "a899d8cb1588f324669a2ce18cd1a57b",
+			"goal": "g17-phone-list",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "1e2e36487d052c1060db704a1cd5375a",
+			"goal": "g18-chase-list",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "f8e9367c7b4f184c977adceb1ca173f9",
+			"goal": "g19-farah-code",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "1737d2c9f21f9fcd4c21689e2f24c04c",
+			"goal": "g20-copperline-manager",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "98c32cdaaff343ad4112b5e4bde16342",
+			"goal": "g21-copperline-buyer",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "f2e4849945990f9255bb261f60de3df3",
+			"goal": "g22-kenji-returns",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "75240737f4b725b388f84f112bb42afa",
+			"goal": "g23-grace-reopened",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		},
+		{
+			"opaque": "c824bd9f2534582d661e4ef5f4a81fa2",
+			"goal": "g24-halvorsen-claim",
+			"runIdentity": "eb385eb6a63c5faa74a2e7855c694ff36fac93ade2ae3fe3775771b94b709385",
+			"run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1"
+		}
+	],
+	"hashes": {
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v1.json": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\run.json": "95a8827c03d20fe08427542a0d315630a73b9ace202ce2ed6a1fc15b305a23e9",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\rows.jsonl": "898ea3238ed459412508f9e252f6539398776f2077ad8689c8e709f31af83607",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\reserve-512\\l6-g2-think0-records-v1\\messages.jsonl": "2c890c8bc0b69812b3a4a3f2cec529ff4bac11ed206ffd2bd19dda743688ac4e",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\run.json": "50b78ecf590d206d227d127b9c5a0ee61a9e179752dee14fe4f63d05c64166b8",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\rows.jsonl": "bda38223d84765e7bc60ba9fb70483d3bd4cf0d027c2f13db17ad4866996f0b2",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\messages.jsonl": "2e346a05e9ff2e510651192407ac79e8cc29ad3772294b783f4790a9dd4b4cd5",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1\\run.json": "0da26e1eca34915879c4c771f351881c23a79179a4fcc345e129a46e083ee0a4",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1\\rows.jsonl": "01d4b55dda290911ee6eddc50353a56124feda36526b463918d15a7d4577caa9",
+		"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\full\\preflight\\l6-g2-think0-full-v1\\messages.jsonl": "5128ff3b55487246e3c32ce761764256808a859e4f56f7a2fa56489d0f0c59f7"
+	}
+}

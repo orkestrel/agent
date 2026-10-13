@@ -1,0 +1,14 @@
+{
+  "name": "syntax-verify.ts",
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "--check",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\verify.ts"
+  ],
+  "expected": 0,
+  "exit": 0,
+  "signal": null,
+  "durationMs": 62.31869999999981,
+  "stdoutPath": "syntax-verify.ts.stdout.txt",
+  "stderrPath": "syntax-verify.ts.stderr.txt"
+}

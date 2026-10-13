@@ -1,0 +1,45 @@
+[
+  {
+    "line": 53,
+    "raw": "{\"sent\":true,\"sequence\":53,\"role\":\"flush\",\"goal\":\"g20-copperline-manager\",\"started\":1791780864862,\"wall\":5576,\"status\":200}",
+    "value": {
+      "sent": true,
+      "sequence": 53,
+      "role": "flush",
+      "goal": "g20-copperline-manager",
+      "started": 1791780864862,
+      "wall": 5576,
+      "status": 200
+    }
+  },
+  {
+    "line": 54,
+    "raw": "{\"sent\":true,\"turn\":32,\"sequence\":54,\"role\":\"agent\",\"goal\":\"g20-copperline-manager\",\"started\":1791780870440,\"wall\":14509,\"status\":200,\"estimate\":1211}",
+    "value": {
+      "sent": true,
+      "turn": 32,
+      "sequence": 54,
+      "role": "agent",
+      "goal": "g20-copperline-manager",
+      "started": 1791780870440,
+      "wall": 14509,
+      "status": 200,
+      "estimate": 1211
+    }
+  },
+  {
+    "line": 55,
+    "raw": "{\"sent\":true,\"turn\":33,\"sequence\":55,\"role\":\"agent\",\"goal\":\"g20-copperline-manager\",\"started\":1791780885052,\"wall\":3735,\"status\":200,\"estimate\":1518}",
+    "value": {
+      "sent": true,
+      "turn": 33,
+      "sequence": 55,
+      "role": "agent",
+      "goal": "g20-copperline-manager",
+      "started": 1791780885052,
+      "wall": 3735,
+      "status": 200,
+      "estimate": 1518
+    }
+  }
+]

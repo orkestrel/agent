@@ -1,0 +1,80 @@
+✖ missing component control must fail a passing assertion (30.2844ms)
+✖ tie control must fail a passing assertion (26.5042ms)
+✖ failed guard control must fail a passing assertion despite supported focuses (23.5216ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 277.0007
+
+✖ failing tests:
+
+test at tmp\units\aggregate-boundary-screen\negative.test.ts:8:1
+✖ missing component control must fail a passing assertion (30.2844ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/negative.test.ts:10:2)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tmp\units\aggregate-boundary-screen\negative.test.ts:13:1
+✖ tie control must fail a passing assertion (26.5042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'refused'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/negative.test.ts:15:2)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'refused',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tmp\units\aggregate-boundary-screen\negative.test.ts:18:1
+✖ failed guard control must fail a passing assertion despite supported focuses (23.5216ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'refused'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-boundary-screen/negative.test.ts:22:2)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'refused',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

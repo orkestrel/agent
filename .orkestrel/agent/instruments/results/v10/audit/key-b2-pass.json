@@ -1,0 +1,206 @@
+[
+ {
+  "id": "57dda047",
+  "run": "t2a-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "306958a0",
+  "run": "t2a-records-v1",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "0b7c7d22",
+  "run": "t2a-records-v1",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "27e0429a",
+  "run": "t2a-records-v1",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "9b7137cc",
+  "run": "t2a-records-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "0971638c",
+  "run": "t2a-records-v1",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "52494312",
+  "run": "t2a-records-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "5a1027e7",
+  "run": "t2a-records-v2",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "47721695",
+  "run": "t2a-records-v2",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "71961d67",
+  "run": "t2a-records-v2",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "81699d0a",
+  "run": "t2a-records-v2",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "f637a219",
+  "run": "t2a-records-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": true
+ },
+ {
+  "id": "58ac494d",
+  "run": "t2a-records-v2",
+  "goal": "g07-depot-release",
+  "passed": true
+ },
+ {
+  "id": "259ca91a",
+  "run": "t2a-records-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "ae29306d",
+  "run": "t2a-records-v2",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "ba6cc812",
+  "run": "t2a-records-v2",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "80fc3349",
+  "run": "t2a-records-v3",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "ace0269c",
+  "run": "t2a-records-v3",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "f353829b",
+  "run": "t2a-records-v3",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "de156d39",
+  "run": "t2a-records-v3",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "866d515b",
+  "run": "t2a-records-v3",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "713c719d",
+  "run": "t2a-records-v3",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "8d8f47f4",
+  "run": "t2w-control-v2",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "6885f0fe",
+  "run": "t2w-control-v2",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "7a124018",
+  "run": "t2w-control-v2",
+  "goal": "g03-grace-escalation",
+  "passed": true
+ },
+ {
+  "id": "227b10cb",
+  "run": "t2w-control-v2",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "ebb4aa1a",
+  "run": "t2w-control-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "60953eb9",
+  "run": "t2w-control-v2",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ },
+ {
+  "id": "cf738915",
+  "run": "t2w-control-v2",
+  "goal": "g10-sigrid-callback",
+  "passed": true
+ },
+ {
+  "id": "ecc75c81",
+  "run": "t2w-control-v3",
+  "goal": "g01-luis-refund-amount",
+  "passed": true
+ },
+ {
+  "id": "4eb46202",
+  "run": "t2w-control-v3",
+  "goal": "g02-luis-card",
+  "passed": true
+ },
+ {
+  "id": "3c9cd745",
+  "run": "t2w-control-v3",
+  "goal": "g04-halvorsen-ticket",
+  "passed": true
+ },
+ {
+  "id": "66283d38",
+  "run": "t2w-control-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": true
+ },
+ {
+  "id": "29732d34",
+  "run": "t2w-control-v3",
+  "goal": "g09-kenji-gift-note",
+  "passed": true
+ }
+]

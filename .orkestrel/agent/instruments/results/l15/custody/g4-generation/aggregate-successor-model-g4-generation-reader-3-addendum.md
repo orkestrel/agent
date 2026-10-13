@@ -1,0 +1,9 @@
+# G4 generation reader successor 3 addendum
+
+The original generation report and captures remain unchanged. The checked emitted fit caller binds `verifyEvidence` to the model returned by `createOllamaJudge` configured from the emitted MICA constants. I prepared `tmp/units/aggregate-successor-model-g4-generation-read-3.ts` as a copy of the prior reader, changing only the two imports required for that binding and the fourth argument to `verifyEvidence`.
+
+The literal diff is preserved in `tmp/units/aggregate-successor-model-g4-generation-read-3.diff.txt` (compared with the prior reader). The first invocation failed before reader validation with `ERR_MODULE_NOT_FOUND`: the temporary helper resolved the vendored judge module beneath `.build/bench5/vendor`, while the emitted fitting caller's relative import resolves beneath `.build/vendor`. Exit was 1 after 275.124 ms. Full stdout/stderr and exact exit/duration are retained at `tmp/units/aggregate-successor-model-g4-generation-read-3.stdout.txt`, `tmp/units/aggregate-successor-model-g4-generation-read-3.stderr.txt`, `tmp/units/aggregate-successor-model-g4-generation-read-3.exit.txt`, and `tmp/units/aggregate-successor-model-g4-generation-read-3.duration-ms.txt`.
+
+This is a reader import-path failure, not a new conclusion about the generation evidence. No further reader execution was made. Packet/cost/coverage validation remains unresolved; there was no fit, label, model request, source/build/HEAD change, or service action.
+
+Evidence: the emitted fit caller's configuration-bound verifier call is [refit/helpers.js](.orkestrel/agent/instruments/harness/.build/bench5/refit/helpers.js:356). The corresponding model configuration constants are in [constants.js](.orkestrel/agent/instruments/harness/.build/bench5/constants.js:1). The retained import-resolution failure is [reader-3.stderr.txt](tmp/units/aggregate-successor-model-g4-generation-read-3.stderr.txt:1).

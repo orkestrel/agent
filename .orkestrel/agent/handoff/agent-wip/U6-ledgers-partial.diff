@@ -1,0 +1,2911 @@
+diff --git a/src/core/ledgers/Classifier.ts b/src/core/ledgers/Classifier.ts
+index 4c9b5a4..0217584 100644
+--- a/src/core/ledgers/Classifier.ts
++++ b/src/core/ledgers/Classifier.ts
+@@ -18,7 +18,7 @@ import {
+ 	LEDGER_CATEGORIES,
+ 	QUIET_CATEGORIES,
+ } from './constants.js'
+-import { extractTokens } from './helpers.js'
++import { extractTokens, renderCauseChain } from './helpers.js'
+ 
+ /**
+  * Files messages through the conversation's judgment manager and reads their categories and corrections.
+@@ -44,7 +44,7 @@ export class Classifier implements ClassifierInterface {
+ 
+ 	/**
+ 	 * Asks the judge every question the filing still lacks, in the measured order.
+-	 * @param requests - The ids of the messages that belong to the current request
++	 * @param requests - The ids of the user messages the ledger serves as requests
+ 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
+ 	 * @returns The judgment keys and summed usage; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+ 	 */
+@@ -169,7 +169,7 @@ export class Classifier implements ClassifierInterface {
+ 
+ 	/**
+ 	 * Reads the whole filing from the recorded judgments.
+-	 * @returns The quiet ids, categories, topics, and the amended and superseded marks
++	 * @returns The quiet ids, categories, topics, amendments, and supersessions
+ 	 */
+ 	classification(): LedgerClassification {
+ 		const messages = this.#options.conversation.messages()
+@@ -177,8 +177,8 @@ export class Classifier implements ClassifierInterface {
+ 		const quiet = new Set<string>()
+ 		const categories = new Map<string, LedgerCategory>()
+ 		const topics = new Map<string, readonly string[]>()
+-		const amended = new Map<string, string[]>()
+-		const superseded = new Map<string, string[]>()
++		const amendments = new Map<string, string[]>()
++		const supersessions = new Map<string, string[]>()
+ 		for (const message of messages) {
+ 			if (this.quiet(message.id)) quiet.add(message.id)
+ 			const category = this.category(message.id)
+@@ -209,18 +209,18 @@ export class Classifier implements ClassifierInterface {
+ 				)
+ 					continue
+ 			}
+-			for (const map of head === 'supersedes' ? [superseded, amended] : [amended]) {
++			for (const map of head === 'supersedes' ? [supersessions, amendments] : [amendments]) {
+ 				const ids = map.get(earlier) ?? []
+ 				if (!ids.includes(later)) map.set(earlier, [...ids, later])
+ 			}
+ 		}
+-		for (const map of [amended, superseded])
++		for (const map of [amendments, supersessions])
+ 			for (const [id, ids] of map)
+ 				map.set(
+ 					id,
+ 					[...ids].sort((left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0)),
+ 				)
+-		return { quiet, categories, topics, amended, superseded }
++		return { quiet, categories, topics, amendments, supersessions }
+ 	}
+ 
+ 	#renderState(id: string): string {
+@@ -310,16 +310,6 @@ export class Classifier implements ClassifierInterface {
+ 		])
+ 	}
+ 
+-	#describeError(error: unknown): string {
+-		const parts: string[] = []
+-		let current: unknown = error
+-		for (let depth = 0; current !== undefined && depth < 4; depth += 1) {
+-			parts.push(isError(current) ? `${current.name}: ${current.message}` : String(current))
+-			current = isError(current) ? current.cause : undefined
+-		}
+-		return parts.join(' <- ')
+-	}
+-
+ 	async #ask(
+ 		spec: JudgmentInput,
+ 		signal: AbortSignal,
+@@ -354,7 +344,7 @@ export class Classifier implements ClassifierInterface {
+ 				})
+ 			if (
+ 				(isJudgeError(error) && error.code === 'QUESTION') ||
+-				DETERMINISTIC_JUDGE_ERROR.test(this.#describeError(error))
++				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
+ 			)
+ 				this.#failed.add(fingerprint)
+ 			if (signal.aborted) throw error
+diff --git a/src/core/ledgers/Gauge.ts b/src/core/ledgers/Gauge.ts
+index f067099..b98e0b1 100644
+--- a/src/core/ledgers/Gauge.ts
++++ b/src/core/ledgers/Gauge.ts
+@@ -1,24 +1,25 @@
+-import type { Message, ThinkingReplay } from '../types.js'
++import type { ThinkingReplay } from '../types.js'
+ import type { GaugeCall, GaugeInterface, GaugeOptions } from './types.js'
+ import { isFiniteNumber } from '@orkestrel/contract'
+ import { estimateMessages } from '../agents/helpers.js'
+ import { LedgerError } from './errors.js'
+-import { fitSlope, resolvePredict } from './helpers.js'
++import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
++import { isPositiveSafeInteger } from './validators.js'
+ 
+ /**
+- * Prices prompts in tokens from a measured scale and fixed cost, and measures the room a request
++ * Prices prompts in tokens from a measured scale and overhead, and measures the room a request
+  * has left.
+  *
+  * @remarks
+- * `observe` rescales from the first call of each finished request with the fixed cost taken out,
++ * `observe` rescales from the first call of each finished request with the overhead taken out,
+  * and keeps that request's calls for the marginal rate and the longest final completion for the reply
+- * reserve after subtracting its thinking. `fixed` never changes after construction.
++ * reserve after subtracting its thinking. `overhead` never changes after construction.
+  * {@link GaugeOptions} defines the measured use, reply reserve, and recall-room formulas.
+  * {@link LedgerOptions} defines the ledger's plan budget and recall close rule.
+  *
+  * @example
+  * ```ts
+- * const gauge = new Gauge({ scale: 1.16, fixed: 498, capacity: 32768 })
++ * const gauge = new Gauge({ scale: 1.16, overhead: 498, capacity: 32768 })
+  * gauge.room([{ estimate: 1719, prompt: 2498, tools: 3 }], '') // estimate units a recall result can take
+  * ```
+  */
+@@ -26,16 +27,16 @@ export class Gauge implements GaugeInterface {
+ 	readonly #capacity: number
+ 	readonly #predict: number
+ 	readonly #replay: ThinkingReplay
+-	readonly #history: Array<readonly GaugeCall[]> = []
++	readonly #overhead: number
++	#history: ReadonlyArray<readonly GaugeCall[]> = []
+ 	#scale: number
+-	#fixed: number
+ 	#reply = 0
+ 
+ 	/**
+ 	 * Holds the starting price and the capacity.
+ 	 *
+-	 * @param options - The starting `scale` and `fixed` price and the context `capacity`
+-	 * @throws {LedgerError} Thrown when `scale` is not finite and above 0, or `fixed` is not finite and at least 0 (code `'GAUGE'`)
++	 * @param options - The starting `scale` and `overhead` price and the context `capacity`
++	 * @throws {LedgerError} Thrown when `scale` is not finite and above 0, or `overhead` is not finite and at least 0 (code `'GAUGE'`)
+ 	 * @throws {LedgerError} Thrown when `capacity` is not a positive safe integer (code `'CAPACITY'`)
+ 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
+ 	 */
+@@ -43,14 +44,14 @@ export class Gauge implements GaugeInterface {
+ 		if (!isFiniteNumber(options.scale) || options.scale <= 0) {
+ 			throw new LedgerError('GAUGE', 'gauge scale must be finite and greater than 0')
+ 		}
+-		if (!isFiniteNumber(options.fixed) || options.fixed < 0) {
+-			throw new LedgerError('GAUGE', 'gauge fixed must be finite and at least 0')
++		if (!isFiniteNumber(options.overhead) || options.overhead < 0) {
++			throw new LedgerError('GAUGE', 'gauge overhead must be finite and at least 0')
+ 		}
+-		if (!Number.isSafeInteger(options.capacity) || options.capacity <= 0) {
++		if (!isPositiveSafeInteger(options.capacity)) {
+ 			throw new LedgerError('CAPACITY', 'gauge capacity must be a positive safe integer')
+ 		}
+ 		this.#scale = options.scale
+-		this.#fixed = options.fixed
++		this.#overhead = options.overhead
+ 		this.#capacity = options.capacity
+ 		this.#predict = resolvePredict(options.predict, options.capacity)
+ 		this.#replay = options.replay ?? 'none'
+@@ -60,20 +61,16 @@ export class Gauge implements GaugeInterface {
+ 		return this.#scale
+ 	}
+ 
+-	get fixed(): number {
+-		return this.#fixed
+-	}
+-
+-	measure(messages: readonly Message[]): number {
+-		return this.#fixed + this.#scale * estimateMessages(messages)
++	get overhead(): number {
++		return this.#overhead
+ 	}
+ 
+ 	/**
+ 	 * Reads the marginal rate of prompt tokens per estimate unit.
+ 	 *
+ 	 * @remarks
+-	 * Returns the scale when the fit is undefined, nonfinite, or not above 0, a guard the measured
+-	 * harness lacked, so a degenerate fit never prices recall room.
++	 * Returns the scale when the fit is undefined, nonfinite, or not above 0, so a degenerate fit
++	 * never prices recall room.
+ 	 *
+ 	 * @param calls - The calls of the request in progress
+ 	 * @returns The fitted slope, or the scale when the slope is unusable
+@@ -83,11 +80,11 @@ export class Gauge implements GaugeInterface {
+ 		return slope !== undefined && isFiniteNumber(slope) && slope > 0 ? slope : this.#scale
+ 	}
+ 
+-	left(calls: readonly GaugeCall[]): number {
++	remainder(calls: readonly GaugeCall[]): number {
+ 		const call = calls.at(-1)
+ 		const used = isFiniteNumber(call?.prompt)
+ 			? call.prompt + (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
+-			: this.#fixed + this.#scale * (call?.estimate ?? 0)
++			: this.#overhead + this.#scale * (call?.estimate ?? 0)
+ 		return Math.max(0, this.#capacity - used)
+ 	}
+ 
+@@ -99,33 +96,24 @@ export class Gauge implements GaugeInterface {
+ 				? this.#reply
+ 				: rate * estimateMessages([{ id: 'reply', role: 'assistant', content: longest }])
+ 		const recall =
+-			rate *
+-			estimateMessages([
+-				{
+-					id: 'call',
+-					role: 'assistant',
+-					content: '',
+-					calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic: '' } }],
+-				},
+-				{ id: 'result', role: 'tool', content: '' },
+-			])
++			rate * estimateMessages([buildRecallMessage(''), { id: 'result', role: 'tool', content: '' }])
+ 		return reply + recall
+ 	}
+ 
+ 	room(calls: readonly GaugeCall[], longest: string): number {
+ 		return Math.max(
+ 			0,
+-			(this.left(calls) - this.#predict - this.reserve(calls, longest)) / 2 / this.rate(calls),
++			(this.remainder(calls) - this.#predict - this.reserve(calls, longest)) / 2 / this.rate(calls),
+ 		)
+ 	}
+ 
+ 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void {
+ 		const first = calls[0]
+ 		if (first !== undefined && isFiniteNumber(first.prompt) && first.estimate > 0) {
+-			const priced = first.prompt - this.#fixed
++			const priced = first.prompt - this.#overhead
+ 			if (priced > 0) this.#scale = priced / first.estimate
+ 		}
+-		this.#history.push([...calls])
++		this.#history = [...this.#history, [...calls]]
+ 		if (isFiniteNumber(reply?.completion))
+ 			this.#reply = Math.max(this.#reply, reply.completion - (reply.thinking ?? 0))
+ 	}
+diff --git a/src/core/ledgers/Ledger.ts b/src/core/ledgers/Ledger.ts
+index c6c8486..fe2fbe4 100644
+--- a/src/core/ledgers/Ledger.ts
++++ b/src/core/ledgers/Ledger.ts
+@@ -11,7 +11,6 @@ import type {
+ 	LedgerInterface,
+ 	LedgerLine,
+ 	LedgerLookupReading,
+-	LedgerNote,
+ 	LedgerOptions,
+ 	LedgerProjection,
+ 	LedgerProjectionInput,
+@@ -50,25 +49,32 @@ import {
+ import { isLedgerError, LedgerError } from './errors.js'
+ import {
+ 	buildLines,
++	buildRecallMessage,
+ 	buildRecords,
+ 	collectNames,
++	collectProjectionIds,
+ 	collectRegistry,
+ 	computeThinking,
+ 	cutListing,
+ 	extractTokens,
++	extractWords,
++	findLedgerCall,
+ 	linkOwners,
+ 	matchEntities,
+ 	rankLedgerCut,
+ 	resolvePredict,
+-	resolveLedgerCall,
+ 	matchesCutLine,
+ 	renderLedgerPinned,
+ 	renderLedgerRecord,
+ 	renderStub,
++	renderTopicNames,
++	scanAmendments,
+ 	selectRecords,
+ 	splitTopic,
+ 	splitSentences,
++	splitWords,
+ } from './helpers.js'
++import { isFraction, isPositiveSafeInteger } from './validators.js'
+ 
+ /**
+  * Serves one conversation through classified records, a bounded briefing, and a final answer pass.
+@@ -84,7 +90,6 @@ export class Ledger implements LedgerInterface {
+ 	readonly #options: LedgerOptions
+ 	readonly #replay: ThinkingReplay
+ 	readonly #predict: number
+-	readonly #notes: LedgerNote
+ 	readonly #share: LedgerShare
+ 	readonly #conversation: ConversationInterface
+ 	readonly #agent: AgentInterface
+@@ -100,7 +105,7 @@ export class Ledger implements LedgerInterface {
+ 	#selected: Selection | undefined
+ 	#boundary = 0
+ 	#gauge: Gauge | undefined
+-	#calls: GaugeCall[] = []
++	#calls: readonly GaugeCall[] = []
+ 	#position: number | undefined
+ 	#active = false
+ 	#recalls = 0
+@@ -116,15 +121,13 @@ export class Ledger implements LedgerInterface {
+ 	 */
+ 	constructor(provider: ProviderInterface, options: LedgerOptions) {
+ 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {
+-			const value = options.thresholds[key]
+-			if (!isFiniteNumber(value) || value <= 0 || value > 1)
++			if (!isFraction(options.thresholds[key]))
+ 				throw new LedgerError('THRESHOLD', 'thresholds must be finite and in (0, 1]')
+ 		}
+ 		for (const value of Object.values(options.share ?? {})) {
+-			if (!isFiniteNumber(value) || value <= 0 || value > 1)
+-				throw new LedgerError('SHARE', 'shares must be finite and in (0, 1]')
++			if (!isFraction(value)) throw new LedgerError('SHARE', 'shares must be finite and in (0, 1]')
+ 		}
+-		if (!Number.isSafeInteger(options.capacity) || options.capacity <= 0)
++		if (!isPositiveSafeInteger(options.capacity))
+ 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
+ 		this.#predict = resolvePredict(options.predict, options.capacity)
+ 		for (const value of [options.recall?.limit, options.agent?.limit]) {
+@@ -146,7 +149,6 @@ export class Ledger implements LedgerInterface {
+ 		this.#provider = provider
+ 		this.#replay = provider.replay ?? 'none'
+ 		this.#options = options
+-		this.#notes = { ...LEDGER_NOTES, ...options.notes }
+ 		this.#share = { ...DEFAULT_LEDGER_SHARE, ...options.share }
+ 		if (options.gauge !== undefined)
+ 			this.#gauge = new Gauge({
+@@ -189,9 +191,7 @@ export class Ledger implements LedgerInterface {
+ 		tools.add(
+ 			createTool({
+ 				name: 'recall',
+-				description:
+-					options.recall?.description ??
+-					`Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics ${options.topics.map((topic) => topic.name).join(', ')}. Returns source lines, newest first.`,
++				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics ${renderTopicNames(options.topics)}. Returns source lines, newest first.`,
+ 				parameters: {
+ 					type: 'object',
+ 					properties: {
+@@ -214,7 +214,7 @@ export class Ledger implements LedgerInterface {
+ 		this.#agent.emitter.on('tool', (_call, result) => {
+ 			this.#flush()
+ 			this.#pending.set(this.#conversation.messages().length, result)
+-			if (!result.success && result.error === this.#notes.repeat) {
++			if (!result.success && result.error === LEDGER_NOTES.repeat) {
+ 				this.#closed = true
+ 				this.#agent.abort('repeat')
+ 			}
+@@ -230,11 +230,10 @@ export class Ledger implements LedgerInterface {
+ 			this.#usage = sumUsage(this.#usage, usage)
+ 			const last = this.#calls.at(-1)
+ 			if (last !== undefined)
+-				this.#calls[this.#calls.length - 1] = {
+-					...last,
+-					prompt: usage.prompt,
+-					completion: usage.completion,
+-				}
++				this.#calls = [
++					...this.#calls.slice(0, -1),
++					{ ...last, prompt: usage.prompt, completion: usage.completion },
++				]
+ 		})
+ 	}
+ 
+@@ -254,18 +253,18 @@ export class Ledger implements LedgerInterface {
+ 	}
+ 	/**
+ 	 * Returns the stored prompt price.
+-	 * @returns The scale and fixed cost, or undefined before calibration
++	 * @returns The scale and overhead, or undefined before calibration
+ 	 */
+ 	get gauge(): LedgerGauge | undefined {
+ 		return this.#gauge === undefined
+ 			? undefined
+-			: { scale: this.#gauge.scale, fixed: this.#gauge.fixed }
++			: { scale: this.#gauge.scale, overhead: this.#gauge.overhead }
+ 	}
+ 
+ 	/**
+ 	 * Measures message scale and tool overhead from provider prompt usage.
+ 	 * @param signal - The signal bounding both calibration calls; an abort rejects with its reason
+-	 * @returns The stored scale and fixed cost
++	 * @returns The stored scale and overhead
+ 	 * @throws {LedgerError} Thrown when either call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+ 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+ 	 */
+@@ -279,61 +278,20 @@ export class Ledger implements LedgerInterface {
+ 		}
+ 	}
+ 
+-	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
+-		try {
+-			const messages = stripThinking(
+-				[
+-					{ id: 'system', role: 'system', content: this.#options.system },
+-					...this.#conversation.view(),
+-					{ id: 'calibration', role: 'user', content: '' },
+-				],
+-				this.#replay,
+-			).slice(0, -1)
+-			const priced = await this.#provider.generate(
+-				messages,
+-				signal,
+-				this.#agent.context.tools.definitions(),
+-				{ think: false },
+-			)
+-			const bare = await this.#provider.generate(messages, signal, undefined, { think: false })
+-			if (
+-				!isFiniteNumber(priced.usage?.prompt) ||
+-				priced.usage.prompt <= 0 ||
+-				!isFiniteNumber(bare.usage?.prompt) ||
+-				bare.usage.prompt <= 0
+-			)
+-				throw new LedgerError('GAUGE', 'calibration requires prompt usage from both calls')
+-			this.#gauge = new Gauge({
+-				capacity: this.#options.capacity,
+-				predict: this.#predict,
+-				replay: this.#replay,
+-				scale: bare.usage.prompt / estimateMessages(messages),
+-				fixed: Math.max(0, priced.usage.prompt - bare.usage.prompt),
+-			})
+-			return { scale: this.#gauge.scale, fixed: this.#gauge.fixed }
+-		} catch (error) {
+-			signal.throwIfAborted()
+-			throw error
+-		}
+-	}
+-
+ 	/**
+ 	 * Appends a request and serves it, recovering an unfinished first pass with one answer pass.
+-	 * A failed calibration rejects with `LedgerError` code `'GAUGE'`.
++	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
++	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
+ 	 * @param content - The request text
+ 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
+ 	 * @returns The final pass and the usage of every pass
+ 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+-	 * @throws {LedgerError} Thrown when calibration fails (code `'GAUGE'`)
++	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+ 	 */
+ 	async respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
+ 		if (this.#active) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+ 		this.#active = true
+-		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
+-		const caller =
+-			this.#options.agent?.signal === undefined
+-				? abort.signal
+-				: AbortSignal.any([abort.signal, this.#options.agent.signal])
++		const caller = createAbort({ ...(signal === undefined ? {} : { signal }) }).signal
+ 		try {
+ 			if (this.#gauge === undefined) await this.#measureGauge(caller)
+ 			this.#request = this.#conversation.add({ role: 'user', content })
+@@ -346,13 +304,13 @@ export class Ledger implements LedgerInterface {
+ 			this.#closed = false
+ 			this.#answered.clear()
+ 			this.#recalled.clear()
+-			const first = await this.#runPass(caller, this.#options.think)
++			const first = await this.#generatePass(caller, this.#options.think)
+ 			const passes = [first]
+ 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
+ 				const digest = this.#buildDigest()
+ 				if (digest !== undefined)
+ 					this.#annotations.add(this.#conversation.add({ role: 'user', content: digest }).id)
+-				this.#annotations.add(this.#conversation.add({ role: 'user', content: this.#notes.cue }).id)
++				this.#annotations.add(this.#conversation.add({ role: 'user', content: LEDGER_NOTES.cue }).id)
+ 				const previous = this.#agent.context.scope
+ 				this.#agent.context.apply(
+ 					createScope({
+@@ -371,7 +329,7 @@ export class Ledger implements LedgerInterface {
+ 					}),
+ 				)
+ 				try {
+-					passes.push(await this.#runPass(caller, false))
++					passes.push(await this.#generatePass(caller, false))
+ 				} finally {
+ 					this.#agent.context.apply(previous)
+ 				}
+@@ -402,7 +360,45 @@ export class Ledger implements LedgerInterface {
+ 		}
+ 	}
+ 
+-	async #runPass(signal: AbortSignal, think?: boolean): Promise<AgentResult> {
++	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
++		try {
++			const messages = stripThinking(
++				[
++					{ id: 'system', role: 'system', content: this.#options.system },
++					...this.#conversation.view(),
++					{ id: 'calibration', role: 'user', content: '' },
++				],
++				this.#replay,
++			).slice(0, -1)
++			const priced = await this.#provider.generate(
++				messages,
++				signal,
++				this.#agent.context.tools.definitions(),
++				{ think: false },
++			)
++			const bare = await this.#provider.generate(messages, signal, undefined, { think: false })
++			if (
++				!isFiniteNumber(priced.usage?.prompt) ||
++				priced.usage.prompt <= 0 ||
++				!isFiniteNumber(bare.usage?.prompt) ||
++				bare.usage.prompt <= 0
++			)
++				throw new LedgerError('GAUGE', 'calibration requires prompt usage from both calls')
++			this.#gauge = new Gauge({
++				capacity: this.#options.capacity,
++				predict: this.#predict,
++				replay: this.#replay,
++				scale: bare.usage.prompt / estimateMessages(messages),
++				overhead: Math.max(0, priced.usage.prompt - bare.usage.prompt),
++			})
++			return { scale: this.#gauge.scale, overhead: this.#gauge.overhead }
++		} catch (error) {
++			signal.throwIfAborted()
++			throw error
++		}
++	}
++
++	async #generatePass(signal: AbortSignal, think?: boolean): Promise<AgentResult> {
+ 		this.#selected = undefined
+ 		this.#boundary = this.#conversation.messages().length
+ 		this.#usage = undefined
+@@ -417,6 +413,10 @@ export class Ledger implements LedgerInterface {
+ 		}
+ 	}
+ 
++	#price(messages: readonly Message[]): number {
++		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
++	}
++
+ 	#flush(): void {
+ 		const messages = this.#conversation.messages()
+ 		for (const [at, result] of this.#pending) {
+@@ -449,7 +449,7 @@ export class Ledger implements LedgerInterface {
+ 		const readings: LedgerLookupReading[] = []
+ 		for (const group of collectToolGroups(this.#conversation.messages())) {
+ 			for (const message of group.slice(1)) {
+-				const call = resolveLedgerCall(group, message)
++				const call = findLedgerCall(group, message)
+ 				const lookup = this.#options.lookups?.find((one) => one.tool.name === call?.name)
+ 				if (
+ 					call === undefined ||
+@@ -499,7 +499,7 @@ export class Ledger implements LedgerInterface {
+ 		const messages = this.#conversation.messages()
+ 		const input: LedgerProjectionInput = {
+ 			system: this.#options.system,
+-			exclude: [...this.#requests, ...this.#annotations],
++			exclusions: [...this.#requests, ...this.#annotations],
+ 			owners: registry.owners,
+ 			messages,
+ 			readings,
+@@ -604,12 +604,11 @@ export class Ledger implements LedgerInterface {
+ 		const total =
+ 			Math.max(
+ 				0,
+-				(this.#options.capacity - this.#predict) * this.#share.prompt - (this.#gauge?.fixed ?? 0),
++				(this.#options.capacity - this.#predict) * this.#share.prompt - (this.#gauge?.overhead ?? 0),
+ 			) /
+ 			(1 + LEDGER_SCALE_DRIFT)
+ 		const tail = this.#selectTail(request, total * this.#share.tail, input)
+-		const cap =
+-			total - (this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(tail, this.#replay))
++		const cap = total - this.#price(stripThinking(tail, this.#replay))
+ 		const tailIds = new Set(tail.map((message) => message.id))
+ 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
+ 		const held = new Set(
+@@ -628,26 +627,12 @@ export class Ledger implements LedgerInterface {
+ 						held.add(id)
+ 		const texts = input.messages
+ 			.filter((message) => (message.calls?.length ?? 0) === 0)
+-			.map((message) => ({
+-				message,
+-				words: new Set(message.content.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []),
+-				names: new Set(
+-					[...message.content.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
+-						.filter((match) => {
+-							const before = message.content.slice(0, match.index).trimEnd()
+-							return before !== '' && !/[.!?:;]$/.test(before)
+-						})
+-						.map((match) => match[0].toLowerCase()),
+-				),
+-			}))
++			.map((message) => ({ message, ...extractWords(message.content) }))
+ 		const asked = texts.find(({ message }) => message.id === request.id)
+ 		const counts = new Map<string, number>()
+ 		for (const text of texts)
+ 			for (const word of text.words) counts.set(word, (counts.get(word) ?? 0) + 1)
+-		const live = new Set([
+-			...projection.loose,
+-			...projection.records.flatMap((record) => record.members),
+-		])
++		const live = collectProjectionIds(projection)
+ 		const units = texts.flatMap(({ message, words, names }, position) => {
+ 			if (
+ 				!live.has(message.id) ||
+@@ -729,11 +714,7 @@ export class Ledger implements LedgerInterface {
+ 		)
+ 		for (const step of steps) {
+ 			const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
+-			if (
+-				(this.#gauge?.scale ?? 1) * estimateMessages([{ id: 'system', role: 'system', content }]) <=
+-				cap
+-			)
+-				break
++			if (this.#price([{ id: 'system', role: 'system', content }]) <= cap) break
+ 			if (step.record !== undefined) step.record.lines.pop()
+ 			if (step.source !== undefined) included.delete(step.source)
+ 			briefing = this.#render(
+@@ -787,21 +768,12 @@ export class Ledger implements LedgerInterface {
+ 		source: string,
+ 		held: ReadonlySet<string>,
+ 	): readonly LedgerLine[] {
+-		const live = new Set([
+-			...projection.loose,
+-			...projection.records.flatMap((record) => record.members),
+-		])
+-		const queue = [source]
+-		const done = new Set<string>()
+-		const lines: LedgerLine[] = []
+-		for (const id of queue) {
+-			if (done.has(id)) continue
+-			done.add(id)
+-			if (id !== source && (held.has(id) || !live.has(id))) continue
+-			lines.push(...this.#projectLines(input, projection, id))
+-			queue.push(...(input.classification.amended.get(id) ?? []))
+-		}
+-		return lines
++		const live = collectProjectionIds(projection)
++		return scanAmendments(
++			input.classification.amendments,
++			source,
++			(id) => id === source || (!held.has(id) && live.has(id)),
++		).flatMap((id) => this.#projectLines(input, projection, id))
+ 	}
+ 
+ 	#render(records: readonly LedgerRecord[], units: readonly LedgerRecord[]): string {
+@@ -850,12 +822,12 @@ export class Ledger implements LedgerInterface {
+ 			const leader = group[0]
+ 			if (leader === undefined) continue
+ 			const kept = (leader.calls ?? []).filter((call) => {
+-				const message = group.slice(1).find((result) => resolveLedgerCall(group, result) === call)
++				const message = group.slice(1).find((result) => findLedgerCall(group, result) === call)
+ 				const result = message === undefined ? undefined : this.#results.get(message.id)
+ 				if (
+ 					message === undefined ||
+ 					!this.#options.lookups?.some((lookup) => lookup.tool.name === call.name) ||
+-					(result?.success === false && result.error === this.#notes.repeat)
++					(result?.success === false && result.error === LEDGER_NOTES.repeat)
+ 				)
+ 					return false
+ 				results.add(message.id)
+@@ -887,8 +859,7 @@ export class Ledger implements LedgerInterface {
+ 		let tail = [request]
+ 		for (const exchange of collectExchanges(history).toReversed()) {
+ 			const next = [...exchange, ...tail]
+-			if ((this.#gauge?.scale ?? 1) * estimateMessages(stripThinking(next, this.#replay)) > cap)
+-				break
++			if (this.#price(stripThinking(next, this.#replay)) > cap) break
+ 			tail = next
+ 		}
+ 		return tail
+@@ -898,7 +869,7 @@ export class Ledger implements LedgerInterface {
+ 		const group = collectToolGroups(this.#conversation.messages()).find((entries) =>
+ 			entries.some((one) => one.id === message.id),
+ 		)
+-		const call = group === undefined ? undefined : resolveLedgerCall(group, message)
++		const call = group === undefined ? undefined : findLedgerCall(group, message)
+ 		const reading = this.#readLookups().find((one) => one.id === message.id)
+ 		const hidden = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'hidden')
+ 		const visible = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'shown')
+@@ -928,12 +899,15 @@ export class Ledger implements LedgerInterface {
+ 		const additions = this.#conversation.messages().slice(this.#boundary)
+ 		const messages = this.#agent.context.build(selection)
+ 		const names = this.#agent.context.scope?.tools
+-		this.#calls.push({
+-			estimate: estimateMessages(stripThinking([...messages, ...additions], this.#replay)),
+-			tools: this.#agent.context.tools
+-				.definitions()
+-				.filter((tool) => names === undefined || names.includes(tool.name)).length,
+-		})
++		this.#calls = [
++			...this.#calls,
++			{
++				estimate: estimateMessages(stripThinking([...messages, ...additions], this.#replay)),
++				tools: this.#agent.context.tools
++					.definitions()
++					.filter((tool) => names === undefined || names.includes(tool.name)).length,
++			},
++		]
+ 		this.#position = this.#conversation.messages().length
+ 	}
+ 
+@@ -945,10 +919,10 @@ export class Ledger implements LedgerInterface {
+ 			.slice(this.#position)
+ 			.find((entry) => entry.role === 'assistant')
+ 		if (message?.thinking === undefined) return
+-		this.#calls[this.#calls.length - 1] = {
+-			...call,
+-			thinking: computeThinking(message, call.completion),
+-		}
++		this.#calls = [
++			...this.#calls.slice(0, -1),
++			{ ...call, thinking: computeThinking(message, call.completion) },
++		]
+ 	}
+ 
+ 	#findLongest(): string {
+@@ -964,7 +938,7 @@ export class Ledger implements LedgerInterface {
+ 	#repeat(name: string, args: Readonly<Record<string, unknown>>): void {
+ 		const key = canonicalStringify([name, args])
+ 		if (key === undefined) throw new Error('tool arguments have no canonical identity')
+-		if (this.#answered.has(key)) throw new Error(this.#notes.repeat)
++		if (this.#answered.has(key)) throw new Error(LEDGER_NOTES.repeat)
+ 		this.#answered.add(key)
+ 	}
+ 
+@@ -984,31 +958,21 @@ export class Ledger implements LedgerInterface {
+ 			this.#recalls >= (this.#options.recall?.limit ?? DEFAULT_RECALL_LIMIT) ||
+ 			(gauge !== undefined &&
+ 				this.#calls.length > 0 &&
+-				gauge.left(this.#calls) - this.#predict <
++				gauge.remainder(this.#calls) - this.#predict <
+ 					2 * gauge.reserve(this.#calls, this.#findLongest()))
+ 		)
+ 			this.#closed = true
+-		if (this.#closed) throw new Error(this.#notes.closed)
++		if (this.#closed) throw new Error(LEDGER_NOTES.closure)
+ 		this.#recalls += 1
+-		const guidance = `an owner name, an id, or one of ${this.#options.topics.map((one) => one.name).join(', ')}`
++		const guidance = `an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
+ 		if (topic === '') throw new Error(`recall needs a topic: ${guidance}`)
+ 		const room =
+ 			(gauge?.room(this.#calls, this.#findLongest()) ?? 0) -
+-			estimateMessages([
+-				{
+-					id: 'call',
+-					role: 'assistant',
+-					content: '',
+-					calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
+-				},
+-			])
++			estimateMessages([buildRecallMessage(topic)])
+ 		const { input, projection } = this.#project()
+ 		const registry = collectRegistry(input.readings)
+ 		const searches = splitTopic(topic).map((part) => {
+-			const words = part
+-				.split(/\s+/)
+-				.map((word) => word.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').toLowerCase())
+-				.filter((word) => word !== '')
++			const words = splitWords(part)
+ 			const matched = new Set([
+ 				...[...registry.ids].filter(
+ 					(id) =>
+@@ -1063,23 +1027,22 @@ export class Ledger implements LedgerInterface {
+ 					search.words.every((word) => message.content.toLowerCase().includes(word)),
+ 				)
+ 			if (!onTopic && !worded) continue
+-			const queue = [message.id]
+ 			const texts: string[] = []
+-			while (queue.length > 0) {
+-				const id = queue.shift()
+-				if (id === undefined || done.has(id)) continue
+-				const source = listable.get(id)
+-				if (source === undefined) continue
++			for (const id of scanAmendments(
++				input.classification.amendments,
++				message.id,
++				(one) => listable.has(one) && !done.has(one),
++			)) {
+ 				done.add(id)
++				const content = listable.get(id)?.content ?? ''
+ 				const lookup = readings.get(id)
+ 				const text =
+ 					lookup === undefined
+-						? source.content
+-						: `${lookup.name} ${JSON.stringify(lookup.arguments)}: ${source.content}`
++						? content
++						: `${lookup.name} ${JSON.stringify(lookup.arguments)}: ${content}`
+ 				texts.push(text)
+ 				if (lookup !== undefined)
+-					recalled.set(text.split('\n')[0] ?? '', source.content.split('\n')[0] ?? '')
+-				queue.push(...(input.classification.amended.get(id) ?? []))
++					recalled.set(text.split(/\r\n|\n/)[0] ?? '', content.split(/\r\n|\n/)[0] ?? '')
+ 			}
+ 			if (texts.length > 0) listed.push(texts.join('\n'))
+ 		}
+@@ -1098,12 +1061,12 @@ export class Ledger implements LedgerInterface {
+ 			const listing = result.name === 'recall'
+ 			if (listing && /^nothing on /.test(message.content)) continue
+ 			const recalled = listing ? this.#recalled.get(message.content) : undefined
+-			for (const line of message.content.split('\n')) {
++			for (const line of message.content.split(/\r\n|\n/)) {
+ 				if (listing && matchesCutLine(line)) continue
+ 				const text = recalled?.get(line) ?? line
+ 				if (!lines.includes(text)) lines.push(text)
+ 			}
+ 		}
+-		return lines.length === 0 ? undefined : `${this.#notes.results}\n${lines.join('\n')}`
++		return lines.length === 0 ? undefined : `${LEDGER_NOTES.results}\n${lines.join('\n')}`
+ 	}
+ }
+diff --git a/src/core/ledgers/constants.ts b/src/core/ledgers/constants.ts
+index aba363b..ec23a01 100644
+--- a/src/core/ledgers/constants.ts
++++ b/src/core/ledgers/constants.ts
+@@ -84,7 +84,7 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
+ 	results: '[Desk] What your lookups and recalls returned in this request:',
+ 	repeat:
+ 		'You already have this result earlier in this request; give your complete answer now as your final message.',
+-	closed:
++	closure:
+ 		'recall is closed for the rest of this request; give your final answer from what you have',
+ })
+ 
+diff --git a/src/core/ledgers/helpers.ts b/src/core/ledgers/helpers.ts
+index 3150237..da65458 100644
+--- a/src/core/ledgers/helpers.ts
++++ b/src/core/ledgers/helpers.ts
+@@ -13,24 +13,26 @@ import type {
+ 	LedgerRegistry,
+ 	LedgerStaleSentence,
+ 	LedgerTokenSet,
++	LedgerTopic,
++	LedgerWordSet,
+ } from './types.js'
+ import type { ToolCall } from '@orkestrel/tool'
+-import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
++import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
+ import { estimateMessages } from '../agents/helpers.js'
+ import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
+ import { LedgerError } from './errors.js'
+ 
+ /**
+- * Resolves the call that owns a tool message within a collected tool group.
++ * Finds the call that owns a tool message within a collected tool group.
+  * @param group - The assistant leader followed by its tool results
+  * @param message - The tool result to pair; distinct leader ids pair by result id when any result has one
+  * @returns The call matching the result's call id, or its position when the leader repeats an id or every result lacks an id; undefined when unpaired
+  * @example
+  * ```ts
+- * resolveLedgerCall(group, result)?.arguments
++ * findLedgerCall(group, result)?.arguments
+  * ```
+  */
+-export function resolveLedgerCall(
++export function findLedgerCall(
+ 	group: readonly Message[],
+ 	message: Message,
+ ): ToolCall | undefined {
+@@ -140,7 +142,6 @@ export function computeThinking(
+  * ```
+  */
+ export function splitSentences(text: string): readonly string[] {
+-	// A decimal point, an id, or an amount never meets the break, which needs a space and then a capital, a digit, or a quote.
+ 	return text
+ 		.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"'“])/u)
+ 		.map((sentence) => sentence.trim())
+@@ -172,6 +173,38 @@ export function extractTokens(text: string): LedgerTokenSet {
+ 	return { ids, numbers }
+ }
+ 
++/**
++ * Reads the lowercased words of a text and the capitalized words it holds mid-sentence.
++ *
++ * @remarks
++ * A word is a run of letters and digits. A name is a word of one capital and lowercase letters
++ * that neither opens the text nor follows `.`, `!`, `?`, `:`, or `;`, so a word that is capitalized
++ * only because it opens a sentence is no name.
++ *
++ * @param text - The text to read
++ * @returns The words and the names, each lowercased
++ *
++ * @example
++ * ```ts
++ * const words = extractWords('Refunds wait. Ask Odile about BW-5512.')
++ * // words.words is Set { 'refunds', 'wait', 'ask', 'odile', 'about', 'bw', '5512' }
++ * // words.names is Set { 'odile' }
++ * ```
++ */
++export function extractWords(text: string): LedgerWordSet {
++	return {
++		words: new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []),
++		names: new Set(
++			[...text.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
++				.filter((match) => {
++					const before = text.slice(0, match.index).trimEnd()
++					return before !== '' && !/[.!?:;]$/.test(before)
++				})
++				.map((match) => match[0].toLowerCase()),
++		),
++	}
++}
++
+ /**
+  * Collects the capitalized name runs of a text, leaving out the run that opens each sentence.
+  *
+@@ -210,8 +243,8 @@ export function collectNames(text: string): readonly string[] {
+  *
+  * @example
+  * ```ts
+- * identifyLookup('lookup_order', { id: 'bw-5512', opts: { b: 1, a: 2 } }) ===
+- * 	identifyLookup('lookup_order', { opts: { a: 2, b: 1 }, id: ' BW-5512' }) // true
++ * identifyLookup('lookup_order', { id: 'bw-5512', opts: { tier: 2, region: 'north' } }) ===
++ * 	identifyLookup('lookup_order', { opts: { region: 'north', tier: 2 }, id: ' BW-5512' }) // true
+  * ```
+  */
+ export function identifyLookup(name: string, args: Readonly<Record<string, unknown>>): string {
+@@ -365,15 +398,16 @@ export function matchEntities(
+  *
+  * A live message joins the owner records its entities name, directly or through a linked lookup
+  * argument. A message that names no owner joins where its earlier side of an amended pair joins,
+- * or on the rules record when it is filed as a rule or a correction, and is loose otherwise.
++ * or on the rules record when it is filed as a rule or a correction, and is listed in `orphans`
++ * otherwise.
+  *
+  * A sentence an amending message made stale is left out and listed in `stale`. An amending message
+  * that is itself superseded keeps that effect, so the old value never revives.
+  *
+  * A sentence that opens with a pronoun takes the party named in the sentence before it. The reading
+  * trusts capitals, so a capitalized word that is no person, such as a carrier named mid-sentence,
+- * is read as the party. This is a documented limit that the measured series kept: the prefix carries
+- * the follow-up facts the records exist for.
++ * is read as the party. This is a documented limit: the prefix carries the follow-up facts the
++ * records exist for.
+  *
+  * @param input - The messages, readings, entities, and classification to project
+  * @returns The records with owner records ordered by their first member and the rules record last, the stale sentences, and the live message ids no record placed
+@@ -382,12 +416,12 @@ export function matchEntities(
+  * ```ts
+  * const projection = buildRecords({
+  * 	system: 'You staff the desk.',
+- * 	exclude: [],
++ * 	exclusions: [],
+  * 	owners: new Map([['BW-20931', ['Brightwater Studio']]]),
+  * 	messages: [{ id: 'user-1', role: 'user', content: 'Brightwater Studio asked for a refund.' }],
+  * 	readings: [],
+  * 	entities: new Map([['user-1', ['BW-20931']]]),
+- * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amended: new Map(), superseded: new Map() },
++ * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amendments: new Map(), supersessions: new Map() },
+  * })
+  * // projection.records[0].title === 'Brightwater Studio (account BW-20931)'
+  * ```
+@@ -402,7 +436,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
+ 	const live = collectLive(input)
+ 	const links = linkOwners(input.readings, input.owners)
+ 	const amending = new Map<string, readonly string[]>()
+-	for (const [earlier, laters] of input.classification.amended) {
++	for (const [earlier, laters] of input.classification.amendments) {
+ 		for (const later of laters) amending.set(later, [...(amending.get(later) ?? []), earlier])
+ 	}
+ 	const stale = collectStale(input, byId, live)
+@@ -410,10 +444,10 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
+ 	const holders = [...input.owners.values()].flat()
+ 	const system = collectNames(input.system)
+ 	const members = new Map<string, string[]>()
+-	const loose: string[] = []
++	const orphans: string[] = []
+ 	for (const id of live) {
+ 		const keys = placeMember(input, links, amending, id, new Set())
+-		if (keys.size === 0) loose.push(id)
++		if (keys.size === 0) orphans.push(id)
+ 		for (const key of keys) members.set(key, [...(members.get(key) ?? []), id])
+ 	}
+ 	const records = [...members]
+@@ -446,7 +480,62 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
+ 				(left.record.key < right.record.key ? -1 : left.record.key > right.record.key ? 1 : 0),
+ 		)
+ 		.map(({ record }) => record)
+-	return { records, stale, loose }
++	return { records, stale, orphans }
++}
++
++/**
++ * Collects the ids of the live messages a projection holds.
++ *
++ * @param projection - The output of {@link buildRecords}
++ * @returns The orphans, then the members of each record in record order, each id once
++ *
++ * @example
++ * ```ts
++ * collectProjectionIds({
++ * 	records: [{ key: 'rules', title: 'Rules', members: ['user-1'], lines: [] }],
++ * 	stale: [],
++ * 	orphans: ['user-2'],
++ * }) // Set { 'user-2', 'user-1' }
++ * ```
++ */
++export function collectProjectionIds(projection: LedgerProjection): ReadonlySet<string> {
++	return new Set([...projection.orphans, ...projection.records.flatMap((record) => record.members)])
++}
++
++/**
++ * Scans the amendments breadth first from one message and returns the ids it admits.
++ *
++ * @remarks
++ * The scan visits each id once. It follows the amendments of an admitted id and stops at an id
++ * `admit` refuses, so a refused id's amendments are reached only through another admitted id.
++ *
++ * @param amendments - The later messages that amend each earlier message, from {@link LedgerClassification}
++ * @param start - The id the scan opens with
++ * @param admit - Returns true if the scan keeps an id and follows its amendments; false otherwise
++ * @returns The admitted ids in visit order
++ *
++ * @example
++ * ```ts
++ * scanAmendments(new Map([['user-1', ['user-2', 'user-3']]]), 'user-1', (id) => id !== 'user-2')
++ * // ['user-1', 'user-3']
++ * ```
++ */
++export function scanAmendments(
++	amendments: ReadonlyMap<string, readonly string[]>,
++	start: string,
++	admit: (id: string) => boolean,
++): readonly string[] {
++	const queue = [start]
++	const visited = new Set<string>()
++	const admitted: string[] = []
++	for (const id of queue) {
++		if (visited.has(id)) continue
++		visited.add(id)
++		if (!admit(id)) continue
++		admitted.push(id)
++		queue.push(...(amendments.get(id) ?? []))
++	}
++	return admitted
+ }
+ 
+ /**
+@@ -517,7 +606,7 @@ export function renderLedgerRecord(record: Pick<LedgerRecord, 'title' | 'lines'>
+  * ```
+  */
+ export function renderLedgerPinned(record: Pick<LedgerRecord, 'title' | 'lines'>): string {
+-	return [`### ${record.title}`, ...record.lines.map((line) => `- ${line.text}`)].join('\n')
++	return `#${renderLedgerRecord(record)}`
+ }
+ 
+ /**
+@@ -528,7 +617,7 @@ export function renderLedgerPinned(record: Pick<LedgerRecord, 'title' | 'lines'>
+  * returned whole, so a model that joins a name and an id recalls each part alone.
+  *
+  * @param topic - The topic the model asked for
+- * @returns The trimmed, non-empty parts when there are at least two; otherwise the topic itself
++ * @returns The trimmed, non-empty parts when there are at least 2; otherwise the topic itself
+  *
+  * @example
+  * ```ts
+@@ -543,6 +632,66 @@ export function splitTopic(topic: string): readonly string[] {
+ 	return parts.length > 1 ? parts : [topic]
+ }
+ 
++/**
++ * Splits one part of a recall topic into the lowercased words a search matches.
++ *
++ * @remarks
++ * Each whitespace-separated word loses its leading and trailing punctuation and symbols, and a word
++ * left empty is dropped.
++ *
++ * @param part - A part of the topic, from {@link splitTopic}
++ * @returns The lowercased words in order
++ *
++ * @example
++ * ```ts
++ * splitWords('"Odile Marlow\'s" refund!') // ['odile', "marlow's", 'refund']
++ * ```
++ */
++export function splitWords(part: string): readonly string[] {
++	return part
++		.split(/\s+/)
++		.map((word) => word.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').toLowerCase())
++		.filter((word) => word !== '')
++}
++
++/**
++ * Renders the names of the desk topics as one comma-separated list.
++ *
++ * @param topics - The desk topics
++ * @returns The topic names joined by a comma and a space; empty when no topic is given
++ *
++ * @example
++ * ```ts
++ * renderTopicNames([
++ * 	{ name: 'refunds', criterion: 'refund amounts' },
++ * 	{ name: 'delivery', criterion: 'shipping dates' },
++ * ]) // 'refunds, delivery'
++ * ```
++ */
++export function renderTopicNames(topics: readonly LedgerTopic[]): string {
++	return topics.map((topic) => topic.name).join(', ')
++}
++
++/**
++ * Builds the assistant message that carries one `recall` call, which the ledger and the gauge price.
++ *
++ * @param topic - The topic argument of the call
++ * @returns An assistant message with empty content and the one `recall` call
++ *
++ * @example
++ * ```ts
++ * buildRecallMessage('refunds').calls // [{ id: 'call_00000000', name: 'recall', arguments: { topic: 'refunds' } }]
++ * ```
++ */
++export function buildRecallMessage(topic: string): Message {
++	return {
++		id: 'call',
++		role: 'assistant',
++		content: '',
++		calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
++	}
++}
++
+ /**
+  * Cuts entries to a room and names how many it left out.
+  *
+@@ -601,7 +750,7 @@ export function matchesCutLine(line: string): boolean {
+ }
+ 
+ /**
+- * Renders the tail stub of a lookup result from an earlier request.
++ * Renders the tail stub of a seed lookup result.
+  *
+  * @param name - The lookup tool name
+  * @param args - The arguments the call carried
+@@ -636,7 +785,7 @@ export function renderStub(
+  * schema, so a pooled fit across tool counts would read the dropped schemas as a falling rate.
+  *
+  * @param groups - The calls of each request
+- * @returns The slope, or undefined when no set holds two calls with a prompt count and an estimate that differ
++ * @returns The slope, or undefined when no set holds 2 calls with a prompt count and an estimate that differ
+  *
+  * @example
+  * ```ts
+@@ -684,7 +833,7 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number |
+  */
+ export function collectLive(input: LedgerProjectionInput): readonly string[] {
+ 	const { classification } = input
+-	const excluded = new Set(input.exclude)
++	const excluded = new Set(input.exclusions)
+ 	const position = new Map(input.messages.map((message, at) => [message.id, at]))
+ 	const readings = input.readings.filter((reading) => position.has(reading.id))
+ 	const identities = new Map(
+@@ -712,7 +861,7 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
+ 			(id) =>
+ 				!excluded.has(id) &&
+ 				!classification.quiet.has(id) &&
+-				(classification.superseded.get(id) ?? []).length === 0,
++				(classification.supersessions.get(id) ?? []).length === 0,
+ 		)
+ }
+ 
+@@ -789,7 +938,7 @@ export function collectStale(
+ 	live: readonly string[],
+ ): readonly LedgerStaleSentence[] {
+ 	const { classification } = input
+-	const excluded = new Set(input.exclude)
++	const excluded = new Set(input.exclusions)
+ 	const effective = new Set([
+ 		...live,
+ 		...[...byId.values()]
+@@ -798,13 +947,13 @@ export function collectStale(
+ 					message.role !== 'assistant' &&
+ 					!excluded.has(message.id) &&
+ 					!classification.quiet.has(message.id) &&
+-					(classification.superseded.get(message.id) ?? []).length > 0,
++					(classification.supersessions.get(message.id) ?? []).length > 0,
+ 			)
+ 			.map((message) => message.id),
+ 	])
+ 	const stale: LedgerStaleSentence[] = []
+ 	for (const id of live) {
+-		const laters = (classification.amended.get(id) ?? [])
++		const laters = (classification.amendments.get(id) ?? [])
+ 			.filter((later) => effective.has(later))
+ 			.flatMap((later) => {
+ 				const message = byId.get(later)
+@@ -876,3 +1025,29 @@ export function buildLines(
+ 		return [party === undefined ? line : { ...line, party }]
+ 	})
+ }
++
++/**
++ * Renders an error and its causes as one line, each as its name and message.
++ *
++ * @remarks
++ * The line holds the error and at most 3 of its causes, joined by ` <- `. A value that is not an
++ * `Error` renders as its string form and ends the chain.
++ *
++ * @param error - The caught value
++ * @returns The rendered chain
++ *
++ * @example
++ * ```ts
++ * renderCauseChain(new Error('judge failed', { cause: new TypeError('bad token') }))
++ * // 'Error: judge failed <- TypeError: bad token'
++ * ```
++ */
++export function renderCauseChain(error: unknown): string {
++	const parts: string[] = []
++	let current: unknown = error
++	for (let depth = 0; current !== undefined && depth < 4; depth += 1) {
++		parts.push(isError(current) ? `${current.name}: ${current.message}` : String(current))
++		current = isError(current) ? current.cause : undefined
++	}
++	return parts.join(' <- ')
++}
+diff --git a/src/core/ledgers/types.ts b/src/core/ledgers/types.ts
+index 6e57984..3094072 100644
+--- a/src/core/ledgers/types.ts
++++ b/src/core/ledgers/types.ts
+@@ -20,8 +20,8 @@ export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number]
+  * Carries the wording of every question the ledger asks its judge.
+  *
+  * @remarks
+- * `category` is the choice question asked about each message the category handler leaves open; its
+- * criteria name every {@link LedgerCategory}. `topic` is the instructions of the noul question
++ * `category` is the choice question asked about each message the category handler leaves open,
++ * other than a request; its criteria name every {@link LedgerCategory}. `topic` is the instructions of the noul question
+  * asked for each desk topic, whose criteria the ledger frames from the topic, as
+  * {@link LedgerTopic} states. `amends` and `supersedes` are the noul questions asked about an
+  * earlier and a later message. The ledger asks each question as given, so a judgment reused across
+@@ -56,20 +56,21 @@ export interface LedgerThreshold {
+ }
+ 
+ /**
+- * Carries one desk topic: the subject the ledger asks its judge about for every message.
++ * Carries one desk topic: a subject the ledger asks its judge whether a message concerns.
+  *
+  * @remarks
+  * The ledger asks the {@link LedgerQuestion} `topic` instructions with the criteria
+  * `The message concerns NAME: CRITERION` for true and `The message does not concern NAME` for
+- * false, where `NAME` is `name` and `CRITERION` is `criterion`. `name` must be non-empty and
+- * unique among the ledger's topics.
++ * false, where `NAME` is `name` and `CRITERION` is `criterion`. It asks about each message the
++ * category handler leaves open and the category question does not file quiet, and about each
++ * request as `requested` selects. `name` must be non-empty and unique among the ledger's topics.
+  */
+ export interface LedgerTopic {
+ 	readonly name: string
+ 	readonly criterion: string
+ 	/**
+-	 * If `true`, the ledger asks this topic about each request as well as about each statement;
+-	 * if `false`, it asks it about statements only. Default: `true`.
++	 * If `true`, the ledger also asks this topic about each request; if `false`, it asks it about
++	 * the other messages only. Default: `true`.
+ 	 */
+ 	readonly requested?: boolean
+ }
+@@ -79,7 +80,7 @@ export interface LedgerTopic {
+  * tail can take.
+  *
+  * @remarks
+- * `prompt` is a share of the ledger's `capacity`; the fixed tokens of the gauge come out of it
++ * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
+  * before the briefing and the tail take the rest. `tail` is a share of what remains for messages.
+  * Each share must be finite, greater than 0, and at most 1.
+  */
+@@ -94,14 +95,14 @@ export interface LedgerShare {
+  * @remarks
+  * `cue` is the last user message of an answer pass. `results` heads the note that carries what the
+  * first pass's lookups and recalls returned. `repeat` is the failure a repeated tool call returns,
+- * and the ledger reads a failure with exactly this text as a repeat. `closed` is the failure a
++ * and the ledger reads a failure with exactly this text as a repeat. `closure` is the failure a
+  * `recall` call returns after the request's recalls are spent, repeated, or out of room.
+  */
+ export interface LedgerNote {
+ 	readonly cue: string
+ 	readonly results: string
+ 	readonly repeat: string
+-	readonly closed: string
++	readonly closure: string
+ }
+ 
+ /**
+@@ -109,14 +110,12 @@ export interface LedgerNote {
+  *
+  * @remarks
+  * `limit` caps the `recall` calls one request can make before the tool refuses with the
+- * {@link LedgerNote} `closed` text; it must be a nonnegative safe integer. Default: the
+- * `DEFAULT_RECALL_LIMIT` constant. `description` replaces the tool description the ledger builds
+- * from its topics.
++ * `LEDGER_NOTES` constant's `closure` text; it must be a nonnegative safe integer. Default: the
++ * `DEFAULT_RECALL_LIMIT` constant.
+  * Recall identity is the trimmed `{ topic }` alone; other arguments do not change its identity.
+  */
+ export interface LedgerRecallOptions {
+ 	readonly limit?: number
+-	readonly description?: string
+ }
+ 
+ /**
+@@ -191,7 +190,7 @@ export interface LedgerLookupReading {
+ 	readonly result: LedgerLookupResult | undefined
+ }
+ 
+-/** Names what became of a lookup of an earlier request, as the tail stub of its result reports it. */
++/** Names what became of a seed lookup, as the tail stub of its result reports it. */
+ export type LedgerLookupState = 'failed' | 'empty' | 'shown' | 'hidden'
+ 
+ /**
+@@ -211,13 +210,13 @@ export interface LedgerRegistry {
+  * Carries the price of a prompt in tokens, measured against the model the ledger serves.
+  *
+  * @remarks
+- * `scale` is the tokens one unit of the `estimateMessages` estimate costs. `fixed` is the tokens
++ * `scale` is the tokens one unit of the `estimateMessages` estimate costs. `overhead` is the tokens
+  * every request carries beyond its messages, such as the tool definitions and the chat framing.
+- * `scale` must be finite and greater than 0, and `fixed` finite and at least 0.
++ * `scale` must be finite and greater than 0, and `overhead` finite and at least 0.
+  */
+ export interface LedgerGauge {
+ 	readonly scale: number
+-	readonly fixed: number
++	readonly overhead: number
+ }
+ 
+ /**
+@@ -228,28 +227,25 @@ export interface LedgerGauge {
+  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
+  * the scope.
+  */
+-export type LedgerAgentOptions = Pick<
+-	AgentOptions,
+-	'limit' | 'timeout' | 'budget' | 'signal' | 'on' | 'error'
+->
++export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
+ 
+ /**
+  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
+- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall, notes,
+- * and agent bounds.
++ * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall, and agent
++ * bounds.
+  *
+  * @remarks
+  * `judge` answers every filing question. `system` is the application's system text, a date
+  * sentence included; the briefing follows it in the system message. `topics` lists the desk
+  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
+  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
+- * integer. Without `gauge`, the ledger calibrates before its first pass. `share` and `notes`
+- * default leaf by leaf to the `DEFAULT_LEDGER_SHARE` and `LEDGER_NOTES` constants.
++ * integer. Without `gauge`, the ledger calibrates before its first pass. `share` defaults leaf by
++ * leaf to the `DEFAULT_LEDGER_SHARE` constant. The ledger writes the `LEDGER_NOTES` constant's notes.
+  * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
+  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
+  * `'CAPACITY'` otherwise. The plan budgets
+- * `max(0, (capacity - predict) * share.prompt - fixed) / (1 + LEDGER_SCALE_DRIFT)`.
+- * Recall closes when `left - predict < 2 * reserve`.
++ * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
++ * Recall closes when `remainder - predict < 2 * reserve`.
+  */
+ export interface LedgerOptions {
+ 	readonly judge: JudgeInterface
+@@ -271,7 +267,6 @@ export interface LedgerOptions {
+ 	readonly lookups?: readonly LedgerLookup[]
+ 	readonly share?: Partial<LedgerShare>
+ 	readonly recall?: LedgerRecallOptions
+-	readonly notes?: Partial<LedgerNote>
+ 	readonly agent?: LedgerAgentOptions
+ }
+ 
+@@ -312,15 +307,16 @@ export interface LedgerInterface {
+ 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
+ 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
+ 	 * answer pass that advertises no tools. A `respond` or `calibrate` call while either is in flight
+-	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A failed calibration rejects with
+-	 * `LedgerError` code `'GAUGE'`.
++	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no
++	 * prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a
++	 * provider error during calibration rejects with that error.
+ 	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
+ 	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
+ 	 *
+ 	 * @param content - The request text
+ 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
+ 	 * @returns The reply and the passes the request took
+-	 * @throws {LedgerError} Thrown when calibration fails (code `'GAUGE'`)
++	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+ 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+ 	 */
+ 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
+@@ -330,7 +326,7 @@ export interface LedgerInterface {
+ 	 * @remarks
+ 	 * The ledger sends its system message and its conversation's view to the provider twice, with
+ 	 * and without the tool definitions. The call without tools prices the messages and the
+-	 * difference between the calls is the fixed cost.
++	 * difference between the calls is the overhead.
+ 	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
+ 	 * with `AgentError` code `'CONCURRENCY'`.
+ 	 *
+@@ -359,15 +355,27 @@ export interface LedgerTokenSet {
+  *
+  * @remarks
+  * `quiet` holds the messages the projection leaves out. `categories` maps each decided message to
+- * its category and `topics` to its desk topics. `amended` and `superseded` map an earlier message
+- * to the later messages that replace part or all of it, in conversation order.
++ * its category and `topics` to its desk topics. `amendments` and `supersessions` map an earlier
++ * message to the later messages that replace part or all of it, in conversation order.
+  */
+ export interface LedgerClassification {
+ 	readonly quiet: ReadonlySet<string>
+ 	readonly categories: ReadonlyMap<string, LedgerCategory>
+ 	readonly topics: ReadonlyMap<string, readonly string[]>
+-	readonly amended: ReadonlyMap<string, readonly string[]>
+-	readonly superseded: ReadonlyMap<string, readonly string[]>
++	readonly amendments: ReadonlyMap<string, readonly string[]>
++	readonly supersessions: ReadonlyMap<string, readonly string[]>
++}
++
++/**
++ * Carries the lowercased words of a text and the capitalized words it holds mid-sentence.
++ *
++ * @remarks
++ * `words` holds every run of letters and digits. `names` holds each word of one capital and lowercase
++ * letters, lowercased, that neither opens the text nor follows `.`, `!`, `?`, `:`, or `;`.
++ */
++export interface LedgerWordSet {
++	readonly words: ReadonlySet<string>
++	readonly names: ReadonlySet<string>
+ }
+ 
+ /**
+@@ -424,21 +432,21 @@ export interface LedgerStaleSentence {
+ export interface LedgerProjection {
+ 	readonly records: readonly LedgerRecord[]
+ 	readonly stale: readonly LedgerStaleSentence[]
+-	readonly loose: readonly string[]
++	readonly orphans: readonly string[]
+ }
+ 
+ /**
+  * Carries what a projection reads.
+  *
+  * @remarks
+- * `system` is the system text, whose names never serve as a party. `exclude` lists the message ids
++ * `system` is the system text, whose names never serve as a party. `exclusions` lists the message ids
+  * no record places, such as requests and ledger notes. `owners` maps each owner id to its names.
+  * `readings` lists the lookup results in conversation order, and `entities` maps a message id to
+  * the registry ids its text names.
+  */
+ export interface LedgerProjectionInput {
+ 	readonly system: string
+-	readonly exclude: readonly string[]
++	readonly exclusions: readonly string[]
+ 	readonly owners: ReadonlyMap<string, readonly string[]>
+ 	readonly messages: readonly Message[]
+ 	readonly readings: readonly LedgerLookupReading[]
+@@ -575,11 +583,12 @@ export interface GaugeCall {
+  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
+  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
+  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
+- * otherwise; absent completion counts as 0. Without prompt usage, use is `fixed + scale * estimate`.
+- * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall framing at the marginal
++ * otherwise; absent completion counts as 0. Without prompt usage, use is `overhead + scale * estimate`.
++ * The remainder is `max(0, capacity - used)`. The reply reserve adds recall framing at the marginal
+  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
+  * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is
+- * `max(0, (left - predict - reserve) / 2 / rate)`; recall closes at `left - predict < 2 * reserve`.
++ * `max(0, (remainder - predict - reserve) / 2 / rate)`; recall closes at
++ * `remainder - predict < 2 * reserve`.
+  */
+ export interface GaugeOptions extends LedgerGauge {
+ 	readonly capacity: number
+@@ -591,16 +600,9 @@ export interface GaugeOptions extends LedgerGauge {
+  * Prices prompts in tokens and measures the room a request has left.
+  *
+  * @remarks
+- * `scale` and `fixed` hold the price the gauge read from its last observation.
++ * `scale` and `overhead` hold the price the gauge read from its last observation.
+  */
+ export interface GaugeInterface extends LedgerGauge {
+-	/**
+-	 * Returns the tokens the messages cost at the current scale.
+-	 *
+-	 * @param messages - The messages to price
+-	 * @returns The cost in tokens
+-	 */
+-	measure(messages: readonly Message[]): number
+ 	/**
+ 	 * Returns the tokens one more estimate unit adds within a request, fitted over the observed calls.
+ 	 *
+@@ -617,7 +619,7 @@ export interface GaugeInterface extends LedgerGauge {
+ 	 * @param calls - The calls of the request so far
+ 	 * @returns The tokens left
+ 	 */
+-	left(calls: readonly GaugeCall[]): number
++	remainder(calls: readonly GaugeCall[]): number
+ 	/**
+ 	 * Returns the tokens a reply turn needs after the calls, given the longest reply text written so far.
+ 	 *
+diff --git a/tests/src/core/ledgers/Classifier.test.ts b/tests/src/core/ledgers/Classifier.test.ts
+index e524efb..8eb932b 100644
+--- a/tests/src/core/ledgers/Classifier.test.ts
++++ b/tests/src/core/ledgers/Classifier.test.ts
+@@ -15,8 +15,9 @@ import {
+ 	RecordingJudge,
+ 	ScriptedJudge,
+ 	SequentialSystemOneJudge,
++	buildLedgerMessage,
++	LEDGER_DESK_THRESHOLDS,
+ } from '../../../setup.js'
+-import { buildLedgerMessage } from '../../../setupLedger.js'
+ 
+ describe('Classifier', () => {
+ 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
+@@ -43,7 +44,7 @@ describe('Classifier', () => {
+ 			},
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -70,7 +71,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -140,7 +141,7 @@ describe('Classifier', () => {
+ 				{ name: 'refunds', criterion: 'Refund amounts' },
+ 				{ name: 'warehouse', criterion: 'Warehouse work', requested: false },
+ 			],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: (message) => (message.role === 'tool' ? 'fact' : undefined),
+ 			entities: (text) => extractTokens(text).ids,
+ 		})
+@@ -211,8 +212,8 @@ describe('Classifier', () => {
+ 				['m4', ['refunds']],
+ 				['m5', []],
+ 			]),
+-			amended: new Map([['m1', ['m2']]]),
+-			superseded: new Map(),
++			amendments: new Map([['m1', ['m2']]]),
++			supersessions: new Map(),
+ 		})
+ 		expect(await classifier.classify(new Set(['m4']), new AbortController().signal)).toEqual({
+ 			judgments: result.judgments,
+@@ -238,7 +239,7 @@ describe('Classifier', () => {
+ 				},
+ 			},
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -315,7 +316,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: (message) =>
+ 				message.id === 'quiet' ? 'chatter' : message.id === 'call' ? 'fact' : undefined,
+ 			entities: (text, partial) =>
+@@ -357,7 +358,7 @@ describe('Classifier', () => {
+ 				answer: { form: 'noul', noul: 0.8 },
+ 			})
+ 		}
+-		expect(classifier.classification().amended.size).toBe(0)
++		expect(classifier.classification().amendments.size).toBe(0)
+ 		for (const later of ['last', 'later']) {
+ 			const after = requireValue(conversation.message(later))
+ 			conversation.judgments.add({
+@@ -369,10 +370,10 @@ describe('Classifier', () => {
+ 				answer: { form: 'noul', noul: 0.8 },
+ 			})
+ 		}
+-		expect(classifier.classification().amended.get('whole')).toEqual(['later', 'last'])
+-		expect(classifier.classification().superseded.get('whole')).toEqual(['later', 'last'])
++		expect(classifier.classification().amendments.get('whole')).toEqual(['later', 'last'])
++		expect(classifier.classification().supersessions.get('whole')).toEqual(['later', 'last'])
+ 		conversation.remove('later')
+-		expect(classifier.classification().superseded.get('whole')).toEqual(['last'])
++		expect(classifier.classification().supersessions.get('whole')).toEqual(['last'])
+ 	})
+ 
+ 	it('holds deterministic failures for their exact spec, retries transient failures, and resets with its lifetime', async () => {
+@@ -401,7 +402,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -421,7 +422,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -474,7 +475,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -500,7 +501,7 @@ describe('Classifier', () => {
+ 			judge: new RecordingJudge(),
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => {
+ 				throw fault
+ 			},
+@@ -550,7 +551,7 @@ describe('Classifier', () => {
+ 				},
+ 				questions: LEDGER_QUESTIONS,
+ 				topics: [],
+-				thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++				thresholds: LEDGER_DESK_THRESHOLDS,
+ 				assign: () => undefined,
+ 				entities: () => new Set(),
+ 			})
+@@ -584,7 +585,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -616,7 +617,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: () => undefined,
+ 			entities: () => new Set(),
+ 		})
+@@ -635,7 +636,7 @@ describe('Classifier', () => {
+ 			judge,
+ 			questions: LEDGER_QUESTIONS,
+ 			topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			assign: (message) =>
+ 				message.role === 'tool' ? 'fact' : message.id === noise.id ? 'distractor' : undefined,
+ 			entities: () => new Set(),
+diff --git a/tests/src/core/ledgers/Gauge.test.ts b/tests/src/core/ledgers/Gauge.test.ts
+index b01f5e7..ec79a18 100644
+--- a/tests/src/core/ledgers/Gauge.test.ts
++++ b/tests/src/core/ledgers/Gauge.test.ts
+@@ -1,86 +1,62 @@
+ import type { GaugeCall } from '../../../../src/core/ledgers/types.js'
+ import { describe, expect, it } from 'vitest'
+ import { Gauge } from '../../../../src/core/ledgers/Gauge.js'
+-import { isLedgerError } from '../../../../src/core/ledgers/errors.js'
++import { captureLedgerCode, LEDGER_GAUGE_SEED } from '../../../setup.js'
+ 
+ // Gauge arithmetic on hand-computed values. A recall call with a short result estimates 25 units: the
+ // assistant message is 4 overhead plus ceil(65 / 4) = 17 for its serialized call, the tool message 4.
+ 
+-const SEED = { scale: 1.1634671320535195, fixed: 498, capacity: 32768 } as const
+-
+-function readCode(build: () => unknown): string | undefined {
+-	try {
+-		build()
+-	} catch (error) {
+-		return isLedgerError(error) ? error.code : 'OTHER'
+-	}
+-	return undefined
+-}
+-
+ describe('Gauge construction', () => {
+ 	it('refuses an invalid generation cap and accepts its boundaries', () => {
+ 		for (const predict of [
+ 			-1,
+ 			0.5,
+-			SEED.capacity,
+-			SEED.capacity + 1,
++			LEDGER_GAUGE_SEED.capacity,
++			LEDGER_GAUGE_SEED.capacity + 1,
+ 			Number.NaN,
+ 			Infinity,
+ 			Number.MAX_SAFE_INTEGER + 1,
+ 		]) {
+-			expect(readCode(() => new Gauge({ ...SEED, predict }))).toBe('CAPACITY')
++			expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, predict }))).toBe('CAPACITY')
+ 		}
+-		for (const predict of [0, -0, SEED.capacity - 1]) {
+-			expect(readCode(() => new Gauge({ ...SEED, predict }))).toBeUndefined()
++		for (const predict of [0, -0, LEDGER_GAUGE_SEED.capacity - 1]) {
++			expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, predict }))).toBeUndefined()
+ 		}
+ 	})
+ 
+ 	it('refuses a scale that is nonfinite or not above 0', () => {
+ 		for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+-			expect(readCode(() => new Gauge({ ...SEED, scale }))).toBe('GAUGE')
++			expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, scale }))).toBe('GAUGE')
+ 		}
+ 	})
+ 
+-	it('refuses a fixed cost that is negative or nonfinite and accepts 0', () => {
+-		for (const fixed of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+-			expect(readCode(() => new Gauge({ ...SEED, fixed }))).toBe('GAUGE')
++	it('refuses an overhead that is negative or nonfinite and accepts 0', () => {
++		for (const overhead of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
++			expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, overhead }))).toBe('GAUGE')
+ 		}
+-		expect(readCode(() => new Gauge({ ...SEED, fixed: 0 }))).toBeUndefined()
++		expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, overhead: 0 }))).toBeUndefined()
+ 	})
+ 
+ 	it('refuses a capacity that is not a positive safe integer', () => {
+ 		for (const capacity of [0, -5, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+-			expect(readCode(() => new Gauge({ ...SEED, capacity }))).toBe('CAPACITY')
++			expect(captureLedgerCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, capacity }))).toBe('CAPACITY')
+ 		}
+ 	})
+ })
+ 
+-describe('Gauge.measure', () => {
+-	it('prices the seed reading at fixed plus scale times the estimate', () => {
+-		// One user message of 6860 characters estimates 1715 + 4 = 1719; 498 + 1.1634671320535195 * 1719 = 2498.
+-		const gauge = new Gauge(SEED)
+-		const price = gauge.measure([{ id: 'u', role: 'user', content: 'a'.repeat(6860) }])
+-		expect(price).toBeCloseTo(2498, 6)
+-	})
+-
+-	it('prices no messages at the fixed cost', () => {
+-		expect(new Gauge(SEED).measure([])).toBe(498)
+-	})
+-})
+-
+ describe('Gauge.observe', () => {
+-	it('rescales from the first call with the fixed cost taken out', () => {
+-		const gauge = new Gauge(SEED)
++	it('rescales from the first call with the overhead taken out', () => {
++		const gauge = new Gauge(LEDGER_GAUGE_SEED)
+ 		gauge.observe([
+ 			{ estimate: 1000, prompt: 1498, tools: 3 },
+ 			{ estimate: 2000, prompt: 9000, tools: 3 },
+ 		])
+ 		expect(gauge.scale).toBe(1)
+-		expect(gauge.fixed).toBe(498)
++		expect(gauge.overhead).toBe(498)
+ 	})
+ 
+-	it('keeps the scale when the first call has no usage, no estimate, or a prompt at or under the fixed cost', () => {
+-		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 1000 })
++	it('keeps the scale when the first call has no usage, no estimate, or a prompt at or under the overhead', () => {
++		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 1000 })
+ 		gauge.observe([{ estimate: 50, tools: 0 }])
+ 		gauge.observe([{ estimate: 0, prompt: 500, tools: 0 }])
+ 		gauge.observe([{ estimate: 50, prompt: 100, tools: 0 }])
+@@ -88,7 +64,7 @@ describe('Gauge.observe', () => {
+ 	})
+ 
+ 	it('reproduces the seed scale from the seed prompt', () => {
+-		const gauge = new Gauge({ scale: 5, fixed: 498, capacity: 32768 })
++		const gauge = new Gauge({ scale: 5, overhead: 498, capacity: 32768 })
+ 		gauge.observe([{ estimate: 1719, prompt: 2498, tools: 3 }])
+ 		expect(gauge.scale).toBeCloseTo(1.1634671320535195, 12)
+ 	})
+@@ -96,7 +72,7 @@ describe('Gauge.observe', () => {
+ 
+ describe('Gauge.rate', () => {
+ 	it('falls back to the scale before two calls of one tool count exist', () => {
+-		const gauge = new Gauge({ scale: 1.5, fixed: 0, capacity: 1000 })
++		const gauge = new Gauge({ scale: 1.5, overhead: 0, capacity: 1000 })
+ 		expect(gauge.rate([])).toBe(1.5)
+ 		expect(gauge.rate([{ estimate: 100, prompt: 200, tools: 1 }])).toBe(1.5)
+ 	})
+@@ -104,7 +80,7 @@ describe('Gauge.rate', () => {
+ 	it('fits within each tool count and pools, where one slope across both reads 0', () => {
+ 		// Tools 3: (100, 300), (200, 400), slope 1. Tools 1: (300, 250), (400, 350), slope 1.
+ 		// One line through all four points has slope 0.
+-		const gauge = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		gauge.observe([
+ 			{ estimate: 100, prompt: 300, tools: 3 },
+ 			{ estimate: 200, prompt: 400, tools: 3 },
+@@ -118,7 +94,7 @@ describe('Gauge.rate', () => {
+ 
+ 	it('pools the kept requests with the calls in progress', () => {
+ 		// Kept: (100, 150), (200, 250), slope 1. Live: (100, 100), (200, 400), slope 3. Equal spreads pool to 2.
+-		const gauge = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		gauge.observe([
+ 			{ estimate: 100, prompt: 150, tools: 0 },
+ 			{ estimate: 200, prompt: 250, tools: 0 },
+@@ -131,13 +107,13 @@ describe('Gauge.rate', () => {
+ 	})
+ 
+ 	it('returns the scale when the fit slope is negative or zero', () => {
+-		const falling = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const falling = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		falling.observe([
+ 			{ estimate: 100, prompt: 300, tools: 0 },
+ 			{ estimate: 200, prompt: 200, tools: 0 },
+ 		])
+ 		expect(falling.rate([])).toBe(3)
+-		const flat = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const flat = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		flat.observe([
+ 			{ estimate: 100, prompt: 300, tools: 0 },
+ 			{ estimate: 200, prompt: 300, tools: 0 },
+@@ -146,7 +122,7 @@ describe('Gauge.rate', () => {
+ 	})
+ 
+ 	it('keeps its own copy of the observed calls', () => {
+-		const gauge = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		const calls = [
+ 			{ estimate: 100, prompt: 150, tools: 0 },
+ 			{ estimate: 200, prompt: 250, tools: 0 },
+@@ -157,7 +133,7 @@ describe('Gauge.rate', () => {
+ 	})
+ 
+ 	it('ignores a call with no usage', () => {
+-		const gauge = new Gauge({ scale: 9, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+ 		expect(
+ 			gauge.rate([
+ 				{ estimate: 100, tools: 0 },
+@@ -167,54 +143,58 @@ describe('Gauge.rate', () => {
+ 	})
+ })
+ 
+-describe('Gauge.left', () => {
++describe('Gauge.remainder', () => {
+ 	it('counts the whole completion when thinking is replayed within a turn or across turns', () => {
+ 		for (const replay of ['turn', 'all'] as const) {
+-			const retained = new Gauge({ scale: 1, fixed: 0, capacity: 1000, replay })
++			const retained = new Gauge({ scale: 1, overhead: 0, capacity: 1000, replay })
+ 			expect(
+-				retained.left([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
++				retained.remainder([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
+ 			).toBe(600)
+ 		}
+-		const dropped = new Gauge({ scale: 1, fixed: 0, capacity: 1000 })
++		const dropped = new Gauge({ scale: 1, overhead: 0, capacity: 1000 })
+ 		expect(
+-			dropped.left([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
++			dropped.remainder([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
+ 		).toBe(850)
+ 	})
+ 
+-	const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
++	const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+ 
+ 	it('subtracts the last prompt and completion', () => {
+-		expect(gauge.left([{ estimate: 1, prompt: 3000, completion: 500, tools: 0 }])).toBe(6500)
+-		expect(gauge.left([{ estimate: 1, prompt: 3000, tools: 0 }])).toBe(7000)
++		expect(gauge.remainder([{ estimate: 1, prompt: 3000, completion: 500, tools: 0 }])).toBe(6500)
++		expect(gauge.remainder([{ estimate: 1, prompt: 3000, tools: 0 }])).toBe(7000)
+ 	})
+ 
+-	it('prices a call with no usage at fixed plus scale times the estimate', () => {
++	it('prices a call with no usage at the overhead plus scale times the estimate', () => {
+ 		// 100 + 2 * 1000 = 2100.
+-		expect(gauge.left([{ estimate: 1000, tools: 0 }])).toBe(7900)
++		expect(gauge.remainder([{ estimate: 1000, tools: 0 }])).toBe(7900)
++		// 498 + 1.1634671320535195 * 1719 = 2498.
++		expect(
++			new Gauge(LEDGER_GAUGE_SEED).remainder([{ estimate: 1719, tools: 3 }]),
++		).toBeCloseTo(32768 - 2498, 6)
+ 	})
+ 
+ 	it('reads only the last call', () => {
+ 		expect(
+-			gauge.left([
++			gauge.remainder([
+ 				{ estimate: 1, prompt: 9000, tools: 0 },
+ 				{ estimate: 1, prompt: 1000, tools: 0 },
+ 			]),
+ 		).toBe(9000)
+ 	})
+ 
+-	it('prices no calls at the fixed cost', () => {
+-		expect(gauge.left([])).toBe(9900)
++	it('prices no calls at the overhead', () => {
++		expect(gauge.remainder([])).toBe(9900)
+ 	})
+ 
+ 	it('never falls below 0', () => {
+-		expect(gauge.left([{ estimate: 1, prompt: 9000, completion: 2000, tools: 0 }])).toBe(0)
++		expect(gauge.remainder([{ estimate: 1, prompt: 9000, completion: 2000, tools: 0 }])).toBe(0)
+ 	})
+ })
+ 
+ describe('Gauge.reserve', () => {
+ 	it('excludes thinking from the reply reserve under every replay policy', () => {
+ 		for (const replay of ['none', 'turn', 'all'] as const) {
+-			const gauge = new Gauge({ scale: 1, fixed: 0, capacity: 1000, replay })
++			const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 1000, replay })
+ 			gauge.observe([], { estimate: 10, completion: 900, thinking: 850, tools: 0 })
+ 			expect(gauge.reserve([], '')).toBe(75)
+ 		}
+@@ -222,13 +202,13 @@ describe('Gauge.reserve', () => {
+ 
+ 	it('prices the longest text and one recall call at the rate before any reply is observed', () => {
+ 		// Rate 2. Longest 40 characters: 10 + 4 = 14 units. Recall call 25 units. (14 + 25) * 2 = 78.
+-		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
++		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+ 		expect(gauge.reserve([], 'a'.repeat(40))).toBe(78)
+ 	})
+ 
+ 	it('uses the final answer completion instead of a larger tool completion', () => {
+ 		// Observing (100, 300) sets scale 3 and rate 3. Reply 70, recall 25 * 3 = 75.
+-		const gauge = new Gauge({ scale: 2, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000 })
+ 		gauge.observe(
+ 			[
+ 				{ estimate: 100, prompt: 300, completion: 900, tools: 1 },
+@@ -240,7 +220,7 @@ describe('Gauge.reserve', () => {
+ 	})
+ 
+ 	it('keeps the longest completion across requests', () => {
+-		const gauge = new Gauge({ scale: 2, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000 })
+ 		gauge.observe([{ estimate: 100, prompt: 300, completion: 70, tools: 0 }], {
+ 			estimate: 100,
+ 			completion: 70,
+@@ -254,7 +234,7 @@ describe('Gauge.reserve', () => {
+ 		expect(gauge.reserve([], '')).toBe(145)
+ 	})
+ 	it('keeps the text fallback when a request delivered no final answer', () => {
+-		const gauge = new Gauge({ scale: 1, fixed: 0, capacity: 10000 })
++		const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 10000 })
+ 		gauge.observe([{ estimate: 100, prompt: 100, completion: 900, tools: 1 }])
+ 		expect(gauge.reserve([], '')).toBe(29)
+ 	})
+@@ -262,10 +242,10 @@ describe('Gauge.reserve', () => {
+ 
+ describe('Gauge.room', () => {
+ 	it('preserves room, reserve, and recall closure when capacity grows by the generation cap', () => {
+-		const plain = new Gauge({ scale: 1, fixed: 0, capacity: 3072 })
++		const plain = new Gauge({ scale: 1, overhead: 0, capacity: 3072 })
+ 		const thinking = new Gauge({
+ 			scale: 1,
+-			fixed: 0,
++			overhead: 0,
+ 			capacity: 4096,
+ 			predict: 1024,
+ 			replay: 'none',
+@@ -275,24 +255,24 @@ describe('Gauge.room', () => {
+ 		for (const prompt of [1000, 2600, 2822, 2823, 2900]) {
+ 			const plainCalls = [{ estimate: 100, prompt, completion: 0, tools: 0 }]
+ 			const thinkingCalls = [{ estimate: 100, prompt, completion: 700, thinking: 700, tools: 0 }]
+-			expect(thinking.left(thinkingCalls) - 1024).toBe(plain.left(plainCalls))
++			expect(thinking.remainder(thinkingCalls) - 1024).toBe(plain.remainder(plainCalls))
+ 			expect(thinking.reserve(thinkingCalls, '')).toBe(plain.reserve(plainCalls, ''))
+ 			expect(thinking.room(thinkingCalls, '')).toBe(plain.room(plainCalls, ''))
+-			expect(thinking.left(thinkingCalls) - 1024 < 2 * thinking.reserve(thinkingCalls, '')).toBe(
++			expect(thinking.remainder(thinkingCalls) - 1024 < 2 * thinking.reserve(thinkingCalls, '')).toBe(
+ 				prompt > 2822,
+ 			)
+-			expect(plain.left(plainCalls) < 2 * plain.reserve(plainCalls, '')).toBe(prompt > 2822)
++			expect(plain.remainder(plainCalls) < 2 * plain.reserve(plainCalls, '')).toBe(prompt > 2822)
+ 		}
+ 	})
+ 
+ 	it('halves what the call left beyond the reserve and divides by the rate', () => {
+ 		// Left 10000 - 2100 = 7900. Reserve 78 at rate 2. (7900 - 78) / 2 / 2 = 1955.5.
+-		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
++		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+ 		expect(gauge.room([{ estimate: 1000, tools: 0 }], 'a'.repeat(40))).toBe(1955.5)
+ 	})
+ 
+ 	it('floors at 0 when the reserve exceeds what is left', () => {
+-		const gauge = new Gauge({ scale: 2, fixed: 100, capacity: 10000 })
++		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+ 		expect(gauge.room([{ estimate: 1, prompt: 9990, tools: 0 }], 'a'.repeat(40))).toBe(0)
+ 		expect(gauge.room([{ estimate: 1, prompt: 9999, completion: 500, tools: 0 }], '')).toBe(0)
+ 	})
+diff --git a/tests/src/core/ledgers/Ledger.test.ts b/tests/src/core/ledgers/Ledger.test.ts
+index 1283554..4afd0c6 100644
+--- a/tests/src/core/ledgers/Ledger.test.ts
++++ b/tests/src/core/ledgers/Ledger.test.ts
+@@ -13,6 +13,7 @@ import { createTool } from '@orkestrel/tool'
+ import { requireValue } from '@orkestrel/test'
+ import { beforeEach, describe, expect, it } from 'vitest'
+ import {
++	LEDGER_DESK_THRESHOLDS,
+ 	RecordedTransport,
+ 	RecordingJudge,
+ 	SequentialSystemOneJudge,
+@@ -28,10 +29,10 @@ describe('Ledger', () => {
+ 			judge,
+ 			system: 'Serve the desk.',
+ 			questions: LEDGER_QUESTIONS,
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
+ 			capacity: 4096,
+-			gauge: { scale: 1, fixed: 0 },
++			gauge: { scale: 1, overhead: 0 },
+ 			lookups: [
+ 				{
+ 					tool: createTool({
+@@ -298,8 +299,8 @@ describe('Ledger', () => {
+ 			expect(recorded).toEqual(judgments)
+ 			expect(ledger.gauge).toEqual(
+ 				phase === 'first pass'
+-					? { scale: 1, fixed: 0 }
+-					: { scale: 10 / estimateMessages(requireValue(provider.calls[0]).messages), fixed: 10 },
++					? { scale: 1, overhead: 0 }
++					: { scale: 10 / estimateMessages(requireValue(provider.calls[0]).messages), overhead: 10 },
+ 			)
+ 			expect(selections.at(-1)?.briefing).toBe(selections[0]?.briefing)
+ 			expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
+@@ -520,6 +521,35 @@ describe('Ledger', () => {
+ 		).toBe(`${LEDGER_NOTES.results}\n${text}`)
+ 	})
+ 
++	it('splits CRLF lookup lines like LF lines in the recall listing and the answer note', async () => {
++		const text = 'Account BW-20931: Brightwater Studio.\r\nRefund is $148.50.'
++		const lookup = requireValue(options.lookups?.[0])
++		const provider = createScriptedProvider(
++			[
++				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
++				{
++					content: '',
++					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater' } }],
++				},
++				{ content: 'Done.' },
++			],
++			{ record: true },
++		)
++		const ledger = createLedger(provider, {
++			...options,
++			agent: { limit: 2 },
++			lookups: [{ ...lookup, tool: createTool({ name: 'lookup', execute: () => text }) }],
++		})
++		await ledger.respond('Check the account.')
++		expect(
++			provider.calls[2]?.messages.find((message) =>
++				message.content.startsWith(LEDGER_NOTES.results),
++			)?.content,
++		).toBe(
++			`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio.\nRefund is $148.50.`,
++		)
++	})
++
+ 	it('lists an earlier answer note through a word match but never through a topic match', async () => {
+ 		const provider = createScriptedProvider(
+ 			[
+@@ -666,7 +696,7 @@ describe('Ledger', () => {
+ 		// System: 4 + 4; user: 2 + 4; assistant: 4 + 4 = 22 estimate units.
+ 		await expect(ledger.calibrate(new AbortController().signal)).resolves.toEqual({
+ 			scale: 1.8181818181818181,
+-			fixed: 100,
++			overhead: 100,
+ 		})
+ 		expect(provider.calls).toHaveLength(2)
+ 		expect(provider.calls[0]?.messages).toEqual(provider.calls[1]?.messages)
+@@ -967,7 +997,7 @@ describe('Ledger', () => {
+ 			).toBe(
+ 				replay === 'none'
+ 					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+-					: LEDGER_NOTES.closed,
++					: LEDGER_NOTES.closure,
+ 			)
+ 		}
+ 	})
+@@ -1026,7 +1056,7 @@ describe('Ledger', () => {
+ 				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
+ 			)
+ 			expect(recalled).toContain('Delivery 19 arrived Tuesday with a completed receipt.')
+-			expect(recalled).not.toBe(LEDGER_NOTES.closed)
++			expect(recalled).not.toBe(LEDGER_NOTES.closure)
+ 			expect(recalled.includes('Delivery 0 arrived')).toBe(predict === 0)
+ 			expect(recalled.includes('older items not shown')).toBe(predict === 1024)
+ 		}
+@@ -1056,7 +1086,7 @@ describe('Ledger', () => {
+ 			).toBe(
+ 				replay === 'none'
+ 					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+-					: LEDGER_NOTES.closed,
++					: LEDGER_NOTES.closure,
+ 			)
+ 		}
+ 	})
+@@ -1088,7 +1118,7 @@ describe('Ledger', () => {
+ 			await ledger.respond('Review.')
+ 			expect(
+ 				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+-			).toBe(LEDGER_NOTES.closed)
++			).toBe(LEDGER_NOTES.closure)
+ 		}
+ 	})
+ 
+@@ -1344,7 +1374,7 @@ describe('Ledger', () => {
+ 		await ledger.respond('Check the desk.')
+ 		expect(ledger.gauge).toEqual({
+ 			scale: 10 / estimateMessages([{ id: 'system', role: 'system', content: options.system }]),
+-			fixed: 20,
++			overhead: 20,
+ 		})
+ 		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+ 		expect(provider.calls[1]?.tools).toBeUndefined()
+@@ -1364,6 +1394,16 @@ describe('Ledger', () => {
+ 		expect(ledger.gauge).toBeUndefined()
+ 	})
+ 
++	it('rejects with the provider error when a calibration call fails', async () => {
++		const { gauge: _gauge, ...uncalibrated } = options
++		const ledger = createLedger(createScriptedProvider([], { exhaust: 'throw' }), uncalibrated)
++		const failure = await ledger.respond('Check the desk.').catch((error: unknown) => error)
++		expect(isLedgerError(failure)).toBe(false)
++		expect(failure).toMatchObject({ message: 'createScriptedProvider exhausted at turn 0' })
++		expect(ledger.gauge).toBeUndefined()
++		expect(ledger.conversation.messages()).toEqual([])
++	})
++
+ 	it('validates constructor options with LedgerError', () => {
+ 		expect(() => new Ledger(createScriptedProvider([]), { ...options, capacity: 0 })).toThrow(
+ 			expect.objectContaining({ code: 'CAPACITY' }),
+@@ -1717,7 +1757,7 @@ describe('Ledger', () => {
+ 				.map((message) => message.content),
+ 		).toEqual([
+ 			'recall needs a topic: an owner name, an id, or one of refunds',
+-			LEDGER_NOTES.closed,
++			LEDGER_NOTES.closure,
+ 		])
+ 		const short = createLedger(createScriptedProvider([]), { ...options, capacity: 1 })
+ 		const result = await short.agent.context.tools.execute([
+@@ -1801,7 +1841,7 @@ describe('Ledger', () => {
+ 				.messages()
+ 				.filter((message) => message.role === 'tool')
+ 				.at(-1)?.content,
+-		).toBe(LEDGER_NOTES.closed)
++		).toBe(LEDGER_NOTES.closure)
+ 		const crowded = createScriptedProvider(
+ 			[
+ 				{
+@@ -1816,7 +1856,7 @@ describe('Ledger', () => {
+ 		const tight = createLedger(crowded, options)
+ 		await tight.respond('Check the desk.')
+ 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
+-			LEDGER_NOTES.closed,
++			LEDGER_NOTES.closure,
+ 		)
+ 	})
+ 
+@@ -2381,7 +2421,7 @@ describe('Ledger', () => {
+ 		).toEqual([
+ 			'nothing on "one"; recall an owner name, an id, or one of refunds',
+ 			'nothing on "two"; recall an owner name, an id, or one of refunds',
+-			LEDGER_NOTES.closed,
++			LEDGER_NOTES.closure,
+ 		])
+ 	})
+ 
+diff --git a/tests/src/core/ledgers/factories.test.ts b/tests/src/core/ledgers/factories.test.ts
+index b9d042e..5980616 100644
+--- a/tests/src/core/ledgers/factories.test.ts
++++ b/tests/src/core/ledgers/factories.test.ts
+@@ -1,8 +1,13 @@
+-import type { LedgerAgentOptions, LedgerOptions } from '@src/core'
++import type {
++	GaugeInterface,
++	LedgerAgentOptions,
++	LedgerOptions,
++	LedgerRecallOptions,
++} from '@src/core'
+ import { Classifier, Gauge, Ledger, LEDGER_QUESTIONS, createLedger } from '@src/core'
+ import { createTool } from '@orkestrel/tool'
+ import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest'
+-import { RecordingJudge, createScriptedProvider } from '../../../setup.js'
++import { LEDGER_DESK_THRESHOLDS, RecordingJudge, createScriptedProvider } from '../../../setup.js'
+ 
+ describe('createLedger', () => {
+ 	let options: LedgerOptions
+@@ -11,18 +16,24 @@ describe('createLedger', () => {
+ 			judge: new RecordingJudge(),
+ 			system: 'Serve the desk.',
+ 			questions: LEDGER_QUESTIONS,
+-			thresholds: { category: 0.7, topic: 0.8, correction: 0.3, amends: 0.8, supersedes: 0.8 },
++			thresholds: LEDGER_DESK_THRESHOLDS,
+ 			topics: [],
+ 			capacity: 4096,
+-			gauge: { scale: 1, fixed: 0 },
++			gauge: { scale: 1, overhead: 0 },
+ 		}
+ 	})
+ 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
+ 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('strict')
++		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('signal')
++		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('budget')
++		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('error')
++		expectTypeOf<LedgerOptions>().not.toHaveProperty('notes')
++		expectTypeOf<LedgerRecallOptions>().not.toHaveProperty('description')
++		expectTypeOf<GaugeInterface>().not.toHaveProperty('measure')
+ 		const ledger = createLedger(createScriptedProvider([]), options)
+ 		expect(ledger).toBeInstanceOf(Ledger)
+ 		expect(Classifier).toBeTypeOf('function')
+-		expect(new Gauge({ scale: 1, fixed: 0, capacity: 4096 }).scale).toBe(1)
++		expect(new Gauge({ scale: 1, overhead: 0, capacity: 4096 }).scale).toBe(1)
+ 		expect(ledger.conversation.summarizable).toBe(false)
+ 		expect(ledger.agent.context.conversations.count).toBe(1)
+ 	})
+@@ -68,7 +79,7 @@ describe('createLedger', () => {
+ 					],
+ 				}),
+ 		).toThrow(expect.objectContaining({ code: 'LOOKUP' }))
+-		expect(() => new Ledger(provider, { ...options, gauge: { scale: 0, fixed: 0 } })).toThrow(
++		expect(() => new Ledger(provider, { ...options, gauge: { scale: 0, overhead: 0 } })).toThrow(
+ 			expect.objectContaining({ code: 'GAUGE' }),
+ 		)
+ 	})
+@@ -151,11 +162,11 @@ describe('createLedger', () => {
+ 	it('refuses invalid supplied gauge values', () => {
+ 		for (const scale of [0, -1, NaN, Infinity])
+ 			expect(() =>
+-				createLedger(createScriptedProvider([]), { ...options, gauge: { scale, fixed: 0 } }),
++				createLedger(createScriptedProvider([]), { ...options, gauge: { scale, overhead: 0 } }),
+ 			).toThrow(expect.objectContaining({ code: 'GAUGE' }))
+-		for (const fixed of [-1, NaN, Infinity])
++		for (const overhead of [-1, NaN, Infinity])
+ 			expect(() =>
+-				createLedger(createScriptedProvider([]), { ...options, gauge: { scale: 1, fixed } }),
++				createLedger(createScriptedProvider([]), { ...options, gauge: { scale: 1, overhead } }),
+ 			).toThrow(expect.objectContaining({ code: 'GAUGE' }))
+ 	})
+ })
+diff --git a/tests/src/core/ledgers/helpers.test.ts b/tests/src/core/ledgers/helpers.test.ts
+index 2f574ce..70d84d5 100644
+--- a/tests/src/core/ledgers/helpers.test.ts
++++ b/tests/src/core/ledgers/helpers.test.ts
+@@ -1,44 +1,52 @@
+-import type { GaugeCall, LedgerLookupReading } from '../../../../src/core/ledgers/types.js'
+ import type { Message } from '@src/core'
+-import { estimateMessages } from '../../../../src/core/agents/helpers.js'
++import { describe, expect, it } from 'vitest'
+ import {
+ 	buildLines,
++	buildRecallMessage,
+ 	buildRecords,
+ 	collectLive,
+ 	collectNames,
++	collectProjectionIds,
+ 	collectRegistry,
+ 	collectStale,
+ 	computeThinking,
+ 	resolvePredict,
+-	resolveLedgerCall,
++	findLedgerCall,
+ 	rankLedgerCut,
+ 	cutListing,
+ 	extractTokens,
++	extractWords,
+ 	fitSlope,
+ 	identifyLookup,
+ 	linkOwners,
+ 	matchEntities,
+ 	matchesCutLine,
+ 	placeMember,
++	renderCauseChain,
+ 	renderLedgerPinned,
+ 	renderLedgerRecord,
+ 	renderStub,
++	renderTopicNames,
++	scanAmendments,
+ 	selectRecords,
+ 	splitSentences,
+ 	splitTopic,
++	splitWords,
+ } from '../../../../src/core/ledgers/helpers.js'
+-import { describe, expect, it } from 'vitest'
+ import {
++	buildGaugeCall,
+ 	buildLedgerInput,
+ 	buildLedgerMessage,
+ 	buildLedgerReading,
+ 	checkLedgerProjection,
+ 	createLedgerDesk,
+ 	createLedgerRequest,
++	estimateRecallListing,
+ 	LEDGER_DESK_OWNERS,
+ 	LEDGER_DESK_SYSTEM,
++	LEDGER_EMPTY_FOUND,
+ 	LEDGER_HANDLE,
+-} from '../../../setupLedger.js'
++} from '../../../setup.js'
+ 
+ describe('rankLedgerCut', () => {
+ 	it('ranks name matches before loose sources, off-topic corrections, rules, and on-topic sources', () => {
+@@ -51,7 +59,7 @@ describe('rankLedgerCut', () => {
+ 	})
+ })
+ 
+-describe('resolveLedgerCall', () => {
++describe('findLedgerCall', () => {
+ 	it('pairs repeated call ids by position under their own arguments', () => {
+ 		const leader: Message = {
+ 			id: 'leader',
+@@ -64,8 +72,8 @@ describe('resolveLedgerCall', () => {
+ 		}
+ 		const first: Message = { id: 'r1', role: 'tool', call: 'c1', content: 'Brightwater.' }
+ 		const second: Message = { id: 'r2', role: 'tool', call: 'c1', content: 'Lighthouse.' }
+-		expect(resolveLedgerCall([leader, first, second], first)?.arguments).toEqual({ id: 'BW-5512' })
+-		expect(resolveLedgerCall([leader, first, second], second)?.arguments).toEqual({
++		expect(findLedgerCall([leader, first, second], first)?.arguments).toEqual({ id: 'BW-5512' })
++		expect(findLedgerCall([leader, first, second], second)?.arguments).toEqual({
+ 			id: 'LH-81660',
+ 		})
+ 	})
+@@ -84,13 +92,13 @@ describe('resolveLedgerCall', () => {
+ 		const second: Message = { id: 'r2', role: 'tool', content: 'Second.', call: 'c2' }
+ 		const anonymous: Message = { id: 'r3', role: 'tool', content: 'Anonymous.' }
+ 		const other: Message = { id: 'r4', role: 'tool', content: 'Other.' }
+-		expect(resolveLedgerCall([leader, second, first], first)?.name).toBe('first')
+-		expect(resolveLedgerCall([leader, second, first], second)?.name).toBe('second')
+-		expect(resolveLedgerCall([leader, second, anonymous], anonymous)).toBeUndefined()
+-		expect(resolveLedgerCall([leader, anonymous, other], anonymous)?.name).toBe('first')
+-		expect(resolveLedgerCall([leader, anonymous, other], other)?.name).toBe('second')
+-		expect(resolveLedgerCall([leader, first], second)).toBeUndefined()
+-		expect(resolveLedgerCall([first], first)).toBeUndefined()
++		expect(findLedgerCall([leader, second, first], first)?.name).toBe('first')
++		expect(findLedgerCall([leader, second, first], second)?.name).toBe('second')
++		expect(findLedgerCall([leader, second, anonymous], anonymous)).toBeUndefined()
++		expect(findLedgerCall([leader, anonymous, other], anonymous)?.name).toBe('first')
++		expect(findLedgerCall([leader, anonymous, other], other)?.name).toBe('second')
++		expect(findLedgerCall([leader, first], second)).toBeUndefined()
++		expect(findLedgerCall([first], first)).toBeUndefined()
+ 	})
+ })
+ 
+@@ -142,17 +150,6 @@ describe('resolvePredict', () => {
+ // the registry and entity matching, the record projection with the three fixes (R5a, R2b, R8), the
+ // renderers, and the recall leaves (topic split, cut, stub, slope).
+ 
+-const found = { ids: [], owners: [] }
+-
+-function buildReading(
+-	id: string,
+-	args: Readonly<Record<string, unknown>>,
+-	text: string,
+-	empty = false,
+-): LedgerLookupReading {
+-	return buildLedgerReading(id, 'lookup_order', args, text, empty ? undefined : found)
+-}
+-
+ describe('splitSentences', () => {
+ 	it('splits at a period, question mark, or exclamation mark before a capital, a digit, or a quote', () => {
+ 		expect(
+@@ -259,12 +256,8 @@ describe('linkOwners', () => {
+ 	it('links an owner argument to itself and another id to the one owner its text names', () => {
+ 		const links = linkOwners(
+ 			[
+-				buildReading(
+-					'tool-1',
+-					{ id: 'bw-5512' },
+-					'Order BW-5512 for account BW-20931 (Brightwater Studio).',
+-				),
+-				buildReading('tool-2', { account: 'OM-30418' }, 'Account OM-30418: Odile Marlow.'),
++				buildLedgerReading('tool-1', 'lookup_order', { id: 'bw-5512' }, 'Order BW-5512 for account BW-20931 (Brightwater Studio).', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-2', 'lookup_order', { account: 'OM-30418' }, 'Account OM-30418: Odile Marlow.', LEDGER_EMPTY_FOUND),
+ 			],
+ 			owners,
+ 		)
+@@ -277,8 +270,8 @@ describe('linkOwners', () => {
+ 	it('leaves an argument unlinked when its text names no owner or several', () => {
+ 		const links = linkOwners(
+ 			[
+-				buildReading('tool-1', { id: 'BW-5512' }, 'Order BW-5512 has no owner.'),
+-				buildReading('tool-2', { id: 'BW-5513' }, 'Order BW-5513 for BW-20931 and OM-30418.'),
++				buildLedgerReading('tool-1', 'lookup_order', { id: 'BW-5512' }, 'Order BW-5512 has no owner.', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-2', 'lookup_order', { id: 'BW-5513' }, 'Order BW-5513 for BW-20931 and OM-30418.', LEDGER_EMPTY_FOUND),
+ 			],
+ 			owners,
+ 		)
+@@ -288,9 +281,9 @@ describe('linkOwners', () => {
+ 	it('skips an empty reading and lets a later reading overwrite an earlier link', () => {
+ 		const links = linkOwners(
+ 			[
+-				buildReading('tool-1', { id: 'BW-5512' }, 'Order BW-5512 for BW-20931.'),
+-				buildReading('tool-2', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.', true),
+-				buildReading('tool-3', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.'),
++				buildLedgerReading('tool-1', 'lookup_order', { id: 'BW-5512' }, 'Order BW-5512 for BW-20931.', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-2', 'lookup_order', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.'),
++				buildLedgerReading('tool-3', 'lookup_order', { id: 'BW-5512' }, 'Order BW-5512 for OM-30418.', LEDGER_EMPTY_FOUND),
+ 			],
+ 			owners,
+ 		)
+@@ -299,7 +292,7 @@ describe('linkOwners', () => {
+ 
+ 	it('ignores an argument that is no id', () => {
+ 		const links = linkOwners(
+-			[buildReading('tool-1', { id: 'five', n: 5 }, 'Order for BW-20931.')],
++			[buildLedgerReading('tool-1', 'lookup_order', { id: 'five', n: 5 }, 'Order for BW-20931.', LEDGER_EMPTY_FOUND)],
+ 			owners,
+ 		)
+ 		expect(links.size).toBe(0)
+@@ -414,9 +407,9 @@ describe('collectLive', () => {
+ 				buildLedgerMessage('tool-c', 'tool', 'Order BW-5513: total $12.00.'),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512' }, 'Order BW-5512: total $10.00.'),
+-				buildReading('tool-b', { id: 'bw-5512' }, 'No record of order BW-5512.', true),
+-				buildReading('tool-c', { id: 'BW-5513' }, 'Order BW-5513: total $12.00.'),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, 'Order BW-5512: total $10.00.', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { id: 'bw-5512' }, 'No record of order BW-5512.'),
++				buildLedgerReading('tool-c', 'lookup_order', { id: 'BW-5513' }, 'Order BW-5513: total $12.00.', LEDGER_EMPTY_FOUND),
+ 			],
+ 		})
+ 		expect(collectLive(input)).toEqual(['tool-c'])
+@@ -429,8 +422,8 @@ describe('collectLive', () => {
+ 				buildLedgerMessage('tool-b', 'tool', 'two'),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512' }, 'one'),
+-				buildReading('tool-b', { id: 'BW-5513' }, 'two'),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, 'one', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { id: 'BW-5513' }, 'two', LEDGER_EMPTY_FOUND),
+ 			],
+ 		})
+ 		expect(collectLive(input)).toEqual(['tool-a', 'tool-b'])
+@@ -443,8 +436,8 @@ describe('collectLive', () => {
+ 				buildLedgerMessage('tool-b', 'tool', 'two'),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512', opts: { a: 1, b: { c: 2, d: 3 } } }, 'one'),
+-				buildReading('tool-b', { opts: { b: { d: 3, c: 2 }, a: 1 }, id: 'BW-5512' }, 'two'),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512', opts: { a: 1, b: { c: 2, d: 3 } } }, 'one', LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { opts: { b: { d: 3, c: 2 }, a: 1 }, id: 'BW-5512' }, 'two', LEDGER_EMPTY_FOUND),
+ 			],
+ 		})
+ 		expect(collectLive(input)).toEqual(['tool-b'])
+@@ -485,7 +478,7 @@ describe('placeMember', () => {
+ 		])
+ 	})
+ 
+-	it('stops at a cycle of amended pairs and leaves a message with no category loose', () => {
++	it('stops at a cycle of amended pairs and leaves a message with no category unplaced', () => {
+ 		const cycle = new Map([
+ 			['user-05', ['user-07']],
+ 			['user-07', ['user-05']],
+@@ -513,8 +506,8 @@ describe('collectStale', () => {
+ 				buildLedgerMessage('user-c', 'user', 'The code is MX-5000.'),
+ 			],
+ 			classification: {
+-				amended: { 'user-a': ['user-b'] },
+-				superseded: { 'user-b': ['user-c'] },
++				amendments: { 'user-a': ['user-b'] },
++				supersessions: { 'user-b': ['user-c'] },
+ 			},
+ 		})
+ 		const live = collectLive(input)
+@@ -532,7 +525,7 @@ describe('collectStale', () => {
+ 				buildLedgerMessage('user-c', 'user', 'Correction: it is MX-5000, not MX-4486.'),
+ 			],
+ 			classification: {
+-				amended: { 'user-a': ['user-b'], 'user-b': ['user-c'] },
++				amendments: { 'user-a': ['user-b'], 'user-b': ['user-c'] },
+ 			},
+ 		})
+ 		const stale = collectStale(
+@@ -553,11 +546,11 @@ describe('collectStale', () => {
+ 		]
+ 		const byMessage = new Map(messages.map((message) => [message.id, message]))
+ 		const classification = {
+-			amended: { 'user-a': ['user-b'] },
+-			superseded: { 'user-b': ['user-c'] },
++			amendments: { 'user-a': ['user-b'] },
++			supersessions: { 'user-b': ['user-c'] },
+ 		}
+ 		for (const variant of [
+-			{ exclude: ['user-b'] },
++			{ exclusions: ['user-b'] },
+ 			{ classification: { ...classification, quiet: ['user-b'] } },
+ 		]) {
+ 			const input = buildLedgerInput({
+@@ -705,7 +698,7 @@ describe('buildRecords', () => {
+ 			],
+ 		])
+ 		expect(built.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+-		expect(built.loose).toEqual([])
++		expect(built.orphans).toEqual([])
+ 		expect(checkLedgerProjection(built, createLedgerDesk())).toEqual([])
+ 	})
+ 
+@@ -718,12 +711,12 @@ describe('buildRecords', () => {
+ 		expect(buildRecords(input).records.map((record) => record.title)).toEqual(['account BW-20931'])
+ 	})
+ 
+-	it('lists a live message that no record placed as loose', () => {
++	it('lists a live message that no record placed as an orphan', () => {
+ 		const input = buildLedgerInput({
+ 			messages: [buildLedgerMessage('user-a', 'user', 'Nothing names an owner here.')],
+ 		})
+ 		const built = buildRecords(input)
+-		expect(built.loose).toEqual(['user-a'])
++		expect(built.orphans).toEqual(['user-a'])
+ 		expect(built.records).toEqual([])
+ 	})
+ 
+@@ -748,14 +741,14 @@ describe('buildRecords', () => {
+ 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512' }, text),
+-				buildReading('tool-b', { id: 'BW-5512' }, 'No record of order BW-5512.', true),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { id: 'BW-5512' }, 'No record of order BW-5512.'),
+ 			],
+ 			entities: { 'tool-a': ['BW-20931'] },
+ 		})
+ 		const built = buildRecords(input)
+ 		expect(built.records).toEqual([])
+-		expect(built.loose).toEqual([])
++		expect(built.orphans).toEqual([])
+ 		expect(checkLedgerProjection(built, input)).toEqual([])
+ 	})
+ 
+@@ -768,8 +761,8 @@ describe('buildRecords', () => {
+ 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-9999.'),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512' }, text),
+-				buildReading('tool-b', { id: 'BW-9999' }, 'No record of order BW-9999.', true),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { id: 'BW-9999' }, 'No record of order BW-9999.'),
+ 			],
+ 			entities: { 'tool-a': ['BW-20931'] },
+ 		})
+@@ -789,8 +782,8 @@ describe('buildRecords', () => {
+ 			],
+ 			classification: {
+ 				categories: { 'user-a': 'rule', 'user-b': 'correction' },
+-				amended: { 'user-a': ['user-b'] },
+-				superseded: { 'user-b': ['user-c'] },
++				amendments: { 'user-a': ['user-b'] },
++				supersessions: { 'user-b': ['user-c'] },
+ 			},
+ 		})
+ 		const built = buildRecords(input)
+@@ -810,8 +803,8 @@ describe('buildRecords', () => {
+ 				buildLedgerMessage('tool-b', 'tool', text),
+ 			],
+ 			readings: [
+-				buildReading('tool-a', { id: 'BW-5512', opts: { a: 1, b: 2 } }, text),
+-				buildReading('tool-b', { opts: { b: 2, a: 1 }, id: 'BW-5512' }, text),
++				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512', opts: { a: 1, b: 2 } }, text, LEDGER_EMPTY_FOUND),
++				buildLedgerReading('tool-b', 'lookup_order', { opts: { b: 2, a: 1 }, id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
+ 			],
+ 			entities: { 'tool-a': ['BW-20931'], 'tool-b': ['BW-20931'] },
+ 		})
+@@ -861,7 +854,7 @@ describe('buildRecords', () => {
+ 		expect(buildRecords(buildLedgerInput())).toEqual({
+ 			records: [],
+ 			stale: [],
+-			loose: [],
++			orphans: [],
+ 		})
+ 	})
+ })
+@@ -934,7 +927,7 @@ describe('selectRecords', () => {
+ 		expect(selectRecords(built, { owners: [], topics: [] }).map((view) => view.key)).toEqual([
+ 			'rules',
+ 		])
+-		expect(selectRecords({ records: [], stale: [], loose: [] }, createLedgerRequest())).toEqual([])
++		expect(selectRecords({ records: [], stale: [], orphans: [] }, createLedgerRequest())).toEqual([])
+ 	})
+ 
+ 	it('returns copies that share no record, line, or list with the projection', () => {
+@@ -1028,27 +1021,19 @@ describe('splitTopic', () => {
+ 	})
+ })
+ 
+-function measureRoom(kept: readonly string[]): number {
+-	return estimateMessages([{ id: 'recall', role: 'tool', content: kept.join('\n') }])
+-}
+-
+-function buildCall(estimate: number, prompt: number | undefined, tools: number): GaugeCall {
+-	return prompt === undefined ? { estimate, tools } : { estimate, prompt, tools }
+-}
+-
+ describe('cutListing and matchesCutLine', () => {
+ 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
+ 
+ 	it('keeps every item that fits and adds no cut line', () => {
+-		expect(cutListing(items, measureRoom(items))).toBe(items.join('\n'))
++		expect(cutListing(items, estimateRecallListing(items))).toBe(items.join('\n'))
+ 		expect(cutListing([], 10)).toBe('')
+ 	})
+ 
+ 	it('cuts at the first item that overflows and names how many it left out', () => {
+-		expect(cutListing(items, measureRoom(items.slice(0, 2)))).toBe(
++		expect(cutListing(items, estimateRecallListing(items.slice(0, 2)))).toBe(
+ 			'first recalled line\nsecond recalled line\n1 older item not shown; name a narrower topic to narrow the recall',
+ 		)
+-		expect(cutListing(items, measureRoom(items.slice(0, 1)))).toBe(
++		expect(cutListing(items, estimateRecallListing(items.slice(0, 1)))).toBe(
+ 			'first recalled line\n2 older items not shown; name a narrower topic to narrow the recall',
+ 		)
+ 	})
+@@ -1107,16 +1092,16 @@ describe('renderStub', () => {
+ describe('fitSlope', () => {
+ 	it('fits the least-squares slope of prompt over estimate', () => {
+ 		expect(
+-			fitSlope([[buildCall(100, 130, 2), buildCall(200, 260, 2), buildCall(300, 390, 2)]]),
++			fitSlope([[buildGaugeCall(100, 130, 2), buildGaugeCall(200, 260, 2), buildGaugeCall(300, 390, 2)]]),
+ 		).toBe(1.3)
+ 	})
+ 
+ 	it('fits within each tool count and pools the sets, so a dropped schema reads as no change in rate', () => {
+ 		const group = [
+-			buildCall(100, 100, 0),
+-			buildCall(200, 200, 0),
+-			buildCall(100, 150, 2),
+-			buildCall(300, 350, 2),
++			buildGaugeCall(100, 100, 0),
++			buildGaugeCall(200, 200, 0),
++			buildGaugeCall(100, 150, 2),
++			buildGaugeCall(300, 350, 2),
+ 		]
+ 		expect(fitSlope([group])).toBe(1)
+ 	})
+@@ -1124,32 +1109,185 @@ describe('fitSlope', () => {
+ 	it('pools the sets of every group', () => {
+ 		expect(
+ 			fitSlope([
+-				[buildCall(100, 100, 1), buildCall(200, 200, 1)],
+-				[buildCall(100, 150, 1), buildCall(300, 350, 1)],
++				[buildGaugeCall(100, 100, 1), buildGaugeCall(200, 200, 1)],
++				[buildGaugeCall(100, 150, 1), buildGaugeCall(300, 350, 1)],
+ 			]),
+ 		).toBe(1)
+ 	})
+ 
+ 	it('returns undefined when no set holds two usable points that differ', () => {
+ 		expect(fitSlope([])).toBeUndefined()
+-		expect(fitSlope([[buildCall(100, 130, 2)]])).toBeUndefined()
+-		expect(fitSlope([[buildCall(100, 130, 2), buildCall(100, 140, 2)]])).toBeUndefined()
+-		expect(fitSlope([[buildCall(100, 130, 0), buildCall(200, 260, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(100, 130, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(100, 130, 2), buildGaugeCall(100, 140, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(100, 130, 0), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
+ 	})
+ 
+ 	it('skips a call without a prompt count, with an estimate of zero, or with a prompt that is not finite', () => {
+-		expect(fitSlope([[buildCall(100, undefined, 2), buildCall(200, 260, 2)]])).toBeUndefined()
+-		expect(fitSlope([[buildCall(0, 50, 2), buildCall(200, 260, 2)]])).toBeUndefined()
+-		expect(fitSlope([[buildCall(100, Number.NaN, 2), buildCall(200, 260, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(100, undefined, 2), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(0, 50, 2), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
++		expect(fitSlope([[buildGaugeCall(100, Number.NaN, 2), buildGaugeCall(200, 260, 2)]])).toBeUndefined()
+ 		expect(
+ 			fitSlope([
+ 				[
+-					buildCall(100, 130, 2),
+-					buildCall(200, 260, 2),
+-					buildCall(0, 9, 2),
+-					buildCall(50, undefined, 2),
++					buildGaugeCall(100, 130, 2),
++					buildGaugeCall(200, 260, 2),
++					buildGaugeCall(0, 9, 2),
++					buildGaugeCall(50, undefined, 2),
+ 				],
+ 			]),
+ 		).toBe(1.3)
+ 	})
+ })
++
++describe('collectProjectionIds', () => {
++	it('collects the orphans first, then each record member once in record order', () => {
++		expect([
++			...collectProjectionIds({
++				records: [
++					{ key: 'owner:BW-20931', title: 'Brightwater Studio', members: ['tool-1', 'user-1'], lines: [] },
++					{ key: 'rules', title: 'Rules', members: ['user-1', 'user-3'], lines: [] },
++				],
++				stale: [],
++				orphans: ['user-2'],
++			}),
++		]).toEqual(['user-2', 'tool-1', 'user-1', 'user-3'])
++	})
++
++	it('collects nothing from an empty projection', () => {
++		expect(collectProjectionIds({ records: [], stale: [], orphans: [] }).size).toBe(0)
++	})
++
++	it('collects the live ids of the desk build that the oracle passes', () => {
++		const built = buildRecords(createLedgerDesk())
++		expect([...collectProjectionIds(built)].sort()).toEqual(
++			[...new Set([...built.orphans, ...built.records.flatMap((record) => record.members)])].sort(),
++		)
++		expect([...collectProjectionIds(built)]).not.toContain('user-05')
++	})
++})
++
++describe('scanAmendments', () => {
++	const amendments = new Map([
++		['user-a', ['user-b', 'user-c']],
++		['user-b', ['user-d']],
++		['user-c', ['user-d']],
++	])
++
++	it('admits breadth first and lists a shared descendant once', () => {
++		expect(scanAmendments(amendments, 'user-a', () => true)).toEqual([
++			'user-a',
++			'user-b',
++			'user-c',
++			'user-d',
++		])
++	})
++
++	it('follows no amendment of a refused id and reaches its descendant only through an admitted one', () => {
++		expect(scanAmendments(amendments, 'user-a', (id) => id !== 'user-b')).toEqual([
++			'user-a',
++			'user-c',
++			'user-d',
++		])
++		expect(scanAmendments(amendments, 'user-a', (id) => id !== 'user-b' && id !== 'user-c')).toEqual(
++			['user-a'],
++		)
++	})
++
++	it('ends a cycle and returns nothing when it refuses the start', () => {
++		const cycle = new Map([
++			['user-a', ['user-b']],
++			['user-b', ['user-a']],
++		])
++		expect(scanAmendments(cycle, 'user-a', () => true)).toEqual(['user-a', 'user-b'])
++		expect(scanAmendments(cycle, 'user-a', () => false)).toEqual([])
++		expect(scanAmendments(new Map(), 'user-a', () => true)).toEqual(['user-a'])
++	})
++
++	it('asks the admission of each id once', () => {
++		const asked: string[] = []
++		scanAmendments(amendments, 'user-a', (id) => {
++			asked.push(id)
++			return id !== 'user-d'
++		})
++		expect(asked).toEqual(['user-a', 'user-b', 'user-c', 'user-d'])
++	})
++})
++
++describe('buildRecallMessage', () => {
++	it('builds an empty assistant message that carries one recall call with the topic', () => {
++		expect(buildRecallMessage('refunds')).toEqual({
++			id: 'call',
++			role: 'assistant',
++			content: '',
++			calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic: 'refunds' } }],
++		})
++		expect(buildRecallMessage('').calls?.[0]?.arguments).toEqual({ topic: '' })
++	})
++})
++
++describe('renderTopicNames', () => {
++	it('joins the topic names by a comma and a space in order', () => {
++		expect(
++			renderTopicNames([
++				{ name: 'refunds', criterion: 'refund amounts' },
++				{ name: 'delivery', criterion: 'shipping dates', requested: false },
++			]),
++		).toBe('refunds, delivery')
++		expect(renderTopicNames([{ name: 'refunds', criterion: 'refund amounts' }])).toBe('refunds')
++		expect(renderTopicNames([])).toBe('')
++	})
++})
++
++describe('renderCauseChain', () => {
++	it('renders an error and its causes by name and message', () => {
++		expect(
++			renderCauseChain(new Error('judge failed', { cause: new TypeError('bad token') })),
++		).toBe('Error: judge failed <- TypeError: bad token')
++	})
++
++	it('renders a value that is not an error as its string form and ends the chain there', () => {
++		expect(renderCauseChain('refused')).toBe('refused')
++		expect(renderCauseChain(new Error('outer', { cause: 'inner' }))).toBe('Error: outer <- inner')
++	})
++
++	it('renders at most 3 causes', () => {
++		let error = new Error('cause 5')
++		for (const depth of [4, 3, 2, 1]) error = new Error(`cause ${depth}`, { cause: error })
++		expect(renderCauseChain(error)).toBe(
++			'Error: cause 1 <- Error: cause 2 <- Error: cause 3 <- Error: cause 4',
++		)
++	})
++})
++
++describe('extractWords', () => {
++	it('reads the lowercased words and the names that follow inside a sentence', () => {
++		const read = extractWords('Refunds wait. Ask Odile about BW-5512.')
++		expect([...read.words]).toEqual(['refunds', 'wait', 'ask', 'odile', 'about', 'bw', '5512'])
++		expect([...read.names]).toEqual(['odile'])
++	})
++
++	it('leaves out a word that opens the text or follows a sentence or clause mark', () => {
++		expect([...extractWords('Odile phoned! Marlow called; Dana: Pat? Lee asked Kim').names]).toEqual(
++			['kim'],
++		)
++	})
++
++	it('leaves out a hyphenated, an elided, or an all-capital word', () => {
++		expect(
++			[...extractWords("ask Dana-Lee and O'Neil about the BW account and Odile").names],
++		).toEqual(['odile'])
++		expect(extractWords('').words.size + extractWords('').names.size).toBe(0)
++	})
++})
++
++describe('splitWords', () => {
++	it('lowercases each word and strips its outer punctuation and symbols', () => {
++		expect(splitWords('"Odile Marlow\'s" refund!')).toEqual(['odile', "marlow's", 'refund'])
++		expect(splitWords('  BW-5512, $148.50 ')).toEqual(['bw-5512', '148.50'])
++	})
++
++	it('drops a word that holds only punctuation', () => {
++		expect(splitWords('refunds ... — ok')).toEqual(['refunds', 'ok'])
++		expect(splitWords('')).toEqual([])
++	})
++})
+diff --git a/src/core/ledgers/validators.ts b/src/core/ledgers/validators.ts
+new file mode 100644
+index 0000000..34a1493
+--- /dev/null
++++ b/src/core/ledgers/validators.ts
+@@ -0,0 +1,33 @@
++import { isFiniteNumber, isNumber } from '@orkestrel/contract'
++
++/**
++ * Checks whether a value is a finite number greater than 0 and at most 1.
++ *
++ * @param value - The value to check
++ * @returns True if `value` is a number in the interval above 0 up to and including 1; false otherwise
++ *
++ * @example
++ * ```ts
++ * isFraction(0.7) // true
++ * isFraction(0) // false
++ * ```
++ */
++export function isFraction(value: unknown): value is number {
++	return isFiniteNumber(value) && value > 0 && value <= 1
++}
++
++/**
++ * Checks whether a value is a safe integer greater than 0.
++ *
++ * @param value - The value to check
++ * @returns True if `value` is a positive safe integer; false otherwise
++ *
++ * @example
++ * ```ts
++ * isPositiveSafeInteger(32_768) // true
++ * isPositiveSafeInteger(0) // false
++ * ```
++ */
++export function isPositiveSafeInteger(value: unknown): value is number {
++	return isNumber(value) && Number.isSafeInteger(value) && value > 0
++}
+diff --git a/tests/src/core/ledgers/validators.test.ts b/tests/src/core/ledgers/validators.test.ts
+new file mode 100644
+index 0000000..c4b124d
+--- /dev/null
++++ b/tests/src/core/ledgers/validators.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it } from 'vitest'
++import { isFraction, isPositiveSafeInteger } from '../../../../src/core/ledgers/validators.js'
++
++describe('isFraction', () => {
++	it('accepts a number above 0 up to and including 1', () => {
++		for (const value of [1, 0.7, 0.3, Number.MIN_VALUE]) expect(isFraction(value)).toBe(true)
++	})
++
++	it('refuses 0, a negative, a value above 1, and a nonfinite number', () => {
++		for (const value of [0, -0, -0.5, 1 + Number.EPSILON, 2, Number.NaN, Infinity, -Infinity])
++			expect(isFraction(value)).toBe(false)
++	})
++
++	it('refuses a value that is not a number', () => {
++		for (const value of ['0.5', undefined, null, {}, [0.5], 1n]) expect(isFraction(value)).toBe(false)
++	})
++})
++
++describe('isPositiveSafeInteger', () => {
++	it('accepts a safe integer above 0', () => {
++		for (const value of [1, 4096, Number.MAX_SAFE_INTEGER]) expect(isPositiveSafeInteger(value)).toBe(true)
++	})
++
++	it('refuses 0, a negative, a fraction, an unsafe integer, and a nonfinite number', () => {
++		for (const value of [0, -0, -5, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Infinity])
++			expect(isPositiveSafeInteger(value)).toBe(false)
++	})
++
++	it('refuses a value that is not a number', () => {
++		for (const value of ['1', undefined, null, {}, [1], 1n])
++			expect(isPositiveSafeInteger(value)).toBe(false)
++	})
++})

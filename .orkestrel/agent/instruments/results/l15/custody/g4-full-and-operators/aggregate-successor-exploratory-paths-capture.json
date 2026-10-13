@@ -1,0 +1,86 @@
+{
+  "diffs": [
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-g4.diff",
+      "command": "git diff --no-index --no-ext-diff -- tmp/units/aggregate-successor-g4-exploratory-prepare.ts tmp/units/aggregate-successor-g4-exploratory-prepare-2.ts",
+      "exit": 1,
+      "stderr": "",
+      "bytes": 3511,
+      "sha256": "ee5b91d15ed12ae79f20780cd4e59947efbd36be137b1aa95da7b251607d5e73"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-q2.diff",
+      "command": "git diff --no-index --no-ext-diff -- tmp/units/aggregate-successor-q2-exploratory-prepare.ts tmp/units/aggregate-successor-q2-exploratory-prepare-2.ts",
+      "exit": 1,
+      "stderr": "",
+      "bytes": 3043,
+      "sha256": "5c34dae99baa53f684c71b81071a611ad004ee888bed431ef693e69b637dffd5"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-aggregate-reader.diff",
+      "command": "git diff --no-index --no-ext-diff -- tmp/units/aggregate-successor-g4-think0-aggregate-read.ts tmp/units/aggregate-successor-g4-think0-aggregate-read-2.ts",
+      "exit": 1,
+      "stderr": "",
+      "bytes": 1251,
+      "sha256": "f5e32e8484da5a24f85ba486aa7e7465ff07fc97e57ec4e866e92be42371475e"
+    }
+  ],
+  "files": [
+    {
+      "path": "tmp/units/aggregate-successor-g4-exploratory-prepare.ts",
+      "bytes": 7418,
+      "sha256": "a5ee0d1e2e382f7002919cc10a268432b50d887023c27175fdd9c2fdc9a75e73"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-g4-exploratory-prepare-2.ts",
+      "bytes": 8013,
+      "sha256": "4df8f2ca81aad37209c327b7dfa05576bbf65dff3d80025d9f759781a9d7e4e2"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-q2-exploratory-prepare.ts",
+      "bytes": 7420,
+      "sha256": "b33662c6020f67feb528b8e73269435a88474ae8e20456e296ef4a04d69999c9"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-q2-exploratory-prepare-2.ts",
+      "bytes": 8013,
+      "sha256": "96bba9c75fb37eb2017bdfb0334e26a328c7050b15f7c0dbe5d25db6af1056d6"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-g4-think0-aggregate-read.ts",
+      "bytes": 2451,
+      "sha256": "b95842b89a48c520b1c0240cced86712f776879f7265d5a5509e2477120ba358"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-g4-think0-aggregate-read-2.ts",
+      "bytes": 2455,
+      "sha256": "d9c6cd3e564a81f97e6a92777af3b39fa22cdb15b49080aba4b99f011d03cff7"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-read.ts",
+      "bytes": 6449,
+      "sha256": "69b4fd97b94a21f83914150389377c4b95818deba1c4cecc595d5dc560943150"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-read.stdout.jsonl",
+      "bytes": 7089,
+      "sha256": "4172aa645659e26f2e2f43df97d41fa8a15b39a28b335265a7f4d72b5d4bd5d9"
+    },
+    {
+      "path": "tmp/units/aggregate-successor-exploratory-paths-read.stderr.txt",
+      "bytes": 50,
+      "sha256": "feb0ec57964abec836fdecc0dce06648f23458e5505c5e61261e528aa8699288"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l15/g4-think0/exploration/policy.json",
+      "bytes": 2422,
+      "sha256": "b1a8bcfcee87dcb1dbf1ffcaed5ac6bd5a5ced95a30cc0b39ad6799633cae511"
+    }
+  ],
+  "absent": [
+    ".orkestrel/agent/instruments/results/l15/g4-think0/exploration-2",
+    ".orkestrel/agent/instruments/results/l15/g4-think1/exploration-2",
+    ".orkestrel/agent/instruments/results/l15/q2-think0/exploration",
+    ".orkestrel/agent/instruments/results/l15/q2-think1/exploration"
+  ]
+}

@@ -1,0 +1,427 @@
+<title>Larkspur Context Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: status, points, the per-setting table, the per-request table, the g06 table, one lane per strategy with pins on the step where an open problem sits, then the earlier round. */
+:root {
+  --bg: #f3f4f7; --surface: #ffffff; --sunk: #e9ecf1; --line: #d6dbe3; --fg: #161d2b; --muted: #576173; --accent: #2a4cc0;
+  --good: #1d7f47; --good-bg: #e2f3e9; --warn: #9a6512; --warn-bg: #f8eed9; --bad: #b42d2d; --bad-bg: #f9e3e1; --info: #2a4cc0; --info-bg: #e5eafb; --idle: #5e6778; --idle-bg: #e8eaee;
+  --s-ceiling: #6d7687; --s-tight: #a1a8b5; --s-comp: #cf7420; --s-sel: #2f6ad3; --s-ex: #128a7e; --s-both: #7e55e6; --s-brief: #b8367e;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10141b; --surface: #171d27; --sunk: #0c1016; --line: #283141; --fg: #e5e9f0; --muted: #98a2b4; --accent: #8ea7ff;
+  --good: #57c68c; --good-bg: #15291f; --warn: #e2aa4c; --warn-bg: #2c2414; --bad: #f07a72; --bad-bg: #321a1a; --info: #8ea7ff; --info-bg: #1b2238; --idle: #a0a9b8; --idle-bg: #1f2530;
+  --s-ceiling: #9aa3b3; --s-tight: #5f6879; --s-comp: #f0a052; --s-sel: #6d9cff; --s-ex: #3cc5b4; --s-both: #a98bff; --s-brief: #e47ab6;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #10141b; --surface: #171d27; --sunk: #0c1016; --line: #283141; --fg: #e5e9f0; --muted: #98a2b4; --accent: #8ea7ff;
+  --good: #57c68c; --good-bg: #15291f; --warn: #e2aa4c; --warn-bg: #2c2414; --bad: #f07a72; --bad-bg: #321a1a; --info: #8ea7ff; --info-bg: #1b2238; --idle: #a0a9b8; --idle-bg: #1f2530;
+  --s-ceiling: #9aa3b3; --s-tight: #5f6879; --s-comp: #f0a052; --s-sel: #6d9cff; --s-ex: #3cc5b4; --s-both: #a98bff; --s-brief: #e47ab6;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 44px; }
+h1, h2 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+section { display: grid; gap: 14px; min-width: 0; }
+.muted { color: var(--muted); }
+.lede { max-width: 66ch; color: var(--muted); }
+.status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.9rem; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 0.72rem/1 var(--f-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.t-good { color: var(--good); background: var(--good-bg); }
+.t-warn { color: var(--warn); background: var(--warn-bg); }
+.t-bad { color: var(--bad); background: var(--bad-bg); }
+.t-info { color: var(--info); background: var(--info-bg); }
+.t-idle { color: var(--idle); background: var(--idle-bg); }
+
+.points { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.points li { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.points b { font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th { text-align: left; font: 500 0.72rem var(--f-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td.name { font-weight: 600; white-space: nowrap; }
+td.name i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
+td.note { color: var(--muted); font-size: 0.85rem; }
+td.num { text-align: center; white-space: nowrap; }
+.score { display: grid; grid-template-columns: 3.2rem 1fr; gap: 8px; align-items: center; min-width: 140px; }
+.score b { font-weight: 600; }
+.track { position: relative; height: 8px; background: var(--sunk); border-radius: 3px; }
+.track span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.track .ceil { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--fg); opacity: 0.5; }
+
+svg { display: block; min-width: 560px; width: 100%; height: auto; }
+svg text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .window { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 6 4; }
+svg .series { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+svg .dot { stroke: var(--surface); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+.lanes { display: grid; gap: 12px; }
+.lane { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--lane); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.lane header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.lane header b { font-family: var(--f-display); font-size: 1.05rem; }
+.steps { list-style: none; margin: 0; padding: 2px 0 4px; display: flex; min-width: min-content; }
+.step { position: relative; flex: 1 1 0; min-width: 118px; max-width: 220px; background: var(--sunk); border-radius: 7px; padding: 8px 10px; margin-right: 22px; display: grid; gap: 2px; align-content: start; }
+.step:last-child { margin-right: 0; }
+.step:not(:last-child)::after { content: ""; position: absolute; right: -17px; top: 50%; width: 12px; height: 2px; background: var(--muted); }
+.step:not(:last-child)::before { content: ""; position: absolute; right: -18px; top: calc(50% - 4px); border: 5px solid transparent; border-left-color: var(--muted); border-right: 0; }
+.step b { font-size: 0.86rem; }
+.step span { font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+.step.model { background: var(--info-bg); }
+.step.judge { background: color-mix(in srgb, var(--s-sel) 14%, var(--sunk)); }
+.step.summ { background: color-mix(in srgb, var(--s-comp) 14%, var(--sunk)); }
+.pins { display: flex; gap: 4px; margin-top: 4px; }
+.pin { font: 600 0.7rem/1 var(--f-mono); border-radius: 999px; padding: 3px 7px; text-decoration: none; }
+
+.problems { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.problems li { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; scroll-margin-top: 16px; }
+.problems li:target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.problems .n { font: 600 0.9rem var(--f-mono); color: var(--muted); }
+.problems p { color: var(--muted); font-size: 0.86rem; }
+@media (max-width: 640px) { .problems li { grid-template-columns: 1.8rem minmax(0, 1fr); } .problems .chip { grid-column: 2; justify-self: start; } }
+details { font-size: 0.88rem; color: var(--muted); }
+summary { cursor: pointer; }
+
+.queue { margin: 0; padding-left: 1.4rem; display: grid; gap: 6px; }
+.queue li::marker { font-family: var(--f-mono); color: var(--muted); }
+.queue .on { font-weight: 600; }
+footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 14px; }
+code { font-family: var(--f-mono); font-size: 0.85em; overflow-wrap: anywhere; }
+.points li, .problems b, footer { overflow-wrap: anywhere; }
+td.setting { vertical-align: top; font-weight: 600; min-width: 170px; }
+td.setting span { display: block; font: 400 0.78rem var(--f-mono); color: var(--muted); margin-top: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+td.num small { display: block; color: var(--muted); font-size: 0.75rem; margin-top: 3px; }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Larkspur Context Lab</h1>
+    <p class="lede">A small model, Qwen 3.5 or Gemma 4 at the 2B or 4B size, works one support shift: 10 requests in a row, each needing a fact from 48 earlier messages. Each strategy decides what the model reads per request. The per-topic records, the ledger’s records briefing, run against the full view, the control.</p>
+    <div class="status" id="status"></div>
+  </header>
+
+  <section>
+    <h2>Where things stand</h2>
+    <ul class="points" id="points"></ul>
+  </section>
+
+  <section>
+    <h2>Records against the full view, per setting</h2>
+    <p class="muted">Every figure counts audited passes out of 10 requests per reworded copy of the Larkspur shift; each copy rewords the 10 requests and keeps every fact. A range runs from the low end to the high end: an ambiguous audit verdict counts as a fail at the low end and as a pass at the high end. With d the per-copy difference, records minus the full view, a pair clears at an end when mean(d) − 2·sd(d)/√n &gt; 0. The strict end pairs both low ends, the lenient end pairs both high ends, and across pairs the records low end with the full view high end.</p>
+    <div class="panel scroll"><table id="band"></table></div>
+    <p class="muted" id="lift"></p>
+  </section>
+
+  <section>
+    <h2>The models we tried</h2>
+    <p class="muted">Advertised figures come from each vendor’s model card (Granite 4.2 from an aggregator site); a dash means no published figure, and BFCL v3 and v4 are different test versions. Measured figures come from this host: the same two recorded g06 calls, the model swapped and every other field kept, thinking off. The bold rows ran the full benchmark.</p>
+    <div class="panel scroll"><table id="models"></table></div>
+  </section>
+
+  <section>
+    <h2>Per request on the 4B, copies 1–4</h2>
+    <p class="muted">Audited passes out of 4 copies, as a range where an ambiguous verdict changes the count.</p>
+    <div class="panel scroll"><table id="goals"></table></div>
+    <p class="muted">The records’ credit-check misses state every figure and leave out the “it fits” verdict. g06, Kenji’s shipping reply, passes in no arm and no setting; the following section shows why.</p>
+  </section>
+
+  <section>
+    <h2>g06, Kenji’s shipping reply</h2>
+    <p class="muted">A pass needs four things at once: a message to Kenji, the tracking number, no delivery date although the order lookup returns the carrier’s estimate, and no claim that the gift note was added although the lookup says its text is not recorded. Each cell counts audited correct replies of 4 copies (a range where an ambiguous verdict changes the count) and, under it, the replies that carry a delivery date. The live columns ran g06 alone; the replay columns change one thing in the recorded records calls, each base replay reproducing its record byte for byte.</p>
+    <div class="panel scroll"><table id="g06"></table></div>
+    <p class="muted">The rule reaches every prompt in both arms, and records and the full view fail alike, so g06 measures the model and the goal rather than the context strategy. The plain rule is “never put a delivery date, a carrier estimate included, in a customer reply”; the recorded rule says “never promise”.</p>
+  </section>
+
+  <section>
+    <h2>How each strategy works</h2>
+    <p class="muted">Left to right, from the conversation to the reply. A numbered pin marks an open problem from the following list.</p>
+    <div class="lanes" id="lanes"></div>
+  </section>
+
+  <section>
+    <h2>Open problems</h2>
+    <ol class="problems" id="problems"></ol>
+    <details id="fixed"></details>
+  </section>
+
+  <section>
+    <h2>Next</h2>
+    <ol class="queue" id="queue"></ol>
+  </section>
+
+  <section>
+    <h2>Earlier round: round A, graded 2026-10-09</h2>
+    <p class="muted">Round A ran the 2B with thinking off, one run each, graded out of 60 (correct, complete, faithful) on the fixed harness, where every request gets a reply. The tick marks the control. Differences under about 4 points are noise.</p>
+    <div class="panel scroll"><table id="scores"></table></div>
+    <p class="muted">Largest prompt per request in round A. The control grows about 300 tokens per request and passes the 3,072-token window at request 4; the briefing stays under 2,900.</p>
+    <div class="panel"><div class="legend" id="legend"></div><div class="scroll"><svg id="room" viewBox="0 0 720 300" role="img" aria-label="Largest prompt per request in round A, in tokens"></svg></div></div>
+  </section>
+
+  <footer>Qwen 3.5 2B and 4B and Gemma 4 E2B and E4B at Q4_K_M on Ollama 0.40.0, a 4-CPU host with no GPU, temperature 0; judge Mica-v0.1-4B; blind audits by two Haiku auditors with a tiebreak. The harness lives in the scaffold repository under <code>.orkestrel/agent/instruments/harness</code>, and the readings under <code>.orkestrel/agent/instruments/results</code>.</footer>
+</div>
+
+<script>
+const UPDATED = '2026-10-10'
+const STATUS_TEXT = 'The model decides most of the records lead. Records hold the same level per size on Qwen 3.5 and Gemma 4, while the full view moves with the model: records lead by about 2 passes per copy on the Qwen 2B and by none on Gemma 4 E4B, which still answers from a prompt under half the full view’s size. Release 0.0.30 passes every gate and waits on the owner’s go-ahead.'
+
+const POINTS = [
+  ['The model decides most of the records lead.', 'Thinking off, 8 copies each, audited on both sides: records read 5.50–6.38 on the Qwen 2B and 5.88–6.88 on Gemma 4 E2B, and 7.63–8.00 on the Qwen 4B and 7.75–8.38 on Gemma 4 E4B. The full view moves with the model: 3.50–4.13 and 4.75–6.00 at the 2B size, 6.13–7.63 and 7.38–8.63 at the 4B size. The lead clears at every end on the Qwen 2B, at the strict end only on the Qwen 4B, and at no end on either Gemma.'],
+  ['Records answer from a smaller prompt.', 'At the tenth request of a Gemma 4 E4B shift the records prompt holds 1,904 tokens and the full view’s 4,962, so where the scores tie records still read under half the context.'],
+  ['On the 2B, records clear the full view at every end, with thinking off and on.', 'Thinking off, 8 copies, every row audited on both sides: records 5.50–6.38 passes per copy against 3.50–4.13 for the full view, lower bounds 1.07 strict, 0.80 lenient, and 0.13 across. Thinking on with the answer pass thinking off (t2a, 4 copies): 6.75–7.00 against 4.50–5.25, lower bounds 1.29, 0.49, and 0.21.'],
+  ['The ported ledger, run live, matches the measured method.', 'Over the same 8 copies, the `createLedger` function at commit 8f5098b reads 5.75–6.50 against 5.50–6.38 for the measured records runs, inside the tolerance of 1 pass per copy (lower bounds −0.57 and −0.91). Against the full view it clears at every end: 1.43, 1.13, and 0.70. Read by the scorer alone it trailed; the audit removes 12 false passes from the measured runs and 6 from the port.'],
+  ['The records lead shrinks as the Qwen model gets stronger.', 'Qwen 4B, thinking off (f4, 8 copies): 7.63–8.00 against 6.13–7.63, clearing at the strict end (0.19) and not at the lenient end (−0.37). 4B, thinking on (t4, cap 1,024, 4 copies): 8.00–8.25 against 7.50–8.50, clearing at neither end (−0.79, −1.21).'],
+  ['With the 4B thinking, the full view catches up.', 'Against its thinking-off copies, thinking lifts the 4B full view at both ends (lower bounds 1.18 and 0.29) and lifts records at neither end.'],
+  ['g06, Kenji’s shipping reply, measures the model and the goal, not the context strategy.', '1 correct of 48 live runs with the plain rule in both arms, after 0 of 38 in the final check and 0 of 32 around the date anchor. The plain rule stops the 4B with thinking relaying the carrier estimate in 7 of 8 replies; those replies then claim the gift note in 7 of 8, and with the gift note removed it writes 3 correct replies of 4. Without thinking, the 2B and the 4B relay the estimate even when the request itself forbids it (3 of 4 each); the 2B with thinking withholds it only when the request says so. The rule reaches every prompt and both arms fail alike, so the port needs no change.'],
+  ['Compaction ran as pilots only.', 'One copy per condition, with no audited reading.'],
+]
+
+// Arms the per-setting table, the lanes, and the round A table share by id.
+const ARMS = {
+  records: { name: 'Per-topic records', color: '--s-both' },
+  ceiling: { name: 'Full view (control)', color: '--s-ceiling' },
+  brief: { name: 'Event-sourced briefing', color: '--s-brief' },
+}
+
+// Round A graded out of 60 ([correct, complete, faithful], each out of 20); the full view is the control.
+const ROWS = [
+  { id: 'brief', grade: [14, 19, 16], invented: 3, prompts: [2419, 2219, 2869, 2399, 2586, 2452, 2387, 2368, 2112, 2444], time: '60 s', note: 'Round A, one run. Every needed fact in its briefing, no replaced value revived; its 4 misses were the model misreading a fact in view.' },
+  { id: 'ceiling', grade: [12, 16, 13], invented: 5, prompts: [2684, 2839, 3045, 3369, 3421, 3818, 4135, 4596, 5132, 5456], time: '14 s', note: 'Round A, one run. Every message in view at a 6,144-token window, twice the briefing’s.' },
+]
+
+// Passes of 10 per reworded copy: a number, or [low, high] where an ambiguous audit verdict changes the count.
+// `mean` stands in for copies an audit reads for direction only; `pending` marks a series still running.
+const SETTINGS = [
+  { name: 'Qwen 2B, thinking off', tag: 'v9 runs, 8 copies, audited 2026-10-10', ends: ['strict', 'lenient', 'across'],
+    copies: { records: [[5, 7], [6, 8], 6, [5, 7], [5, 6], 6, 5, 6], ceiling: [2, [3, 4], 5, [5, 6], 3, 2, [4, 6], [4, 5]] } },
+  { name: 'Gemma 4 E2B, thinking off', tag: 'v11, 8 copies, audited 2026-10-10', ends: ['strict', 'lenient', 'across'],
+    copies: { records: [[4, 6], [5, 6], [8, 9], [6, 7], 6, [7, 8], 7, [4, 6]], ceiling: [[6, 7], 6, [4, 7], [5, 6], [2, 4], 5, 6, [4, 7]] } },
+  { name: 'Qwen 2B, thinking on, answer pass thinking off', tag: 't2a, 4 copies', ends: ['strict', 'lenient', 'across'],
+    copies: { records: [7, 8, 6, [6, 7]], ceiling: [4, [5, 6], [5, 6], [4, 5]] } },
+  { name: 'Qwen 4B, thinking off', tag: 'f4, 8 copies', ends: ['strict', 'lenient'],
+    copies: { records: [8, [6, 8], 8, 8, 7, 8, [8, 9], 8], ceiling: [[5, 7], [7, 8], [5, 7], [5, 7], [7, 8], 9, [5, 7], [6, 8]] } },
+  { name: 'Gemma 4 E4B, thinking off', tag: 'v12, 8 copies, audited 2026-10-10', ends: ['strict', 'lenient', 'across'],
+    copies: { records: [[6, 7], [7, 8], 9, [8, 9], 7, [8, 9], 9, [8, 9]], ceiling: [9, [8, 9], 9, [6, 8], [8, 9], [6, 9], [7, 8], [6, 8]] } },
+  { name: 'Qwen 4B, thinking on, cap 1,024', tag: 't4, 4 copies', ends: ['strict', 'lenient'],
+    copies: { records: [8, 8, [8, 9], 8], ceiling: [[8, 9], 9, [7, 9], [6, 7]] } },
+  { name: 'Ported ledger, live, Qwen 2B, thinking off', tag: 'createLedger at 8f5098b, 8 copies, audited 2026-10-10', ends: ['strict', 'lenient', 'across'],
+    copies: { records: [[6, 8], [5, 6], [6, 7], [6, 7], 4, [5, 6], 7, 7], ceiling: [2, [3, 4], 5, [5, 6], 3, 2, [4, 6], [4, 5]] } },
+]
+// Thinking on against thinking off on the 4B, paired by copy over the copies both settings ran.
+const LIFT = { on: 'Qwen 4B, thinking on, cap 1,024', off: 'Qwen 4B, thinking off' }
+
+// Advertised (vendor cards) and measured on this host, thinking off; `ran` marks a model that ran the full benchmark.
+const MODEL_COLUMNS = ['Model', 'Size', 'BFCL', 'IFEval', 'MMLU-Pro', 'Tau2', 'Prompt tok/s', 'Gen tok/s', 'Tool call', 'Thinking', 'Result']
+const MODELS = [
+  { ran: true, cells: ['Qwen 3.5 2B', '2B', 'v4 43.6', '61.2', '55.3', '48.8', '152–167', '12.8–13.3', 'correct', 'yes', 'baseline'] },
+  { ran: true, cells: ['Gemma 4 E2B', '2.3B effective', '–', '–', '60.0', '24.5', '118–119', '11.1–11.6', 'correct', 'yes', 'ran 8 copies'] },
+  { cells: ['Granite 4 H-Tiny', '7B, 1B active', 'v3 57.7', '–', '–', '–', '97–102', '16.9–17.5', 'correct', 'no', 'passes the pilot'] },
+  { cells: ['LFM2.5 1.2B Thinking', '1.2B', 'v3 57.0', '–', '–', '–', '249–291', '21–22', 'none', 'always on', 'fails'] },
+  { ran: true, cells: ['Qwen 3.5 4B', '4B', 'v4 50.3', '89.8', '79.1', '79.9', '68–71', '6.2–6.3', 'correct', 'yes', 'baseline'] },
+  { ran: true, cells: ['Gemma 4 E4B', '4.5B effective', '–', '–', '69.4', '42.2', '65', '8.2–8.6', 'correct', 'yes', 'ran 8 copies'] },
+  { cells: ['Ministral 3 3B', '3.4B', '–', '–', '–', '–', '85–93', '6.4–8.1', 'correct', 'no', 'passes the pilot'] },
+  { cells: ['Granite 4.2 3B', '3B', 'v4 52.4', '–', '–', '–', '69–83', '6.2–8.0', 'searched first', 'yes', 'needs a harness run'] },
+  { cells: ['LFM2.5 8B', '8B, 1.5B active', 'v4 48.5–49.7', '91.8', '–', '39.8–88.1', '96', '16.7–17.6', '1 of 2', 'yes', 'unreliable'] },
+  { cells: ['Granite 4.1 3B', '3B', 'v3 60.8', '82.3', '49.8', '–', '77–84', '6.5–7.7', 'none', 'no', 'fails'] },
+]
+
+// Per request, audited passes out of 4 on the 4B, copies 1–4: a number or [low, high].
+const GOAL_COLUMNS = ['t4 records', 't4 full view', 'f4 records', 'f4 full view']
+const GOALS = [
+  { name: 'g05 approval note', passes: [3, 3, [2, 3], [0, 2]] },
+  { name: 'g08 credit check', passes: [[2, 3], 4, 1, [1, 2]] },
+]
+
+// g06 per setting, 2026-10-10: [correct, ambiguous, replies carrying a delivery date], each of 4.
+const G06_COLUMNS = ['Live: records, plain rule', 'Live: full view, recorded rule', 'Live: full view, plain rule', 'Replay: rule in the request', 'Replay: no gift note', 'Replay: neither trap']
+const G06 = [
+  { name: 'Qwen 2B, thinking off', cells: [[0, 0, 3], [0, 0, 2], [1, 0, 2], [0, 0, 3], [0, 0, 4], [0, 1, 1]] },
+  { name: 'Qwen 2B, thinking on', cells: [[0, 0, 4], [0, 0, 4], [0, 0, 4], [1, 0, 1], [0, 1, 3], [1, 0, 0]] },
+  { name: 'Qwen 4B, thinking off', cells: [[0, 0, 4], [0, 0, 4], [0, 0, 4], [0, 0, 3], [0, 0, 4], [0, 1, 2]] },
+  { name: 'Qwen 4B, thinking on', cells: [[0, 1, 1], [0, 0, 4], [0, 0, 1], [0, 0, 0], [3, 0, 0], [2, 0, 0]] },
+]
+
+// Pins reference PROBLEMS by number.
+const LANES = [
+  { ref: 'records', name: 'Per-topic records: the ledger, the `createLedger` function in the `@orkestrel/agent` package', chip: ['Ported', 't-info'], steps: [['Events', 'Messages, tool results, and judge answers, each in an append-only store'], ['File', 'The judge files each message once: kind, topic, and what it amends or replaces', 'judge'], ['Record', 'Per account, the current sentences rebuilt from its events by code; a sentence holding a replaced value leaves', 'summ'], ['Briefing', 'Today’s date, the rules, the request’s account record, and the recall tool', '', [2, 3]], ['Model', '2B or 4B, thinking on or off; can recall, then answers', 'model', [1, 4, 5]], ['Reply', 'The final message']] },
+  { ref: 'ceiling', name: 'Full view (control)', chip: ['Control', 't-idle'], steps: [['Conversation', 'Every message'], ['Prompt', 'Grows each request; round A ran it at a 6,144-token window', '', [3]], ['Model', '2B or 4B, thinking on or off; looks up, answers', 'model', [4, 5]], ['Reply', 'The final message']] },
+]
+
+const STATUS = { fixing: ['Being built', 't-info'], open: ['Open', 't-bad'], goal: ['Open: goal defect', 't-bad'], model: ['Open: model behavior', 't-warn'] }
+const PROBLEMS = [
+  ['open', 'In records, the credit check leaves out the fit verdict.'],
+  ['open', 'The records briefing splits a rule into a bare fragment (“- And never promise …”). Live, the fragment suffices for the 4B with thinking; the whole-rule rendering is unmeasured on all ten goals.'],
+  ['goal', 'g06 asks for four things at once, and each model below the 4B with thinking fails a different one; “never promise” also lets a hedged estimate through. The successor harness rewords the rule and splits g06 into a withhold-the-estimate goal and a pending-gift-note goal.'],
+  ['model', 'The 4B with thinking invents actions the record does not support: an escalation, a gift note “added” (7 of 8 plain-rule g06 replies, in both arms), and a warehouse pickup.'],
+  ['model', 'In 20 of 48 g06 replies the models call the ship date today, though every prompt states “Today is Friday 2026-10-09”.'],
+]
+const FIXED = 'Closed on 2026-10-10: the harness lives in the scaffold repository under `.orkestrel/agent/instruments/harness`, with the agent and judge builds every measured run used, and a run from there matches the original on every call (83 of 83 records calls, 13 of 13 full-view calls). Settled on 2026-10-10: g06, by 48 live runs with the plain rule in both arms and 64 request-level replays, each set audited blind. Closed on 2026-10-10: the scorer corrections for g01, g03, g04, g05, g06, g08, and g09, with 83 fixtures, in all 17 scenario files; the live port series and its two-sided audit. Closed before publish: three falsify rounds on the ported ledger, closed at commit 8f5098b, and an offline replay of the 8 measured records runs that sends the measured requests, 108 of 108, with 0 unlisted bodies. Every scenario date is anchored to the run day, 2026-10-09; g06 failed 0 of 32 g06-only records runs before and after that anchor. Fixed in earlier rounds: the briefing states today’s date and lists rules one per line; the answer run reads the results as a note with no tools, so every request gets a reply; the scorer reads negations; every run starts from a cold daemon and records its wire.'
+
+const QUEUE = [
+  ['on', 'Publish `@orkestrel/agent` 0.0.30 with the ledger. The release visit passed every gate in a full clone (scaffold 0.0.99, dist moved, ranges same); the release commit, the push, and the upload wait on the owner’s go-ahead and npm login.'],
+  ['', 'The desk: the core contract, thread families, turn, and the page with toggles for strategy (Records, Full view, Compaction), model (2B, 4B), and thinking pass every gate against the release candidate; it re-pins to 0.0.30 and pushes after the upload.'],
+  ['', 'Successor harness: reword the g06 rule, split g06 into a withhold-the-estimate goal and a pending-gift-note goal, and give g04 a send tool.'],
+  ['', 'Records rendering: measure each rule rendered whole at the top of the system message on all ten goals.'],
+  ['', 'Run t4 copies 5–8.'],
+  ['', 'Optional: a third model family at the 2B size (Granite 4 H-Tiny passes the pilot and generates faster than the Qwen 2B) to test that records hold their level on it too.'],
+]
+
+const css = (name) => `var(${name})`
+const el = (tag, attrs = {}, ...kids) => {
+  const node = document.createElement(tag)
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'class') node.className = value
+    else if (key === 'style') node.setAttribute('style', value)
+    else if (key === 'text') node.textContent = value
+    else node.setAttribute(key, value)
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) node.append(kid)
+  return node
+}
+const chip = ([label, tone]) => el('span', { class: `chip ${tone}`, text: label })
+// Backticks in the data mark a code token.
+const rich = (text) => text.split('`').map((part, index) => (index % 2 === 1 ? el('code', { text: part }) : part))
+
+document.getElementById('status').append(el('span', { class: 'muted', text: `Updated ${UPDATED}.` }), el('span', { text: STATUS_TEXT }))
+document.getElementById('points').append(...POINTS.map(([lead, rest]) => el('li', {}, el('b', {}, rich(lead)), ' ', el('span', { class: 'muted' }, rich(rest)))))
+
+const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length
+const ends = (value) => (Array.isArray(value) ? value : [value, value])
+const span = (value) => { const [low, high] = ends(value); return low === high ? String(low) : `${low}–${high}` }
+const signed = (value) => value.toFixed(2).replace('-', '−')
+// Each end names which side of [low, high] the records and the full view take.
+const END_SIDES = { strict: [0, 0], lenient: [1, 1], across: [0, 1] }
+const lowerBound = (d) => {
+  const m = mean(d)
+  const sd = Math.sqrt(d.reduce((sum, value) => sum + (value - m) ** 2, 0) / (d.length - 1))
+  return m - (2 * sd) / Math.sqrt(d.length)
+}
+const bounds = (arm, base, names) => names.map((end) => {
+  const [armSide, baseSide] = END_SIDES[end]
+  const pairs = Math.min(arm.length, base.length)
+  return [end, lowerBound(arm.slice(0, pairs).map((value, index) => ends(value)[armSide] - ends(base[index])[baseSide]))]
+})
+const verdict = (list) => {
+  const cleared = list.filter(([, bound]) => bound > 0).map(([end]) => end)
+  const missed = list.filter(([, bound]) => bound <= 0).map(([end]) => end)
+  if (missed.length === 0) return list.length === 2 ? 'at both ends' : 'at every end'
+  if (cleared.length === 0) return list.length === 2 ? 'at neither end' : 'at no end'
+  return `at the ${cleared.join(' and ')} end, not at the ${missed.join(' and ')} end`
+}
+const boundText = (list) => list.map(([end, bound]) => `${signed(bound)} ${end}`).join(', ')
+
+const COPIES = 8
+const bandTable = document.getElementById('band')
+bandTable.append(el('thead', {}, el('tr', {}, ...['Setting', 'Arm', ...Array.from({ length: COPIES }, (_, index) => `Copy ${index + 1}`), 'Mean', 'Against the full view'].map((text) => el('th', { text })))))
+bandTable.append(el('tbody', {}, ...SETTINGS.flatMap((setting) => {
+  const armIds = setting.arms ?? ['records', 'ceiling']
+  const paired = setting.copies ? bounds(setting.copies.records, setting.copies.ceiling, setting.ends) : null
+  const against = paired ? `Clears ${verdict(paired)} (lower bounds ${boundText(paired)}).` : setting.note
+  return armIds.map((id, row) => {
+    const values = setting.copies?.[id]
+    const cells = setting.pending
+      ? [el('td', { class: 'num', colspan: String(COPIES) }, chip(setting.pending))]
+      : Array.from({ length: COPIES }, (_, index) => el('td', { class: 'num', text: values && index < values.length ? span(values[index]) : '–' }))
+    const meanRange = values ? [mean(values.map((value) => ends(value)[0])), mean(values.map((value) => ends(value)[1]))] : setting.mean?.[id]
+    return el('tr', {},
+      row === 0 ? el('td', { class: 'setting', rowspan: String(armIds.length) }, setting.name, el('span', { text: setting.tag })) : null,
+      el('td', { class: 'name' }, el('i', { style: `background:${css(ARMS[id].color)}` }), ARMS[id].name),
+      ...cells,
+      el('td', { class: 'num' }, el('b', { text: meanRange ? `${meanRange[0].toFixed(2)}–${meanRange[1].toFixed(2)}` : '–' })),
+      row === 0 ? el('td', { class: 'note', rowspan: String(armIds.length), text: against }) : null)
+  })
+})))
+
+const byName = Object.fromEntries(SETTINGS.map((setting) => [setting.name, setting]))
+const on = byName[LIFT.on].copies, off = byName[LIFT.off].copies
+const liftCeiling = bounds(on.ceiling, off.ceiling, ['strict', 'lenient'])
+const liftRecords = bounds(on.records, off.records, ['strict', 'lenient'])
+document.getElementById('lift').textContent = `Thinking on the 4B, paired by copy with the thinking-off copies 1–${on.ceiling.length}: the full view clears ${verdict(liftCeiling)} (lower bounds ${boundText(liftCeiling)}); records clear ${verdict(liftRecords)}.`
+
+const goalTable = document.getElementById('goals')
+goalTable.append(el('thead', {}, el('tr', {}, el('th', { text: 'Request' }), ...GOAL_COLUMNS.map((text) => el('th', { text })))))
+goalTable.append(el('tbody', {}, ...GOALS.map((goal) => el('tr', {},
+  el('td', { class: 'name', text: goal.name }),
+  ...goal.passes.map((value) => {
+    const share = ends(value)[0] / 4
+    const tone = share >= 0.75 ? 't-good' : share >= 0.25 ? 't-warn' : 't-bad'
+    return el('td', { class: 'num' }, el('span', { class: `chip ${tone}`, text: `${span(value)} of 4` }))
+  })))))
+
+const modelTable = document.getElementById('models')
+modelTable.append(el('thead', {}, el('tr', {}, ...MODEL_COLUMNS.map((text) => el('th', { text })))))
+modelTable.append(el('tbody', {}, ...MODELS.map((model) => el('tr', {}, ...model.cells.map((text, index) => el('td', { class: index === 0 ? 'name' : 'num', text: index === 0 && model.ran ? '' : text }, index === 0 && model.ran ? el('b', { text }) : null))))))
+
+const g06Table = document.getElementById('g06')
+g06Table.append(el('thead', {}, el('tr', {}, el('th', { text: 'Setting' }), ...G06_COLUMNS.map((text) => el('th', { text })))))
+g06Table.append(el('tbody', {}, ...G06.map((row) => el('tr', {},
+  el('td', { class: 'name', text: row.name }),
+  ...row.cells.map(([correct, ambiguous, dated]) => {
+    const tone = correct >= 3 ? 't-good' : correct + ambiguous > 0 ? 't-warn' : 't-bad'
+    return el('td', { class: 'num' }, el('span', { class: `chip ${tone}`, text: `${span(ambiguous ? [correct, correct + ambiguous] : correct)} of 4` }), el('small', { text: `date in ${dated}` }))
+  })))))
+
+const pin = (number) => {
+  const [status, title] = PROBLEMS[number - 1]
+  return el('a', { class: `pin ${STATUS[status][1]}`, href: `#p${number}`, title: title.replace(/`/g, ''), text: String(number) })
+}
+document.getElementById('lanes').append(...LANES.map((lane) => el('article', { class: 'lane', style: `--lane:${css(ARMS[lane.ref].color)}` },
+  el('header', {}, el('b', {}, rich(lane.name)), chip(lane.chip)),
+  el('div', { class: 'scroll' }, el('ol', { class: 'steps' }, ...lane.steps.map(([title, detail, kind, pins]) => el('li', { class: `step ${kind ?? ''}` }, el('b', { text: title }), detail ? el('span', { text: detail }) : null, pins ? el('div', { class: 'pins' }, ...pins.map(pin)) : null)))))))
+
+document.getElementById('problems').append(...PROBLEMS.map(([status, title], index) => el('li', { id: `p${index + 1}` },
+  el('span', { class: 'n', text: String(index + 1) }), el('div', {}, el('b', {}, rich(title))), chip(STATUS[status]))))
+document.getElementById('fixed').append(el('summary', { text: 'Closed earlier' }), el('p', { style: 'margin-top:6px' }, rich(FIXED)))
+document.getElementById('queue').append(...QUEUE.map(([state, text]) => el('li', { class: state }, rich(text))))
+
+const CEILING = ROWS.find((row) => row.id === 'ceiling').grade.reduce((sum, part) => sum + part, 0) // the control
+const score = (parts, color) => {
+  const value = parts.reduce((sum, part) => sum + part, 0)
+  return el('div', { class: 'score' }, el('b', { text: `${value} / 60` }),
+    el('div', { class: 'track' }, el('span', { style: `width:${(value / 60) * 100}%;background:${css(color)}` }), el('i', { class: 'ceil', style: `left:calc(${(CEILING / 60) * 100}% - 1px)` })))
+}
+const table = document.getElementById('scores')
+table.append(el('thead', {}, el('tr', {}, ...['Strategy', 'Score', 'Invented', 'Prompt, tokens', 'Per answer', ''].map((text) => el('th', { text })))))
+table.append(el('tbody', {}, ...ROWS.map((row) => {
+  const values = row.prompts ?? []
+  const range = values.length === 0 ? '–' : `${Math.min(...values).toLocaleString('en-US')}–${Math.max(...values).toLocaleString('en-US')}`
+  return el('tr', {},
+    el('td', { class: 'name' }, el('i', { style: `background:${css(ARMS[row.id].color)}` }), ARMS[row.id].name),
+    el('td', {}, score(row.grade, ARMS[row.id].color)),
+    el('td', { text: `${row.invented} of 10` }),
+    el('td', { text: range }), el('td', { text: row.time }), el('td', { class: 'note', text: row.note }))
+})))
+
+const NS = 'http://www.w3.org/2000/svg'
+const svg = (tag, attrs = {}, text) => { const node = document.createElementNS(NS, tag); for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value); if (text !== undefined) node.textContent = text; return node }
+const chart = document.getElementById('room')
+const W = 720, H = 300, L = 52, R = 24, T = 14, B = 36, MAX = 6000
+const x = (index) => L + (index * (W - L - R)) / 9
+const y = (value) => T + (1 - value / MAX) * (H - T - B)
+for (let tick = 0; tick <= MAX; tick += 1000) chart.append(svg('line', { class: 'grid', x1: L, x2: W - R, y1: y(tick), y2: y(tick) }), svg('text', { x: L - 8, y: y(tick) + 4, 'text-anchor': 'end' }, tick.toLocaleString('en-US')))
+for (let index = 0; index < 10; index += 1) chart.append(svg('text', { x: x(index), y: H - B + 18, 'text-anchor': 'middle' }, String(index + 1)))
+chart.append(svg('text', { x: (L + W - R) / 2, y: H - 4, 'text-anchor': 'middle' }, 'request'))
+chart.append(svg('line', { class: 'window', x1: L, x2: W - R, y1: y(3072), y2: y(3072) }), svg('text', { x: W - R, y: y(3072) - 6, 'text-anchor': 'end', style: `fill:${css('--bad')}` }, '3,072-token window'))
+for (const row of ROWS) {
+  const color = ARMS[row.id].color
+  const points = row.prompts.map((value, index) => [x(index), y(value)])
+  chart.append(svg('polyline', { class: 'series', points: points.map((point) => point.join(',')).join(' '), stroke: css(color) }))
+  for (const [px, py] of points) chart.append(svg('circle', { class: 'dot', cx: px, cy: py, r: 3, fill: css(color) }))
+}
+document.getElementById('legend').append(...ROWS.map((row) => el('span', {}, el('i', { style: `background:${css(ARMS[row.id].color)}` }), ARMS[row.id].name)))
+</script>

@@ -1,0 +1,110 @@
+{
+ "total": 13,
+ "disagreements": 0,
+ "final": [
+  {
+   "id": "4bb98d89",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks who gets copied. The reply names no copy recipient, and the desk rule in the seed (index 6) requires copying Priya Raman on every escalation. The omission is an unanswered part of the request.",
+   "points": "missing: priya. Other scored points (marcus, pw-5521-9930) are met."
+  },
+  {
+   "id": "7a8bd5e5",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply tells the customer the kettle is estimated to arrive on October 12th. That is a delivery date written to a customer, which the seed's never-promise rule forbids. The date is an arrival date, not a ship date, so the ship-date misread case does not apply.",
+   "points": "forbiddenHit: october 12. patternsHit: written calendar date. expected pw-6013-2280 is met."
+  },
+  {
+   "id": "8deba591",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says the kettle will arrive on October 12th, a delivery date written to the customer. The seed's never-promise rule forbids it.",
+   "points": "forbiddenHit: october 12. patternsHit: written calendar date. expected pw-6013-2280 is met."
+  },
+  {
+   "id": "e3951e48",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives the customer an estimated delivery of 2026-10-12 in writing, which the seed's never-promise rule forbids.",
+   "points": "forbiddenHit: 2026-10-12. patternsHit: ISO date. expected pw-6013-2280 is met."
+  },
+  {
+   "id": "2116eee6",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks by when. The reply names Tomasz Brennan and pro number FL-660412 but gives no deadline. The seed says release requests must reach Tomasz today, so the timing part of the request is unanswered.",
+   "points": "missing: any of today/2026-10-08. Expected tomasz and fl-660412 are met. No pattern hit."
+  },
+  {
+   "id": "e133427f",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply tells the user to reach out by Friday, 2026-10-09. Tomasz is off that day, and the seed says requests must reach him today, so the deadline is wrong. The reply also omits today.",
+   "points": "missing: any of today/2026-10-08. patternsHit: Friday deadline. Expected tomasz and fl-660412 are met."
+  },
+  {
+   "id": "62d973a7",
+   "verdict": "misread",
+   "a": "misread",
+   "b": "misread",
+   "reason": "The reply states the fit verdict as They can easily put a $3,000 order on credit. That is correct: $3,000 is within the $3,760 available. The scorer misses it only because the phrase can put is split by easily. The account manager Ines Albrecht and the line 555-0142 are correct.",
+   "points": "missing: expectedAny. Expected albrecht is met. No forbidden or pattern hit."
+  },
+  {
+   "id": "6791a02e",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks whether the $3,000 fits the available credit. The reply gives the $5,000 limit and $1,240 outstanding but neither the $3,760 available figure nor any fit statement. The requested verdict is missing.",
+   "points": "missing: expectedAny. Expected albrecht is met. No forbidden or pattern hit."
+  },
+  {
+   "id": "8607b631",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "The reply states the $3,760 available figure, so a reader can compare it with $3,000. It never states that the reorder fits, which the request asks for. A careful grader could accept the figure as the answer or require the explicit verdict.",
+   "points": "missing: expectedAny. Expected albrecht is met. No forbidden or pattern hit."
+  },
+  {
+   "id": "e421c7ac",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks whether the $3,000 charge fits the available credit. The reply gives the limit and the outstanding balance, with no available figure and no fit statement, so the requested answer is missing.",
+   "points": "missing: expectedAny. Expected albrecht is met. No forbidden or pattern hit."
+  },
+  {
+   "id": "089570e2",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says Sigrid Halvorsen's direct line is 555-0142. The seed says 555-0142 is account manager Ines Albrecht's line and that Sigrid's direct line is extension 4127. The number to dial is wrong.",
+   "points": "patternsHit: 555-0142 as Sigrid's direct line. expected 4127 and the after-2-pm timing are met."
+  },
+  {
+   "id": "6b5892f0",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says Sigrid's direct line is 555-0142, extension 4127. The seed assigns 555-0142 to account manager Ines Albrecht, so the dial number is wrong.",
+   "points": "patternsHit: 555-0142 as Sigrid's direct line. expected 4127 and the after-2-pm timing are met."
+  },
+  {
+   "id": "d20dbfce",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply says Sigrid's direct line is 555-0142, extension 4127. The seed assigns 555-0142 to account manager Ines Albrecht, so the dial number is wrong. The after-2-pm timing is correct.",
+   "points": "patternsHit: 555-0142 as Sigrid's direct line. expected 4127 and the after-2-pm timing are met."
+  }
+ ]
+}

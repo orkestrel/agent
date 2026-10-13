@@ -1,0 +1,39 @@
+diff --git a/tmp/units/aggregate-successor-q2-exploratory-prepare.ts b/tmp/units/aggregate-successor-q2-exploratory-prepare-2.ts
+index e22e91146..a56334650 100644
+--- a/tmp/units/aggregate-successor-q2-exploratory-prepare.ts
++++ b/tmp/units/aggregate-successor-q2-exploratory-prepare-2.ts
+@@ -21,7 +21,7 @@ class ExploratoryPreparation {
+ 		const [cell, ...extra] = positionals
+ 		const head = values.head
+ 		if ((cell !== 'q2-think0' && cell !== 'q2-think1') || extra.length !== 0 || typeof head !== 'string' || !/^[a-f0-9]{40}$/.test(head)) {
+-			throw new Error('Usage: node tmp/units/aggregate-successor-q2-exploratory-prepare.ts q2-think0|q2-think1 --head SHA1')
++			throw new Error('Usage: node tmp/units/aggregate-successor-q2-exploratory-prepare-2.ts q2-think0|q2-think1 --head SHA1')
+ 		}
+ 		if (resolve(process.cwd()) !== this.#root) throw new Error('Explicit scaffold cwd required')
+ 		this.#checkHead(head)
+@@ -49,10 +49,22 @@ class ExploratoryPreparation {
+ 		readFrozen(calibration)
+ 		const calibrationDirectory = join(results, 'calibration', 'q2')
+ 		const diagnosis = this.#seal(join(calibrationDirectory, 'fit-2', 'diagnosis.json'), '626ac28ed56f4b0f1e1ce51ff2ebdece035ba2760ce532c551642c74d89fc5ca')
+-		const labels = this.#seal(join(calibrationDirectory, 'labels.json'), 'ae937346c5e0abdc1b4543511b171e93ec117f795b90b9fd93af87e67b53f661')
+-		const packet = this.#seal(join(calibrationDirectory, 'generation', 'packet.jsonl'), 'a67c510650eaa2ffae29fe5c461fcf56d4cd91e9e3376a3ac4b5fba2b3c14999')
+-		const generation = this.#seal(join(calibrationDirectory, 'generation', 'manifest.json'), '10e654ee24fe25b7a32af7e8f6610467154a8c1c5cc65dcbeeb2c6335e722d23')
++		const sealedLabels = this.#seal(join(calibrationDirectory, 'labels.json'), 'ae937346c5e0abdc1b4543511b171e93ec117f795b90b9fd93af87e67b53f661')
++		const sealedPacket = this.#seal(join(calibrationDirectory, 'generation', 'packet.jsonl'), 'a67c510650eaa2ffae29fe5c461fcf56d4cd91e9e3376a3ac4b5fba2b3c14999')
++		const sealedGeneration = this.#seal(join(calibrationDirectory, 'generation', 'manifest.json'), '10e654ee24fe25b7a32af7e8f6610467154a8c1c5cc65dcbeeb2c6335e722d23')
+ 		const assessment = readRefitAssessment(diagnosis)
++		const labels = assessment.preparation.labels
++		const packet = assessment.preparation.packet
++		const generation = assessment.preparation.manifest
++		for (const reference of [
++			{ retained: labels, sealed: sealedLabels },
++			{ retained: packet, sealed: sealedPacket },
++			{ retained: generation, sealed: sealedGeneration },
++		]) {
++			if (reference.retained.hash !== reference.sealed.hash || resolve(reference.retained.path) !== resolve(reference.sealed.path)) {
++				throw new Error(`Calibration reference differs from the sealed file: ${reference.retained.path}`)
++			}
++		}
+ 		const agree = selectMajorityCutoff(assessment)
+ 		if (assessment.accepted || assessment.errors.length !== 0 || assessment.change !== 0.56 || agree !== 0.68) {
+ 			throw new Error('Retained Q2 diagnosis does not reproduce the released exploratory cutoff')

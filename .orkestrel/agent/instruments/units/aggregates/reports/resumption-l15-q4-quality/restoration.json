@@ -1,0 +1,186 @@
+{
+  "head": "bfafe543ca73595233b0733289589d78d46d121c",
+  "archive": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l15-q4-quality",
+  "files": [
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-successor-a/packet.json",
+      "archive": "packet.json",
+      "bytes": 256596,
+      "sha256": "6d10d40bc303dc09c4db2d643fbc913cafe647899e070703a7856db9a7641745"
+    },
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-successor-a/private/joins.json",
+      "archive": "joins.json",
+      "bytes": 26591,
+      "sha256": "9254b82a2417bd56b46bac38851d3c9af36dd5a69a0d27b638f81f369fcd4be3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-judgments.json",
+      "archive": "judgments.json",
+      "bytes": 168810,
+      "sha256": "83c4dea97eaffd9a9dac1a5b9377f516f543f03f7b1abef54453270ddc79eeb2"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-report.md",
+      "archive": "audit.md",
+      "bytes": 7046,
+      "sha256": "8db339922c168e00455e9b8a4d00aaa295ed3e934d42fa3dc9bea145f3b8129d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-brief.md",
+      "archive": "audit-brief.md",
+      "bytes": 7248,
+      "sha256": "0d5ed9de4db3c204f3d4a4b5385571f4b6e649c899b056c7648989dc0150db39"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-joined.json",
+      "archive": "joined.json",
+      "bytes": 57459,
+      "sha256": "91105db2eb3278df282f103350d0f4c27d23eaf4d2d05aa18c8dabd3bf337f1b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-joined.md",
+      "archive": "joined.md",
+      "bytes": 22453,
+      "sha256": "c998e9e38dc4f3619f91d8f105e25c4168ef44e9ea59a18352217939a460891d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-join-validation.md",
+      "archive": "validation.md",
+      "bytes": 7351,
+      "sha256": "39c3b1a0c64b1ca89f91486d7ea8a72bfecf7d35198540ab247bbe64b55c435b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-boundary-addendum.md",
+      "archive": "boundaries.md",
+      "bytes": 1732,
+      "sha256": "409273c727c2756037e1eba3937f2036e5660fb7ec40cca243f6f2a227217380"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-join.ts",
+      "archive": "join-original.ts",
+      "bytes": 23820,
+      "sha256": "303c71ff33dbc3f86331ff70800adfc2e4e52147dd03f3170e8ffac9d52ff452"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-join-sealed.ts",
+      "archive": "join-sealed.ts",
+      "bytes": 23897,
+      "sha256": "b09855374f107f1daf45c0b1a2cb61e151bb0a0c2063d5fba64ebd73a7b86d8b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-boundary.ts",
+      "archive": "boundary-original.ts",
+      "bytes": 8408,
+      "sha256": "54583cc92d39b58903ad576557b088fd9a5c1ecd5c8172216aeb00aa4dcd4f60"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-boundary-sealed.ts",
+      "archive": "boundary-sealed.ts",
+      "bytes": 8485,
+      "sha256": "fc8f1fd957360026a709ca6ff6d40049e09f2c4253a64c8a4b967fc0b30cf55e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-join-preparation-report.md",
+      "archive": "join-preparation.md",
+      "bytes": 5993,
+      "sha256": "6cd935d5a2af0a222446fa26698dc7e31ee472597539d944f3fb374114a1306d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-join-preparation-brief.md",
+      "archive": "join-preparation-brief.md",
+      "bytes": 4996,
+      "sha256": "3303c8669cc3a8ef755f95f820c802e395d7aa350c7c070f84e1ecac3429f46c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-join.diff",
+      "archive": "join-preparation.diff",
+      "bytes": 14318,
+      "sha256": "72ff5af89bb7856bbc43fb0f1bdf3b0c719cf7d66989b1ae4a9d2734b95ae9d6"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-seal.ts",
+      "archive": "seal.ts",
+      "bytes": 1764,
+      "sha256": "0a23e6c4164d1ed46062a24a7f55344c4a60cf9088ff0d12e3a8dda90e980f72"
+    },
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-export.ts",
+      "archive": "packet-export.ts",
+      "bytes": 12057,
+      "sha256": "c6f1e212ef8bca0035862b78556fbafc564123ad1590d9f3e27211585b385fb9"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-report.md",
+      "archive": "verifier.md",
+      "bytes": 5138,
+      "sha256": "82d862b4149edd5f12531c38f78807878c44b0da3e276430fc2c88deedef9ccf"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-brief.md",
+      "archive": "verifier-brief.md",
+      "bytes": 4246,
+      "sha256": "4e5bd7da73bf2f0c3cec843be6e99dc9f94f5c6c711b8c29047d1c88ddf8c5d4"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-join.stdout.txt",
+      "archive": "aggregate-successor-quality-a-validation-join.stdout.txt",
+      "bytes": 15290,
+      "sha256": "65013e307541274136eb9584c1c5818c9262bda0a0241cdba9e4b8339682c27b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-join.stderr.txt",
+      "archive": "aggregate-successor-quality-a-validation-join.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-join.meta.json",
+      "archive": "aggregate-successor-quality-a-validation-join.meta.json",
+      "bytes": 436,
+      "sha256": "33958260244a478bb42583b79a03b3f41cfaaa0fa7924598c22e08e1ddbfc5e9"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-boundary.stdout.txt",
+      "archive": "aggregate-successor-quality-a-validation-boundary.stdout.txt",
+      "bytes": 1808,
+      "sha256": "a2803dde8ab7ce4f7517dabf622f152e2dc260098e8a4ed163b16a9c742f3ff0"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-boundary.stderr.txt",
+      "archive": "aggregate-successor-quality-a-validation-boundary.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-validation-boundary.meta.json",
+      "archive": "aggregate-successor-quality-a-validation-boundary.meta.json",
+      "bytes": 448,
+      "sha256": "d98c71201398cf7e48e721df6ca47a93c5517e9de6c7de36586846281fba88b3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-retention-preparation.md",
+      "archive": "aggregate-successor-quality-retention-preparation.md",
+      "bytes": 10404,
+      "sha256": "f03565424c0ca538f60b736e6b197f2518abac59771da31fd0629b396be7102a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-retain.diff",
+      "archive": "aggregate-successor-quality-a-retain.diff",
+      "bytes": 12065,
+      "sha256": "3aa22e7086ea723763dca076a5597748ca55833f24acf3c281de3d649eba6f2c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-retention-brief.md",
+      "archive": "aggregate-successor-quality-retention-brief.md",
+      "bytes": 5592,
+      "sha256": "67a9d3be4f02cc47ddca4290678c2af2004b52d144869a9f2e21b6baa9638226"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-a-retain.ts",
+      "archive": "aggregate-successor-quality-a-retain.ts",
+      "bytes": 14350,
+      "sha256": "c1286edd6c1e93e4b52db31fedfd7b9ea1289260951aedeaa80ac1077a58a5e1"
+    }
+  ]
+}

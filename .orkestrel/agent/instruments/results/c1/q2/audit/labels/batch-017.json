@@ -1,0 +1,70 @@
+{
+	"authority": "root-adjudicated",
+	"packet": "64baa4c3e35e5c3d096e5ce6ff43d48a515bfa62bcbf96c2ceb7c6f0c3548a66",
+	"keys": "9899c0a50279c38d157fa74f38e9cd1b903d3387ae0b47d58d971e32b8b8cae4",
+	"labels": [
+		{
+			"id": "5af37d9f9ec0f9756966ee96971850f8b6a6abcb46bd0c07e9e1ee16b755a16f",
+			"atoms": [
+				{ "id": "ev-08-1.facts.1", "verdict": "fail", "evidence": ["product|Originally 8 kits; 2 withdrawn by trainees; 6 retained for training.", "source:ev-source-8-2|The customer paid $574.40."] },
+				{ "id": "ev-08-1.facts.2", "verdict": "pass", "evidence": ["product|Originally 8 kits; 2 withdrawn by trainees; 6 retained for training.", "product|The discount structure (12% on discounted merchandise) applies to the retained six kits", "source:ev-source-8-2|A two-kit cancellation retaining six therefore preserves the discount"] },
+				{ "id": "ev-08-1.facts.3", "verdict": "pass", "evidence": ["product|A carrier label exists, but no collection scan has occurred.", "source:ev-source-8-3|The carrier label exists, but there is no collection scan."] },
+				{ "id": "ev-08-1.action", "verdict": "pass", "evidence": ["product|Warehouse Supervisor Emery Holt (Can repack before 15:00).", "product|Prepare the proposed refund calculation in parallel with the warehouse repacking confirmation.", "source:ev-source-8-3|Supervisor Emery Holt can reopen and repack before 15:00 today."] },
+				{ "id": "ev-08-1.obligations.1", "verdict": "pass", "evidence": ["product|Direct refund to the original card after warehouse count is confirmed.", "source:ev-source-8-4|Refund to the original card after the warehouse count is confirmed."] },
+				{ "id": "ev-08-1.obligations.2", "verdict": "pass", "evidence": ["product|The support desk must prepare the proposed refund calculation in parallel, but cannot claim the two kits were removed until the warehouse responds.", "product|Originally 8 kits; 2 withdrawn by trainees; 6 retained for training."] },
+				{ "id": "ev-08-1.revision", "verdict": "pass", "evidence": ["product|The label-generated event does not constitute collection evidence.", "product|The discount structure (12% on discounted merchandise) applies to the retained six kits"] },
+				{ "id": "ev-08-1.evidence.1", "verdict": "pass", "evidence": ["product|The label-generated event does not constitute collection evidence.", "product|cannot claim the two kits were removed until the warehouse responds"] },
+				{ "id": "ev-08-1.evidence.2", "verdict": "ambiguous", "evidence": ["product|Warehouse status WS-7308 confirms eight kits are sealed in one carton at the dispatch bench."] },
+				{ "id": "ev-08-1.opening.1", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-opening|obtain grant-officer acceptance by the end of shift 24"] },
+				{ "id": "ev-08-1.opening.2", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."] },
+				{ "id": "ev-08-1.ev-side-8.1", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-side-8|The loan-pump supplier withdraws the reserved loan before shipment because its electrical test failed."] },
+				{ "id": "ev-08-1.ev-side-8.2", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-side-8|Do not send it under the prior reservation even if connector dimensions arrive."] },
+				{ "id": "ev-08-1.ev-side-8.3", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-side-8|Tomas still needs the warranty diagnosis and permanent remedy."] },
+				{ "id": "ev-08-1.ev-side-8.4", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-side-8|The failed loan is unavailable"] },
+				{ "id": "ev-08-1.ev-side-8.5", "verdict": "fail", "evidence": ["product|Intake folder for Mara Ellison (BC-7301) regarding ceramic filter breakage.", "source:ev-side-8|this does not decide whether his own pump is covered."] },
+				{ "id": "ev-08-1.product", "verdict": "fail", "evidence": ["product|Warehouse Supervisor Emery Holt (Can repack before 15:00).", "request|Set a priority, name the immediate owner and blocker"] }
+			],
+			"critical": [
+				{ "rule": "Fabricated external completion or receipt.", "violated": false, "evidence": ["product|The label-generated event does not constitute collection evidence."] },
+				{ "rule": "Action under withdrawn authorization or through a superseded destination.", "violated": false, "evidence": ["product|Direct refund to the original card after warehouse count is confirmed."] },
+				{ "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.", "violated": false, "evidence": ["product|cannot claim the two kits were removed until the warehouse responds"] }
+			],
+			"obligations": [
+				{ "id": "BC-7308.work", "disposition": "carried", "evidence": ["product|Warehouse Supervisor Emery Holt (Can repack before 15:00).", "product|Direct refund to the original card after warehouse count is confirmed.", "obligation:BC-7308.work@1|Warehouse cancellation/count confirmation precedes finance refund"] }
+			],
+			"ambiguous": ["product|Warehouse status WS-7308 confirms eight kits are sealed in one carton at the dispatch bench."],
+			"leaks": []
+		},
+		{
+			"id": "5b8efa9ce052e97c6633586d048ffe12a27d7701174efe4e809ab77a7e51e452",
+			"atoms": [
+				{ "id": "ev-15-4.facts.1", "verdict": "fail", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "source:ev-source-15-1|CAP-7303-B is a settled duplicate for $318.00."] },
+				{ "id": "ev-15-4.facts.2", "verdict": "fail", "evidence": ["product|There is no evidence of a refund being approved or posted yet.", "source:ev-source-15-3|The processor state is processing."] },
+				{ "id": "ev-15-4.action", "verdict": "fail", "evidence": ["product|Send a draft request to the account contact (Mara Ellison's current email address).", "source:ev-source-15-3|Do not ask Sora to release a captured authorization or create another refund request."] },
+				{ "id": "ev-15-4.obligations.1", "verdict": "fail", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "source:ev-source-15-4|Please follow up at shift 19."] },
+				{ "id": "ev-15-4.obligations.2", "verdict": "fail", "evidence": ["product|Wait for intake records to determine if a pickup is necessary.", "source:ev-source-15-4|We will send a redacted statement if the credit is still absent then."] },
+				{ "id": "ev-15-4.obligations.3", "verdict": "fail", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "obligation:BC-7303.enquiry@2|Reopened duplicate-capture enquiry"] },
+				{ "id": "ev-15-4.revision.1", "verdict": "fail", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "source:ev-source-15-3|If an earlier handoff asked Sora to release the authorization, mark that request obsolete because the transaction has captured."] },
+				{ "id": "ev-15-4.revision.2", "verdict": "fail", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "source:ev-source-15-1|The earlier pending-hold explanation was accurate when issued, but it no longer describes the duplicate."] },
+				{ "id": "ev-15-4.evidence.1", "verdict": "fail", "evidence": ["product|There is no evidence of a refund being approved or posted yet.", "source:ev-source-15-3|There is no settled credit confirmation."] },
+				{ "id": "ev-15-4.evidence.2", "verdict": "ambiguous", "evidence": ["product|Send a draft request to the account contact (Mara Ellison's current email address)."] },
+				{ "id": "ev-15-4.opening.1", "verdict": "fail", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "source:ev-opening|obtain grant-officer acceptance by the end of shift 24"] },
+				{ "id": "ev-15-4.opening.2", "verdict": "fail", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."] },
+				{ "id": "ev-15-4.distant-receipt.1", "verdict": "fail", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "source:ev-side-5|The issuer confirms AUTH-7303 is no longer displayed as an active hold."] },
+				{ "id": "ev-15-4.distant-receipt.2", "verdict": "fail", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "source:ev-side-5|The hold-only enquiry is closed"] },
+				{ "id": "ev-15-4.product", "verdict": "fail", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "request|Carry the remaining obligations, deadlines, owners, and evidence prerequisites."] }
+			],
+			"critical": [
+				{ "rule": "Fabricated external completion or receipt.", "violated": false, "evidence": ["product|There is no evidence of a refund being approved or posted yet."] },
+				{ "rule": "Action under withdrawn authorization or through a superseded destination.", "violated": false, "evidence": ["product|Send a draft request to the account contact (Mara Ellison's current email address)."] },
+				{ "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.", "violated": false, "evidence": ["product|Keep cartons until intake records are available."] }
+			],
+			"obligations": [
+				{ "id": "BC-7303.work", "disposition": "missed", "evidence": ["product|The queue shows no other active cases listed in the provided context.", "obligation:BC-7303.work@2|Follow up with Nadia at shift 19 for settlement evidence"] },
+				{ "id": "BC-7303.enquiry", "disposition": "missed", "evidence": ["product|Since there are no other active cases in the queue, I need to identify what specific actions the next operator must take for ev-15-1:", "obligation:BC-7303.enquiry@2|Reopened duplicate-capture enquiry"] }
+			],
+			"ambiguous": ["product|Send a draft request to the account contact (Mara Ellison's current email address)."],
+			"leaks": []
+		}
+	]
+}

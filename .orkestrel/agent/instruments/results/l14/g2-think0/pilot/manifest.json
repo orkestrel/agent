@@ -1,0 +1,270 @@
+{
+  "protocol": "l6",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\freeze\\manifest.json",
+    "hash": "2cc6f94dabd536d93914b5b650dfc1c9eb18fbdfbe8ec154123b75a062a8536e"
+  },
+  "resource": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\resource\\manifest.json",
+    "hash": "f0598ea5f76090c23312fbc512b7df1adc2c895a586133fc43bf8bdd0d3f2cf1"
+  },
+  "fit": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\calibration\\g2\\fit\\fit.json",
+    "hash": "515ba2af23418808f425177a534d40c36c5f57943ee5697da6e1a3baf5f53d8f"
+  },
+  "attempt": {
+    "execution": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\execution.json",
+      "hash": "a6259c39e7935cfd7ee25ea03d3cb7064defcdfc8e344b2a33dad5bc358abbb2"
+    },
+    "run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1",
+    "budget": {
+      "reserve": 512,
+      "window": 3072,
+      "ceiling": 3072,
+      "predict": 0
+    },
+    "accepted": false,
+    "failures": [
+      "request 63 g04-halvorsen-ticket: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired|earlier|previous|prior|original|mistyped|transposed)\\\\s+(?:(?:a|an|the)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\besc-2291\\\\b(?![)\\\"'”]?,?\\\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count|was (?:a |an )?(?:transposition |typing |digit )?(?:error|mistake|typo)|(?:has been|was|is) corrected|(?:was|is) (?:wrong|incorrect))\\\\b)\"]",
+      "request 64 g04-halvorsen-ticket: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired|earlier|previous|prior|original|mistyped|transposed)\\\\s+(?:(?:a|an|the)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\besc-2291\\\\b(?![)\\\"'”]?,?\\\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count|was (?:a |an )?(?:transposition |typing |digit )?(?:error|mistake|typo)|(?:has been|was|is) corrected|(?:was|is) (?:wrong|incorrect))\\\\b)\"]",
+      "request 66 g05-luis-approval-note: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replaces|replacing|was|formerly|original|rotated from|old|previous|prior|superseded|withdrawn|dead|retired)\\\\s+(?:(?:a|an|the)\\\\s+)?(?:(?:manager\\\\s+)?approval\\\\s+)?(?:(?:code|ticket|number)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\bmx-4471\\\\b(?![)\\\"'”]?,?\\\\s+(?:(?:is|was|has been|had been|got)\\\\s+(?:replaced|superseded)|(?:replaced|superseded)\\\\s+by|(?:(?:is|was|has been|had been)\\\\s+)?(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|no longer (?:valid|applies|in use|used|active|current))|is not kept|does not count)\\\\b)(?!\\\\s*\\\\(\\\\s*(?:now\\\\s+)?(?:(?:replaced|superseded)\\\\s+by\\\\b|(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|old|previous|prior|no longer)\\\\b(?!\\\\s+(?:[\\\\w'-]+\\\\s+){0,2}[(\\\"'“]?[a-z]{2,4}-\\\\d)))\"]"
+    ],
+    "resource": false,
+    "files": [
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-1.json",
+        "hash": "57adf25be85afff8f3a5c7ec0f334c4c040c946420fb14ee165868a7c6b3eeef"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-2.json",
+        "hash": "23f766816029fd8d080459817952328bc4f91126419eab2648edccd67d220bb3"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-35.json",
+        "hash": "4965d9b01acd869305bcb120d93b71c71abdc78c685b97bb26d04990778da375"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-36.json",
+        "hash": "bbdba92ecb08b9d9509b0236d532ed84f270ed60823cb5841605988b9e7f21d3"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-40.json",
+        "hash": "5a0f23715c04def7eda7bbcc72b66c5dc19cfaa91518ac1c6235e74bcaf2fbaf"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-41.json",
+        "hash": "06c0145c5a15f162a19a4780f25691bc1206467a79ebb9baab7238fcab12ce4c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-53.json",
+        "hash": "775f97a4e05ed75b32906d66bfe269e1cb62df89395edb177fd152dfaa6b0c5b"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-54.json",
+        "hash": "be11446c384fd92eb5828f2a79e01ea55721b06087695cfaaad15960bf63a064"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-63.json",
+        "hash": "6cb5d325cfcd30953d12d698f3a1be33c50f6f008ff93908e870dd7b7a2b3c8a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-64.json",
+        "hash": "8e335f12dab6f6fa6acf3ca9ad79359d0fe251bbf1c47951f45e4559f5f46f60"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-66.json",
+        "hash": "3bbe2183c527e5059c4393d65b08ccd197a6b62f694975af35cb8350d4daf8aa"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-67.json",
+        "hash": "b9414fbb8e6cfaf043f6a69a6af2b0caaba996ff678a3e21ee3c88fd30c8c5b7"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-69.json",
+        "hash": "a774d080abe85362ec1d62ca5d72810ddfdff02d3fb812dc288b435b8acc9eec"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-70.json",
+        "hash": "2b1a307ba16c35bf7a87ea3d626eadb558a9a55615442fd18d07295a7ddb549c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-72.json",
+        "hash": "9ca15c5ad6b5e7bd261b4b19d608cd6f4947d65007dbe23d3a124dc2d8577454"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-74.json",
+        "hash": "c7dda826add038fda097a2dc4b381fbbe2dba17796f2b150b0a2f4dccf16e976"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-75.json",
+        "hash": "6616f707f3eb147c817581359f62bc534609ff0d858a96c3cfc885c87bdb31b8"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-86.json",
+        "hash": "b18824d7fe1f5f20975db9f1948b4267d54192036cb90a73934dfda6206f02c8"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-87.json",
+        "hash": "80d9e46a700d81750e6664ad778a245ba290686a08a8ac73da70fbccf28566bc"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-96.json",
+        "hash": "e85f58ea498cfc95b965f5ff7354bc66ecd1a8a3bca3f3cd71c59d3830e13d56"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-97.json",
+        "hash": "8b1293fbce4d7598ef8e6560090fe62943bb120947876e35ebb26f6c2cf6e51a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-157.json",
+        "hash": "3d3c3d8703b07851f2513ce4fbae730941e32ed1624eeecb104b44a0a908c01a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-158.json",
+        "hash": "f086f75e08b10674a9e7516ce43ccb43c147f983186491435664bbdc06410042"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-159.json",
+        "hash": "f8d429cefdfd682d4b56dbfd423167294c25e045858305db9fa52e74d690d126"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-196.json",
+        "hash": "55d9c9c4a184a1e529c353d02bed29b72540e351992cf8d4102fc059fa5aed12"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-197.json",
+        "hash": "9a590cea265495cc57fe4d90cd37cfecd00b3e0688be39018725f0f30c24803a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-218.json",
+        "hash": "373c1e9de89e6414b8fd420a69f22fca8dcbc605df5bfcba0afd5c84ae82c7a2"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-236.json",
+        "hash": "c13ec4b68690eaf7e37da7ad5a251cae06b39e0ef61e19a760fda9ce51afb43f"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-237.json",
+        "hash": "bf9a6c9497084b31e299bc6259b8d3b7822f3f9ce98cad8f89541f80822478ef"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-246.json",
+        "hash": "82bd4794d559f2a6b1ecd24c57a3bfe6c2afc9211f175ee987119b02135202a3"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-247.json",
+        "hash": "75a7fd4be14c0f7af4dc4299aa94f9752d1997a35692c2d68bc30ad9af1d3973"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-261.json",
+        "hash": "74f8c2e6f6dcd7ff61a0b73dc08ea859dfcb13eff353ee8dc2860203fb8fa97c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-273.json",
+        "hash": "38419ae4eec013417a35537746701ec4fd08e62d538bebd5cbd735bd4d6f9299"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-280.json",
+        "hash": "804927c370ea64c93b450de7d6feda567213b2f3ad50b317373d249197d56a5a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-281.json",
+        "hash": "55a355dc48a15701cbbd456248a718fb20e43b9685362d17a0d7b21775fb0cdc"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-298.json",
+        "hash": "1b1b0f12a8e93d7c5e3fe69dc2446e3e9c43042c2019ac57109a41a2fe799b83"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-302.json",
+        "hash": "0c2f96f41aa81ce091e4d0b1288c7a98972bb3761396a159ffad52d12bd9b44e"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-303.json",
+        "hash": "f7b3c6bf511bfa0676c30af6c79d959384f115cc57a27fd6756572aefeaa36ad"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-327.json",
+        "hash": "339cbd60e8c8c0ba248c38b9c21bfe5b2cec0bc094ba4b93009e91be52538bfd"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-328.json",
+        "hash": "734369c61235edfadfd6624b4697cab78f1c89090838ab6d4bc69f06e7fe52fb"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-343.json",
+        "hash": "2cd15c874fd02e9715ac9fa521eee160f7af9526179620259b69c19f1df5a342"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-344.json",
+        "hash": "0742bb26b0441c3eac675e8d1efcf45fe904427d5827ab7581033af428248bbf"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-364.json",
+        "hash": "b0777b0b98c826820cf0e59ce8d69000388c4ae3e97356f420017145d5a03000"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-386.json",
+        "hash": "4b1131648dc753e7ada19c2158bbf43484056c890678d66c7d0c5ca9288cd4a8"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\capacity-387.json",
+        "hash": "b17a9f45e5be269229c49fa4ac0bb3696595444661f9875fa83dd8972986949a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\run.json",
+        "hash": "50b78ecf590d206d227d127b9c5a0ee61a9e179752dee14fe4f63d05c64166b8"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\rows.jsonl",
+        "hash": "bda38223d84765e7bc60ba9fb70483d3bd4cf0d027c2f13db17ad4866996f0b2"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\selections.jsonl",
+        "hash": "c0357af0a5844a76a44fc42a19ac3169b25f3935e662537e95f06bc1014c3f01"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\requests.jsonl",
+        "hash": "b1dc18477a82ae65cd43a6be7c9c3268f88eca223edb0c02e4d5f03241ac70ec"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\turns.jsonl",
+        "hash": "a87e88fe3338bc05a117a7deeb058a25c09830bd1c739d6449c33cbeafe8a10d"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\calls.jsonl",
+        "hash": "66f2c525c3be9b1b332a752e8c13663ad56e8f0c9548f2452365724a1ca17d95"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\messages.jsonl",
+        "hash": "2e346a05e9ff2e510651192407ac79e8cc29ad3772294b783f4790a9dd4b4cd5"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\judgments.jsonl",
+        "hash": "3d5c78be19dc2254e39a6435b1a286dd4ee2c1a56e1e321a1669ad2d4780b8b2"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\model-inventory.json",
+        "hash": "6fb04221184bcf46ef33dbb17c79bee4eb1fc2eb8c0fce74593f58c09a4ca986"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l14\\g2-think0\\pilot\\development\\l6-g2-think0-aggregate-v1\\aggregates.jsonl",
+        "hash": "96b84e55b7a9e981d6168ea898e81109b60a434d4d0f5fdd488b2614f8405b20"
+      }
+    ]
+  },
+  "served": 24,
+  "exposed": 14,
+  "accepted": false,
+  "failures": [
+    "request 63 g04-halvorsen-ticket: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired|earlier|previous|prior|original|mistyped|transposed)\\\\s+(?:(?:a|an|the)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\besc-2291\\\\b(?![)\\\"'”]?,?\\\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count|was (?:a |an )?(?:transposition |typing |digit )?(?:error|mistake|typo)|(?:has been|was|is) corrected|(?:was|is) (?:wrong|incorrect))\\\\b)\"]",
+    "request 64 g04-halvorsen-ticket: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired|earlier|previous|prior|original|mistyped|transposed)\\\\s+(?:(?:a|an|the)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\besc-2291\\\\b(?![)\\\"'”]?,?\\\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count|was (?:a |an )?(?:transposition |typing |digit )?(?:error|mistake|typo)|(?:has been|was|is) corrected|(?:was|is) (?:wrong|incorrect))\\\\b)\"]",
+    "request 66 g05-luis-approval-note: sole-carried stale phrase [\"(?<!\\\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replaces|replacing|was|formerly|original|rotated from|old|previous|prior|superseded|withdrawn|dead|retired)\\\\s+(?:(?:a|an|the)\\\\s+)?(?:(?:manager\\\\s+)?approval\\\\s+)?(?:(?:code|ticket|number)\\\\s+)?[(\\\"'“]?\\\\$?)\\\\bmx-4471\\\\b(?![)\\\"'”]?,?\\\\s+(?:(?:is|was|has been|had been|got)\\\\s+(?:replaced|superseded)|(?:replaced|superseded)\\\\s+by|(?:(?:is|was|has been|had been)\\\\s+)?(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|no longer (?:valid|applies|in use|used|active|current))|is not kept|does not count)\\\\b)(?!\\\\s*\\\\(\\\\s*(?:now\\\\s+)?(?:(?:replaced|superseded)\\\\s+by\\\\b|(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|old|previous|prior|no longer)\\\\b(?!\\\\s+(?:[\\\\w'-]+\\\\s+){0,2}[(\\\"'“]?[a-z]{2,4}-\\\\d)))\"]",
+    "g02-luis-card: paired gauge drift exceeds ledger bound",
+    "g05-luis-approval-note: paired gauge drift exceeds ledger bound",
+    "g06-kenji-shipping: paired gauge drift exceeds ledger bound",
+    "g08-halvorsen-credit: paired gauge drift exceeds ledger bound",
+    "g10-sigrid-callback: paired gauge drift exceeds ledger bound"
+  ]
+}

@@ -1,0 +1,2200 @@
+{
+  "adjudication": {
+    "packetHash": "2f7c267dc8ed24a6fc68adc7609bfe6637df34a30d1d7fd8eb8a2b5926bba45b",
+    "mappingHash": "8c935f627ff5f8dabc38c57398276ddf612738bea2e80545a2e3c8ab261228ac",
+    "verdictHash": "6b16ba75bf88184eec455c6af6cf405bd050ad289ddd2991c5a5c5a1e4704cf6",
+    "corrections": [
+      "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+      "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+      "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001"
+    ],
+    "grouping": {
+      "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+      "seed": 6,
+      "sentences": [
+        "Third rule: copy Priya Raman from the refunds team on every escalation.",
+        "And never promise a customer a delivery date in writing."
+      ]
+    },
+    "population": {
+      "total": 12,
+      "supported": 5,
+      "negative": 6,
+      "ambiguous": 1,
+      "scored": 9,
+      "unscored": 3
+    },
+    "diagnostic": {
+      "cutoff": 0.78,
+      "positives": 4,
+      "negatives": 4,
+      "ambiguous": 1,
+      "recalled": 0,
+      "recall": 0,
+      "leaked": 0,
+      "feasible": false,
+      "deployed": false
+    },
+    "rows": [
+      {
+        "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+        "index": 15,
+        "topic": "escalations",
+        "version": 2,
+        "original": "contradicted",
+        "verdict": "supported",
+        "corrected": true,
+        "score": 0.5112304729912349
+      },
+      {
+        "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+        "index": 17,
+        "topic": "escalations",
+        "version": 3,
+        "original": "contradicted",
+        "verdict": "supported",
+        "corrected": true,
+        "score": 0.5112304729912349
+      },
+      {
+        "id": "0ee3f70dd454adb7ecc8c58e66185b67c18259a59b8b4158c8062d4037a7f1a6-000001",
+        "index": 33,
+        "topic": "owner:LH-44870",
+        "version": 2,
+        "original": "unsupported",
+        "verdict": "unsupported",
+        "corrected": false,
+        "score": 0.716448021609171
+      },
+      {
+        "id": "3b467737f13f859307aa7ff8d58e425647eb31d4de1229bb836846706d4a9045-000001",
+        "index": 4,
+        "topic": "refunds",
+        "version": 3,
+        "original": "supported",
+        "verdict": "supported",
+        "corrected": false,
+        "score": 0.49741159905610755
+      },
+      {
+        "id": "4f3e0f4b0735c2aa5939faaf58ad6d9b1ac336f0f9c141f01d9b8f884b171d9d-000001",
+        "index": 25,
+        "topic": "delivery",
+        "version": 3,
+        "original": "supported",
+        "verdict": "supported",
+        "corrected": false
+      },
+      {
+        "id": "797dffb6c68900f1e432f3f9f631eb1ac6618557709519d80e70a8fbda47abd7-000001",
+        "index": 35,
+        "topic": "owner:LH-44870",
+        "version": 3,
+        "original": "unsupported",
+        "verdict": "unsupported",
+        "corrected": false,
+        "score": 0.7753600931549042
+      },
+      {
+        "id": "8d43ad8054d2e661f2ea2adaffc2d60377134331401cbfca57761c2772c343ad-000001",
+        "index": 10,
+        "topic": "returns",
+        "version": 3,
+        "original": "unsupported",
+        "verdict": "unsupported",
+        "corrected": false,
+        "score": 0.48327988713877107
+      },
+      {
+        "id": "92b9b6d5c640cb8c87068d1dc0f0881d98f6d65f61ae541e42b9ade9fcd0e36b-000001",
+        "index": 21,
+        "topic": "contacts",
+        "version": 3,
+        "original": "contradicted",
+        "verdict": "contradicted",
+        "corrected": false
+      },
+      {
+        "id": "e3ffb897670d8e1bd5fb249ec5435ae1832aaeb58a8b3a2461b1662b22d89576-000001",
+        "index": 2,
+        "topic": "refunds",
+        "version": 2,
+        "original": "genuinely ambiguous",
+        "verdict": "genuinely ambiguous",
+        "corrected": false,
+        "score": 0.4801168705769321
+      },
+      {
+        "id": "ec45ae9450422b8336babe85020cfe94128cd97daed19799be267c6f20d658f1-000001",
+        "index": 8,
+        "topic": "returns",
+        "version": 2,
+        "original": "unsupported",
+        "verdict": "unsupported",
+        "corrected": false,
+        "score": 0.5308665977384849
+      },
+      {
+        "id": "ec50f45ca83af4b14470d27bcd5f423b737e3e7a01e494d73705693e394ccbde-000001",
+        "index": 29,
+        "topic": "warehouse",
+        "version": 3,
+        "original": "unsupported",
+        "verdict": "unsupported",
+        "corrected": false
+      },
+      {
+        "id": "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001",
+        "index": 13,
+        "topic": "escalations",
+        "version": 1,
+        "original": "contradicted",
+        "verdict": "supported",
+        "corrected": true,
+        "score": 0.47218748995940685
+      }
+    ]
+  },
+  "packet": [
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, a support desk message instructs to copy Priya Raman from the refunds team on every escalation. The same message clarifies that no delivery dates should be promised to customers in writing. A later message corrects an ID number for Halvorsen Interiors, changing ESC-2291 to ESC-2219 while noting a transposed digit error.\nSource messages:\n(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.\n(2026-10-08) user: And never promise a customer a delivery date in writing.\n(2026-10-08) user: Agreed, open the locker trace.\n(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\n(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.\n(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.\n(2026-10-08) user: I transposed the digits."
+    },
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, a support desk message instructs to copy Priya Raman from the refunds team on every escalation. The same message clarifies that no delivery dates should be promised to customers in writing. A later message corrects an ID number for Halvorsen Interiors, changing ESC-2291 to ESC-2219 while noting a transposed digit error.\nSource messages:\n(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.\n(2026-10-08) user: And never promise a customer a delivery date in writing.\n(2026-10-08) user: Agreed, open the locker trace.\n(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\n(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.\n(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.\n(2026-10-08) user: I transposed the digits."
+    },
+    {
+      "id": "0ee3f70dd454adb7ecc8c58e66185b67c18259a59b8b4158c8062d4037a7f1a6-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "Luis Ferreira (account LH-44870) returned an opened stand mixer from order LH-79215 on 2026-10-08 for a full refund of $289.00, as the director scrapped the restocking fee.\nSource messages:\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.\n(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "3b467737f13f859307aa7ff8d58e425647eb31d4de1229bb836846706d4a9045-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, Luis Ferreira requested a refund for an opened stand mixer from order LH-79215 with no specific amount mentioned. The support desk clarified that refunds over $200 require manager approval and noted that the director scrapped the restocking fee. Additionally, it was confirmed that opened-item returns receive a full refund instead of the previous 15 percent fee.\nSource messages:\n(2026-10-08) user: Standing rule: any refund over $200 needs a manager approval code in the internal note.\n(2026-10-08) user: Marcus just messaged that the approval code rotated early.\n(2026-10-08) user: Use MX-4486 from now on; MX-4471 is dead.\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "4f3e0f4b0735c2aa5939faaf58ad6d9b1ac336f0f9c141f01d9b8f884b171d9d-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On October 8, 2026, Grace Okafor reported order LH-77302 never arrived for account LH-20418. Tomasz Brennan is scheduled to be off tomorrow, Friday, October 9, 2026.\nSource messages:\n(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.\n(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.\n(2026-10-08) user: Ugh, the label printer by the door just jammed again and ate half a roll of shipping labels.\n(2026-10-08) user: Quick one before the queue: Kenji Nakamura's replacement kettle on order LH-81660 needs a gift note that reads 'Happy 40th, Aiko'.\n(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.\n(2026-10-08) user: Anyway, can you check where the Halvorsen shipment actually is?"
+    },
+    {
+      "id": "797dffb6c68900f1e432f3f9f631eb1ac6618557709519d80e70a8fbda47abd7-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "Luis Ferreira (account LH-44870) returned an opened stand mixer from order LH-79215 on 2026-10-08 for a total refund of $289.00, as the director scrapped the restocking fee and returns receive a full refund.\nSource messages:\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.\n(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "8d43ad8054d2e661f2ea2adaffc2d60377134331401cbfca57761c2772c343ad-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, Luis Ferreira returned an opened stand mixer from order LH-79215 for a full refund. The director scrapped the 15 percent restocking fee this morning, and opened-item returns now receive a full refund again.\nSource messages:\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "92b9b6d5c640cb8c87068d1dc0f0881d98f6d65f61ae541e42b9ade9fcd0e36b-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On October 8, 2026, Priya Raman is assigned to handle escalations from the refunds team. Tomasz Brennan manages warehouse releases for carrier depot issues until he returns on Friday, October 9, 2026. Sigrid Halvorsen serves as the buyer and is reachable at extension 4127 after 2 pm.\nSource messages:\n(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.\n(2026-10-08) user: And never promise a customer a delivery date in writing.\n(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.\n(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.\n(2026-10-08) user: Their buyer is Sigrid Halvorsen.\n(2026-10-08) user: Sigrid Halvorsen: She only takes calls after 2 pm, on her direct line at extension 4127."
+    },
+    {
+      "id": "e3ffb897670d8e1bd5fb249ec5435ae1832aaeb58a8b3a2461b1662b22d89576-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, Luis Ferreira requested a refund for an opened stand mixer from order LH-79215 with a $200+ approval code requirement. The support desk noted that the director scrapped the restocking fee and refunds are now full for opened items.\nSource messages:\n(2026-10-08) user: Standing rule: any refund over $200 needs a manager approval code in the internal note.\n(2026-10-08) user: Marcus just messaged that the approval code rotated early.\n(2026-10-08) user: Use MX-4486 from now on; MX-4471 is dead.\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "ec45ae9450422b8336babe85020cfe94128cd97daed19799be267c6f20d658f1-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, Luis Ferreira returned an opened stand mixer from order LH-79215 for a full refund. The support desk noted that the director scrapped the 15 percent restocking fee this morning. Opened-item returns receive a full refund again.\nSource messages:\n(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.\n(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.\n(2026-10-08) user: Opened-item returns get a full refund again."
+    },
+    {
+      "id": "ec50f45ca83af4b14470d27bcd5f423b737e3e7a01e494d73705693e394ccbde-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, Tomasz Brennan issued a release for stuck carrier depot items. He is scheduled to be off tomorrow, Friday, October 9, 2026. A user asked to check the location of the Halvorsen shipment.\nSource messages:\n(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.\n(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.\n(2026-10-08) user: Anyway, can you check where the Halvorsen shipment actually is?"
+    },
+    {
+      "id": "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001",
+      "question": {
+        "form": "noul",
+        "instructions": "Does the summary agree with its source messages?",
+        "criteria": {
+          "true": "Every statement in the summary matches the source messages, a later message replacing an earlier one",
+          "false": "The summary states something the source messages contradict, replace, or do not state"
+        }
+      },
+      "state": "On 2026-10-08, a support desk message instructs to copy Priya Raman from the refunds team on every escalation and to never promise a customer a delivery date in writing. The same day, an update regarding Halvorsen Interiors noted that their late lighting order ticket is ESC-2219 rather than ESC-2291 due to a digit transposition correction.\nSource messages:\n(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.\n(2026-10-08) user: And never promise a customer a delivery date in writing.\n(2026-10-08) user: Agreed, open the locker trace.\n(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\n(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.\n(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.\n(2026-10-08) user: I transposed the digits."
+    }
+  ],
+  "mapping": [
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+      "original": {
+        "index": 15,
+        "topic": "escalations",
+        "version": 2,
+        "reasons": [
+          "agree-scored build"
+        ],
+        "score": {
+          "agree": 0.5112304729912349
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          14
+        ],
+        "summary": 81,
+        "judges": [
+          934
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 0,
+          "role": "user",
+          "text": "Third rule: copy Priya Raman from the refunds team on every escalation.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation."
+        },
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 1,
+          "role": "user",
+          "text": "And never promise a customer a delivery date in writing.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: And never promise a customer a delivery date in writing."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 0,
+          "role": "user",
+          "text": "Agreed, open the locker trace.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Agreed, open the locker trace."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 1,
+          "role": "user",
+          "text": "Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first."
+        },
+        {
+          "id": "8e02fab1-e319-4e13-8fc4-efafec578f17",
+          "seed": 22,
+          "sentence": 0,
+          "role": "user",
+          "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 0,
+          "role": "user",
+          "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 1,
+          "role": "user",
+          "text": "I transposed the digits.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: I transposed the digits."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "02cfe291ee8e9cc9099bd7ff444b01dd3e3734e4985aefaf7c8f70ad8d60617d",
+        "summary": "5df057c110bace0d4267fa009fd69e83be46dcdf1c6f56cc3275aea911ccdfdd",
+        "judges": [
+          "e9d87e3e4ea5ecd911b85d335bd31a6ce8488210451d5aa4c355492aa5234d23"
+        ],
+        "prompt": "eeb4e007b0c71407c297ba2e660e0b8601f23350ea1c00d1aebdac4b7aee9fa7"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "0a856d123315a3265e044115f3c14d155d2fcc3be04a5fc7a605c3a46bb720e6"
+      }
+    },
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+      "original": {
+        "index": 17,
+        "topic": "escalations",
+        "version": 3,
+        "reasons": [
+          "agree-scored build",
+          "final withheld-topic build"
+        ],
+        "score": {
+          "agree": 0.5112304729912349
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          16
+        ],
+        "summary": 81,
+        "judges": [
+          934
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 0,
+          "role": "user",
+          "text": "Third rule: copy Priya Raman from the refunds team on every escalation.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation."
+        },
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 1,
+          "role": "user",
+          "text": "And never promise a customer a delivery date in writing.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: And never promise a customer a delivery date in writing."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 0,
+          "role": "user",
+          "text": "Agreed, open the locker trace.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Agreed, open the locker trace."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 1,
+          "role": "user",
+          "text": "Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first."
+        },
+        {
+          "id": "8e02fab1-e319-4e13-8fc4-efafec578f17",
+          "seed": 22,
+          "sentence": 0,
+          "role": "user",
+          "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 0,
+          "role": "user",
+          "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 1,
+          "role": "user",
+          "text": "I transposed the digits.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: I transposed the digits."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "96e06624b5b21ec05d0ae849457959b70f77cf7c86208f89053c494ea5af8c68",
+        "summary": "5df057c110bace0d4267fa009fd69e83be46dcdf1c6f56cc3275aea911ccdfdd",
+        "judges": [
+          "e9d87e3e4ea5ecd911b85d335bd31a6ce8488210451d5aa4c355492aa5234d23"
+        ],
+        "prompt": "eeb4e007b0c71407c297ba2e660e0b8601f23350ea1c00d1aebdac4b7aee9fa7"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "0a856d123315a3265e044115f3c14d155d2fcc3be04a5fc7a605c3a46bb720e6"
+      }
+    },
+    {
+      "id": "0ee3f70dd454adb7ecc8c58e66185b67c18259a59b8b4158c8062d4037a7f1a6-000001",
+      "original": {
+        "index": 33,
+        "topic": "owner:LH-44870",
+        "version": 2,
+        "reasons": [
+          "agree-scored build"
+        ],
+        "score": {
+          "agree": 0.716448021609171
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          32
+        ],
+        "summary": 89,
+        "judges": [
+          935
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "dbbcccd1-b306-4e67-aaf8-548c3dc6abdc",
+          "seed": 42,
+          "sentence": 0,
+          "role": "tool",
+          "text": "lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00."
+        },
+        {
+          "id": "dbbcccd1-b306-4e67-aaf8-548c3dc6abdc",
+          "seed": 42,
+          "sentence": 1,
+          "role": "tool",
+          "text": "lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "0cc61e9a8a8073b0e0ebb45783bc648b1198acb1e0bbdbca2ca715379b238730",
+        "summary": "2f0686fd361373ab65973ae7eabf8e9ef56d123e8528522ac9c1095bea6a7a7d",
+        "judges": [
+          "1c7527f3ff539a3ffed183b0a627f6c3fe6e828a6e313b06b36fa3c3db6a2fe9"
+        ],
+        "prompt": "017f1bb802145e0cc57f063afc15845faf779a122bd7d6552ef5c2edca86f149"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "3760759513ef2cb060dd158a6e3dadf5a3dc45e92900e2d31013caf9a0d3df63"
+      }
+    },
+    {
+      "id": "3b467737f13f859307aa7ff8d58e425647eb31d4de1229bb836846706d4a9045-000001",
+      "original": {
+        "index": 4,
+        "topic": "refunds",
+        "version": 3,
+        "reasons": [
+          "agree-scored build",
+          "final withheld-topic build"
+        ],
+        "score": {
+          "agree": 0.49741159905610755
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          3
+        ],
+        "summary": 76,
+        "judges": [
+          930
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "92fbd085-7e98-4395-abf5-101c75b98e78",
+          "seed": 2,
+          "sentence": 0,
+          "role": "user",
+          "text": "Standing rule: any refund over $200 needs a manager approval code in the internal note.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Standing rule: any refund over $200 needs a manager approval code in the internal note."
+        },
+        {
+          "id": "98873a53-8bf8-4f31-9c72-7410239ff36e",
+          "seed": 29,
+          "sentence": 0,
+          "role": "user",
+          "text": "Marcus just messaged that the approval code rotated early.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Marcus just messaged that the approval code rotated early."
+        },
+        {
+          "id": "98873a53-8bf8-4f31-9c72-7410239ff36e",
+          "seed": 29,
+          "sentence": 1,
+          "role": "user",
+          "text": "Use MX-4486 from now on; MX-4471 is dead.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Use MX-4486 from now on; MX-4471 is dead."
+        },
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "e4049250371f30beb7582e2a5b6d11c01f8a1c1c572a6dc9a4d9d13912923b94",
+        "summary": "89edf586bf50a588c44658366e71e58cbbb6a919d53415c54c30f373148a8f07",
+        "judges": [
+          "c710487ea1cc14f142da24f9e62a0c135502f0d5525481cdbe1b0ddb0c4332b0"
+        ],
+        "prompt": "a1b15f98ae10a0c5c46d22e94e5064116e42b5981ffdacdbc6a8b75cfccfee7e"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "93fc14760bf00c6c7859afa22ded494174c3c3298e093645516109d661fca0f6"
+      }
+    },
+    {
+      "id": "4f3e0f4b0735c2aa5939faaf58ad6d9b1ac336f0f9c141f01d9b8f884b171d9d-000001",
+      "original": {
+        "index": 25,
+        "topic": "delivery",
+        "version": 3,
+        "reasons": [
+          "final withheld-topic build"
+        ],
+        "score": {},
+        "provenance": "constructed unscored state",
+        "agree": [],
+        "summary": 85,
+        "judges": [],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 0,
+          "role": "user",
+          "text": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release."
+        },
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 1,
+          "role": "user",
+          "text": "Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today."
+        },
+        {
+          "id": "90404899-cd44-4c47-b7d7-b06592e9851d",
+          "seed": 9,
+          "sentence": 0,
+          "role": "user",
+          "text": "Ugh, the label printer by the door just jammed again and ate half a roll of shipping labels.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Ugh, the label printer by the door just jammed again and ate half a roll of shipping labels."
+        },
+        {
+          "id": "5517678c-5144-4258-b093-28de71c49c08",
+          "seed": 11,
+          "sentence": 0,
+          "role": "user",
+          "text": "Quick one before the queue: Kenji Nakamura's replacement kettle on order LH-81660 needs a gift note that reads 'Happy 40th, Aiko'.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Quick one before the queue: Kenji Nakamura's replacement kettle on order LH-81660 needs a gift note that reads 'Happy 40th, Aiko'."
+        },
+        {
+          "id": "27877008-5b79-45a7-9085-d5568e4704f0",
+          "seed": 13,
+          "sentence": 0,
+          "role": "user",
+          "text": "First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement."
+        },
+        {
+          "id": "d0d73281-80c1-4b21-85c3-fe83f477dfc7",
+          "seed": 34,
+          "sentence": 0,
+          "role": "user",
+          "text": "Anyway, can you check where the Halvorsen shipment actually is?",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Anyway, can you check where the Halvorsen shipment actually is?"
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "2d29d5fcf554729f7a4f08917285f1638b66363b74a7444b3aa6ecf7c76643e4",
+        "summary": "93695ee08cada1c1e3b4d9dc10653ded6d5cc61b0adfb2bfddb13e96ecfdf4db",
+        "judges": [],
+        "prompt": "a2f9c187de8eb4f25102c97679c7854949952dc4767f36ecbb1bffebc12befb8"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "a3135b66087ca4f28a72305e0b6d0a583498a26b80f1d0e2add7db297fef5259"
+      }
+    },
+    {
+      "id": "797dffb6c68900f1e432f3f9f631eb1ac6618557709519d80e70a8fbda47abd7-000001",
+      "original": {
+        "index": 35,
+        "topic": "owner:LH-44870",
+        "version": 3,
+        "reasons": [
+          "agree-scored build",
+          "final withheld-topic build"
+        ],
+        "score": {
+          "agree": 0.7753600931549042
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          34
+        ],
+        "summary": 90,
+        "judges": [
+          936
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "dbbcccd1-b306-4e67-aaf8-548c3dc6abdc",
+          "seed": 42,
+          "sentence": 0,
+          "role": "tool",
+          "text": "lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00."
+        },
+        {
+          "id": "dbbcccd1-b306-4e67-aaf8-548c3dc6abdc",
+          "seed": 42,
+          "sentence": 1,
+          "role": "tool",
+          "text": "lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) tool: lookup_order {\"id\":\"LH-79215\"}: Delivered 2026-09-21; return window open until 2026-10-21."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "1255d6de6f02d052b6ddc55efbec954aeaf8b94b081adedeb994b4667be40006",
+        "summary": "4fad06fa026e8b99e4d34ad63e569af045b9fe7e3b9aba9bc7b56c06911cc1e4",
+        "judges": [
+          "c36920ea24355286e39ca1388ca78828c287ba03a79b45d0f3be2a132f71f687"
+        ],
+        "prompt": "f3f7240487aba196789aa486874ed5ad48509c369b7f92797175d46f98b8feb1"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "faf414e840f6279663140975f8eeded35861665460166bc86ebd12aa7308d99a"
+      }
+    },
+    {
+      "id": "8d43ad8054d2e661f2ea2adaffc2d60377134331401cbfca57761c2772c343ad-000001",
+      "original": {
+        "index": 10,
+        "topic": "returns",
+        "version": 3,
+        "reasons": [
+          "agree-scored build",
+          "final withheld-topic build"
+        ],
+        "score": {
+          "agree": 0.48327988713877107
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          9
+        ],
+        "summary": 79,
+        "judges": [
+          932
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "e7c400902353faad90d354fab2b8db4c5b41b80e88f619a75b2124d84fe31716",
+        "summary": "0070cf37bcc9103bae7004af5474dca9162edd42a128e19a59c6bbd8c1cff632",
+        "judges": [
+          "30291de47b690d0623f8ffeef0461d37b3bb043bed132e6439de8d2a34b2a3ad"
+        ],
+        "prompt": "903bc98bdd3f66233efd47aae3fa52971ca94858c44f63f0f458bf2154a981a6"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "b6991fce04e3897f2feb5cf1718ecd5bd9049ae039cefe5a1c1eba6b6156dc9e"
+      }
+    },
+    {
+      "id": "92b9b6d5c640cb8c87068d1dc0f0881d98f6d65f61ae541e42b9ade9fcd0e36b-000001",
+      "original": {
+        "index": 21,
+        "topic": "contacts",
+        "version": 3,
+        "reasons": [
+          "final withheld-topic build"
+        ],
+        "score": {},
+        "provenance": "constructed unscored state",
+        "agree": [],
+        "summary": 83,
+        "judges": [],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 0,
+          "role": "user",
+          "text": "Third rule: copy Priya Raman from the refunds team on every escalation.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation."
+        },
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 1,
+          "role": "user",
+          "text": "And never promise a customer a delivery date in writing.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: And never promise a customer a delivery date in writing."
+        },
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 0,
+          "role": "user",
+          "text": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release."
+        },
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 1,
+          "role": "user",
+          "text": "Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today."
+        },
+        {
+          "id": "851929e5-f678-4470-b970-fc38e34eeac2",
+          "seed": 24,
+          "sentence": 0,
+          "role": "user",
+          "text": "Their buyer is Sigrid Halvorsen.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Their buyer is Sigrid Halvorsen."
+        },
+        {
+          "id": "851929e5-f678-4470-b970-fc38e34eeac2",
+          "seed": 24,
+          "sentence": 1,
+          "role": "user",
+          "text": "Sigrid Halvorsen: She only takes calls after 2 pm, on her direct line at extension 4127.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Sigrid Halvorsen: She only takes calls after 2 pm, on her direct line at extension 4127."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "84bcaa2bb7e4148b47dd0f014e3b15752e9531c8a16ade471d862203816eaa8b",
+        "summary": "7259d780d643b42b4fe789cd66d50ab05e106aef4f91c00b98a9ef123a1fb904",
+        "judges": [],
+        "prompt": "083d9cea68d746337264867915d21cdfba217c45847017455ce7a147b8223159"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "5751ecef7a88d01631d8c3851c2251a02e1ddfdaa10e8fbe68bacc9309c5fb8f"
+      }
+    },
+    {
+      "id": "e3ffb897670d8e1bd5fb249ec5435ae1832aaeb58a8b3a2461b1662b22d89576-000001",
+      "original": {
+        "index": 2,
+        "topic": "refunds",
+        "version": 2,
+        "reasons": [
+          "agree-scored build"
+        ],
+        "score": {
+          "agree": 0.4801168705769321
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          1
+        ],
+        "summary": 75,
+        "judges": [
+          929
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "92fbd085-7e98-4395-abf5-101c75b98e78",
+          "seed": 2,
+          "sentence": 0,
+          "role": "user",
+          "text": "Standing rule: any refund over $200 needs a manager approval code in the internal note.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Standing rule: any refund over $200 needs a manager approval code in the internal note."
+        },
+        {
+          "id": "98873a53-8bf8-4f31-9c72-7410239ff36e",
+          "seed": 29,
+          "sentence": 0,
+          "role": "user",
+          "text": "Marcus just messaged that the approval code rotated early.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Marcus just messaged that the approval code rotated early."
+        },
+        {
+          "id": "98873a53-8bf8-4f31-9c72-7410239ff36e",
+          "seed": 29,
+          "sentence": 1,
+          "role": "user",
+          "text": "Use MX-4486 from now on; MX-4471 is dead.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Use MX-4486 from now on; MX-4471 is dead."
+        },
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "6fe9d8cf24483348eab7f11f7bf24d1263aeccf37b14bd2ee4f16dd94e196631",
+        "summary": "4c407e964cfa299009a91e0dff0473debd8d2a38dfdbad67e7b2912ce1c5ea01",
+        "judges": [
+          "622c45cb517022084163c98fd8fee206a149e9417a8c924529186981eb3f7c80"
+        ],
+        "prompt": "3380c567b53d9898da76bf29a3d338901b1ac9f2840df3e2cb114b429faedd9d"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "8cb9ddf2951694625db030f6b6117ff7107b812a6ee1ee503d9db6be66d742f2"
+      }
+    },
+    {
+      "id": "ec45ae9450422b8336babe85020cfe94128cd97daed19799be267c6f20d658f1-000001",
+      "original": {
+        "index": 8,
+        "topic": "returns",
+        "version": 2,
+        "reasons": [
+          "agree-scored build"
+        ],
+        "score": {
+          "agree": 0.5308665977384849
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          7
+        ],
+        "summary": 78,
+        "judges": [
+          931
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "381bf330-ca46-4391-9a54-7ee66a2befbc",
+          "seed": 40,
+          "sentence": 0,
+          "role": "user",
+          "text": "Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 0,
+          "role": "user",
+          "text": "Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning."
+        },
+        {
+          "id": "99ad534a-14f4-4fce-b8ac-02aaeb386de4",
+          "seed": 44,
+          "sentence": 1,
+          "role": "user",
+          "text": "Opened-item returns get a full refund again.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Opened-item returns get a full refund again."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "40d49e72f5001d643d472f055d7a1821eb99bd1cdec88003a16bb9e6769a2951",
+        "summary": "5d7e06d2de05943c952ecaade017c7e6e2e1dcac09eb018d4918ea655b0bf19f",
+        "judges": [
+          "176fe35e2986717ca2cc4ecb17f793f3dddd39691eece1b43936e15e8a3ef83c"
+        ],
+        "prompt": "b342907976478c08497017da375acdf5379f0a6bfa183b7c65237d7afa35456a"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "a27b43e363017fc925a9bcbf161ae6d6f64abd4484df8002fc69421581fd4c16"
+      }
+    },
+    {
+      "id": "ec50f45ca83af4b14470d27bcd5f423b737e3e7a01e494d73705693e394ccbde-000001",
+      "original": {
+        "index": 29,
+        "topic": "warehouse",
+        "version": 3,
+        "reasons": [
+          "final withheld-topic build"
+        ],
+        "score": {},
+        "provenance": "constructed unscored state",
+        "agree": [],
+        "summary": 87,
+        "judges": [],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 0,
+          "role": "user",
+          "text": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release."
+        },
+        {
+          "id": "bf156d91-4153-49fc-be2c-7c1f66740f8f",
+          "seed": 8,
+          "sentence": 1,
+          "role": "user",
+          "text": "Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today."
+        },
+        {
+          "id": "d0d73281-80c1-4b21-85c3-fe83f477dfc7",
+          "seed": 34,
+          "sentence": 0,
+          "role": "user",
+          "text": "Anyway, can you check where the Halvorsen shipment actually is?",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Anyway, can you check where the Halvorsen shipment actually is?"
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "a0433a7f10b30bf33a5a5495ebf9f6622db2e13c1945613d454a738c1ac54b4a",
+        "summary": "030a76b07730cdefb4a1efc85a973b0fb3018d7428c3ed16a617cb9b7e3a4d39",
+        "judges": [],
+        "prompt": "20b717b9f030759f34e667f3dd3bfb63d776cf2187a4f9e31f0d4e4e25552c70"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "3d379547c2efb68f20024a68b397dfc56256418b81bc55e73956d421f0c6dd3e"
+      }
+    },
+    {
+      "id": "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001",
+      "original": {
+        "index": 13,
+        "topic": "escalations",
+        "version": 1,
+        "reasons": [
+          "agree-scored build"
+        ],
+        "score": {
+          "agree": 0.47218748995940685
+        },
+        "provenance": "exact archived AGREE cache state",
+        "agree": [
+          12
+        ],
+        "summary": 80,
+        "judges": [
+          933
+        ],
+        "judgments": []
+      },
+      "sources": [
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 0,
+          "role": "user",
+          "text": "Third rule: copy Priya Raman from the refunds team on every escalation.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation."
+        },
+        {
+          "id": "a0f83ddd-123e-448f-977d-18cf754e4ba7",
+          "seed": 6,
+          "sentence": 1,
+          "role": "user",
+          "text": "And never promise a customer a delivery date in writing.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: And never promise a customer a delivery date in writing."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 0,
+          "role": "user",
+          "text": "Agreed, open the locker trace.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Agreed, open the locker trace."
+        },
+        {
+          "id": "3e81db03-8213-45ea-ab7f-3cbffac524e9",
+          "seed": 18,
+          "sentence": 1,
+          "role": "user",
+          "text": "Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first."
+        },
+        {
+          "id": "8e02fab1-e319-4e13-8fc4-efafec578f17",
+          "seed": 22,
+          "sentence": 0,
+          "role": "user",
+          "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 0,
+          "role": "user",
+          "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291."
+        },
+        {
+          "id": "94c445b2-244d-423f-93f9-ab1fa5fde053",
+          "seed": 27,
+          "sentence": 1,
+          "role": "user",
+          "text": "I transposed the digits.",
+          "day": "2026-10-08",
+          "rendered": "(2026-10-08) user: I transposed the digits."
+        }
+      ],
+      "input": {
+        "files": [
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/manifest.json",
+            "sha256": "0a78cf3be08fcd5383c4dcd0f8396459c2bc2e3b12097b0acca4880990efaef9"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/aggregates.jsonl",
+            "sha256": "115c984e784bab13dd7ff76cbc083f42fb65527dbff4ed2e55360d322b45b15b"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/messages.jsonl",
+            "sha256": "6411dfd04eca554027d4c544daa6b6252a95b279245d6609fa62d9ecc85bcdb4"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/judgments.jsonl",
+            "sha256": "a704371b6e5f53c6c21535f23a4c67043d5bffd3621612fca565f852c99ebefa"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/selections.jsonl",
+            "sha256": "9b92db4808c47381c28003e0489ea6ff371e4d14972f610287c7db62214e2f56"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/l5-q2-aggregatefill-v1/run.json",
+            "sha256": "064168a7cec93fff7b000cd82206ee0631c778768711a4518ea886c43878e08d"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/judge.jsonl",
+            "sha256": "c52b71f94ab1c2e742a6d6b698bc8fc278b2de1885e4ebdde75caf733355d15e"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/cache/summary.jsonl",
+            "sha256": "0df8a61ed4e64365224305d5480e25eb3bb86b234b54c0fc56c94a00aac67953"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/results/l5/pilot-resumption/calibrate/items.jsonl",
+            "sha256": "2fadbdfc994ac86343a6961b5a2ae85c254414c6ed075ea141673a12c32b3d3e"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/helpers.ts",
+            "sha256": "5d58f31b810a24ac70607bca4408fb09d7c75eec4afad0105451d67a11944449"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/constants.ts",
+            "sha256": "de90563086a0d79d1984b648ca1e380ba98de7365df5fe799b918a9b7c715ed7"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/Mirror.ts",
+            "sha256": "434621409d0c7e8c56a53e70e3a45f334dc53d59126f209f3ae25c872d7f3e9b"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/calibrate.ts",
+            "sha256": "3c2c8ac1a027584a955b8f47503ae5b4015dfef9e6f18f7100852ecd5b4e6f57"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/types.ts",
+            "sha256": "dce262c91d88dad3e1e5af84c62a6c4dbbb790381858670c6eb2cbac7ed1f251"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/helpers.ts",
+            "sha256": "264744d0023e9916c4d347b28f804ddb7bbade5867ca6724da766541f7e2a41c"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/bench5/aggregates/Aggregator.ts",
+            "sha256": "0a2a0f73bad06a86b0af5a208791cbf789ff2c4f9a6d7a7ac344ad55bbdc7318"
+          },
+          {
+            "path": "HEAD:.orkestrel/agent/instruments/harness/vendor/agent-0.0.30/index.js",
+            "sha256": "066f7368af737eb34bc839abf3f69397f21efe95edb2a81f1637492a8ed2e911"
+          },
+          {
+            "path": ".orkestrel/agent/instruments/units/aggregates/revision.md",
+            "sha256": "2f4ba7fe94cc513c61a6300c4a331ff3ca151a882c76a55ff32f010864370139"
+          }
+        ],
+        "row": "7651965565cccf3c973337af92ddc101d38e9d4985ed42ea3b58c7f1427c3803",
+        "summary": "5efa9166e36ffd62253ade2a3cb8ddf2d6e94035d9a29124c93e066399b75742",
+        "judges": [
+          "3b6f1135b41b036b8a3c9ffe2468f5b9abf3087b198f7247c0d162bee8b07813"
+        ],
+        "prompt": "bdbe725fb7dbf0372d1da4813997104c9efb3ad5a0224277fa80a3ad49cb338c"
+      },
+      "evidence": {
+        "question": "1c1cd512b212eab431bdb86ae80321709577e417d62b71efa2d3a8a615054e3a",
+        "state": "310e9a3f63faadb030ae82570645bc6b2ad6bf56b11ae06662b3a469f90da852"
+      }
+    }
+  ],
+  "hashes": {
+    "packet.jsonl": "2f7c267dc8ed24a6fc68adc7609bfe6637df34a30d1d7fd8eb8a2b5926bba45b",
+    "mapping.jsonl": "8c935f627ff5f8dabc38c57398276ddf612738bea2e80545a2e3c8ab261228ac",
+    "verdicts.json": "6b16ba75bf88184eec455c6af6cf405bd050ad289ddd2991c5a5c5a1e4704cf6",
+    "adjudication.json": "c7be44cbba2321b233a0bd30023a0eb150f2ae003bb43352473ab2e8d6b3033a"
+  }
+}

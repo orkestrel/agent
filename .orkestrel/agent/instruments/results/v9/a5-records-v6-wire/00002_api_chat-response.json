@@ -1,0 +1,5 @@
+{
+ "status": 200,
+ "ms": 17903,
+ "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:46:11.999251684Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":17897216604,\"load_duration\":4033968101,\"prompt_eval_count\":2498,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":13850997000,\"eval_count\":1,\"eval_duration\":1000}"
+}

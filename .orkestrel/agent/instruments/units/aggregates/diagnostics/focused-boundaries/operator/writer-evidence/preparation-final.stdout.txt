@@ -1,0 +1,2 @@
+{"prepared":true,"packet":{"path":"tmp/units/aggregate-boundary-screen/prepared-final/packet-final.json","hash":"621dc71f3291fb560753919858800ed06a7b644cefbd721b0ef65c8ada64e055","bytes":348716},"operator":"cf027a84382bf86bd6f71c6e18474fc90f4c9527ff71cc8482ff4c286afbd1cd","checks":44,"requests":88,"dispatches":0,"native":0}
+Offline global-fetch guard dispatches: 0; native dispatches: 0

@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "text": "OK",
+  "url": "http://127.0.0.1:11434/api/ps",
+  "redirected": false,
+  "headers": [
+    [
+      "content-length",
+      "421"
+    ],
+    [
+      "content-type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "date",
+      "Sun, 11 Oct 2026 11:06:19 GMT"
+    ]
+  ],
+  "at": "2026-10-11T11:06:19.666Z",
+  "duration": 5.474400000006426
+}

@@ -1,0 +1,32 @@
+[
+ {
+  "id": "f0b8462a",
+  "run": "t4-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "2f79c142",
+  "run": "t4-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "72dfb062",
+  "run": "t4-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a6cc25a1",
+  "run": "t4-records-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "1f74761c",
+  "run": "t4-control-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ }
+]

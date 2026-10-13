@@ -1,0 +1,16 @@
+# Larkspur Home support desk: ledger
+
+mode ledger, reply terminal, gate deny, judge mica (num_ctx 4096), categories choice, budget 0.7, tail 0.35, horizon 3, ctx 3072, temperature 0, seed 7, presence_penalty 1.5, top_k 20, top_p 0.95. Seed pass: 1 questions, 37.3 s. Passed 5 of 10; ok any 5 of 10. Reply via: final 6, answered 0, held 4, tool 0, reminded 0, content 0, none 0. Lookup repeats 0.
+
+| goal | success | answer | reply via | ok any | turns | lookup repeats | max prompt tokens | overflow | truncated | faults | judge calls | selection/view | asked/screened | wall s | in prompt | tools ok | summaries | sections | view | briefing recall | briefing precision | stale | judge questions | pins model/loop | denials |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| g01-luis-refund-amount | yes | reply | held | yes | 4 | 0 | 2419 | 0 | 0 | 0 | 7 | 20/55 | - | 61.3 | yes | yes | 0 | 0 | 56 | 1 | 0.222 | 0 | 7 (0 pairs) | 0/1 | 1 |
+| g02-luis-card | yes | reply | held | yes | 4 | 0 | 2219 | 0 | 0 | 0 | 7 | 18/61 | - | 59.0 | yes | yes | 0 | 0 | 64 | 1 | 0.111 | 0 | 7 (0 pairs) | 0/1 | 1 |
+| g03-grace-escalation | yes | reply | final | yes | 7 | 0 | 2869 | 0 | 0 | 0 | 7 | 13/65 | - | 77.1 | yes | no | 0 | 0 | 78 | 1 | 0.25 | 0 | 7 (0 pairs) | 0/0 | 0 |
+| g04-halvorsen-ticket | yes | reply | final | yes | 3 | 0 | 2399 | 0 | 0 | 0 | 7 | 8/79 | - | 46.0 | yes | yes | 0 | 0 | 84 | 1 | 0.2 | 0 | 7 (0 pairs) | 0/2 | 0 |
+| g05-luis-approval-note | no | reply | final | no | 5 | 0 | 2586 | 0 | 0 | 0 | 7 | 9/85 | - | 74.9 | yes | no | 0 | 0 | 94 | 1 | 0.2 | 0 | 7 (0 pairs) | 0/0 | 0 |
+| g06-kenji-shipping | no | reply | held | no | 5 | 0 | 2452 | 0 | 0 | 0 | 7 | 11/101 | - | 97.9 | yes | yes | 0 | 0 | 104 | 1 | 0.111 | 0 | 7 (0 pairs) | 0/1 | 1 |
+| g07-depot-release | no | reply | final | no | 2 | 0 | 2387 | 0 | 0 | 0 | 7 | 5/105 | - | 52.0 | yes | no | 0 | 0 | 108 | 1 | 0.167 | 0 | 7 (0 pairs) | 0/0 | 0 |
+| g08-halvorsen-credit | no | reply | held | no | 4 | 0 | 2368 | 0 | 0 | 0 | 7 | 7/113 | - | 75.7 | yes | yes | 0 | 0 | 116 | 1 | 0.1 | 0 | 7 (0 pairs) | 0/1 | 1 |
+| g09-kenji-gift-note | yes | reply | final | yes | 2 | 0 | 2112 | 0 | 0 | 0 | 7 | 6/117 | - | 42.9 | yes | no | 0 | 0 | 120 | 1 | 0 | 0 | 7 (0 pairs) | 0/0 | 0 |
+| g10-sigrid-callback | no | reply | final | no | 2 | 0 | 2444 | 0 | 0 | 0 | 7 | 7/121 | - | 46.3 | yes | yes | 0 | 0 | 124 | 1 | 0.091 | 0 | 7 (0 pairs) | 0/0 | 0 |

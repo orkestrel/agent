@@ -1,0 +1,161 @@
+{
+  "passed": true,
+  "packet": {
+    "path": "tmp/units/aggregate-capacity-g2-control/prepared/packet.json",
+    "hash": "bb7d5de942f9c4e5168fa77d0bb344bcb2d585b931129294b68c74bb8e94bd56",
+    "bytes": 7380
+  },
+  "operator": "5504592be3b85761ec98574ac48e95be539998b22da5b42f2d1d5a6b6dbca014",
+  "models": [
+    {
+      "key": "g2",
+      "tag": "gemma4:e2b-it-q4_K_M",
+      "digest": "b37049369adfe3d2b653af0ab301a062ca5cbe96ace6aa0d3f2559ee9b563fc2",
+      "route": "/api/chat"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/types.ts",
+      "hash": "023f2eb80650fc927c34b71feefb8717ed17fe76558ef5bcafa439ae7857064e",
+      "bytes": 2392
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/constants.ts",
+      "hash": "2238838e5a11baa01c6263ddcf2870a1ef2d922249a056c374b40d92d8ae4fa7",
+      "bytes": 2833
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/helpers.ts",
+      "hash": "3e446b3ca4f46ae797c05def075e489a00d85ed636fef0fb3e2aff109aa0ddbe",
+      "bytes": 10036
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/Driver.ts",
+      "hash": "a31706d5e1e27c5aa9fe80385783079ea0abf2efbf35a5963b639a6b8b0e3271",
+      "bytes": 9307
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/Daemon.ts",
+      "hash": "68db7adfa74a89b72cd213424bd7b5a941ac4dfd0f05bff16bbf124fa110f8de",
+      "bytes": 3985
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/main.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/prepare.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/execute.ts",
+      "hash": "da1053936570c4d9740200b1c9c23df4f06971d018dae8d17396f4238b2bcea7",
+      "bytes": 104
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/start.ts",
+      "hash": "1d9bfca5c85f61e26f7b5933da53d191e9dd30fe60e78d93ce43a8f53bd4c570",
+      "bytes": 104
+    },
+    {
+      "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-direction.md",
+      "hash": "e55224d7b9300739dc568f5f5e3601a541cec5a9ee293ba94b8172c4dfff9230",
+      "bytes": 3865
+    },
+    {
+      "path": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-full-admission-clarification.md",
+      "hash": "a96a1d965fed096f13fa6e7fd1ffc1a6305f1532149e785af0cd8926b179bc31",
+      "bytes": 13178
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-startup-report.md",
+      "hash": "fd5a236913b56a9c360275249f529e7de08252fffc0033d842508c627614219a",
+      "bytes": 5612
+    },
+    {
+      "path": "tmp/units/aggregate-focused-screen/live-forward-reverse/01-statement-a.request.json",
+      "hash": "37430d08fd152afdd3a768029d3f34bed8bad426b5a873ef12cafc721dd76e28",
+      "bytes": 5775
+    },
+    {
+      "path": "tmp/units/aggregate-judge-counterfactual/helpers.ts",
+      "hash": "403a364d5f6974171b8116636ff0cbb372b95ad33cf2055f2b511c0e06d97bb5",
+      "bytes": 9454
+    },
+    {
+      "path": "tmp/units/aggregate-judge-counterfactual/constants.ts",
+      "hash": "0a4d866d8481755f6b4968f1295e280d8e2d982d47e1530051de074cfdebb046",
+      "bytes": 2326
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/live1/g2-generation.request.bin",
+      "hash": "dfa52c5dd1d77d505928d3de9a831b23c79cab4bcce49d3600b245cc6fd091f5",
+      "bytes": 420
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-probe/prepared/packet.json",
+      "hash": "27ff15eb80f8dba7d236cdf08e4330a3e37ddd8fd9a46afaf11ddd77f2a9f7d2",
+      "bytes": 80122
+    },
+    {
+      "path": ".orkestrel/agent/instruments/results/l7/g2-think0/freeze/manifest.json",
+      "hash": "04a1e41ae941899e6af64b3289b7e9604f64b508db86f376fc0bccc0403ef487",
+      "bytes": 18941
+    },
+    {
+      "path": "tmp/units/aggregate-capacity-g2-control/prepared/generation.json",
+      "hash": "695dba977ed20b4221d997a93a34e9cb5a5c7acd831c8fa56cd399d95cd7dab3",
+      "bytes": 1148
+    }
+  ],
+  "bodies": [
+    {
+      "id": "g2-reachability",
+      "model": "g2",
+      "route": "/api/chat",
+      "body": "{\"model\":\"gemma4:e2b-it-q4_K_M\",\"messages\":[{\"role\":\"system\",\"content\":\"Provide direct output only.\"},{\"role\":\"user\",\"content\":\" 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1\"},{\"role\":\"assistant\",\"content\":\"Acknowledged the older content.\"},{\"role\":\"user\",\"content\":\"Output every integer from 1 through 5000, one per line, without commentary or an early stop.\"}],\"truncate\":false,\"shift\":false,\"stream\":false,\"keep_alive\":\"5m\",\"think\":false,\"options\":{\"temperature\":0,\"seed\":7,\"presence_penalty\":1.5,\"top_k\":20,\"top_p\":0.95,\"num_ctx\":2048,\"num_predict\":1}}",
+      "hash": "61668937ffba7c3d9205c9660cd7a424f07a6686250b93bf9871050ca6727614",
+      "bytes": 1311
+    },
+    {
+      "id": "g2-generation",
+      "model": "g2",
+      "route": "/api/chat",
+      "body": "{\"model\":\"gemma4:e2b-it-q4_K_M\",\"messages\":[{\"role\":\"system\",\"content\":\"Provide direct output only.\"},{\"role\":\"user\",\"content\":\" 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1\"},{\"role\":\"assistant\",\"content\":\"Acknowledged the older content.\"},{\"role\":\"user\",\"content\":\"Output every integer from 1 through 5000, one per line, without commentary or an early stop.\"}],\"truncate\":false,\"shift\":false,\"stream\":false,\"keep_alive\":\"5m\",\"think\":false,\"options\":{\"temperature\":0,\"seed\":7,\"presence_penalty\":1.5,\"top_k\":20,\"top_p\":0.95,\"num_ctx\":2048,\"num_predict\":4096}}",
+      "hash": "08a3a074bd155facceb93e70dd6cba949e6c985d631a4166fce06d508821df48",
+      "bytes": 1314
+    }
+  ],
+  "sequence": [
+    "initial-version",
+    "initial-tags",
+    "initial-ps",
+    "initial-show-g2",
+    "g2-reachability",
+    "g2-reachability-ps",
+    "g2-generation",
+    "g2-generation-ps",
+    "final-tags",
+    "final-ps"
+  ],
+  "inference": 2,
+  "metadata": 8,
+  "dispatches": {
+    "global": 0,
+    "native": 0
+  },
+  "controls": [
+    "predecessor-packet-identity",
+    "predecessor-operator-identity",
+    "missing-receipt",
+    "explicit-execute-missing-options"
+  ],
+  "output": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\evidence\\independent-verifier-never-created",
+    "exists": false
+  },
+  "coverage": "Fixed population and unchanged sequencing/capture/admission source comparison; no inference or capture replay."
+}

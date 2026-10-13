@@ -1,0 +1,18 @@
+{
+  "protocol": "l6",
+  "key": "g4",
+  "think": false,
+  "arm": "records",
+  "copy": 1,
+  "phase": "resource",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g4-think0\\freeze\\manifest.json",
+    "hash": "9fecc71430f9c6af8580bdc7eb43e6ec2b034fa12c45690581af4197ac818f36"
+  },
+  "budget": {
+    "reserve": 512,
+    "window": 3072,
+    "ceiling": 3072,
+    "predict": 0
+  }
+}

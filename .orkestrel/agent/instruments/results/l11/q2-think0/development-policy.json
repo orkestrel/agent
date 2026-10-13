@@ -1,0 +1,52 @@
+{
+  "phase": "development",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l11\\q2-think0\\freeze\\manifest.json",
+    "hash": "74fdcef1eab7ba3c8e6ad7660547c99713b398d39a604b10e66d650e96662988"
+  },
+  "predecessor": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\freeze\\manifest.json",
+    "hash": "87c3b7b5b5756b0285f26302f3dbf4beb377e20f394973d011a7d192dc9df3ac"
+  },
+  "diagnosis": {
+    "path": ".orkestrel/agent/instruments/results/l9/calibration/q2/fit-v3/diagnosis.json",
+    "hash": "063c4ed9917f4db61b1cb6cecb47863d32e813009e329e66f47c44c8cf0c5a37"
+  },
+  "labels": {
+    "path": ".orkestrel/agent/instruments/results/l9/calibration/q2/labels-v3.json",
+    "hash": "eede8c57cff36b858494df2e500168caca37f004dfed2718bd238df76f3d14f2"
+  },
+  "packet": {
+    "path": ".orkestrel\\agent\\instruments\\results\\l9\\calibration\\q2\\generation\\packet.jsonl",
+    "hash": "606faa019bab5d6724ced6b0e1c118568b2c585befeeb43c1c6943fdf514bd58"
+  },
+  "generation": {
+    "path": ".orkestrel\\agent\\instruments\\results\\l9\\calibration\\q2\\generation\\manifest.json",
+    "hash": "d44390638081f8ad1e206c341f75dd3e1f7ae76dd3d5256a8cecaaaab7d1f7c1"
+  },
+  "resource": {
+    "path": ".orkestrel/agent/instruments/results/l9/q2-think0/resource/manifest.json",
+    "hash": "81f29fd3494dc6d635abcac79e287e8403b2492fecbaf1dde53a0a5bb6a95338"
+  },
+  "full": {
+    "path": ".orkestrel/agent/instruments/results/l9/q2-think0/full/manifest.json",
+    "hash": "6e5b7e3c28c9fa66d695c68d4bef1ef8b8f63bab5f6847428a34c42a15b7b38a"
+  },
+  "agree": 0.67,
+  "change": 0.56,
+  "selection": "highest-grid-majority-occurrences-and-identities",
+  "continuation": "failed-goal-after-xml-function-parameter-error",
+  "limitation": "seed-candidates-do-not-certify-diverged-history",
+  "paired": {
+    "reserve": 512,
+    "window": 3072,
+    "ceiling": 3072,
+    "predict": 0
+  },
+  "expanded": {
+    "reserve": 512,
+    "window": 1068663,
+    "ceiling": 262144,
+    "predict": 0
+  }
+}

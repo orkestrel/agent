@@ -1,0 +1,1 @@
+{"model":"qwen3.5:2b-q4_K_M","created_at":"2026-10-11T11:04:07.647359Z","message":{"role":"assistant","content":"PARCEL-CEDAR-7319"},"done":true,"done_reason":"stop","total_duration":277024900,"load_duration":10271500,"prompt_eval_count":62,"prompt_eval_cached_count":0,"prompt_eval_duration":164556000,"eval_count":11,"eval_duration":100326000}

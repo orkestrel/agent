@@ -1,0 +1,21 @@
+# G4 full-view and closed operator retention preparation
+
+Prepared the accepted retainer with 90 closed originals (371024 bytes), each pinned by directly measured SHA-256. The bounded population contains 94 candidates; 4 byte-identical originals use existing custody references. The map includes 5 preparation artifacts whose self-dependent seals are measured by restoration at execution. Retention was not executed.
+
+Accepted source: `tmp/units/aggregate-successor-g2-fit-retain.ts`, 23622 bytes, SHA-256 `a7a9250461b037e451342261aeb03a0791adef1d132e3e041fb9f2c05272f656`. Prepared retainer: `tmp/units/aggregate-successor-g4-full-retention-retain.ts`, 31759 bytes, SHA-256 `173d80046c681fa2fa6266c4191d97dff6e45bf53386b54b9405b339b1e8a0bf`. Full actual diff: `tmp/units/aggregate-successor-g4-full-retention.diff`, 38878 bytes, SHA-256 `ed4c26325f3b5d01e5ece2d71490a2899a6c1221ff411e77704ae2a6c3b643ff`.
+
+The complete candidate inventory, original paths/bytes/seals, retained prior references, and bare syntax/diff results are recorded in `tmp/units/aggregate-successor-g4-full-retention-capture.json:1`. The fixed retainer arrays own the copy mappings. Identical previously archived evidence is omitted; originals that differ from prior copies remain in this inventory. The original G4/Q2 materializers use existing retained references where their bytes match.
+
+Closed groups are G4 think0 full brief/reader/report/captures and full logs; G2 cell preparation/no-live captures and copied resource/full/pilot readers; remaining explore-cells preparation brief/report/diffs/capture/writer and prospective G4 think1/Q2 briefs/readers; exploratory-paths correction brief/report/reader/diffs/captures and successor G4/Q2 materializers; failed G4 preparation note and closed successor materialization captures; continuous-command Grok report and brief as reading evidence only.
+
+Changes are confined to header/usage, expected HEAD `b33dc98e13f589b0196b9f1aad9bd100306926f5`, archive/script/report literals, basename inventory, fixed seals, and generated report prose. Executable copy guards, restoration generation, create-only writes, attributes, byte/hash equality, Git custody implementation, archive census, and verify mode remain the accepted mechanism. See `tmp/units/aggregate-successor-g2-fit-retain.ts:166` and `tmp/units/aggregate-successor-g4-full-retention-retain.ts:1`; root reviews the full literal diff.
+
+From explicit scaffold cwd on Windows, `node --check tmp/units/aggregate-successor-g4-full-retention-retain.ts` exited 0 with empty stdout/stderr. The actual no-index diff exited 1 because the intended data differs, with empty stderr. Source template and every candidate remained equal on repeat reads before script generation.
+
+Archive `.orkestrel/agent/instruments/results/l15/custody/g4-full-and-operators` and distinct execution report `tmp/units/aggregate-successor-g4-full-retention-execution-report.md` remain absent. The archive destination was not created. Root supplies execution acceptance on the brief's expected HEAD; this preparation performs no HEAD/index/status operation.
+
+Excluded all live G4 aggregate reports/logs/captures and active Opus evidence; the continuous-command Grok journal; raw full and policy/execution/cache/run trees; the active retention brief; unrelated history and daemon material. Original full/exploration artifacts remain at their existing locations. No model/service operation, Git mutation, source/build/index/HEAD change, cleanup, or retainer runtime occurred. No required closed input was missing and no basename collision occurred. Root owns README, runtime, prose, and acceptance.
+
+Root created tmp/units/aggregate-successor-g4-think1-aggregate-read-2.ts after this inventory was sealed and directed that it be reported for the next retention. Its root-supplied SHA-256 is aa47b833c7e0e55fe57ce3cad4366cfbc13a052bddc824e0751b67c8caacdefc. This retainer preserves the sealed inventory and the original prospective briefs; root's separate releases state corrected operator/reader paths.
+
+The complete 379-line literal diff was inspected; only the permitted header/usage, paths/HEAD, data arrays/seals, and generated report prose differ. The dispatch citation check exited 0 with 3 citations and 0 unresolved.

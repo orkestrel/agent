@@ -1,0 +1,79 @@
+▶ aggregate helpers
+  ✔ copies exact source grouping and multiplicity into validated maintenance bindings (2.2182ms)
+  ✔ accepts extended retained sources while rejecting invalid declared fields (0.2092ms)
+  ✔ names the summarizer prefix and fills its slots in one pass (0.2268ms)
+  ✔ words the questions and the instructions as the proposal does (0.444ms)
+  ✔ builds the summary prompt, the CHANGE state, and the AGREE state as the proposal words them (0.3086ms)
+  ✔ escapes exact offending tokens and failure kinds as retry data (0.1737ms)
+  ✔ reads a letter-and-digit run as an id and a capitalized word in any position as a name candidate (2.8271ms)
+  ✔ counts a scored code and a sentence-initial name that only the summary carries as sole tokens (0.473ms)
+  ✔ drops the sentences whose tokens the shown text lacks and keeps the ids it shows (0.601ms)
+  ✔ fails a summary by kind: empty, id, number, name, and stale (2.641ms)
+  ✔ collects the stale tokens that no current source carries (0.2411ms)
+  ✔ compares built sources with current sources by message, sentence, and text (0.3613ms)
+  ✔ puts the tool name and arguments before a tool line and nothing before another line (0.1602ms)
+  ✔ cuts whole entries from the end until the block price fits the allowance (0.3652ms)
+✔ aggregate helpers (12.8437ms)
+▶ Aggregator
+  ▶ first build
+    ✔ builds every desk topic and the request owner that have sources (325.4862ms)
+    ✔ maintains only the owners that the request names, and asks a complete contextual bundle per build and CHANGE never (239.4332ms)
+    ✔ keeps every version when nothing changed, and asks nothing on a second read point (251.5299ms)
+    ✔ keeps the request out of every summarizer prompt (210.9367ms)
+  ✔ first build (1027.8206ms)
+  ▶ rebuild on a removed source line
+    ✔ rebuilds a topic whose source an amends and supersedes pair removed, and asks no CHANGE (288.239ms)
+    ✔ keeps the earlier version in the log beside the rebuilt one (282.0438ms)
+  ✔ rebuild on a removed source line (570.6018ms)
+  ▶ CHANGE on an arriving message
+    ✔ keeps the version when CHANGE reads no only after AGREE on the complete changed sources (300.0046ms)
+    ✔ rebuilds retained prose when complete-source AGREE rejects it (263.6219ms)
+    ✔ rebuilds the version when CHANGE reaches the cutoff, then checks the new build with AGREE (274.5191ms)
+  ✔ CHANGE on an arriving message (838.5001ms)
+  ▶ consistency failure
+    ✔ keeps the version number when a supported rebuild returns unchanged prose (267.1812ms)
+    ✔ rebuilds after a retained AGREE refusal and binds the supported successor (289.9524ms)
+    ✔ withholds rejected retained and rebuilt prose, then recovers from restored live sources (300.4933ms)
+    ✔ retires all sources including owners omitted by the live collector (254.3941ms)
+    ✔ invalidates a pass on abort after the provider receives a rebuild and recovers later (301.2107ms)
+    ✔ records a failed maintenance call with prior sources and recovers through the real provider (294.5766ms)
+    ✔ invalidates older state when the top-level maintenance journal fails (306.1854ms)
+    ✔ marks a mistyped id stale, retries with a different prompt, and withholds the topic after the retry bound (295.0309ms)
+    ✔ fails a build that AGREE reads below the cutoff when the cutoff separates, and withholds the topic (244.5808ms)
+    ✔ refuses a failed fit instead of accepting lexical-only summaries (193.5531ms)
+    ✔ withholds at once when the retry bound is zero, and builds the topic again at the next read point (222.055ms)
+  ✔ consistency failure (2970.2436ms)
+  ▶ render
+    ✔ orders the request owners before its desk topics and renders the heading and prose (227.2294ms)
+    ✔ preserves checked multiline whitespace byte-for-byte in the exposed binding (223.7167ms)
+    ✔ binds the exact rendered version and refuses source changes before the next maintenance (308.5546ms)
+    ✔ withholds the whole entry when a sentence would be dropped (235.7917ms)
+    ✔ renders nothing for a topic whose title or prose the selection cannot carry (232.3838ms)
+    ✔ withholds the title with the prose, so a title never carries an id or a name that the selection lacks (226.1329ms)
+    ✔ cuts whole topics from the end to fit the allowance at the supplied scale (253.7615ms)
+    ✔ lists a withheld topic that the request names and renders its siblings (192.591ms)
+  ✔ render (1900.8593ms)
+✔ Aggregator (7336.5116ms)
+▶ complete contextual support
+  ✔ matches the accepted independent specimen and native rendered request bytes (1.9953ms)
+  ✔ covers CRLF, repeated text, date prefixes, Unicode offsets, and every suffix (0.5333ms)
+  ✔ requires complete membership, retains low components, and replays only identical semantic input (9.0124ms)
+  ✔ retains refusal and abort attempts without scoring a prefix (8.4248ms)
+  ✔ binds fresh archived controls, refuses historical singular evidence, and sums every component cost (45.2654ms)
+✔ complete contextual support (66.1919ms)
+▶ summary body validation
+  ✔ requires prose after an optional IDs header without backtracking the header into prose (0.1656ms)
+  ✔ preserves valid prose with and without an IDs header (0.153ms)
+✔ summary body validation (0.4091ms)
+▶ complete request admission
+  ✔ prices the real builder framing, scale, fixed tool cost, and selected evidence while cutting whole entries in order (0.735ms)
+  ✔ counts nonempty rendered topic prose and rejects a heading-only exposure control (0.0941ms)
+✔ complete request admission (0.9187ms)
+ℹ tests 51
+ℹ suites 10
+ℹ pass 51
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7642.9717

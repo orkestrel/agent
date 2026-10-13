@@ -1,0 +1,11 @@
+{
+  "id": "initial-show-mica",
+  "complete": true,
+  "breached": false,
+  "bytes": 33601,
+  "hash": "b451ed07c2c8ed5b2f0da06178d2f31a6f18fe5f89b65373c9a6e15eb12a0138",
+  "status": 200,
+  "started": "2026-10-11T11:03:49.541Z",
+  "finished": "2026-10-11T11:03:49.617Z",
+  "duration": 75.33609999999999
+}

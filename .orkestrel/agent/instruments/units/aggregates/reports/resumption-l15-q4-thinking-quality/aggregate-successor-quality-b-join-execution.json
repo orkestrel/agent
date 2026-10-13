@@ -1,0 +1,7 @@
+﻿{
+    "command":  "node tmp/units/aggregate-successor-quality-b-join-sealed.ts",
+    "exit":  0,
+    "durationMs":  184,
+    "stdout":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-quality-b-join.stdout.txt",
+    "stderr":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-quality-b-join.stderr.txt"
+}

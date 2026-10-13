@@ -1,0 +1,232 @@
+{
+  "body": {
+    "availability": "present",
+    "hash": "eaf69b3cae96bfcb1af2e1c36265485a4c9742defdd1fdd0f0bb47257d4459d6",
+    "bytes": 1722
+  },
+  "token": {
+    "availability": "present",
+    "value": "No"
+  },
+  "finish": {
+    "availability": "present",
+    "value": "length"
+  },
+  "top": {
+    "availability": "present",
+    "value": [
+      {
+        "token": "No",
+        "logprob": -0.012683075852692127,
+        "bytes": [
+          78,
+          111
+        ],
+        "top_logprobs": [
+          {
+            "token": "No",
+            "logprob": -0.012683075852692127,
+            "bytes": [
+              78,
+              111
+            ]
+          },
+          {
+            "token": "Yes",
+            "logprob": -4.923623085021973,
+            "bytes": [
+              89,
+              101,
+              115
+            ]
+          },
+          {
+            "token": "False",
+            "logprob": -5.741450309753418,
+            "bytes": [
+              70,
+              97,
+              108,
+              115,
+              101
+            ]
+          },
+          {
+            "token": "false",
+            "logprob": -7.390881538391113,
+            "bytes": [
+              102,
+              97,
+              108,
+              115,
+              101
+            ]
+          },
+          {
+            "token": "no",
+            "logprob": -7.83022403717041,
+            "bytes": [
+              110,
+              111
+            ]
+          },
+          {
+            "token": "A",
+            "logprob": -9.253928184509277,
+            "bytes": [
+              65
+            ]
+          },
+          {
+            "token": "B",
+            "logprob": -9.396413803100586,
+            "bytes": [
+              66
+            ]
+          },
+          {
+            "token": "NO",
+            "logprob": -9.585224151611328,
+            "bytes": [
+              78,
+              79
+            ]
+          },
+          {
+            "token": "C",
+            "logprob": -9.689539909362793,
+            "bytes": [
+              67
+            ]
+          },
+          {
+            "token": "<think>",
+            "logprob": -9.830434799194336,
+            "bytes": [
+              60,
+              116,
+              104,
+              105,
+              110,
+              107,
+              62
+            ]
+          },
+          {
+            "token": "The",
+            "logprob": -10.056310653686523,
+            "bytes": [
+              84,
+              104,
+              101
+            ]
+          },
+          {
+            "token": "True",
+            "logprob": -10.533284187316895,
+            "bytes": [
+              84,
+              114,
+              117,
+              101
+            ]
+          },
+          {
+            "token": "c",
+            "logprob": -11.010193824768066,
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "token": "It",
+            "logprob": -11.056294441223145,
+            "bytes": [
+              73,
+              116
+            ]
+          },
+          {
+            "token": "yes",
+            "logprob": -11.063018798828125,
+            "bytes": [
+              121,
+              101,
+              115
+            ]
+          },
+          {
+            "token": "Now",
+            "logprob": -11.098526954650879,
+            "bytes": [
+              78,
+              111,
+              119
+            ]
+          },
+          {
+            "token": "Nos",
+            "logprob": -11.101302146911621,
+            "bytes": [
+              78,
+              111,
+              115
+            ]
+          },
+          {
+            "token": "I",
+            "logprob": -11.233986854553223,
+            "bytes": [
+              73
+            ]
+          },
+          {
+            "token": "f",
+            "logprob": -11.258257865905762,
+            "bytes": [
+              102
+            ]
+          },
+          {
+            "token": "None",
+            "logprob": -11.407355308532715,
+            "bytes": [
+              78,
+              111,
+              110,
+              101
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "usage": {
+    "prompt": {
+      "availability": "present",
+      "value": 551
+    },
+    "completion": {
+      "availability": "present",
+      "value": 1
+    }
+  },
+  "timing": {
+    "total": {
+      "availability": "present",
+      "value": 2213375200
+    },
+    "load": {
+      "availability": "present",
+      "value": 8325800
+    },
+    "prompt": {
+      "availability": "present",
+      "value": 2136016000
+    },
+    "evaluation": {
+      "availability": "present",
+      "value": 1000
+    }
+  }
+}

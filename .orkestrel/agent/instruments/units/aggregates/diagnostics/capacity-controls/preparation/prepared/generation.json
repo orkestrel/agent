@@ -1,0 +1,10 @@
+[
+  {
+    "role": "system",
+    "content": "Provide direct output only."
+  },
+  {
+    "role": "user",
+    "content": "Output every integer from 1 through 5000, one per line, without commentary or an early stop."
+  }
+]

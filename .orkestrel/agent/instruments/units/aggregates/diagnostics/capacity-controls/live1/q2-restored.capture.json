@@ -1,0 +1,11 @@
+{
+  "id": "q2-restored",
+  "complete": true,
+  "breached": false,
+  "bytes": 348,
+  "hash": "588f252e7d5282a3e8ac323ac0402b1115021f0b50095fdd416ed169fc5a953b",
+  "status": 200,
+  "started": "2026-10-11T11:04:07.651Z",
+  "finished": "2026-10-11T11:04:12.888Z",
+  "duration": 5236.6685
+}

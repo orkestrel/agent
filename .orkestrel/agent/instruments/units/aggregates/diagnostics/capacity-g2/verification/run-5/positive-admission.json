@@ -1,0 +1,18 @@
+{
+  "admitted": true,
+  "packet": "bb7d5de942f9c4e5168fa77d0bb344bcb2d585b931129294b68c74bb8e94bd56",
+  "operator": "5504592be3b85761ec98574ac48e95be539998b22da5b42f2d1d5a6b6dbca014",
+  "receipt": {
+    "path": "tmp/units/aggregate-capacity-probe/daemon-start.json",
+    "hash": "19c077e9190accb54e1e791d2be4493412431d22a86778a1b1e229255854a120",
+    "bytes": 449,
+    "pid": 38284
+  },
+  "host": "Windows; controlled attached daemon; exclusive serial client; no other service requests",
+  "output": "tmp/units/aggregate-capacity-g2-control/evidence/independent-admission-never-created",
+  "outputExists": false,
+  "dispatches": {
+    "global": 0,
+    "native": 0
+  }
+}

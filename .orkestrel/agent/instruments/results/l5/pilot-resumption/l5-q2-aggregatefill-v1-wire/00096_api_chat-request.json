@@ -1,0 +1,31 @@
+{
+ "url": "http://127.0.0.1:11434/api/chat",
+ "method": "POST",
+ "started": 1791653579717,
+ "body": {
+  "model": "qwen3.5:2b-q4_K_M",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You maintain a short summary of what a support desk's messages establish about warehouse as of 2026-10-09. A later message replaces what an earlier message said. Copy every id, amount, date, and name exactly as the messages write it. Write only the summary, in at most three sentences."
+   },
+   {
+    "role": "user",
+    "content": "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.\n(2026-10-08) user: Tomasz Brennan: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.\n(2026-10-08) user: Anyway, can you check where the Halvorsen shipment actually is?\n\nYour previous summary failed these checks: number, name. Write it again so that every id, amount, date, and name occurs in the messages above."
+   }
+  ],
+  "stream": true,
+  "keep_alive": "30m",
+  "think": false,
+  "options": {
+   "temperature": 0,
+   "seed": 7,
+   "presence_penalty": 1.5,
+   "top_k": 20,
+   "top_p": 0.95,
+   "num_ctx": 3072,
+   "num_predict": 160
+  },
+  "truncate": false
+ }
+}

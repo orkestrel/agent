@@ -1,0 +1,222 @@
+{
+  "cell": "q4-think1",
+  "head": "bd31e6573562045fc5ea190edc839960fe4fac92",
+  "live": true,
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze\\manifest.json",
+    "hash": "8c9f816203eb24a8ab3c9d87e94e3da5d841200d1737691fbb91c3596bac0b07"
+  },
+  "build": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\build-manifest.json",
+    "hash": "0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc"
+  },
+  "deployment": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-daemon-deployment.json",
+    "hash": "40442197423b574b61548feb702b55c948d77f61dd719d9d6b26e24ad3016e19"
+  },
+  "fit": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\fit\\fit.json",
+    "hash": "46f1bcf297ccd0989c20280f3e50bdaf692c8ab47b8d936487d6996eecd928a8"
+  },
+  "admission": "released fit bytes; strict admission belongs to emitted operator",
+  "sequence": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-cell-q4-think1-sequence.jsonl",
+  "paths": [
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-cell-q4-think1-sequence.jsonl",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\resource",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.err",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl.pid",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl.status-before.txt",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl.status-after.txt",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\full",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.err",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl.pid",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl.status-before.txt",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl.status-after.txt",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\pilot",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.err",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl.pid",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl.status-before.txt",
+      "absent": true
+    },
+    {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl.status-after.txt",
+      "absent": true
+    }
+  ],
+  "commands": [
+    {
+      "stage": "resource",
+      "out": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\resource",
+      "journal": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl",
+      "errors": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.err",
+      "argv": [
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.err",
+        "--cap",
+        "7200",
+        "--status",
+        "--",
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "resource",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze\\manifest.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\resource",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ]
+    },
+    {
+      "stage": "full",
+      "out": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\full",
+      "journal": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl",
+      "errors": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.err",
+      "argv": [
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.err",
+        "--cap",
+        "7200",
+        "--status",
+        "--",
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "full",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze\\manifest.json",
+        "--resource",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\resource\\manifest.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\full",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ]
+    },
+    {
+      "stage": "pilot",
+      "out": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\pilot",
+      "journal": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl",
+      "errors": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.err",
+      "argv": [
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.err",
+        "--cap",
+        "10800",
+        "--status",
+        "--",
+        "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "pilot",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\freeze\\manifest.json",
+        "--resource",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\resource\\manifest.json",
+        "--fit",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\q4\\fit\\fit.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\q4-think1\\pilot",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ]
+    }
+  ],
+  "outer": {
+    "cap": 25920,
+    "argv": [
+      "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+      "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+      "--journal",
+      "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-cell-q4-think1-live.jsonl",
+      "--errors",
+      "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-cell-q4-think1-live.err",
+      "--cap",
+      "25920",
+      "--status",
+      "--",
+      "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+      "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-cell-run.ts",
+      "q4-think1",
+      "--head",
+      "bd31e6573562045fc5ea190edc839960fe4fac92",
+      "--fit",
+      "46f1bcf297ccd0989c20280f3e50bdaf692c8ab47b8d936487d6996eecd928a8",
+      "--live"
+    ]
+  }
+}
+{"pid":52932,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.err"}
+{"pid":52932,"exit":0,"signal":null,"capped":false,"durationMs":706009,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-resource.err"}
+{"pid":35552,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.err"}
+{"pid":35552,"exit":0,"signal":null,"capped":false,"durationMs":3979016,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-full.err"}
+{"pid":43144,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.err"}
+{"pid":43144,"exit":0,"signal":null,"capped":false,"durationMs":2086555,"journal":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.jsonl","errors":"C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\q4-think1-pilot.err"}

@@ -1,0 +1,546 @@
+{
+  "01ac45de246728baa4c046b3d8421f0b47f2bd5ea45a39b659ae3e6173bc67f4-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The ticket and escalation are recorded on 2026-10-08, not 2021-04-12. The remaining order, amount, delay, escalation, and copied-recipient details agree.",
+    "claim": "On 2021-04-12, a support ticket was opened for Copperline Cafes regarding order LH-84056 (LH-71592) totaling $2,880.00 due to a linehaul shortage at the Dunmore hub. The assistant logged escalation ESC-2244 and copied Priya Raman from the refunds team on this matter.",
+    "source": [
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 1
+  },
+  "04f2c52a22ebfa1c2e89e9ace9414fb66a3fed89f8f379a28b47b523fb5cafce-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The initial ticket is recorded on 2026-10-08, not 2021-04-12. The source explicitly closes TR-3307, the locker trace; it does not separately report closure of the original support ticket.",
+    "claim": "On 2021-04-12, a support ticket was opened for order LH-77302 (Grace Okafor), which was marked delivered on 2026-10-03 but later resolved via locker trace. On 2026-10-09, the same ticket was closed after Parcelway confirmed Grace collected her duvet at Elm Street station on 2026-10-09.",
+    "source": [
+      "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+      "(2026-10-09) user: Trace TR-3307 is resolved, close it, and drop the replacement.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 2
+  },
+  "05cc94294f2833846c36832fd663f45fa91cfd74c383d5cd0689ae2309075fed-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Dalia left voicemail requesting a callback to book a slot; the slot was not booked by voicemail. The rug's arrival is supported, but delivery specifically to Beatriz's home is not stated.",
+    "claim": "As of 2026-10-10, a Sage Rug for order LH-83317 was delivered to Beatriz Solano's home on Parcelway tracking PW-7042-1185. A Sofa for order LH-86610 is currently held at the Larkspur Home warehouse awaiting a delivery slot booked by Dalia Moreno via voicemail.",
+    "source": [
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) tool: At the Larkspur Home warehouse awaiting a two-person delivery slot; slots are booked by phone with the customer.",
+      "(2026-10-10) user: Beatriz Solano emailed: the sage rug came this morning and it's perfect."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 3
+  },
+  "0c0d97409c0f51c03432a343eecec4660bf950d17409958b6b7a851a82209b1d-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The rug was shipped on 2026-10-09 and reported arrived on the morning of 2026-10-10. The claimed 2026-10-09 delivery date is contradicted.",
+    "claim": "As of 2026-10-10, a Sage Rug (LH-83317) was delivered to Beatriz Solano's account on 2026-10-09, while a Sofa (LH-86610) for Dalia Moreno remains in the warehouse awaiting a delivery slot booked via phone. Additionally, a Locker Trace (TR-3307) regarding Grace Okafor's duvet was closed after she collected her item at Elm Street station on 2026-10-09.",
+    "source": [
+      "(2026-10-09) user: The warehouse sent the sage rug for LH-83317 this afternoon on Parcelway, tracking PW-7042-1185.",
+      "(2026-10-10) user: Beatriz Solano emailed: the sage rug came this morning and it's perfect."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 4
+  },
+  "12ac6826ea70fd2f25eff0dfcd5f08ea8718079c454477502f56f5d8fc52af33-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Reopening for cracked pendants is recorded on 2026-10-10, not 2026-10-08.",
+    "claim": "On 2026-10-08, a support desk message reopens escalation ESC-2219 for Sigrid's two cracked pendants after an electrician found them during unpacking. The assistant copied Priya Raman from the refunds team on this update.",
+    "source": [
+      "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass.",
+      "(2026-10-10) user: Her electrician found it when unpacking this morning.",
+      "(2026-10-10) assistant: Reopened ESC-2219 for the cracked pendants and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 5
+  },
+  "1c5d6596f2976f271b5795e861e28a6ed2a84436015adf40efc37662e874b303-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The Grace replacement request is recorded on 2026-10-08, and Halvorsen delivery on 2026-10-09. Both asserted 2021-04-12 event dates are wrong. The unfinished Copperline fragment supplies no complete further proposition and does not undo these contradictions.",
+    "claim": "(2021-04-12) Grace Okafor (LH-20418) requested a replacement for her linen duvet set (Order LH-77302), which was marked delivered on 2026-10-03 but remains missing.\n(2021-04-12) Halvorsen Interiors (LH-31055) received their brass pendant lights (Order LH-80941) at 7:40 am on 2021-04-12 after Tomasz Brennan released the order from the Riverside depot.\n(2021-04-12) Copperline Cafes (LH-",
+    "source": [
+      "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+      "(2026-10-09) tool: Freightline pro number FL-660412; released from the Riverside depot 2026-10-08 and delivered 2026-10-09 at 7:40 am to the Halvorsen Interiors loading dock, signed by S."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 6
+  },
+  "1de412ad69ac4792cc38fd479c1b6f7d5a551739e78062d8224d84a0a14b2b37-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Grace collected the original parcel and her replacement was cancelled; she did not receive the claimed replacement. The damage-claim passage states a filing deadline, not acceptance of an individual damage claim.",
+    "claim": "(2026-10-09) Grace Okafor received a replacement for linen duvet set LH-77302 after locker trace TR-3307 resolved on 2026-10-09. Order LH-80941 for Halvorsen Interiors was delivered at 7:40 am to the loading dock, signed by S., with a damage claim accepted until 2026-10-16.",
+    "source": [
+      "(2026-10-09) user: Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement.",
+      "(2026-10-09) tool: Carrier damage claims accepted until 2026-10-16."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 7
+  },
+  "2b377bba57746013143d83838e9bba005efcb3ca22f13a6a4c1cf21a78c3901a-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Dalia's request is dated 2026-10-10, not 2021-04-12. The source identifies a callback as the next step but does not state that a call was scheduled.",
+    "claim": "(2021-04-12) Dalia Moreno (account LH-66208) requested a delivery slot for her charcoal 3-seat sofa (order LH-86610, $1,180.00). The warehouse noted the order is awaiting a two-person delivery slot booked via phone. A call to Dalia on 555-0175 is scheduled to book the delivery slot for her sofa.",
+    "source": [
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) assistant: LH-86610 is in our warehouse waiting on a delivery slot, so a call to Dalia on 555-0175 is the next step."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 8
+  },
+  "3015170c2b807c89e169b247ecfe1abe555082ee75bc6caf1be01fc4ae9f5795-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The Grace report and Tomasz responsibility statements are dated 2026-10-08, not 2021-04-12. Tomasz issues releases and receives release requests; the source does not assign him the claimed act of issuing release requests.",
+    "claim": "(2021-04-12) Grace Okafor reported order LH-77302 never arrived for $148.50, which was marked delivered on 2026-10-03 to a locker at Elm Street station.\n(2021-04-12) Tomasz Brennan in the warehouse issues release requests for LH-80941 held at Riverside depot since 2026-10-02 under pro number FL-660412.",
+    "source": [
+      "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+      "(2026-10-08) user: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+      "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 9
+  },
+  "345f01f661c476bf26c8859df6422c67069f2eaa4f9baadf7b5370dba24e5128-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "No source reports Tomasz issuing a Copperline release on 2026-09-30 or because Sigrid was unavailable until 2026-10-09. Tomasz's own absence is the stated constraint, and Sigrid's calls are restricted to after 2 pm. The sofa callback is to Dalia; Hana is Copperline's buyer and is email-only, with no stated connection to Dalia's order.",
+    "claim": "On 2026-09-30, Tomasz Brennan issued a release for Copperline Cafes (Account LH-71592) due to Sigrid Halvorsen's unavailability until 2026-10-09. On 2026-10-10, Dalia Moreno requested a delivery slot for order LH-86610, which is currently held by the warehouse awaiting a call back from Hana Ikeda, the new buyer replacing Owen Pritchard.",
+    "source": [
+      "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+      "(2026-10-08) user: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+      "(2026-10-08) user: She only takes calls after 2 pm, on her direct line at extension 4127.",
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) assistant: LH-86610 is in our warehouse waiting on a delivery slot, so a call to Dalia on 555-0175 is the next step.",
+      "(2026-10-10) user: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 10
+  },
+  "34741c801a1cc8898bc76c27b64902f9d8ffb1e8fc32de2afc3f078ceb6f121c-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "ESC-2219 is the Halvorsen escalation, not Grace's locker-trace case, and it closes on 2026-10-09 rather than by 2026-10-08. The source records copying Priya on ESC-2244 and gives a standing copying rule; it does not report the claimed completed copying on every subsequent escalation.",
+    "claim": "As of 2026-10-08, the support desk has resolved escalation ESC-2219 for Grace by closing it after Sigrid confirmed all pendants were in. The team also logged a new ticket (ESC-2244) regarding late order LH-84056 and copied Priya Raman to every subsequent escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 11
+  },
+  "3d15d08447f3c610be16baa53eafcc52cf5d7a455243d4bb18178f8f967e22b5-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The source identifies Halvorsen's escalation and Sigrid's confirmation, but never identifies a person named Grace Halvorsen or assigns that escalation to Grace. 'All 8 pendants are in' does not establish the added inventory assertion 'in stock'. The ESC-2244 clause agrees.",
+    "claim": "As of 2026-10-09, the support desk closed escalation ESC-2219 for Grace Halvorsen after confirming all pendants were in stock via email from Sigrid. The assistant also logged a new ticket (ESC-2244) regarding late order LH-84056 and copied Priya Raman on this escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) user: Sigrid confirmed by email that all 8 pendants are in.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 12
+  },
+  "3f0ec7a139b524010b221caa41f5e3989ddbad09cbfa13c5b23337a16318c6c6-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The Grace report, price, marked-delivery date, locker, and depot hold agree. The release sentence changes Tomasz's role: he issues the release, while release requests must reach him. The sources do not say he issues release requests for LH-80941.",
+    "claim": "(2026-10-08) Grace Okafor reported order LH-77302 never arrived for $148.50, which was marked delivered on 2026-10-03 to a locker at Elm Street station.\n(2026-10-08) Tomasz Brennan in the warehouse issues release requests for LH-80941 held at Riverside depot since 2026-10-02 under pro number FL-660412.",
+    "source": [
+      "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+      "(2026-10-08) user: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+      "(2026-10-08) assistant: LH-80941 has been held at Freightline's Riverside depot since 2026-10-02 under pro number FL-660412, waiting on a release from our warehouse."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 13
+  },
+  "49ea585fa4f87b9c2f5eecab22b17d81d0d4b9c8d14a1f9c4ee1b66f9cdb7e16-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Copperline's ticket opens on 2026-10-08, not 2026-10-09, and the recorded escalation is ESC-2244, not ESC-2291.",
+    "claim": "On 2026-10-09, a support ticket was opened for Copperline Cafes regarding order LH-84056 (LH-71592) totaling $2,880.00 due to a linehaul shortage at the Dunmore hub. The assistant logged escalation ESC-2291 and copied Priya Raman from the refunds team on this matter.",
+    "source": [
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) user: Escalations opened ESC-2244.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 14
+  },
+  "5917bae71c62b38f2fa228386bccae5484b5e07bbca675219530b14922f8653e-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The dates, marked delivery, collection, and resolution agree. The claim that the same original support ticket was closed goes beyond the source: it explicitly closes the locker trace TR-3307 and cancels a replacement, but does not state the original ticket's closure or equate its status with the carrier trace.",
+    "claim": "On 2026-10-08, a support ticket was opened for order LH-77302 (Grace Okafor), which was marked delivered on 2026-10-03 but later resolved via locker trace. On 2026-10-09, the same ticket was closed after Parcelway confirmed Grace collected her duvet at Elm Street station on 2026-10-09.",
+    "source": [
+      "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+      "(2026-10-08) assistant: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+      "(2026-10-08) assistant: Recorded TR-3307 as the locker trace reference for Grace's order LH-77302.",
+      "(2026-10-09) user: Trace TR-3307 is resolved, close it, and drop the replacement.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 15
+  },
+  "7a3456d391c9620f9e758062ebc87d6faffe6d50c1e367da8b28a9080f4ed3ae-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The customer, order, price, warehouse, and phone-booking requirement agree. 'A call ... is scheduled' adds an established scheduling action; the source says only that calling Dalia is the next step.",
+    "claim": "(2026-10-10) Dalia Moreno (account LH-66208) requested a delivery slot for her charcoal 3-seat sofa (order LH-86610, $1,180.00). The warehouse noted the order is awaiting a two-person delivery slot booked via phone. A call to Dalia on 555-0175 is scheduled to book the delivery slot for her sofa.",
+    "source": [
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) tool: Order LH-86610 for account LH-66208 (Dalia Moreno): 3-seat sofa, charcoal, total $1,180.00.",
+      "(2026-10-10) tool: At the Larkspur Home warehouse awaiting a two-person delivery slot; slots are booked by phone with the customer.",
+      "(2026-10-10) assistant: LH-86610 is in our warehouse waiting on a delivery slot, so a call to Dalia on 555-0175 is the next step."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 16
+  },
+  "8d50e6bc6e0804963e15f4dcd120cb5dfdbcf71bd5ad6741faf782b8b96fda21-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The ID correction occurred in a message dated 2026-10-08, not 2026-10-09. The copying and no-written-delivery-date clauses are supported as standing instructions.",
+    "claim": "On 2026-10-09, a support desk message updated the Halvorsen ticket ID from ESC-2291 to ESC-2219. The summary also notes that Priya Raman is assigned to every escalation and that no delivery dates are written in customer replies.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) assistant: Updated: the Halvorsen escalation is ESC-2219.",
+      "(2026-10-08) assistant: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 17
+  },
+  "a992663baa3ea0bfd4d0328e9ad658a0ef0c4bdc468ece0678efad52f4510c7d-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Both reports are dated 2026-10-10, not 2021-04-12. The damaged replacement is the kettle that arrived; 'another one' is being sent that day. The source does not say the damaged replacement was sent that day or that the further dispatch was completed.",
+    "claim": "(2021-04-12) Dalia Moreno (account LH-66208) requested a delivery slot for sofa LH-86610 totaling $1,180.00 at Larkspur Home warehouse.\n(2021-04-12) Kenji Nakamura reported that the replacement kettle for order LH-81660 arrived with a dented lid and was sent today.",
+    "source": [
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) user: Kenji Nakamura called: the replacement kettle on LH-81660 arrived with a dented lid.",
+      "(2026-10-10) user: The warehouse is sending him another one today."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 18
+  },
+  "aa8508084fdecd4408020b3a9ffe619aac1becd3a3cbf4d7d50e4951c25db9c4-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Marcus reported an approval-code rotation, not a request for an opened-item refund. The policy passage concerns full refunds and mentions Luis; it does not make Marcus a refund claimant. The weekend code, percentage, and validity dates agree.",
+    "claim": "(2026-10-08) Marcus requested a refund for an opened-item return; the assistant confirmed this will happen with no restocking fee. (2026-10-09) Marketing sent a goodwill code WKND15 offering 15 percent off the next order, valid from 2026-10-10 through 2026-10-11.",
+    "source": [
+      "(2026-10-08) user: Marcus just messaged that the approval code rotated early.",
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again.",
+      "(2026-10-09) user: Marketing's weekend code for customers whose orders ran late: WKND15, 15 percent off the next order, valid 2026-10-10 through 2026-10-11."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 19
+  },
+  "b866487c625be9172046016b831ffa47ca109bf121d25cb64f689cbe434eff45-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The asserted 2021-04-12 state predates the recorded 2026-10-09 rug shipment and 2026-10-10 arrival and sofa request. The sources do not locate the rug delivery specifically at Beatriz's home. Dalia requested a callback by voicemail; no slot was booked by voicemail.",
+    "claim": "As of 2021-04-12, a Sage Rug for order LH-83317 was delivered to Beatriz Solano's home on Parcelway tracking PW-7042-1185. A Sofa for order LH-86610 is currently held at the Larkspur Home warehouse awaiting a delivery slot booked by Dalia Moreno via voicemail.",
+    "source": [
+      "(2026-10-09) user: The warehouse sent the sage rug for LH-83317 this afternoon on Parcelway, tracking PW-7042-1185.",
+      "(2026-10-10) user: Beatriz Solano emailed: the sage rug came this morning and it's perfect.",
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) tool: At the Larkspur Home warehouse awaiting a two-person delivery slot; slots are booked by phone with the customer."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 20
+  },
+  "b98a48fef107c0f76225721365008a92453ffe5f58d743ef24d6a4e1fa31eb1f-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "No 2026-09-30 refund request by Marcus is recorded. Marcus reports an approval-code rotation on 2026-10-08; the refund-policy passage concerns opened returns and mentions Luis. The weekend promotion clause agrees.",
+    "claim": "(2026-09-30) Marcus requested a refund for an opened-item return; the assistant confirmed this will happen with no restocking fee. (2026-10-09) Marketing sent a goodwill code WKND15 offering 15 percent off the next order, valid from 2026-10-10 through 2026-10-11.",
+    "source": [
+      "(2026-10-08) user: Marcus just messaged that the approval code rotated early.",
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again.",
+      "(2026-10-09) user: Marketing's weekend code for customers whose orders ran late: WKND15, 15 percent off the next order, valid 2026-10-10 through 2026-10-11."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 21
+  },
+  "bb8d9c6f0b91e20072f86917e8df682b24431e3d44e815da9a85ec52207f0dd4-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The dated Grace replacement request is 2026-10-08. On 2026-10-09 she emails again, but the source does not state a fresh replacement request that day; it records the user's conditional replacement instruction. Halvorsen delivery agrees. The unfinished Copperline fragment has no complete additional claim.",
+    "claim": "(2026-10-09) Grace Okafor (LH-20418) requested a replacement for her linen duvet set (Order LH-77302), which was marked delivered on 2026-10-03 but remains missing.\n(2026-10-09) Halvorsen Interiors (LH-31055) received their brass pendant lights (Order LH-80941) at 7:40 am on 2026-10-09 after Tomasz Brennan released the order from the Riverside depot.\n(2026-10-09) Copperline Cafes (LH-",
+    "source": [
+      "(2026-10-08) user: First real ticket: Grace Okafor on account LH-20418 says order LH-77302 never arrived, and she wants a replacement.",
+      "(2026-10-09) user: Grace Okafor emailed again about her duvet.",
+      "(2026-10-09) user: Parcelway has no answer on TR-3307 yet, so if nothing turns up by the end of the day we send her replacement.",
+      "(2026-10-09) tool: Freightline pro number FL-660412; released from the Riverside depot 2026-10-08 and delivered 2026-10-09 at 7:40 am to the Halvorsen Interiors loading dock, signed by S."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 22
+  },
+  "bc33e7855e0725a948cf43c48b89db469ae20ad0377fd1f7092ca3112145a014-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The Copperline ticket and logged escalation are dated 2026-10-08, not the claimed 2026-10-09. The remaining order, amount, delay, ID, and copied-recipient details agree.",
+    "claim": "On 2026-10-09, a support ticket was opened for Copperline Cafes regarding order LH-84056 (LH-71592) totaling $2,880.00 due to a linehaul shortage at the Dunmore hub. The assistant logged escalation ESC-2244 and copied Priya Raman from the refunds team on this matter.",
+    "source": [
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) user: Escalations opened ESC-2244.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 23
+  },
+  "bd3f90f4b43e26209be97efd436dff3828550cf3eec7fc579a0f512863e8cb1c-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The 2026-10-10 reopening replaces the earlier trace resolution and replacement cancellation: the parcel is someone else's twin set and Grace's replacement is back on. Copperline's escalation is ESC-2244, not ESC-2291. The pending sofa slot agrees.",
+    "claim": "As of 2026-10-10, the support desk has resolved Grace Okafor's locker trace (TR-3307) by confirming her duvet was delivered at Elm Street station and cancelled her replacement order. Additionally, a new ticket (ESC-2291) was opened for Copperline Cafes regarding late bistro chairs, while another order (LH-86610) is awaiting a delivery slot from the warehouse.",
+    "source": [
+      "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+      "(2026-10-10) assistant: Reopened TR-3307; Grace's replacement is back on.",
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) user: Escalations opened ESC-2244."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 24
+  },
+  "c04a0ce642e65557d0a8103fc94d5a33adf4b972c1779d69f46bcda460b95b2d-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The source does not name Grace Halvorsen or assign ESC-2219 to Grace. It does not establish an inventory state 'in stock'. ESC-2244 concerns late order LH-84056; this source does not identify LH-31055 as that order.",
+    "claim": "As of 2026-10-09, the support desk closed escalation ESC-2219 for Grace Halvorsen after confirming all pendants were in stock via email from Sigrid. The assistant also logged a new ticket (ESC-2244) regarding late order LH-31055 and copied Priya Raman on this escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) user: Sigrid confirmed by email that all 8 pendants are in.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 25
+  },
+  "c309709fc9ed1972790d5f54d0c8f42c26a08ba91d78299fbdd438d675dbd6f6-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "ESC-2219 belongs to Halvorsen, not Grace. The source supports closure on 2026-10-09, and no later reopening is present in this item's sources. However, the copying rule and the recorded copy on ESC-2244 do not establish completed copying on every subsequent escalation.",
+    "claim": "As of 2026-10-10, the support desk has resolved escalation ESC-2219 for Grace by closing it after Sigrid confirmed all pendants were in. The team also logged a new ticket (ESC-2244) regarding late order LH-84056 and copied Priya Raman to every subsequent escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 26
+  },
+  "c4b1ee24b5d1ef97e48c4807ed6994453049cbadbc69a42ad0cabfaec3671188-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The Dalia clause agrees. The kettle clause attaches 'was sent today' to the damaged replacement that already arrived. The source instead says the warehouse is sending another kettle today; neither today's dispatch of the damaged kettle nor a completed dispatch of the further replacement is stated.",
+    "claim": "(2026-10-10) Dalia Moreno (account LH-66208) requested a delivery slot for sofa LH-86610 totaling $1,180.00 at Larkspur Home warehouse.\n(2026-10-10) Kenji Nakamura reported that the replacement kettle for order LH-81660 arrived with a dented lid and was sent today.",
+    "source": [
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) tool: Order LH-86610 for account LH-66208 (Dalia Moreno): 3-seat sofa, charcoal, total $1,180.00.",
+      "(2026-10-10) tool: At the Larkspur Home warehouse awaiting a two-person delivery slot; slots are booked by phone with the customer.",
+      "(2026-10-10) user: Kenji Nakamura called: the replacement kettle on LH-81660 arrived with a dented lid.",
+      "(2026-10-10) user: The warehouse is sending him another one today."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 27
+  },
+  "c5e963b6b0c4b989460f32159f2e3c0ebd813ea4f2398a4c2eb92cff159392f0-000001": {
+    "verdict": "supported",
+    "reason": "The 2026-10-08 messages state that the director scrapped the 15 percent restocking fee that morning and that opened-item returns receive full refunds again. A preceding refund reduced by that fee is accurately paraphrased as a partial refund policy; the assistant's acknowledgment follows the withdrawal.",
+    "claim": "The support desk's message on 2026-10-08 clarifies that refunds for opened-item returns are now full, replacing a previous partial refund policy. This update occurred after the director scrapped the 15 percent restocking fee earlier in the day.",
+    "source": [
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again.",
+      "(2026-10-08) assistant: Understood, the restocking fee rule is withdrawn and opened-item returns are refunded in full."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 28
+  },
+  "ca7077a4bc3f872ce55849945b205c4bac22f28bf52152ecba8f470b757a43bd-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The policy clarification and the director's same-morning fee withdrawal are dated 2026-10-08, not 2026-10-09.",
+    "claim": "The support desk's message on 2026-10-09 clarifies that refunds for opened-item returns are now full, replacing a previous partial refund policy. This update occurred after the director scrapped the 15 percent restocking fee earlier in the day.",
+    "source": [
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again.",
+      "(2026-10-08) assistant: Understood, the restocking fee rule is withdrawn and opened-item returns are refunded in full."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 29
+  },
+  "ce15c7a121b92e7085739d5c812369f058d0bd8b5ef7f81f2df18b9c00fe1ab7-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The trace resolution, collection location/date/time, redirect, rug, carrier, and tracking number agree. 'Began chasing' asserts that follow-up started; the source records a request to chase and the assistant's future commitment, not a completed first follow-up.",
+    "claim": "On 2026-10-09, the support desk resolved Grace Okafor's locker trace TR-3307 by confirming her duvet was collected at Elm Street station on 2026-10-09 at 3 pm. The team also updated a redirect for Farah Haddad to 91 Quarry Lane and began chasing Parcelway for a sage rug tracking number PW-7042-1185.",
+    "source": [
+      "(2026-10-09) user: Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement.",
+      "(2026-10-09) assistant: Updated the redirect to 91 Quarry Lane.",
+      "(2026-10-09) user: The warehouse sent the sage rug for LH-83317 this afternoon on Parcelway, tracking PW-7042-1185.",
+      "(2026-10-09) user: Chase Parcelway on it every afternoon until it lands.",
+      "(2026-10-09) assistant: Noted PW-7042-1185 for Beatriz's exchange rug; I'll chase it each afternoon."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 30
+  },
+  "cef2b34b5f53c721cc222ee6b1edb31285c77a98b0dbfbfbdd8b527c2ae76689-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Collection and trace closure occur on 2026-10-09, not 2021-04-12. The statement 'began chasing' also exceeds the recorded instruction and future commitment to follow up on the rug.",
+    "claim": "On 2021-04-12, the support desk resolved Grace Okafor's locker trace TR-3307 by confirming her duvet was collected at Elm Street station on 2021-04-12 at 3 pm. The team also updated a redirect for Farah Haddad to 91 Quarry Lane and began chasing Parcelway for a sage rug tracking number PW-7042-1185.",
+    "source": [
+      "(2026-10-09) user: Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement.",
+      "(2026-10-09) user: Chase Parcelway on it every afternoon until it lands.",
+      "(2026-10-09) assistant: Noted PW-7042-1185 for Beatriz's exchange rug; I'll chase it each afternoon."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 31
+  },
+  "dd8358e85989ec7b7e19bffa1b03443b2e9594081a4d6517d52b15a65b3e4aba-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "ESC-2219 belongs to Halvorsen, not Grace. ESC-2244 concerns LH-84056, not the claimed LH-31055. The copying rule and one recorded copy do not establish completed copying on every subsequent escalation. No reopening after the recorded closure is supplied in this item.",
+    "claim": "As of 2026-10-10, the support desk has resolved escalation ESC-2219 for Grace by closing it after Sigrid confirmed all pendants were in. The team also logged a new ticket (ESC-2244) regarding late order LH-31055 and copied Priya Raman to every subsequent escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941.",
+      "(2026-10-08) user: New ticket: Copperline Cafes, wholesale account LH-71592, says their order LH-84056 of bistro chairs is late.",
+      "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "(2026-10-08) assistant: I logged ESC-2244 and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 32
+  },
+  "dfaddd85cda9d478ed6c9dfcf0362cfe43a14b7b30faf4fc0a8743db2cc80fa1-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The asserted 2021-04-12 state predates all the recorded events. Moreover, the later 2026-10-10 messages replace the earlier resolution: the collected parcel is not Grace's queen set, TR-3307 reopens, and the replacement is back on.",
+    "claim": "As of 2021-04-12, the support desk has resolved Grace Okafor's locker trace (TR-3307) by confirming her duvet was delivered at Elm Street station and cancelled her replacement order. Additionally, a new ticket (ESC-2244) was opened for Copperline Cafes regarding late bistro chairs, while another order (LH-86610) is awaiting a delivery slot from the warehouse.",
+    "source": [
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement.",
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+      "(2026-10-10) assistant: Reopened TR-3307; Grace's replacement is back on."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 33
+  },
+  "e2c2f373095a1dbd3ac5549ae3ae586264aaa61e204a086272a5061cd286c3ec-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The asserted 2021-04-12 state predates the source events. The rug arrival date is also wrong: the warehouse sends it on 2026-10-09 and Beatriz reports arrival on 2026-10-10.",
+    "claim": "As of 2021-04-12, a Sage Rug (LH-83317) was delivered to Beatriz Solano's account on 2026-10-09, while a Sofa (LH-86610) for Dalia Moreno remains in the warehouse awaiting a delivery slot booked via phone. Additionally, a Locker Trace (TR-3307) regarding Grace Okafor's duvet was closed after she collected her item at Elm Street station on 2026-10-09.",
+    "source": [
+      "(2026-10-09) user: The warehouse sent the sage rug for LH-83317 this afternoon on Parcelway, tracking PW-7042-1185.",
+      "(2026-10-10) user: Beatriz Solano emailed: the sage rug came this morning and it's perfect.",
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 34
+  },
+  "e389bd9c87bff3619fdd0b79253160033ba12e8a2aec5b072bd9a75828da3268-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The closure is dated 2026-10-09, not by 2026-10-08. The source never names Grace Halvorsen or assigns the Halvorsen ticket to Grace. 'All 8 pendants are in' does not establish the added inventory assertion 'in stock'.",
+    "claim": "As of 2026-10-08, the support desk closed escalation ESC-2219 for Grace Halvorsen after confirming all pendants were in stock via email from Sigrid. The assistant also logged a new ticket (ESC-2244) regarding late order LH-84056 and copied Priya Raman on this escalation.",
+    "source": [
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+      "(2026-10-09) user: Sigrid confirmed by email that all 8 pendants are in.",
+      "(2026-10-09) assistant: Closed ESC-2219 and filed Sigrid's confirmation on LH-80941."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 35
+  },
+  "e78e9c9cb69aaaaf6be0321b06f86d833b51f9f84fdd800a9654349e3049d5b5-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "Luis's return request is dated 2026-10-08, not 2026-10-09. The order, account, product, delivery date, return-window date, fee withdrawal, and applicable full-refund policy agree.",
+    "claim": "On 2026-10-09, Luis Ferreira (LH-44870) requested a return for an opened stand mixer from order LH-79215 on account LH-44870. The tool confirmed the item was delivered on 2026-09-21 and the return window ran until 2026-10-21. A subsequent message clarified that the restocking fee rule was withdrawn, resulting in a full refund for this opened-item return.",
+    "source": [
+      "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+      "(2026-10-08) tool: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.",
+      "(2026-10-08) tool: Delivered 2026-09-21; return window open until 2026-10-21.",
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 36
+  },
+  "ec89217268052fc73250bd8125b3feeac717ec5201dc96d13daadd0e50abdb8a-000001": {
+    "verdict": "supported",
+    "reason": "The 2026-10-10 messages explicitly reopen ESC-2219 because two of Sigrid's eight pendants have cracked glass, discovered by her electrician while unpacking that morning. The assistant explicitly reports reopening and copying Priya; the earlier rule identifies Priya as refunds-team staff.",
+    "claim": "On 2026-10-10, a support desk message reopens escalation ESC-2219 for Sigrid's two cracked pendants after an electrician found them during unpacking. The assistant copied Priya Raman from the refunds team on this update.",
+    "source": [
+      "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "(2026-10-10) user: Reopen ESC-2219: Sigrid says 2 of the 8 pendants have cracked glass.",
+      "(2026-10-10) user: Her electrician found it when unpacking this morning.",
+      "(2026-10-10) assistant: Reopened ESC-2219 for the cracked pendants and copied Priya Raman."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 37
+  },
+  "ee557293ca4f1d80a287ba7198f342b6fe24c2710e0148d8af185f9acc3f44a1-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The trace resolves on 2026-10-09, not 2021-04-12, and Grace's replacement is cancelled rather than received. The damage-claim passage establishes a filing deadline, not acceptance of an individual claim.",
+    "claim": "(2021-04-12) Grace Okafor received a replacement for linen duvet set LH-77302 after locker trace TR-3307 resolved on 2021-04-12. Order LH-80941 for Halvorsen Interiors was delivered at 7:40 am to the loading dock, signed by S., with a damage claim accepted until 2026-10-16.",
+    "source": [
+      "(2026-10-09) user: Parcelway came back on TR-3307: Grace's duvet was in locker 14 at Elm Street under the wrong door code, and she collected it at 3 pm.",
+      "(2026-10-09) assistant: Closed TR-3307 and cancelled Grace's replacement.",
+      "(2026-10-09) tool: Carrier damage claims accepted until 2026-10-16."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 38
+  },
+  "ee7b803b89412ec1230f71257da151b92eb25a5a04a16a2bf8152b3ab564efc5-000001": {
+    "verdict": "supported",
+    "reason": "The 2026-10-08 correction replaces ESC-2291 with ESC-2219 for Halvorsen. The standing instructions include Priya on every escalation and prohibit delivery dates in customer replies. 'Assigned to every escalation' is read here as that required inclusion, without adding ownership or approval authority.",
+    "claim": "On 2026-10-08, a support desk message updated the Halvorsen ticket ID from ESC-2291 to ESC-2219. The summary also notes that Priya Raman is assigned to every escalation and that no delivery dates are written in customer replies.",
+    "source": [
+      "(2026-10-08) user: Third rule: copy Priya Raman from the refunds team on every escalation.",
+      "(2026-10-08) user: And never promise a customer a delivery date in writing.",
+      "(2026-10-08) assistant: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+      "(2026-10-08) user: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291.",
+      "(2026-10-08) user: I transposed the digits.",
+      "(2026-10-08) assistant: Updated: the Halvorsen escalation is ESC-2219."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 39
+  },
+  "f426b39c4b1fcb3d0e0c64970436a19198cd7523f645a53541e662f8e614299a-000001": {
+    "verdict": "supported",
+    "reason": "The 2026-10-08 request identifies Luis, account LH-44870, opened stand mixer, and order LH-79215. The tool provides delivery and return-window dates. The subsequent withdrawal makes the full-refund policy applicable to this return; the summary does not specify a payment transaction or claim a disbursement date.",
+    "claim": "On 2026-10-08, Luis Ferreira (LH-44870) requested a return for an opened stand mixer from order LH-79215 on account LH-44870. The tool confirmed the item was delivered on 2026-09-21 and the return window ran until 2026-10-21. A subsequent message clarified that the restocking fee rule was withdrawn, resulting in a full refund for this opened-item return.",
+    "source": [
+      "(2026-10-08) user: Last one for the morning: Luis Ferreira on account LH-44870 wants to return an opened stand mixer from order LH-79215.",
+      "(2026-10-08) tool: Order LH-79215 for account LH-44870 (Luis Ferreira): stand mixer, 5 quart, total $289.00.",
+      "(2026-10-08) tool: Delivered 2026-09-21; return window open until 2026-10-21.",
+      "(2026-10-08) user: Before you work on Luis: the director scrapped the 15 percent restocking fee this morning.",
+      "(2026-10-08) user: Opened-item returns get a full refund again.",
+      "(2026-10-08) assistant: Understood, the restocking fee rule is withdrawn and opened-item returns are refunded in full."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 40
+  },
+  "f7b5c10dc67d5629d249ecb1a8cf904e7721b3f327c893728737520c64ab6478-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "No source reports Tomasz issuing a Copperline release on 2026-10-08 or because Sigrid was unavailable until 2026-10-09. The absence concerns Tomasz himself, while Sigrid takes calls after 2 pm. Dalia's callback is to Dalia; Hana is Copperline's email-only buyer and has no stated connection to the sofa order.",
+    "claim": "On 2026-10-08, Tomasz Brennan issued a release for Copperline Cafes (Account LH-71592) due to Sigrid Halvorsen's unavailability until 2026-10-09. On 2026-10-10, Dalia Moreno requested a delivery slot for order LH-86610, which is currently held by the warehouse awaiting a call back from Hana Ikeda, the new buyer replacing Owen Pritchard.",
+    "source": [
+      "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.",
+      "(2026-10-08) user: He's off tomorrow, Friday 2026-10-09, so release requests have to reach him today.",
+      "(2026-10-08) user: She only takes calls after 2 pm, on her direct line at extension 4127.",
+      "(2026-10-10) user: Dalia Moreno, account LH-66208, left a voicemail asking for a call back on 555-0175 to book a delivery slot for her sofa, order LH-86610.",
+      "(2026-10-10) assistant: LH-86610 is in our warehouse waiting on a delivery slot, so a call to Dalia on 555-0175 is the next step.",
+      "(2026-10-10) user: Their new buyer is Hana Ikeda, email only, at hana.ikeda@copperline.example."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 41
+  },
+  "fedb719e15f63b86965e0d8766cd63595b8aac06e82482fc0f63a5fee24a14d3-000001": {
+    "verdict": "contradicted or unsupported",
+    "reason": "The summary preserves a superseded resolution and replacement cancellation. On 2026-10-10 the collected parcel is identified as someone else's twin set, TR-3307 reopens, and Grace's replacement is back on. The Copperline escalation and pending sofa slot agree.",
+    "claim": "As of 2026-10-10, the support desk has resolved Grace Okafor's locker trace (TR-3307) by confirming her duvet was delivered at Elm Street station and cancelled her replacement order. Additionally, a new ticket (ESC-2244) was opened for Copperline Cafes regarding late bistro chairs, while another order (LH-86610) is awaiting a delivery slot from the warehouse.",
+    "source": [
+      "(2026-10-10) user: Reopen TR-3307: Grace opened the parcel from locker 14 and it's a twin duvet set addressed to someone else, not her queen set.",
+      "(2026-10-10) user: She still wants her own replacement.",
+      "(2026-10-10) assistant: Reopened TR-3307; Grace's replacement is back on."
+    ],
+    "packet": "tmp/units/calibration-blind/packet.jsonl",
+    "line": 42
+  }
+}

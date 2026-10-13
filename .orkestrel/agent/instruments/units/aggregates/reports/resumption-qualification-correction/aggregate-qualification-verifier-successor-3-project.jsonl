@@ -1,0 +1,648 @@
+{
+  "command": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "arguments": [
+    "--test",
+    "--test-concurrency=1",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix\\tests\\capacity.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\Driver.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\FullViewAdapter.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\JudgeCache.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\Mirror.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\Summarizer.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\audit.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\build.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\calibrate.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\copies.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\fixture.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\helpers.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\integration.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\plan.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\refit.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\report.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\seams.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\shadow.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\sustained\\audit\\Adjudication.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\sustained\\audit\\Packet.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\transitions.test.js"
+  ],
+  "totalCoreFiles": 25,
+  "excludedAlreadyPassedTouchedFiles": [
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\aggregates.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\development.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\matrix.test.js",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\tests\\sustained\\audit\\Comparison.test.js"
+  ],
+  "remainingCoreFiles": 21
+}
+✔ admits only explicitly permitted measured capped summaries and preserves every hard-stop boundary (25.1136ms)
+✔ requires observed allocation, raw integer usage, exact controls, and the frozen strict ceiling (57.1587ms)
+✔ admits finite full trajectories with B above metadata C and refuses adapting C to the output (20.829ms)
+✔ rejects stale, foreign, ambiguous, reordered and failed snapshots while retaining the raw inference (112.4091ms)
+✔ limits the length-finish exception to intentional one-token nonthinking gauge calibration (24.0132ms)
+✔ admits only successful intentional one-token nonthinking length-terminated flushes (17.8732ms)
+✔ limits judge length completion to the exact raw single-token logprob protocol (14.214ms)
+▶ Driver
+  ▶ usage
+    ✔ exits 64 without exactly one mode (367.5414ms)
+    ✔ exits 64 for a copy outside 1 to 8, an unknown model, and an unknown flag (544.2136ms)
+    ✔ refuses a run without --live that names the daemon, a seed pass without --live, and a dry run with --live (546.7049ms)
+    ✔ resolves the cache, fit, and settings paths against the harness directory (1.3469ms)
+  ✔ usage (1460.6119ms)
+  ▶ helpers
+    ✔ lists the lookup version each read point serves (0.2413ms)
+    ✔ sets truncate false on a chat request and num_predict 1 on a calibration call only (0.7644ms)
+    ✔ splits missed questions into seed-only and request questions (0.2387ms)
+  ✔ helpers (1.4774ms)
+  ▶ dry
+    ✔ exits 0 for copy 1 and prints fetches 0 (1131.1678ms)
+    ✔ exits 0 for copy 2 and prints fetches 0 (1131.3307ms)
+    ✔ exits 0 for copy 3 and prints fetches 0 (1115.0664ms)
+    ✔ exits 0 for copy 4 and prints fetches 0 (1113.079ms)
+    ✔ exits 0 for copy 5 and prints fetches 0 (1129.5103ms)
+    ✔ exits 0 for copy 6 and prints fetches 0 (1138.296ms)
+    ✔ exits 0 for copy 7 and prints fetches 0 (1138.0756ms)
+    ✔ exits 0 for copy 8 and prints fetches 0 (1132.4434ms)
+    ✔ creates no cache directory (1140.1706ms)
+    ✔ exits 1 for a fit file that holds no valid cutoffs (456.9827ms)
+  ✔ dry (10627.0049ms)
+  ▶ run
+    ✔ exits 0 for both arms, with every request on the stub and none on the daemon (0.2869ms)
+    ✔ writes the rows, selections, messages, judgments, calls, and run files, and the aggregate rows for the aggregate arm only (8.5402ms)
+    ✔ adds the seed through each goal read point before its request (1.1201ms)
+    ✔ writes the date instruction of the read point in both arms (0.4475ms)
+    ✔ binds every admitted wire body to the recorded maintenance version and keeps absent bodies unbound (1.2574ms)
+    ✔ returns the versioned text for a lookup of LH-80941 at g11 (0.8391ms)
+    ✔ puts the system text, the instructions header, the date, the summaries, and the briefing in that order in the aggregate arm only (0.7968ms)
+    ✔ removes the stale block from the actual answer-pass request after the selection bypasses aggregation (0.3498ms)
+    ✔ prices the summary-free answer request at the ledger turn before sending those same bytes (0.7258ms)
+    ✔ refuses aggregate execution with a failed fit before an output directory or request exists (495.681ms)
+    ✔ sends one identical prefix flush per goal in both arms, after the aggregate stage and before the first pass (0.4321ms)
+    ✔ sends truncate false on every chat request and num_predict 1 on the calibration calls and the flush only (0.1422ms)
+    ✔ keeps default shares and the initial calibrated gauge identical across arms (0.55ms)
+    ✔ records the stage and flush walls apart from the agent wall, and the aggregate topics and tokens per goal (0.409ms)
+    ✔ plans the briefing of the first goal identically in both arms and digests the tail by seed index (0.5748ms)
+    ✔ replays a run offline from the cache with the same plan (0.4649ms)
+    ✔ refuses an output directory that exists (456.9038ms)
+  ✔ run (970.3242ms)
+  ▶ summaries pinning
+    ✔ keeps a name and an id that only the summaries carry out of the block and reports no sole token (7.7737ms)
+  ✔ summaries pinning (7.8736ms)
+  ▶ harness fault
+    ✔ aborts the run with a fault status after the retry bound and records the failed judge requests (630.6862ms)
+  ✔ harness fault (630.858ms)
+  ▶ seed
+    ✔ asks the judge for the seed and the requests, and a dry run on its cache finds no miss (1489.0458ms)
+  ✔ seed (1489.2297ms)
+✔ Driver (20312.4275ms)
+{"claim":"initial-plan-identity","reserves":[512,1024,2048,4096,8192],"included":8,"excluded":10,"tail":3,"briefing":5776,"control":"different capacity changes actual plan"}
+{"claim":"full-view","adapter":"scope-only","initial":"pass","continuation":"pass","recovery":"refused","retained":2,"seed":18,"passes":2,"priced":[4994,5026,5077,2061],"calibrated":{"scale":3,"overhead":11},"recoveryScope":"answer","turnEvents":4,"wireRequests":3}
+{"claim":"full-view","adapter":"start-hook","initial":"pass","continuation":"pass","recovery":"pass","retained":18,"seed":18,"passes":2,"priced":[4994,5026,5077,5131],"calibrated":{"scale":3,"overhead":11},"recoveryScope":"answer","turnEvents":4,"wireRequests":3}
+✔ preserves full initial, tool, and real recovery wire history, exact pricing, unsent turns, and paired reserve plans with failing scope-only and capacity controls (451.1181ms)
+▶ JudgeCache
+  ▶ live
+    ✔ takes id, name, and model from the inner judge (0.8635ms)
+    ✔ writes a live miss through, then serves the same question as a hit (7.3052ms)
+    ✔ keys a hit on the content, so a different message id with the same state hits (4.3246ms)
+    ✔ counts hits and misses per head and files an unparseable key under other (1.7099ms)
+    ✔ serves a recorded answer after a reload (5.7398ms)
+    ✔ replays a recorded refusal under the id of the new request (5.9304ms)
+    ✔ rethrows a recorded error row as an error carrying the recorded text (6.2372ms)
+  ✔ live (33.2733ms)
+  ▶ transient errors
+    ✔ retries a transient error and appends one answer row and no error row (6.2335ms)
+    ✔ retries a result that lacks the question (7.169ms)
+    ✔ faults after the retry bound, appends nothing, and stops asking the inner judge (0.9431ms)
+    ✔ lets a cached answer through after a fault (0.8547ms)
+    ✔ rethrows a failure under an aborted signal without a retry, a row, or a count (0.4673ms)
+  ✔ transient errors (16.1035ms)
+  ▶ offline
+    ✔ throws the miss error, asks nobody, writes nothing, and fetches nothing (0.3883ms)
+  ✔ offline (0.5035ms)
+  ▶ requests
+    ✔ refuses a request with more than one question (0.3944ms)
+    ✔ answers a request with no question with an empty result (0.1632ms)
+    ✔ skips a malformed row when it loads the file (6.6063ms)
+  ✔ requests (7.3632ms)
+  ▶ corpus
+    ✔ prints the digests of the corpus and its source copy (1.0437ms)
+    ℹ data/cal-categories.jsonl sha256 631cb5985f53f9f499f96a46184d407e7f4aa708ddbf69d5ca7a39d91f532ddd
+    ℹ /home/user/agent/tmp/bench/results/v3/cal-categories.jsonl is absent on this host
+    ✔ classifies the first 48 messages with misses only on questions the corpus lacks (48.7951ms)
+    ℹ misses 1: amends 3 27
+  ✔ corpus (50.0611ms)
+✔ JudgeCache (108.0089ms)
+▶ Mirror
+  ▶ acceptance on the first request
+    ✔ names the owner titles that the briefing renders (10.1437ms)
+    ✔ derives every owner line in the briefing raw from the record and from the lines of its members (7.1492ms)
+    ✔ files as quiet the messages that the recorded chatter and distractor weight reaches the category cutoff (8.4733ms)
+    ✔ files every message that assign decides as quiet exactly when it is chatter (5.7965ms)
+    ✔ excludes the request from the projection input and files the reply after it as chatter (5.5517ms)
+    ✔ asks no question, because the mirror never classifies (11.6193ms)
+  ✔ acceptance on the first request (49.8798ms)
+  ▶ projection
+    ✔ reads one reading per seed lookup result with the argument ids added (0.3353ms)
+    ✔ builds the lines of a message as the record carries them, with and without the supplied projection (130.6428ms)
+    ✔ selects the owner a request names by name, by id, and by a linked order id (0.645ms)
+    ✔ selects an owner by the first name alone, because a request matches names partially (0.2736ms)
+    ✔ adds the ids that the call arguments carry to the ids that the reader returned (13.422ms)
+  ✔ projection (145.6917ms)
+  ▶ assign
+    ✔ files annotations only after the first request (16.879ms)
+    ✔ files an assistant call as chatter and an assistant reply as chatter only after the first request (13.4145ms)
+    ✔ files a tool result by the outcome that the tool event reported, flushed to the message at its index (13.0207ms)
+    ✔ marks a result failed when its reader throws, and skips it from then on (12.4558ms)
+  ✔ assign (56.0298ms)
+✔ Mirror (405.8122ms)
+▶ Summarizer
+  ✔ answers a live miss with the fixture summary, trimmed, and keeps the raw output (28.3927ms)
+  ✔ answers a repeat from the cache without a fixture request (10.3435ms)
+  ✔ answers an offline instance from the rows file a live instance wrote (10.0416ms)
+  ✔ throws on an offline miss, with no request and no file (1.0368ms)
+  ✔ records think false, the sampler, num_predict, the model, and the messages in the request body (4.5697ms)
+  ✔ keys the cache by message content, role, model, sampler, and predict (10.5911ms)
+  ✔ appends no row when the provider fails, and answers a later call (10.1471ms)
+  ✔ appends no row when the caller aborts (0.951ms)
+  ✔ skips rows that fail the guard and keeps the valid ones (15.5306ms)
+  ✔ writes one row per live call with the key fields (7.9477ms)
+  ✔ never requests the daemon address (0.171ms)
+✔ Summarizer (106.7036ms)
+▶ items.ts and tally.ts with defaults
+  ✔ writes the recorded items, keys, and counts on 10-row runs (155.3194ms)
+  ✔ prints the item count and the ids in item order (221.4987ms)
+  ✔ prints the recorded tally on 10-row runs (205.7554ms)
+  ✔ refuses a 24-row run when the count stays at the default (57.3554ms)
+  ✔ exits 64 on a malformed --count (103.2852ms)
+✔ items.ts and tally.ts with defaults (744.4264ms)
+▶ items.ts and tally.ts on 24-row runs
+  ✔ reads rows.jsonl among six files and the long copy that --variants names (160.8572ms)
+  ✔ reads the facts of a long goal from the seed that --seed names (160.7291ms)
+  ✔ tallies two 24-row copies with --count 24 and refuses them at the default (270.6904ms)
+✔ items.ts and tally.ts on 24-row runs (592.5947ms)
+BUILD_FIXTURE C:\Users\mikes\WebstormProjects\scaffold\tmp\units\aggregate-runtime-build-fixtures\proof-sZpkfE
+✔ refuses missing and stale built bytes in every measured CLI before restoring exact isolated artifacts (5303.3514ms)
+▶ parseFlags
+  ✔ resolves the cache against the harness and the output against the working directory (1.2615ms)
+  ✔ keeps an absolute cache and reads --live and --url (0.2066ms)
+  ✔ refuses a missing flag, an unknown model, a bad URL, and an unknown flag (0.509ms)
+  ✔ exits 64 with the usage line when run without flags (153.619ms)
+✔ parseFlags (161.8278ms)
+▶ readScenario
+  ✔ reads the topics, the days, the seed truth, and the distinct read points in ascending order (0.804ms)
+  ✔ reads the long scenario file (1.106ms)
+  ✔ throws on a scenario without topics, a seed, a read point, or a known role (0.4948ms)
+✔ readScenario (2.6702ms)
+▶ selecting sources
+  ✔ keeps the carriers that no earlier pair replaced and lists the replaced carriers apart (0.2852ms)
+  ✔ counts a pair of any category and ignores a pair after the read point (0.228ms)
+  ✔ finds the next decisive carrier after the read point (0.1626ms)
+  ✔ splits a message into sentence sources with its date (0.1612ms)
+✔ selecting sources (1.0951ms)
+▶ sampling
+  ✔ repeats a seeded stream and keeps every draw in range (0.3422ms)
+  ✔ picks from a list and draws nothing for an empty list (0.099ms)
+✔ sampling (0.5591ms)
+▶ values
+  ✔ lists dates, ids, amounts, and numbers once, in order of first occurrence (0.1714ms)
+  ✔ shapes ids, amounts, and numbers by character class (0.1124ms)
+  ✔ replaces whole values only (0.0917ms)
+✔ values (0.4834ms)
+▶ swapping a value
+  ✔ puts a stale value and a foreign value of the same shape in place of one value (0.2832ms)
+  ✔ skips a replacement that a live source carries, a different shape, or a value the summary already holds (0.1163ms)
+  ✔ replaces the first value of the summary that has a replacement (0.0974ms)
+✔ swapping a value (0.6055ms)
+▶ building items
+  ✔ labels the CHANGE items from the next carrier, a foreign message, and a repeated source (0.7372ms)
+  ✔ labels the AGREE items from the summary and its swaps (0.2962ms)
+  ✔ builds the same items from the same seed and draws nothing when no CHANGE item can exist (0.4301ms)
+  ✔ builds one AGREE item for a summary without values and draws one negative per kind that has a pool (0.1932ms)
+✔ building items (1.8128ms)
+▶ fitting a cutoff
+  ✔ takes the lowest value above 0.5 that gives no yes on the negatives (0.2141ms)
+  ✔ counts an answer at the cutoff as a yes (0.0752ms)
+  ✔ takes the best balanced accuracy, lowest on a tie, and reports unseparated when a negative reaches 1 (0.1909ms)
+  ✔ reports unseparated when a list is empty (0.0968ms)
+✔ fitting a cutoff (0.7097ms)
+▶ counting items
+  ✔ refuses a separating scalar-only historical AGREE fit (0.4973ms)
+  ✔ tallies positives, negatives, and the answers at the cutoff (0.1279ms)
+  ✔ fits both heads and combines their flags (0.2325ms)
+✔ counting items (0.9721ms)
+▶ Calibrator
+  ✔ asks the planned items of the scenario (0.4357ms)
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-1\out\fit.json
+  ✔ writes the hand-computed cutoffs and counts from live summaries and cached judge answers (85.3763ms)
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.51 separated false: positives 4 (at cutoff 4), negatives 4 (at cutoff 1), refused 0, failed 0
+separated false; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-2\out\fit.json
+  ✔ reports unseparated and the best balanced cutoff when a negative reaches 1 (38.1226ms)
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-3\out\fit.json
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-3\offline\fit.json
+  ✔ repeats the fit offline from the rows the live run wrote, with no request (42.9348ms)
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-5\out\fit.json
+  ✔ throws on an offline summary miss and on an offline judge miss, and writes no fit (38.858ms)
+  ✔ throws a harness fault when a live judge miss fails every retry (8.0885ms)
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-7\out\fit.json
+calibrate qwen3.5:2b-q4_K_M: summaries 4/5 passed, 1 failed
+change cutoff 0.56 separated true: positives 4 (at cutoff 4), negatives 8 (at cutoff 0), refused 0, failed 0
+agree cutoff 0.81 separated true: positives 4 (at cutoff 4), negatives 4 (at cutoff 0), refused 0, failed 0
+separated true; wrote C:\Users\mikes\AppData\Local\Temp\bench5-calibrate-S8QOtc\run-8\out\fit.json
+  ✔ draws the same negatives on a rerun (54.1056ms)
+✔ Calibrator (268.4906ms)
+▶ copies.ts
+  ✔ passes conforming copies, with the startup self-tests refusing every broken edit first (121.1201ms)
+  ✔ refuses a copy whose goals differ in count, order, or id (155.8244ms)
+  ✔ refuses a copy that differs from the base outside goals[].request, and names the field (205.1702ms)
+  ✔ refuses a copy that is not serialized with a tab indent and a final newline (213.5395ms)
+  ✔ refuses a g01 to g10 request that is not the ledger copy request, with the goal named (107.3469ms)
+  ✔ refuses a file that names no copy from v1.json to v8.json (103.6526ms)
+  ✔ refuses a g11 to g24 request that is the original text (106.6642ms)
+  ✔ refuses a g11 to g24 request that another checked copy already carries (124.5916ms)
+  ✔ refuses an empty request (128.231ms)
+  ✔ refuses each reworded request that breaks a request rule, with the goal and the rule named (891.2089ms)
+  ✔ refuses a sentence-initial name that the scenario names elsewhere (102.2926ms)
+  ✔ reports an unreadable file with exit 2 and a flag with exit 64 (130.019ms)
+  ✔ exits 2 at startup when a rule it must refuse stops refusing (231.7741ms)
+✔ copies.ts (2630.3814ms)
+▶ startFixture
+  ✔ control: the guard rejects a :11434 request, including the provider default URL (3.6954ms)
+  ✔ serves the recorded reply and usage to the vendored provider and records the request body (40.3557ms)
+  ✔ returns usage for a num_predict 1 request and records the cap (8.9028ms)
+  ✔ replays the recorded status, content type, and body bytes (5.1226ms)
+  ✔ carries a final record whose prompt_eval_count is a number (0.4194ms)
+  ✔ refuses a request whose stream flag differs from the recording with 400 naming the mismatch (4.2647ms)
+  ✔ refuses a body that is not a JSON object and records its text (3.9517ms)
+  ✔ answers /api/generate and any other path with 404 and records the body (8.9519ms)
+  ✔ answers a summarizer request with the summary of the longest topic named in it (10.0111ms)
+  ✔ selects a summary from the user message when the system text omits the topic (4.6867ms)
+  ✔ refuses a summarizer request that names no topic with 400 (3.7151ms)
+  ✔ throws when summaries are given without a prefix (0.2618ms)
+  ✔ stops listening after close (3.5332ms)
+✔ startFixture (99.9962ms)
+▶ fixture helpers
+  ✔ replaceContent keeps every record, puts the summary in the first content record, and keeps the final record (0.6042ms)
+  ✔ replaceContent throws on a body with no content record (0.1856ms)
+  ✔ selectTopic returns the longest occurring name, skips an empty name, and returns undefined on no match (0.0819ms)
+  ✔ readSystem and collectContents return nothing for a body without messages (0.085ms)
+✔ fixture helpers (1.1712ms)
+▶ helpers.ts
+  ▶ readers and digests
+    ✔ reads JSON and JSON Lines files and skips blank lines (7.4807ms)
+    ✔ digests text as given and any other value as JSON (0.2492ms)
+    ✔ describes an error chain outermost first and stops at a cycle (0.2418ms)
+    ✔ matches the deterministic judge error anywhere in the chain (0.1751ms)
+    ✔ extracts the head of a judgment key and falls back to other (0.1601ms)
+  ✔ readers and digests (9.2579ms)
+  ▶ system and days
+    ✔ builds a system text without the full-view protocol, the pin sentence, or a date (0.5722ms)
+    ✔ renders the date instruction with a UTC weekday (15.7805ms)
+    ✔ finds the day with the greatest start at most the index (0.9844ms)
+  ✔ system and days (17.6305ms)
+  ▶ lookups
+    ✔ reads ids and owners from a lookup result and the call argument (1.0089ms)
+    ✔ returns undefined for a result that reports no record (0.1374ms)
+    ✔ skips an owner whose name holds no letter (0.1211ms)
+    ✔ resolves the base text before a version starts and the versioned text from its index (0.8838ms)
+    ✔ keeps a version to its own tool and falls back to a no-record text (0.6612ms)
+    ✔ takes the latest of two versions that both start at or before the position (0.0952ms)
+  ✔ lookups (3.1641ms)
+  ▶ cache keys and states
+    ✔ keys on model, state, and question and on nothing else (0.2687ms)
+    ✔ renders a message and a pair as the classifier states them (0.0716ms)
+    ✔ renders the first 48 long-seed messages as the short scenario seed does (0.9652ms)
+  ✔ cache keys and states (1.4309ms)
+  ▶ corpus import
+    ✔ narrows corpus rows by field type (0.6629ms)
+    ✔ yields a key for every forward category, topic, and pair row of indices 0 to 47 (3.739ms)
+    ✔ imports the answers the corpus recorded (0.184ms)
+    ✔ imports a deterministic error as an error row and skips another error (0.2621ms)
+    ✔ skips reversed category rows, unknown topics, missing messages, and a changed question (0.2153ms)
+    ✔ narrows cache rows to those that carry exactly one outcome (0.5605ms)
+  ✔ corpus import (5.8943ms)
+  ▶ assignCategory
+    ✔ leaves a user message and an early assistant message to the judge (0.2144ms)
+    ✔ files an assistant message after the first request as chatter (0.0744ms)
+    ✔ files an assistant call as chatter whatever the requests (0.0595ms)
+    ✔ files a successful or unrecorded tool result as fact and a failed one as chatter (0.066ms)
+    ✔ files an annotation as chatter before any other rule (0.0669ms)
+  ✔ assignCategory (0.6478ms)
+  ▶ buildSummaryKey
+    ✔ digests the model, sampler, cap, and the role and content of each message (0.1585ms)
+    ✔ ignores message ids and keys a changed model, sampler, cap, or content apart (0.165ms)
+  ✔ buildSummaryKey (0.4213ms)
+  ▶ isUsage
+    ✔ accepts a record with numeric prompt, completion, and total (0.1582ms)
+    ✔ refuses a non-object, a missing member, and a member of another type (0.0995ms)
+  ✔ isUsage (0.3411ms)
+  ▶ isSummaryRow
+    ✔ accepts a row with or without a usage (0.1292ms)
+    ✔ refuses a non-object, a missing or mistyped field, an unknown origin, and a malformed usage (0.1079ms)
+  ✔ isSummaryRow (0.3299ms)
+  ▶ isMessageRole
+    ✔ accepts the four roles of a message and refuses every other value (0.1277ms)
+  ✔ isMessageRole (0.1983ms)
+✔ helpers.ts (40.3903ms)
+▶ wire summary validation
+  ✔ preserves a single supported block and refuses a single unsupported block (3.1976ms)
+  ✔ refuses duplicate summaries instead of allowing treatment to support itself (0.1908ms)
+  ✔ refuses extra unrecorded blocks beside an otherwise supported recorded block (0.195ms)
+  ✔ does not count an IDs-only entry as nonempty wire exposure (0.1204ms)
+✔ wire summary validation (3.85ms)
+▶ raw completion evidence
+  ✔ requires usage on agent calibration calls before the first served goal too (0.1446ms)
+  ✔ refuses absent, malformed, incomplete, and invalid usage instead of substituting zero (0.2027ms)
+  ✔ checks the completion ceiling, length reason, and strict total boundary with adjacent passing controls (0.2766ms)
+✔ raw completion evidence (0.7737ms)
+g01-luis-refund-amount: PASS; wall=91.65129999999999ms stage=0ms
+g02-luis-card: PASS; wall=32.91139999999996ms stage=0ms
+g03-grace-escalation: PASS; wall=58.36760000000004ms stage=0ms
+g04-halvorsen-ticket: PASS; wall=39.72670000000005ms stage=0ms
+g05-luis-approval-note: PASS; wall=63.72280000000001ms stage=0ms
+g06-kenji-shipping: FAIL; wall=34.540700000000015ms stage=0ms
+g07-depot-release: PASS; wall=29.41489999999999ms stage=0ms
+g08-halvorsen-credit: PASS; wall=32.57600000000002ms stage=0ms
+g09-kenji-gift-note: PASS; wall=41.675199999999904ms stage=0ms
+g10-sigrid-callback: FAIL; wall=41.94510000000014ms stage=0ms
+g11-grace-signoff-today: PASS; wall=71.5320999999999ms stage=0ms
+g12-copperline-gesture: FAIL; wall=95.86329999999998ms stage=0ms
+g01-luis-refund-amount: PASS; wall=59.878200000000106ms stage=37ms
+g02-luis-card: PASS; wall=27.55300000000011ms stage=15ms
+g03-grace-escalation: PASS; wall=51.21699999999987ms stage=17ms
+g04-halvorsen-ticket: PASS; wall=36.702200000000175ms stage=18ms
+g05-luis-approval-note: PASS; wall=55.953599999999824ms stage=17ms
+g06-kenji-shipping: FAIL; wall=39.796299999999974ms stage=26ms
+g07-depot-release: PASS; wall=29.68190000000004ms stage=20ms
+g08-halvorsen-credit: PASS; wall=34.80859999999984ms stage=18ms
+g09-kenji-gift-note: PASS; wall=40.8759ms stage=21ms
+g10-sigrid-callback: FAIL; wall=41.643199999999524ms stage=22ms
+g11-grace-signoff-today: PASS; wall=73.09659999999985ms stage=44ms
+g12-copperline-gesture: FAIL; wall=91.79340000000047ms stage=39ms
+g01-luis-refund-amount: PASS; wall=56.83869999999979ms stage=62ms
+g02-luis-card: PASS; wall=24.83770000000004ms stage=16ms
+g03-grace-escalation: PASS; wall=45.903999999999996ms stage=22ms
+g04-halvorsen-ticket: PASS; wall=37.22910000000002ms stage=22ms
+g05-luis-approval-note: PASS; wall=53.93459999999959ms stage=22ms
+g06-kenji-shipping: FAIL; wall=31.143999999999778ms stage=18ms
+g07-depot-release: PASS; wall=27.26929999999993ms stage=20ms
+g08-halvorsen-credit: PASS; wall=30.966699999999946ms stage=20ms
+g09-kenji-gift-note: PASS; wall=39.74409999999989ms stage=25ms
+g10-sigrid-callback: FAIL; wall=43.67749999999978ms stage=29ms
+g11-grace-signoff-today: PASS; wall=80.58549999999968ms stage=67ms
+g12-copperline-gesture: FAIL; wall=90.66570000000047ms stage=56ms
+g01-luis-refund-amount: PASS; wall=74.16229999999996ms stage=58ms
+g02-luis-card: PASS; wall=26.642100000000028ms stage=14ms
+g03-grace-escalation: PASS; wall=53.14689999999973ms stage=31ms
+g04-halvorsen-ticket: PASS; wall=38.07049999999981ms stage=24ms
+g05-luis-approval-note: PASS; wall=56.312300000000505ms stage=15ms
+g06-kenji-shipping: FAIL; wall=30.379100000000108ms stage=15ms
+g07-depot-release: PASS; wall=31.907899999999245ms stage=18ms
+g08-halvorsen-credit: PASS; wall=29.333700000000135ms stage=17ms
+g09-kenji-gift-note: PASS; wall=44.865099999999984ms stage=32ms
+g10-sigrid-callback: FAIL; wall=42.16159999999945ms stage=19ms
+g11-grace-signoff-today: PASS; wall=70.20389999999952ms stage=77ms
+g12-copperline-gesture: FAIL; wall=90.37960000000021ms stage=65ms
+▶ archived records messages with explicit l6 wire caps
+  ✔ preserves archived messages through empty, rejected, and all-cut treatment while explicitly capping previously uncapped decisions at 512 (5683.0775ms)
+g01-luis-refund-amount: PASS; wall=48.37499999999909ms stage=564ms
+  ✔ cuts accepted whole entries using the complete provider request price including fixed tool overhead (963.354ms)
+✔ archived records messages with explicit l6 wire caps (6647.774ms)
+▶ plan.ts
+  ✔ writes eight entries for q2 copies 1-4 in the order control, aggregate, aggregate, control (153.0991ms)
+  ✔ writes the harness and the driver arguments of each entry (161.6725ms)
+  ✔ writes the cache path absolute and resolved against the working directory (155.5379ms)
+  ✔ keeps the series.ts plan shape: a string name and harness, a finite estimate, and string arguments (154.8185ms)
+  ✔ estimates 60 x 1.3 x the projected minutes, with copy 1 of the aggregate arm kept apart (153.7035ms)
+  ✔ names only the first aggregate entry of each model with the aggregatefill token (155.2484ms)
+  ✔ orders several models one after another, each in copy order (155.6291ms)
+  ✔ exits 64 on a usage fault and writes no plan (1612.3655ms)
+✔ plan.ts (2703.2967ms)
+▶ run-one.ts
+  ✔ exits 2 for a bench5 run whose output directory exists, before any cold start (464.9689ms)
+  ✔ exits 2 for an existing log or wire directory of a bench5 run (873.1236ms)
+  ✔ keeps exit 2 for an existing bench and bench3 output (850.3951ms)
+  ✔ exits 64 for an unknown harness, before the existing-output check and any cold start (424.2838ms)
+  ✔ exits 64 when the separator or an argument is missing (1276.6544ms)
+✔ run-one.ts (3890.238ms)
+▶ refit freeze
+  ✔ reproduces the all-request census offline and retains later dates, tool arguments and owner groups (0.9293ms)
+  ✔ matches every g01 archived runtime group by exact rendered source and seed/sentence grouping (0.8779ms)
+  ✔ refuses reused output directories and modified corpus files (276.713ms)
+✔ refit freeze (1726.0748ms)
+▶ refit generation and fit custody
+  ✔ refuses the reviewed negative original summary duration before generation completes (2749.4373ms)
+  ✔ refuses the reviewed erased manifest custody with unchanged labels (682.1676ms)
+  ✔ retains exact cached observations, accepts zero duration and unrelated live cache growth (1374.8047ms)
+  ✔ refuses missing observed rows, changed retained bytes, and empty required membership (4166.0815ms)
+  ✔ binds every completed manifest field to unchanged root labels (654.0729ms)
+  ✔ refuses invalid original duration during fitting even with rebound evidence and labels (977.3894ms)
+  ✔ records lexical exhaustion and retry duplicates without a judge request or lost audit occurrence (756.5487ms)
+  ✔ matches real Aggregator wire bytes through its first AGREE decision and retains failed-fit refusal (461.4963ms)
+  ✔ retries copied tokens, stops on the first lexical success even at AGREE zero, and replays offline (988.522ms)
+  ✔ refuses missing usage and aborts without successful preparation (665.8951ms)
+  ✔ charges sent judge failures and sent aborts while marking historical boundaries unmeasured (720.9883ms)
+  ✔ fits only immutable independent labels and preserves all archived hard controls (1272.3528ms)
+✔ refit generation and fit custody (15471.4572ms)
+▶ refit fitting
+  ✔ rejects equality at a negative cutoff and scoreable ambiguity (0.213ms)
+  ✔ keeps supported lexical failures in the floor denominator, including the exact 0.5 boundary (0.165ms)
+  ✔ refuses missing required scores, absent positives, incomplete costs and conflicting duplicates (0.2003ms)
+  ✔ validates every artifact boundary without treating lexical success as a label (9.0268ms)
+✔ refit fitting (9.885ms)
+▶ report.ts
+  ▶ usage
+    ✔ exits 64 with the usage line for a missing flag, a bad pair, an unknown model, and an unknown flag (2136.7219ms)
+  ✔ usage (2137.4977ms)
+  ▶ pair statistics
+    ✔ computes d without the g06 goal, its mean, deviation, and bounds, and continues (267.2047ms)
+    ✔ prints the d line, the bounds, and the verdict (271.8852ms)
+    ✔ stops when the upper bound is below 0 (533.3199ms)
+    ✔ gives no bound for one copy and continues (497.3562ms)
+    ✔ splits d by the goals where recall closed only in the aggregate arm (273.6093ms)
+    ✔ gives pass rates for g01 to g10 against g11 to g24 and for each scored lifetime case (543.833ms)
+    ✔ reads the folder of the copy that fills the caches (258.5293ms)
+  ✔ pair statistics (2646.4295ms)
+  ▶ run metrics
+    ✔ counts the walls by role, the prompts of agent requests from the wire, and the questions (267.4926ms)
+    ✔ falls back to the row when no wire folder exists (273.1955ms)
+    ✔ reports builds, triggers, CHANGE and AGREE rates, code failures, and the seconds by head (267.5051ms)
+    ✔ counts whole candidates separately from complete component expenditure and replay (295.8075ms)
+    ✔ reports the facts and stale tokens that the rendered summaries carry for each goal (281.7475ms)
+  ✔ run metrics (1386.1048ms)
+  ▶ invariants
+    ▶ g03 stale-carrier regression
+      ✔ g03 stale-carrier regression: empty summary (496.3432ms)
+      ✔ g03 stale-carrier regression: The carrier trace is open. (491.158ms)
+      ✔ g03 stale-carrier regression: Use ESC-2291. (504.3728ms)
+    ✔ g03 stale-carrier regression (1493.7267ms)
+    ✔ stops on a token that only the summaries carry (524.1239ms)
+    ✔ stops on a scored value that only the summaries carry, though the token filter reads none (517.7051ms)
+    ✔ reads a scored value that the shown text also carries as no leak (277.2101ms)
+    ✔ counts an any-of phrase that only the summaries carry as a scored leak (274.1346ms)
+    ✔ stops on a rendered aggregate whose last build failed or was withheld, and passes after a successful retry (844.2672ms)
+    ✔ stops on a rendered topic that no build row backs (261.6788ms)
+    ✔ stops on an aggregate overflow with no paired control overflow, from the row or the wire, and ignores a summarizer prompt (1049.9498ms)
+    ✔ stops when the first select of g01 differs in its briefing or its tail, and only there (1125.1533ms)
+    ✔ stops when the gauge scale drifts by more than the ledger bound and passes within it (547.5973ms)
+    ✔ stops on a timeout or partial reply in the aggregate arm alone while the stage outlasts the agent (1094.2206ms)
+  ✔ invariants (8010.5072ms)
+  ▶ dose
+    ✔ requires more than half of served goals to expose nonempty topic bodies, ignoring rendered counters (252.2616ms)
+    ✔ does not infer exposure from a rendered row or a selection when the wire carries no summary (269.4634ms)
+    ✔ refuses a null verdict when most goals rendered no topic, and splits them by withheld and cut (687.3294ms)
+    ✔ keeps a negative verdict when most goals rendered no topic (256.3241ms)
+    ✔ counts a minority of empty goals as no dose limit (259.2394ms)
+  ✔ dose (1724.9335ms)
+  ▶ per-request wire boundaries
+    ✔ fails missing usage even when a row reports a usable prompt count (257.8051ms)
+    ✔ checks a tool continuation that fits by prompt alone but exhausts the context with its completion (253.678ms)
+    ✔ detects stale summary content on an answer pass and records its selection (679.5277ms)
+    ✔ checks never-only-carrier against each request rather than the union of selections (285.6606ms)
+    ✔ reports shortened recall listings and later plan differences as consequences following treatment (263.2516ms)
+  ✔ per-request wire boundaries (1740.2242ms)
+  ▶ refusals
+    ✔ exits 1 for a missing run and names it (238.5977ms)
+    ✔ exits 1 for a short run (232.0839ms)
+    ✔ exits 1 for a run that did not complete (232.7908ms)
+    ✔ exits 1 for a pair with a transient judge error (242.8285ms)
+    ✔ exits 1 for runs whose arm, copy, or model differs from their folder (229.4108ms)
+    ✔ exits 1 for arms that served different goals (246.1903ms)
+    ✔ exits 1 for a goal that the scenario copy lacks (248.6244ms)
+    ✔ prints the readable pair, refuses the other, and exits 1 (248.9223ms)
+  ✔ refusals (1919.9554ms)
+  ▶ json output
+    ✔ writes the pairs and the refusals (263.4619ms)
+  ✔ json output (263.5742ms)
+✔ report.ts (20696.9584ms)
+▶ seams.ts
+  ✔ passes on the vendored build with no fetch call and the digest the README records (116.0855ms)
+  ✔ resolves a relative build path against the working directory (111.791ms)
+  ✔ prints parseable JSON with --json (112.8297ms)
+  ✔ loads an arbitrary artifact with a transitive top-level await (111.8489ms)
+  ✔ blocks import-time fetch after transitive asynchronous evaluation (107.6555ms)
+  ✔ exits 1 with a line naming buildRecords on a build that omits it (155.8051ms)
+  ✔ exits 1 naming LEDGER_CATEGORIES on a build that omits it (114.6937ms)
+  ✔ exits 1 naming the note members on a build whose LEDGER_NOTES lacks one (114.2005ms)
+  ✔ exits 1 on a build whose scope handler is not read at call time (113.5097ms)
+  ✔ exits 1 on a build that fails to import (56.9898ms)
+  ✔ exits 64 with the usage line when --build is missing, valueless, or an unknown flag is given (288.9578ms)
+✔ seams.ts (1407.6599ms)
+shadow v1 qwen3.5:2b-q4_K_M aggregate: items 12 (plain 2, asked 9, missed 1, failed 0); topics without an aggregate 7
+keep      plain 2/2 1.000 | shadow 1/2 0.500
+drop      plain 2/2 1.000 | shadow 1/2 0.500
+amends recall plain 2/3 0.667 | shadow 2/3 0.667
+amends falsedrop plain 0/2 0.000 | shadow 1/2 0.500
+supersedes recall plain 1/2 0.500 | shadow 0/2 0.000
+supersedes falsedrop plain 0/1 0.000 | shadow 0/1 0.000
+flips     category 2, amends 1, supersedes 1
+wrote C:\Users\mikes\AppData\Local\Temp\bench5-shadow-8aHllF\offline-1.json
+shadow v1 qwen3.5:2b-q4_K_M aggregate: items 12 (plain 2, asked 9, missed 1, failed 0); topics without an aggregate 7
+keep      plain 2/2 1.000 | shadow 1/2 0.500
+drop      plain 2/2 1.000 | shadow 1/2 0.500
+amends recall plain 2/3 0.667 | shadow 2/3 0.667
+amends falsedrop plain 0/2 0.000 | shadow 1/2 0.500
+supersedes recall plain 1/2 0.500 | shadow 0/2 0.000
+supersedes falsedrop plain 0/1 0.000 | shadow 0/1 0.000
+flips     category 2, amends 1, supersedes 1
+wrote C:\Users\mikes\AppData\Local\Temp\bench5-shadow-8aHllF\plain-2.json
+shadow v1 qwen3.5:2b-q4_K_M aggregate: items 12 (plain 2, asked 9, missed 1, failed 0); topics without an aggregate 7
+keep      plain 2/2 1.000 | shadow 1/2 0.500
+drop      plain 2/2 1.000 | shadow 1/2 0.500
+amends recall plain 2/3 0.667 | shadow 2/3 0.667
+amends falsedrop plain 0/2 0.000 | shadow 1/2 0.500
+supersedes recall plain 1/2 0.500 | shadow 0/2 0.000
+supersedes falsedrop plain 0/1 0.000 | shadow 0/1 0.000
+flips     category 2, amends 1, supersedes 1
+wrote C:\Users\mikes\AppData\Local\Temp\bench5-shadow-8aHllF\states-3.json
+shadow v1 qwen3.5:2b-q4_K_M aggregate: items 12 (plain 2, asked 9, missed 1, failed 0); topics without an aggregate 7
+keep      plain 2/2 1.000 | shadow 1/2 0.500
+drop      plain 2/2 1.000 | shadow 1/2 0.500
+amends recall plain 2/3 0.667 | shadow 2/3 0.667
+amends falsedrop plain 0/2 0.000 | shadow 1/2 0.500
+supersedes recall plain 1/2 0.500 | shadow 0/2 0.000
+supersedes falsedrop plain 0/1 0.000 | shadow 0/1 0.000
+flips     category 2, amends 1, supersedes 1
+wrote C:\Users\mikes\AppData\Local\Temp\bench5-shadow-8aHllF\first-4.json
+▶ shadow
+  ▶ helpers
+    ✔ excludes unmaintained topics at each completed boundary (1.2925ms)
+    ✔ finds the latest snapshot strictly before a message (0.2172ms)
+    ✔ requires exact source custody and completion and removes retired failed and withheld entries (2.042ms)
+    ✔ keeps repeated completed boundaries distinct and never uses a later recovery for an earlier arrival (0.1566ms)
+    ✔ reads a verdict at the ledger cutoffs (0.1931ms)
+    ✔ renders the plain state when no summary applies (0.2057ms)
+    ✔ keys a pair only when both messages are seed messages (0.1491ms)
+    ✔ computes a rate and leaves the ratio out for a total of 0 (0.2348ms)
+    ✔ counts a truth pair that no judgment screened as not read, and leaves an undecided pair out (0.4817ms)
+    ✔ reads the truth of a copy after its first read point (0.8148ms)
+    ✔ reads the copy of the series from the same field (0.8529ms)
+  ✔ helpers (7.7163ms)
+  ▶ flags
+    ✔ refuses a call without the required flags (0.604ms)
+    ✔ refuses an unknown flag and a bad URL (0.4899ms)
+    ✔ resolves the cache against the harness directory and the rest against the working directory (0.2319ms)
+  ✔ flags (1.5002ms)
+  ▶ offline
+    ✔ reproduces the hand-computed counts and rates, asks nobody, and fetches nothing (16.0267ms)
+    ✔ leaves the state plain where no aggregate is current, and counts the missing topics (8.9711ms)
+    ✔ reads the aggregates current before the message, the owner link, and the request topics (11.8579ms)
+    ✔ leaves out the judgments at or before the first read point (10.814ms)
+  ✔ offline (47.9322ms)
+  ▶ command line
+    ✔ exits 64 without the required flags (369.0026ms)
+    ✔ exits 0, prints the rates, and writes the report (197.1279ms)
+    ✔ exits 1 and names the file when the run lacks its aggregates (202.0804ms)
+    ✔ exits 1 offline when the cache file is absent, and when the run directory is (583.9587ms)
+    ✔ exits 1 when the copy of the run is absent (461.2569ms)
+  ✔ command line (1814.1663ms)
+  ▶ live
+    ✔ asks a missed question of the judge once, appends the answer, and reads it as a flip (500.5741ms)
+  ✔ live (500.8544ms)
+✔ shadow (2372.7553ms)
+✔ refuses a structurally valid same-ID edited oracle against frozen byte custody (48.9773ms)
+✔ refuses a different workload manifest even when packet and oracle references are unchanged (9.199ms)
+✔ requires exact packet and key hashes plus every atom, critical rule, and obligation (21.0294ms)
+✔ missed stale controls invalidate the shared packet batch (13.1134ms)
+✔ missed ambiguous controls and identity leaks invalidate the affected audit batch (20.1661ms)
+✔ missed fabricated controls and unavailable controls invalidate the shared packet batch (22.6181ms)
+✔ refuses unrelated obligations and fabricated evidence citations (4.8832ms)
+✔ does not accept earlier work as factual support or as an external completion receipt (18.5854ms)
+✔ preserves ambiguity bounds and makes evidenced critical violations fully unacceptable (5.1437ms)
+✔ closed guards reject coercible outcome arrays, missing limitation fields, and hostile getters (8.568ms)
+✔ completion requires the exact arrived closure and refuses a foreign available source (20.149ms)
+✔ completion receipts bind a required arrived lookup and the same obligation closure (43.4928ms)
+✔ open obligations allow product-only carry, miss, ambiguity and externally supported repair (50.4095ms)
+✔ an open obligation permits receipt-backed repair only with the earlier product (19.2137ms)
+✔ randomizes reproducibly and keeps identity/control metadata only in private joins (24.003ms)
+✔ retains actual earlier wrong work separately from external truth (10.9437ms)
+✔ refuses missing earlier products, observations, source joins, and corrupt oracle identity (6.3861ms)
+✔ withholds future closure and supersession metadata while preserving ended history (4.8328ms)
+✔ uses the real immutable evaluation reader and oracle checker for packet correspondence (253.3176ms)
+▶ source transition census
+  ✔ freezes copy-1 opportunities without claiming observed maintenance coverage (22.3762ms)
+  ✔ refuses an empty or changed source population instead of reporting a passing census (1.9594ms)
+✔ source transition census (25.8599ms)
+ℹ tests 342
+ℹ suites 71
+ℹ pass 342
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90883.9253

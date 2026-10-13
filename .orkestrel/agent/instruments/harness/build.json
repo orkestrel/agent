@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"erasableSyntaxOnly": true,
+		"declaration": true,
+		"noEmitOnError": true,
+		"allowJs": true,
+		"checkJs": false,
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"target": "es2023",
+		"lib": ["es2023"],
+		"types": ["node"],
+		"typeRoots": ["./node_modules/@types", "../../../../node_modules/@types"],
+		"skipLibCheck": true,
+		"rootDir": ".",
+		"outDir": "./.build"
+	},
+	"include": ["bench5/**/*.ts", "tools/**/*.ts", "audit/**/*.ts"],
+	"exclude": ["node_modules", ".build"]
+}

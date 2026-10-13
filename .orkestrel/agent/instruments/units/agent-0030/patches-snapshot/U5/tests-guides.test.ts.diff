@@ -1,0 +1,76 @@
+--- a/tests/guides.test.ts
++++ b/tests/guides.test.ts
+@@ -893,40 +893,40 @@
+ 			)
+ 		})
+ 
+-		it('regenerates the rollup only when the rollup option is true (the compaction fence)', async () => {
++		it('folds the first exchange with one summarizer call (the compaction fence)', async () => {
+ 			// The fence's summarizer calls a provider; the transcription digests through the stub.
+-			const silent = createStubSummarizer()
+-			const plain = createConversation({ summarize: silent.summarize, keep: 2 })
+-			const counted = createStubSummarizer()
+-			const rolled = createConversation({ summarize: counted.summarize, keep: 2, rollup: true })
+-			for (const conversation of [plain, rolled]) {
+-				conversation.add([
+-					{ role: 'user', content: 'My name is Ada.' },
+-					{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+-					{ role: 'user', content: 'Book a table for two at 19:00.' },
+-					{ role: 'assistant', content: 'Booked for two at 19:00.' },
+-					{ role: 'user', content: 'What did I say my name was?' },
+-				])
+-			}
+-			const sections = [await plain.compact(), await rolled.compact()]
++			const stub = createStubSummarizer()
++			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
++			conversation.add([
++				{ role: 'user', content: 'My name is Ada.' },
++				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
++				{ role: 'user', content: 'Book a table for two at 19:00.' },
++				{ role: 'assistant', content: 'Booked for two at 19:00.' },
++				{ role: 'user', content: 'What did I say my name was?' },
++			])
++
++			const section = await conversation.compact()
++			const original = section && conversation.rehydrate(section.id)
+ 
+-			expect(sections.map((section) => section?.messages.length)).toEqual([2, 2])
+-			expect(rolled.view().map(({ content }) => content)).toEqual([
++			expect(section?.messages.map(({ content }) => content)).toEqual([
++				'My name is Ada.',
++				'Nice to meet you, Ada.',
++			])
++			expect(conversation.view().map(({ content }) => content)).toEqual([
+ 				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
+ 				'Book a table for two at 19:00.',
+ 				'Booked for two at 19:00.',
+ 				'What did I say my name was?',
+ 			])
+-			expect(silent.calls).toHaveLength(1)
+-			expect(plain.summary).toBeUndefined()
+-			expect(counted.calls).toHaveLength(2)
+-			expect(rolled.summary).toBe('recap of 1')
++			expect(conversation.search('ada').map(({ content }) => content)).toEqual([
++				'My name is Ada.',
++				'Nice to meet you, Ada.',
++			])
++			expect(original).toEqual(section?.messages)
++			expect(stub.calls).toHaveLength(1)
+ 			expect(guideText).toContain(
+ 				'const section = await conversation.compact() // folds the first exchange → a summarized section',
+ 			)
+-			expect(guideText).toContain(
+-				'With `rollup: true`, each compaction also regenerates the conversation rollup `summary`, a summary of every section summary, through a further summarizer call. Without it, no summarizer call is spent on a rollup and `summary` keeps its value: `undefined`, or the summary a restored snapshot carried.',
+-			)
+ 		})
+ 
+ 		it('folds nothing after a cancel and folds on the next run (the no-fold-after-cancel bullet)', async () => {
+@@ -2669,7 +2669,7 @@
+ 
+ 		it('folds a reference block written to the active workspace into the next build (the provenance pattern)', () => {
+ 			// The fence passes `summarize: undefined` as a placeholder; the transcription omits the key.
+-			const conversations = createConversationManager({ rollup: true })
++			const conversations = createConversationManager()
+ 			conversations.add({ id: 'auth' })
+ 			const b = conversations.add({ id: 'planning' })
+ 			// The fence starts from a thread that already holds turns; the transcription seeds them.

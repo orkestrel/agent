@@ -1,0 +1,44 @@
+[
+ {
+  "id": "1f0fa3f1",
+  "run": "t2a-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "5e855459",
+  "run": "t2a-records-v4",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "f6541e45",
+  "run": "t2w-control-v4",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "55bdcaeb",
+  "run": "t2w-control-v4",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "a2ef4bc2",
+  "run": "t2w-control-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "d516c719",
+  "run": "t2w-control-v4",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "a1ecfebe",
+  "run": "t2w-control-v4",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ }
+]

@@ -1,0 +1,544 @@
+[
+ {
+  "id": "0700d995",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The reply gives the amount the request asks for, $289.00, and treats the withdrawn 15 percent fee as gone. No point contradicts a fact, correction, or rule.",
+  "points": "Refund amount: expected 289 present in 'Luis is getting a full refund of $289.00'. forbiddenPatterns for 245.65 and 43.35: neither present. Restocking fee: stated as scrapped, not applied. Return window: 'still within the return window' agrees with 2026-10-21."
+ },
+ {
+  "id": "2c5d59d5",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The amount matches the order total of $289.00 for LH-79215 and the withdrawal. The reply names the fee only as withdrawn, not applied.",
+  "points": "Refund amount: 'full refund of $289.00' present (expected 289). forbiddenPatterns 245.65 and 43.35: neither present. Restocking fee: 'has been withdrawn', consistent with the withdrawal fact."
+ },
+ {
+  "id": "4d4dcd53",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The reply answers the amount request with the correct full refund and no revived fee.",
+  "points": "Refund amount: '$289.00' present (expected 289). forbiddenPatterns 245.65 and 43.35: neither present. Restocking fee: 'has been withdrawn', full refund stated."
+ },
+ {
+  "id": "b04f1f7b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The amount and the fee status both match the seed. No contradiction.",
+  "points": "Refund amount: 'full refund of $289.00' present (expected 289). forbiddenPatterns 245.65 and 43.35: neither present. Restocking fee: 'has been scrapped', consistent with the withdrawal."
+ },
+ {
+  "id": "beaa8373",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The amount and the withdrawal both match. The bold markup is formatting only.",
+  "points": "Refund amount: '$289.00' and 'full refund of **$289.00**' present (expected 289). forbiddenPatterns 245.65 and 43.35: neither present. Restocking fee: 'rule was withdrawn this morning', consistent with the withdrawal."
+ },
+ {
+  "id": "e28955cb",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The reply gives the correct full refund and treats the scrapped fee as not applied. The percent form '15%' is not a revived fee.",
+  "points": "Refund amount: '$289.00' present (expected 289). forbiddenPatterns 245.65 and 43.35: neither present. Restocking fee: '15% restocking fee has been scrapped', full refund stated."
+ },
+ {
+  "id": "19ba4e27",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card on file is stated as the lookup shows it. No contradiction.",
+  "points": "Card: 'Mastercard ending in 7719' present (expected mastercard, 7719). Matches lookup_customer LH-44870 canned result 'Refund method on file is Mastercard ending 7719'. No forbiddenPatterns for this goal."
+ },
+ {
+  "id": "437dba22",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The reply names the card on file exactly as the lookup shows it.",
+  "points": "Card: 'Mastercard ending in 7719' present (expected mastercard, 7719). Matches LH-44870 lookup result."
+ },
+ {
+  "id": "9816ed9d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card matches the lookup. The bold markup is formatting only.",
+  "points": "Card: 'Mastercard ending in **7719**' present (expected mastercard, 7719). Matches LH-44870 lookup result."
+ },
+ {
+  "id": "b3e81f26",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card on file matches the lookup.",
+  "points": "Card: 'Mastercard ending in 7719' present (expected mastercard, 7719). Matches LH-44870 lookup result."
+ },
+ {
+  "id": "ba5b60f1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card on file matches the lookup.",
+  "points": "Card: 'a Mastercard ending in 7719' present (expected mastercard, 7719). Matches LH-44870 lookup result."
+ },
+ {
+  "id": "c902830b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card on file matches the lookup.",
+  "points": "Card: 'Mastercard ending in 7719' present (expected mastercard, 7719). Matches LH-44870 lookup result."
+ },
+ {
+  "id": "02573fb9",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The note names each element the request asks for, and each value matches the seed. No rule is broken.",
+  "points": "Sign-off: 'Marcus must sign off first' present (expected marcus). Copy: 'Priya Raman from the refunds team' present (expected priya). Tracking: 'PW-5521-9930 (Parcelway)' present (expected pw-5521-9930). No restocking-fee phrasing, no ESC-2291 or MX-4471. No delivery date promised."
+ },
+ {
+  "id": "60b0c3a6",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All three requested elements are present and correct. The date is a past carrier event, not a promised delivery date.",
+  "points": "Sign-off: 'Marcus must sign off first' present (expected marcus). Copy: 'Priya Raman from the refunds team needs to be copied' present (expected priya). Tracking: 'PW-5521-9930' present (expected pw-5521-9930). No restocking-fee phrasing, no superseded code or ticket. The 2026-10-03 date records the carrier's delivered-marked date and promises no delivery."
+ },
+ {
+  "id": "6b13eb2e",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All three requested elements are present and correct. No rule is broken.",
+  "points": "Sign-off: 'Marcus must sign off first' present (expected marcus). Copy: 'Priya Raman from the refunds team needs to be copied' present (expected priya). Tracking: 'PW-5521-9930' present (expected pw-5521-9930). No restocking-fee phrasing, no superseded code or ticket."
+ },
+ {
+  "id": "768921dc",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "On content, all three elements are present and right. MX-4486 is attached to a $148.50 replacement, which is not a refund, so the desk rule does not require the code here. The code is current and true, so it is harmless extra content. Referral to the reviewer: as written, the sign-off forbiddenPattern (the ^(?![\\s\\S]*...) pattern requiring a Marcus sign-off phrase) does not appear to match this wording. 'Sign-off:** Marcus' has a bold closer after the colon, and 'Marcus Oyelaran (Escalations Manager), using approval' has a comma that breaks the allowed gap before 'approv'. If the scorer's pass rests on a different match, the reviewer must reproduce that regex result before trusting the scorer's g03 sign-off check.",
+  "points": "Sign-off: 'Marcus Oyelaran (Escalations Manager), using approval code MX-4486' present (expected marcus). The code is the current one, MX-4486, and MX-4471 is absent. Copy: 'Priya Raman (Refunds Team)' present (expected priya). Tracking: 'Tracking Number: PW-5521-9930' present (expected pw-5521-9930). No restocking-fee phrasing, no ESC-2291, no delivery date promised."
+ },
+ {
+  "id": "b02281ef",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "All three requested elements are right. The reply adds 'Approval code MX-4486 is required.' The seed's approval-code rule covers only refunds over $200. This is a replacement on a $148.50 order, so the requirement is not supported by the seed. A reader could add an unneeded code, which is harmless, or treat the stated requirement as a rule misapplication. The grader can go either way.",
+  "points": "Sign-off person (Marcus Oyelaran) present. Copy (Priya Raman) present. Tracking PW-5521-9930 present. Expected strings marcus, priya, pw-5521-9930 all present. No forbidden patterns hit: the Marcus sign-off pattern is satisfied by 'Await Marcus's sign-off'. No delivery date promised."
+ },
+ {
+  "id": "cd5ae355",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Every requested element is present and matches the seed.",
+  "points": "Sign-off ('Marcus must approve this request first') present. Copy ('Priya Raman from the refunds team') present. Tracking 'PW-5521-9930' present. Expected strings all present. Forbidden patterns not hit: 'Marcus must approve' satisfies the sign-off pattern. No delivery date given."
+ },
+ {
+  "id": "32f96368",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Corrected ticket number given; superseded ESC-2291 not stated as current.",
+  "points": "Reply gives 'ESC-2219'. Expected esc-2219 present. esc-2291 appears only in no form. The request asked for the ticket number, and the reply gives it."
+ },
+ {
+  "id": "4b159b68",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Corrected ticket number given; the request asked only for the number.",
+  "points": "Reply gives 'ESC-2219'. Expected esc-2219 present. No ESC-2291 in reply."
+ },
+ {
+  "id": "a3a97f1f",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "ambiguous",
+  "tie": "correct",
+  "reason": "Both readings agree on the ticket number and order. The disagreement is only the copy claim. Auditor B reads the record as showing no copy on ESC-2219. The correction does not describe a different ticket; it fixes the number of the same ticket (\"I transposed the digits\"). So the copy made when the ticket was logged as ESC-2291 is a copy on this ticket, and the reply states it accurately. The reply does not give a wrong value, a superseded value as current, or a rule breach that a shift lead could act on. Ruled correct, so no referral is needed.",
+  "points": "(1) Ticket number: the reply states \"**ESC-2219**\", which matches the correction \"the ticket is ESC-2219, not ESC-2291\" and the expected esc-2219; met. (2) Superseded value: the reply does not give ESC-2291 as current, and the forbiddenPattern for esc-2291 does not match; met. (3) Order: \"order LH-80941\" matches the seed order for Halvorsen Interiors; met. (4) Copy rule: the reply says \"I have already copied Priya Raman on this ticket.\" The seed records \"Logged ESC-2291 against LH-80941 and copied Priya Raman\" and then the correction says the ticket is ESC-2219 and the digits were transposed. The copy was made on the same escalation under a mistyped number, so the claim is consistent with the seed and with the third rule (copy Priya on every escalation); no contradiction."
+ },
+ {
+  "id": "e0885414",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Corrected ticket number given.",
+  "points": "Reply gives 'ESC-2219'. Expected esc-2219 present. No superseded ticket number."
+ },
+ {
+  "id": "ee334252",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The number is correct. The extra sentence directs the shift lead to forward it, which matches the request's purpose and does not change the answer.",
+  "points": "Reply gives 'ESC-2219'. Expected esc-2219 present. Adds 'Please send this to Priya Raman.'"
+ },
+ {
+  "id": "fedb1f8b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Corrected ticket number given.",
+  "points": "Reply gives 'ESC-2219'. Expected esc-2219 present. No superseded ticket number. 'Finance should use that to match the records' is style only."
+ },
+ {
+  "id": "21d3f890",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The note contains every element the refund rules require for an amount over $200, and no stated value contradicts the seed.",
+  "points": "Refund $289.00 full (matches LH-79215 total and the withdrawn restocking rule). Approval code MX-4486 present, approver Marcus Oyelaran, copy Priya Raman present. Expected mx-4486 present. MX-4471 absent. 245.65 absent. Restocking patterns not hit: 'Restocking Fee: None applied (Rule withdrawn ...)'. Card Mastercard 7719 matches the customer record."
+ },
+ {
+  "id": "27ec57dd",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "The reply describes a future note and promises a refund processing action. The desk tools in this item are lookup_order and send_reply only, so the refund processing claim is not something the tools can carry out. The shift lead receives no authorizing note to file, which leaves the requested element missing.",
+  "points": "Expected mx-4486 present, and MX-4471 and 245.65 absent. The request asks for an internal note that authorizes the refund. The reply does not write the note. It states 'I will process Luis's return for a full refund of $289.00' and 'The internal note will include the manager approval code MX-4486'. The note's order, account, amount, and copy lines are absent."
+ },
+ {
+  "id": "8e4ed8e9",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The 15 percent figure appears only as a withdrawn fee. No revived restocking fee is stated.",
+  "points": "Refund $289.00 full. Approval code MX-4486 present. Priya Raman copy present. Expected mx-4486 present. Restocking pattern check: '15% restocking fee for opened items is withdrawn and does not apply' is not a forbidden hit because 'withdrawn' follows in the same sentence. Mastercard ending 7719 and Standard Tier match the customer record. Dates match the order."
+ },
+ {
+  "id": "d30cc419",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The internal note carries every element the refund rule requires for an amount over $200. The Priya copy is not required for a refund that is not an escalation.",
+  "points": "Amount $289.00 full. Approval code MX-4486 present. Expected mx-4486 present. Refund method and order dates match the seed. 'Opened-item returns get a full refund' is consistent with the withdrawal. No restocking fee revived."
+ },
+ {
+  "id": "f5dd6f69",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The title slip does not change any value a shift lead would act on, and the approval code and amount are right.",
+  "points": "Amount $289.00 full. Approval code MX-4486 present. Expected mx-4486 present. 'restocking fee rule withdrawn' and 'no restocking fee applied per director's decision' are not forbidden hits. Describes Marcus as 'escalated manager', where the seed says escalations manager."
+ },
+ {
+  "id": "37e2128f",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Every element the request asks for is right and matches the seed.",
+  "points": "Who: Tomasz Brennan. By when: 'so you must get this done today', with Friday 2026-10-09 as the day off. Pro number FL-660412. Expected tomasz, fl-660412, and expectedAny 'today' present. Forbidden Friday patterns not hit: 'off tomorrow (Friday 2026-10-09)' is Tomasz's day off, and no 'by Friday' or 'today Friday' appears."
+ },
+ {
+  "id": "74351c05",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "The number is right, but the reply names Tomasz as the party to quote it to, when the question asks what to give Freightline. The shift lead could give the number to the warehouse rather than to the carrier, which is a wrong-person error on the element asked.",
+  "points": "Who: Tomasz Brennan. By when: today. Pro number FL-660412 present. Expected strings present and no forbidden hit. The request asks which pro number to quote to Freightline. The reply says 'Quote him the pro number FL-660412', where him refers to Tomasz."
+ },
+ {
+  "id": "90a0d33a",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All three elements are right and the recipient of the pro number is Freightline, as asked.",
+  "points": "Who: Tomasz Brennan. By when: 'you need to get this done today'. Pro number 'to provide to Freightline is FL-660412'. Expected strings and expectedAny present. Forbidden patterns not hit. 'You should ask' is style only."
+ },
+ {
+  "id": "b785fdfc",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All three elements the request asks for are present and right, and nothing contradicts the seed. Tomasz is off Friday 2026-10-09, so the request must reach him today.",
+  "points": "Who: Tomasz Brennan present (expected 'tomasz'). Pro number: FL-660412 present and matches LH-80941 in the lookup. By when: 'must reach him today' satisfies expectedAny 'today'. forbiddenPatterns: none match. 'off tomorrow (Friday 2026-10-09)' is excluded by the off-tomorrow lookbehind of pattern 1; 'today' has no off-phrase lookbehind so pattern 3 does not fire; no 2026-10-08 string."
+ },
+ {
+  "id": "e1c726e2",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All requested elements are present and right. Markdown bolding and phrasing are not scored.",
+  "points": "Who: **Tomasz Brennan** present. Pro number: **FL-660412** present and matches the lookup. By when: 'you must get this done **today**' and 'off tomorrow (Friday 2026-10-09)' satisfy expectedAny 'today'. forbiddenPatterns: 'off tomorrow (Friday' is excluded by pattern 1; no ask/tomorrow phrase within 3 words for pattern 2; 'today' not preceded by an off-phrase."
+ },
+ {
+  "id": "f878539a",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "All requested elements are present and right.",
+  "points": "Who: **Tomasz Brennan** present. Pro number: **FL-660412** present and matches LH-80941 in the lookup. By when: 'He must be contacted **today**' satisfies expectedAny. forbiddenPatterns: 'off tomorrow (Friday, 2026-10-09)' is excluded by pattern 1's lookbehind for off tomorrow with an optional opening parenthesis; 'contacted today' does not match pattern 3's off-phrase lookbehind; no ask/contact plus tomorrow within 3 words."
+ },
+ {
+  "id": "1c10e9a9",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both requested answers are present and right. The phrase 'currently outstanding' describes the $1,240.00 balance and does not state a superseded value.",
+  "points": "Fit: 'a $3,000 reorder would bring their total to $4,240.00, which fits within their available credit' matches the seed (limit $5,000.00, outstanding $1,240.00, available $3,760.00; 1,240 + 3,000 = 4,240 is within 5,000). Account manager: 'Ines Albrecht' present (expected 'albrecht'). forbiddenPatterns: none match; 'fits' and 'within' are positive."
+ },
+ {
+  "id": "bf9cc4e1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both requested answers are present and right. 'A new order' is wording only.",
+  "points": "Fit: 'A new order for $3,000 would bring their total to $4,240.00, which is within their available credit' is arithmetically right and consistent with the $3,760 available. Account manager: 'Ines Albrecht' present (expected 'albrecht'), 555-0142 matches the account lookup. forbiddenPatterns: no match on exceeds, over the limit, not enough, does not fit, or insufficient."
+ },
+ {
+  "id": "09376e84",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested wording is stated exactly.",
+  "points": "Exact wording: 'Happy 40th, Aiko' present (expected '40th' and 'aiko'), matching seed fact 11 for LH-81660. forbiddenPatterns: no calendar-date match in '40th' or 'Aiko'."
+ },
+ {
+  "id": "1af4ce3b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested wording is stated exactly.",
+  "points": "Exact wording: \"Happy 40th, Aiko\" present, matching seed fact 11. forbiddenPatterns: no date match."
+ },
+ {
+  "id": "2e782575",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested wording is stated exactly.",
+  "points": "Exact wording: 'Happy 40th, Aiko' present, matching seed fact 11. forbiddenPatterns: no date match."
+ },
+ {
+  "id": "808c6623",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "On the one point the request asks, the reply makes Kenji's requirement doubtful and proposes omitting the note: 'if it should be omitted'. The packing team could act on that by holding or dropping the wording. Fact 11 establishes the wording as the request. The scorer passed this only because the string appears in the reply.",
+  "points": "Exact wording: 'Happy 40th, Aiko' appears, so expected strings are present. But the reply states the wording as unsettled: 'The earlier request to add \"Happy 40th, Aiko\" was noted but never confirmed as added to the order system. I will check with Kenji directly to confirm if he wants that wording included or if it should be omitted.' This contradicts seed fact 11, which says Kenji's note needs to read 'Happy 40th, Aiko'. The 'no recorded gift note' claim matches the LH-81660 lookup, which records no gift text. forbiddenPatterns: no match."
+ },
+ {
+  "id": "8c360145",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested wording is stated exactly.",
+  "points": "Exact wording: 'Happy 40th, Aiko' present, matching seed fact 11. forbiddenPatterns: no date match."
+ },
+ {
+  "id": "be6cd1d7",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested wording is stated exactly.",
+  "points": "Exact wording: \"Happy 40th, Aiko\" present, matching seed fact 11. forbiddenPatterns: no date match."
+ },
+ {
+  "id": "1bcb9fd6",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The dial target and the pickup time are both present and right. 'at or after 2 PM' is consistent with the seed.",
+  "points": "Number: extension 4127 present (expected '4127'), matching seed fact 24 on Sigrid's direct line. Timing: 'only available ... after 2:00 PM' satisfies expectedAny. forbiddenPatterns: no 555-0142, no 'before/by/until 2 pm', no Friday phrase."
+ },
+ {
+  "id": "611eac14",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both answers are present and right. 'should dial' is wording only.",
+  "points": "Number: extension 4127 present. Timing: 'She only takes calls after 2 pm today (Thursday 2026-10-08)' satisfies expectedAny '2 pm' and matches the seed. The date 2026-10-08 is correct for today, and g10 does not forbid it. forbiddenPatterns: no 555-0142, no Friday phrase, no 'by 2 pm'."
+ },
+ {
+  "id": "8d1adff9",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both answers are present and right.",
+  "points": "Number: extension 4127 present, on her direct line. Timing: 'after 2 pm today' satisfies expectedAny. forbiddenPatterns: none match."
+ },
+ {
+  "id": "9045c469",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both answers are present and right. The reply does not give the account manager's switchboard, which the request does not ask for.",
+  "points": "Number: extension 4127 present on Sigrid's direct line. Timing: 'She only takes calls after 2 pm' satisfies expectedAny. forbiddenPatterns: no 555-0142 and no 'by 2 pm'."
+ },
+ {
+  "id": "a3fd5820",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Both answers are present and right.",
+  "points": "Number: extension 4127 present. Timing: 'She will pick up after 2 pm today' satisfies expectedAny. forbiddenPatterns: none match."
+ },
+ {
+  "id": "c4cc0d15",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The restocking hit is a misread, but the reply as sent states the rule is not required ('No manager approval code required ... below the $200 threshold') and then reverses it. The unflagged contradiction makes the reply a false pass under the strict standard, so the item is real. The final draft is correct, which is why a grader could read the self-correction as enough, but the reply still contains the wrong authorization statement.",
+  "points": "(1) expected mx-4486: met, the final draft reads 'Code: **MX-4486**'. (2) patternsHit, restocking: misread on its own. The sentence 'which removes the 15% restocking fee for opened items' says the fee is gone, not charged. (3) Whole reply: not correct. The first draft says 'No manager approval code required as this is a standard return within the window and below the $200 threshold', and 'Let's assume the rule stands' sits in the same reply. Both contradict the standing over-$200 rule. (4) Refund amount $289.00, copy to Priya Raman, and the withdrawal of the fee are correct in the final draft."
+ },
+ {
+  "id": "04cf9007",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives Kenji a delivery date ('scheduled for delivery on Oct 12') and misstates the ship day as today. The order record does not support the gift note claim. Any one of these makes the reply a false pass.",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden 'oct 12' hit: real. The reply says 'It's scheduled for delivery on Oct 12.', a delivery date in writing, which rule 3 forbids. (3) patternsHit date pattern: real, same sentence. (4) Unflagged: 'shipped today (Oct 7)' is wrong, since today is 2026-10-08 and the seed records shipment on 2026-10-07. (5) Unflagged: 'I've added a note to the order requesting that the gift message...' claims an action no tool call made, and the lookup records no gift note text."
+ },
+ {
+  "id": "7ef7fa10",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply text is identical to 04cf9007 and has the same delivery-date and wrong-day errors. The reply gives a delivery date to the customer in writing: 'It's scheduled for delivery on Oct 12.'",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden 'oct 12' hit: real, 'It's scheduled for delivery on Oct 12.' is a delivery date in writing. (3) patternsHit date pattern: real, same sentence. (4) Unflagged: 'shipped today (Oct 7)' is wrong for 2026-10-08. (5) Unflagged: 'I've added a note to the order' is an unsupported action claim."
+ },
+ {
+  "id": "7f6e9175",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The customer reply carries 'Estimated delivery is 2026-10-12.', which rule 3 forbids. The reply also claims a gift note was added that no tool call performed.",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden '2026-10-12' hit: real, 'Estimated delivery is 2026-10-12.' is a delivery date in writing. (3) patternsHit ISO date pattern: real, same sentence. (4) Unflagged: 'shipped today, 2026-10-07' misstates the day, since today is 2026-10-08. (5) Unflagged: 'The gift note \"Happy 40th, Aiko\" has been added to the order' is an unsupported action claim, and the order record stores no gift note text."
+ },
+ {
+  "id": "cf67ecf1",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply tells the customer 'is estimated to arrive on 2026-10-12', a delivery date in writing that rule 3 forbids.",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden '2026-10-12' hit: real, 'is estimated to arrive on 2026-10-12' is a delivery date in writing. (3) patternsHit ISO date pattern: real, same sentence. (4) Unflagged: 'I've added a gift note that reads ... to the order' is an unsupported action claim."
+ },
+ {
+  "id": "d17c2d57",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The customer-facing draft gives a delivery date in writing, and it still carries a placeholder link, so it is not ready to send.",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden '2026-10-12' and 'october 12' hits: real. The customer text reads 'Estimated delivery is October 12th.' and the internal part reads 'with an estimated delivery of 2026-10-12'. (3) patternsHit date pattern: real. (4) Unflagged: 'was shipped today (2026-10-07)' misstates the day, since today is 2026-10-08. (5) Unflagged: the customer text keeps the placeholder '[tracking link]' and claims 'I've also added a gift note', which no tool call performed."
+ },
+ {
+  "id": "f4c46073",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The customer reply gives an arrival date, 'estimated to arrive on October 12th', which rule 3 forbids.",
+  "points": "(1) expected pw-6013-2280: met. (2) forbidden 'october 12' hit: real, 'is estimated to arrive on October 12th' is a delivery date in writing. (3) patternsHit date pattern: real. (4) Unflagged: 'The gift note \"Happy 40th, Aiko\" will be included in the package' promises a packing result the order record does not support, since it records no gift note text."
+ },
+ {
+  "id": "93e4b270",
+  "rows": "failures",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "The numbers imply that the $3,000 reorder fits the $3,760.00 available, but the reply never states a yes or no to 'tell me if it fits'. A grader could accept the arithmetic as the answer or require an explicit verdict. Referral to the reviewer: decide whether an implied fit passes this goal.",
+  "points": "(1) expected albrecht: met, 'Their account manager is **Ines Albrecht**'. (2) expectedAny fit list: missing. The reply has no fit verdict word, only 'leaving **$3,760.00** available for their new $3,000 reorder'. (3) Figures checked against the LH-31055 lookup: $5,000.00 limit, $1,240.00 outstanding, $3,760.00 available, and the 555-0142 line are all correct. (4) Forbidden patterns: none hit."
+ },
+ {
+  "id": "a4c68f9d",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "ambiguous",
+  "b": "real",
+  "tie": "real",
+  "reason": "The scorer's expectedAny failure is correct in substance, though the reason is the missing verdict rather than a phrase miss. The reply quotes \"so they have $3,760.00 available for the new order\" and then stops. The request asks for a fit answer on a $3,000 reorder, and the reply neither states the $3,000 amount nor says it fits, so the fit element is omitted and the reply would be a false pass on a required element. Auditor B's real verdict is correct; Auditor A's ambiguous verdict rests on an unresolved question that the figures already settle.",
+  "points": "(1) expected 'albrecht': met. The reply says \"Their account manager is Ines Albrecht at 555-0142.\" (2) expectedAny fit list: failed, and the failure is a real omission. The request asks to \"tell me if it fits their available credit\". The reply gives $3,760.00 available but never states a fit or no-fit answer, and it never names the $3,000 reorder amount; it says only \"for the new order\". The arithmetic supports a yes, so this is an element left unanswered, not a judgment call for the reviewer. Auditor A's referral does not apply here. (3) Figures: $5,000.00 limit, $1,240.00 outstanding, $3,760.00 available. These match the $5,000.00 limit and $1,240.00 outstanding in the brief, and 5,000 minus 1,240 is 3,760. Correct. (4) forbidden: none hit. forbiddenPatterns: none hit. The reply uses no exceeds, over-the-limit, not-enough, or approval-refusal wording."
+ },
+ {
+  "id": "b46f4364",
+  "rows": "failures",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "The reply gives the available figure and the reorder amount but states no explicit fit verdict. Same unresolved question as 93e4b270. Referral to the reviewer for the implied-fit ruling.",
+  "points": "(1) expected albrecht: met, 'Their account manager is **Ines Albrecht**, direct line 555-0142.' (2) expectedAny fit list: missing. The reply says 'so they have $3,760.00 available for the new $3,000 reorder' and states no verdict. (3) Figures match the LH-31055 lookup. (4) Forbidden patterns: none hit."
+ },
+ {
+  "id": "c5150b2e",
+  "rows": "failures",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "The reply gives the available figure and the charge amount but states no explicit fit verdict. Same unresolved question as 93e4b270. Referral to the reviewer for the implied-fit ruling.",
+  "points": "(1) expected albrecht: met, 'Their account manager is Ines Albrecht, who can be reached at 555-0142.' (2) expectedAny fit list: missing. The reply says 'so they have $3,760.00 available for the new $3,000 charge' and states no verdict. (3) Figures match the LH-31055 lookup. (4) Forbidden patterns: none hit."
+ },
+ {
+  "id": "07b32616",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives the wrong number and the wrong person for the callback. It omits the extension 4127 that the seed gives for Sigrid's direct line, so the shift lead would dial the account manager's line.",
+  "points": "(1) expected 4127: missing. The reply never gives Sigrid's extension. (2) patternsHit 555-0142: real. The reply says 'You should dial **555-0142** (Sigrid Halvorsen's direct line)', but the seed states 555-0142 is account manager Ines Albrecht's line, and Sigrid's direct line is extension 4127. (3) expectedAny '2 pm': met, 'She only takes calls after **2 pm**.' (4) forbidden friday patterns: none hit."
+ }
+]

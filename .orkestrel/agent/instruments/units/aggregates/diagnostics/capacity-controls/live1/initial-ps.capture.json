@@ -1,0 +1,11 @@
+{
+  "id": "initial-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 13,
+  "hash": "a6fe9ec6e26a38d99fca418b69826e0238b7a2bb319ff05eb153a6fcfd1fa28d",
+  "status": 200,
+  "started": "2026-10-11T11:03:49.176Z",
+  "finished": "2026-10-11T11:03:49.179Z",
+  "duration": 2.6947000000000116
+}

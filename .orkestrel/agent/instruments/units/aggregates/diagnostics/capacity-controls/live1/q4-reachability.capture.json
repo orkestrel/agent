@@ -1,0 +1,11 @@
+{
+  "id": "q4-reachability",
+  "complete": true,
+  "breached": false,
+  "bytes": 335,
+  "hash": "ebd16c2590bddb641e71e2a74a24e0b2592e73059cb1f54c2415471faba34f43",
+  "status": 200,
+  "started": "2026-10-11T11:04:41.247Z",
+  "finished": "2026-10-11T11:05:03.270Z",
+  "duration": 22023.295499999993
+}

@@ -1,0 +1,13 @@
+{
+  "executable": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "args": [
+    "--import",
+    "file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/witness.ts",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\main.ts"
+  ],
+  "exit": 0,
+  "signal": null,
+  "stdout": "{\"offline\":true,\"message\":\"No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.\",\"host\":\"Windows; controlled attached daemon; exclusive serial client; no other service requests\"}\n{\"witness\":true,\"global\":0,\"native\":0}\n",
+  "stderr": "",
+  "duration": 113.63830000000007
+}

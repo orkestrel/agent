@@ -1,0 +1,14 @@
+{
+  "url": "http://127.0.0.1:11434/api/show",
+  "method": "POST",
+  "body": {
+    "hash": "cb81f77934fa9338b6d2b8f7cbb076d02108770d9102ec4f4ecb72c0171e3dc8",
+    "bytes": 61
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "started": "2026-10-11T11:03:49.541Z",
+  "timeout": 30000,
+  "limit": 1048576
+}

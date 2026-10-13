@@ -1,0 +1,36 @@
+{
+  "body": {
+    "availability": "absent"
+  },
+  "token": {
+    "availability": "absent"
+  },
+  "finish": {
+    "availability": "absent"
+  },
+  "top": {
+    "availability": "absent"
+  },
+  "usage": {
+    "prompt": {
+      "availability": "absent"
+    },
+    "completion": {
+      "availability": "absent"
+    }
+  },
+  "timing": {
+    "total": {
+      "availability": "absent"
+    },
+    "load": {
+      "availability": "absent"
+    },
+    "prompt": {
+      "availability": "absent"
+    },
+    "evaluation": {
+      "availability": "absent"
+    }
+  }
+}

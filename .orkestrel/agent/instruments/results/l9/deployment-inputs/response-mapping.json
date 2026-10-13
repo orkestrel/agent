@@ -1,0 +1,38 @@
+[
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/live1/g2-generation.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/live1/g2-generation.response.bin",
+    "hash": "08588c039d17224afe2fcc71ef197f1037c4e958785f1d0feec4d2c8a09d1933",
+    "bytes": 1853
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/live1/g2-generation-ps.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/live1/g2-generation-ps.response.bin",
+    "hash": "b67a830451833835171a89c73906ed9dcd2946388d956246d38c31f9487b4c7d",
+    "bytes": 421
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-probe/live1/initial-show-q2.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/live1/initial-show-q2.response.bin",
+    "hash": "c1f7a3c63cc61e8bfae6c8e4a217e80e4200e2831161756b2d86ea422661bc1e",
+    "bytes": 26522
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-probe/live1/initial-show-q4.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/live1/initial-show-q4.response.bin",
+    "hash": "19a71a676d23c59736d7a4129458f2f891fc445fee2f4f046c396b92d1127c6d",
+    "bytes": 27114
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-g2-control/live1/initial-show-g2.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-g2-control/live1/initial-show-g2.response.bin",
+    "hash": "90c9003d86f52c90b125538ed36ab9ae01234b5a2c159fdf70de83e28eea58b9",
+    "bytes": 28271
+  },
+  {
+    "original": "tmp/units/aggregate-capacity-probe/live1/initial-show-g4.response.bin",
+    "archive": ".orkestrel/agent/instruments/results/l9/deployment-inputs/aggregate-capacity-probe/live1/initial-show-g4.response.bin",
+    "hash": "b3c12145b74b6ad0845105c70ad9b0cf76e2cda353c96a3744b4b2ac78ae4238",
+    "bytes": 28115
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "packet": {
+    "path": "tmp/units/aggregate-capacity-g2-control/prepared/packet.json",
+    "hash": "bb7d5de942f9c4e5168fa77d0bb344bcb2d585b931129294b68c74bb8e94bd56",
+    "bytes": 7380
+  },
+  "operator": "5504592be3b85761ec98574ac48e95be539998b22da5b42f2d1d5a6b6dbca014",
+  "dispatches": {
+    "global": 0,
+    "native": 0
+  }
+}

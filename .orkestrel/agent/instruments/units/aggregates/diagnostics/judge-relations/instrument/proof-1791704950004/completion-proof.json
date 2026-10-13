@@ -1,0 +1,15 @@
+{
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "--test",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-judge-counterfactual\\Completion.test.ts"
+  ],
+  "name": "completion-proof",
+  "expected": 0,
+  "exit": 0,
+  "signal": null,
+  "wall": 251.1558,
+  "stdout": "✔ real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence (7.6785ms)\n✔ complete emitted decoder result passes through unchanged with present raw evidence (2.2849ms)\n✔ malformed JSON and absent capture describe raw fields and preserve the original rejection (2.6545ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 189.9803\n",
+  "stderr": "",
+  "error": "absent"
+}

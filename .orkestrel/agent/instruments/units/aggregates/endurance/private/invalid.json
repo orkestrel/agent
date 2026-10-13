@@ -1,0 +1,62 @@
+[
+	{
+		"id": "shifted-arrival",
+		"target": "runtime",
+		"path": ["seed", 6, "shift"],
+		"value": 0,
+		"reason": "shifted arrival"
+	},
+	{
+		"id": "future-lookup",
+		"target": "oracle",
+		"path": ["goals", 1, "lookups", 0, "from"],
+		"value": 102,
+		"reason": "future lookup"
+	},
+	{
+		"id": "broken-dependency",
+		"target": "oracle",
+		"path": ["goals", 1, "earlier", 0],
+		"value": "ev-24-4",
+		"reason": "broken dependency"
+	},
+	{
+		"id": "wrong-calculation",
+		"target": "oracle",
+		"path": ["calculations", 0, "result"],
+		"value": 8263,
+		"reason": "wrong calculation"
+	},
+	{
+		"id": "premature-closure",
+		"target": "oracle",
+		"path": ["obligations", 24, "closed"],
+		"value": 1,
+		"reason": "unsupported closed obligation"
+	},
+	{
+		"id": "nested-private",
+		"target": "runtime",
+		"path": ["seed", 0, "rubric"],
+		"value": {
+			"expected": ["hidden answer"]
+		},
+		"reason": "runtime schema"
+	},
+	{
+		"id": "tool-private",
+		"target": "runtime",
+		"path": ["tools", "lookup_order", "BC-7301"],
+		"value": {
+			"expected": ["hidden answer"]
+		},
+		"reason": "runtime schema"
+	},
+	{
+		"id": "fact-version",
+		"target": "oracle",
+		"path": ["facts", 0, "version"],
+		"value": 2,
+		"reason": "fact version"
+	}
+]

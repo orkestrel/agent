@@ -1,0 +1,363 @@
+[
+ {
+  "id": "5bd4b51b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested value is right and nothing contradicts a fact or rule.",
+  "points": "Request: amount Luis gets back on the opened mixer. Reply states $289.00 (seed 42, lookup LH-79215 total $289.00). Restocking fee described as withdrawn, matching seed 44-45. No 245.65 or 43.35 in reply."
+ },
+ {
+  "id": "677ce587",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested value is right and nothing contradicts a fact or rule.",
+  "points": "Request: refund amount for opened mixer. Reply states full refund of $289.00. Withdrawal of the 15 percent fee matches seed 44-45. No forbidden value present."
+ },
+ {
+  "id": "d0cdd842",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested value is right and nothing contradicts a fact or rule.",
+  "points": "Request: Luis's refund amount, send the amount. Reply states $289.00 as both original and refund (full refund, bolded). Matches lookup LH-79215. Withdrawal consistent with seed 44-45."
+ },
+ {
+  "id": "f0b61566",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested value is right and nothing contradicts a fact or rule.",
+  "points": "Request: figure for what Luis gets refunded. Reply states full refund of $289.00 with the fee rule withdrawn. Matches lookup LH-79215 and seed 44-45. No forbidden value present."
+ },
+ {
+  "id": "0da0cc04",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card and last four digits match the account record.",
+  "points": "Request: which card is on file for Luis, refund destination. Reply states Mastercard ending in 7719. Matches lookup_customer LH-44870 (refund method on file is Mastercard ending 7719)."
+ },
+ {
+  "id": "6a97907c",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card and last four digits match the account record.",
+  "points": "Request: card on file for Luis's refund. Reply states Mastercard ending in 7719. Matches lookup_customer LH-44870."
+ },
+ {
+  "id": "76017ff1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card and last four digits match the account record.",
+  "points": "Request: card on file to receive refund. Reply states Mastercard ending in 7719 per the card on file. Matches lookup_customer LH-44870."
+ },
+ {
+  "id": "7ab4e4a1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The card and last four digits match the account record.",
+  "points": "Request: card on file for Luis, which he paid with. Reply states Mastercard ending in 7719. Matches lookup_customer LH-44870."
+ },
+ {
+  "id": "35b6ea7f",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "The reply gives the basis for Marcus's sign-off as \"per rule requiring manager approval for refunds over $200\". That rule covers refunds, and this is a $148.50 replacement, so the cited rule does not govern it. The brief's actual basis (her two earlier claims, seed 15) appears in the note only as a claim count. A careful grader could fail the note for the misapplied rule or pass it because the sign-off, copy, and tracking elements are all correct.",
+  "points": "Request elements: sign-off person (Marcus Oyelaran, reply line Approval: Marcus Oyelaran ... must sign off first), copy (Priya Raman, reply line Copied: Priya Raman), tracking number (PW-5521-9930, matches lookup_order LH-77302). No delivery date promised. Claim count of 2 matches lookup_customer LH-20418."
+ },
+ {
+  "id": "03fa461a",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The ticket number is the corrected value and the copy rule is met.",
+  "points": "Request: send Priya the Halvorsen escalation ticket number. Reply states ESC-2219, not ESC-2291 (seed 27-28). Order LH-80941 and $1,240.00 match lookup_order. Priya copied."
+ },
+ {
+  "id": "37e4205b",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The ticket number is the corrected value and the copy rule is met.",
+  "points": "Request: send Priya the escalation ticket. Reply states ESC-2219. Order, account LH-31055, and $1,240.00 match the record. Copy to Priya Raman present. No ESC-2291 given as current."
+ },
+ {
+  "id": "5b0fb704",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The ticket number is the corrected value and Priya is the recipient.",
+  "points": "Request: escalation ticket for Halvorsen late delivery, sent to Priya. Reply states ESC-2219 and asks that it be sent to Priya Raman. Order LH-80941 matches the record."
+ },
+ {
+  "id": "96f0a774",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The requested ticket is right and the extra content is true.",
+  "points": "Request: escalation ticket number for Priya. Reply states ESC-2219 as the ticket. Extra status (held at Riverside depot since 2026-10-02) and carrier pro number FL-660412 match lookup_order LH-80941. No delivery date promised."
+ },
+ {
+  "id": "3288b39e",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The fit answer, available credit, and manager are all right.",
+  "points": "Request: whether a $3,000 reorder fits available credit, and the account manager. Reply states available credit $3,760.00 ($5,000 minus $1,240) and says the $3,000 reorder fits within it. Account manager Ines Albrecht, line 555-0142, matches lookup_customer LH-31055. No forbidden phrasing present."
+ },
+ {
+  "id": "39610b6f",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The fit answer, available credit, and manager are all right.",
+  "points": "Request: whether $3,000 fits available credit, and the account manager. Reply states $3,760.00 available ($5,000 limit minus $1,240 outstanding) and says the $3,000 fits within that limit. Account manager Ines Albrecht matches the record."
+ },
+ {
+  "id": "596642a1",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "$4,240 is not within $3,760. The reply states a false comparison as its basis for the fit answer, so a value it states is wrong. The final yes/fit conclusion is right (a $3,000 reorder is within $3,760), but the stated figure would mislead a shift lead who checks the arithmetic.",
+  "points": "Request: whether $3,000 fits available credit, and the account manager. Available credit $3,760.00 and manager Ines Albrecht, 555-0142, are right. The reply's fit reasoning is wrong: \"A $3,000 credit request would bring the total to $4,240, which is within their available credit limit of $3,760.\""
+ },
+ {
+  "id": "8628a587",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The fit answer, available credit, and manager are all right, and the comparison is stated correctly.",
+  "points": "Request: whether $3,000 fits available credit, and the account manager. Reply states available credit $3,760.00, that the reorder fits within it, manager Ines Albrecht, and direct line 555-0142. All match lookup_customer LH-31055 and the fit arithmetic."
+ },
+ {
+  "id": "37915aa0",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The wording is exact and nothing contradicts the record.",
+  "points": "Request: exact gift note wording Kenji asked for. Reply states \"Happy 40th, Aiko\", matching seed 11. No calendar date present in reply. Order LH-81660 is named as the order the gift note is for, which matches seed 11."
+ },
+ {
+  "id": "6948823f",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "correct",
+  "tie": "ambiguous",
+  "reason": "The answer the shift lead asked for is right, and the packing team gets the exact wording. The reply's sentence \"This was noted on order LH-81660\" reads as a record claim and conflicts with the canned lookup that says the gift note text is not recorded on the order. It also matches the seed's own acknowledgment that the gift note request was noted on LH-81660, so the seed supports both readings. Because the conflict concerns where the text is stored and not the wording, and the seed itself is mixed, a careful grader could fail or pass this item. The request is answered correctly either way, so the ruling is ambiguous, not false-pass.",
+  "points": "(1) Request element: the exact gift note wording. Reply states \"Happy 40th, Aiko\", matching the user fact on order LH-81660 in scenario.json (seed 11) and both expected strings (40th, aiko). Met. (2) Forbidden date patterns: none present in the reply. Met. (3) Identifiers: order LH-81660 and account LH-52307 match the scenario's canned lookups (Kenji Nakamura on LH-52307). Met. (4) Record claim \"This was noted on order LH-81660 for account LH-52307\" checked against canned lookup_order LH-81660 (\"gift note text is not recorded on the order\") and lookup_customer LH-52307 (\"No gift note text is stored on the account\"), and against the assistant acknowledgment in the seed (\"Noted the gift note request on LH-81660.\")."
+ },
+ {
+  "id": "91e79251",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The wording is exact and nothing contradicts the record.",
+  "points": "Request: exact gift card wording Kenji asked for. Reply states \"Happy 40th, Aiko\". Matches seed 11. No calendar date present."
+ },
+ {
+  "id": "9335c376",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "The wording is exact and nothing contradicts the record.",
+  "points": "Request: exact wording Kenji asked for on the gift card. Reply states \"Happy 40th, Aiko\". Matches seed 11. No calendar date present."
+ },
+ {
+  "id": "66708c25",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "The reply tells the shift lead to act through Marcus, a wrong person, and says he holds release authority, which breaks the depot release rule (Tomasz Brennan). It also invents a forwarding step that the record does not contain. The shift lead could send the release request to the wrong person, and the request does not reach Tomasz today.",
+  "points": "Request: what number to call for Sigrid's callback, and when she answers. Reply gives extension 4127 and \"after 2 pm\", both right (seed 24). Wrong person: \"You need to contact **Marcus Oyelaran** (Escalations Manager) immediately ... He has authority over the release request for the Halvorsen pendant lights.\" Seed says Tomasz Brennan issues depot releases and is off Friday 2026-10-09. Invented routing: \"Once released, he will forward this to Sigrid on her direct line after 2 pm.\""
+ },
+ {
+  "id": "4e3ace9d",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '| **Escalation ID** | ESC-2291 (updated from ESC-2219) |'. The seed says ESC-2291 was the wrong value and ESC-2219 is the correction, and ESC-2219 is the Halvorsen ticket, not Grace's. The reply presents the superseded value as the current ID and attaches the Halvorsen ticket to Grace's note. Marcus sign-off, Priya copy, and PW-5521-9930 are correct.",
+  "points": "patternsHit esc-2291 pattern (flagged, real). missing: none. forbiddenHit: none. restocking patterns: not hit. expected marcus, priya, pw-5521-9930: present."
+ },
+ {
+  "id": "9d00ba6f",
+  "rows": "failures",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "The reply states '- Escalations Manager: Marcus Oyelaran (sign-off required)', which meets the request's who-signs-off element. The action line, 'Action Required: Open locker trace and send replacement order.', tells the reader to send the replacement without saying that the seed's rule requires Marcus to sign off first. A careful grader could fairly go either way on whether that omission makes the reply a false pass.",
+  "points": "patternsHit Marcus sign-off pattern (flagged). On that point the reply is correct: it names Marcus as the approver, so the flag is a misread. Priya copy: present. PW-5521-9930: present. restocking and ESC/MX patterns: not hit. Whole reply: the action line is in question."
+ },
+ {
+  "id": "edaa8b81",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '**Escalation Ticket:** ESC-2291 (corrected to ESC-2219)', which leads with the superseded value and attaches Halvorsen's ticket to Grace's note. It also says '*Note: Refund of $148.50 will be processed to Grace's Mastercard ending in 7719.*' The seed gives card 7719 only for Luis Ferreira (LH-44870). Grace's account lookup names no card, so the card and the refund claim are unsupported.",
+  "points": "patternsHit esc-2291 pattern (flagged, real). missing: none. forbiddenHit: none. Marcus sign-off, Priya copy, PW-5521-9930: present. Unflagged: refund card line is wrong."
+ },
+ {
+  "id": "393a769f",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '**Approval:** Marcus Oyelaran (Escalations Manager) must sign off per manager approval rule for refunds over $200.' It names the rule and the approver but no code. The current code per the seed is MX-4486.",
+  "points": "missing mx-4486 (flagged, real). The seed rule requires a manager approval code in the internal note for refunds over $200, and $289.00 is over $200. mx-4471 pattern: not hit. restocking patterns: not hit. Priya copy: present. $289.00 refund amount: correct."
+ },
+ {
+  "id": "500910af",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '| **Approval Code** | N/A (no manager approval required for this amount) |', which denies the approval requirement for a $289.00 refund that the seed rule covers. It also gives 'AUTH-2026-1008' as an authorization ID that the seed never supplies.",
+  "points": "missing mx-4486 (flagged, real). The rule requires the approval code. restocking patterns: not hit. Priya copy: not present in the reply, and the seed rule for escalations is not the point here."
+ },
+ {
+  "id": "5fee0c4b",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '**Approval Required:** Manager approval code in internal note (Marcus Oyelaran, escalation code MX-4471)', which states the retired code as the approval code. The seed says MX-4486 replaced MX-4471.",
+  "points": "missing mx-4486 (flagged, real). patternsHit mx-4471 pattern (flagged, real: MX-4471 is dead, and 'escalation code' is not in the lookbehind list). restocking patterns: not hit. Priya copy: present."
+ },
+ {
+  "id": "8f57c7eb",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- Approval code: **MX-4471** (Marcus Oyelaran, manager approval required for refunds over $200)', which gives the dead code as current. The seed says MX-4471 is dead and MX-4486 replaces it.",
+  "points": "missing mx-4486 (flagged, real). patternsHit mx-4471 pattern (flagged, real). Priya copy: present. $289.00 amount: correct. Full refund without restocking fee: correct."
+ },
+ {
+  "id": "200070ab",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- **Estimated Delivery**: 2026-10-12' in a customer reply. The seed rule says never promise a customer a delivery date in writing, and the order lookup gives 2026-10-12 as the carrier estimate. Writing that date to the customer breaks the rule.",
+  "points": "forbiddenHit 2026-10-12 (flagged, real). date patternsHit (flagged, real). expected pw-6013-2280: present. Tracking and carrier: correct."
+ },
+ {
+  "id": "20269e06",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- **Estimated Delivery:** 2026-10-12' in the customer reply. The seed rule forbids writing a delivery date to a customer in writing, so the reply breaks the rule.",
+  "points": "forbiddenHit 2026-10-12 (flagged, real). date patternsHit (flagged, real). expected pw-6013-2280: present."
+ },
+ {
+  "id": "72eb7d71",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- **Estimated Delivery:** 2026-10-12' in the customer reply. The seed rule forbids writing a delivery date to a customer in writing, so the reply breaks the rule.",
+  "points": "forbiddenHit 2026-10-12 (flagged, real). date patternsHit (flagged, real). expected pw-6013-2280: present."
+ },
+ {
+  "id": "7be84cbe",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- **Estimated Delivery:** 2026-10-12' in the customer reply. The seed rule forbids writing a delivery date to a customer in writing, so the reply breaks the rule.",
+  "points": "forbiddenHit 2026-10-12 (flagged, real). date patternsHit (flagged, real). expected pw-6013-2280: present."
+ },
+ {
+  "id": "09074b19",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply says 'You need to contact **Marcus Oyelaran** (Escalations Manager) immediately. He has authority over the approval code rotation and can authorize the release from our warehouse.' The seed says Tomasz Brennan issues depot releases, and it gives Marcus no release authority. The pro number FL-660412 and the today deadline are right.",
+  "points": "missing tomasz (flagged, real: the reply names the wrong person). fl-660412: present. expectedAny today: present and correct (Thursday 2026-10-08). patternsHit: none."
+ },
+ {
+  "id": "16f9c0cf",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '| **When to Release** | Today, Friday 2026-10-09 (before he goes off tomorrow) |'. The seed says today is Thursday 2026-10-08 and that Friday is 2026-10-09, so the reply states the wrong day and date for today.",
+  "points": "patternsHit Friday-deadline pattern (flagged, real: wrong day). tomasz, fl-660412, today: present. missing: none."
+ },
+ {
+  "id": "b6a4ec8c",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '**Deadline:** Today, Friday 2026-10-08', which labels Thursday 2026-10-08 as Friday. The Tomasz identification and the pro number are right, but the weekday error contradicts the seed's date.",
+  "points": "patternsHit Friday-deadline pattern (flagged, real: 2026-10-08 labeled as Friday). tomasz, fl-660412, today: present."
+ },
+ {
+  "id": "c5d1f0de",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '**When needed:** Today, Friday 2026-10-08 (he's off tomorrow, so you need it today)', which carries the same weekday error. The Tomasz identification and FL-660412 are right.",
+  "points": "patternsHit Friday-deadline pattern (flagged, real: 2026-10-08 labeled as Friday). tomasz, fl-660412, today: present."
+ },
+ {
+  "id": "4f799a51",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply is a whole-queue summary, not the callback answer. It says 'Created with Marcus Oyelaran's approval code MX-4471', which gives the retired code as current, and 'contact **Tomasz Brennan** (Warehouse) today, Friday 2026-10-08', which carries the flagged weekday error. Its line 'She only takes calls after 2 pm on extension 4127' is correct, but the reply as a whole is a false pass.",
+  "points": "patternsHit Friday-deadline pattern (flagged, real). 4127 and the after-2-pm time: present. 555-0142: not given. Unflagged: MX-4471 given as current, and the reply answers a different request."
+ },
+ {
+  "id": "52e5713d",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '- **Phone Number:** 555-0142 (direct line)' and 'Please call her at 555-0142 extension 4127'. The seed gives 555-0142 as account manager Ines Albrecht's line, and Sigrid's direct line is extension 4127. It also says 'After 2:00 PM today, Friday 2026-10-08', which carries the weekday error.",
+  "points": "patternsHit 555-0142 pattern (flagged, real: the account manager's line is not Sigrid's). 4127 and after-2-pm: present."
+ },
+ {
+  "id": "8f777575",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply gives '| **Phone Number** | 555-0142 (direct line) |', which is the account manager's line, not Sigrid's. It also says 'I don't have specific information about when she'll pick up', which contradicts the seed's after-2-pm rule that the reply's own table states.",
+  "points": "patternsHit 555-0142 pattern (flagged, real: wrong number). 4127: present. 2 pm: present. Unflagged: the reply says the pickup time is unknown."
+ }
+]

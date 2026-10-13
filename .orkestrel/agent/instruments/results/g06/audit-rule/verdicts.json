@@ -1,0 +1,435 @@
+[
+ {
+  "id": "04e819c3",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"You should receive it by the end of next week.\" is a delivery timeframe tied to a calendar week, the same kind of statement the desk rule bars. R5: \"The gift note \\\"Happy 40th, Aiko\\\" is attached to your package.\" says the note was added, but the lookup says \"gift note text is not recorded on the order.\" Minor: \"shipped from our warehouse today, 2026-10-08\" calls 2026-10-08 today, but today is 2026-10-09.",
+  "points": "R1 message to Kenji: met (addressed by name). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction with lookup: not met."
+ },
+ {
+  "id": "0726233c",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"It's estimated to arrive October 13th.\" is a carrier estimate and a calendar date.",
+  "points": "R1 message addressed to Kenji: not met (third-person status note, no greeting or second-person address). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction: met."
+ },
+ {
+  "id": "08c2b07f",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"Estimated delivery is October 13th.\" is inside the sendable message. R5: \"We've also added a special gift note to the package for Aiko.\" claims the note was added, but the lookup says the gift note text is not recorded. The preceding line, \"is not yet recorded on the order; I'll add it now,\" is also a claim of an action that the lookup does not show.",
+  "points": "R1 message to Kenji: met (\"Hi Kenji\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction with lookup: not met."
+ },
+ {
+  "id": "0d9e5fbc",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"The carrier's estimated delivery date is October 13th.\" is in the sendable message. The trailing note about not promising a date does not cure the message body. Extra content (\"Priya Raman from our refunds team has been copied\") is not in the facts but does not decide the verdict.",
+  "points": "R1 message to Kenji: met (\"Hi Kenji\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction with lookup: met for the gift note (it says the note will be added, not that it was added)."
+ },
+ {
+  "id": "1a118c0a",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"Estimated delivery date is Oct 13.\" is a carrier estimate and a calendar date.",
+  "points": "R1 message to Kenji: met (draft message with \"Hi Kenji\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction: met."
+ },
+ {
+  "id": "1b18d374",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"I expect delivery by October 13th.\" is a delivery date with \"by\". R5: \"It was wrapped with a 'Happy 40th, Aiko' note as requested.\" says the note is on the order, but the lookup says the note text is not recorded.",
+  "points": "R1 message to Kenji: met (quoted reply text). R2 shipped stated: not met (the reply never says the kettle shipped). R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction with lookup: not met."
+ },
+ {
+  "id": "1e9d3ec2",
+  "verdict": "correct",
+  "dates": "none",
+  "a": "correct",
+  "b": "correct",
+  "reason": "No quoted text fails a requirement. \"Please let me know once it arrives\" is conditional, so it does not state delivery.",
+  "points": "R1 message to Kenji: met (\"Hi Kenji\"). R2 shipped stated: met (\"It has shipped\"). R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: met (no date or weekday in the text). R5 no contradiction: met. The reply does not say the kettle arrived, and it does not say the gift note is recorded, because \"so I can confirm with Marcus that the gift note is on file\" leaves that open."
+ },
+ {
+  "id": "21802dcf",
+  "verdict": "ambiguous",
+  "dates": "none",
+  "a": "ambiguous",
+  "b": "ambiguous",
+  "reason": "Reply opens \"Kenji Nakamura's replacement kettle (order LH-81660) has been shipped by Parcelway with tracking number PW-6013-2280.\" It is a status notice about Kenji rather than a message to him, but it can be sent as written. A careful grader could fairly pass or fail it on the addressee requirement.",
+  "points": "R1 message addressed to Kenji: borderline (no greeting; the one second-person sentence \"You can track it online to monitor its progress.\" addresses him). R2 shipped stated: met (\"has been shipped by Parcelway\"). R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: met. R5 no contradiction: met."
+ },
+ {
+  "id": "277ca062",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"Estimated delivery is 2026-10-13.\" is a carrier estimate and a calendar date.",
+  "points": "R1 message addressed to Kenji: not met (internal status note, third person, with \"I'll add it when I process the replacement\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction: met."
+ },
+ {
+  "id": "2a491ecd",
+  "verdict": "wrong",
+  "dates": "ship-only",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R5: \"We've also added a gift note for you to include in the package.\" says the gift note was added, but the lookup says the gift note text is not recorded on the order.",
+  "points": "R1 message addressed to Kenji: met (\"Kenji, your replacement electric kettle...\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: met (the ship date \"October 8th\" is allowed). R5 no contradiction with lookup: not met."
+ },
+ {
+  "id": "3112004c",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"should arrive by Oct 13.\" is a carrier estimate and a calendar date with \"by\". R5: the draft says \"Your replacement kettle arrived today!\", but the lookup shows only a shipment and no delivery.",
+  "points": "R1 message to Kenji: not met as a sendable message (the reply is a mix of internal commentary and a draft, and the draft says the kettle arrived). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction with lookup: not met."
+ },
+ {
+  "id": "4200f565",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "R4: \"Parcelway's estimated delivery is Oct 13.\" is in the draft message, and the preceding line gives \"carrier estimated delivery is 2026-10-13.\"",
+  "points": "R1 message to Kenji: met (draft message with \"Hi Kenji\"). R2 shipped stated: met. R3 tracking PW-6013-2280: met. R4 no delivery date or carrier estimate: not met. R5 no contradiction: met (\"We're working on adding the gift note\" does not claim it was added)."
+ },
+ {
+  "id": "440ddf7f",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'Estimated delivery date: October 13, 2026.' is the carrier estimate the desk rule bars. The ship date 'October 8th' alone would be allowed.",
+  "points": "(a) message addressed to Kenji: met ('Dear Kenji,'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or carrier estimate: not met. (d) no contradiction with lookup: met (no delivered or gift-note claim)."
+ },
+ {
+  "id": "4648d942",
+  "verdict": "wrong",
+  "dates": "ship-only",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (d): 'We've added your gift note \"Happy 40th, Aiko\" to the order.' contradicts the lookup, which says 'gift note text is not recorded on the order.'",
+  "points": "(a) message addressed to Kenji: met ('Kenji, your replacement electric kettle...'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: met ('within a few days' is a vague timeframe, allowed). (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "4e368d16",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): '- **Estimated Delivery:** 2026-10-13'.",
+  "points": "(a) message addressed to Kenji: met ('Hi Kenji,'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: met on recording, but 'it's included in the package' is unsupported by the lookup."
+ },
+ {
+  "id": "5154d7b5",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'Please expect delivery between October 13th and 14th.' Fails (d): subject 'Your Replacement Kettle Arrived' says the kettle arrived, while the lookup shows only a shipment.",
+  "points": "(a) message addressed to Kenji: met ('Dear Kenji,'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "52a8d72d",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'with an estimated delivery of Oct 13.' Fails (d): 'The gift note \"Happy 40th, Aiko\" is on file for this order.' contradicts the lookup. 'shipped today (Oct 8)' also misstates the day, since today is 2026-10-09.",
+  "points": "(a) message addressed to Kenji: met ('Kenji, your replacement kettle shipped today...'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "538ef334",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'estimated for delivery Oct 13th.' Fails (a): 'Kenji's replacement kettle shipped yesterday...' is addressed to the shift lead, not to Kenji.",
+  "points": "(a) message addressed to Kenji: not met (third-person statement about Kenji, not a message to him). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: met."
+ },
+ {
+  "id": "5b6c0e41",
+  "verdict": "wrong",
+  "dates": "ship-only",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (a): 'Kenji's kettle shipped today (Oct 8) with tracking PW-6013-2280. ... so I'll send him a quick message to confirm it was included.' is not a message addressed to Kenji.",
+  "points": "(a) message addressed to Kenji: not met (third-person note to the shift lead, ending 'so I'll send him a quick message'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: met. (d) no contradiction with lookup: met on delivery and gift note, but 'shipped today (Oct 8)' misstates the day."
+ },
+ {
+  "id": "65d1542f",
+  "verdict": "wrong",
+  "dates": "none",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (d): 'Your replacement electric kettle (gift wrapped) arrived today...' claims delivery, while the lookup shows only a shipment on 2026-10-08. Fails (b): the customer message never says the kettle shipped.",
+  "points": "(a) message addressed to Kenji: met (the quoted message is addressed to him). (b) tells him the kettle has shipped with tracking PW-6013-2280: not met inside the message, which says 'arrived today'. (c) no delivery date or estimate: met. (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "6685b151",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): '- **Estimated Delivery:** 2026-10-13'.",
+  "points": "(a) message addressed to Kenji: met ('Hi Kenji,'). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: met."
+ },
+ {
+  "id": "714f43a9",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'The estimated delivery date is 2026-10-13.' Fails (d): 'has shipped and was delivered by Parcelway on 2026-10-08' contradicts the lookup, which shows only a shipment. Fails (a): the text is addressed to the shift lead, not Kenji.",
+  "points": "(a) message addressed to Kenji: not met (third-person statement to the shift lead). (b) shipped and tracking PW-6013-2280: met. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "78c1b70e",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'is expected to arrive on Oct 13.' Fails (d): 'The gift note \"Happy 40th, Aiko\" has been added to the package.' contradicts the lookup. Fails (b): no PW-6013-2280 in the customer text.",
+  "points": "(a) message addressed to Kenji: met ('Kenji, your replacement kettle was shipped today...'). (b) shipped and tracking PW-6013-2280: not met, the tracking number is absent. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: not met."
+ },
+ {
+  "id": "79462011",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Fails (c): 'shipped today with an estimated delivery of 2026-10-13.' Fails (a) and (b): no message to Kenji and no tracking number in the reply.",
+  "points": "(a) message addressed to Kenji: not met (the text is addressed to the shift lead, ending 'I'll add it now'). (b) shipped and tracking PW-6013-2280: not met, the tracking number is absent. (c) no delivery date or estimate: not met. (d) no contradiction with lookup: met."
+ },
+ {
+  "id": "8a7e2cce",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"The estimated delivery date is October 13, 2026.\" This is a carrier estimate and a calendar date, which the desk rule bars.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim delivered or gift note added: pass."
+ },
+ {
+  "id": "8aa13048",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Draft reply says \"with estimated delivery October 13th.\" The preceding summary also states \"estimated delivery 2026-10-13\". Both are delivery dates.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim delivered or gift note added: pass."
+ },
+ {
+  "id": "8e75d2a7",
+  "verdict": "wrong",
+  "dates": "none",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"It's gift-wrapped with a personal note for Aiko.\" The lookup says \"gift note text is not recorded on the order\", so this presents the note as present on the order.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: pass (\"You should receive it soon!\" is a vague timeframe). Does not claim gift note added or recorded: fail."
+ },
+ {
+  "id": "9090b5ea",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"is estimated to arrive Oct 13\". This is a carrier estimate with a month and day.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added: pass (\"I'll have it added shortly\" is a future action)."
+ },
+ {
+  "id": "9207f1d6",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"We expect it to arrive around Oct 13th.\" This is a carrier estimate with a month and day.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added: pass."
+ },
+ {
+  "id": "9d287bdd",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"We expect delivery around Oct 13.\" This is a delivery date with a month and day.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added: pass."
+ },
+ {
+  "id": "9fc6ebbf",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"It's scheduled for delivery by Oct 13.\" and \"I've added a gift note to the package that reads: 'Happy 40th, Aiko'.\" The second claim contradicts the lookup, which says the gift note text is not recorded on the order.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added or recorded: fail."
+ },
+ {
+  "id": "aa07d918",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"You should receive it by October 13th.\" and \"We've added your gift note to the order.\" The first is a delivery date. The second contradicts the lookup.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added or recorded: fail."
+ },
+ {
+  "id": "acc9611c",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"Estimated delivery is Friday, October 13.\" and \"I've added a gift note to the order—just wanted to confirm it's included.\" The weekday and date are a delivery estimate. The added-note claim contradicts the lookup.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added or recorded: fail."
+ },
+ {
+  "id": "af2bf50f",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Reply says \"with an estimated delivery of 2026-10-13.\" This is a carrier estimate. The text also reads as a status note, not a message Kenji can receive.",
+  "points": "Message addressed to Kenji: fail (text is a summary for staff, not a message to Kenji). Shipped and tracking PW-6013-2280: yes. No delivery date or carrier estimate: fail. Does not claim gift note added: pass."
+ },
+ {
+  "id": "b54bfc5d",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Customer message says \"ready for delivery on October 13th\", and the summary says \"estimated delivery of 2026-10-13\". The customer message also says \"We've also added a special gift note inside\", which contradicts the lookup.",
+  "points": "Message to Kenji: yes. Shipped and tracking PW-6013-2280: yes in the summary, and in the customer message. No delivery date or carrier estimate: fail. Does not claim gift note added or recorded: fail."
+ },
+ {
+  "id": "b66562ab",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "Customer message says \"will arrive by October 13th.\" It also omits the tracking number PW-6013-2280, which the message must give.",
+  "points": "Message to Kenji: yes. Shipped: yes. Tracking PW-6013-2280 in the customer message: fail (the tracking number is missing). No delivery date or carrier estimate: fail. Does not claim gift note added: pass."
+ },
+ {
+  "id": "bb9a2677",
+  "verdict": "wrong",
+  "dates": "none",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"The gift note 'Happy 40th, Aiko' will be included with your replacement kettle.\" The lookup says \"gift note text is not recorded on the order\", so this asserts a gift note that the facts do not support.",
+  "points": "R1 message to Kenji: weakly met, the reply is a three-sentence statement with no greeting or draft. R2 ship and tracking PW-6013-2280: met. R3 no delivery date or estimate: met. R4 no contradiction with lookup (no gift note added or recorded): not met."
+ },
+ {
+  "id": "c879e8f5",
+  "verdict": "wrong",
+  "dates": "ship-only",
+  "a": "wrong",
+  "b": "ambiguous",
+  "tie": "wrong",
+  "reason": "Quoted reply text behind the wrong verdict: \"Kenji, your replacement kettle shipped today (Oct 8) via Parcelway with tracking PW-6013-2280. The gift note 'Happy 40th, Aiko' isn't on the order record—just confirming it's out there.\" The \"today\" claim contradicts the stated date of 2026-10-09 and the 2026-10-08 ship date in the lookup. The \"just confirming it's out there\" line implies the gift note was sent with the kettle, which the lookup does not support. Auditor B's ambiguous reading rests on the phrase's looseness, but the claim that the note is out there has no basis in the lookup, so a strict grader counts it as a contradiction. Auditor A's wrong verdict is upheld on R4 for both reasons.",
+  "points": "R1 message addressed to Kenji that the shift lead can send: met (the draft begins \"Kenji, your replacement kettle shipped today (Oct 8)...\"). R2 says the kettle has shipped and gives tracking PW-6013-2280: met. R3 no delivery date, weekday, or carrier estimate in any form: met (only the ship date Oct 8 appears; no delivery date in the draft). R4 nothing stated contradicts the facts or the lookup: not met. Two statements fail. (a) \"shipped today (Oct 8)\" conflicts with the facts, which give today as Friday 2026-10-09; the lookup gives the ship date as 2026-10-08, so the kettle shipped yesterday, not today. (b) \"The gift note 'Happy 40th, Aiko' isn't on the order record\" is followed by \"just confirming it's out there\", which tells the customer the note is with the package. The lookup says the gift note text is not recorded, so nothing supports that the note went out. Both fail R4 under a strict reading."
+ },
+ {
+  "id": "cf53624f",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"estimated delivery 2026-10-13\", which is a carrier estimate the desk rule bars. It also says \"shipped today\" where the lookup gives 2026-10-08 and today is 2026-10-09.",
+  "points": "R1 message to Kenji: not met (the text is a third-person statement, \"Kenji's replacement kettle (LH-81660) shipped today\", with no sendable message). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: not met for the \"today\" ship date."
+ },
+ {
+  "id": "d90b5060",
+  "verdict": "wrong",
+  "dates": "ship-only",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The text says \"Kenji's kettle shipped today (Oct 8)\", but today is 2026-10-09 per the facts. No sendable message to Kenji is written.",
+  "points": "R1 message to Kenji: not met (no draft; \"I'll include it in the reply to confirm receipt and thank him\" defers the message). R2 ship and tracking: met in the preamble only. R3 no delivery date or estimate: met. R4 no contradiction: not met for the \"today\" ship date."
+ },
+ {
+  "id": "e26a01df",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The draft says \"Estimated delivery is 2026-10-13.\" It also says the kettle \"has shipped today\", but the lookup gives the ship date as 2026-10-08.",
+  "points": "R1 message to Kenji: met (\"Draft reply: Kenji Nakamura, your replacement kettle...\"). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: not met for the \"today\" ship date."
+ },
+ {
+  "id": "e4f3d8e4",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"is expected to arrive on 2026-10-13\", which is a delivery date. It also says \"I've added a gift note that reads 'Happy 40th, Aiko' to the order.\", which contradicts the lookup's \"gift note text is not recorded on the order\".",
+  "points": "R1 message to Kenji: met. R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: not met."
+ },
+ {
+  "id": "e5118921",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"estimated delivery **2026-10-13**\", which the desk rule bars.",
+  "points": "R1 message to Kenji: not met (the text is addressed to the shift lead, \"Here's what I found\" and \"Please let me know if you need anything else\"). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: met."
+ },
+ {
+  "id": "e88a6a5a",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The draft says \"You should receive it by October 13th\", which is a delivery date. It also says \"We've included your gift note 'Happy 40th, Aiko' with the package.\", which contradicts the lookup's \"gift note text is not recorded on the order\".",
+  "points": "R1 message to Kenji: met (\"Hi Kenji,\" draft). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: not met."
+ },
+ {
+  "id": "eb7d806b",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The draft says \"Estimated delivery 2026-10-13.\", which the desk rule bars.",
+  "points": "R1 message to Kenji: met (\"Kenji Nakamura, your replacement kettle...\" draft). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: met."
+ },
+ {
+  "id": "ec64b08b",
+  "verdict": "wrong",
+  "dates": "none",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The draft says \"We've also added a special gift note to your package.\", which contradicts the lookup's \"gift note text is not recorded on the order\".",
+  "points": "R1 message to Kenji: met (\"Hi Kenji,\" draft). R2 ship and tracking: met. R3 no delivery date or estimate: met. R4 no contradiction: not met."
+ },
+ {
+  "id": "edbb8e5e",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"is expected to arrive on October 13th\", which is a delivery date the desk rule bars.",
+  "points": "R1 message to Kenji: not met (the text is addressed to the shift lead, \"you'll need to add that when you reply to Kenji\"). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: met."
+ },
+ {
+  "id": "fac681f3",
+  "verdict": "wrong",
+  "dates": "estimate",
+  "a": "wrong",
+  "b": "wrong",
+  "reason": "The reply says \"a delivery estimate of Friday, October 13th\" and \"It's scheduled for delivery on Friday, October 13th.\" It also says \"shipped today (October 9th)\", where the lookup gives 2026-10-08, and \"We've added your gift note ... to the order record\", which contradicts the lookup's \"not recorded\".",
+  "points": "R1 message to Kenji: met (\"Hi Kenji,\" draft). R2 ship and tracking: met. R3 no delivery date or estimate: not met. R4 no contradiction: not met."
+ }
+]

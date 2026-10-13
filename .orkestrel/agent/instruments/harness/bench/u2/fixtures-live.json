@@ -1,0 +1,554 @@
+[
+  {
+    "id": "g03-rotated",
+    "goal": "g03",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "Marcus must sign off; copy Priya. Tracking PW-5521-9930. Approval rotated from MX-4471 to MX-4486.",
+    "live": false
+  },
+  {
+    "id": "g03-original",
+    "goal": "g03",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "Marcus must sign off; copy Priya. Tracking PW-5521-9930. The original code MX-4471 was replaced by MX-4486.",
+    "live": true
+  },
+  {
+    "id": "g03-old",
+    "goal": "g03",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "Marcus must sign off; copy Priya. Tracking PW-5521-9930. MX-4471 (old); use MX-4486.",
+    "live": true
+  },
+  {
+    "id": "g03-use",
+    "goal": "g03",
+    "rule": "active stale code",
+    "pass": false,
+    "text": "Marcus must sign off; copy Priya. Tracking PW-5521-9930. Use MX-4471.",
+    "live": false
+  },
+  {
+    "id": "g05-rotated",
+    "goal": "g05",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "The approval code rotated from MX-4471 to MX-4486. Authorize the $289 refund.",
+    "live": false
+  },
+  {
+    "id": "g05-original",
+    "goal": "g05",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "The original code MX-4471 is superseded; authorize with MX-4486.",
+    "live": true
+  },
+  {
+    "id": "g05-original-only",
+    "goal": "g05",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "Use MX-4486, replacing the original code MX-4471.",
+    "live": false
+  },
+  {
+    "id": "g05-old",
+    "goal": "g05",
+    "rule": "replaced code",
+    "pass": true,
+    "text": "MX-4471 (old). Authorize with MX-4486.",
+    "live": true
+  },
+  {
+    "id": "g05-use",
+    "goal": "g05",
+    "rule": "active stale code",
+    "pass": false,
+    "text": "MX-4486 is noted, but use MX-4471 to authorize the refund.",
+    "live": false
+  },
+  {
+    "id": "g05-old-reused",
+    "goal": "g05",
+    "rule": "each occurrence checked",
+    "pass": false,
+    "text": "The original code MX-4471 was replaced by MX-4486. Use MX-4471.",
+    "live": false
+  },
+  {
+    "id": "g01-percent",
+    "goal": "g01",
+    "rule": "scrapped fee",
+    "pass": false,
+    "text": "Refund $289 minus a 15 percent restocking fee.",
+    "live": true
+  },
+  {
+    "id": "g01-reserved",
+    "goal": "g01",
+    "rule": "reserved fee",
+    "pass": false,
+    "text": "Refund $289 less restocking fees (if applicable).",
+    "live": true
+  },
+  {
+    "id": "g01-subject",
+    "goal": "g01",
+    "rule": "reserved fee",
+    "pass": false,
+    "text": "Refund $289 subject to a restocking fee.",
+    "live": true
+  },
+  {
+    "id": "g01-applies",
+    "goal": "g01",
+    "rule": "applied fee",
+    "pass": false,
+    "text": "Refund $289. A restocking fee applies.",
+    "live": true
+  },
+  {
+    "id": "g01-fee-of",
+    "goal": "g01",
+    "rule": "applied fee",
+    "pass": false,
+    "text": "Refund $289 less a restocking fee of $10.",
+    "live": true
+  },
+  {
+    "id": "g01-waived",
+    "goal": "g01",
+    "rule": "withdrawn fee",
+    "pass": true,
+    "text": "Full refund $289. The 15 percent restocking fee was scrapped.",
+    "live": true
+  },
+  {
+    "id": "g01-no-fee",
+    "goal": "g01",
+    "rule": "withdrawn fee",
+    "pass": true,
+    "text": "Full refund $289 without a restocking fee.",
+    "live": true
+  },
+  {
+    "id": "g06-ship",
+    "goal": "g06",
+    "rule": "ship date",
+    "pass": true,
+    "text": "Hi Kenji, your kettle shipped on 2026-10-07. Track it with PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-ship-month",
+    "goal": "g06",
+    "rule": "ship date",
+    "pass": true,
+    "text": "Kenji, your kettle shipped on Oct. 7, 2026. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-header",
+    "goal": "g06",
+    "rule": "dated header",
+    "pass": true,
+    "text": "Date: 2026-10-08\nDear Kenji, your kettle has shipped. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-table-ship",
+    "goal": "g06",
+    "rule": "table boundaries",
+    "pass": true,
+    "text": "Hi Kenji, your kettle has shipped.\n| Status | Date |\n|---|---|\n| Shipped | 2026-10-07 |\n| Delivery | Pending |\nTracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-arrival",
+    "goal": "g06",
+    "rule": "arrival date",
+    "pass": false,
+    "text": "Hi Kenji, your kettle arrives on October 13. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-estimate",
+    "goal": "g06",
+    "rule": "estimate date",
+    "pass": false,
+    "text": "Hi Kenji, estimate: 13 October 2026. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-expected",
+    "goal": "g06",
+    "rule": "expected date",
+    "pass": false,
+    "text": "Hi Kenji, expected date: 10/13/2026. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-date-first",
+    "goal": "g06",
+    "rule": "date before topic",
+    "pass": false,
+    "text": "Kenji, October 13 is the delivery date. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-table-delivery",
+    "goal": "g06",
+    "rule": "delivery table row",
+    "pass": false,
+    "text": "Hi Kenji, your kettle shipped.\n| Delivery | 2026-10-13 |\nTracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-abbreviated-arrival",
+    "goal": "g06",
+    "rule": "abbreviated date",
+    "pass": false,
+    "text": "Kenji, arrival: Oct. 13. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-iso-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "2026-10-12\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-ordinal-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "October 12th, 2026\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-reversed-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "12th of October 2026\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-words-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "The twelfth of October, twenty twenty-six\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-words-forward",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "October twelfth\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-european-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "12/10/2026\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": false
+  },
+  {
+    "id": "g06-dot-forbidden",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "2026.10.12\nHi Kenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-arrived",
+    "goal": "g06",
+    "rule": "claimed delivery",
+    "pass": false,
+    "text": "Hi Kenji, your kettle arrived today. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-delivered",
+    "goal": "g06",
+    "rule": "claimed delivery",
+    "pass": false,
+    "text": "Kenji, your kettle has been delivered. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-not-delivered",
+    "goal": "g06",
+    "rule": "negated delivery",
+    "pass": true,
+    "text": "Hi Kenji, your kettle has shipped but has not been delivered yet. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-future-delivery",
+    "goal": "g06",
+    "rule": "future delivery without date",
+    "pass": true,
+    "text": "Hi Kenji, your kettle will be delivered to your address. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-no-draft",
+    "goal": "g06",
+    "rule": "customer draft required",
+    "pass": false,
+    "text": "Shift lead: Kenji's kettle shipped. Tracking PW-6013-2280. Tell him it is on its way.",
+    "live": true
+  },
+  {
+    "id": "g06-lead-you",
+    "goal": "g06",
+    "rule": "customer draft required",
+    "pass": false,
+    "text": "You can tell Kenji that his kettle shipped; tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-draft-no-greeting",
+    "goal": "g06",
+    "rule": "customer draft required",
+    "pass": true,
+    "text": "Your replacement kettle has shipped with Parcelway. Your tracking number is PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-gift-added",
+    "goal": "g06",
+    "rule": "unsupported gift action",
+    "pass": false,
+    "text": "Kenji, your kettle shipped. Tracking PW-6013-2280. I've added a gift note to your order.",
+    "live": true
+  },
+  {
+    "id": "g06-gift-not-recorded",
+    "goal": "g06",
+    "rule": "gift lookup truth",
+    "pass": true,
+    "text": "Kenji, your kettle shipped. Tracking PW-6013-2280. The gift note text is not recorded on the order.",
+    "live": true
+  },
+  {
+    "id": "g06-gift-future",
+    "goal": "g06",
+    "rule": "gift future intent",
+    "pass": true,
+    "text": "Kenji, your kettle shipped. Tracking PW-6013-2280. I'll ask the packing team to add the gift note.",
+    "live": true
+  },
+  {
+    "id": "g09-gift-added",
+    "goal": "g09",
+    "rule": "recorded gift action on g09",
+    "pass": false,
+    "text": "The wording is Happy 40th, Aiko. I've already added that text to his order LH-81660.",
+    "live": true
+  },
+  {
+    "id": "g09-gift-wording",
+    "goal": "g09",
+    "rule": "gift wording only",
+    "pass": true,
+    "text": "The gift note should read: Happy 40th, Aiko.",
+    "live": true
+  },
+  {
+    "id": "g08-correct",
+    "goal": "g08",
+    "rule": "available credit",
+    "pass": true,
+    "text": "Yes, it fits. Available credit: $3,760. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-correct-decimal",
+    "goal": "g08",
+    "rule": "available credit",
+    "pass": true,
+    "text": "Yes, it fits. They have $3,760.00 available credit. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong3860",
+    "goal": "g08",
+    "rule": "wrong available credit",
+    "pass": false,
+    "text": "Yes, it fits. Available credit: $3,860. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong4240",
+    "goal": "g08",
+    "rule": "wrong available credit",
+    "pass": false,
+    "text": "Yes, it fits. They have $4,240 in available credit. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong-other",
+    "goal": "g08",
+    "rule": "any incorrect figure",
+    "pass": false,
+    "text": "Yes, it fits. Available credit is $4,100. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong-cents",
+    "goal": "g08",
+    "rule": "any incorrect figure",
+    "pass": false,
+    "text": "Yes, it fits. Available credit is $3,760.50. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong-bare",
+    "goal": "g08",
+    "rule": "figure without dollar sign",
+    "pass": false,
+    "text": "Yes, it fits. Credit available: 3860 dollars. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-total",
+    "goal": "g08",
+    "rule": "balance versus available credit",
+    "pass": true,
+    "text": "Yes: $4,240 total after the order, within the $5,000 limit. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-reorder",
+    "goal": "g08",
+    "rule": "order versus available credit",
+    "pass": true,
+    "text": "The $3,000 reorder fits within their available credit of $3,760. Account manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-table",
+    "goal": "g08",
+    "rule": "table available credit",
+    "pass": false,
+    "text": "Yes, it fits.\n| Available credit | $3,860 |\nManager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-manager-line",
+    "goal": "g08",
+    "rule": "manager line unscored",
+    "pass": true,
+    "text": "Yes, it fits. Available credit is $3,760. Manager Albrecht, line 555-9999.",
+    "live": true
+  },
+  {
+    "id": "g08-separate-lines",
+    "goal": "g08",
+    "rule": "line boundaries",
+    "pass": true,
+    "text": "Yes, it fits.\nOutstanding balance: $1,240.00\nAvailable credit: $3,760.00\nManager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-equation",
+    "goal": "g08",
+    "rule": "available-credit calculation",
+    "pass": true,
+    "text": "Yes, it fits. Available credit: $5,000 - $1,240 = $3,760 available. Manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-wrong-equation",
+    "goal": "g08",
+    "rule": "wrong available-credit calculation",
+    "pass": false,
+    "text": "Yes, it fits. Available credit: $5,000 - $1,240 = $3,860 available. Manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-false-comparison",
+    "goal": "g08",
+    "rule": "total falsely within available credit",
+    "pass": false,
+    "text": "Albrecht manages the account. The order brings the total to $4,240, which is within their available credit limit of $3,760.",
+    "live": true
+  },
+  {
+    "id": "g08-total-limit",
+    "goal": "g08",
+    "rule": "correct balance comparison",
+    "pass": true,
+    "text": "Yes, $4,240 total after the order is within the $5,000 credit limit. Available credit before the order is $3,760. Manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g06-dashed-month",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "12-Oct-2026\nKenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-month-no-space",
+    "goal": "g06",
+    "rule": "forbidden date anywhere",
+    "pass": false,
+    "text": "Oct.12\nKenji, your kettle shipped. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-delivered-contraction",
+    "goal": "g06",
+    "rule": "claimed delivery",
+    "pass": false,
+    "text": "Kenji, your kettle's been delivered. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-delivered-adverb",
+    "goal": "g06",
+    "rule": "claimed delivery",
+    "pass": false,
+    "text": "Kenji, your kettle was successfully delivered. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g06-not-arrived",
+    "goal": "g06",
+    "rule": "negated arrival",
+    "pass": true,
+    "text": "Kenji, your kettle hasn't arrived yet. Tracking PW-6013-2280.",
+    "live": true
+  },
+  {
+    "id": "g08-adverb",
+    "goal": "g08",
+    "rule": "available credit with qualifier",
+    "pass": false,
+    "text": "Yes, it fits. Available credit is only $4,100. Manager Albrecht.",
+    "live": true
+  },
+  {
+    "id": "g08-correct-table",
+    "goal": "g08",
+    "rule": "correct available credit in table",
+    "pass": true,
+    "text": "Yes, it fits.\n| Balance | $1,240 |\n| Available credit | $3,760 |\nManager Albrecht.",
+    "live": true
+  }
+]

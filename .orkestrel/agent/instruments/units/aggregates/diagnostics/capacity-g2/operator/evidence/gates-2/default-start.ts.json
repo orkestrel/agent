@@ -1,0 +1,13 @@
+{
+  "executable": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "args": [
+    "--import",
+    "file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/witness.ts",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\start.ts"
+  ],
+  "exit": 0,
+  "signal": null,
+  "stdout": "{\"offline\":true,\"message\":\"No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree.\"}\n{\"witness\":true,\"global\":0,\"native\":0}\n",
+  "stderr": "",
+  "duration": 112.93589999999995
+}

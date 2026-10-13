@@ -1,0 +1,11 @@
+{
+  "id": "initial-show-q4",
+  "complete": true,
+  "breached": false,
+  "bytes": 27114,
+  "hash": "19a71a676d23c59736d7a4129458f2f891fc445fee2f4f046c396b92d1127c6d",
+  "status": 200,
+  "started": "2026-10-11T11:03:49.258Z",
+  "finished": "2026-10-11T11:03:49.330Z",
+  "duration": 71.9273
+}

@@ -1,0 +1,306 @@
+{
+  "stages": [
+    {
+      "name": "typecheck",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "--project",
+        ".orkestrel/agent/instruments/harness/build.json",
+        "--typeRoots",
+        "node_modules/@types"
+      ],
+      "exit": 0,
+      "pid": 8152,
+      "duration_ms": 3204,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\typecheck.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\typecheck.stderr.log"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "node",
+        "node_modules/oxlint/bin/oxlint",
+        "--config",
+        "tmp/units/aggregate-sustained-transport-fix-lint.json",
+        "--no-ignore",
+        "--deny-warnings",
+        ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+        ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts",
+        ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts",
+        ".orkestrel/agent/instruments/harness/bench5/sustained/tests/transport.test.ts",
+        ".orkestrel/agent/instruments/harness/bench5/sustained/tests/preparation.test.ts"
+      ],
+      "exit": 0,
+      "pid": 62048,
+      "duration_ms": 296,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\lint.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\lint.stderr.log"
+    },
+    {
+      "name": "format-check",
+      "command": [
+        "node",
+        "node_modules/oxfmt/bin/oxfmt",
+        "--config",
+        ".oxfmtrc.json",
+        "--ignore-path",
+        "tmp/units/aggregate-sustained-transport-fix-ignore.txt",
+        "--check",
+        ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+        ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts",
+        ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts",
+        ".orkestrel/agent/instruments/harness/bench5/sustained/tests/transport.test.ts",
+        ".orkestrel/agent/instruments/harness/bench5/sustained/tests/preparation.test.ts"
+      ],
+      "exit": 0,
+      "pid": 25440,
+      "duration_ms": 97,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\format-check.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\format-check.stderr.log"
+    },
+    {
+      "name": "resource-bound-build-before-controls",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types",
+        "--resource",
+        "tmp/units/aggregate-runtime-workload-audit-2/manifest.json"
+      ],
+      "exit": 0,
+      "pid": 54908,
+      "duration_ms": 5086,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\resource-bound-build-before-controls.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\resource-bound-build-before-controls.stderr.log"
+    },
+    {
+      "name": "study-guard-disabled-build",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types",
+        "--resource",
+        "tmp/units/aggregate-runtime-workload-audit-2/manifest.json"
+      ],
+      "exit": 0,
+      "pid": 16540,
+      "duration_ms": 4587,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-guard-disabled-build.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-guard-disabled-build.stderr.log"
+    },
+    {
+      "name": "study-guard-disabled-test",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "--test-name-pattern=retries sent filing judge transport within frozen attempts and preserves the study call limit",
+        ".orkestrel/agent/instruments/harness/.build/bench5/sustained/tests/transport.test.js"
+      ],
+      "exit": 1,
+      "pid": 7784,
+      "duration_ms": 12560,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-guard-disabled-test.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-guard-disabled-test.stderr.log"
+    },
+    {
+      "name": "study-restored-build",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types",
+        "--resource",
+        "tmp/units/aggregate-runtime-workload-audit-2/manifest.json"
+      ],
+      "exit": 0,
+      "pid": 57332,
+      "duration_ms": 4822,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-restored-build.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\study-restored-build.stderr.log"
+    },
+    {
+      "name": "development-guard-disabled-build",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types",
+        "--resource",
+        "tmp/units/aggregate-runtime-workload-audit-2/manifest.json"
+      ],
+      "exit": 0,
+      "pid": 3708,
+      "duration_ms": 4472,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-guard-disabled-build.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-guard-disabled-build.stderr.log"
+    },
+    {
+      "name": "development-guard-disabled-test",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "--test-name-pattern=retries sent judge transport in real matrix development without admitting missing usage",
+        ".orkestrel/agent/instruments/harness/.build/bench5/tests/development.test.js"
+      ],
+      "exit": 1,
+      "pid": 18336,
+      "duration_ms": 3231,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-guard-disabled-test.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-guard-disabled-test.stderr.log"
+    },
+    {
+      "name": "development-restored-build",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types",
+        "--resource",
+        "tmp/units/aggregate-runtime-workload-audit-2/manifest.json"
+      ],
+      "exit": 0,
+      "pid": 53340,
+      "duration_ms": 4250,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-restored-build.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\development-restored-build.stderr.log"
+    },
+    {
+      "name": "full-transport",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        ".orkestrel/agent/instruments/harness/.build/bench5/sustained/tests/transport.test.js"
+      ],
+      "exit": 0,
+      "pid": 59156,
+      "duration_ms": 126726,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-transport.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-transport.stderr.log"
+    },
+    {
+      "name": "full-development",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        ".orkestrel/agent/instruments/harness/.build/bench5/tests/development.test.js"
+      ],
+      "exit": 0,
+      "pid": 63064,
+      "duration_ms": 53426,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-development.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-development.stderr.log"
+    },
+    {
+      "name": "full-preparation",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        ".orkestrel/agent/instruments/harness/.build/bench5/sustained/tests/preparation.test.js"
+      ],
+      "exit": 0,
+      "pid": 62360,
+      "duration_ms": 125994,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-preparation.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\full-preparation.stderr.log"
+    },
+    {
+      "name": "isolated-refusal",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        ".orkestrel/agent/instruments/harness/.build/bench5/sustained/tests/refusal.test.js"
+      ],
+      "exit": 0,
+      "pid": 31680,
+      "duration_ms": 73203,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\isolated-refusal.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\isolated-refusal.stderr.log"
+    },
+    {
+      "name": "capacity",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        ".orkestrel/agent/instruments/harness/.build/bench5/matrix/tests/capacity.test.js"
+      ],
+      "exit": 0,
+      "pid": 38472,
+      "duration_ms": 450,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\capacity.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\capacity.stderr.log"
+    },
+    {
+      "name": "canonical-build",
+      "command": [
+        "node",
+        ".orkestrel/agent/instruments/harness/tools/build.ts",
+        "--compiler",
+        "node_modules/typescript/bin/tsc",
+        "--types",
+        "node_modules/@types"
+      ],
+      "exit": 0,
+      "pid": 17132,
+      "duration_ms": 4224,
+      "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\canonical-build.stdout.log",
+      "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-development-flush-verifier-7-logs\\canonical-build.stderr.log"
+    }
+  ],
+  "source_hashes_before": {
+    ".orkestrel/agent/instruments/harness/bench5/Driver.ts": "23a49fd19926270fa6038a842f645e1b0affb23fa674f2ec7724f8ef7a1a3792",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts": "93780d9d39d2f5fc8e72273c50f4e72b19eae8928cec84664c947a0a05f34565",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/tests/capacity.test.ts": "36932ed08139292c6eebce716df8f917d754e0af52afd9b0bc3792d560cd3e8a",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/Peer.test.ts": "d91291f1fd2acdf8356fb4053de1ac5d38bff8d8ecc27494565a039507c8650e",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/Peer.ts": "895a5248b1faefc2cbfc26d309db7c918cb3066d439f349548ae32c589ea43e7",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/preparation.test.ts": "dc68b1d754a8c67300bbff52ee04b97a33797c5f1d74691d5371856ed692de8d",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/refusal.test.ts": "847d8a33083deb48b6f1d494bcf7de04eefa3db02312682cfcac6c2f23b5b799",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/runtime.test.ts": "386d835fa16010448813dd63a11086cb807c5a091acfc2279fa5e6ecb9bbd989",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/transport.test.ts": "0fec10d00bb3f07d5f85c474d59d6eb8b8c80be75ff4db6a2e790a8321a7c164",
+    ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts": "bcfe1a995e25504952ac2bec76897f3c772b21fc8d9e7af47d8a89071f6e7146",
+    ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts": "ca56aa22cde7a369611146121c2877bc17d46d9bc760dde035cd47ad13bfc627"
+  },
+  "source_hashes_after": {
+    ".orkestrel/agent/instruments/harness/bench5/Driver.ts": "23a49fd19926270fa6038a842f645e1b0affb23fa674f2ec7724f8ef7a1a3792",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts": "93780d9d39d2f5fc8e72273c50f4e72b19eae8928cec84664c947a0a05f34565",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/tests/capacity.test.ts": "36932ed08139292c6eebce716df8f917d754e0af52afd9b0bc3792d560cd3e8a",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/Peer.test.ts": "d91291f1fd2acdf8356fb4053de1ac5d38bff8d8ecc27494565a039507c8650e",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/Peer.ts": "895a5248b1faefc2cbfc26d309db7c918cb3066d439f349548ae32c589ea43e7",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/preparation.test.ts": "dc68b1d754a8c67300bbff52ee04b97a33797c5f1d74691d5371856ed692de8d",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/refusal.test.ts": "847d8a33083deb48b6f1d494bcf7de04eefa3db02312682cfcac6c2f23b5b799",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/runtime.test.ts": "386d835fa16010448813dd63a11086cb807c5a091acfc2279fa5e6ecb9bbd989",
+    ".orkestrel/agent/instruments/harness/bench5/sustained/tests/transport.test.ts": "0fec10d00bb3f07d5f85c474d59d6eb8b8c80be75ff4db6a2e790a8321a7c164",
+    ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts": "bcfe1a995e25504952ac2bec76897f3c772b21fc8d9e7af47d8a89071f6e7146",
+    ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts": "ca56aa22cde7a369611146121c2877bc17d46d9bc760dde035cd47ad13bfc627"
+  },
+  "source_stable": true,
+  "resource_bound_manifest_sha256": "56b857db54ef677c9b1f769e8a0509ecd4c5616d09809060fe8ad242a9d9e021",
+  "expected_resource_bound_manifest_sha256": "56b857db54ef677c9b1f769e8a0509ecd4c5616d09809060fe8ad242a9d9e021",
+  "resource_bound_emitted_files_verified": 622,
+  "positive_failures": [],
+  "canonical_build_skipped": false,
+  "canonical_manifest_sha256": "7cbe4b125656f9b4dc54b79c7d8891965367fa25f3a3d2ec9c4f3fc0a4335644",
+  "canonical_emitted_files_verified": 622,
+  "fixture_resource_in_canonical": false,
+  "elapsed_ms": 426858
+}

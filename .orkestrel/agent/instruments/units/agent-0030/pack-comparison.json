@@ -1,0 +1,35 @@
+﻿{
+    "historical_manifest_commit":  "68060778df1e737e51ab083e90af81683c49671c",
+    "historical_manifest_path":  ".orkestrel/agent/instruments/units/agent-0030/consumers/packed-hashes.json",
+    "historical_archive_path":  "C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\packs\\8f040acf72b64262\\orkestrel-agent-0.0.30.tgz",
+    "fresh_archive_path":  "C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\units\\agent-0030-publication-readiness-pack\\orkestrel-agent-0.0.30.tgz",
+    "archive":  {
+                    "old_bytes":  633936,
+                    "fresh_bytes":  633936,
+                    "old_sha1":  "1bb0bb123e4a2414a9a99b5dc73ad41e5566b2ca",
+                    "fresh_sha1":  "1bb0bb123e4a2414a9a99b5dc73ad41e5566b2ca",
+                    "old_sha256":  "22fa21dc1cb66a9fd8400814b90ab99a8066114127ec567c87cc54ae126b51a3",
+                    "fresh_sha256":  "22fa21dc1cb66a9fd8400814b90ab99a8066114127ec567c87cc54ae126b51a3",
+                    "bytes_match":  true,
+                    "sha1_match":  true,
+                    "sha256_match":  true
+                },
+    "manifest_members":  [
+                             {
+                                 "actual_bytes":  310864,
+                                 "path":  "package/dist/src/core/index.js",
+                                 "actual_sha256":  "8f040acf72b6426246b79e5c2f31d3644291e4c08f49434ad1224e16f176311d",
+                                 "expected_sha256":  "8f040acf72b6426246b79e5c2f31d3644291e4c08f49434ad1224e16f176311d",
+                                 "matches_manifest":  true,
+                                 "expected_bytes":  310864
+                             },
+                             {
+                                 "actual_bytes":  4077,
+                                 "path":  "package/package.json",
+                                 "actual_sha256":  "d4be8839966d2d478e4c808d04688bcb1ae4297b982038a8fc3a22becd91dd1e",
+                                 "expected_sha256":  "d4be8839966d2d478e4c808d04688bcb1ae4297b982038a8fc3a22becd91dd1e",
+                                 "matches_manifest":  true,
+                                 "expected_bytes":  4077
+                             }
+                         ]
+}

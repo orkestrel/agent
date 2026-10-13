@@ -1,0 +1,11 @@
+{
+  "id": "g4-generation-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 421,
+  "hash": "b395273d9e0370f5f46b963d82a24ae161a61c9373eb9e783207b3581026c86f",
+  "status": 200,
+  "started": "2026-10-11T11:08:22.481Z",
+  "finished": "2026-10-11T11:08:22.485Z",
+  "duration": 3.6480999999912456
+}

@@ -1,0 +1,6 @@
+{
+  "selector": "withholds a capped rebuilt summary while real development decisions and later recovery continue",
+  "assertion": "refused candidate must never enter the summary cache",
+  "requiredRefusal": "",
+  "result": "required assertion failed"
+}

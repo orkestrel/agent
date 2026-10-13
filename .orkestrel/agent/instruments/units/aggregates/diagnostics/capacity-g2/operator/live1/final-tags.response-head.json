@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "text": "OK",
+  "url": "http://127.0.0.1:11434/api/tags",
+  "redirected": false,
+  "headers": [
+    [
+      "content-type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "date",
+      "Sun, 11 Oct 2026 11:55:28 GMT"
+    ],
+    [
+      "transfer-encoding",
+      "chunked"
+    ]
+  ],
+  "at": "2026-10-11T11:55:28.665Z",
+  "duration": 34.76799999999639
+}

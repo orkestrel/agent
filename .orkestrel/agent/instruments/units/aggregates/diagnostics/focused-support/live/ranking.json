@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "comparisons": [
+    {
+      "pass": "forward",
+      "supported": 0.7570881646437931,
+      "unsupported": 0.3957718403070372,
+      "exceeds": true
+    },
+    {
+      "pass": "reverse",
+      "supported": 0.7570881646437931,
+      "unsupported": 0.3957718403070372,
+      "exceeds": true
+    }
+  ]
+}

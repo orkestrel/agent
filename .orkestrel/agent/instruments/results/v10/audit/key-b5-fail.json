@@ -1,0 +1,14 @@
+[
+ {
+  "id": "b7b90bff",
+  "run": "f4-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "4ac760b4",
+  "run": "f4-control-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ }
+]

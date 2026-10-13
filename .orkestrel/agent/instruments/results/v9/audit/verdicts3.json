@@ -1,0 +1,150 @@
+{
+ "total": 18,
+ "disagreements": 0,
+ "final": [
+  {
+   "id": "6e405b61",
+   "verdict": "misread",
+   "a": "misread",
+   "b": "misread",
+   "reason": "The reply writes 'This replaces the earlier value of ESC-2291', so the dead value appears only as replaced. The pattern's lookbehind lists 'replaced' and 'replacing' but not 'value of', so the hit is a scorer gap. The '(m23)' tag is an unscored oddity and does not fail a point.",
+   "points": "Point 1, pattern hit on esc-2291 (g04 pattern). The reply names ESC-2219 in bold as the ticket."
+  },
+  {
+   "id": "62b47c46",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The refund rule requires the manager approval code for amounts over $200, and MX-4486 is in view as the rotated code. The reply says the note is 'in r8', which matches nothing in the conversation, and it does not write the note the request asks for.",
+   "points": "Point 1, missing mx-4486. The reply contains no approval code."
+  },
+  {
+   "id": "dcb8bffd",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "MX-4486 is in view from the correction message, so the placeholder leaves a required field empty that the reply could fill. The reply also cites 'the third rule' for the opened-item refund, which is the withdrawn restocking rule's neighbour and not a refund-approval rule.",
+   "points": "Point 1, missing mx-4486. The reply leaves 'Approval Code: [Insert Manager Approval Code Here]'."
+  },
+  {
+   "id": "e203b2b5",
+   "verdict": "misread",
+   "a": "misread",
+   "b": "misread",
+   "reason": "The reply writes 'Approval Code: MX-4486 (rotated early from Marcus Oyelaran's original code MX-4471)'. The dead code appears only as the origin of the rotation, which is the replaced sense. The scorer's lookbehind does not list 'original code', so the hit is a scorer gap.",
+   "points": "Point 1, pattern hit on mx-4471 (g05 pattern). The approval field reads 'MX-4486'."
+  },
+  {
+   "id": "6af840e3",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Rule 6 forbids a delivery date in writing to a customer, and this is a delivery date inside the quoted reply Kenji is to receive. The 'sent on October 7th' ship date is a misread on its own, but the delivery date point fails the item.",
+   "points": "Point 1, forbidden 'october 12' and the date pattern. The reply quotes customer text saying the kettle 'is expected to arrive on October 12th'."
+  },
+  {
+   "id": "6c3b2931",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks for a reply the shift lead can pass to Kenji, so the delivery date reaches the customer in writing, which rule 6 forbids. The gift-note remark is accurate but does not offset the violation.",
+   "points": "Point 1, forbidden 'october 12' and the date pattern. The reply says the kettle 'is expected to arrive by October 12th'."
+  },
+  {
+   "id": "6f34f0a6",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The delivery date in the customer draft breaks rule 6, which makes the item real. The missing tracking number is ambiguous because the request asks whether the kettle has shipped and does not ask for a tracking number, although a status reply usually carries one.",
+   "points": "Point 1, missing pw-6013-2280 (ambiguous). Point 2, forbidden 'october 12' and the date pattern (real). The draft for Kenji says 'expected to arrive by October 12th'."
+  },
+  {
+   "id": "723021c7",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The ISO delivery date in the customer draft breaks rule 6, which makes the item real. The missing tracking number is ambiguous for the same reason as the preceding kettle item. The draft's claim that the gift note was 'noted' for the return is an unscored statement with no support in the conversation.",
+   "points": "Point 1, missing pw-6013-2280 (ambiguous). Point 2, forbidden '2026-10-12' and the date pattern (real). The draft says 'It will arrive by 2026-10-12'."
+  },
+  {
+   "id": "b6ffa80c",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The estimate is a delivery date stated in the reply the shift lead will pass to Kenji, which rule 6 forbids. The 'sent on October 7th' ship date alone would be a misread.",
+   "points": "Point 1, forbidden 'october 12' and the date pattern. The reply says the kettle is 'estimated to arrive on October 12th'."
+  },
+  {
+   "id": "c920c6da",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply states the carrier's delivery estimate as a date for the customer, which rule 6 forbids. The ship date is not the failing point.",
+   "points": "Point 1, forbidden 'october 12' and the date pattern. The reply says the kettle is 'estimated to arrive on October 12th'."
+  },
+  {
+   "id": "1841e046",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks who to ask and by when, and the reply names neither Tomasz Brennan nor the deadline of today. The pro number FL-660412 and depot details are correct, but two of the three asked-for answers are missing.",
+   "points": "Point 1, missing 'tomasz'. Point 2, missing 'today' or '2026-10-08'."
+  },
+  {
+   "id": "c6c00d3f",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "Today is Thursday 2026-10-08 per the system prompt, and Friday 2026-10-09 is tomorrow, so the reply misdates today. It also says Tomasz issues the release today, when the rule is that the request must reach him today.",
+   "points": "Point 1, Friday pattern hit on 'Friday, 2026-10-09'. The reply says Tomasz 'will issue the release request today (Friday, 2026-10-09)'."
+  },
+  {
+   "id": "5972e30f",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks whether the $3,000 reorder fits the available credit. The reply gives the limit and balance and names Ines Albrecht, but it never says whether the reorder fits. The $3,760 available figure is also absent.",
+   "points": "Point 1, missing a fit verdict (fits, within, enough, and the other listed phrases)."
+  },
+  {
+   "id": "6ed90f56",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives the limit, the balance, and the account manager but no statement on whether the $3,000 charge fits the credit. The request asks for that verdict.",
+   "points": "Point 1, missing a fit verdict."
+  },
+  {
+   "id": "a46f763d",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply answers the account manager part, but the question 'Does a $3,000 reorder on credit fit' gets no answer in any wording. The request asks for a yes or no.",
+   "points": "Point 1, missing a fit verdict."
+  },
+  {
+   "id": "af1ca274",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The request asks whether the reorder fits. The reply never answers, and its balance arithmetic is wrong: $1,240 plus $3,000 is $4,240, which is within the $5,000 limit, so the reply contradicts the account facts.",
+   "points": "Point 1, missing a fit verdict. The reply also says the reorder 'would bring their balance to $1,240'."
+  },
+  {
+   "id": "b59c983c",
+   "verdict": "real",
+   "a": "real",
+   "b": "real",
+   "reason": "The reply gives the limit and balance and the account manager's number, but no verdict on whether the $3,000 reorder fits the available credit. The request asks for that verdict.",
+   "points": "Point 1, missing a fit verdict."
+  },
+  {
+   "id": "ddeaeebf",
+   "verdict": "ambiguous",
+   "a": "ambiguous",
+   "b": "ambiguous",
+   "reason": "All figures are correct and the comparison is one step, so a grader who accepts the stated available figure as the answer scores the point misread. A grader who requires the reply to state the fit verdict in words scores it real, because no word such as fits or within appears. The reply does not say the figure answers the question.",
+   "points": "Point 1, missing a fit verdict. The reply gives $5,000 limit, $1,240 on the books, and $3,760 available against the $3,000 request, and names Ines Albrecht."
+  }
+ ]
+}

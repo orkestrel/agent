@@ -1,0 +1,13 @@
+{
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "--test",
+    "--test-name-pattern",
+    "^real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence$",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-judge-counterfactual\\Completion.test.ts"
+  ],
+  "exit": 0,
+  "stdout": "✔ real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence (13.3954ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 238.5374\n",
+  "stderr": "",
+  "wall": 320.98080000000004
+}

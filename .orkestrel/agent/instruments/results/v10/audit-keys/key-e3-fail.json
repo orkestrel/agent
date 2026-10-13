@@ -1,0 +1,20 @@
+[
+ {
+  "id": "99893628",
+  "run": "t4-records-v4",
+  "goal": "g04-halvorsen-ticket",
+  "passed": false
+ },
+ {
+  "id": "cfebf8a0",
+  "run": "t4-records-v4",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "b62f68e8",
+  "run": "t4-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ }
+]

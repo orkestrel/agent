@@ -1,0 +1,7 @@
+{
+  "accepted": false,
+  "reasons": [
+    "Error: summarizer model differs from frozen configuration"
+  ],
+  "limitation": "Cold-build and lexical-retry candidates on copy-1 seed-only runtime projections. Later states do not reproduce diverged live histories. CHANGE 0.56 is retained; its old calibration does not certify repaired future summary states."
+}

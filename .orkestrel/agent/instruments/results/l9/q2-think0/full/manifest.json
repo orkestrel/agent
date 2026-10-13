@@ -1,0 +1,441 @@
+{
+  "protocol": "l6",
+  "frozen": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\freeze\\manifest.json",
+    "hash": "87c3b7b5b5756b0285f26302f3dbf4beb377e20f394973d011a7d192dc9df3ac"
+  },
+  "bound": {
+    "scenario": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v1.json",
+      "hash": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b"
+    },
+    "copies": [
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v1.json",
+        "hash": "24efde87208498722a7b25a69cb98ff12552da6379af0c6972144dbd63bf170b"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v2.json",
+        "hash": "2f6add98593124c8576e210e252816da4b908e7dda84b328af812021516ac6c0"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v3.json",
+        "hash": "d71f6be397bf6af8889bd9a49d876f622ef9e39cc0227fb26dc5904de0b5403a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v4.json",
+        "hash": "5fec4c001970f2e45468be3686dfdaf6c2f20cff4c4a040f46300e0912a89ff9"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v5.json",
+        "hash": "b35c527327b001f5d16fc6ff3acda50dfdcac15e3b8b76d67b75f1de47fd2f05"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v6.json",
+        "hash": "9053ae687e0efc17db90cd7c751fc0056ca76fef840646e7df3756aaa0970037"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v7.json",
+        "hash": "223d19cfde8512f2b4ea57fff549042d2896085e58cd8b0c5977719b218f55b1"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench\\variants\\long\\v8.json",
+        "hash": "bfb775fa75a90855f6deca239c6bf60250057e2e16faad95bbfd06e76a345f69"
+      }
+    ],
+    "development": [
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-1.json",
+        "hash": "54c15a8f50b49ed31342efbcf17d5b669643b3868ed4bb74fc4abfe8ccfab65d"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-2.json",
+        "hash": "4df227826710c9dd2e2d81a7b68bd2ca90889179c78f84e42f99b89e324fba00"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-4.json",
+        "hash": "e2b32760947f4e71917c2584d53ffce0637a89406712c6225a9f6bd8c61f37d0"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-5.json",
+        "hash": "ce2c41530c6c446735111f26e0ca70bfa00cc0f52e1f23de31ee53258aaeb0b4"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-7.json",
+        "hash": "44ff8a3ff6015d5d92ae0c2ec701cdf6d0b1f63900980d7979a33be7849fe99a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-8.json",
+        "hash": "6b785ebe7348b57d71c96da34bf61344e3e4bae67a27f4884039446435224a5f"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-10.json",
+        "hash": "838b824da15c949b6bd1e34f1991890c0ea4d9781ba11f8ccde6c8da9ec87557"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-11.json",
+        "hash": "ccb3c44f3c324362bff5ca650696ba9c77b7f888b215e696b0046c641f4d1d6c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-12.json",
+        "hash": "fd84562167863aeaaf190241738f357fd6ece3ca6bfdea3d1e81e5757f5a213c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-14.json",
+        "hash": "50111e459bac72cbd3454be6845a3f6fce84c76a74ad8fbb03d4e3807cbecb4e"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-15.json",
+        "hash": "a674dca30d0c69971ddaa23b7946951466f63509872ad4d16a91b4538d0082cc"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-17.json",
+        "hash": "f40d4e509bebb5b7205c8297a9b67fff265febb046d58253af0a3464ea669d7c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-18.json",
+        "hash": "2c0f7cdf9e95b1dab63f407b29d4639dcaa43ef0495179af4a5e4cc9341901f2"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-19.json",
+        "hash": "3ed5b93fd1aa92565de4767f6dd94638c4e327bc19e1e16fb407aa1157ee91a8"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-20.json",
+        "hash": "e69f89e07222ab30135622485d321d4eb8f08c29c060e0c0ec719c4e2afbcc26"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-22.json",
+        "hash": "75a2836968cc5c1d4c9fde9744679f9d917777b1fe474efd17b6464bdfc13f5d"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-23.json",
+        "hash": "5e366673bf81ce08e4ff494e58e8efc397ac89df2817424e03963050a7e90ace"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-25.json",
+        "hash": "c7af3cf79d0617e7d79eb8b881cfbebb5be49ad2520787a0b86e96f7f2fcd50a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-27.json",
+        "hash": "fa65b5da047fe41a6404d89178a5ce11c5af0f8d094819935fcecfa020078e6a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-28.json",
+        "hash": "2e9085721e5d72110ca8e09d3c063694b55070546de461da4f6900cdd10b02ff"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-30.json",
+        "hash": "8103551a919dc225f9355743096713d3f89930a939c4ca70e5adc3fc2b8fd47e"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-31.json",
+        "hash": "dae6092a3f8570667789552c5cb7a0d0b4d1abc0d811e5cd848b916d318875cd"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-33.json",
+        "hash": "220bb7c513b8652e6413a32ca78ad158982f3e7871df8fb21bace52d0b4a120d"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-34.json",
+        "hash": "4c864e7fa867ae96b0a378537aea264ca669bcea91cb204168cfe6d7c7969ba7"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-36.json",
+        "hash": "8d6d9b13138bbedfcc5e89dd52d0c208860adb7a2602eed852d2a4989431afd4"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-37.json",
+        "hash": "e23cc71b3b4e7c2f593a7898c9c168b10fdb07f91ecc4357cb78c1f8f24c9b3f"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-39.json",
+        "hash": "882ea631bce00dd71ecbcfe78b442a6f0584dbd7d7d6dcae9c80680bac157d08"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-40.json",
+        "hash": "b60261dbe64bfb9ab72d391f5887e68bd93e1ffaa94ac0c0e47eb79fb61e769b"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-42.json",
+        "hash": "d597ada8c4dd0d662ef05a739dd292023668f362f2c9807822139a5ed48f5183"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-44.json",
+        "hash": "5a2d11fec3e3e95d19553737e8480ca6b94367b85446645fb4c91e8966f37c29"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-45.json",
+        "hash": "17469581fd077a86d62107fd4e42114e3fb6c791956c1a54aaf0ef82e75066cb"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-46.json",
+        "hash": "252679b0c9781bc5c1ba1290fa205f210216e568974bad503f033d9bbf35177b"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-48.json",
+        "hash": "922602c2ad9680651324f18fc15fe9f5f8f736c74c0bb9b539897617bdd7b8b5"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-49.json",
+        "hash": "4495c49871f826d24fa82bee859d035bc2594fac3af3744a6e0ca8c46532e145"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-51.json",
+        "hash": "9704eed705b1959152c357e1566d2ff775f6f49d3fff199c17bcc3fbfb2540d7"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-53.json",
+        "hash": "649111222dad95c2a462ff86f120dbb6bd9495925163fd07d48850f4c965d10a"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-54.json",
+        "hash": "70a91d0ad46fffd60a6ffdfdff5d13d04310d4b42c63e6778d6404694a3cb504"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-56.json",
+        "hash": "afd0e40e63c05e052fa12c44e9aaadc7d6bfbe2f79dc8dbe7d29c6d318ade586"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-57.json",
+        "hash": "48ec9f681cdb557f773111b22241021b4be40dc7b831550fe40a29cfef7d4401"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-59.json",
+        "hash": "815e5fda6c3bec078f2f122bbdf6e1c84ec345ef17f97e01f22d60ffb29040b2"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-60.json",
+        "hash": "1d27ad1764a0595f614242bccc27b6860cfb5b8df56f4ab52cb02b91a1e68077"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-61.json",
+        "hash": "cf8150a9ce4e158a6f37f7d9120142e2a6c591e1f4b09e3a101f549131ef624c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-63.json",
+        "hash": "a54d953c3e0d79e3ece322c2eafae3051ecfcc2bcb0b735cba5cc76ba9eaef16"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-64.json",
+        "hash": "2c4124fb69c92c926049aab9b3f1b4ca709cae0a6e6b3c6688605019159c7b22"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-66.json",
+        "hash": "ba5ff1f371d833cefe290a426fe5345bd1bb29fc13d8247ca77697260997c286"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-67.json",
+        "hash": "ce484470f27802a1815ab70bd9889fe72ed7cfcd980e2d3d8207376489fa7787"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-69.json",
+        "hash": "1562a96c150e2cd149f742b1ac8c457399f22b4663361317615ecfdfd4a84bec"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-70.json",
+        "hash": "3b6a1b1cf6c965449f17b0eebb363e50286de59c6eab8d64ea948bbf5d663b0f"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-72.json",
+        "hash": "9ec0c6a02a4905944be8f56d96fe6fee7ee3df456621f3e9ed493feaa76263d4"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-73.json",
+        "hash": "5c9ced28d8de9871474e4fe5c3eb7c13d253a469561831bec68adb3680675f0d"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-74.json",
+        "hash": "7a108d7a78b53bb5d69dd6da68f23a84b9669af063cb23e0d66e7c9b04b5b096"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-75.json",
+        "hash": "e0b52b6ea25200e0e454fdba0bf49d00b99d7691661ed34199ca5c0fe10c24f9"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-77.json",
+        "hash": "269be907a976a285c5a872856c080bf3a2db6567f5ed25e76d43e5eeb48e36b7"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\capacity-78.json",
+        "hash": "7a528db63091c2671d00702a5320cd7d11c98ea7f2559f6d05305b59ad67d272"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\run.json",
+        "hash": "5486223c89ec7e273048b50bf5a6955d23ca61489189a6fbb700096eb7743179"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\rows.jsonl",
+        "hash": "429420e964a6f6712a7946b988c490df5e62a019d935b8692fde1e77d8b49412"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\selections.jsonl",
+        "hash": "923694ef253728599b28e5b238920a037175d10a33b7ad375382d8edc5db651f"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\requests.jsonl",
+        "hash": "ac538e4f74b220f611b1ebb61b042b9e8819e80885e787634ed71a8616860b8e"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\turns.jsonl",
+        "hash": "9c3686a1621194683c4d0ef06a67b6d25aad37c1b0f604bbac08d13ff521b8dd"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\calls.jsonl",
+        "hash": "5f99439753c09acf6c76c481b2dd2e22a2dc74b881c16bd06010a0a8ee3dd066"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\messages.jsonl",
+        "hash": "02b76bb52329c1a36ce073ddbd07f62750bbfdc81741b42fbb157c19e842d608"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\judgments.jsonl",
+        "hash": "c644ff60c971c7e267f90f5c20aa78c47b05e7c1a8d4194a8a747fe4c221313c"
+      },
+      {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\resource\\reserve-512\\l6-q2-think0-records-v1\\model-inventory.json",
+        "hash": "6fb04221184bcf46ef33dbb17c79bee4eb1fc2eb8c0fce74593f58c09a4ca986"
+      }
+    ],
+    "gauge": {
+      "scale": 1.1633254716981132,
+      "overhead": 467
+    },
+    "goals": 24,
+    "turns": 9,
+    "reserve": 512,
+    "seed": 4666,
+    "requests": 62,
+    "payload": 3636,
+    "growth": 512,
+    "observed": 2643,
+    "window": 1068663,
+    "limitation": "Finite empirical envelope from all copy inputs, largest reachable payload including the complete recall seed, declared turn/completion caps, calibrated pricing, and measured development output. It is not a tokenizer worst-case guarantee; complete copy-1 preflight and actual wire capacity checks must pass. No text is trimmed."
+  },
+  "accepted": false,
+  "attempts": [
+    {
+      "execution": {
+        "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\execution.json",
+        "hash": "86b8ee8ca11063b1ec75489211cff03aa5dbbf6bdefca27e75c771f080e9c334"
+      },
+      "run": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1",
+      "budget": {
+        "reserve": 512,
+        "window": 1068663,
+        "ceiling": 262144,
+        "predict": 0
+      },
+      "accepted": false,
+      "failures": [
+        "g05-luis-approval-note: incomplete or failed execution",
+        "incomplete or reordered trajectory",
+        "run status failed",
+        "request 20: transport",
+        "request 21: transport",
+        "request 21: model role differs",
+        "request 21: thinking policy differs",
+        "Error: decision qualification failed: transport"
+      ],
+      "resource": false,
+      "files": [
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-1.json",
+          "hash": "a7e419b28beb27bffc17da34102493f522f81601f287e3c97705d71af88adefd"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-2.json",
+          "hash": "653f74b15998cf7ec340cbbad4c823bd752fec12e36fd7ff75e0dd4259741f07"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-4.json",
+          "hash": "3379cfb7c88e97e1068c1ba7f95744fcef1275117cdaec006e741658b3617360"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-5.json",
+          "hash": "8eceb1142cba82d31df872d2aebdb05e1ea04ddf41fcca73a7a6f091ad9fd458"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-7.json",
+          "hash": "52ee57c6dc9a649b2074294e4febdf5600873e9e77b05e7124336dfb66f153a4"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-8.json",
+          "hash": "f73f8fe87b899a008c690370bb2b71dedb43dde71c42568308a1e869465578be"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-10.json",
+          "hash": "81ed9a4ce387fd999fdf818e3319fcd416683952e5b3b7e9d536ab6456b80914"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-11.json",
+          "hash": "9ea096eaa99219bdb548194bbba7cf3fb50a9965c9d95d97d3b0e33c1218423d"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-12.json",
+          "hash": "883782da81ca04fbb2f03ba8f190f8d93455b29e92d584cc7ffdad9d864e20ac"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-14.json",
+          "hash": "5c587db51d201734acb2659e8b3fdf2664ef57fbaf7a4485b311e5bd80d978ef"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-15.json",
+          "hash": "c85611edce159aa14222c46edd2ecfd1bee6bc0759c81d1b16c19766c44b39fd"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-16.json",
+          "hash": "c49f6eab9ec14a213a9e1f424e0f806155520f3e0f9d116582109ccaef7e014a"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-17.json",
+          "hash": "9f7e2f462937707431be20d037abc05865f0b7b832c41c9536d1d412cc297332"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-19.json",
+          "hash": "fe8c23cd93e4a4e56067a03fe3a0493c26cbff7b21465d5e6f262db34d2a1e1f"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\capacity-20.json",
+          "hash": "30c053b0ffe3188d8d68e4dd3f8ad77ffc6eab4439ea88fb062242a1fc76d1d8"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\run.json",
+          "hash": "a43eaebc09abd8bb4cea488496c2b654298affff8d4c8d0030a86523aa6fa70c"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\rows.jsonl",
+          "hash": "63758e52aab838f414cd4851b35a518b5b37f65f5ebfe31104a0155263d18648"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\selections.jsonl",
+          "hash": "3d28337c893fc402300932be48cde3764ede975127ac513459f7bd6328bad58d"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\requests.jsonl",
+          "hash": "6310d9a809c7ae1495853dab22d1a7a01e96e8260880e61cf983079ace156738"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\turns.jsonl",
+          "hash": "5b6bf44b4ed0ae0725bc0fb7198f0a833650b35655221b84a74d892688d5abe1"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\calls.jsonl",
+          "hash": "6f55c8ab6ee2f92715c9c1e41fbb9e5663b7868f680eb769d166c434c325ca49"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\messages.jsonl",
+          "hash": "caf7da8208d19d59710757ddc2c8adc1a48dfcf05fafb7b10ac70d6939209be9"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\judgments.jsonl",
+          "hash": "c1b433e516576d3348ac83ec3651256b013454f900ddbbf751946121eb2c3b5c"
+        },
+        {
+          "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l9\\q2-think0\\full\\preflight\\l6-q2-think0-full-v1\\model-inventory.json",
+          "hash": "6fb04221184bcf46ef33dbb17c79bee4eb1fc2eb8c0fce74593f58c09a4ca986"
+        }
+      ]
+    }
+  ]
+}

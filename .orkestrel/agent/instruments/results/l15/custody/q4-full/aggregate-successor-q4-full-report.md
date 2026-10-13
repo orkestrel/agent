@@ -1,0 +1,21 @@
+# Q4-think0 full-view verification
+
+The released full-view command completed once and was accepted. Dispatch PID `72524` exited `0`, with no signal and no cap, after `1,674,884 ms` against the fixed `7,200 s` cap. The full [dispatcher journal](.orkestrel/agent/instruments/results/l15/logs/q4-think0-full.jsonl:1), [terminal result](.orkestrel/agent/instruments/results/l15/logs/q4-think0-full.err:1), PID record, and before/after status captures are retained. Post-run queries found neither PID `72524` nor a direct child.
+
+The exact command was:
+
+```text
+node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal .orkestrel/agent/instruments/results/l15/logs/q4-think0-full.jsonl --errors .orkestrel/agent/instruments/results/l15/logs/q4-think0-full.err --cap 7200 --status -- node .orkestrel/agent/instruments/harness/.build/bench5/matrix.js full --frozen .orkestrel/agent/instruments/results/l15/q4-think0/freeze/manifest.json --resource .orkestrel/agent/instruments/results/l15/q4-think0/resource/manifest.json --out .orkestrel/agent/instruments/results/l15/q4-think0/full --live --url http://127.0.0.1:11435
+```
+
+Preflight and terminal custody matched: HEAD `5ef0eb4fa719386ab7ba9c2dba542552231e6c8e`; build-manifest SHA-256 `0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc`; freeze SHA-256 `95da49bbb6f4811f2bcad63e87ace42c380ba15ceb5ee42c0bd113b509ac72a9`; accepted records-resource SHA-256 `a4db9c340ad82e69b0f8b6b877ca4d330dac8d3375bb363e0378e58c96f1edcb`; deployment SHA-256 `40442197423b574b61548feb702b55c948d77f61dd719d9d6b26e24ad3016e19`. The emitted frozen and records-resource readers revalidated their complete input custody after the run.
+
+The [full manifest](.orkestrel/agent/instruments/results/l15/q4-think0/full/manifest.json:1) SHA-256 is `87d52cbc27cfc134ee40ae19e2047b8f0b2824e67c077ff210f69638f40d0603`; its retained [empirical bound](.orkestrel/agent/instruments/results/l15/q4-think0/full/bound.json:1) SHA-256 is `00527a3767091bec43e7527a659f469aa0ea71f2f5c20f6b80387468cfb13101`. The full manifest is accepted with one attempt. The attempt, decoded through `readAttempt`, contains 24 rows, 17 machine-success rows, 7 machine-failed rows, and 0 unattempted rows. These are retained execution outcomes only; no candidate text was reviewed or graded. The [run manifest](.orkestrel/agent/instruments/results/l15/q4-think0/full/preflight/l6-q4-think0-full-v1/run.json:1) SHA-256 is `1b1544de7b516a1ea055620f07a9e62392316ae5516eac302685cc9dfec5f8a6`.
+
+The emitted full-manifest shape guard, `readAttempt`, `readExecution`, `buildMatrixBound`, and `verifyMatrixFeasibility` checks passed. The stored bound matched recomputation from the accepted records run. It covers 24 goals and 9 turns, with 62 anticipated requests, payload `3636`, growth `512`, observed `2354`, seed estimate `4666`, and a finite window of `1,068,374`; accepted full budget is reserve `512`, window `1,068,374`, ceiling `262,144`, prediction cap `0`.
+
+Measured costs include 30 metadata observations (`58 ms`) and 54 wire requests: 30 agent requests (2 calibration, 28 trajectory) and 24 trajectory flush requests. Agent usage totals 155,197 prompt and 1,840 completion tokens; flush usage totals 528 prompt and 24 completion tokens. Judge and summarizer wire requests were zero. All role/phase usage fields are present; missing-usage count is `0`. The [emitted-reader evidence summary](tmp/units/aggregate-successor-q4-full-evidence-2.json:1) contains the complete per-role costs, input-file hash inventory, and cache lineage without candidate text.
+
+One validation-helper mismatch is preserved: the first helper applied the resource-phase `readResource` validator to the full-phase manifest, which correctly failed with `resource attempt configuration mismatch` before writing an evidence file. No workload was retried. The successor helper instead applies the emitted resource-manifest shape guard to the full manifest, then validates its attempt, execution, bound, and feasibility through the existing readers. Its results are in the cited evidence summary.
+
+No pilot, aggregate, fit, additional model request, source/build edit, service change, or Git mutation was performed. The next dependency is separate root review and release of the pilot stage.

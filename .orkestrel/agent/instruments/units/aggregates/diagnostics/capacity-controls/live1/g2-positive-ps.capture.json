@@ -1,0 +1,11 @@
+{
+  "id": "g2-positive-ps",
+  "complete": true,
+  "breached": false,
+  "bytes": 421,
+  "hash": "5d2be0e8b29b82aaccb8bb98acf15f699beb7997627a9501f921ecf79f28186b",
+  "status": 200,
+  "started": "2026-10-11T11:05:58.784Z",
+  "finished": "2026-10-11T11:05:58.786Z",
+  "duration": 2.635099999999511
+}

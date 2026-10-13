@@ -1,0 +1,411 @@
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/types.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/types.ts
+index ecfbf72c3..0dc8d8148 100644
+--- a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/types.ts
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/types.ts
+@@ -1,3 +1,5 @@
++import type { JudgeResult } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++
+ /** Carries a file's prospective byte binding. */
+ export interface Binding {
+ 	readonly path: string
+@@ -50,3 +52,26 @@ export interface Reading {
+ 	readonly usage: unknown
+ 	readonly wall: number
+ }
++
++/** Carries the response capture and exclusive per-request artifact destination. */
++export interface CompletionOptions {
++	readonly output: string
++	readonly label: string
++	readonly capture: { readonly response: Uint8Array | undefined }
++}
++
++/** Invokes real request or decoder behavior inside the completion boundary. */
++export type CompletionFunction = () => JudgeResult | Promise<JudgeResult>
++
++/** Carries an observed raw field or the reason it cannot be read. */
++export type WireField = { readonly availability: 'present'; readonly value: unknown } | { readonly availability: 'absent' | 'unparseable' }
++
++/** Carries independent captured-body accounting without interpreting a score. */
++export interface WireEvidence {
++	readonly body: { readonly availability: 'present' | 'absent' | 'unparseable'; readonly hash?: string; readonly bytes?: number; readonly error?: string }
++	readonly token: WireField
++	readonly finish: WireField
++	readonly top: WireField
++	readonly usage: { readonly prompt: WireField; readonly completion: WireField }
++	readonly timing: { readonly total: WireField; readonly load: WireField; readonly prompt: WireField; readonly evaluation: WireField }
++}
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/constants.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/constants.ts
+index 657ee7c39..3272f9eec 100644
+--- a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/constants.ts
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/constants.ts
+@@ -21,7 +21,7 @@ export const CAUSE_TARGET = ' due to Owen Pritchard'
+ export const CAUSE_REPLACEMENT = '; Owen Pritchard'
+ export const SOURCE_SEPARATOR = '\nSource messages:\n'
+ export const DAEMON = 'http://127.0.0.1:11434'
+-export const OPERATOR_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Recorder.ts', 'Operator.ts', 'main.ts'])
++export const OPERATOR_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Recorder.ts', 'Completion.ts', 'Operator.ts', 'main.ts'])
+ export const VARIANT_EDITS = Object.freeze([
+ 	Object.freeze({ name: 'original', repair: false, cause: false, expectation: 'unsupported' }),
+ 	Object.freeze({ name: 'repair-removed', repair: true, cause: false, expectation: 'unsupported' }),
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/helpers.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/helpers.ts
+index a6bbb3068..b1e338be2 100644
+--- a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/helpers.ts
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/helpers.ts
+@@ -1,4 +1,4 @@
+-import type { Binding, ExecutionOptions, Packet } from './types.ts'
++import type { Binding, ExecutionOptions, Packet, WireEvidence, WireField } from './types.ts'
+ import { createHash } from 'node:crypto'
+ import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+ import { isAbsolute, relative, resolve, sep } from 'node:path'
+@@ -137,3 +137,36 @@ export function describeDifference(left: string, right: string): unknown {
+ 	while (suffix < left.length - prefix && suffix < right.length - prefix && left[left.length - 1 - suffix] === right[right.length - 1 - suffix]) suffix += 1
+ 	return { equal: left === right, prefix, removed: left.slice(prefix, left.length - suffix), inserted: right.slice(prefix, right.length - suffix), left: computeHash(left), right: computeHash(right) }
+ }
++
++/** Describes a captured field, preserving present values including external nulls.
++ * @param raw - The parsed response object, when readable
++ * @param name - The external wire field name
++ * @param missing - The reason an unreadable body supplies no field
++ * @returns The field's observed availability and its unmodified value when present
++ * @example describeField({}, 'response', 'absent') // { availability: 'absent' }
++ */
++export function describeField(raw: Readonly<Record<string, unknown>> | undefined, name: string, missing: 'absent' | 'unparseable'): WireField {
++	if (raw === undefined) return { availability: missing }
++	return raw[name] === undefined ? { availability: 'absent' } : { availability: 'present', value: raw[name] }
++}
++
++/** Describes captured response bytes independently of the judge's decoding outcome.
++ * @param bytes - The untouched captured entity-body bytes, when available
++ * @returns Explicit body and raw-field availability without manufacturing scores
++ * @example describeWire(undefined).token // { availability: 'absent' }
++ */
++export function describeWire(bytes: Uint8Array | undefined): WireEvidence {
++	let raw: Record<string, unknown> | undefined
++	let error: string | undefined
++	if (bytes !== undefined) {
++		try { raw = readObject(JSON.parse(Buffer.from(bytes).toString('utf8'))) }
++		catch (failure) { error = failure instanceof Error ? failure.message : String(failure) }
++	}
++	const missing = bytes === undefined ? 'absent' : 'unparseable'
++	return {
++		body: bytes === undefined ? { availability: 'absent' } : { availability: raw === undefined ? 'unparseable' : 'present', hash: computeHash(bytes), bytes: bytes.length, ...(error === undefined ? {} : { error }) },
++		token: describeField(raw, 'response', missing), finish: describeField(raw, 'done_reason', missing), top: describeField(raw, 'logprobs', missing),
++		usage: { prompt: describeField(raw, 'prompt_eval_count', missing), completion: describeField(raw, 'eval_count', missing) },
++		timing: { total: describeField(raw, 'total_duration', missing), load: describeField(raw, 'load_duration', missing), prompt: describeField(raw, 'prompt_eval_duration', missing), evaluation: describeField(raw, 'eval_duration', missing) },
++	}
++}
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/Operator.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Operator.ts
+index 9f6ba5ffc..02acda9d5 100644
+--- a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/Operator.ts
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Operator.ts
+@@ -9,6 +9,7 @@ import { AGREE_QUESTION } from '../../../.orkestrel/agent/instruments/harness/be
+ import { ATTEMPTS_HASH, BUILD, BUILD_HASH, CANDIDATE_ID, CAUSE_REPLACEMENT, CAUSE_TARGET, DAEMON, EVIDENCE_HASH, GENERATION, HARNESS, LABELS, LABELS_HASH, MANIFEST_HASH, PACKET, PACKET_HASH, REPAIR_TARGET, ROOT, SEQUENCE, SOURCE_SEPARATOR, UNIT, VARIANT_EDITS, VENDOR } from './constants.ts'
+ import { computeHash, computeOperator, computeReplay, describeDifference, extractRow, readArray, readBinding, readJSON, readNumber, readObject, readString, replaceTarget, validateExecution, writeArtifact } from './helpers.ts'
+ import { Recorder } from './Recorder.ts'
++import { Completion } from './Completion.ts'
+ 
+ /** Prepares and executes only the frozen diagnostic sequence. */
+ export class Operator {
+@@ -102,16 +103,15 @@ export class Operator {
+ 				const frozen = packet.rendering.find(entry => entry.name === name)
+ 				if (variant === undefined || frozen === undefined) throw new Error('Frozen sequence variant absent')
+ 				const label = `${String(index + 1).padStart(2, '0')}-${name}`
+-				const body = JSON.stringify(judge.body({ state: variant.state, questions: { agree: packet.question } }))
++				const request = { state: variant.state, questions: { agree: packet.question } }
++				const body = JSON.stringify(judge.body(request))
+ 				if (body !== frozen.body) throw new Error('Frozen runtime rendering mismatch')
+ 				recorder.arm(label, body)
+ 				const started = performance.now()
+-				const result = await judge.ask({ state: variant.state, questions: { agree: packet.question } }, controller.signal)
+-				writeArtifact(resolve(output, `${label}.normalized.json`), { result, wall: performance.now() - started })
++				const result = await new Completion({ output, label, capture: recorder }).execute(() => judge.ask(request, controller.signal))
+ 				if (recorder.count !== index + 1 || recorder.response === undefined) throw new Error('Actual response accounting mismatch')
+ 				const response = Buffer.from(recorder.response).toString('utf8')
+ 				const raw = readObject(JSON.parse(response))
+-				writeArtifact(resolve(output, `${label}.wire-evidence.json`), { token: raw.response ?? 'absent', finish: raw.done_reason ?? 'absent', top: raw.logprobs ?? 'absent', usage: { prompt: raw.prompt_eval_count ?? 'absent', completion: raw.eval_count ?? 'absent' }, timing: { total: raw.total_duration ?? 'absent', load: raw.load_duration ?? 'absent', prompt: raw.prompt_eval_duration ?? 'absent', evaluation: raw.eval_duration ?? 'absent' } })
+ 				const answer = result.answers.agree
+ 				if (answer?.form !== 'noul' || result.model !== packet.identity || result.refusals?.agree !== undefined) throw new Error('Missing/malformed normalized Yes answer')
+ 				const replay = computeReplay(raw, readNumber(tuple[2]))
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/Verifier.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Verifier.ts
+index 1a2ae22ab..6ce564604 100644
+--- a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/precursor-repair/Verifier.ts
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Verifier.ts
+@@ -2,12 +2,15 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+ import { resolve } from 'node:path'
+ import { spawnSync } from 'node:child_process'
+ import { BUILD_HASH, OPERATOR_FILES, PACKET, ROOT, UNIT } from './constants.ts'
+-import { computeHash, computeOperator, readBinding, writeArtifact } from './helpers.ts'
++import { computeHash, computeOperator, readBinding, readJSON, readObject, writeArtifact } from './helpers.ts'
+ 
+ /** Collects complete offline commands and their expected exit codes. */
+ export class Verifier {
+ 	/** Runs the bounded offline proof suite and records every output without truncation. */
+ 	run(): void {
++		const planpath = resolve(UNIT, 'plan-ready-repair-typed.json')
++		const plan = readObject(readJSON(planpath))
++		if (plan.operator !== computeOperator() || readObject(plan.packet).hash !== readBinding(PACKET).hash || plan.build !== BUILD_HASH) throw new Error('Explicit successor plan custody mismatch')
+ 		const output = resolve(UNIT, `proof-${Date.now()}`)
+ 		mkdirSync(output)
+ 		const files = readdirSync(UNIT).filter(name => name.endsWith('.ts') && name !== 'inspect.ts')
+@@ -15,6 +18,7 @@ export class Verifier {
+ 			{ name: 'default', args: [resolve(UNIT, 'offline.ts')], expected: 0 },
+ 			{ name: 'preparation-occupied', args: [resolve(UNIT, 'prepare-offline.ts')], expected: 1 },
+ 			{ name: 'collected-proof', args: ['--test', resolve(UNIT, 'proof.test.ts')], expected: 0 },
++			{ name: 'completion-proof', args: ['--test', resolve(UNIT, 'Completion.test.ts')], expected: 0 },
+ 			{ name: 'direction-negative', args: ['--test', resolve(UNIT, 'negative.test.ts')], expected: 1 },
+ 			{ name: 'types', args: [resolve(ROOT, 'node_modules/typescript/bin/tsc'), '--ignoreConfig', '--noEmit', '--allowImportingTsExtensions', '--module', 'nodenext', '--target', 'esnext', '--strict', '--types', 'node', '--skipLibCheck', ...files.map(file => resolve(UNIT, file))], expected: 0 },
+ 			...files.map(name => ({ name: `syntax-${name}`, args: ['--check', resolve(UNIT, name)], expected: 0 })),
+@@ -28,7 +32,7 @@ export class Verifier {
+ 			results.push(result)
+ 			if (child.status !== command.expected) throw new Error(`Offline proof exit mismatch: ${command.name}; see ${output}`)
+ 		}
+-		const review = [...OPERATOR_FILES, 'prepare.ts', 'prepare-offline.ts', 'NetworkWitness.ts', 'offline.ts', 'proof.test.ts', 'negative.test.ts', 'Verifier.ts', 'verify.ts', 'freeze.ts', 'packet-final.json', 'plan-ready.json']
++		const review = [...OPERATOR_FILES, 'prepare.ts', 'prepare-offline.ts', 'NetworkWitness.ts', 'offline.ts', 'proof.test.ts', 'Completion.test.ts', 'negative.test.ts', 'Verifier.ts', 'verify.ts', 'freeze.ts', 'retain-repair.ts', 'mutation-repair.ts', 'freeze-repair.ts', 'packet-final.json', 'plan-ready-repair-typed.json']
+ 		let diff = ''
+ 		for (const name of review) {
+ 			const child = spawnSync('git', ['diff', '--no-index', '--', '/dev/null', resolve(UNIT, name)], { cwd: ROOT, encoding: 'utf8' })
+@@ -36,7 +40,7 @@ export class Verifier {
+ 			diff += child.stdout
+ 		}
+ 		writeFileSync(resolve(output, 'review.diff'), diff, { flag: 'wx' })
+-		writeArtifact(resolve(output, 'summary.json'), { host: { node: process.version, platform: process.platform }, packet: readBinding(PACKET), plan: readBinding(resolve(UNIT, 'plan-ready.json')), build: BUILD_HASH, operator: computeOperator(), files: review.map(name => readBinding(resolve(UNIT, name))), proof: results, diff: readBinding(resolve(output, 'review.diff')), inference: 0, limitations: ['Forwarding and raw custody are prepared but require real local execution for transport evidence', 'Undici diagnostic witness observes native fetch requests, not arbitrary socket activity', 'Fetch exposes decoded entity-body bytes and not HTTP framing or compressed wire bytes', 'Transitive runtime dependencies beyond the explicitly bound direct judge/scorer/timeout packages are not recursively inventoried', 'Initial packet.json, plan.json, and plan-final.json are preserved drafts; packet-final.json and plan-ready.json are the frozen authority'] })
++		writeArtifact(resolve(output, 'summary.json'), { host: { node: process.version, platform: process.platform }, packet: readBinding(PACKET), plan: readBinding(planpath), build: BUILD_HASH, operator: computeOperator(), files: review.map(name => readBinding(resolve(UNIT, name))), proof: results, diff: readBinding(resolve(output, 'review.diff')), inference: 0, limitations: ['Forwarding and live arithmetic require authorized real local execution; offline tests prove completion accounting with the real emitted decoder and inert data', 'Undici diagnostic witness observes native fetch requests, not arbitrary socket activity', 'Fetch exposes decoded entity-body bytes and not HTTP framing or compressed wire bytes', 'Transitive runtime dependencies beyond the explicitly bound direct judge/scorer/timeout packages are not recursively inventoried', 'Preceding plans and proofs remain unchanged; packet-final.json and plan-ready-repair-typed.json explicitly bind the repaired instrument'] })
+ 		writeArtifact(resolve(output, 'hashes.json'), readdirSync(output).map(name => ({ name, hash: computeHash(readFileSync(resolve(output, name))) })))
+ 		console.log(JSON.stringify({ output, packet: readBinding(PACKET).hash, operator: computeOperator(), summary: readBinding(resolve(output, 'summary.json')).hash, hashes: readBinding(resolve(output, 'hashes.json')).hash, review: readBinding(resolve(output, 'review.diff')).hash, inference: 0 }))
+ 	}
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.ts
+new file mode 100644
+index 000000000..dd726934d
+--- /dev/null
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.ts
+@@ -0,0 +1,32 @@
++import type { JudgeResult } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import type { CompletionFunction, CompletionOptions } from './types.ts'
++import { resolve } from 'node:path'
++import { describeWire, writeArtifact } from './helpers.ts'
++
++/** Persists result availability and raw-field evidence around real request completion. */
++export class Completion {
++	readonly #options: CompletionOptions
++
++	constructor(options: CompletionOptions) { this.#options = options }
++
++	/** Records either the actual result or its rejection, then preserves the original outcome.
++	 * @param operation - The real ask or decoder invocation; never a replacement implementation
++	 * @returns The actual result unchanged
++	 * @throws The original operation failure after recording its unavailable result
++	 */
++	async execute(operation: CompletionFunction): Promise<JudgeResult> {
++		const { output, label, capture } = this.#options
++		const started = performance.now()
++		let result: JudgeResult
++		try { result = await operation() }
++		catch (error) {
++			try {
++				writeArtifact(resolve(output, `${label}.normalized.json`), { availability: 'unavailable', error: { name: error instanceof Error ? error.name : 'Thrown value', message: error instanceof Error ? error.message : String(error) }, wall: performance.now() - started })
++				writeArtifact(resolve(output, `${label}.wire-evidence.json`), describeWire(capture.response))
++			} finally { throw error }
++		}
++		writeArtifact(resolve(output, `${label}.normalized.json`), { availability: 'present', result, wall: performance.now() - started })
++		writeArtifact(resolve(output, `${label}.wire-evidence.json`), describeWire(capture.response))
++		return result
++	}
++}
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.test.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.test.ts
+new file mode 100644
+index 000000000..fb46c2a97
+--- /dev/null
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/Completion.test.ts
+@@ -0,0 +1,108 @@
++import { deepStrictEqual, equal, ok, rejects } from 'node:assert'
++import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { test } from 'node:test'
++import { createOllamaJudge, OllamaJudge } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/ollama/index.js'
++import { isJudgeQuestion } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import { Completion } from './Completion.ts'
++import { PACKET, UNIT } from './constants.ts'
++import { computeHash, describeField, readArray, readJSON, readNumber, readObject, readPacket, readString } from './helpers.ts'
++import { NetworkWitness } from './NetworkWitness.ts'
++
++test('real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence', async () => {
++	const output = resolve(UNIT, `proof-completion-rejected-${process.pid}-${Date.now()}`)
++	mkdirSync(output)
++	const packet = readPacket(readJSON(PACKET))
++	const tuple = readArray(JSON.parse(packet.identity))
++	const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++	ok(judge instanceof OllamaJudge)
++	ok(isJudgeQuestion(packet.question))
++	const request = { state: packet.variants[0]?.state ?? '', questions: { agree: packet.question } }
++	const witness = new NetworkWitness()
++	try {
++		for (const [index, raw] of [{ done: true, response: 'Yes', done_reason: 'length', prompt_eval_count: 20, eval_count: 1 }, { done: true }].entries()) {
++			const label = `rejected-${index}`
++			const bytes = Buffer.from(JSON.stringify(raw))
++			const original = Buffer.from(bytes)
++			writeFileSync(resolve(output, `${label}.response.bin`), bytes, { flag: 'wx' })
++			let rejection: unknown
++			await rejects(new Completion({ output, label, capture: { response: bytes } }).execute(() => {
++				try { return judge.read(raw, request) }
++				catch (error) { rejection = error; throw error }
++			}), error => { equal(error, rejection); return true })
++			ok(rejection instanceof Error)
++			equal(readObject(rejection).code, 'PROTOCOL')
++			const normalized = readObject(readJSON(resolve(output, `${label}.normalized.json`)))
++			equal(normalized.availability, 'unavailable')
++			equal(readObject(normalized.error).message, rejection.message)
++			ok(!('result' in normalized))
++			const wire = readObject(readJSON(resolve(output, `${label}.wire-evidence.json`)))
++			deepStrictEqual(wire.top, { availability: 'absent' })
++			if (index === 1) {
++				deepStrictEqual(wire.token, { availability: 'absent' })
++				deepStrictEqual(wire.finish, { availability: 'absent' })
++				deepStrictEqual(readObject(wire.usage).prompt, { availability: 'absent' })
++			} else {
++				deepStrictEqual(wire.token, { availability: 'present', value: 'Yes' })
++				deepStrictEqual(wire.finish, { availability: 'present', value: 'length' })
++			}
++			deepStrictEqual(readObject(wire.timing).total, { availability: 'absent' })
++			equal(readObject(wire.body).hash, computeHash(original))
++			deepStrictEqual(bytes, original)
++			deepStrictEqual(readFileSync(resolve(output, `${label}.response.bin`)), original)
++		}
++		equal(witness.count, 0)
++	} finally { witness.close() }
++})
++
++test('complete emitted decoder result passes through unchanged with present raw evidence', async () => {
++	const output = resolve(UNIT, `proof-completion-returned-${process.pid}-${Date.now()}`)
++	mkdirSync(output)
++	const packet = readPacket(readJSON(PACKET))
++	const tuple = readArray(JSON.parse(packet.identity))
++	const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++	ok(judge instanceof OllamaJudge)
++	ok(isJudgeQuestion(packet.question))
++	const request = { state: packet.variants[0]?.state ?? '', questions: { agree: packet.question } }
++	const raw = { done: true, response: 'Yes', done_reason: 'length', prompt_eval_count: 20, eval_count: 1, logprobs: [{ top_logprobs: [{ token: 'Yes', logprob: -0.2 }, { token: 'No', logprob: -2.2 }] }] }
++	let actual: ReturnType<typeof judge.read> | undefined
++	const result = await new Completion({ output, label: 'returned', capture: { response: Buffer.from(JSON.stringify(raw)) } }).execute(() => { actual = judge.read(raw, request); return actual })
++	equal(result, actual)
++	const normalized = readObject(readJSON(resolve(output, 'returned.normalized.json')))
++	equal(normalized.availability, 'present')
++	deepStrictEqual(normalized.result, actual)
++	ok(!('error' in normalized))
++	const wire = readObject(readJSON(resolve(output, 'returned.wire-evidence.json')))
++	deepStrictEqual(wire.top, { availability: 'present', value: raw.logprobs })
++	deepStrictEqual(readObject(wire.usage).completion, { availability: 'present', value: 1 })
++	deepStrictEqual(readObject(wire.timing).evaluation, { availability: 'absent' })
++	deepStrictEqual(describeField({ response: null }, 'response', 'absent'), { availability: 'present', value: null })
++})
++
++test('malformed JSON and absent capture describe raw fields and preserve the original rejection', async () => {
++	const output = resolve(UNIT, `proof-completion-unreadable-${process.pid}-${Date.now()}`)
++	mkdirSync(output)
++	const packet = readPacket(readJSON(PACKET))
++	const tuple = readArray(JSON.parse(packet.identity))
++	const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++	ok(judge instanceof OllamaJudge)
++	ok(isJudgeQuestion(packet.question))
++	const request = { state: packet.variants[0]?.state ?? '', questions: { agree: packet.question } }
++	for (const [index, bytes] of [Buffer.from('{invalid'), undefined].entries()) {
++		const label = `unreadable-${index}`
++		let rejection: unknown
++		await rejects(new Completion({ output, label, capture: { response: bytes } }).execute(() => {
++			try { return judge.read(bytes === undefined ? undefined : JSON.parse(bytes.toString('utf8')), request) }
++			catch (error) { rejection = error; throw error }
++		}), error => { equal(error, rejection); return true })
++		ok(rejection instanceof Error)
++		const normalized = readObject(readJSON(resolve(output, `${label}.normalized.json`)))
++		equal(normalized.availability, 'unavailable')
++		equal(readObject(normalized.error).message, rejection.message)
++		const wire = readObject(readJSON(resolve(output, `${label}.wire-evidence.json`)))
++		const availability = bytes === undefined ? 'absent' : 'unparseable'
++		equal(readObject(wire.body).availability, availability)
++		for (const field of [wire.token, wire.finish, wire.top, ...Object.values(readObject(wire.usage)), ...Object.values(readObject(wire.timing))]) deepStrictEqual(field, { availability })
++		if (bytes !== undefined) equal(readObject(wire.body).hash, computeHash(bytes))
++	}
++})
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/retain-repair.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/retain-repair.ts
+new file mode 100644
+index 000000000..272c49954
+--- /dev/null
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/retain-repair.ts
+@@ -0,0 +1,14 @@
++import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { spawnSync } from 'node:child_process'
++import { UNIT } from './constants.ts'
++import { computeOperator, readBinding, writeArtifact } from './helpers.ts'
++
++const output = resolve(UNIT, 'precursor-repair')
++mkdirSync(output)
++const files = readdirSync(UNIT, { withFileTypes: true }).filter(entry => entry.isFile() && entry.name !== 'retain-repair.ts').map(entry => entry.name)
++for (const name of files) writeFileSync(resolve(output, name), readFileSync(resolve(UNIT, name)), { flag: 'wx' })
++const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8' })
++if (status.status !== 0) throw new Error(status.stderr)
++writeArtifact(resolve(output, 'custody.json'), { operator: computeOperator(), files: files.map(name => readBinding(resolve(UNIT, name))), status: status.stdout, at: new Date().toISOString() })
++console.log(JSON.stringify({ output, operator: computeOperator(), files: files.length }))
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/mutation-repair.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/mutation-repair.ts
+new file mode 100644
+index 000000000..56928f352
+--- /dev/null
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/mutation-repair.ts
+@@ -0,0 +1,35 @@
++import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { spawnSync } from 'node:child_process'
++import { ROOT, UNIT } from './constants.ts'
++import { computeHash, readBinding, writeArtifact } from './helpers.ts'
++
++const output = resolve(UNIT, `proof-repair-mutation-${Date.now()}`)
++mkdirSync(output)
++const path = resolve(UNIT, 'Completion.ts')
++const original = readFileSync(path)
++const source = original.toString('utf8')
++const lines = source.split(/\r\n|\n/)
++const targets = lines.filter(line => line.includes('writeArtifact') && line.includes("availability: 'unavailable'"))
++const target = targets[0]
++if (targets.length !== 1 || target === undefined) throw new Error('Expected one load-bearing rejection-result write')
++const mutant = source.replace(target, '\t\t\t\t// The scoped mutation disables rejected-result custody.')
++const args = ['--test', '--test-name-pattern', '^real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence$', resolve(UNIT, 'Completion.test.ts')]
++writeFileSync(resolve(output, 'Completion-original.bin'), original, { flag: 'wx' })
++writeFileSync(resolve(output, 'Completion-mutant.bin'), mutant, { flag: 'wx' })
++let failed = false
++try {
++	writeFileSync(path, mutant)
++	const started = performance.now()
++	const child = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8', env: {} })
++	writeArtifact(resolve(output, 'red.json'), { command: [process.execPath, ...args], exit: child.status, stdout: child.stdout, stderr: child.stderr, wall: performance.now() - started })
++	failed = child.status === 1 && child.stdout.includes('real decoder rejection retains per-request unavailable result and explicit missing logprobs evidence') && /fail 1/.test(child.stdout) && child.stdout.includes('ENOENT') && child.stdout.includes('normalized.json')
++} finally { writeFileSync(path, original) }
++if (!failed) throw new Error(`Mutation did not distinguish the missing artifact; see ${output}`)
++if (readBinding(path).hash !== computeHash(original)) throw new Error('Restored completion bytes differ')
++const started = performance.now()
++const child = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8', env: {} })
++writeArtifact(resolve(output, 'green.json'), { command: [process.execPath, ...args], exit: child.status, stdout: child.stdout, stderr: child.stderr, wall: performance.now() - started })
++if (child.status !== 0 || !/pass 1/.test(child.stdout)) throw new Error(`Restored mutation test failed; see ${output}`)
++writeArtifact(resolve(output, 'summary.json'), { original: computeHash(original), mutant: computeHash(mutant), restored: readBinding(path), removed: target, replacement: '\t\t\t\t// The scoped mutation disables rejected-result custody.', red: readBinding(resolve(output, 'red.json')), green: readBinding(resolve(output, 'green.json')), inference: 0 })
++console.log(JSON.stringify({ output, red: 1, green: 0, restored: readBinding(path).hash }))
+diff --git a/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/freeze-repair.ts b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/freeze-repair.ts
+new file mode 100644
+index 000000000..a0e9f300b
+--- /dev/null
++++ b/C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-judge-counterfactual/freeze-repair.ts
+@@ -0,0 +1,16 @@
++import { resolve } from 'node:path'
++import { BUILD, PACKET, ROOT, UNIT } from './constants.ts'
++import { computeOperator, readArray, readBinding, readJSON, readObject, readString, writeArtifact } from './helpers.ts'
++
++const precursor = resolve(UNIT, 'plan-ready.json')
++const plan = readObject(readJSON(precursor))
++const packet = readObject(readJSON(PACKET))
++readBinding(PACKET, readString(readObject(plan.packet).hash))
++readBinding(BUILD, readString(plan.build))
++for (const entry of readArray(packet.bindings)) {
++	const binding = readObject(entry)
++	readBinding(resolve(ROOT, readString(binding.path)), readString(binding.hash))
++}
++const successor = resolve(UNIT, 'plan-ready-repair-typed.json')
++writeArtifact(successor, { ...plan, operator: computeOperator(), frozen: new Date().toISOString(), supersedes: { plan: readBinding(precursor), operator: plan.operator, reason: 'Per-request completion persists actual result or unavailable/error status and independent explicit raw-field absence even when actual decoding rejects; packet, identities, settings, renderings, and sequence unchanged' } })
++console.log(JSON.stringify({ successor: readBinding(successor), packet: readBinding(PACKET), operator: computeOperator(), inference: 0 }))

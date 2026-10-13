@@ -1,0 +1,80 @@
+[
+  {
+    "line": 299,
+    "topic": "contacts",
+    "version": 2,
+    "event": "keep",
+    "status": "current",
+    "prose": "(2026-10-08) user: For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release.\n(2026-10-08) user: Until 2026-10-09, Ruth Adeyemi, our deputy manager, gives any sign-off that would normally need Marcus.\n(2026-10-09) user: Small fix on Copperline: Owen's extension is 4310, not 4301.",
+    "trigger": "unchanged",
+    "failures": [],
+    "answers": {}
+  },
+  {
+    "line": 302,
+    "topic": "owner:LH-71592",
+    "version": 3,
+    "event": "build",
+    "status": "stale",
+    "prose": "(2026-10-10) user: Copperline's accounts team wrote in: they want to put a $1,500 reorder on credit.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account manager Tobias Lindqvist since 2026-10-0",
+    "trigger": "removed",
+    "failures": [
+      {
+        "kind": "id",
+        "token": "2026-10-0"
+      }
+    ],
+    "answers": {}
+  },
+  {
+    "line": 303,
+    "topic": "owner:LH-71592",
+    "version": 4,
+    "event": "build",
+    "status": "stale",
+    "prose": "(2026-10-10) user: Copperline's accounts team wrote in: they want to put a $1,500 reorder on credit.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account manager Tobias Lindqvist since 2026-10-0",
+    "trigger": "retry",
+    "failures": [
+      {
+        "kind": "id",
+        "token": "2026-10-0"
+      }
+    ],
+    "answers": {}
+  },
+  {
+    "line": 304,
+    "topic": "owner:LH-71592",
+    "version": 5,
+    "event": "build",
+    "status": "stale",
+    "prose": "(2026-10-10) user: Copperline's accounts team wrote in: they want to put a $1,500 reorder on credit.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding.\n(2026-10-10) tool: lookup_customer {\"account\":\"LH-71592\"}: Account manager Tobias Lindqvist since 2026-10-0",
+    "trigger": "retry",
+    "failures": [
+      {
+        "kind": "id",
+        "token": "2026-10-0"
+      }
+    ],
+    "answers": {}
+  },
+  {
+    "line": 305,
+    "topic": "owner:LH-71592",
+    "version": 5,
+    "event": "withhold",
+    "status": "withheld",
+    "failures": [
+      {
+        "kind": "id",
+        "token": "2026-10-0"
+      }
+    ],
+    "answers": {}
+  },
+  {
+    "line": 312,
+    "event": "maintenance",
+    "status": "complete"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "executable": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "args": [
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\witness-negative.ts"
+  ],
+  "exit": 3,
+  "signal": null,
+  "stdout": "{\"witness\":true,\"global\":1,\"native\":0}\n",
+  "stderr": "file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/Guard.ts:15\r\n\t\tthrow new Error('Offline witness refuses fetch before native dispatch')\r\n\t\t      ^\r\n\r\nError: Offline witness refuses fetch before native dispatch\r\n    at #refuseFetch (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/Guard.ts:15:9)\r\n    at file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-control/witness-negative.ts:4:7\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\r\n    at async node:internal/modules/esm/loader:647:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\r\n\r\nNode.js v24.21.0\r\n",
+  "duration": 102.41859999999997
+}

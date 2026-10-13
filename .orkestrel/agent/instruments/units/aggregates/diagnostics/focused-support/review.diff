@@ -1,0 +1,976 @@
+diff --git a/tmp/units/aggregate-focused-screen/constants.ts b/tmp/units/aggregate-focused-screen/constants.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/constants.ts
+@@ -0,0 +1,33 @@
++import { dirname, resolve } from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++/** Names the owned instrument directory. */
++export const UNIT = dirname(fileURLToPath(import.meta.url))
++/** Names the frozen specification. */
++export const SPECIFICATION = resolve(UNIT, '../../../.orkestrel/agent/instruments/units/aggregates/admission-focus-r2.json')
++/** Binds the root-selected specification bytes. */
++export const SPECIFICATION_HASH = 'bd907fbb6b214f3fba41115e8ef31a83a58a5174d26ae153efc66d5c893bae71'
++/** Names the superseded specification retained as custody evidence. */
++export const ORIGINAL = resolve(UNIT, '../../../.orkestrel/agent/instruments/units/aggregates/admission-focus.json')
++/** Binds the superseded specification bytes. */
++export const ORIGINAL_HASH = '77e8419febb89e3e3bc2af58fed8d4987e1dde472f74da2fa56afe039793c88c'
++/** Names the accepted predecessor packet. */
++export const PREDECESSOR = resolve(UNIT, '../aggregate-admission-screen-r2/packet-final.json')
++/** Binds the accepted predecessor packet bytes. */
++export const PREDECESSOR_HASH = '5bcb670e5304dce5fd688500f1a8e62e1edbc01f14124513441ead0a51bb6470'
++/** Names the root-owned accepted independent label record. */
++export const LABELS = resolve(UNIT, '../../../.orkestrel/agent/instruments/units/aggregates/reports/resumption-focus-labels.md')
++/** Binds root's accepted corrected focus labels. */
++export const LABELS_HASH = '32df326cece3fd686ae6bda040af74aee30254687684d93f153c71e9b9e53cb2'
++/** Names the create-only prepared packet. */
++export const PACKET = resolve(UNIT, 'packet-final.json')
++/** Names the executable source population bound by the operator digest. */
++export const OPERATOR_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Operator.ts', 'main.ts', 'prepare.ts', 'offline.config.ts'])
++/** Names emitted modules added to the predecessor runtime bindings. */
++export const EMITTED_FILES = Object.freeze(['bench5/aggregates/helpers.js', 'bench5/aggregates/helpers.d.ts', 'bench5/aggregates/constants.js', 'bench5/aggregates/constants.d.ts', 'bench5/types.js', 'bench5/types.d.ts', 'vendor/agent-0.0.30-trimmed/index.js', 'vendor/agent-0.0.30-trimmed/index.d.ts'])
++/** Names accepted instrument files imported at runtime. */
++export const REUSED_FILES = Object.freeze(['types.ts', 'constants.ts', 'helpers.ts', 'Recorder.ts', 'Completion.ts', 'NetworkWitness.ts'])
++/** Names the corrected frozen forward and reverse request order. */
++export const SEQUENCE = Object.freeze(['statement-a', 'statement-b', 'statement-b', 'statement-a'])
++/** Names the frozen focus selector without changing candidate prose. */
++export const FOCUS_MARKER = 'Escalation ESC-2219 remains open because Sigrid reports'
+diff --git a/tmp/units/aggregate-focused-screen/helpers.ts b/tmp/units/aggregate-focused-screen/helpers.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/helpers.ts
+@@ -0,0 +1,280 @@
++import type { AggregateSource } from '../../../.orkestrel/agent/instruments/harness/.build/bench5/types.js'
++import type { ExecutionOptions, Packet } from '../aggregate-judge-counterfactual/types.ts'
++import type { Census, Comparison, RankingReading, RankingResult, ScreenPacket, Span } from './types.ts'
++import { existsSync, lstatSync, realpathSync } from 'node:fs'
++import { isAbsolute, relative, resolve, sep } from 'node:path'
++import { renderSource } from '../../../.orkestrel/agent/instruments/harness/.build/bench5/aggregates/helpers.js'
++import { splitSentences } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/agent-0.0.30-trimmed/index.js'
++import { BUILD, BUILD_HASH, ROOT } from '../aggregate-judge-counterfactual/constants.ts'
++import { computeHash, readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString, replaceTarget } from '../aggregate-judge-counterfactual/helpers.ts'
++import { FOCUS_MARKER, LABELS, LABELS_HASH, OPERATOR_FILES, ORIGINAL, ORIGINAL_HASH, PACKET, PREDECESSOR, PREDECESSOR_HASH, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++
++/** Reads only the fields the emitted source renderer consumes.
++ * @param value - A complete original source object
++ * @returns The renderer's source projection
++ * @example readSource({ id: 'source', sentence: 0, role: 'user', text: 'Complete.', day: '2026-10-10' })
++ */
++export function readSource(value: unknown): AggregateSource {
++	const source = readObject(value)
++	const role = source.role
++	if (role !== 'system' && role !== 'user' && role !== 'assistant' && role !== 'tool') throw new Error('Malformed source role')
++	return { id: readString(source.id), sentence: readNumber(source.sentence), role, text: readString(source.text), day: readString(source.day) }
++}
++
++/** Partitions complete candidate lines through the installed sentence primitive.
++ * @param candidate - The exact unchanged candidate
++ * @returns Disjoint UTF-16 slices covering every nonwhitespace character
++ * @example partitionCandidate('First. Second.').map(span => span.text)
++ */
++export function partitionCandidate(candidate: string): readonly Span[] {
++	const spans: Span[] = []
++	let offset = 0
++	for (const line of candidate.split(/\r\n|\n/)) {
++		let cursor = 0
++		if (line.trim() !== '') for (const text of splitSentences(line)) {
++			const start = line.indexOf(text, cursor)
++			if (text.trim() === '' || start < cursor || start < 0 || /\S/u.test(line.slice(cursor, start))) throw new Error('Malformed sentence coverage')
++			const end = start + text.length
++			spans.push({ start: offset + start, end: offset + end, text })
++			cursor = end
++		}
++		if (/\S/u.test(line.slice(cursor))) throw new Error('Uncovered line suffix')
++		offset += line.length
++		if (candidate.slice(offset, offset + 2) === '\r\n') offset += 2
++		else if (candidate[offset] === '\n') offset += 1
++	}
++	validateCoverage(candidate, spans)
++	return spans
++}
++
++/** Refuses gaps, overlaps, changed offsets, changed text, and empty coverage.
++ * @param candidate - The unchanged complete candidate
++ * @param spans - The prospective exact partition
++ * @returns Nothing when every nonwhitespace character is covered exactly once
++ * @example validateCoverage('Complete.', [{ start: 0, end: 9, text: 'Complete.' }])
++ */
++export function validateCoverage(candidate: string, spans: readonly Span[]): void {
++	if (spans.length === 0) throw new Error('Empty candidate coverage')
++	let cursor = 0
++	for (const span of spans) {
++		if (!Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) || span.start < cursor || span.end <= span.start || span.end > candidate.length || span.text.trim() === '' || candidate.slice(span.start, span.end) !== span.text) throw new Error('Span offset/text custody mismatch')
++		if (/\S/u.test(candidate.slice(cursor, span.start))) throw new Error('Dropped nonwhitespace span coverage')
++		cursor = span.end
++	}
++	if (/\S/u.test(candidate.slice(cursor))) throw new Error('Dropped nonwhitespace suffix coverage')
++}
++
++/** Selects the unique frozen marker within the complete candidate partition.
++ * @param candidate - The unchanged complete candidate
++ * @param spans - Its checked complete coverage
++ * @returns The exact focus slice without rewriting
++ * @example selectFocus('Escalation ESC-2219 remains open because Sigrid reports damage.', partitionCandidate('Escalation ESC-2219 remains open because Sigrid reports damage.'))
++ */
++export function selectFocus(candidate: string, spans: readonly Span[]): Span {
++	validateCoverage(candidate, spans)
++	const start = candidate.indexOf(FOCUS_MARKER)
++	if (start < 0 || candidate.indexOf(FOCUS_MARKER, start + 1) !== -1) throw new Error('Frozen focus marker is absent or repeated')
++	const matches = spans.filter(span => span.start <= start && span.end >= start + FOCUS_MARKER.length)
++	const focus = matches[0]
++	if (matches.length !== 1 || focus === undefined) throw new Error('Unique focus span absent')
++	return { start: focus.start, end: focus.end, text: focus.text }
++}
++
++/** Selects a declared exact statement only when it equals a unique complete partition span.
++ * @param candidate - The complete corrected candidate
++ * @param spans - Its exhaustive checked coverage
++ * @param text - The specification's exact declared focus
++ * @returns The unique exact statement slice
++ * @example selectStatement('Complete.', partitionCandidate('Complete.'), 'Complete.')
++ */
++export function selectStatement(candidate: string, spans: readonly Span[], text: string): Span {
++	validateCoverage(candidate, spans)
++	const start = candidate.indexOf(text)
++	if (text.trim() === '' || start < 0 || candidate.indexOf(text, start + 1) !== -1) throw new Error('Declared focus is absent or repeated')
++	const matches = spans.filter(span => span.start === start && span.end === start + text.length && span.text === text)
++	const focus = matches[0]
++	if (matches.length !== 1 || focus === undefined) throw new Error('Declared focus is not one complete partition span')
++	return { start: focus.start, end: focus.end, text: focus.text }
++}
++
++/** Derives only the specified repair-line replacement from the predecessor baseline.
++ * @param predecessor - The unchanged accepted predecessor packet
++ * @param text - The corrected declared repair line
++ * @returns The complete candidate with its other lines unchanged
++ * @example deriveCandidate(readPacket(readJSON(PREDECESSOR)), 'CORRECTED_LINE')
++ */
++export function deriveCandidate(predecessor: Packet, text: string): string {
++	const baseline = predecessor.variants.filter(variant => variant.name === 'both-removed')
++	const variant = baseline[0]
++	if (baseline.length !== 1 || variant === undefined || /\r|\n/u.test(text)) throw new Error('Corrected candidate requires one baseline and one replacement line')
++	const focus = selectFocus(variant.candidate, partitionCandidate(variant.candidate))
++	if (!variant.candidate.split(/\r\n|\n/).includes(focus.text)) throw new Error('Baseline repair focus is not a complete line')
++	return replaceTarget(variant.candidate, focus.text, text)
++}
++
++/** Renders complete evidence, candidate context, and exact focus in frozen order.
++ * @param sources - The complete original ordered sources
++ * @param candidate - The exact unchanged complete candidate
++ * @param focus - A checked exact slice of that candidate
++ * @returns The state with one-space JSON indentation
++ * @example renderState([], 'Complete.', { start: 0, end: 9, text: 'Complete.' })
++ */
++export function renderState(sources: readonly unknown[], candidate: string, focus: Span): string {
++	if (!Number.isSafeInteger(focus.start) || !Number.isSafeInteger(focus.end) || focus.start < 0 || focus.end <= focus.start || focus.end > candidate.length || focus.text.trim() === '' || candidate.slice(focus.start, focus.end) !== focus.text) throw new Error('Focus slice custody mismatch')
++	return JSON.stringify({ evidence: sources.map(source => renderSource(readSource(source))), candidate, focus: { start: focus.start, end: focus.end, text: focus.text } }, null, 1)
++}
++
++/** Checks rendering custody through a separate JSON decode and source interpolation.
++ * @param state - The serialized state
++ * @param sources - The expected complete ordered sources
++ * @param candidate - The unchanged candidate
++ * @param focus - The exact expected focus
++ * @returns Nothing when every field round-trips unchanged
++ * @example validateState(renderState([], 'Complete.', { start: 0, end: 9, text: 'Complete.' }), [], 'Complete.', { start: 0, end: 9, text: 'Complete.' })
++ */
++export function validateState(state: string, sources: readonly unknown[], candidate: string, focus: Span): void {
++	const decoded = readObject(JSON.parse(state))
++	if (JSON.stringify(Object.keys(decoded)) !== JSON.stringify(['evidence', 'candidate', 'focus']) || decoded.candidate !== candidate) throw new Error('Candidate/property custody mismatch')
++	const decodedfocus = readObject(decoded.focus)
++	if (JSON.stringify(Object.keys(decodedfocus)) !== JSON.stringify(['start', 'end', 'text']) || JSON.stringify(decodedfocus) !== JSON.stringify(focus) || candidate.slice(focus.start, focus.end) !== focus.text) throw new Error('Focus offset/text custody mismatch')
++	const evidence = readArray(decoded.evidence).map(readString)
++	if (evidence.length !== sources.length) throw new Error('Source membership custody mismatch')
++	for (const [index, value] of sources.entries()) {
++		const source = readObject(value)
++		if (evidence[index] !== `(${readString(source.day)}) ${readString(source.role)}: ${readString(source.text)}`) throw new Error('Ordered source custody mismatch')
++	}
++}
++
++/** Computes the digest of the exact executable instrument bytes.
++ * @returns The source-population SHA-256
++ * @example computeOperator()
++ */
++export function computeOperator(): string {
++	return computeHash(JSON.stringify(OPERATOR_FILES.map(name => [name, readBinding(resolve(UNIT, name)).hash])))
++}
++
++/** Reads exact span fields without coercion.
++ * @param value - A decoded candidate span
++ * @returns Its numeric offsets and unchanged text
++ * @example readSpan({ start: 0, end: 9, text: 'Complete.' })
++ */
++export function readSpan(value: unknown): Span {
++	const span = readObject(value)
++	return { start: readNumber(span.start), end: readNumber(span.end), text: readString(span.text) }
++}
++
++/** Reads a complete candidate census without narrowing its source data.
++ * @param value - The decoded census member
++ * @returns Its exact candidate, spans, focus, and rendered state
++ * @example readCensus({ name: 'statement', candidate: 'Complete.', spans: [{ start: 0, end: 9, text: 'Complete.' }], focus: { start: 0, end: 9, text: 'Complete.' }, state: 'STATE' })
++ */
++export function readCensus(value: unknown): Census {
++	const row = readObject(value)
++	return { name: readString(row.name), candidate: readString(row.candidate), spans: readArray(row.spans).map(readSpan), focus: readSpan(row.focus), state: readString(row.state) }
++}
++
++/** Reads corrected screen fields and verifies its fixed document bindings.
++ * @param value - The decoded contextual packet
++ * @returns The complete corrected screen shape
++ * @example readScreen(readJSON(PACKET))
++ */
++export function readScreen(value: unknown): ScreenPacket {
++	const row = readObject(value)
++	return {
++		id: readString(row.id), identity: readString(row.identity), digest: readString(row.digest), question: row.question,
++		separator: readString(row.separator), sources: readArray(row.sources), suffix: readString(row.suffix), sequence: readArray(row.sequence).map(readString),
++		bindings: readArray(row.bindings).map(entry => { const binding = readObject(entry); return readBinding(resolve(ROOT, readString(binding.path)), readString(binding.hash)) }),
++		rendering: readArray(row.rendering).map(entry => { const rendering = readObject(entry); return { name: readString(rendering.name), body: readString(rendering.body) } }),
++		variants: readArray(row.variants).map(readCensus), census: readArray(row.census).map(readCensus), operator: readString(row.operator),
++		specification: readBinding(SPECIFICATION, readString(readObject(row.specification).hash)), original: readBinding(ORIGINAL, readString(readObject(row.original).hash)), predecessor: readBinding(PREDECESSOR, readString(readObject(row.predecessor).hash)), labels: readBinding(LABELS, readString(readObject(row.labels).hash)),
++	}
++}
++
++/** Checks complete predecessor evidence, exhaustive census, and corrected single-line custody.
++ * @param packet - The prepared contextual screen
++ * @param predecessor - The unchanged accepted predecessor
++ * @returns Nothing when complete candidates and focus selections match the specification
++ * @example validatePopulation(readScreen(readJSON(PACKET)), readPacket(readJSON(PREDECESSOR)))
++ */
++export function validatePopulation(packet: ScreenPacket, predecessor: Packet): void {
++	if (packet.id !== predecessor.id || packet.identity !== predecessor.identity || packet.digest !== predecessor.digest || packet.separator !== predecessor.separator || packet.suffix !== predecessor.suffix || JSON.stringify(packet.sources) !== JSON.stringify(predecessor.sources) || JSON.stringify(packet.sequence) !== JSON.stringify(SEQUENCE)) throw new Error('Predecessor population custody mismatch')
++	if (packet.census.length !== predecessor.variants.length) throw new Error('Census membership custody mismatch')
++	for (const [index, census] of packet.census.entries()) {
++		const original = predecessor.variants[index]
++		if (original === undefined || census.name !== original.name || census.candidate !== original.candidate) throw new Error('Predecessor candidate census mismatch')
++		validateCoverage(original.candidate, census.spans)
++		if (JSON.stringify(census.spans) !== JSON.stringify(partitionCandidate(original.candidate)) || JSON.stringify(census.focus) !== JSON.stringify(selectFocus(original.candidate, census.spans))) throw new Error('Frozen predecessor partition/focus mismatch')
++		validateState(census.state, predecessor.sources, original.candidate, census.focus)
++		if (census.state !== renderState(predecessor.sources, original.candidate, census.focus)) throw new Error('Frozen census serialization mismatch')
++	}
++	const specification = readObject(readJSON(SPECIFICATION))
++	const declared = readArray(specification.variants).map(readObject)
++	if (packet.variants.length !== declared.length) throw new Error('Corrected variant membership mismatch')
++	for (const [index, variant] of packet.variants.entries()) {
++		const expected = declared[index]
++		if (expected === undefined || variant.name !== expected.name || variant.candidate !== expected.candidate || variant.candidate !== deriveCandidate(predecessor, readString(expected.focus))) throw new Error('Corrected candidate single-line custody mismatch')
++		validateCoverage(variant.candidate, variant.spans)
++		if (JSON.stringify(variant.spans) !== JSON.stringify(partitionCandidate(variant.candidate)) || JSON.stringify(variant.focus) !== JSON.stringify(selectStatement(variant.candidate, variant.spans, readString(expected.focus)))) throw new Error('Corrected partition/focus custody mismatch')
++		validateState(variant.state, predecessor.sources, variant.candidate, variant.focus)
++		if (variant.state !== renderState(predecessor.sources, variant.candidate, variant.focus)) throw new Error('Frozen corrected state serialization mismatch')
++	}
++	if (JSON.stringify(packet.rendering.map(entry => entry.name)) !== JSON.stringify(['statement-a', 'statement-b'])) throw new Error('Only the corrected pair can have frozen live bodies')
++}
++
++/** Validates exact execution hashes, accepted labels, and every runtime binding before fetch.
++ * @param options - Explicit execution custody arguments
++ * @returns The checked frozen screen
++ * @example validateExecution({ packet: 'HASH', build: 'HASH', operator: 'HASH', output: 'DIRECTORY' })
++ */
++export function validateExecution(options: ExecutionOptions): ScreenPacket {
++	if (!/^[a-f0-9]{64}$/.test(options.packet) || !/^[a-f0-9]{64}$/.test(options.operator) || options.build !== BUILD_HASH) throw new Error('Expected exact packet/build/operator hash arguments')
++	readBinding(PACKET, options.packet)
++	readBinding(BUILD, options.build)
++	if (computeOperator() !== options.operator) throw new Error('Operator hash mismatch')
++	validateDestination(options.output)
++	const packet = readScreen(readJSON(PACKET))
++	if (packet.operator !== options.operator || packet.specification.hash !== SPECIFICATION_HASH || packet.original.hash !== ORIGINAL_HASH || packet.predecessor.hash !== PREDECESSOR_HASH || packet.labels.hash !== LABELS_HASH) throw new Error('Frozen packet custody mismatch')
++	for (const binding of packet.bindings) readBinding(resolve(ROOT, binding.path), binding.hash)
++	if (JSON.stringify(packet.question) !== JSON.stringify(readObject(readJSON(SPECIFICATION)).question)) throw new Error('Frozen question mismatch')
++	validatePopulation(packet, readPacket(readJSON(PREDECESSOR)))
++	return packet
++}
++
++/** Refuses occupied output and paths outside the owned directory.
++ * @param path - The proposed create-only descendant
++ * @returns Nothing when output custody holds
++ * @example validateDestination('OWNED_DIRECTORY')
++ */
++export function validateDestination(path: string): void {
++	const output = resolve(path)
++	const descendant = relative(realpathSync(UNIT), output)
++	if (descendant === '' || descendant === '..' || descendant.startsWith(`..${sep}`) || isAbsolute(descendant)) throw new Error('Output must be a descendant of the owned directory')
++	let cursor = realpathSync(UNIT)
++	for (const segment of descendant.split(sep)) {
++		cursor = resolve(cursor, segment)
++		if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) throw new Error('Output crosses a symbolic link')
++	}
++	if (existsSync(output)) throw new Error('Output directory is occupied')
++}
++
++/** Compares the accepted supported focus independently in each corrected pass.
++ * @param readings - Sequential normalized scores without averaging
++ * @returns Incomplete for a prefix, refused for equality or reversal, or passed
++ * @example computeRanking([]).status // 'incomplete'
++ */
++export function computeRanking(readings: readonly RankingReading[]): RankingResult {
++	if (readings.length > SEQUENCE.length) throw new Error('Ranking sequence overrun')
++	for (const [index, reading] of readings.entries()) if (reading.ordinal !== index + 1 || reading.name !== SEQUENCE[index] || !Number.isFinite(reading.score) || reading.score < 0 || reading.score > 1) throw new Error('Ranking sequence or finite probability mismatch')
++	if (readings.length !== SEQUENCE.length) return { status: 'incomplete', comparisons: [] }
++	const comparisons: Comparison[] = []
++	for (const offset of [0, 2]) {
++		const pass = offset === 0 ? 'forward' : 'reverse'
++		const batch = readings.slice(offset, offset + 2)
++		const supported = batch.find(reading => reading.name === 'statement-b')
++		const unsupported = batch.find(reading => reading.name === 'statement-a')
++		if (supported === undefined || unsupported === undefined) throw new Error('Focused ranking member absent')
++		comparisons.push({ pass, supported: supported.score, unsupported: unsupported.score, exceeds: supported.score > unsupported.score })
++	}
++	return { status: comparisons.every(comparison => comparison.exceeds) ? 'passed' : 'refused', comparisons }
++}
++
+diff --git a/tmp/units/aggregate-focused-screen/main.ts b/tmp/units/aggregate-focused-screen/main.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/main.ts
+@@ -0,0 +1,9 @@
++import { Operator } from './Operator.ts'
++
++if (process.argv.includes('--execute')) {
++	if (process.argv.length !== 11 || process.argv[2] !== '--execute' || process.argv[3] !== '--packet' || process.argv[5] !== '--build' || process.argv[7] !== '--operator' || process.argv[9] !== '--output' || process.argv[4] === undefined || process.argv[6] === undefined || process.argv[8] === undefined || process.argv[10] === undefined) throw new Error('Use --execute --packet HASH --build HASH --operator HASH --output DIRECTORY')
++	await new Operator().execute({ packet: process.argv[4], build: process.argv[6], operator: process.argv[8], output: process.argv[10] })
++} else {
++	if (process.argv.length !== 2) throw new Error('Default invocation is offline; only explicit execution arguments are accepted')
++	console.log('Offline default: no model or network request. Run prepare.ts to create the frozen corrected preparation.')
++}
+diff --git a/tmp/units/aggregate-focused-screen/negative.test.ts b/tmp/units/aggregate-focused-screen/negative.test.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/negative.test.ts
+@@ -0,0 +1,60 @@
++import { test } from 'node:test'
++import { readJSON, readPacket } from '../aggregate-judge-counterfactual/helpers.ts'
++import { PACKET, PREDECESSOR, SEQUENCE } from './constants.ts'
++import { computeRanking, partitionCandidate, readScreen, renderState, selectFocus, validateCoverage, validatePopulation, validateState } from './helpers.ts'
++
++test('dropped span control must fail complete coverage', () => {
++	const candidate = 'First supported. Final unsupported prerequisite.'
++	validateCoverage(candidate, partitionCandidate(candidate).slice(0, -1))
++})
++
++test('changed offset control must fail exact slice custody', () => {
++	const candidate = 'First. Second.'
++	validateCoverage(candidate, partitionCandidate(candidate).map(span => ({ ...span, start: span.start + 1 })))
++})
++
++test('changed text control must fail exact slice custody', () => {
++	const candidate = 'First. Second.'
++	validateCoverage(candidate, partitionCandidate(candidate).map(span => ({ ...span, text: `${span.text}!` })))
++})
++
++test('swapped chronology control must fail ordered source custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	const focus = selectFocus(candidate, partitionCandidate(candidate))
++	validateState(renderState([...original.sources].reverse(), candidate, focus), original.sources, candidate, focus)
++})
++
++test('omitted source control must fail source membership custody', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	const candidate = original.variants[0]?.candidate ?? ''
++	const focus = selectFocus(candidate, partitionCandidate(candidate))
++	validateState(renderState(original.sources.slice(1), candidate, focus), original.sources, candidate, focus)
++})
++import { equal } from 'node:assert'
++
++test('corrected candidate drift control must fail single-line custody', () => {
++	const packet = readScreen(readJSON(PACKET))
++	validatePopulation({ ...packet, variants: packet.variants.map(variant => ({ ...variant, candidate: `${variant.candidate}!` })) }, readPacket(readJSON(PREDECESSOR)))
++})
++
++test('corrected focus drift control must fail exact focus custody', () => {
++	const packet = readScreen(readJSON(PACKET))
++	validatePopulation({ ...packet, variants: packet.variants.map(variant => ({ ...variant, focus: { ...variant.focus, text: `${variant.focus.text}!` } })) }, readPacket(readJSON(PREDECESSOR)))
++})
++
++test('missing reading control must fail complete ranking assertion', () => {
++	equal(computeRanking(SEQUENCE.slice(0, -1).map((name, index) => ({ ordinal: index + 1, name, score: name === 'statement-b' ? 0.9 : 0.2 }))).status, 'passed')
++})
++
++test('equality control must fail strict ranking assertion', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: 0.5 }))).status, 'passed')
++})
++
++test('wrong direction control must fail strict ranking assertion', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: name === 'statement-b' ? 0.1 : 0.9 }))).status, 'passed')
++})
++
++test('reversed pass control must fail independent reverse comparison', () => {
++	equal(computeRanking(SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: index < 2 ? name === 'statement-b' ? 0.9 : 0.2 : name === 'statement-b' ? 0.1 : 0.8 }))).status, 'passed')
++})
+diff --git a/tmp/units/aggregate-focused-screen/offline.config.ts b/tmp/units/aggregate-focused-screen/offline.config.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/offline.config.ts
+@@ -0,0 +1,3 @@
++import { Operator } from './Operator.ts'
++
++await new Operator().inspect()
+diff --git a/tmp/units/aggregate-focused-screen/Operator.ts b/tmp/units/aggregate-focused-screen/Operator.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/Operator.ts
+@@ -0,0 +1,223 @@
++import type { Binding, ExecutionOptions, Reading } from '../aggregate-judge-counterfactual/types.ts'
++import type { Census, RankingResult, ScreenPacket } from './types.ts'
++import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
++import { createRequire } from 'node:module'
++import { dirname, resolve } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { AgentJudge, isJudgeQuestion } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import { createOllamaJudge, MICA_RENDER_REVISION, renderJudgePrompt } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/ollama/index.js'
++import { BUILD, BUILD_HASH, DAEMON, HARNESS, ROOT, VENDOR } from '../aggregate-judge-counterfactual/constants.ts'
++import { computeHash, computeReplay, readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { Recorder } from '../aggregate-judge-counterfactual/Recorder.ts'
++import { Completion } from '../aggregate-judge-counterfactual/Completion.ts'
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++import { EMITTED_FILES, LABELS, LABELS_HASH, ORIGINAL, ORIGINAL_HASH, PACKET, PREDECESSOR, PREDECESSOR_HASH, REUSED_FILES, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++import { computeOperator, computeRanking, deriveCandidate, partitionCandidate, renderState, selectFocus, selectStatement, validateDestination, validateExecution, validatePopulation, validateState } from './helpers.ts'
++
++/** Prepares and executes the corrected contextual support discriminator. */
++export class Operator {
++	#tags = 0
++	#dispatches = 0
++
++	/** Prepares exact requests and exhaustive spans under refusing fetch guards.
++	 * @param output - A create-only destination inside the owned directory
++	 * @returns Nothing after retaining the corrected frozen packet and preparation plan
++	 * @example new Operator().prepare()
++	 */
++	prepare(output: string = UNIT): void {
++		const fetch = globalThis.fetch
++		const witness = new NetworkWitness()
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		this.#dispatches = 0
++		try {
++			const packetpath = resolve(output, 'packet-final.json')
++			const planpath = resolve(output, 'plan-final.json')
++			if (resolve(output) !== UNIT) validateDestination(output)
++			if (existsSync(packetpath) || existsSync(planpath) || (resolve(output) !== UNIT && existsSync(output))) throw new Error('Preparation artifacts are occupied')
++			const specification = readBinding(SPECIFICATION, SPECIFICATION_HASH)
++			const prior = readBinding(ORIGINAL, ORIGINAL_HASH)
++			const predecessor = readBinding(PREDECESSOR, PREDECESSOR_HASH)
++			const labels = readBinding(LABELS, LABELS_HASH)
++			readBinding(BUILD, BUILD_HASH)
++			const original = readPacket(readJSON(PREDECESSOR))
++			const spec = readObject(readJSON(SPECIFICATION))
++			if (spec.revision !== 'focus-2' || JSON.stringify(readObject(spec.screen).sequence) !== JSON.stringify(SEQUENCE) || !isJudgeQuestion(spec.question) || JSON.stringify(spec.question) !== JSON.stringify(readObject(readJSON(ORIGINAL)).question) || JSON.stringify(spec.question.criteria) !== JSON.stringify(readObject(original.question).criteria)) throw new Error('Frozen specification/question/criteria mismatch')
++			const tuple = readArray(JSON.parse(original.identity))
++			if (tuple.length !== 5 || tuple[4] !== MICA_RENDER_REVISION) throw new Error('Frozen identity revision mismatch')
++			const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]), url: DAEMON, timeout: 300000 })
++			if (!(judge instanceof AgentJudge) || judge.model !== original.identity) throw new Error('Installed judge identity mismatch')
++			const census: readonly Census[] = original.variants.map(variant => {
++				const spans = partitionCandidate(variant.candidate)
++				const focus = selectFocus(variant.candidate, spans)
++				const state = renderState(original.sources, variant.candidate, focus)
++				validateState(state, original.sources, variant.candidate, focus)
++				return { name: variant.name, candidate: variant.candidate, spans, focus, state }
++			})
++			const variants = readArray(spec.variants).map(entry => {
++				const declared = readObject(entry)
++				const candidate = deriveCandidate(original, readString(declared.focus))
++				if (candidate !== declared.candidate) throw new Error('Declared corrected candidate is not the exact single-line replacement')
++				const spans = partitionCandidate(candidate)
++				const focus = selectStatement(candidate, spans, readString(declared.focus))
++				return { name: readString(declared.name), candidate, spans, focus, state: renderState(original.sources, candidate, focus) }
++			})
++			const question = spec.question
++			const rendering = variants.map(variant => {
++				const body = judge.body({ state: variant.state, questions: { agree: question } })
++				if (readObject(body).prompt !== renderJudgePrompt(variant.state, question, readString(tuple[1]))) throw new Error('Actual emitted renderer mismatch')
++				return { name: variant.name, body: JSON.stringify(body) }
++			})
++			const bindings: Binding[] = original.bindings.map(binding => readBinding(resolve(ROOT, binding.path), binding.hash))
++			bindings.push(specification, prior, predecessor, labels)
++			for (const name of REUSED_FILES) bindings.push(readBinding(resolve(UNIT, '../aggregate-judge-counterfactual', name)))
++			const build = readObject(readJSON(BUILD))
++			for (const name of EMITTED_FILES) {
++				const declared = readArray(build.outputs).map(readObject).find(entry => entry.path === name)
++				if (declared === undefined) throw new Error(`Emitted runtime missing from frozen build: ${name}`)
++				bindings.push(readBinding(resolve(HARNESS, '.build', name), readString(declared.hash)))
++			}
++			this.#bindDependencies(bindings)
++			const packet: ScreenPacket = { id: original.id, identity: original.identity, digest: original.digest, separator: original.separator, sources: original.sources, suffix: original.suffix, specification, original: prior, predecessor, labels, operator: computeOperator(), question, sequence: SEQUENCE, variants, census, bindings: [...new Map(bindings.map(binding => [binding.path, binding])).values()], rendering }
++			validatePopulation(packet, original)
++			const sizes = rendering.map(entry => {
++				const body = readObject(JSON.parse(entry.body))
++				const prompt = readString(body.prompt)
++				const options = readObject(body.options)
++				if (options.num_predict !== 1 || options.num_ctx !== 4096) throw new Error('Unchanged context/completion contract mismatch')
++				return { name: entry.name, body: { bytes: Buffer.byteLength(entry.body, 'utf8'), units: entry.body.length }, prompt: { bytes: Buffer.byteLength(prompt, 'utf8'), units: prompt.length }, context: options.num_ctx, completion: options.num_predict }
++			})
++			if (resolve(output) !== UNIT) mkdirSync(output)
++			writeArtifact(packetpath, packet)
++			writeArtifact(resolve(output, 'census.json'), { predecessor, specification, census, variants })
++			if (this.#dispatches !== 0 || witness.count !== 0) throw new Error('Offline preparation dispatched a request')
++			writeArtifact(planpath, { packet: readBinding(packetpath), build: BUILD_HASH, operator: packet.operator, specification, original: prior, predecessor, labels, sequence: SEQUENCE, sizes, ceilings: { inference: SEQUENCE.length, daemon: 2, retries: 0, body: Math.max(...sizes.map(size => size.body.bytes)), prompt: Math.max(...sizes.map(size => size.prompt.bytes)) }, fit: 'Offline fit is unproved. Byte and UTF-16 sizes are not exact token counts; no source shortening is permitted.', host: { platform: process.platform, node: process.version }, guard: { dispatches: this.#dispatches, native: witness.count }, interpretation: 'Necessary local prerequisite discrimination only; no calibration, causal explanation, full-candidate qualification, or adoption verdict.' })
++			console.log(JSON.stringify({ prepared: true, packet: readBinding(packetpath), operator: packet.operator, dispatches: this.#dispatches, modelRequests: 0 }))
++		} finally {
++			globalThis.fetch = fetch
++			console.log(`Offline global-fetch guard dispatches: ${this.#dispatches}; native dispatches: ${witness.count}`)
++			witness.close()
++		}
++	}
++
++	/** Imports the default entry under refusing global and native fetch witnesses.
++	 * @returns Nothing after reporting dispatch counts
++	 * @example await new Operator().inspect()
++	 */
++	async inspect(): Promise<void> {
++		const fetch = globalThis.fetch
++		const witness = new NetworkWitness()
++		this.#dispatches = 0
++		globalThis.fetch = this.#refuseFetch.bind(this)
++		try { await import('./main.ts') }
++		finally {
++			globalThis.fetch = fetch
++			console.log(`Offline global-fetch guard dispatches: ${this.#dispatches}; native dispatches: ${witness.count}`)
++			witness.close()
++		}
++	}
++
++	/** Executes the frozen pair only after complete local custody validation.
++	 * @param options - Exact packet, build, and operator hashes with a vacant output
++	 * @returns Nothing after retaining complete ranking or incomplete execution evidence
++	 * @example await new Operator().execute({ packet: 'HASH', build: 'HASH', operator: 'HASH', output: 'DIRECTORY' })
++	 */
++	async execute(options: ExecutionOptions): Promise<void> {
++		const packet = validateExecution(options)
++		const output = resolve(options.output)
++		mkdirSync(output)
++		const recorder = new Recorder(output)
++		const controller = new AbortController()
++		const readings: Reading[] = []
++		let complete = false
++		let failure: string | undefined
++		let ranking: RankingResult = { status: 'incomplete', comparisons: [] }
++		this.#tags = 0
++		const abort = controller.abort.bind(controller)
++		process.once('SIGINT', abort)
++		process.once('SIGTERM', abort)
++		try {
++			writeArtifact(resolve(output, 'custody.json'), { options, packet: readBinding(PACKET), operator: computeOperator(), bindings: packet.bindings, labels: packet.labels, sequence: packet.sequence, host: { node: process.version, platform: process.platform }, at: new Date().toISOString() })
++			const start = await this.#verifyDaemon(packet, output, 'start', controller.signal)
++			const tuple = readArray(JSON.parse(packet.identity))
++			const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]), url: DAEMON, timeout: 300000, fetch: recorder.fetch.bind(recorder) })
++			if (!(judge instanceof AgentJudge) || judge.model !== packet.identity || !isJudgeQuestion(packet.question)) throw new Error('Frozen judge identity/question/superclass mismatch')
++			for (const [index, name] of packet.sequence.entries()) {
++				const variant = packet.variants.find(entry => entry.name === name)
++				const frozen = packet.rendering.find(entry => entry.name === name)
++				if (variant === undefined || frozen === undefined) throw new Error('Frozen sequence variant absent')
++				const label = `${String(index + 1).padStart(2, '0')}-${name}`
++				const request = { state: variant.state, questions: { agree: packet.question } }
++				const body = JSON.stringify(judge.body(request))
++				if (body !== frozen.body) throw new Error('Frozen runtime rendering mismatch')
++				recorder.arm(label, body)
++				const started = performance.now()
++				const result = await new Completion({ output, label, capture: recorder }).execute(() => judge.ask(request, controller.signal))
++				if (recorder.count !== index + 1 || recorder.response === undefined) throw new Error('Actual response accounting mismatch')
++				const response = Buffer.from(recorder.response).toString('utf8')
++				const raw = readObject(JSON.parse(response))
++				const answer = result.answers.agree
++				if (answer?.form !== 'noul' || result.model !== packet.identity || result.refusals?.agree !== undefined) throw new Error('Missing/malformed normalized Yes answer')
++				const replay = computeReplay(raw, readNumber(tuple[2]))
++				const score = readNumber(answer.noul)
++				const difference = replay - score
++				writeArtifact(resolve(output, `${label}.replay.json`), { replay, library: score, difference, token: raw.response, finish: raw.done_reason, top: raw.logprobs, usage: { prompt: raw.prompt_eval_count, completion: raw.eval_count, normalized: result.usage }, timing: { total: raw.total_duration, load: raw.load_duration, prompt: raw.prompt_eval_duration, evaluation: raw.eval_duration } })
++				if (Math.abs(difference) > 1e-12 || score < 0 || score > 1) throw new Error('Independent arithmetic replay mismatch')
++				if (raw.done !== true || typeof raw.response !== 'string' || typeof raw.done_reason !== 'string' || raw.eval_count !== 1 || result.usage === undefined || result.usage.prompt + result.usage.completion >= 4096) throw new Error('Incomplete, missing-usage, or capacity-bound response evidence')
++				readings.push({ ordinal: index + 1, name, score, replay, difference, body, response, usage: result.usage, wall: performance.now() - started })
++			}
++			const end = await this.#verifyDaemon(packet, output, 'end', controller.signal)
++			writeArtifact(resolve(output, 'daemon-comparison.json'), { start, end })
++			for (const binding of packet.bindings) readBinding(resolve(ROOT, binding.path), binding.hash)
++			if (computeOperator() !== options.operator) throw new Error('Operator changed during execution')
++			readBinding(PACKET, options.packet)
++			ranking = computeRanking(readings)
++			writeArtifact(resolve(output, 'ranking.json'), ranking)
++			complete = true
++		} catch (error) {
++			failure = error instanceof Error ? error.message : String(error)
++			throw error
++		} finally {
++			controller.abort()
++			process.removeListener('SIGINT', abort)
++			process.removeListener('SIGTERM', abort)
++			writeArtifact(resolve(output, 'outcome.json'), { complete, status: complete ? ranking.status : 'incomplete', ...(failure === undefined ? {} : { failure }), modelRequests: recorder.count, daemonChecks: this.#tags, completed: readings.length, readings, ranking, interpretation: complete ? 'Complete local screen; failed ordering refuses the method.' : 'Incomplete measurement; no method ruling.', at: new Date().toISOString() })
++		}
++	}
++
++	#refuseFetch(): Promise<Response> {
++		this.#dispatches += 1
++		return Promise.reject(new Error('Offline preparation refuses global fetch'))
++	}
++
++	#bindDependencies(bindings: Binding[]): void {
++		const queue = [{ origin: VENDOR, name: '@orkestrel/agent' }, { origin: VENDOR, name: '@orkestrel/ndjson' }]
++		const visited = new Set<string>()
++		for (const dependency of queue) {
++			const require = createRequire(pathToFileURL(dependency.origin))
++			const packagepath = require.resolve(`${dependency.name}/package.json`)
++			if (visited.has(packagepath)) continue
++			visited.add(packagepath)
++			const packagevalue = readObject(readJSON(packagepath))
++			const exported = readObject(readObject(packagevalue.exports)['.'])
++			const imports = exported.import
++			const entry = resolve(dirname(packagepath), typeof imports === 'string' ? imports : readString(readObject(imports).default))
++			const declaration = typeof imports === 'string' ? readString(exported.types) : readString(readObject(imports).types)
++			bindings.push(readBinding(packagepath), readBinding(entry), readBinding(resolve(dirname(packagepath), declaration)))
++			if (packagevalue.dependencies !== undefined) for (const name of Object.keys(readObject(packagevalue.dependencies))) queue.push({ origin: entry, name })
++		}
++	}
++
++	async #verifyDaemon(packet: ScreenPacket, output: string, phase: string, signal: AbortSignal): Promise<unknown> {
++		this.#tags += 1
++		const response = await fetch(`${DAEMON}/api/tags`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]), redirect: 'error' })
++		const bytes = new Uint8Array(await response.arrayBuffer())
++		writeFileSync(resolve(output, `daemon-${phase}.bin`), bytes, { flag: 'wx' })
++		writeArtifact(resolve(output, `daemon-${phase}.json`), { status: response.status, hash: computeHash(bytes), body: Buffer.from(bytes).toString('utf8') })
++		if (!response.ok) throw new Error('Daemon tag check transport failure')
++		const models = readArray(readObject(JSON.parse(Buffer.from(bytes).toString('utf8'))).models).map(readObject)
++		const model = readString(readArray(JSON.parse(packet.identity))[0])
++		const matches = models.filter(entry => entry.name === model || entry.model === model)
++		if (matches.length !== 1 || matches[0]?.digest !== packet.digest) throw new Error('Daemon judge tag/digest mismatch')
++		return matches[0]
++	}
++}
+diff --git a/tmp/units/aggregate-focused-screen/prepare.ts b/tmp/units/aggregate-focused-screen/prepare.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/prepare.ts
+@@ -0,0 +1,5 @@
++import { Operator } from './Operator.ts'
++
++if (process.argv.length === 2) new Operator().prepare()
++else if (process.argv.length === 4 && process.argv[2] === '--output' && process.argv[3] !== undefined) new Operator().prepare(process.argv[3])
++else throw new Error('Use prepare.ts [--output VACANT_OWNED_DIRECTORY]')
+diff --git a/tmp/units/aggregate-focused-screen/proof.test.ts b/tmp/units/aggregate-focused-screen/proof.test.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/proof.test.ts
+@@ -0,0 +1,193 @@
++import { deepStrictEqual, equal, ok, rejects, throws } from 'node:assert'
++import { mkdirSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { test } from 'node:test'
++import { AgentJudge, isJudgeQuestion } from '../../../.orkestrel/agent/instruments/harness/node_modules/@orkestrel/agent/dist/src/core/index.js'
++import { createOllamaJudge, renderJudgePrompt } from '../../../.orkestrel/agent/instruments/harness/.build/vendor/ollama/index.js'
++import { readArray, readBinding, readJSON, readNumber, readObject, readPacket, readString } from '../aggregate-judge-counterfactual/helpers.ts'
++import { NetworkWitness } from '../aggregate-judge-counterfactual/NetworkWitness.ts'
++import { BUILD_HASH, HARNESS, ROOT } from '../aggregate-judge-counterfactual/constants.ts'
++import { EMITTED_FILES, FOCUS_MARKER, LABELS_HASH, ORIGINAL_HASH, PACKET, PREDECESSOR, PREDECESSOR_HASH, REUSED_FILES, SEQUENCE, SPECIFICATION, SPECIFICATION_HASH, UNIT } from './constants.ts'
++import { computeOperator, computeRanking, deriveCandidate, partitionCandidate, readCensus, readScreen, readSource, readSpan, renderState, selectFocus, selectStatement, validateCoverage, validateDestination, validateExecution, validatePopulation, validateState } from './helpers.ts'
++import { Operator } from './Operator.ts'
++
++test('date prefixes, repeated text, line endings, Unicode offsets, and trailing assertions remain covered', () => {
++	const candidate = ' \t(2026-10-10) user: Echo. Echo.\r\n\n(2026-10-11) assistant: "Quoted." She agreed.\n Ω😀 stays together, and repair is mandatory. \t'
++	const spans = partitionCandidate(candidate)
++	deepStrictEqual(spans.map(span => span.text), ['(2026-10-10) user: Echo.', 'Echo.', '(2026-10-11) assistant: "Quoted." She agreed.', 'Ω😀 stays together, and repair is mandatory.'])
++	deepStrictEqual(spans.map(span => span.start), [2, 27, 35, 82])
++	for (const span of spans) equal(candidate.substring(span.start, span.end), span.text)
++	validateCoverage(candidate, spans)
++	throws(() => partitionCandidate(' \t\r\n'), /Empty/)
++	throws(() => validateCoverage(candidate, spans.slice(1)), /Dropped/)
++	throws(() => validateCoverage(candidate, spans.slice(0, -1)), /suffix/)
++	throws(() => validateCoverage(candidate, spans.map((span, index) => index === 1 ? { ...span, start: span.start - 1 } : span)), /custody/)
++	throws(() => validateCoverage(candidate, spans.map((span, index) => index === 1 ? { ...span, text: `${span.text}!` } : span)), /custody/)
++	throws(() => validateCoverage(candidate, [...spans, ...spans]), /custody/)
++})
++
++test('installed punctuation and abbreviation semantics preserve every exact character without extra splitting', () => {
++	const candidate = 'Dr. Hester paid 12.50. "Ask her." It depends on her consent, and the repair must finish.\nNext? Yes! “Quoted” remains.'
++	const spans = partitionCandidate(candidate)
++	deepStrictEqual(spans.map(span => span.text), ['Dr.', 'Hester paid 12.50.', '"Ask her." It depends on her consent, and the repair must finish.', 'Next?', 'Yes!', '“Quoted” remains.'])
++	validateCoverage(candidate, spans)
++	ok(spans.some(span => span.text.includes('and the repair must finish.')))
++	deepStrictEqual(readSpan({ start: 0, end: 3, text: 'Dr.' }), { start: 0, end: 3, text: 'Dr.' })
++	throws(() => readSpan({ start: '0', end: 3, text: 'Dr.' }), /finite/)
++})
++
++test('every original variant supplies unique repair focus and exact source/candidate/focus round-trip', () => {
++	const original = readPacket(readJSON(PREDECESSOR))
++	for (const variant of original.variants) {
++		const spans = partitionCandidate(variant.candidate)
++		const focus = selectFocus(variant.candidate, spans)
++		equal(spans.length, 3)
++		ok(focus.text.startsWith('(2026-10-10) user: '))
++		ok(focus.text.includes(FOCUS_MARKER))
++		ok(focus.text.includes("requiring an electrician's repair") === (variant.name === 'original' || variant.name === 'cause-removed'))
++		const state = renderState(original.sources, variant.candidate, focus)
++		validateState(state, original.sources, variant.candidate, focus)
++		const decoded = readObject(JSON.parse(state))
++		deepStrictEqual(Object.keys(decoded), ['evidence', 'candidate', 'focus'])
++		equal(decoded.candidate, variant.candidate)
++		deepStrictEqual(decoded.focus, focus)
++		deepStrictEqual(decoded.evidence, original.suffix.split(/\r\n|\n/))
++		equal(state, JSON.stringify(decoded, null, 1))
++		throws(() => validateState(state, original.sources.slice(1), variant.candidate, focus), /membership/)
++		throws(() => validateState(state, [...original.sources].reverse(), variant.candidate, focus), /Ordered/)
++		throws(() => validateState(state, original.sources, `${variant.candidate}!`, focus), /Candidate/)
++		throws(() => validateState(state, original.sources, variant.candidate, { ...focus, end: focus.end - 1 }), /Focus/)
++		throws(() => selectFocus('No repair marker.', partitionCandidate('No repair marker.')), /absent/)
++		const duplicate = `${variant.candidate}\n${focus.text}`
++		throws(() => selectFocus(duplicate, partitionCandidate(duplicate)), /repeated/)
++	}
++	const candidate = `literal "quote" \\ slash\n${FOCUS_MARKER} Ω😀.`
++	const focus = selectFocus(candidate, partitionCandidate(candidate))
++	const sources = [{ id: 'literal', sentence: 0, role: 'user', text: candidate, day: '2026-10-10', seed: 0 }]
++	validateState(renderState(sources, candidate, focus), sources, candidate, focus)
++	throws(() => readSource({ ...sources[0], role: 'invalid' }), /role/)
++})
++
++test('actual native rendering preserves judge identity, settings, system, and question criteria without dispatch', () => {
++	const witness = new NetworkWitness()
++	try {
++		const original = readPacket(readJSON(PREDECESSOR))
++		const tuple = readArray(JSON.parse(original.identity))
++		const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++		ok(judge instanceof AgentJudge)
++		equal(judge.model, original.identity)
++		const question = readObject(readJSON(SPECIFICATION)).question
++		ok(isJudgeQuestion(question))
++		deepStrictEqual(question.criteria, readObject(original.question).criteria)
++		for (const variant of original.variants) {
++			const state = renderState(original.sources, variant.candidate, selectFocus(variant.candidate, partitionCandidate(variant.candidate)))
++			const body = readObject(judge.body({ state, questions: { agree: question } }))
++			equal(body.prompt, renderJudgePrompt(state, question, readString(tuple[1])))
++			const prior = original.rendering.find(entry => entry.name === variant.name)
++			ok(prior !== undefined)
++			const previous = readObject(JSON.parse(prior.body))
++			deepStrictEqual(Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'prompt')), Object.fromEntries(Object.entries(previous).filter(([key]) => key !== 'prompt')))
++		}
++		equal(witness.count, 0)
++	} finally { witness.close() }
++})
++
++test('corrected candidates are exact declared single-line replacements with accepted label and runtime custody', () => {
++	const predecessor = readPacket(readJSON(PREDECESSOR))
++	const packet = readScreen(readJSON(PACKET))
++	const spec = readObject(readJSON(SPECIFICATION))
++	deepStrictEqual(packet.sources, predecessor.sources)
++	deepStrictEqual(packet.question, spec.question)
++	deepStrictEqual(packet.sequence, SEQUENCE)
++	equal(packet.identity, predecessor.identity)
++	equal(packet.digest, predecessor.digest)
++	equal(packet.labels.hash, LABELS_HASH)
++	equal(packet.original.hash, ORIGINAL_HASH)
++	equal(packet.specification.hash, SPECIFICATION_HASH)
++	equal(packet.predecessor.hash, PREDECESSOR_HASH)
++	validatePopulation(packet, predecessor)
++	const baseline = predecessor.variants.find(variant => variant.name === 'both-removed')
++	ok(baseline !== undefined)
++	for (const [index, variant] of packet.variants.entries()) {
++		const declared = readObject(readArray(spec.variants)[index])
++		equal(variant.candidate, declared.candidate)
++		equal(variant.focus.text, declared.focus)
++		equal(variant.candidate, deriveCandidate(predecessor, readString(declared.focus)))
++		deepStrictEqual(variant.candidate.split(/\r\n|\n/).filter((_, position) => position !== 1), baseline.candidate.split(/\r\n|\n/).filter((_, position) => position !== 1))
++		deepStrictEqual(selectStatement(variant.candidate, variant.spans, readString(declared.focus)), variant.focus)
++		deepStrictEqual(readCensus(variant), variant)
++		throws(() => selectStatement(variant.candidate, variant.spans, variant.focus.text.slice(1)), /complete partition/)
++		throws(() => selectStatement(variant.candidate, variant.spans, 'Missing statement.'), /absent/)
++		throws(() => deriveCandidate(predecessor, `${variant.focus.text}\nExtra.`), /replacement line/)
++		const mutated = { ...packet, variants: packet.variants.map((entry, position) => position === index ? { ...entry, candidate: `${entry.candidate}!` } : entry) }
++		throws(() => validatePopulation(mutated, predecessor), /single-line/)
++		throws(() => validatePopulation({ ...packet, variants: packet.variants.map((entry, position) => position === index ? { ...entry, focus: { ...entry.focus, start: entry.focus.start + 1 } } : entry) }, predecessor), /focus custody/)
++	}
++	for (const binding of packet.bindings) equal(readBinding(resolve(ROOT, binding.path)).hash, binding.hash)
++	for (const name of EMITTED_FILES) ok(packet.bindings.some(binding => resolve(ROOT, binding.path) === resolve(HARNESS, '.build', name)))
++	for (const name of REUSED_FILES) ok(packet.bindings.some(binding => resolve(ROOT, binding.path) === resolve(UNIT, '../aggregate-judge-counterfactual', name)))
++	const tuple = readArray(JSON.parse(packet.identity))
++	const judge = createOllamaJudge({ model: readString(tuple[0]), system: readString(tuple[1]), calibration: { temperature: readNumber(tuple[2]) }, options: readObject(tuple[3]) })
++	ok(judge instanceof AgentJudge)
++	ok(isJudgeQuestion(packet.question))
++	for (const variant of packet.variants) equal(JSON.stringify(judge.body({ state: variant.state, questions: { agree: packet.question } })), packet.rendering.find(entry => entry.name === variant.name)?.body)
++	deepStrictEqual(packet.rendering.map(entry => entry.name), ['statement-a', 'statement-b'])
++})
++
++test('accepted supported focus must exceed the unsupported focus separately in each pass', () => {
++	const readings = SEQUENCE.map((name, index) => ({ ordinal: index + 1, name, score: name === 'statement-b' ? 0.9 : 0.2 }))
++	const ranking = computeRanking(readings)
++	equal(ranking.status, 'passed')
++	deepStrictEqual(ranking.comparisons.map(comparison => comparison.pass), ['forward', 'reverse'])
++	equal(computeRanking(readings.map(reading => ({ ...reading, score: 0.5 }))).status, 'refused')
++	equal(computeRanking(readings.map(reading => ({ ...reading, score: 1 - reading.score }))).status, 'refused')
++	const reverse = computeRanking(readings.map(reading => ({ ...reading, score: reading.ordinal === 3 ? 0.1 : reading.score })))
++	equal(reverse.status, 'refused')
++	ok(reverse.comparisons[0]?.exceeds === true)
++	ok(reverse.comparisons[1]?.exceeds === false)
++	equal(computeRanking(readings.slice(0, -1)).status, 'incomplete')
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: Number.NaN }))), /finite/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: Number.POSITIVE_INFINITY }))), /finite/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: -0.1 }))), /probability/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, score: 1.1 }))), /probability/)
++	throws(() => computeRanking([...readings, ...readings]), /overrun/)
++	throws(() => computeRanking(readings.map(reading => ({ ...reading, ordinal: reading.ordinal + 1 }))), /sequence/)
++})
++
++test('invalid hashes and occupied outputs refuse before global or native fetch', async () => {
++	const witness = new NetworkWitness()
++	const fetch = globalThis.fetch
++	let count = 0
++	Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: () => { count += 1; return Promise.reject(new Error('Offline test refuses fetch')) } })
++	try {
++		const options = { packet: readBinding(PACKET).hash, build: BUILD_HASH, operator: computeOperator(), output: resolve(UNIT, `proof-vacant-${process.pid}`) }
++		equal(validateExecution(options).operator, options.operator)
++		for (const field of ['packet', 'build', 'operator']) await rejects(new Operator().execute({ ...options, [field]: '0'.repeat(64) }), /hash|Hash/)
++		const occupied = resolve(UNIT, `proof-execution-occupied-${process.pid}`)
++		mkdirSync(occupied)
++		await rejects(new Operator().execute({ ...options, output: occupied }), /occupied/)
++		await rejects(new Operator().execute({ ...options, output: resolve(UNIT, '..') }), /descendant/)
++		equal(count, 0)
++		equal(witness.count, 0)
++	} finally { globalThis.fetch = fetch; witness.close() }
++})
++
++test('corrected packet preparation repeats byte-for-byte and rejects occupied or escaped output before dispatch', () => {
++	const witness = new NetworkWitness()
++	try {
++		const first = resolve(UNIT, `proof-census-first-${process.pid}`)
++		const second = resolve(UNIT, `proof-census-second-${process.pid}`)
++		new Operator().prepare(first)
++		new Operator().prepare(second)
++		equal(readBinding(resolve(first, 'packet-final.json')).hash, readBinding(resolve(second, 'packet-final.json')).hash)
++		equal(readBinding(resolve(first, 'packet-final.json')).hash, readBinding(PACKET).hash)
++		deepStrictEqual(readObject(readJSON(resolve(first, 'plan-final.json'))).guard, { dispatches: 0, native: 0 })
++		throws(() => new Operator().prepare(first), /occupied/)
++		throws(() => new Operator().prepare(resolve(UNIT, '..')), /descendant/)
++		throws(() => validateDestination(UNIT), /descendant/)
++		const occupied = resolve(UNIT, `proof-occupied-${process.pid}`)
++		mkdirSync(occupied)
++		throws(() => new Operator().prepare(occupied), /occupied/)
++		equal(witness.count, 0)
++	} finally { witness.close() }
++})
+diff --git a/tmp/units/aggregate-focused-screen/tsconfig.json b/tmp/units/aggregate-focused-screen/tsconfig.json
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/tsconfig.json
+@@ -0,0 +1,20 @@
++{
++	"compilerOptions": {
++		"target": "ESNext",
++		"module": "NodeNext",
++		"moduleResolution": "NodeNext",
++		"allowImportingTsExtensions": true,
++		"lib": ["ESNext", "DOM", "DOM.Iterable"],
++		"types": ["node"],
++		"strict": true,
++		"verbatimModuleSyntax": true,
++		"noUncheckedIndexedAccess": true,
++		"exactOptionalPropertyTypes": true,
++		"noUnusedLocals": true,
++		"noUnusedParameters": true,
++		"noImplicitOverride": true,
++		"skipLibCheck": true,
++		"noEmit": true
++	},
++	"include": ["*.ts"]
++}
+diff --git a/tmp/units/aggregate-focused-screen/types.ts b/tmp/units/aggregate-focused-screen/types.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/types.ts
+@@ -0,0 +1,46 @@
++/** Carries an exact UTF-16 half-open candidate slice. */
++export interface Span {
++	readonly start: number
++	readonly end: number
++	readonly text: string
++}
++
++/** Carries complete coverage independently of the selected live pair. */
++export interface Census {
++	readonly name: string
++	readonly candidate: string
++	readonly spans: readonly Span[]
++	readonly focus: Span
++	readonly state: string
++}
++
++/** Carries the corrected discriminator without predecessor whole-candidate labels. */
++export interface ScreenPacket extends Pick<Packet, 'id' | 'identity' | 'digest' | 'question' | 'separator' | 'sources' | 'suffix' | 'sequence' | 'bindings' | 'rendering'> {
++	readonly specification: Binding
++	readonly original: Binding
++	readonly predecessor: Binding
++	readonly labels: Binding
++	readonly operator: string
++	readonly census: readonly Census[]
++	readonly variants: readonly Census[]
++}
++
++/** Carries the score fields required by the fixed ranking screen. */
++export type RankingReading = Pick<Reading, 'ordinal' | 'name' | 'score'>
++
++/** Carries a supported-versus-unsupported comparison within its own pass. */
++export interface Comparison {
++	readonly pass: 'forward' | 'reverse'
++	readonly supported: number
++	readonly unsupported: number
++	readonly exceeds: boolean
++}
++
++/** Carries local discrimination, complete refusal, or incomplete measurement. */
++export interface RankingResult {
++	readonly status: 'passed' | 'refused' | 'incomplete'
++	readonly comparisons: readonly Comparison[]
++}
++
++import type { Binding, Packet, Reading } from '../aggregate-judge-counterfactual/types.ts'
++
+diff --git a/tmp/units/aggregate-focused-screen/Verifier.ts b/tmp/units/aggregate-focused-screen/Verifier.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/Verifier.ts
+@@ -0,0 +1,39 @@
++import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
++import { relative, resolve, sep } from 'node:path'
++import { spawnSync } from 'node:child_process'
++import { BUILD, ROOT } from '../aggregate-judge-counterfactual/constants.ts'
++import { readBinding, writeArtifact } from '../aggregate-judge-counterfactual/helpers.ts'
++import { PREDECESSOR, SPECIFICATION, UNIT } from './constants.ts'
++import { computeOperator, validateDestination } from './helpers.ts'
++
++/** Retains reproducible local commands and their bare outputs without accepting the unit. */
++export class Verifier {
++	/** Executes scoped offline gates into a vacant owned evidence directory.
++	 * @param output - A vacant descendant for immutable gate evidence
++	 * @returns Nothing after retaining commands, output, hashes, and inventory
++	 * @example new Verifier().execute('tmp/units/aggregate-focused-screen/verifier-evidence')
++	 */
++	execute(output: string): void {
++		validateDestination(output)
++		mkdirSync(resolve(output))
++		const commands = [
++			['node_modules/typescript/bin/tsc', '-p', 'tmp/units/aggregate-focused-screen/tsconfig.json'],
++			...readdirSync(UNIT).filter(name => name.endsWith('.ts')).map(name => ['--check', relative(ROOT, resolve(UNIT, name)).split(sep).join('/')]),
++			['--test', 'tmp/units/aggregate-focused-screen/proof.test.ts'],
++			['--test', 'tmp/units/aggregate-focused-screen/negative.test.ts'],
++			['tmp/units/aggregate-focused-screen/offline.config.ts'],
++			['tmp/units/aggregate-focused-screen/prepare.ts', '--output', relative(ROOT, resolve(output, 'census')).split(sep).join('/')],
++		]
++		const results = commands.map(args => {
++			const result = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8' })
++			const expected = args[0] === '--test' && args[1] === 'tmp/units/aggregate-focused-screen/negative.test.ts' ? 1 : 0
++			console.log(JSON.stringify({ args, expected, exit: result.status, stdout: result.stdout, stderr: result.stderr }))
++			if (result.error !== undefined || result.status !== expected) throw new Error(`Scoped command failed: ${JSON.stringify(args)}`)
++			return { args, expected, exit: result.status, stdout: result.stdout, stderr: result.stderr }
++		})
++		const status = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' })
++		const diff = spawnSync('git', ['diff', '--stat'], { cwd: ROOT, encoding: 'utf8' })
++		if (status.status !== 0 || diff.status !== 0) throw new Error('Git status/diff observation failed')
++		writeArtifact(resolve(output, 'verification.json'), { results, status: status.stdout, diff: diff.stdout, operator: computeOperator(), predecessor: readBinding(PREDECESSOR), build: readBinding(BUILD), specification: readBinding(SPECIFICATION), inventory: readdirSync(UNIT).filter(name => name.endsWith('.ts') || name === 'tsconfig.json').map(name => ({ ...readBinding(resolve(UNIT, name)), text: readFileSync(resolve(UNIT, name), 'utf8') })), interpretation: 'Writer self-reported offline gates; independent acceptance remains required. No live request has run.' })
++	}
++}
+diff --git a/tmp/units/aggregate-focused-screen/verify.ts b/tmp/units/aggregate-focused-screen/verify.ts
+new file mode 100644
+--- /dev/null
++++ b/tmp/units/aggregate-focused-screen/verify.ts
+@@ -0,0 +1,4 @@
++import { Verifier } from './Verifier.ts'
++
++if (process.argv.length === 4 && process.argv[2] === '--output' && process.argv[3] !== undefined) new Verifier().execute(process.argv[3])
++else throw new Error('Use verify.ts --output VACANT_OWNED_EVIDENCE_PREFIX')
+

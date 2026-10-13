@@ -1,0 +1,5 @@
+{
+ "status": 200,
+ "ms": 13965,
+ "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:11:56.262047988Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_6n29dmfp\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"refunds\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:11:56.332489228Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":13962756594,\"load_duration\":3771240259,\"prompt_eval_count\":1590,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":8343161000,\"eval_count\":27,\"eval_duration\":1841171000}\n"
+}

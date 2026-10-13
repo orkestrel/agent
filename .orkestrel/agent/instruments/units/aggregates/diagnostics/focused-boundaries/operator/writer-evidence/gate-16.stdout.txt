@@ -1,0 +1,2 @@
+Offline default: no model or network request. Run prepare.ts to freeze complete boundary requests.
+Offline global-fetch guard dispatches: 0; native dispatches: 0

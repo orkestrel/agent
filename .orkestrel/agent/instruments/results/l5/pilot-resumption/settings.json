@@ -1,0 +1,6 @@
+{
+	"q2": { "allowance": 555, "retry": 2, "predict": 160 },
+	"q4": { "allowance": 300, "retry": 2, "predict": 160 },
+	"g2": { "allowance": 300, "retry": 2, "predict": 160 },
+	"g4": { "allowance": 300, "retry": 2, "predict": 160 }
+}

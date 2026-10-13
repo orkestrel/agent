@@ -1,0 +1,20 @@
+✔ frozen composition derives complete population, spans, guards, and reverse sequence (33.9734ms)
+✔ actual native bodies preserve every full state and expose only evidence/candidate/focus (28.047ms)
+✔ complete scoring preserves every component and independent minima without ranking original whole anchors (25.5497ms)
+✔ absent and incomplete readings remain unscored without manufactured zero (32.0843ms)
+✔ duplicate and extraneous readings cannot supply complete membership (24.3411ms)
+✔ alien name, row, ordinal, pass, and settled label refuse scoring (23.2694ms)
+✔ malformed, nonfinite, nonnumeric, and out-of-range scores remain incomplete (24.5219ms)
+✔ ties and reversals fail independently in each pass (24.3767ms)
+✔ every supported pair component including its guard can individually fail its boundary (27.7557ms)
+✔ whole original anchors have no invented ordering and original focus comparison remains independent (24.6975ms)
+✔ composition refuses altered rows, source ordering, spans, labels, pairs, and anchor selection (41.5805ms)
+✔ failed explicit admission creates no output and makes no native dispatch (10.4583ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 556.4172

@@ -1,0 +1,163 @@
+// Journal: tmp/units/aggregate-successor-model-<key>-execution-root.jsonl; outer cap: 2880 seconds.
+// Adapts the accepted Q4 runner to a validated g4/q2/g2 key and root-supplied plan seal; remains unexecuted during preparation.
+import { strict as assert } from 'node:assert'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { parseArgs } from 'node:util'
+import { isRecord } from '@orkestrel/contract'
+import { readBuild } from '../../.orkestrel/agent/instruments/harness/.build/bench5/build/helpers.js'
+import { hashFile } from '../../.orkestrel/agent/instruments/harness/.build/bench5/refit/helpers.js'
+import { readMatrixFiles } from '../../.orkestrel/agent/instruments/harness/.build/bench5/matrix/helpers.js'
+
+function readCustody(root: string, deployment: string, seed: string, settings: string, key: string) {
+	return {
+		head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
+		build: hashFile(join(root, '.orkestrel/agent/instruments/harness/.build/build-manifest.json')),
+		manifest: readBuild(),
+		matrix: readMatrixFiles(),
+		deployment: hashFile(deployment),
+		seed: hashFile(seed),
+		settings: hashFile(settings),
+		launcher: hashFile(join(root, '.agents/skills/orkestrel-dispatch/scripts/launch.ts')),
+		plan: hashFile(join(root, `tmp/units/aggregate-successor-model-${key}-plan.json`)),
+		runner: hashFile(join(root, 'tmp/units/aggregate-successor-model-run.ts')),
+	}
+}
+
+const root = resolve(import.meta.dirname, '..', '..')
+assert.equal(resolve(process.cwd()), root, 'execute from the scaffold root')
+const { values } = parseArgs({
+	options: { key: { type: 'string' }, plan: { type: 'string' }, head: { type: 'string' }, build: { type: 'string' } },
+	allowPositionals: false,
+})
+const head = values.head
+const build = values.build
+const key = values.key
+const seal = values.plan
+assert(key === 'g4' || key === 'q2' || key === 'g2', 'supply --key g4|q2|g2')
+assert(typeof seal === 'string' && /^[a-f0-9]{64}$/.test(seal), 'supply accepted --plan SHA-256')
+assert(typeof head === 'string' && /^[a-f0-9]{40}$/.test(head), 'supply accepted --head SHA-1')
+assert(typeof build === 'string' && /^[a-f0-9]{64}$/.test(build), 'supply accepted --build SHA-256')
+const path = join(root, `tmp/units/aggregate-successor-model-${key}-plan.json`)
+assert.equal(hashFile(path).hash, seal, 'sealed command plan changed')
+const plan: unknown = JSON.parse(readFileSync(path, 'utf8'))
+assert(isRecord(plan) && typeof plan.root === 'string')
+assert.equal(resolve(plan.root), root)
+assert(typeof plan.deployment === 'string' && typeof plan.seed === 'string' && typeof plan.settings === 'string')
+const deployment = plan.deployment
+const seed = plan.seed
+const settings = plan.settings
+assert(Array.isArray(plan.commands) && plan.commands.length === 5)
+const ids = [`${key}-think0-freeze`, `${key}-think1-freeze`, `${key}-calibration-corpus`, `${key}-calibration-generate`]
+// Fixed per-key generation caps from aggregate-final-calibration-command-plan-2.json; preparation verifies these values.
+const caps = { g4: 1800, q2: 1800, g2: 1800 }
+const commands = plan.commands.slice(0, ids.length).map((command: unknown, index: number) => {
+	assert(isRecord(command))
+	assert.equal(command.id, ids[index])
+	assert.equal(command.sequence, index + 1)
+	assert(typeof command.id === 'string' && typeof command.capSeconds === 'number')
+	assert(Array.isArray(command.argv) && command.argv.every((value: unknown) => typeof value === 'string'))
+	assert(Array.isArray(command.expected) && command.expected.every((value: unknown) => typeof value === 'string'))
+	const argv = command.argv
+	assert.equal(argv[0], 'node')
+	assert.equal(resolve(argv[1] ?? ''), join(root, '.agents/skills/orkestrel-dispatch/scripts/launch.ts'))
+	const separator = argv.indexOf('--')
+	assert(separator > 0 && argv[separator + 1] === 'node')
+	assert(argv.slice(0, separator).includes('--status'))
+	assert.equal(argv[argv.indexOf('--cap') + 1], String(command.capSeconds))
+	assert.equal(command.capSeconds, command.id === `${key}-calibration-generate` ? caps[key] : 240)
+	assert.equal(argv[argv.indexOf('--url') + 1], 'http://127.0.0.1:11435')
+	const output = argv[argv.indexOf('--out') + 1]
+	const journal = argv[argv.indexOf('--journal') + 1]
+	const errors = argv[argv.indexOf('--errors') + 1]
+	assert(typeof output === 'string' && typeof journal === 'string' && typeof errors === 'string')
+	const cache = command.id === `${key}-calibration-generate` ? argv[argv.indexOf('--cache') + 1] : undefined
+	const executable = [...argv]
+	executable[0] = process.execPath
+	executable[separator + 1] = process.execPath
+	return { id: command.id, argv, executable, expected: command.expected, cap: command.capSeconds, output, journal, errors, cache }
+})
+const prefix = join(root, `tmp/units/aggregate-successor-model-${key}-execution`)
+const record = `${prefix}-sequence.jsonl`
+const destinations = [
+	record,
+	`${prefix}-custody-before.json`,
+	`${prefix}-custody-after.json`,
+	...commands.flatMap((command) => [
+		command.output,
+		...command.expected,
+		command.journal,
+		command.errors,
+		`${command.journal}.pid`,
+		`${command.journal}.status-before.txt`,
+		`${command.journal}.status-after.txt`,
+		...(command.cache === undefined ? [] : [command.cache]),
+	]),
+]
+for (const destination of destinations) assert(!existsSync(destination), `occupied destination: ${destination}`)
+writeFileSync(record, `${JSON.stringify({ event: 'start', plan: hashFile(path), accepted: { head, build }, commands: ids, started: new Date().toISOString() })}\n`, { flag: 'wx' })
+try {
+	const before = readCustody(root, deployment, seed, settings, key)
+	writeFileSync(`${prefix}-custody-before.json`, `${JSON.stringify(before, null, 2)}\n`, { flag: 'wx' })
+	appendFileSync(record, `${JSON.stringify({ event: 'custody', stage: 'before', reading: before })}\n`)
+	assert.equal(before.head, head, 'HEAD differs from root release')
+	assert.equal(before.build.hash, build, 'build differs from root release')
+	assert.equal(before.deployment.hash, '40442197423b574b61548feb702b55c948d77f61dd719d9d6b26e24ad3016e19', 'validated deployment changed')
+	for (const command of commands) {
+		const current = readCustody(root, deployment, seed, settings, key)
+		appendFileSync(record, `${JSON.stringify({ event: 'custody', stage: `${command.id}-before`, reading: current })}\n`)
+		assert.deepEqual(current, before, 'source or execution custody moved before command')
+		for (const destination of [
+			command.output,
+			command.journal,
+			command.errors,
+			`${command.journal}.pid`,
+			`${command.journal}.status-before.txt`,
+			`${command.journal}.status-after.txt`,
+			...command.expected,
+			...(command.cache === undefined ? [] : [command.cache]),
+		])
+			assert(!existsSync(destination), `occupied command destination: ${destination}`)
+		const started = performance.now()
+		appendFileSync(record, `${JSON.stringify({ event: 'command', id: command.id, started: new Date().toISOString(), argv: command.argv, executable: command.executable, cap: command.cap })}\n`)
+		process.stdout.write(`START ${command.id}\n`)
+		const result = spawnSync(process.execPath, command.executable.slice(1), { cwd: root, stdio: 'inherit', shell: false, windowsHide: true })
+		const outcome = {
+			event: 'result',
+			id: command.id,
+			pid: result.pid,
+			exit: result.status,
+			signal: result.signal,
+			error: result.error?.message,
+			durationMs: performance.now() - started,
+			outputs: command.expected.filter(existsSync).map(hashFile),
+			journal: existsSync(command.journal) ? hashFile(command.journal) : undefined,
+			errors: existsSync(command.errors) ? hashFile(command.errors) : undefined,
+		}
+		appendFileSync(record, `${JSON.stringify(outcome)}\n`)
+		process.stdout.write(`${JSON.stringify(outcome)}\n`)
+		const after = readCustody(root, deployment, seed, settings, key)
+		appendFileSync(record, `${JSON.stringify({ event: 'custody', stage: `${command.id}-after`, reading: after })}\n`)
+		assert.deepEqual(after, before, 'source or execution custody moved during command')
+		if (result.error !== undefined) throw result.error
+		if (result.status !== 0) {
+			process.exitCode = result.status ?? 1
+			throw new Error(`command stopped: ${command.id}: exit ${result.status}, signal ${result.signal}`)
+		}
+		assert(command.expected.every(existsSync), `missing expected output: ${command.id}`)
+	}
+	const after = readCustody(root, deployment, seed, settings, key)
+	writeFileSync(`${prefix}-custody-after.json`, `${JSON.stringify(after, null, 2)}\n`, { flag: 'wx' })
+	assert.deepEqual(after, before, 'terminal custody differs')
+	appendFileSync(record, `${JSON.stringify({ event: 'complete', finished: new Date().toISOString(), next: 'independent blind labels and root adjudication; fit held' })}\n`)
+} catch (error) {
+	appendFileSync(record, `${JSON.stringify({ event: 'stopped', finished: new Date().toISOString(), error: error instanceof Error ? error.stack : String(error), exit: process.exitCode ?? 1 })}\n`)
+	try {
+		const after = readCustody(root, deployment, seed, settings, key)
+		writeFileSync(`${prefix}-custody-after.json`, `${JSON.stringify(after, null, 2)}\n`, { flag: 'wx' })
+	} catch (custody) {
+		appendFileSync(record, `${JSON.stringify({ event: 'custody', stage: 'terminal', error: custody instanceof Error ? custody.stack : String(custody) })}\n`)
+	}
+	throw error
+}

@@ -1,0 +1,160 @@
+{
+  "system": "You are the operations assistant on the Larkspur Home online store's customer-support desk, working for the shift lead in this conversation. You must use the facts, rules, corrections, and withdrawals stated earlier in the conversation: a correction replaces the earlier value, and a withdrawn rule no longer applies. When a request concerns an order id or account number from the conversation, you must call lookup_order or lookup_customer with it before you answer. When a fact you need is not in view, you must call search_history with a distinctive name, id, or word to recover it from the full conversation record. You must finish every request by calling send_reply with the complete answer; only the send_reply text counts as your answer.",
+  "seed": [
+    {
+      "index": 65,
+      "value": {
+        "role": "tool",
+        "kind": "tool-group",
+        "call": "call_6",
+        "content": "Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding. Account manager Ines Albrecht; preferred contact is the buyer.",
+        "truth": {
+          "category": "fact",
+          "topics": [
+            "LH-71592",
+            "contacts"
+          ]
+        }
+      }
+    },
+    {
+      "index": 68,
+      "value": {
+        "role": "user",
+        "kind": "fact",
+        "content": "Copperline's buyer is Owen Pritchard. He takes calls before noon on extension 4301.",
+        "truth": {
+          "category": "fact",
+          "topics": [
+            "LH-71592",
+            "contacts"
+          ]
+        }
+      }
+    },
+    {
+      "index": 92,
+      "value": {
+        "role": "user",
+        "kind": "correction",
+        "content": "Small fix on Copperline: Owen's extension is 4310, not 4301. The before-noon window stands.",
+        "truth": {
+          "category": "correction",
+          "topics": [
+            "LH-71592",
+            "contacts"
+          ],
+          "amends": [
+            68
+          ]
+        }
+      }
+    },
+    {
+      "index": 93,
+      "value": {
+        "role": "assistant",
+        "kind": "correction",
+        "content": "Updated: Owen Pritchard is on extension 4310, calls before noon.",
+        "truth": {
+          "category": "correction",
+          "topics": [
+            "LH-71592",
+            "contacts"
+          ]
+        }
+      }
+    },
+    {
+      "index": 134,
+      "value": {
+        "role": "user",
+        "kind": "fact",
+        "content": "Copperline's accounts team wrote in: they want to put a $1,500 reorder on credit.",
+        "truth": {
+          "category": "request",
+          "topics": [
+            "LH-71592"
+          ]
+        }
+      }
+    },
+    {
+      "index": 135,
+      "value": {
+        "role": "assistant",
+        "kind": "tool-group",
+        "content": "Checking Copperline's account.",
+        "calls": [
+          {
+            "id": "call_11",
+            "name": "lookup_customer",
+            "arguments": {
+              "account": "LH-71592"
+            }
+          }
+        ],
+        "truth": {
+          "category": "chatter",
+          "topics": [
+            "LH-71592"
+          ]
+        }
+      }
+    },
+    {
+      "index": 136,
+      "value": {
+        "role": "tool",
+        "kind": "tool-group",
+        "call": "call_11",
+        "content": "Account LH-71592: Copperline Cafes, wholesale tier, net 30 terms, credit limit $6,000.00 with $2,880.00 outstanding. Account manager Tobias Lindqvist since 2026-10-09; preferred contact is the buyer.",
+        "truth": {
+          "category": "fact",
+          "topics": [
+            "LH-71592",
+            "contacts"
+          ]
+        }
+      }
+    },
+    {
+      "index": 137,
+      "value": {
+        "role": "assistant",
+        "kind": "fact",
+        "content": "Copperline's $6,000.00 limit leaves room for a $1,500 reorder.",
+        "truth": {
+          "category": "fact",
+          "topics": [
+            "LH-71592"
+          ]
+        }
+      }
+    }
+  ],
+  "goal": [
+    {
+      "id": "g20-copperline-manager",
+      "distance": "near",
+      "request": "Who is Copperline's account manager? Their accounts team wants to talk the reorder over with them.",
+      "expected": [
+        "lindqvist"
+      ],
+      "forbidden": [],
+      "forbiddenPatterns": [
+        "(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\bines\\s+albrecht|(?<!\\bines\\s+)\\balbrecht)\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+      ],
+      "facts": [
+        136
+      ],
+      "tools": [
+        "send_reply"
+      ],
+      "after": 137,
+      "stale": [
+        65
+      ]
+    }
+  ]
+}

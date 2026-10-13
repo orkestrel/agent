@@ -1,0 +1,142 @@
+{
+  "files": [
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-driver-brief.md",
+      "archive": "aggregate-successor-q4-driver-brief.md",
+      "bytes": 5253,
+      "sha256": "a14d410112d84519327d9b917dbd7d7f6c2e74e57cbb3db89459df045ff61ff7"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-driver-report.md",
+      "archive": "aggregate-successor-q4-driver-report.md",
+      "bytes": 6268,
+      "sha256": "aa440341ad0022c619e02cf47d799d66b3de101e6bc8411b80c42561bb9995b7"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-adaptation-2.patch",
+      "archive": "aggregate-successor-q4-execution-adaptation-2.patch",
+      "bytes": 11890,
+      "sha256": "576ffd67b9ace412c0afddb49538e7810184cc300fd38c7a3350fc0b071473af"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-adaptation.patch",
+      "archive": "aggregate-successor-q4-execution-adaptation.patch",
+      "bytes": 11690,
+      "sha256": "63a62722e0557c8bfd5f607ac68890524bf88eea4f1cf0c8d59e169ce8e2ba1d"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-brief.md",
+      "archive": "aggregate-successor-q4-execution-brief.md",
+      "bytes": 3745,
+      "sha256": "d3102996f1388079a2d14f088d1f369fde188b1efcb108d75b5e4c33b7ce8ecd"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-custody-after.json",
+      "archive": "aggregate-successor-q4-execution-custody-after.json",
+      "bytes": 242223,
+      "sha256": "ac9c974037af844a3632b1072611a378063e7ec46493fe35df93ec7b6d6e00dd"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-custody-before.json",
+      "archive": "aggregate-successor-q4-execution-custody-before.json",
+      "bytes": 242223,
+      "sha256": "ac9c974037af844a3632b1072611a378063e7ec46493fe35df93ec7b6d6e00dd"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-diff.ts",
+      "archive": "aggregate-successor-q4-execution-diff.ts",
+      "bytes": 854,
+      "sha256": "1922d9377341f946bdcc91c6eb13c306c1e71f849401a3ae279919a8ba055f14"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-report.md",
+      "archive": "aggregate-successor-q4-execution-report.md",
+      "bytes": 9325,
+      "sha256": "52ed339850755b60d78d02e94b027f9910e3e8a9daa444c562ecd25321c72fce"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.err",
+      "archive": "aggregate-successor-q4-execution-root.err",
+      "bytes": 53,
+      "sha256": "0026057d8eabded6e644aa6d11c718117954b27b0e557af2b6734a6f7d9e3922"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.jsonl",
+      "archive": "aggregate-successor-q4-execution-root.jsonl",
+      "bytes": 6326,
+      "sha256": "8be1de5ddd8433e0210e6810fbfa2bff5eb1c5bac8cbb7236904c138a723582c"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.jsonl.pid",
+      "archive": "aggregate-successor-q4-execution-root.jsonl.pid",
+      "bytes": 6,
+      "sha256": "d0bc91f4c76b3be059bf906f50c8097695154b6afacca98854eeece5370eb78d"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.jsonl.status-after.txt",
+      "archive": "aggregate-successor-q4-execution-root.jsonl.status-after.txt",
+      "bytes": 193,
+      "sha256": "610466b8f89819c5850caac833ed33276dd9df4a85488b3fc75053199c186a2d"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.jsonl.status-before.txt",
+      "archive": "aggregate-successor-q4-execution-root.jsonl.status-before.txt",
+      "bytes": 102,
+      "sha256": "f92404fe0e35a222e37545ebc558f58e24f064f456a644d88f4a51d06bb412d6"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.stderr.txt",
+      "archive": "aggregate-successor-q4-execution-root.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-root.stdout.txt",
+      "archive": "aggregate-successor-q4-execution-root.stdout.txt",
+      "bytes": 696,
+      "sha256": "56dca669315dd8eb32d824178d6f0e0d8802937fc1e3feaafd83667af28104f4"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-run.ts",
+      "archive": "aggregate-successor-q4-execution-run.ts",
+      "bytes": 9002,
+      "sha256": "d5e562abdc1d8f1ce8d209dd97e438b5eed705b48066ace3c66279145d8f4cdd"
+    },
+    {
+      "original": "tmp\\units\\aggregate-successor-q4-execution-sequence.jsonl",
+      "archive": "aggregate-successor-q4-execution-sequence.jsonl",
+      "bytes": 1755883,
+      "sha256": "0b9d2d136fb23f0d665b6a00fd9abebf67f9880df3a202bd4647a24e420f39df"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-command-plan.json",
+      "archive": "aggregate-successor-q4-command-plan.json",
+      "bytes": 9985,
+      "sha256": "fbc73fbc19ebd34910fd977a87322ed5be296df9dcb5e761ab0661d1ff54fbb0"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-continuation-report.md",
+      "archive": "aggregate-successor-q4-continuation-report.md",
+      "bytes": 6961,
+      "sha256": "e44b5cd6a8b91ad655d8058435b95b578ff710a3dd0d31801d3e758d8009aba1"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-label-release.ts",
+      "archive": "aggregate-successor-q4-label-release.ts",
+      "bytes": 1668,
+      "sha256": "327eea4a1cf8a6364a44d6ca920d42665181482c48103f8fd0867c8371837f39"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-label-seal.json",
+      "archive": "aggregate-successor-q4-label-seal.json",
+      "bytes": 280,
+      "sha256": "ad8725fbc76093cb9cd51833925b667a13b816d38ff4e0d561847d7207011d4d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-generation-retain.ts",
+      "archive": "aggregate-successor-q4-generation-retain.ts",
+      "bytes": 3294,
+      "sha256": "0a70930736f5542a628311b9ad9011bbc6490eb7e6928eadaf506dabf11cc06a"
+    }
+  ]
+}

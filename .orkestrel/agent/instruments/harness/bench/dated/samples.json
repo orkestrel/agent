@@ -1,0 +1,54 @@
+[
+  {
+    "file": "tmp/bench/variants/g06/after-2026-10-09/v1.json",
+    "seed0": {
+      "role": "user",
+      "kind": "fact",
+      "content": "Morning, it's Friday 2026-10-09. I'm Dana Whitcombe, shift lead on the Larkspur Home support desk, and you're helping me work the queue today.",
+      "truth": {
+        "category": "fact",
+        "topics": []
+      }
+    },
+    "seed8": {
+      "role": "user",
+      "kind": "fact",
+      "content": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release. He's off on Monday 2026-10-12, so release requests have to reach him today.",
+      "truth": {
+        "category": "rule",
+        "topics": [
+          "delivery",
+          "warehouse",
+          "contacts"
+        ]
+      }
+    },
+    "lookup": "Order LH-81660 for account LH-52307 (Kenji Nakamura): replacement electric kettle, gift wrapped, no charge. Shipped 2026-10-08 by Parcelway, tracking PW-6013-2280, carrier estimated delivery 2026-10-13; gift note text is not recorded on the order."
+  },
+  {
+    "file": "tmp/bench/variants/g06/after-2026-10-09/v8.json",
+    "seed0": {
+      "role": "user",
+      "kind": "fact",
+      "content": "Morning, it's Friday 2026-10-09. I'm Dana Whitcombe, shift lead on the Larkspur Home support desk, and you're helping me work the queue today.",
+      "truth": {
+        "category": "fact",
+        "topics": []
+      }
+    },
+    "seed8": {
+      "role": "user",
+      "kind": "fact",
+      "content": "For anything stuck at a carrier depot, Tomasz Brennan in the warehouse issues the release. He's off on Monday 2026-10-12, so release requests have to reach him today.",
+      "truth": {
+        "category": "rule",
+        "topics": [
+          "delivery",
+          "warehouse",
+          "contacts"
+        ]
+      }
+    },
+    "lookup": "Order LH-81660 for account LH-52307 (Kenji Nakamura): replacement electric kettle, gift wrapped, no charge. Shipped 2026-10-08 by Parcelway, tracking PW-6013-2280, carrier estimated delivery 2026-10-13; gift note text is not recorded on the order."
+  }
+]

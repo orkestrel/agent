@@ -1,0 +1,1530 @@
+{
+  "accepted": false,
+  "cutoff": 0.78,
+  "reasons": [
+    "end-to-end admission below 0.5"
+  ],
+  "occurrences": {
+    "supported": 132,
+    "scored": 131,
+    "admitted": 0,
+    "conditional": 0,
+    "admission": 0
+  },
+  "distinct": {
+    "supported": 30,
+    "scored": 29,
+    "admitted": 0,
+    "conditional": 0,
+    "admission": 0
+  },
+  "readings": [
+    {
+      "id": "3c77369c-7a5d-480c-8d27-dc62d62d007d",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "403910c7-6ee5-4bff-b6d8-3696d1a6d9fc",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "d8ecba53-61c4-4f37-9cee-2889b550faec",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "50b0a83a-9cc8-4b46-973e-2f5c3526fff1",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "59adfc2a-4eae-4759-abdc-7266c85a6f6f",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "c5b48283-6a4f-4178-8533-2d3797158e9a",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "32d8485d-7a02-4321-a7d4-483dd75b02fe",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "af97a027-aeab-4dcd-8a7d-bfa1b3ff5fd4",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "21858a4c-7bc0-4b4b-9614-1868470d1b83",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "458e3e40-f9d9-46e3-9230-769887ff2ff6",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "f13c1e78-1689-4de9-8903-093710d66971",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "1db074cc-7a7d-410d-92a9-1b0fae5ba11f",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "abcc8d6d-3518-4ebc-9460-8b7970cfd70c",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "b1cc43d2-6d90-4308-b7bd-b3ddcefa743c",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "2d0fd068-4f0d-401a-a716-95d4b015bcb8",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "d9778057-adee-4459-a9dc-aad4740c219b",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "4646ef63-c630-4ee5-8d24-bc41f0fbd2df",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "ccd3365f-63ce-4799-b5f0-d1447c0ec885",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "d5654c24-818a-4cdf-87c8-de5bbd8a7ad7",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "ee5c964e-cc96-44e3-8c93-df30454bfc35",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "a43a53a1-26fb-4aa5-9eb0-f9db846ee7b9",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "897d6baa-f48f-454d-9383-b719654d893d",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "8eb807a9-e743-473a-90e5-c0b3dcdc0877",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "6414dbfd-e173-4941-9e86-5b8f1f9382a2",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "3afd900d-449f-4388-b321-61299eb3830c",
+      "identity": "c12db64480fc2fdb60bc01f0230a1d9069a96299fb25d4c2b15d9ab95edaeaf1",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.1213819282843145
+    },
+    {
+      "id": "e65476ab-6846-44b5-9008-f4d46d2a7ed2",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "05b7a731-70a5-447a-8f09-9164ce63ccad",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "cf015131-38ca-4e1e-a461-4a8a87be2c26",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "95469691-db83-4620-b447-c87e676d9110",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "e4eee723-40b1-4358-a260-a81d4ce9757d",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "8e6329f6-946e-427e-919e-8cab0ccda0ea",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "4c801027-8561-4745-8e91-3ff16080fa7c",
+      "identity": "9cd2aff4e4518f19696d0ab5cb49724729d11e0d0e35fe16d8635de5b7c9783f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.39848255711454034
+    },
+    {
+      "id": "e2a62ba3-f1fc-4a66-932b-37dbefc20996",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "289e9f42-67d5-48c5-b795-ae41ce7d6371",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "feffb220-896c-4949-9186-755c5d9a6cb1",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "625346bb-4f82-40ce-a075-77eb03ec3004",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "24000b87-4cfc-4128-999e-251c3b0af54a",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "68611eaa-d9f7-4599-8eab-19293c00a2ee",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "1ad9815b-aa48-4403-a26f-96094aa9101b",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "5692a002-e7dc-4984-935e-2b452a7eee0b",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "31615d18-da62-48fc-a8b1-faa4e807c71b",
+      "identity": "e446b6f1bd554cf44658c9b451ee374a3a28202a192881ef99cb1bd7f624d0a8",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "b184723f-46e4-46b4-8d9f-2ab4bfe887b1",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "fdeeb315-430a-49fa-90a7-5ad936f102fc",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "3702c686-8ea5-4462-8977-b847c36f6026",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "e31207d7-94d7-40a3-8983-73b2f173cfff",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "85342c11-7631-47b3-8751-01480eabdd3f",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "e8f7dd94-73f4-483a-8e94-c412d39c2bc7",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "45150e47-5b47-4777-8a29-0de8d78b438d",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "3d2395a5-a7fa-4a7a-a459-83abb9f21645",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "06190bea-dfb9-4aad-8809-679e26624868",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "14931b42-3788-496e-bc8a-dea7c3056b88",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "67581fd5-cfa4-439f-8895-238ebb1c221c",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "497657df-50fd-4c99-9e6c-23f3f968706f",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "6c04dc24-aba4-4b40-9f8f-74638a6fb15d",
+      "identity": "9cd2aff4e4518f19696d0ab5cb49724729d11e0d0e35fe16d8635de5b7c9783f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.39848255711454034
+    },
+    {
+      "id": "a6165553-37a0-4d19-9a34-a99d6ff728f7",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "87034ba4-8f58-4034-ad18-a1324880024b",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "ad0b5678-f8f4-453d-bcf1-04a042dfc580",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "2e31a313-3a38-418e-ba12-85ef0989957e",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "39835a3a-ca1e-4959-ab0c-26071e842bfb",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "0083644d-4121-4003-8945-4074d1a99b0b",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "4341957d-216e-4e97-a36b-1b6dca08ab7a",
+      "identity": "9cd2aff4e4518f19696d0ab5cb49724729d11e0d0e35fe16d8635de5b7c9783f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.39848255711454034
+    },
+    {
+      "id": "97d87e5b-8df6-4aea-99e4-a5d26c860fc9",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "8d214381-daff-48a8-b463-4afc3cafd13e",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "9c3427d3-b94f-4b80-9d5b-f78498b02fcf",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "0f8e5648-ea38-4656-bb49-2719ab191fb6",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "6d1d3b87-df7f-4d58-998f-101be5ecb2b0",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "25dd755e-ab40-4bdc-ac81-e844dfb09311",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "86cac509-fe84-45a7-8e39-da09f8fa56d7",
+      "identity": "e73e868ef3ca8f1c8edcd8450b9070edd3a8e7a013e84d6b635df0fccda71c5b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5364715654732044
+    },
+    {
+      "id": "e5e22165-edcf-4475-80d5-996c1570ea8c",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "fc6bc6f0-e683-4789-bd61-482f02128a6d",
+      "identity": "9180e2b954329ae41c90857d971908cd81190b4afcc6e4b2dfb77a3734b703d4",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47067432180525265
+    },
+    {
+      "id": "22113262-9f36-43d2-a290-ca0b539dbe90",
+      "identity": "ecd865239a81d63c27759cf2381e84415e0f2d31f8f50ef2108fec1ab6ca6f39",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4604920133162006
+    },
+    {
+      "id": "38c653d8-507f-4d49-a039-8ac7580e1021",
+      "identity": "1643625e213b11e9bc21c485a956ba8cf94877112b36c3b90011e565a9b03018",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4132161465634961
+    },
+    {
+      "id": "40c5993b-49e0-486a-8a8f-687f45b481e0",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "f4005d04-56e4-44a6-9ee5-95c42a57e196",
+      "identity": "9cd2aff4e4518f19696d0ab5cb49724729d11e0d0e35fe16d8635de5b7c9783f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.39848255711454034
+    },
+    {
+      "id": "7a201e97-9d01-47ab-81ec-dc75a26d118f",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "934979da-811d-4412-a0cf-0604986cc44d",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "586534b8-012f-4606-b92c-a22dc4143768",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "ecd6a40d-b103-48fb-b4e3-85f136a54b5b",
+      "identity": "c77f1e35bab6b88b4381bcaf45e60c5e402f8a9e67251ca87ec32dff5baa84eb",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5184909212606981
+    },
+    {
+      "id": "2c973b08-f8eb-45d0-936c-17fbe43d730b",
+      "identity": "857f69786f78c074bd1fd77d06238e0dd42bbf6325b37288e8f20f7aced904bb",
+      "generated": true,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.7146005277521501
+    },
+    {
+      "id": "6001cf16-f0be-4b8d-b1b3-1d10453442b9",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "2e7714a5-3afa-4c85-94b8-ae0c10b4b82b",
+      "identity": "0fc2c6619252cb916dc600cd302e344750cf07a171a5eec3eee2f51a324b95ba",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7195383312749343
+    },
+    {
+      "id": "699772b6-247f-4eac-8a5e-9e52f67130c4",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "fdeaaf03-aa1e-4838-ae7a-666587b179b3",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "173dba53-e173-49ef-b02d-9d6092bdcdb2",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "76108a76-1570-4175-bbbf-8457cbdae357",
+      "identity": "787cffe06196f1423bc4db2cbde7d213dd1cda5362b39bb9a1588825b774055b",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5022237364346328
+    },
+    {
+      "id": "02758807-f502-4850-831e-4283a6ed0985",
+      "identity": "f4f1e9cf79fe7918015dd0736cf19cb914cff6f365d090e1452f1aefc95afd74",
+      "generated": true,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.5705757828140916
+    },
+    {
+      "id": "4db57e2b-f553-4787-b146-1809ac64e6f4",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "b378c450-967f-4b26-8cfa-27b997cfbb22",
+      "identity": "16d3445e260a77d4fc634844319ca7d0de4d56a4e6b2d7d900316d08b86deddd",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.45797978565381053
+    },
+    {
+      "id": "bad81b71-9691-477d-b411-de6ea0692177",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "f83873aa-5b06-4fc7-96c5-f87704eadc1f",
+      "identity": "935b30a36bfffaf9545102d1cb8379c44c42e654ba5fa67f3895aeed440073be",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.7134800931808714
+    },
+    {
+      "id": "14d545c2-5114-459b-a480-b257542f1bcb",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "bb68ff01-c3f6-42d3-b369-d6a67e9d3313",
+      "identity": "c02cefc8f553f6456029d5bcc944ca4b86b9744ba1b0c8223d93ce2186386ba5",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5735062355693434
+    },
+    {
+      "id": "b7e9bc46-07f5-42d8-aa1d-e4aa1f7b620e",
+      "identity": "a716d728e202904597909278b685b12f4d3654bca439e85b6318510637fae953",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5498866523708501
+    },
+    {
+      "id": "8a0edadb-fae3-4082-a0ec-cbd4e077e80d",
+      "identity": "b0eea2b76b687d406d40df97863131fa0e646e8f0e53b70040c43d88b5553627",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5758287770901697
+    },
+    {
+      "id": "0d74d910-a3d0-410a-8661-048d9baf6d69",
+      "identity": "6cdc4529d7a99286f2ab158b897309598cb823ba67f753f9340884a0b3d07d1d",
+      "generated": true,
+      "verdict": "contradicted",
+      "lexical": true,
+      "score": 0.3170164839010486
+    },
+    {
+      "id": "7f995f61-3b91-4dae-ab7e-d40308d080c3",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "5deb7d49-5375-4b57-9873-d55633410d7c",
+      "identity": "749479252c60786a63d67af10f71bd1ac53c51199d7b2f173efbf2eaef735082",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5324124184753961
+    },
+    {
+      "id": "fa8e816d-d350-4590-8a7a-1842d33d06b3",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "2f5f2046-123c-4f41-b35b-02777afc673b",
+      "identity": "c02cefc8f553f6456029d5bcc944ca4b86b9744ba1b0c8223d93ce2186386ba5",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5735062355693434
+    },
+    {
+      "id": "5bea5959-818e-4962-901e-0b3fa01e2edd",
+      "identity": "aa92e9246aa075f0d3137b132875b0c9239c5a7c9d70f96391af1ced51330721",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5067263720119288
+    },
+    {
+      "id": "a9368bf9-570d-4497-94b4-2520bdd2960b",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "07947d2f-6f19-4f75-b41d-acb745e354ad",
+      "identity": "10c043f24aaf214a82ef48724f666b7a3b6fcb3aff6fb2c80b83a9528d7af6d7",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "822c2cd8-f98b-43dc-b18d-a74800742940",
+      "identity": "10c043f24aaf214a82ef48724f666b7a3b6fcb3aff6fb2c80b83a9528d7af6d7",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "cbcd7d07-3fb7-449e-a8d4-d5a2417b16c4",
+      "identity": "10c043f24aaf214a82ef48724f666b7a3b6fcb3aff6fb2c80b83a9528d7af6d7",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "1d8185a7-4078-4003-8b18-f2f45282bd17",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "2542ec93-37ca-41a3-8942-8066c618289b",
+      "identity": "8fa189d7cb4a416e6d447a3c18bc1251139896b9b5af8e0e5321a45977e2e224",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5230073020604822
+    },
+    {
+      "id": "3dbc954b-bdef-4bc3-9429-6b37798ddfb0",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "7446f339-1f06-4f88-bfd9-34751ae504ea",
+      "identity": "c02cefc8f553f6456029d5bcc944ca4b86b9744ba1b0c8223d93ce2186386ba5",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5735062355693434
+    },
+    {
+      "id": "92dc2204-7920-4211-8e26-99496171a8e6",
+      "identity": "aa92e9246aa075f0d3137b132875b0c9239c5a7c9d70f96391af1ced51330721",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5067263720119288
+    },
+    {
+      "id": "25ab4935-bd61-4181-aab0-1aa9d5ff54b7",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "ec2544c2-c765-4464-a785-b4bf9cbb2bee",
+      "identity": "d5dc387dc70f492bdf65d892a864e9f92a4e80470eb52c03e8c28aba2b196484",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4394001607026619
+    },
+    {
+      "id": "0ed5d98f-3fdb-47c3-be0b-958abcb070a6",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "6fde4611-e323-439a-a145-965ebd9ede05",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "48f8a338-2895-4c9c-a3ef-cfb0ab0a8d9c",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "b6f32c3a-ac3b-41b2-984e-37d4b6263179",
+      "identity": "6dc8793ff05850d206a0821db4dd646354fc3320061ba429b2b94ffc7fb5b8f2",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5672648783293167
+    },
+    {
+      "id": "2cff00d0-3f18-49ae-9c3c-c66806893465",
+      "identity": "2166b1e349d590c76f8a2426cbe3e17ca863f90ffed08f50f51387e00d19ed5c",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47418833943148386
+    },
+    {
+      "id": "38337535-e49d-4af9-bda4-208f0ee257db",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "b582b513-6442-4e61-8bbe-1ebc859c2364",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "d0255463-33a2-4471-abf5-c0213a7a803e",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "5c00b7ff-e9be-4b36-a749-62f56c1880b3",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "e1fef2ad-a1fc-47fd-bacb-21d402feade2",
+      "identity": "2a17fb1b87760df02f451245735d73c8bbc9a6efe336f6dba6b0ef755334d55f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5535201057742846
+    },
+    {
+      "id": "1453c192-3ffb-4ce7-b3a5-567933d0b81b",
+      "identity": "b3a8e7764ae9eedb3f508dd7ed92a1d5340d841f6308ce7f9003f22ee65cbf19",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5471495430592574
+    },
+    {
+      "id": "e540ccc2-12b2-4caf-b133-03d399ccc67f",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "b53fb5cf-3b0e-4e3b-83c4-c87d46bddc48",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "b917b124-a87c-42ac-a7d2-19b2c7a8b673",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "1fbc1ced-26bc-4148-8aa0-25b5aa8e1241",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "6fdbbbc0-ef3e-4345-af47-23d405c0d74f",
+      "identity": "2a17fb1b87760df02f451245735d73c8bbc9a6efe336f6dba6b0ef755334d55f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5535201057742846
+    },
+    {
+      "id": "1feb565b-eb18-4a78-ace0-a38571329465",
+      "identity": "196ebd9ec6ba656c79f7b33a383fe343a7bc73126af3ee9506f9d7e34d29f609",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.44606579289783777
+    },
+    {
+      "id": "3536adf1-f0ed-447b-b2fc-df2dc9ba5ee3",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "6143b1f1-3b38-4cf2-97ee-4c727f58b400",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "ee2f6b32-3a75-4578-885b-851b22ec8c0e",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "4ef8a74b-33c0-4f9f-8e59-8201ffd4fdfa",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "c8142b56-4c9a-4acf-b690-1535a4f0ce03",
+      "identity": "2a17fb1b87760df02f451245735d73c8bbc9a6efe336f6dba6b0ef755334d55f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5535201057742846
+    },
+    {
+      "id": "a16aeaa6-6eb8-499f-a1ae-67c3b846281c",
+      "identity": "94ac76e47af0e919d41abbd9b278be36a22122d26758b042cfd2654876dd65bb",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4642649587664961
+    },
+    {
+      "id": "09ff15ac-8c60-402c-875c-e45bf36f68a6",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "7efd3591-0acb-4c4a-8574-532b25c053bf",
+      "identity": "ead57497732654d7e6a6ea9179ecb7fb6a990b36f78665c41b0b562ec16f1105",
+      "generated": true,
+      "verdict": "contradicted",
+      "lexical": true,
+      "score": 0.26718518178502754
+    },
+    {
+      "id": "90f73876-aaa8-4c7a-89f5-86fa9ced86a1",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "6be6c071-7556-4122-ac28-1e099686d250",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "bfb06876-7196-4fba-8c1f-977059b0ad6e",
+      "identity": "3f9a94e4312677d8c636a299f987da1dc8621837b7c0afb3a3dabf130fd1e1f9",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4847765126893808
+    },
+    {
+      "id": "02f9468c-e035-43b6-b6c9-bfe407b6fe52",
+      "identity": "2a17fb1b87760df02f451245735d73c8bbc9a6efe336f6dba6b0ef755334d55f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5535201057742846
+    },
+    {
+      "id": "da168b85-be81-4b52-be8d-78385d594c1e",
+      "identity": "94ac76e47af0e919d41abbd9b278be36a22122d26758b042cfd2654876dd65bb",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4642649587664961
+    },
+    {
+      "id": "e38149ff-10c0-4951-85ac-ebe0ed2be3e4",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "6765578d-b333-4d35-ac1c-5963a4e431df",
+      "identity": "b00ca01d8cfc5a61a7cd13d510ad52af338a07f4dabc2eb6cf7d1e141f7f387d",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "e14e6381-0c9a-435a-9720-7a5d529d78db",
+      "identity": "b00ca01d8cfc5a61a7cd13d510ad52af338a07f4dabc2eb6cf7d1e141f7f387d",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "757fd7c8-786f-44b1-aab5-52cd4094d70d",
+      "identity": "b00ca01d8cfc5a61a7cd13d510ad52af338a07f4dabc2eb6cf7d1e141f7f387d",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "761b689f-0cdf-458a-be65-97715ddf1b8f",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "83c21610-0b7e-4967-b68a-f4247695da30",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "4df35376-d2c1-48e1-ad89-2388e88da9cc",
+      "identity": "ea817d2a130a3d8ecc278fa65bfe1b21bfa6e265ba07f8c2bfe322f7335dd996",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4353209514959632
+    },
+    {
+      "id": "5f02f876-673e-4d55-b771-437ae4dbc135",
+      "identity": "06f74eeba30d09defac055e0a0f9824048a6ebdaaf8ad1c292a06206a57f91c8",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5581114194494929
+    },
+    {
+      "id": "68e57337-3fea-43fc-bd08-511f9fbf64ea",
+      "identity": "94ac76e47af0e919d41abbd9b278be36a22122d26758b042cfd2654876dd65bb",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4642649587664961
+    },
+    {
+      "id": "70148eab-7e07-4383-ba03-ba8a7e6969f0",
+      "identity": "973577b013f912b712526ea8da98f2c6c02d507a64e3a392476a6b3148c46c59",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4406456570734453
+    },
+    {
+      "id": "971d3535-09c8-4c1a-93f3-b929d8eeff14",
+      "identity": "0f112ffa0bdcb8b2d7a16c6081b06c7b47f5f1f7edc5c1a662d878d88596fcba",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.4265472989139719
+    },
+    {
+      "id": "387a47ff-233d-46cf-adc0-84cd46021f68",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "72591330-f4b6-45e1-933d-66ea9706cc7c",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "62b2aac8-f21f-4ebe-8650-64f37469521d",
+      "identity": "ea817d2a130a3d8ecc278fa65bfe1b21bfa6e265ba07f8c2bfe322f7335dd996",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4353209514959632
+    },
+    {
+      "id": "0b49a65d-b430-4595-93e9-98b96932b891",
+      "identity": "06f74eeba30d09defac055e0a0f9824048a6ebdaaf8ad1c292a06206a57f91c8",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5581114194494929
+    },
+    {
+      "id": "4597677b-8791-4292-ae95-98859f15b182",
+      "identity": "47cec040982687b2273343e0acc38d451ef0b56e97c6a8e2c88aa8527be542ad",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4439682343340031
+    },
+    {
+      "id": "f574f85a-8cae-4798-9d78-50371f876cd1",
+      "identity": "295ed4a69878411d7ae346ada0207ab4a5b958b10967f083241214b52fff9626",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.40001265085126836
+    },
+    {
+      "id": "e6fa9f5f-8423-41fe-bb1f-8b2497916e2e",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "3bf063e7-06b9-4069-b73c-f7836e3340b3",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "6dea6909-21cc-45ca-b125-cf7cdabb674e",
+      "identity": "4ece4ba64b427fe7ad62ea92156cae42aab3cf8730360c02567acd0c55d89a54",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4241297933923847
+    },
+    {
+      "id": "e29ec2ba-8057-4d74-9b81-51449c2f82d9",
+      "identity": "06f74eeba30d09defac055e0a0f9824048a6ebdaaf8ad1c292a06206a57f91c8",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5581114194494929
+    },
+    {
+      "id": "efcc7d89-333f-4dac-8bc8-527a8da12683",
+      "identity": "47cec040982687b2273343e0acc38d451ef0b56e97c6a8e2c88aa8527be542ad",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4439682343340031
+    },
+    {
+      "id": "9a97fc34-67e4-4585-af1d-bf63c8694940",
+      "identity": "295ed4a69878411d7ae346ada0207ab4a5b958b10967f083241214b52fff9626",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.40001265085126836
+    },
+    {
+      "id": "bebd5c9d-9103-41ff-9294-85e87ca8b604",
+      "identity": "41daade3afe31a1cdebe022ec2b660f148cc786a1ae363bbe1306c690cab967f",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.6480610345367844
+    },
+    {
+      "id": "a7d8d984-75dd-417c-baac-bbccdb7e4f07",
+      "identity": "ae98a0db26a78d8391aeb8cbd64224450a818ef75c5523ebf0a1348bfee26e13",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5169874132206057
+    },
+    {
+      "id": "4e05ee33-26f0-4508-bb07-78c5db6cb6c9",
+      "identity": "0f435decf998d832a783b8077e20ea0f31496a2786166cfa1bd3061c5ad196da",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5348953974308243
+    },
+    {
+      "id": "c7747826-d6a3-49e4-b984-f81c9261fe14",
+      "identity": "4d7efaeee39302c83ed2999ad2ec5e1d21b2fbcae1cda5c765c0807539bf2cfb",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4343488688178994
+    },
+    {
+      "id": "3a145ebc-eead-48b7-a157-4ab208949ede",
+      "identity": "06f74eeba30d09defac055e0a0f9824048a6ebdaaf8ad1c292a06206a57f91c8",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5581114194494929
+    },
+    {
+      "id": "bfd8d50c-f51b-4efc-987f-7c52b5807658",
+      "identity": "47cec040982687b2273343e0acc38d451ef0b56e97c6a8e2c88aa8527be542ad",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4439682343340031
+    },
+    {
+      "id": "7d2eb415-a59c-40c9-9de4-9354c44cdee1",
+      "identity": "295ed4a69878411d7ae346ada0207ab4a5b958b10967f083241214b52fff9626",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.40001265085126836
+    },
+    {
+      "id": "e26853f6-ab79-4020-9052-2f26ff4579f7",
+      "identity": "6003726728263f227c10e0924c2f5d1f5671b2ac4e87a2f0b14fb848efb648fc",
+      "generated": true,
+      "verdict": "supported",
+      "lexical": false
+    },
+    {
+      "id": "7f8582d1-9422-47a0-b8af-877d95bf3e21",
+      "identity": "1ce0ef071e6e0f167cfdf733f70b9cdc7c6ee7aec4c97ca3eb1119cc450b3cec",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "685e72cd-92ee-4fe8-8bf6-a248bc52dfde",
+      "identity": "1ce0ef071e6e0f167cfdf733f70b9cdc7c6ee7aec4c97ca3eb1119cc450b3cec",
+      "generated": true,
+      "verdict": "ambiguous",
+      "lexical": false
+    },
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000001",
+      "identity": "bba1df443d9fb6f529630610bcb7efaf319359ce673ebf843801b7fc861f9c86",
+      "generated": false,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5112304729912349
+    },
+    {
+      "id": "0ed98d2fc5646a13e045344ac1bb06d35789a5d8ea56d521d8c592548e10952d-000002",
+      "identity": "bba1df443d9fb6f529630610bcb7efaf319359ce673ebf843801b7fc861f9c86",
+      "generated": false,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.5112304729912349
+    },
+    {
+      "id": "0ee3f70dd454adb7ecc8c58e66185b67c18259a59b8b4158c8062d4037a7f1a6-000001",
+      "identity": "10a956f11a33d09b3c226aabac0247dcd2830576116e3c612adb0de9d228db7b",
+      "generated": false,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.716448021609171
+    },
+    {
+      "id": "3b467737f13f859307aa7ff8d58e425647eb31d4de1229bb836846706d4a9045-000001",
+      "identity": "6e7277874adb90db362d0d0e6d54e0d5de86c91f1bfeca3c8a26092c553fe90b",
+      "generated": false,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.49741159905610755
+    },
+    {
+      "id": "4f3e0f4b0735c2aa5939faaf58ad6d9b1ac336f0f9c141f01d9b8f884b171d9d-000001",
+      "identity": "854a456d05d5fd77e6875e94eaffde29c9d2adb857640ad39fc57bf01b10fdf2",
+      "generated": false,
+      "verdict": "supported",
+      "lexical": false
+    },
+    {
+      "id": "797dffb6c68900f1e432f3f9f631eb1ac6618557709519d80e70a8fbda47abd7-000001",
+      "identity": "8091e912685ab961e16f2c8796269294946dd39d8ec84fa5dc4d360181d34b2f",
+      "generated": false,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.7753600931549042
+    },
+    {
+      "id": "8d43ad8054d2e661f2ea2adaffc2d60377134331401cbfca57761c2772c343ad-000001",
+      "identity": "f144d550d8d1fbc4ad272af090e612cc2e38352c7dfe19d7f4d70893969f1437",
+      "generated": false,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.48327988713877107
+    },
+    {
+      "id": "92b9b6d5c640cb8c87068d1dc0f0881d98f6d65f61ae541e42b9ade9fcd0e36b-000001",
+      "identity": "6772fcb4e9d1cb8e033845da1f057566f1f6169ca7986d9550ab452ab8c13b3d",
+      "generated": false,
+      "verdict": "contradicted",
+      "lexical": false
+    },
+    {
+      "id": "e3ffb897670d8e1bd5fb249ec5435ae1832aaeb58a8b3a2461b1662b22d89576-000001",
+      "identity": "864053cac197568eeceaf64d05f314390b1f05cc34ee38ec85bee97a729e5c82",
+      "generated": false,
+      "verdict": "ambiguous",
+      "lexical": true,
+      "score": 0.4801168705769321
+    },
+    {
+      "id": "ec45ae9450422b8336babe85020cfe94128cd97daed19799be267c6f20d658f1-000001",
+      "identity": "65b77caa21bfffb3afa3fb764030d1e6c152768f9b52d99a140a0a21e344172f",
+      "generated": false,
+      "verdict": "unsupported",
+      "lexical": true,
+      "score": 0.5308665977384849
+    },
+    {
+      "id": "ec50f45ca83af4b14470d27bcd5f423b737e3e7a01e494d73705693e394ccbde-000001",
+      "identity": "e308ba3d6ceeb9601343d96a311055f74403d3d28b76b8a644a9de7769d906a1",
+      "generated": false,
+      "verdict": "unsupported",
+      "lexical": false
+    },
+    {
+      "id": "fa2dfd32fae51a5cf8bb93ba3178486e30f9ae9f4c5ca961df148adbb5e58f91-000001",
+      "identity": "c100a153c3ab06579dac7bb595c79afe6ba3a30a96d0664aeda907b3b1cd08ab",
+      "generated": false,
+      "verdict": "supported",
+      "lexical": true,
+      "score": 0.47218748995940685
+    }
+  ],
+  "change": 0.56,
+  "limitation": "Cold-build and lexical-retry candidates on copy-1 seed-only runtime projections. Later states do not reproduce diverged live histories. CHANGE 0.56 is retained; its old calibration does not certify repaired future summary states.",
+  "preparation": {
+    "manifest": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\generation\\manifest.json",
+      "hash": "c9451e0a2b405b23a553bb90a3e3e2a09cdfe9265e3d8918f02573df122d4a0e"
+    },
+    "corpus": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\corpus\\corpus.json",
+      "hash": "c224e6bdb03cb40371a45b0d3096900cd390d0352257b262a1f0539aa607b397"
+    },
+    "attempts": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\generation\\attempts.jsonl",
+      "hash": "3fc356f66e3d26caaf1b0fbd7d78b6efcaae75ebddf3fcfb95073abf7576786b"
+    },
+    "packet": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\generation\\packet.jsonl",
+      "hash": "962fdb27b0043304631d65eca1620e5e69db8c908bfb43aca0f39273f40ca23c"
+    },
+    "labels": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\labels.json",
+      "hash": "a6776f9b4caf4f0a62895e5b2881663a5632bc073ba3848f1751fd9fe67decc8"
+    }
+  },
+  "custody": {
+    "corpus": "c224e6bdb03cb40371a45b0d3096900cd390d0352257b262a1f0539aa607b397",
+    "attempts": "3fc356f66e3d26caaf1b0fbd7d78b6efcaae75ebddf3fcfb95073abf7576786b",
+    "packet": "962fdb27b0043304631d65eca1620e5e69db8c908bfb43aca0f39273f40ca23c",
+    "manifest": "c9451e0a2b405b23a553bb90a3e3e2a09cdfe9265e3d8918f02573df122d4a0e",
+    "labels": {
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l7\\calibration\\g2\\labels.json",
+      "hash": "a6776f9b4caf4f0a62895e5b2881663a5632bc073ba3848f1751fd9fe67decc8"
+    },
+    "controls": {
+      "packet.jsonl": "2f7c267dc8ed24a6fc68adc7609bfe6637df34a30d1d7fd8eb8a2b5926bba45b",
+      "mapping.jsonl": "8c935f627ff5f8dabc38c57398276ddf612738bea2e80545a2e3c8ab261228ac",
+      "verdicts.json": "6b16ba75bf88184eec455c6af6cf405bd050ad289ddd2991c5a5c5a1e4704cf6",
+      "adjudication.json": "c7be44cbba2321b233a0bd30023a0eb150f2ae003bb43352473ab2e8d6b3033a"
+    }
+  }
+}

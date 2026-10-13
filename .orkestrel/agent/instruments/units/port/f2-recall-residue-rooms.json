@@ -1,0 +1,2465 @@
+{
+  "commit": "7f346b50d0bf96c2182f096b30c5c1b089cdc7c0",
+  "conclusion": "All 13 bodies are cut-point differences or propagation of those cuts into answer notes. No independent candidate-set defect and no Gauge formula defect reproduced.",
+  "method": {
+    "recorded": "Evaluate the literal bench.mjs measureCall, measureRun, measureReply, marginal, left, reserve, room, callSize, and cut methods and fitSlope with the measured built estimateMessages. Feed seed.json measured scale/fixed, ledger.jsonl capacity and complete preceding calls, and final reply completions.",
+    "sameInputs": "Feed the same recorded groups and reply completions to the source Gauge. Compare left, reserve, rate, and room to the measured methods. Every comparison agrees within 1e-10.",
+    "replayInputs": "Replay each affected copy through source createLedger using the existing read-only ledger-replay-support.ts with recorded replies and a recorded judge transport. Global fetch throws. No daemon request, agent, build, or source instrumentation.",
+    "replayPrice": "The existing replay reports prompt = fixed + (recorded.prompt - fixed) / recorded.estimate * estimateMessages(port.messages), with fixed = seed.fixed for calls advertising tools, otherwise 0. Completion counts are recorded. Input arrays below include both sides.",
+    "units": "Room is estimate units after subtracting callSize. Each item estimate includes one tool-message overhead of 4; cumulative estimates price the newline-joined prefix as one tool message. The cut notice is appended after fitting and is not charged.",
+    "index": "Body call indexes are zero-based, matching u8-replay-after-4ceab14.json. generatedByCall names the earlier response whose recall result is visible in that body.",
+    "candidateEvidence": "Escalations selects m28,m27,m23,m22,m19,m18,m7,m6 and the indivisible m3+m29 item on both sides. The imported topic m3 escalations probability is 0.6771258655881988 against 0.6, and amends m3 m29 is 0.9906456143710016 against 0.75. Halvorsen shipment matches no registry/desk label: both sides select the earlier answer note m69 and user message m34 by every-word matching. MX-4471 text is nested inside m69; it is not an independently selected shipment candidate.",
+    "ruling": "T1 removes line handles and amendment marks, so the shorter items can fit. T1/T2 and the listed F4a/R2a replay normalizations change prompt estimates; the existing replay reprices those bytes, changing left and fitted rate. On identical measured inputs Gauge agrees with the harness. Preserve these admitted text differences and the measured formula. No source repair.",
+    "sourceLines": [
+      "bench.mjs:1281-1333",
+      "bench.mjs:2490-2609",
+      "bench.mjs:6098-6115",
+      "ledger-replay-support.ts:874-886",
+      "src/core/ledgers/Ledger.ts:982",
+      "src/core/ledgers/Gauge.ts:78"
+    ]
+  },
+  "controls": [
+    {
+      "recall": "v1/g04-halvorsen-ticket/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v3/g04-halvorsen-ticket/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v6/g04-halvorsen-ticket/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v7/g04-halvorsen-ticket/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v7/g07-depot-release/1",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v7/g07-depot-release/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    },
+    {
+      "recall": "v8/g04-halvorsen-ticket/2",
+      "control": "Remove the last candidate item; the exact recorded-output equality assertion rejects the altered cut/count.",
+      "rejected": true
+    }
+  ],
+  "inputs": {
+    "v1": {
+      "seed": {
+        "estimate": 1719,
+        "prompt": 2498,
+        "bare": 2000,
+        "fixed": 498,
+        "scale": 1.1634671320535195
+      },
+      "capacity": 3072,
+      "history": [
+        {
+          "goal": "g01-luis-refund-amount",
+          "recorded": [
+            {
+              "estimate": 912,
+              "prompt": 1528,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 978,
+              "prompt": 1645,
+              "completion": 40,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 898,
+              "prompt": 1512.188596491228,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 962,
+              "prompt": 1626.235173824131,
+              "completion": 40,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 40
+        },
+        {
+          "goal": "g02-luis-card",
+          "recorded": [
+            {
+              "estimate": 960,
+              "prompt": 1586,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 1029,
+              "prompt": 1688,
+              "completion": 28,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 946,
+              "prompt": 1570.1333333333332,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 1014,
+              "prompt": 1670.6530612244896,
+              "completion": 28,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 28
+        },
+        {
+          "goal": "g03-grace-escalation",
+          "recorded": [
+            {
+              "estimate": 1011,
+              "prompt": 1666,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1281,
+              "prompt": 2049,
+              "completion": 195,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 996,
+              "prompt": 1648.6706231454007,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1258,
+              "prompt": 2021.152224824356,
+              "completion": 195,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 195
+        },
+        {
+          "goal": "g04-halvorsen-ticket",
+          "recorded": [
+            {
+              "estimate": 1004,
+              "prompt": 1652,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1231,
+              "prompt": 1983,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1485,
+              "prompt": 2303,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1361,
+              "prompt": 1598,
+              "completion": 66,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 989,
+              "prompt": 1634.7589641434263,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1203,
+              "prompt": 1949.2225832656377,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1466,
+              "prompt": 2279.905723905724,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1265,
+              "prompt": 1485.2828802351212,
+              "completion": 66,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 66
+        }
+      ]
+    },
+    "v3": {
+      "seed": {
+        "estimate": 1719,
+        "prompt": 2498,
+        "bare": 2000,
+        "fixed": 498,
+        "scale": 1.1634671320535195
+      },
+      "capacity": 3072,
+      "history": [
+        {
+          "goal": "g01-luis-refund-amount",
+          "recorded": [
+            {
+              "estimate": 918,
+              "prompt": 1536,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 984,
+              "prompt": 1653,
+              "completion": 39,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 904,
+              "prompt": 1520.169934640523,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 968,
+              "prompt": 1634.219512195122,
+              "completion": 39,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 39
+        },
+        {
+          "goal": "g02-luis-card",
+          "recorded": [
+            {
+              "estimate": 915,
+              "prompt": 1541,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 984,
+              "prompt": 1643,
+              "completion": 23,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 901,
+              "prompt": 1525.041530054645,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 969,
+              "prompt": 1625.5457317073171,
+              "completion": 23,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 23
+        },
+        {
+          "goal": "g03-grace-escalation",
+          "recorded": [
+            {
+              "estimate": 1009,
+              "prompt": 1666,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 1278,
+              "prompt": 2053,
+              "completion": 165,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 994,
+              "prompt": 1648.6362735381567,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 1255,
+              "prompt": 2025.0148669796556,
+              "completion": 165,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 165
+        },
+        {
+          "goal": "g04-halvorsen-ticket",
+          "recorded": [
+            {
+              "estimate": 1010,
+              "prompt": 1659,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1237,
+              "prompt": 1990,
+              "completion": 57,
+              "tools": 3
+            },
+            {
+              "estimate": 1516,
+              "prompt": 2340,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1367,
+              "prompt": 1605,
+              "completion": 74,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 995,
+              "prompt": 1641.7574257425742,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1209,
+              "prompt": 1956.2279708973322,
+              "completion": 57,
+              "tools": 3
+            },
+            {
+              "estimate": 1497,
+              "prompt": 2316.914248021108,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1271,
+              "prompt": 1492.286027798098,
+              "completion": 74,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 74
+        }
+      ]
+    },
+    "v6": {
+      "seed": {
+        "estimate": 1719,
+        "prompt": 2498,
+        "bare": 2000,
+        "fixed": 498,
+        "scale": 1.1634671320535195
+      },
+      "capacity": 3072,
+      "history": [
+        {
+          "goal": "g01-luis-refund-amount",
+          "recorded": [
+            {
+              "estimate": 915,
+              "prompt": 1533,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 981,
+              "prompt": 1650,
+              "completion": 30,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 901,
+              "prompt": 1517.1639344262294,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 965,
+              "prompt": 1631.211009174312,
+              "completion": 30,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 30
+        },
+        {
+          "goal": "g02-luis-card",
+          "recorded": [
+            {
+              "estimate": 914,
+              "prompt": 1538,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 983,
+              "prompt": 1640,
+              "completion": 23,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 900,
+              "prompt": 1522.070021881838,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 968,
+              "prompt": 1622.5737538148524,
+              "completion": 23,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 23
+        },
+        {
+          "goal": "g03-grace-escalation",
+          "recorded": [
+            {
+              "estimate": 1009,
+              "prompt": 1666,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1279,
+              "prompt": 2049,
+              "completion": 237,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 994,
+              "prompt": 1648.6362735381567,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1256,
+              "prompt": 2021.1086786551994,
+              "completion": 237,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 237
+        },
+        {
+          "goal": "g04-halvorsen-ticket",
+          "recorded": [
+            {
+              "estimate": 1004,
+              "prompt": 1652,
+              "completion": 30,
+              "tools": 3
+            },
+            {
+              "estimate": 1226,
+              "prompt": 1973,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1480,
+              "prompt": 2293,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1361,
+              "prompt": 1598,
+              "completion": 82,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 989,
+              "prompt": 1634.7589641434263,
+              "completion": 30,
+              "tools": 3
+            },
+            {
+              "estimate": 1198,
+              "prompt": 1939.3132137030996,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1461,
+              "prompt": 2269.9560810810813,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1265,
+              "prompt": 1485.2828802351212,
+              "completion": 82,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 82
+        }
+      ]
+    },
+    "v7": {
+      "seed": {
+        "estimate": 1719,
+        "prompt": 2498,
+        "bare": 2000,
+        "fixed": 498,
+        "scale": 1.1634671320535195
+      },
+      "capacity": 3072,
+      "history": [
+        {
+          "goal": "g01-luis-refund-amount",
+          "recorded": [
+            {
+              "estimate": 914,
+              "prompt": 1531,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 980,
+              "prompt": 1648,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 1167,
+              "prompt": 1976,
+              "completion": 33,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 900,
+              "prompt": 1515.1772428884028,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 964,
+              "prompt": 1629.2244897959185,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 1138,
+              "prompt": 1939.2716366752356,
+              "completion": 33,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 33
+        },
+        {
+          "goal": "g02-luis-card",
+          "recorded": [
+            {
+              "estimate": 915,
+              "prompt": 1541,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 984,
+              "prompt": 1643,
+              "completion": 25,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 901,
+              "prompt": 1525.041530054645,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 969,
+              "prompt": 1625.5457317073171,
+              "completion": 25,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 25
+        },
+        {
+          "goal": "g03-grace-escalation",
+          "recorded": [
+            {
+              "estimate": 1012,
+              "prompt": 1671,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1282,
+              "prompt": 2054,
+              "completion": 214,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 997,
+              "prompt": 1653.6136363636365,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1259,
+              "prompt": 2026.0842433697346,
+              "completion": 214,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 214
+        },
+        {
+          "goal": "g04-halvorsen-ticket",
+          "recorded": [
+            {
+              "estimate": 1006,
+              "prompt": 1654,
+              "completion": 30,
+              "tools": 3
+            },
+            {
+              "estimate": 1228,
+              "prompt": 1975,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1482,
+              "prompt": 2296,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1363,
+              "prompt": 1600,
+              "completion": 57,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 991,
+              "prompt": 1636.7634194831014,
+              "completion": 30,
+              "tools": 3
+            },
+            {
+              "estimate": 1200,
+              "prompt": 1941.3224755700326,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1463,
+              "prompt": 2272.948717948718,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1267,
+              "prompt": 1487.3074101247248,
+              "completion": 57,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 57
+        },
+        {
+          "goal": "g05-luis-approval-note",
+          "recorded": [
+            {
+              "estimate": 956,
+              "prompt": 1593,
+              "completion": 261,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 942,
+              "prompt": 1576.9644351464435,
+              "completion": 261,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 261
+        },
+        {
+          "goal": "g06-kenji-shipping",
+          "recorded": [
+            {
+              "estimate": 893,
+              "prompt": 1503,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 984,
+              "prompt": 1641,
+              "completion": 78,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 875,
+              "prompt": 1482.7424412094065,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 964,
+              "prompt": 1617.7682926829268,
+              "completion": 78,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 78
+        },
+        {
+          "goal": "g07-depot-release",
+          "recorded": [
+            {
+              "estimate": 983,
+              "prompt": 1623,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1359,
+              "prompt": 2107,
+              "completion": 28,
+              "tools": 3
+            },
+            {
+              "estimate": 1580,
+              "prompt": 2398,
+              "completion": 28,
+              "tools": 3
+            },
+            {
+              "estimate": 1357,
+              "prompt": 1588,
+              "completion": 117,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 969,
+              "prompt": 1606.9776195320449,
+              "completion": 29,
+              "tools": 3
+            },
+            {
+              "estimate": 1367,
+              "prompt": 2116.4716703458425,
+              "completion": 28,
+              "tools": 3
+            },
+            {
+              "estimate": 1601,
+              "prompt": 2423.253164556962,
+              "completion": 28,
+              "tools": 3
+            },
+            {
+              "estimate": 1261,
+              "prompt": 1475.6580692704497,
+              "completion": 117,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 117
+        }
+      ]
+    },
+    "v8": {
+      "seed": {
+        "estimate": 1719,
+        "prompt": 2498,
+        "bare": 2000,
+        "fixed": 498,
+        "scale": 1.1634671320535195
+      },
+      "capacity": 3072,
+      "history": [
+        {
+          "goal": "g01-luis-refund-amount",
+          "recorded": [
+            {
+              "estimate": 912,
+              "prompt": 1529,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 978,
+              "prompt": 1646,
+              "completion": 36,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 898,
+              "prompt": 1513.173245614035,
+              "completion": 33,
+              "tools": 3
+            },
+            {
+              "estimate": 962,
+              "prompt": 1627.2188139059303,
+              "completion": 36,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 36
+        },
+        {
+          "goal": "g02-luis-card",
+          "recorded": [
+            {
+              "estimate": 960,
+              "prompt": 1587,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 1029,
+              "prompt": 1689,
+              "completion": 35,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 946,
+              "prompt": 1571.1187499999999,
+              "completion": 34,
+              "tools": 3
+            },
+            {
+              "estimate": 1014,
+              "prompt": 1671.6384839650145,
+              "completion": 35,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 35
+        },
+        {
+          "goal": "g03-grace-escalation",
+          "recorded": [
+            {
+              "estimate": 1012,
+              "prompt": 1668,
+              "completion": 39,
+              "tools": 3
+            },
+            {
+              "estimate": 1286,
+              "prompt": 2061,
+              "completion": 281,
+              "tools": 3
+            }
+          ],
+          "port": [
+            {
+              "estimate": 997,
+              "prompt": 1650.6581027667985,
+              "completion": 39,
+              "tools": 3
+            },
+            {
+              "estimate": 1263,
+              "prompt": 2033.0458786936238,
+              "completion": 281,
+              "tools": 3
+            }
+          ],
+          "replyCompletion": 281
+        },
+        {
+          "goal": "g04-halvorsen-ticket",
+          "recorded": [
+            {
+              "estimate": 1004,
+              "prompt": 1652,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1231,
+              "prompt": 1983,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1485,
+              "prompt": 2303,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1361,
+              "prompt": 1598,
+              "completion": 76,
+              "tools": 0
+            }
+          ],
+          "port": [
+            {
+              "estimate": 989,
+              "prompt": 1634.7589641434263,
+              "completion": 40,
+              "tools": 3
+            },
+            {
+              "estimate": 1203,
+              "prompt": 1949.2225832656377,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1466,
+              "prompt": 2279.905723905724,
+              "completion": 27,
+              "tools": 3
+            },
+            {
+              "estimate": 1265,
+              "prompt": 1485.2828802351212,
+              "completion": 76,
+              "tools": 0
+            }
+          ],
+          "replyCompletion": 76
+        }
+      ]
+    }
+  },
+  "bodies": {
+    "v1": {
+      "g04-halvorsen-ticket": {
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v1/g04-halvorsen-ticket/2",
+              "recordedRoom": 263.98315891302434,
+              "portSameInputsRoom": 263.98315891302434,
+              "portReplayRoom": 274.353430576463,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v1/g04-halvorsen-ticket/2",
+              "recordedRoom": 263.98315891302434,
+              "portSameInputsRoom": 263.98315891302434,
+              "portReplayRoom": 274.353430576463,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        }
+      }
+    },
+    "v3": {
+      "g04-halvorsen-ticket": {
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v3/g04-halvorsen-ticket/2",
+              "recordedRoom": 259.30932989690723,
+              "portSameInputsRoom": 259.30932989690723,
+              "portReplayRoom": 269.53865448727544,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v3/g04-halvorsen-ticket/2",
+              "recordedRoom": 259.30932989690723,
+              "portSameInputsRoom": 259.30932989690723,
+              "portReplayRoom": 269.53865448727544,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        }
+      }
+    },
+    "v6": {
+      "g04-halvorsen-ticket": {
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v6/g04-halvorsen-ticket/2",
+              "recordedRoom": 253.88177023945263,
+              "portSameInputsRoom": 253.88177023945263,
+              "portReplayRoom": 264.2903527979215,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v6/g04-halvorsen-ticket/2",
+              "recordedRoom": 253.88177023945263,
+              "portSameInputsRoom": 253.88177023945263,
+              "portReplayRoom": 264.2903527979215,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        }
+      }
+    },
+    "v7": {
+      "g04-halvorsen-ticket": {
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v7/g04-halvorsen-ticket/2",
+              "recordedRoom": 241.3019101380865,
+              "portSameInputsRoom": 241.3019101380865,
+              "portReplayRoom": 250.583814477889,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v7/g04-halvorsen-ticket/2",
+              "recordedRoom": 241.3019101380865,
+              "portSameInputsRoom": 241.3019101380865,
+              "portReplayRoom": 250.583814477889,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        }
+      },
+      "g07-depot-release": {
+        "1": {
+          "cause": "cut point inherited from the g04 note, plus the resulting cut of m34",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v7/g07-depot-release/1",
+              "recordedRoom": 364.94867259320347,
+              "portSameInputsRoom": 364.94867259320347,
+              "portReplayRoom": 371.4021528500562,
+              "recordedKept": 2,
+              "portKept": 1
+            }
+          ]
+        },
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v7/g07-depot-release/1",
+              "recordedRoom": 364.94867259320347,
+              "portSameInputsRoom": 364.94867259320347,
+              "portReplayRoom": 371.4021528500562,
+              "recordedKept": 2,
+              "portKept": 1
+            },
+            {
+              "recall": "v7/g07-depot-release/2",
+              "recordedRoom": 206.1586236556005,
+              "portSameInputsRoom": 206.1586236556005,
+              "portReplayRoom": 204.35430997359651,
+              "recordedKept": 7,
+              "portKept": 8
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v7/g07-depot-release/1",
+              "recordedRoom": 364.94867259320347,
+              "portSameInputsRoom": 364.94867259320347,
+              "portReplayRoom": 371.4021528500562,
+              "recordedKept": 2,
+              "portKept": 1
+            },
+            {
+              "recall": "v7/g07-depot-release/2",
+              "recordedRoom": 206.1586236556005,
+              "portSameInputsRoom": 206.1586236556005,
+              "portReplayRoom": 204.35430997359651,
+              "recordedKept": 7,
+              "portKept": 8
+            }
+          ]
+        }
+      }
+    },
+    "v8": {
+      "g04-halvorsen-ticket": {
+        "2": {
+          "cause": "cut point",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v8/g04-halvorsen-ticket/2",
+              "recordedRoom": 232.74430227908834,
+              "portSameInputsRoom": 232.74430227908834,
+              "portReplayRoom": 243.156276929275,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        },
+        "3": {
+          "cause": "cut point propagated through the answer note",
+          "ruling": "Retain under T1; no candidate-set or Gauge formula repair.",
+          "evidence": [
+            {
+              "recall": "v8/g04-halvorsen-ticket/2",
+              "recordedRoom": 232.74430227908834,
+              "portSameInputsRoom": 232.74430227908834,
+              "portReplayRoom": 243.156276929275,
+              "recordedKept": 8,
+              "portKept": 9
+            }
+          ]
+        }
+      }
+    }
+  },
+  "recalls": {
+    "v1/g04-halvorsen-ticket/2": {
+      "topic": "escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00036_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.155291790306627,
+        "fixed": 498,
+        "left": 1062,
+        "reserve": 231.18734368681953,
+        "rate": 1.447493747472781,
+        "room": 263.98315891302434,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.155291790306627,
+        "fixed": 498,
+        "left": 1062,
+        "reserve": 231.18734368681953,
+        "rate": 1.447493747472781,
+        "room": 263.98315891302434,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.155291790306627,
+        "fixed": 498,
+        "left": 1095.7774167343623,
+        "reserve": 231.33885120533125,
+        "rate": 1.4535540482132505,
+        "room": 274.353430576463,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 9,
+          "omitted": 0,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+        },
+        "portAtRecordedRoom": {
+          "kept": 9,
+          "omitted": 0
+        }
+      }
+    },
+    "v3/g04-halvorsen-ticket/2": {
+      "topic": "escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00036_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1025,
+        "reserve": 201.46424624267894,
+        "rate": 1.4585698497071582,
+        "room": 259.30932989690723,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1025,
+        "reserve": 201.46424624267894,
+        "rate": 1.4585698497071582,
+        "room": 259.30932989690723,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1058.7720291026678,
+        "reserve": 201.6253594403046,
+        "rate": 1.4650143776121842,
+        "room": 269.53865448727544,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 9,
+          "omitted": 0,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+        },
+        "portAtRecordedRoom": {
+          "kept": 9,
+          "omitted": 0
+        }
+      }
+    },
+    "v6/g04-halvorsen-ticket/2": {
+      "topic": "escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00036_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1072,
+        "reserve": 273.0682706148468,
+        "rate": 1.4427308245938721,
+        "room": 253.88177023945263,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1072,
+        "reserve": 273.0682706148468,
+        "rate": 1.4427308245938721,
+        "room": 253.88177023945263,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.157581764122894,
+        "fixed": 498,
+        "left": 1105.6867862969004,
+        "reserve": 273.22059458341096,
+        "rate": 1.4488237833364381,
+        "room": 264.2903527979215,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 9,
+          "omitted": 0,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+        },
+        "portAtRecordedRoom": {
+          "kept": 9,
+          "omitted": 0
+        }
+      }
+    },
+    "v7/g04-halvorsen-ticket/2": {
+      "topic": "escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00037_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.1590909090909092,
+        "fixed": 498,
+        "left": 1070,
+        "reserve": 252.65580260866753,
+        "rate": 1.5462321043467013,
+        "room": 241.3019101380865,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.1590909090909092,
+        "fixed": 498,
+        "left": 1070,
+        "reserve": 252.65580260866753,
+        "rate": 1.5462321043467013,
+        "room": 241.3019101380865,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.1590909090909092,
+        "fixed": 498,
+        "left": 1103.6775244299674,
+        "reserve": 252.87311512421866,
+        "rate": 1.5549246049687466,
+        "room": 250.583814477889,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 9,
+          "omitted": 0,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+        },
+        "portAtRecordedRoom": {
+          "kept": 9,
+          "omitted": 0
+        }
+      }
+    },
+    "v7/g07-depot-release/1": {
+      "topic": "Halvorsen shipment",
+      "generatedByCall": 0,
+      "visibleInCall": 1,
+      "wire": "00061_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m69 (g04 answer note)",
+        "m34"
+      ],
+      "recorded": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 1420,
+        "reserve": 296.99837938748533,
+        "rate": 1.4399351754994123,
+        "room": 364.94867259320347,
+        "callSize": 25
+      },
+      "portSameInputs": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 1420,
+        "reserve": 296.99837938748533,
+        "rate": 1.4399351754994123,
+        "room": 364.94867259320347,
+        "callSize": 25
+      },
+      "portReplay": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 1436.0223804679551,
+        "reserve": 296.9200352785509,
+        "rate": 1.4368014111420369,
+        "room": 371.4021528500562,
+        "callSize": 25
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m69 (g04 answer note)",
+          "recorded": {
+            "text": "m69: [Desk] What your lookups and recalls returned in this request:\nOrder LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.\nm34: Anyway, can you check where the Halvorsen shipment actually is?\nm28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm24: Their buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 332,
+            "cumulative": 332
+          },
+          "port": {
+            "text": "[Desk] What your lookups and recalls returned in this request:\nOrder LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.\nAnyway, can you check where the Halvorsen shipment actually is?\nUpdated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nTheir buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 356,
+            "cumulative": 356
+          }
+        },
+        {
+          "source": "m34",
+          "recorded": {
+            "text": "m34: Anyway, can you check where the Halvorsen shipment actually is?",
+            "estimate": 21,
+            "cumulative": 350
+          },
+          "port": {
+            "text": "Anyway, can you check where the Halvorsen shipment actually is?",
+            "estimate": 20,
+            "cumulative": 372
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 2,
+          "omitted": 0,
+          "text": "m69: [Desk] What your lookups and recalls returned in this request:\nOrder LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.\nm34: Anyway, can you check where the Halvorsen shipment actually is?\nm28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm24: Their buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nm34: Anyway, can you check where the Halvorsen shipment actually is?"
+        },
+        "port": {
+          "kept": 1,
+          "omitted": 1,
+          "text": "[Desk] What your lookups and recalls returned in this request:\nOrder LH-80941 for account LH-31055 (Halvorsen Interiors): 8 brass pendant lights, total $1,240.00. Freightline pro number FL-660412; held at the Riverside depot since 2026-10-02, awaiting a release from the Larkspur Home warehouse.\nAnyway, can you check where the Halvorsen shipment actually is?\nUpdated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nTheir buyer is Sigrid Halvorsen. She only takes calls after 2 pm, on her direct line at extension 4127.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "portAtRecordedRoom": {
+          "kept": 1,
+          "omitted": 1
+        }
+      },
+      "inherited": "v7/g04-halvorsen-ticket/2"
+    },
+    "v7/g07-depot-release/2": {
+      "topic": "Escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00062_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 937,
+        "reserve": 295.96668098235347,
+        "rate": 1.3986672392941388,
+        "room": 206.1586236556005,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 937,
+        "reserve": 295.96668098235347,
+        "rate": 1.3986672392941388,
+        "room": 206.1586236556005,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.1254199328107504,
+        "fixed": 498,
+        "left": 927.5283296541575,
+        "reserve": 295.7361034354318,
+        "rate": 1.3894441374172717,
+        "room": 204.35430997359651,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 7,
+          "omitted": 2,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\n2 older items not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "portAtRecordedRoom": {
+          "kept": 8,
+          "omitted": 1
+        }
+      }
+    },
+    "v8/g04-halvorsen-ticket/2": {
+      "topic": "escalations",
+      "generatedByCall": 1,
+      "visibleInCall": 2,
+      "wire": "00036_api_chat-request.json",
+      "candidateSetEqual": true,
+      "candidates": [
+        "m28",
+        "m27",
+        "m23",
+        "m22",
+        "m19",
+        "m18",
+        "m7",
+        "m6",
+        "m3+m29"
+      ],
+      "recorded": {
+        "scale": 1.1561264822134387,
+        "fixed": 498,
+        "left": 1062,
+        "reserve": 317.3940628637951,
+        "rate": 1.4557625145518045,
+        "room": 232.74430227908834,
+        "callSize": 23
+      },
+      "portSameInputs": {
+        "scale": 1.1561264822134387,
+        "fixed": 498,
+        "left": 1062,
+        "reserve": 317.3940628637951,
+        "rate": 1.4557625145518045,
+        "room": 232.74430227908834,
+        "callSize": 23
+      },
+      "portReplay": {
+        "scale": 1.1561264822134387,
+        "fixed": 498,
+        "left": 1095.7774167343623,
+        "reserve": 317.54939275516296,
+        "rate": 1.4619757102065187,
+        "room": 243.156276929275,
+        "callSize": 23
+      },
+      "inputDifference": "PortReplay uses the smaller handle-free prompt estimates and the existing replay per-call prompt repricing; g07 also carries the larger g04 note. PortSameInputs isolates the formula and equals Recorded.",
+      "ruling": "T1, T2; existing replay prompt repricing. Gauge formula unchanged.",
+      "items": [
+        {
+          "source": "m28",
+          "recorded": {
+            "text": "m28: Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 17,
+            "cumulative": 17
+          },
+          "port": {
+            "text": "Updated: the Halvorsen escalation is ESC-2219.",
+            "estimate": 16,
+            "cumulative": 16
+          }
+        },
+        {
+          "source": "m27",
+          "recorded": {
+            "text": "m27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 27,
+            "cumulative": 40
+          },
+          "port": {
+            "text": "Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.",
+            "estimate": 26,
+            "cumulative": 38
+          }
+        },
+        {
+          "source": "m23",
+          "recorded": {
+            "text": "m23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]",
+            "estimate": 24,
+            "cumulative": 60
+          },
+          "port": {
+            "text": "Logged ESC-2291 against LH-80941 and copied Priya Raman.",
+            "estimate": 18,
+            "cumulative": 52
+          }
+        },
+        {
+          "source": "m22",
+          "recorded": {
+            "text": "m22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]",
+            "estimate": 48,
+            "cumulative": 104
+          },
+          "port": {
+            "text": "Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.",
+            "estimate": 42,
+            "cumulative": 90
+          }
+        },
+        {
+          "source": "m19",
+          "recorded": {
+            "text": "m19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 24,
+            "cumulative": 123
+          },
+          "port": {
+            "text": "Locker trace opened, and Grace's replacement waits on Marcus's sign-off.",
+            "estimate": 22,
+            "cumulative": 108
+          }
+        },
+        {
+          "source": "m18",
+          "recorded": {
+            "text": "m18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 36,
+            "cumulative": 155
+          },
+          "port": {
+            "text": "Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+            "estimate": 35,
+            "cumulative": 139
+          }
+        },
+        {
+          "source": "m7",
+          "recorded": {
+            "text": "m7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 28,
+            "cumulative": 179
+          },
+          "port": {
+            "text": "Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.",
+            "estimate": 27,
+            "cumulative": 162
+          }
+        },
+        {
+          "source": "m6",
+          "recorded": {
+            "text": "m6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 37,
+            "cumulative": 213
+          },
+          "port": {
+            "text": "Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.",
+            "estimate": 36,
+            "cumulative": 195
+          }
+        },
+        {
+          "source": "m3+m29",
+          "recorded": {
+            "text": "m3: Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran. [amended by m29]\nm29: Marcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 56,
+            "cumulative": 265
+          },
+          "port": {
+            "text": "Understood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead.",
+            "estimate": 50,
+            "cumulative": 240
+          }
+        }
+      ],
+      "cuts": {
+        "recorded": {
+          "kept": 8,
+          "omitted": 1,
+          "text": "m28: Updated: the Halvorsen escalation is ESC-2219.\nm27: Correction on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nm23: Logged ESC-2291 against LH-80941 and copied Priya Raman. [amended by m27]\nm22: Next: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it. [amended by m27]\nm19: Locker trace opened, and Grace's replacement waits on Marcus's sign-off.\nm18: Agreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nm7: Got it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nm6: Third rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\n1 older item not shown; name a narrower topic to narrow the recall"
+        },
+        "port": {
+          "kept": 9,
+          "omitted": 0,
+          "text": "Updated: the Halvorsen escalation is ESC-2219.\nCorrection on Halvorsen: the ticket is ESC-2219, not ESC-2291. I transposed the digits.\nLogged ESC-2291 against LH-80941 and copied Priya Raman.\nNext: Halvorsen Interiors, wholesale account LH-31055, is escalating a late $1,240 lighting order, LH-80941. Escalations opened ticket ESC-2291 for it.\nLocker trace opened, and Grace's replacement waits on Marcus's sign-off.\nAgreed, open the locker trace. Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.\nGot it: Priya Raman goes on every escalation, and no delivery dates go in customer replies.\nThird rule: copy Priya Raman from the refunds team on every escalation. And never promise a customer a delivery date in writing.\nUnderstood: refunds above $200 carry approval code MX-4471 from Marcus Oyelaran.\nMarcus just messaged that the approval code rotated early. Use MX-4486 from now on; MX-4471 is dead."
+        },
+        "portAtRecordedRoom": {
+          "kept": 8,
+          "omitted": 1
+        }
+      }
+    }
+  },
+  "tests": {
+    "added": [],
+    "redOnBaseline": "Not applicable: no source defect reproduced and no tests added."
+  },
+  "guides": {
+    "contradicted": [],
+    "failures": [
+      "resolves the judgments fence’s question once over a started listener and reuses the record",
+      "drops only the decisive no through the stock selection fence over a started listener",
+      "reads the select receipt beside the active mode’s description as the judge pattern fence claims",
+      "round trips both relay fence halves over a started listener and refuses what the route declines",
+      "cancels the upstream turn when the relay reader goes away with the first pull pending",
+      "asks the System One fence’s three questions over a started listener and reads the published measures"
+    ]
+  },
+  "gates": [
+    {
+      "command": "npx tsc --noEmit --project tsconfig.json",
+      "exit": 0
+    },
+    {
+      "command": "npm run check:src:core",
+      "exit": 0
+    },
+    {
+      "command": "npm run test:src:core",
+      "exit": 0,
+      "passed": 1231,
+      "files": 43
+    },
+    {
+      "command": "npm run lint:check",
+      "exit": 0
+    },
+    {
+      "command": "npm run format:check",
+      "exit": 0
+    },
+    {
+      "command": "npm run test:policy",
+      "exit": 0,
+      "passed": 119,
+      "skipped": 1
+    },
+    {
+      "command": "npm run test:guides",
+      "exit": 1,
+      "passed": 100,
+      "failed": 6,
+      "reason": "All failures: listen EPERM: operation not permitted 127.0.0.1 (sandbox-only)."
+    }
+  ],
+  "scope": {
+    "sourceChanges": [],
+    "testChanges": [],
+    "report": "tmp/units/f2-recall-residue-rooms.json",
+    "publicAPI": "unchanged",
+    "briefing": "unchanged",
+    "T1": "unchanged",
+    "gitStatusPorcelain": "",
+    "gitDiffStat": "",
+    "reportIgnored": true
+  }
+}

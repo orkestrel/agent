@@ -1,0 +1,25 @@
+{
+  "name": "format-check",
+  "args": [
+    "node_modules/oxfmt/bin/oxfmt",
+    "--config",
+    ".oxfmtrc.json",
+    "--ignore-path",
+    "tmp/units/aggregate-l12-maintenance-verifier-ignore.txt",
+    "--check",
+    ".orkestrel/agent/instruments/harness/bench5/Driver.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/types.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/validators.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/helpers.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/development.test.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/matrixFixture.ts",
+    ".orkestrel/agent/instruments/harness/bench5/tests/refit/helpers.ts",
+    ".orkestrel/agent/instruments/harness/bench5/matrix/tests/capacity.test.ts"
+  ],
+  "expected": 0,
+  "code": 0,
+  "pid": 67256,
+  "durationMs": 81,
+  "stdout": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\format-check.stdout.log",
+  "stderr": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-l12-maintenance-verifier-logs\\format-check.stderr.log"
+}

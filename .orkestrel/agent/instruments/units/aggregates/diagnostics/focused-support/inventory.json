@@ -1,0 +1,207 @@
+[
+  {
+    "path": "tmp/units/aggregate-focused-screen/census.json",
+    "bytes": 27021,
+    "hash": "d1cff832abe38b12a9dbaca539e680c91758270315f5ca85c0de584702f13ef6"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/constants.ts",
+    "bytes": 2704,
+    "hash": "191eba63aa546fffaeaa6d38063f22176d14176bfdeef5588ac013ca2cb1a361"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/helpers.ts",
+    "bytes": 19194,
+    "hash": "638783b0ebc9a58c297c2fc13301e36ea1ec44d9b2255066a57bf95c0523e6b1"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/main.ts",
+    "bytes": 914,
+    "hash": "7d720aed0b81600134a23ee8930cb738066ab51fdde5accbad80b665fff9d596"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/negative.test.ts",
+    "bytes": 3301,
+    "hash": "d9d2f503da80189cbedbeeec56c47e3063970186b2f96cb7872fab4535de9f94"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/offline.config.ts",
+    "bytes": 73,
+    "hash": "c12c856623efff3a3b1cf851291f8dbdf0f46ea655c8c164aa8d6ddb324e84b9"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/Operator.ts",
+    "bytes": 16596,
+    "hash": "3bccc04f115910c123ae1c1ecca385d237c1f4eddbc9a5d766eb859964a89484"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/packet-final.json",
+    "bytes": 64259,
+    "hash": "52aa96b66f45b9cad0275cd6db52e63f1a12ffb9f4b80e84132831f9f885cf11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/plan-final.json",
+    "bytes": 2255,
+    "hash": "2992486156fb84bb28c2ea2a0cfcff01b69da5e867f748169d24618c93d2feb8"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/prepare.ts",
+    "bytes": 314,
+    "hash": "29ab69e4c49c796c1ea08b98a37d176bd5224c33125caf7b3c14304a481e81fa"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof.test.ts",
+    "bytes": 13889,
+    "hash": "aebcf34f19c7dbff2c8c62ed17956678c2aa66fc0685243acc4a71b564758857"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/review.diff",
+    "bytes": 65813,
+    "hash": "13a6da08560c40b5ad4c601ba28db7ef86d64ccf3ed42c7fa011cb614e2d6e76"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/tsconfig.json",
+    "bytes": 485,
+    "hash": "2d3ce489b118900c69f2ebe23d7bf94e31d8e9fbbe6348251bea359d26a079f6"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/types.ts",
+    "bytes": 1556,
+    "hash": "8f91ad2279322261eebd514bb79a985191dffc27fb9386df955d86c4b6447034"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/Verifier.ts",
+    "bytes": 3033,
+    "hash": "c73f2fb1fb0585e4639f6080927ae323217cd06a4d2ce6fa0d5d0d3c94e8bbf1"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/verify.ts",
+    "bytes": 256,
+    "hash": "3c27eed7ab1081d3e1cb5fbd089eac6667159c80ca3f3277926b99443ce4056f"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-42108/census.json",
+    "bytes": 27021,
+    "hash": "d1cff832abe38b12a9dbaca539e680c91758270315f5ca85c0de584702f13ef6"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-42108/packet-final.json",
+    "bytes": 64259,
+    "hash": "52aa96b66f45b9cad0275cd6db52e63f1a12ffb9f4b80e84132831f9f885cf11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-42108/plan-final.json",
+    "bytes": 2280,
+    "hash": "001584d0ad16069bcb8a41c0291962049301fd8d80717e0c82cc1b8253cae223"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-51828/census.json",
+    "bytes": 25882,
+    "hash": "c5e046aeee29a009deddd9b93aa8a705fd05a2826bf421aba8b4d906f0200799"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-51828/preparation.json",
+    "bytes": 409,
+    "hash": "a68e14efda2209ece4a79b512b96e0dd030a9800316c30064c14ea73a9343553"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-52484/census.json",
+    "bytes": 25882,
+    "hash": "183dc8db68c8d2ab839ef2d81820cc8a5e9535f7c403eb44770c5b96f13cc8c9"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-52484/preparation.json",
+    "bytes": 409,
+    "hash": "3ec97224265d7a169bed29596d574e4f9ac936915370a3a3d304163b7c4bf8fd"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-59624/census.json",
+    "bytes": 25882,
+    "hash": "80d71236169f0dbf8f74b334f70789f73c8babf921f5ebd04e606fcd75782c11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-first-59624/preparation.json",
+    "bytes": 409,
+    "hash": "ab8b81f494a166e2d3c5588cc50d546ed5f531fb2f3510e41d525972c9d0092e"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-42108/census.json",
+    "bytes": 27021,
+    "hash": "d1cff832abe38b12a9dbaca539e680c91758270315f5ca85c0de584702f13ef6"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-42108/packet-final.json",
+    "bytes": 64259,
+    "hash": "52aa96b66f45b9cad0275cd6db52e63f1a12ffb9f4b80e84132831f9f885cf11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-42108/plan-final.json",
+    "bytes": 2281,
+    "hash": "6d5c27bea0e5fcec36e779723e54b8eef288d3b29720735fd63b7ddd2f5a5220"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-51828/census.json",
+    "bytes": 25882,
+    "hash": "c5e046aeee29a009deddd9b93aa8a705fd05a2826bf421aba8b4d906f0200799"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-51828/preparation.json",
+    "bytes": 410,
+    "hash": "3c1bcd41b05896efbf9152d9fb3eda916e3e724b33ea30f00be1b2c7a48755b2"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-52484/census.json",
+    "bytes": 25882,
+    "hash": "183dc8db68c8d2ab839ef2d81820cc8a5e9535f7c403eb44770c5b96f13cc8c9"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-52484/preparation.json",
+    "bytes": 410,
+    "hash": "bc617afd2ec781fef4bd9f7e6ded1d3c4028c4be802d731524e5f8ae9d2a1b07"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-59624/census.json",
+    "bytes": 25882,
+    "hash": "80d71236169f0dbf8f74b334f70789f73c8babf921f5ebd04e606fcd75782c11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/proof-census-second-59624/preparation.json",
+    "bytes": 410,
+    "hash": "28d452417826cd3bdedf0afc5c79c6348708e779e4207094728f9b2912325556"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-corrected-evidence/verification.json",
+    "bytes": 84116,
+    "hash": "581db0e24d5b00d993b15f109d6ea63990b02a7647968cc278239c1f31110912"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-corrected-evidence/census/census.json",
+    "bytes": 27021,
+    "hash": "d1cff832abe38b12a9dbaca539e680c91758270315f5ca85c0de584702f13ef6"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-corrected-evidence/census/packet-final.json",
+    "bytes": 64259,
+    "hash": "52aa96b66f45b9cad0275cd6db52e63f1a12ffb9f4b80e84132831f9f885cf11"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-corrected-evidence/census/plan-final.json",
+    "bytes": 2288,
+    "hash": "dbec370aa792d483358ac67ac309758790666eb62cff2f07eb79845ecca6d6f0"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-evidence-r2/verification.json",
+    "bytes": 42287,
+    "hash": "c0b79d1a9adf1763a7890edf7da36e940ec89c17ba0ae44c59c82908f20ab3cc"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-evidence-r2/census/census.json",
+    "bytes": 25882,
+    "hash": "c5e046aeee29a009deddd9b93aa8a705fd05a2826bf421aba8b4d906f0200799"
+  },
+  {
+    "path": "tmp/units/aggregate-focused-screen/writer-evidence-r2/census/preparation.json",
+    "bytes": 410,
+    "hash": "3822f74463743108ac60e69696dae923bc1db36f06b41ee6adf25e9bccd883b8"
+  }
+]

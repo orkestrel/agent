@@ -1,0 +1,312 @@
+<title>Larkspur Context Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: status, one score table, one chart, then one lane per strategy with pins on the step where an open problem sits. */
+:root {
+  --bg: #f3f4f7; --surface: #ffffff; --sunk: #e9ecf1; --line: #d6dbe3; --fg: #161d2b; --muted: #576173; --accent: #2a4cc0;
+  --good: #1d7f47; --good-bg: #e2f3e9; --warn: #9a6512; --warn-bg: #f8eed9; --bad: #b42d2d; --bad-bg: #f9e3e1; --info: #2a4cc0; --info-bg: #e5eafb; --idle: #5e6778; --idle-bg: #e8eaee;
+  --s-ceiling: #6d7687; --s-tight: #a1a8b5; --s-comp: #cf7420; --s-sel: #2f6ad3; --s-ex: #128a7e; --s-both: #7e55e6; --s-brief: #b8367e;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10141b; --surface: #171d27; --sunk: #0c1016; --line: #283141; --fg: #e5e9f0; --muted: #98a2b4; --accent: #8ea7ff;
+  --good: #57c68c; --good-bg: #15291f; --warn: #e2aa4c; --warn-bg: #2c2414; --bad: #f07a72; --bad-bg: #321a1a; --info: #8ea7ff; --info-bg: #1b2238; --idle: #a0a9b8; --idle-bg: #1f2530;
+  --s-ceiling: #9aa3b3; --s-tight: #5f6879; --s-comp: #f0a052; --s-sel: #6d9cff; --s-ex: #3cc5b4; --s-both: #a98bff; --s-brief: #e47ab6;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #10141b; --surface: #171d27; --sunk: #0c1016; --line: #283141; --fg: #e5e9f0; --muted: #98a2b4; --accent: #8ea7ff;
+  --good: #57c68c; --good-bg: #15291f; --warn: #e2aa4c; --warn-bg: #2c2414; --bad: #f07a72; --bad-bg: #321a1a; --info: #8ea7ff; --info-bg: #1b2238; --idle: #a0a9b8; --idle-bg: #1f2530;
+  --s-ceiling: #9aa3b3; --s-tight: #5f6879; --s-comp: #f0a052; --s-sel: #6d9cff; --s-ex: #3cc5b4; --s-both: #a98bff; --s-brief: #e47ab6;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; display: grid; gap: 44px; }
+h1, h2 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+section { display: grid; gap: 14px; min-width: 0; }
+.muted { color: var(--muted); }
+.lede { max-width: 66ch; color: var(--muted); }
+.status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.9rem; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 0.72rem/1 var(--f-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.t-good { color: var(--good); background: var(--good-bg); }
+.t-warn { color: var(--warn); background: var(--warn-bg); }
+.t-bad { color: var(--bad); background: var(--bad-bg); }
+.t-info { color: var(--info); background: var(--info-bg); }
+.t-idle { color: var(--idle); background: var(--idle-bg); }
+
+.points { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.points li { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.points b { font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th { text-align: left; font: 500 0.72rem var(--f-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td.name { font-weight: 600; white-space: nowrap; }
+td.name i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
+td.note { color: var(--muted); font-size: 0.85rem; }
+td.num { text-align: center; white-space: nowrap; }
+.score { display: grid; grid-template-columns: 3.2rem 1fr; gap: 8px; align-items: center; min-width: 140px; }
+.score b { font-weight: 600; }
+.track { position: relative; height: 8px; background: var(--sunk); border-radius: 3px; }
+.track span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.track .ceil { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--fg); opacity: 0.5; }
+
+svg { display: block; min-width: 560px; width: 100%; height: auto; }
+svg text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .window { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 6 4; }
+svg .series { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+svg .dot { stroke: var(--surface); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.82rem; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+.lanes { display: grid; gap: 12px; }
+.lane { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--lane); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.lane header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.lane header b { font-family: var(--f-display); font-size: 1.05rem; }
+.steps { list-style: none; margin: 0; padding: 2px 0 4px; display: flex; min-width: min-content; }
+.step { position: relative; flex: 1 1 0; min-width: 118px; max-width: 220px; background: var(--sunk); border-radius: 7px; padding: 8px 10px; margin-right: 22px; display: grid; gap: 2px; align-content: start; }
+.step:last-child { margin-right: 0; }
+.step:not(:last-child)::after { content: ""; position: absolute; right: -17px; top: 50%; width: 12px; height: 2px; background: var(--muted); }
+.step:not(:last-child)::before { content: ""; position: absolute; right: -18px; top: calc(50% - 4px); border: 5px solid transparent; border-left-color: var(--muted); border-right: 0; }
+.step b { font-size: 0.86rem; }
+.step span { font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+.step.model { background: var(--info-bg); }
+.step.judge { background: color-mix(in srgb, var(--s-sel) 14%, var(--sunk)); }
+.step.summ { background: color-mix(in srgb, var(--s-comp) 14%, var(--sunk)); }
+.pins { display: flex; gap: 4px; margin-top: 4px; }
+.pin { font: 600 0.7rem/1 var(--f-mono); border-radius: 999px; padding: 3px 7px; text-decoration: none; }
+
+.problems { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.problems li { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; scroll-margin-top: 16px; }
+.problems li:target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.problems .n { font: 600 0.9rem var(--f-mono); color: var(--muted); }
+.problems p { color: var(--muted); font-size: 0.86rem; }
+@media (max-width: 640px) { .problems li { grid-template-columns: 1.8rem minmax(0, 1fr); } .problems .chip { grid-column: 2; justify-self: start; } }
+details { font-size: 0.88rem; color: var(--muted); }
+summary { cursor: pointer; }
+
+.queue { margin: 0; padding-left: 1.4rem; display: grid; gap: 6px; }
+.queue li::marker { font-family: var(--f-mono); color: var(--muted); }
+.queue .on { font-weight: 600; }
+footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 14px; }
+code { font-family: var(--f-mono); font-size: 0.85em; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Larkspur Context Lab</h1>
+    <p class="lede">A 2B model works one support shift: 10 requests in a row, each needing a fact from 48 earlier messages, inside a 3,072-token window. Each strategy decides what the model reads per request.</p>
+    <div class="status" id="status"></div>
+  </header>
+
+  <section>
+    <h2>Where things stand</h2>
+    <ul class="points" id="points"></ul>
+  </section>
+
+  <section>
+    <h2>Scores</h2>
+    <p class="muted">Round A, one run each, graded out of 60 (correct, complete, faithful) on the fixed harness, where every request gets a reply. The tick marks the control. Differences under about 4 points are noise.</p>
+    <div class="panel scroll"><table id="scores"></table></div>
+  </section>
+
+  <section>
+    <h2>Passes across reworded copies</h2>
+    <p class="muted">Each copy rewords the 10 requests and keeps every fact, so the spread across copies is the noise. Scored by the harness’s checks, pass or fail per request. A strategy shows a gain only when its mean difference from the full view, minus twice its standard error, stays above 0.</p>
+    <div class="panel scroll"><table id="band"></table></div>
+    <p class="muted">Per request: how many copies passed. Requests every strategy fails point at the model; requests one strategy fails point at its memory.</p>
+    <div class="panel scroll"><table id="goals"></table></div>
+  </section>
+
+  <section>
+    <h2>Prompt size per request</h2>
+    <p class="muted">Round A. The control grows about 300 tokens per request and passes the 3,072-token window at request 3; the briefing stays under 2,900.</p>
+    <div class="panel"><div class="legend" id="legend"></div><div class="scroll"><svg id="room" viewBox="0 0 720 300" role="img" aria-label="Largest prompt per request, in tokens"></svg></div></div>
+  </section>
+
+  <section>
+    <h2>How each strategy works</h2>
+    <p class="muted">Left to right, from the conversation to the reply. A numbered pin marks an open problem from the next list.</p>
+    <div class="lanes" id="lanes"></div>
+  </section>
+
+  <section>
+    <h2>Open problems</h2>
+    <ol class="problems" id="problems"></ol>
+    <details id="fixed"></details>
+  </section>
+
+  <section>
+    <h2>Next</h2>
+    <ol class="queue" id="queue"></ol>
+  </section>
+
+  <footer>qwen3.5 2B, thinking off, temperature 0, on Ollama 0.40.0 with a 4-CPU host and no GPU; judge Mica-v0.1-4B. Grades and per-request numbers live under <code>agent/tmp/bench/results</code>.</footer>
+</div>
+
+<script>
+const UPDATED = '2026-10-09 10:25 UTC'
+const STATUS_TEXT = 'Verdict: the per-topic records clear the bar against both the refined briefing and the full view. Every failure of all three designs was judged blind and checked by a second engine.'
+
+const POINTS = [
+  ['The per-topic records win.', '8.0 passes per copy against 6.75 for the refined briefing and 6.0 for the full view, over the same 8 copies. Against the full view the gain is +2.0 per copy with a lower bound of +0.69; against the refined briefing, +1.25 with a lower bound of +0.43.'],
+  ['They win where the design aimed.', 'Sigrid\u2019s callback 8 of 8 against 1 and 3 of 8, because the record line names whose extension it is; Grace\u2019s escalation 8 of 8 against 1 of 8 for the full view; the depot release 6 of 8 against 4 and 3.'],
+  ['The refined briefing alone only ties the full view.', '+0.75 per copy, lower bound -0.23: not shown to be better, though it reads under half the prompt.'],
+  ['One request still favors the full view.', 'The credit check: 2 of 8 for the records against 8 of 8. The pinned account story buries the question; the judge reads those lines as not needed, which is the next arm.'],
+]
+
+// Graded out of 60 ([correct, complete, faithful], each out of 20); the full view is the control.
+const ROWS = [
+  { id: 'brief', name: 'Event-sourced briefing', color: '--s-brief', grade: [14, 19, 16], invented: 3, prompts: [2419, 2219, 2869, 2399, 2586, 2452, 2387, 2368, 2112, 2444], time: '60 s', note: 'Round A, one run. Every needed fact in its briefing, no replaced value revived; its 4 misses were the model misreading a fact in view.' },
+  { id: 'ceiling', name: 'Full view (control)', color: '--s-ceiling', grade: [12, 16, 13], invented: 5, prompts: [2684, 2839, 3045, 3369, 3421, 3818, 4135, 4596, 5132, 5456], time: '14 s', note: 'Round A, one run. Every message in view with twice the window.' },
+  { id: 'refined', name: 'Briefing, refined', color: '--s-ex', pending: ['Ties the full view', 't-warn'], note: 'The Round A briefing with the attack’s fixes; scored per copy in the next section, graded after its 8 copies.' },
+  { id: 'records', name: 'Briefing + per-topic records', color: '--s-both', pending: ['Clears the bar', 't-good'], note: 'Scored per copy in the next section: 8.0 against 6.0 for the full view, adjudicated over 8 copies.' },
+]
+
+// Passes of 10 per reworded copy (null: not run). Each copy rewords the 10 requests and keeps every fact.
+const GOAL_NAMES = ['Refund amount', 'Card on file', 'Grace escalation', 'Halvorsen ticket', 'Approval note', 'Kenji shipping', 'Depot release', 'Credit check', 'Gift note', 'Callback']
+const BAND = [
+  { ref: 'ceiling', name: 'Full view (control)', copies: [5, 6, 5, 8, 5, 5, 7, 7], goals: [8, 8, 1, 8, 1, 1, 3, 8, 7, 3] },
+  { ref: 'refined', name: 'Briefing, refined', copies: [7, 8, 6, 8, 7, 5, 6, 7], goals: [8, 8, 7, 8, 8, 1, 4, 1, 8, 1], note: 'Adjudicated: two blind-audited misreads count as passes.' },
+  { ref: 'records', name: 'Briefing + per-topic records', copies: [9, 8, 8, 8, 9, 8, 7, 7], goals: [8, 8, 8, 8, 6, 2, 6, 2, 8, 8], note: 'Adjudicated: two blind-audited misreads count as passes.' },
+]
+
+// Pins reference PROBLEMS by number.
+const LANES = [
+  { ref: 'refined', name: 'Event-sourced briefing (the ledger), refined', chip: ['Focus', 't-good'], steps: [['Events', 'Messages, tool results, judge answers, and pins, each in its own store; append only'], ['File', 'The judge files each message once: kind, topic, what it amends or replaces', 'judge'], ['Pin', 'The loop pins lookups and decisive messages; the model only recalls'], ['Lifetimes', 'A pin ends when replaced, expired, or its topic closes; ended pins stay, marked'], ['Briefing', 'Today’s date, live pins for the request’s topics, the rules one per line, then the last seed messages, with no earlier request', '', [1, 2]], ['2B model', 'Looks up, recalls at most twice, stops on a repeat, answers', 'model', [5]], ['Reply', 'The final message; after a stop, one answer run that reads the results as a note, with no tools']] },
+  { ref: 'records', name: 'Per-topic records: the rest of the event-sourced design', chip: ['Clears the bar', 't-good'], steps: [['Events', 'The same append-only stores'], ['Record', 'Per account, the current sentences rebuilt from its events by code; a sentence holding a replaced value leaves', 'summ', [1, 3]], ['Briefing', 'The request’s account record and the desk rules, in place of the raw pins'], ['2B model', 'Answers', 'model', [5]], ['Reply', 'The final message']] },
+  { ref: 'ceiling', name: 'Full view (control)', chip: ['Control', 't-idle'], steps: [['Conversation', 'Every message'], ['Prompt', 'Grows each request; needs a 6,144-token window'], ['2B model', 'Looks up, answers', 'model', [5]], ['Reply', 'The final message']] },
+]
+
+const STATUS = { fixing: ['Being built', 't-info'], queued: ['Fix built, measuring', 't-info'], partial: ['Partly fixed', 't-warn'], open: ['Open', 't-bad'], model: ['Model limit', 't-warn'] }
+const PROBLEMS = [
+  ['open', 'Pinning a whole account story buries a narrow question', 'The credit check fails on 6 of 8 records copies and 7 of 8 refined copies. Removing the pinned block restored it in 5 of 7 cold replays, and the judge reads those lines as not needed. Next arm: keep a pinned or record line only when the judge reads it as needed for the request.'],
+  ['open', 'Recall results carry handles', 'A reply cited \u201cr8\u201d instead of writing the approval note. Recall output drops its handles in the next harness unit.'],
+  ['open', 'Account scope has two design limits', 'A desk-wide correction written inside one account\u2019s message stays in that account\u2019s record, and the person prefix trusts capital letters. Neither touched a measured request.'],
+  ['open', 'Harness edge paths with no recorded effect', 'Two Astra audits found edge paths (a reused call id, a timeout before the answer run, joined handles, a tight-budget cut, argument key order); none fired in the 160 measured goals. They are fixed in the next harness unit.'],
+  ['model', 'The model copies a date the rules forbid', 'Kenji\u2019s delivery date: 0 of 27 probe replies drop it wherever the rule sits, and 0 of 9 rewrites drop it when told the rule.'],
+]
+const FIXED = 'Fixed and measured: the briefing states today’s date, lists rules one per line, and keeps the model’s earlier answers and earlier requests out of the tail (earlier requests made the model answer the wrong one). It stops on a repeated call of any tool and gives the answer run only the results as a note, with no tools, so every request gets a reply. Recall splits joined topics and lost its category filter. The scorer reads negations such as “the earlier incorrect number” and the credit phrases “plenty of room” and “can easily”; every run is rescored with the same rules. Every run starts from a cold daemon and records its wire. Fixed earlier: the gate, pin and read tools, and tally switched off; handle citations; the callback decoy; markdown in the scorer; the sampler settings.'
+
+const QUEUE = [
+  ['', 'Full view, refined briefing, and per-topic records over the same 8 copies: records 8.0, refined 6.75, full view 6.0'],
+  ['on', 'The relevance filter on pinned and record lines, aimed at the credit check, on the same 8 copies'],
+  ['', 'The next harness unit: recall without handles, the audited edge paths, and the account-scope limits'],
+  ['', 'Then the 152-message scenario for lifetimes, and the larger model and thinking mode once the strategy holds'],
+]
+
+const css = (name) => `var(${name})`
+const el = (tag, attrs = {}, ...kids) => {
+  const node = document.createElement(tag)
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'class') node.className = value
+    else if (key === 'style') node.setAttribute('style', value)
+    else if (key === 'text') node.textContent = value
+    else node.setAttribute(key, value)
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) node.append(kid)
+  return node
+}
+const chip = ([label, tone]) => el('span', { class: `chip ${tone}`, text: label })
+
+document.getElementById('status').append(el('span', { class: 'muted', text: `Updated ${UPDATED}.` }), el('span', { text: STATUS_TEXT }))
+document.getElementById('points').append(...POINTS.map(([lead, rest]) => el('li', {}, el('b', { text: lead }), ' ', el('span', { class: 'muted', text: rest }))))
+
+const CEILING = 41 // the control
+const score = (parts, color) => {
+  const value = parts.reduce((sum, part) => sum + part, 0)
+  return el('div', { class: 'score' }, el('b', { text: `${value} / 60` }),
+    el('div', { class: 'track' }, el('span', { style: `width:${(value / 60) * 100}%;background:${css(color)}` }), el('i', { class: 'ceil', style: `left:calc(${(CEILING / 60) * 100}% - 1px)` })))
+}
+const table = document.getElementById('scores')
+table.append(el('thead', {}, el('tr', {}, ...['Strategy', 'Score', 'Invented', 'Prompt, tokens', 'Per answer', ''].map((text) => el('th', { text })))))
+table.append(el('tbody', {}, ...ROWS.map((row) => {
+  const values = row.prompts ?? []
+  const range = values.length === 0 ? '\u2013' : `${Math.min(...values).toLocaleString('en-US')}\u2013${Math.max(...values).toLocaleString('en-US')}`
+  return el('tr', {},
+    el('td', { class: 'name' }, el('i', { style: `background:${css(row.color)}` }), row.name),
+    el('td', {}, row.pending ? chip(row.pending) : score(row.grade, row.color)),
+    el('td', { text: row.invented === undefined ? '\u2013' : `${row.invented} of 10` }),
+    el('td', { text: range }), el('td', { text: row.time ?? '\u2013' }), el('td', { class: 'note', text: row.note }))
+})))
+
+const NS = 'http://www.w3.org/2000/svg'
+const svg = (tag, attrs = {}, text) => { const node = document.createElementNS(NS, tag); for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value); if (text !== undefined) node.textContent = text; return node }
+const chart = document.getElementById('room')
+const W = 720, H = 300, L = 52, R = 24, T = 14, B = 36, MAX = 6000
+const x = (index) => L + (index * (W - L - R)) / 9
+const y = (value) => T + (1 - value / MAX) * (H - T - B)
+for (let tick = 0; tick <= MAX; tick += 1000) chart.append(svg('line', { class: 'grid', x1: L, x2: W - R, y1: y(tick), y2: y(tick) }), svg('text', { x: L - 8, y: y(tick) + 4, 'text-anchor': 'end' }, tick.toLocaleString('en-US')))
+for (let index = 0; index < 10; index += 1) chart.append(svg('text', { x: x(index), y: H - B + 18, 'text-anchor': 'middle' }, String(index + 1)))
+chart.append(svg('text', { x: (L + W - R) / 2, y: H - 4, 'text-anchor': 'middle' }, 'request'))
+chart.append(svg('line', { class: 'window', x1: L, x2: W - R, y1: y(3072), y2: y(3072) }), svg('text', { x: W - R, y: y(3072) - 6, 'text-anchor': 'end', style: `fill:${css('--bad')}` }, '3,072-token window'))
+const plotted = ROWS.filter((row) => row.prompts)
+for (const row of plotted) {
+  const points = row.prompts.map((value, index) => (value === null ? null : [x(index), y(value)])).filter(Boolean)
+  chart.append(svg('polyline', { class: 'series', points: points.map((point) => point.join(',')).join(' '), stroke: css(row.color) }))
+  for (const [px, py] of points) chart.append(svg('circle', { class: 'dot', cx: px, cy: py, r: 3, fill: css(row.color) }))
+  const refused = row.prompts.findIndex((value) => value === null)
+  if (refused >= 0) chart.append(svg('text', { x: x(refused) + 4, y: y(3072) + 16, style: `fill:${css(row.color)}` }, '× refused from here'))
+}
+document.getElementById('legend').append(...plotted.map((row) => el('span', {}, el('i', { style: `background:${css(row.color)}` }), row.name)))
+
+const pin = (number) => {
+  const [status] = PROBLEMS[number - 1]
+  return el('a', { class: `pin ${STATUS[status][1]}`, href: `#p${number}`, title: PROBLEMS[number - 1][1], text: String(number) })
+}
+const byId = Object.fromEntries(ROWS.map((row) => [row.id, row]))
+const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length
+const bandTable = document.getElementById('band')
+const control = BAND.find((arm) => arm.ref === 'ceiling')
+bandTable.append(el('thead', {}, el('tr', {}, ...['Strategy', ...control.copies.map((_, index) => `Copy ${index + 1}`), 'Mean', 'Against the full view'].map((text) => el('th', { text })))))
+bandTable.append(el('tbody', {}, ...BAND.map((arm) => {
+  const run = arm.copies.filter((value) => value !== null)
+  let against = '–'
+  if (arm !== control) {
+    const d = arm.copies.flatMap((value, index) => (value === null ? [] : [value - control.copies[index]]))
+    if (d.length >= 2) {
+      const m = mean(d)
+      const sd = Math.sqrt(d.reduce((sum, value) => sum + (value - m) ** 2, 0) / (d.length - 1))
+      const lower = m - (2 * sd) / Math.sqrt(d.length)
+      against = `${m > 0 ? '+' : ''}${m.toFixed(1)} per copy over ${d.length}; ${lower > 0 ? 'a gain' : 'no gain shown'} (lower bound ${lower.toFixed(1)})`
+    }
+  }
+  return el('tr', {},
+    el('td', { class: 'name' }, el('i', { style: `background:${css(byId[arm.ref].color)}` }), arm.name),
+    ...arm.copies.map((value) => el('td', { class: 'num', text: value === null ? '–' : String(value) })),
+    el('td', { class: 'num' }, el('b', { text: run.length === 0 ? '–' : mean(run).toFixed(1) })),
+    el('td', { class: 'note', text: arm.note ? `${against}. ${arm.note}` : against }))
+})))
+const goalTable = document.getElementById('goals')
+goalTable.append(el('thead', {}, el('tr', {}, el('th', { text: 'Request' }), ...BAND.map((arm) => el('th', { text: arm.name })))))
+goalTable.append(el('tbody', {}, ...GOAL_NAMES.map((name, goal) => el('tr', {},
+  el('td', { class: 'name', text: `${goal + 1}. ${name}` }),
+  ...BAND.map((arm) => {
+    const runs = arm.copies.filter((value) => value !== null).length
+    if (!arm.goals || runs === 0) return el('td', { class: 'num', text: '–' })
+    const share = arm.goals[goal] / runs
+    const tone = share >= 0.75 ? 't-good' : share >= 0.25 ? 't-warn' : 't-bad'
+    return el('td', { class: 'num' }, el('span', { class: `chip ${tone}`, text: `${arm.goals[goal]} of ${runs}` }))
+  })))))
+document.getElementById('lanes').append(...LANES.map((lane) => el('article', { class: 'lane', style: `--lane:${css(lane.ref ? byId[lane.ref].color : lane.color)}` },
+  el('header', {}, el('b', { text: lane.name }), chip(lane.chip)),
+  el('div', { class: 'scroll' }, el('ol', { class: 'steps' }, ...lane.steps.map(([title, detail, kind, pins]) => el('li', { class: `step ${kind ?? ''}` }, el('b', { text: title }), detail ? el('span', { text: detail }) : null, pins ? el('div', { class: 'pins' }, ...pins.map(pin)) : null)))))))
+
+document.getElementById('problems').append(...PROBLEMS.map(([status, title, fix], index) => el('li', { id: `p${index + 1}` },
+  el('span', { class: 'n', text: String(index + 1) }), el('div', {}, el('b', { text: title }), el('p', { text: fix })), chip(STATUS[status]))))
+document.getElementById('fixed').append(el('summary', { text: 'Fixed earlier' }), el('p', { style: 'margin-top:6px', text: FIXED }))
+document.getElementById('queue').append(...QUEUE.map(([state, text]) => el('li', { class: state, text })))
+</script>

@@ -1,0 +1,1 @@
+The freeze identity is 87c3b7b5b5756b0285f26302f3dbf4beb377e20f394973d011a7d192dc9df3ac. Read from file bytes. The generation/baseline reports contain a transposed manual digest; the actual manifests bind this identity. Deployment.json is an exact archival copy; frozen execution still references the original tmp input, which remains retained.

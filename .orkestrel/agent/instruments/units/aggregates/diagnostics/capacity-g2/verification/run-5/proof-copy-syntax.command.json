@@ -1,0 +1,14 @@
+{
+  "name": "proof-copy-syntax",
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "--check",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-verification\\run-5\\Offline.ts"
+  ],
+  "expected": 0,
+  "exit": 0,
+  "signal": null,
+  "durationMs": 64.1343,
+  "stdoutPath": "proof-copy-syntax.stdout.txt",
+  "stderrPath": "proof-copy-syntax.stderr.txt"
+}

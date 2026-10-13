@@ -1,0 +1,56 @@
+[
+  {
+    "line": 263,
+    "raw": "{\"sent\":true,\"sequence\":263,\"role\":\"summarizer\",\"goal\":\"g20-copperline-manager\",\"started\":1791784794190,\"wall\":18662,\"status\":200}",
+    "value": {
+      "sent": true,
+      "sequence": 263,
+      "role": "summarizer",
+      "goal": "g20-copperline-manager",
+      "started": 1791784794190,
+      "wall": 18662,
+      "status": 200
+    }
+  },
+  {
+    "line": 264,
+    "raw": "{\"sent\":true,\"sequence\":264,\"role\":\"summarizer\",\"goal\":\"g20-copperline-manager\",\"started\":1791784812857,\"wall\":11947,\"status\":200}",
+    "value": {
+      "sent": true,
+      "sequence": 264,
+      "role": "summarizer",
+      "goal": "g20-copperline-manager",
+      "started": 1791784812857,
+      "wall": 11947,
+      "status": 200
+    }
+  },
+  {
+    "line": 265,
+    "raw": "{\"sent\":true,\"sequence\":265,\"role\":\"flush\",\"goal\":\"g20-copperline-manager\",\"started\":1791784824834,\"wall\":468,\"status\":200}",
+    "value": {
+      "sent": true,
+      "sequence": 265,
+      "role": "flush",
+      "goal": "g20-copperline-manager",
+      "started": 1791784824834,
+      "wall": 468,
+      "status": 200
+    }
+  },
+  {
+    "line": 266,
+    "raw": "{\"sent\":true,\"turn\":32,\"sequence\":266,\"role\":\"agent\",\"goal\":\"g20-copperline-manager\",\"started\":1791784825303,\"wall\":17639,\"status\":200,\"estimate\":1162}",
+    "value": {
+      "sent": true,
+      "turn": 32,
+      "sequence": 266,
+      "role": "agent",
+      "goal": "g20-copperline-manager",
+      "started": 1791784825303,
+      "wall": 17639,
+      "status": 200,
+      "estimate": 1162
+    }
+  }
+]

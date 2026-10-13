@@ -1,0 +1,14 @@
+file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:52
+	if (JSON.stringify(left) !== JSON.stringify(right)) throw new Error(`${label} mismatch`)
+	                                                          ^
+
+Error: current predecessor custody mismatch
+    at equal (file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:52:60)
+    at file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:185:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.21.0
+
+exit=1 signal=none capped=false duration_ms=262

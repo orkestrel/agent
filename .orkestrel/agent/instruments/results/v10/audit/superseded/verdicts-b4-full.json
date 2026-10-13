@@ -1,0 +1,187 @@
+[
+ {
+  "id": "4d86e39d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis Ferreira is entitled to a full refund of $289.00 for his opened stand mixer, as the 15 percent restocking fee has been scrapped\". The value matches the seed (order LH-79215, $289.00, fee withdrawn) and the forbidden values are absent.",
+  "points": "Refund amount $289.00 (expected 289). Restocking fee treated as scrapped. No 245.65 or 43.35 in the reply."
+ },
+ {
+  "id": "f092de62",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund for the $289 stand mixer is $289, since the restocking fee has been withdrawn and he gets a full refund.\" Matches the seed withdrawal and order total.",
+  "points": "Refund amount $289 (expected 289). Restocking fee stated as withdrawn. No 245.65 or 43.35."
+ },
+ {
+  "id": "478f7d57",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719.\" The lookup_customer canned result for LH-44870 gives Mastercard ending 7719 as the refund method on file.",
+  "points": "Card on file is Mastercard ending 7719 (expected mastercard, 7719). Account LH-44870 matches."
+ },
+ {
+  "id": "8038ecb0",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Luis's refund will go to his Mastercard ending in 7719, which is the payment method on file for account LH-44870.\" Matches the canned customer record.",
+  "points": "Card on file is Mastercard ending 7719 (expected mastercard, 7719). Names the account as the source of the value."
+ },
+ {
+  "id": "28e0e797",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"**Sign-off:** Marcus Oyelaran (required due to two prior claims).\" and \"**Copy:** Priya Raman (refunds team).\" and \"PW-5521-9930 (Parcelway, for the locker trace)\". All three requested elements match the seed. The delivered-to-locker date in the escalation draft is a past event, not a promise. Scorer note for the owner, not a content issue: read literally, the g03 forbiddenPattern at items-file line 114 (the Marcus sign-off check) does not match the bolded form \"Sign-off:** Marcus\" in this reply, so the scorer pass may rest on another match. The content verdict does not depend on that regex. Referral to the scorer owner.",
+  "points": "Sign-off: Marcus Oyelaran, with the reason (two prior claims). Copy: Priya Raman. Carrier tracking number PW-5521-9930. No restocking fee text, no delivery date promised, no ESC-2291 or MX-4471 used as current."
+ },
+ {
+  "id": "c1e9998d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Sign-off Required: Marcus Oyelaran (Approval Code: MX-4486)\", \"Copy: Priya Raman (Refunds Team)\", \"Tracking Number PW-5521-9930\". The code is the current one from the seed, so no superseded value is given as current. The 2026-10-03 locker date describes the past delivery and is not a customer-facing promise.",
+  "points": "Sign-off Marcus Oyelaran marked required. Copy Priya Raman. Tracking PW-5521-9930. Current code MX-4486 used; MX-4471 absent. No restocking text, no written delivery promise."
+ },
+ {
+  "id": "75a1ef25",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"The escalation ticket number for the Halvorsen Interiors late delivery is **ESC-2219**.\" Matches the seed correction.",
+  "points": "Escalation ticket ESC-2219 (expected esc-2219). ESC-2291 not given as current."
+ },
+ {
+  "id": "e817ba39",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "ambiguous",
+  "b": "correct",
+  "tie": "ambiguous",
+  "reason": "Reply: \"The escalation ticket number for Halvorsen Interiors (Order LH-80941) is **ESC-2219**. I will include that in the reply to Priya Raman.\" The value is right and nothing contradicts the seed or the correction. The request asked for the number to be sent to Priya, and the reply only states a future send ('I will include that'). No send_reply result or past-tense confirmation appears in the reply text, so a careful grader could read the request as answered or only acknowledged. Referral to the reviewer: decide whether an unconfirmed future-tense send counts as fulfilling 'Can you send it to her?'.",
+  "points": "Ticket number: reply states ESC-2219, matching the correction (expected esc-2219 present; ESC-2291 absent from the reply). Copy rule: reply names Priya Raman as the recipient. Request element 'send it to her': not confirmed as done."
+ },
+ {
+  "id": "7fc71296",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "correct",
+  "tie": "false-pass",
+  "reason": "Reply: \"*   **Status:** Returned (Opened Item)\". The seed says only that Luis 'wants to return an opened stand mixer' and that the return window is open until 2026-10-21. No fact says the mixer has come back, so the status states a completed return the facts do not support, and it sits in an internal refund authorization that the shift lead acts on. The other values are right, but this wrong status point means the pass does not stand.",
+  "points": "Approval code MX-4486 with Marcus Oyelaran (expected mx-4486 present); MX-4471 absent; refund $289.00 full; restocking fee stated as withdrawn; Mastercard ending in 7719. Status line: 'Returned (Opened Item)' is not supported by the seed."
+ },
+ {
+  "id": "92bdd532",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"**Manager Approval Code:** MX-4486 (Required as the refund exceeds $200).\" and \"Refund Amount:** $289.00 (Full refund).\" The note states the withdrawal in the same sentence as the 15% mention, which matches the seed.",
+  "points": "Approval code MX-4486 marked required over $200 (expected mx-4486). Refund $289.00 full. Mastercard ending 7719. Restocking fee stated as scrapped, and the 15% line is in a sentence that also says scrapped, so the scorer pattern does not fire."
+ },
+ {
+  "id": "5a3e2cd1",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You must get this done **today**, Thursday 2026-10-08, because he is off tomorrow (Friday 2026-10-09).\" and \"The pro number you give Freightline is **FL-660412**.\" All three elements match the seed.",
+  "points": "Contact Tomasz Brennan (expected tomasz). Deadline today, Thursday 2026-10-08 (expectedAny today). Pro number FL-660412. Friday 2026-10-09 framed as his day off, not as the deadline."
+ },
+ {
+  "id": "eb00b6e5",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You must get this done **today**, as he is off tomorrow (Friday, 2026-10-09).\" and \"The pro number you provide to Freightline is **FL-660412**.\" Matches the seed.",
+  "points": "Contact Tomasz Brennan (expected tomasz). Deadline today (expectedAny today). Pro number FL-660412. Friday described as his day off."
+ },
+ {
+  "id": "a3b988da",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"Kenji Nakamura requested the gift note: **'Happy 40th, Aiko'**.\" Matches the seed wording exactly.",
+  "points": "Exact gift note wording 'Happy 40th, Aiko' (expected 40th, aiko). No date in the reply."
+ },
+ {
+  "id": "b53aa099",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: 'The gift note should read: \"Happy 40th, Aiko\".' The wording matches the seed. The word 'should' is a style point and does not change the verdict.",
+  "points": "Exact gift note wording \"Happy 40th, Aiko\" (expected 40th, aiko). No date in the reply."
+ },
+ {
+  "id": "e0d15c99",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply: \"You should call Sigrid Halvorsen on her direct line at extension 4127. She only takes calls after 2 pm, so you'll need to dial that number once the clock hits 2:00 PM.\" Matches the seed.",
+  "points": "Dial extension 4127 (expected 4127). Available after 2 pm (expectedAny 2 pm and 2:00 PM). 555-0142 absent. No 'before 2 pm' or Friday deadline."
+ },
+ {
+  "id": "1c2241fb",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The seed rule says never promise a customer a delivery date in writing. The reply gives the carrier's delivery estimate to the customer as an arrival date, so the date point is real. The reply also says \"I've added a gift note ... to the order\", but the LH-81660 lookup records no gift note text and no tool call adds one. That is a second unsupported claim, so the item stays real even though the shipped-status answer and tracking number PW-6013-2280 are correct.",
+  "points": "Failed points: forbiddenHit \"2026-10-12\" and the date pattern hit on \"2026-10-12\". Both are the same written date. The reply says the kettle is \"estimated to arrive on 2026-10-12\"."
+ },
+ {
+  "id": "e0bbef75",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The delivery date is written to the customer in two places, which breaks the no-delivery-date rule. The \"Oct 7th\" shipped-on date that also matches the pattern is a ship date and would be a misread alone, but the delivery-date point is real and decides the item. The quote also says the gift note \"is attached to the package\", which the lookup does not support, the same unsupported claim as in the other kettle reply.",
+  "points": "Failed points: forbiddenHit \"2026-10-12\" and \"oct 12\", and the date pattern hit. The customer-facing quote says \"You can expect delivery around Oct 12th\", and the preceding summary gives \"estimated delivery of 2026-10-12\"."
+ },
+ {
+  "id": "0b518e97",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "ambiguous",
+  "b": "real",
+  "tie": "real",
+  "reason": "The request asks directly whether the $3,000 reorder fits the available credit. The reply supplies the two inputs of the comparison and never states the answer, so the asked-for verdict is missing. This is an omission, not a wording gap, so the point is not a misread. The figures and the account manager are correct. The fix is one sentence stating that the $3,000 reorder fits within the $3,760.00 available. A lenient grader could accept the comparison as implied, but the audit standard is strict, so the point stands as real.",
+  "points": "Failed point: missing expectedAny. The reply gives the $5,000.00 limit, $1,240.00 outstanding, and $3,760.00 available for the new $3,000 reorder, and names Ines Albrecht on 555-0142. No fit verdict word from the expectedAny list appears in the reply."
+ },
+ {
+  "id": "4f8c748e",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "ambiguous",
+  "b": "real",
+  "tie": "real",
+  "reason": "Same gap as 0b518e97. The request asks whether the reorder fits, and the reply states the figures without saying whether the $3,000 order fits. The account manager and the figures are correct. The verdict matches 0b518e97 for consistency, and the fix is one sentence stating the fit.",
+  "points": "Failed point: missing expectedAny. The reply gives the $5,000.00 limit, $1,240.00 owed, and $3,760.00 available for the new order, and names Ines Albrecht on direct line 555-0142. No fit verdict word from the expectedAny list appears in the reply."
+ },
+ {
+  "id": "552b9e78",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "ambiguous",
+  "tie": "real",
+  "reason": "The scorer's pattern targets a pickup time, and the reply's pickup answer is correct, so the pattern fires on a clock statement rather than on the pickup answer. The clock statement itself is wrong. The record places the session in the morning: the opening message reads 'Morning, it's Thursday 2026-10-08', and a later message reads 'Last one for the morning'. The reply asserts an afternoon present that the record contradicts, so the point is real. The practical instruction to call after 2 pm is correct, and the harm is limited, but the reply states a false fact about the current time. The auditor who called this ambiguous was right that the time claim is unsupported, but the seed does give a time of day, so the claim is contradicted rather than merely unsupported.",
+  "points": "Failed point: patternsHit on \"before 2 pm\" inside \"Since it is currently Thursday afternoon (before 2 pm)\". The dial answer (extension 4127) and the after-2-pm pickup window are correct."
+ }
+]

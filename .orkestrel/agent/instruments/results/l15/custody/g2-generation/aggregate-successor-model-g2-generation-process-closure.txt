@@ -1,0 +1,21 @@
+﻿Process closure check after G2 generation; 2026-10-12
+Commands: Get-Process -Id <recorded PID>; Get-CimInstance Win32_Process -Filter ParentProcessId=<recorded PID>.
+Recorded PIDs: 60168, 47768, 33160, 66900, 58584, 61248, 66516, 34420, 5760
+GONE pid=60168
+NO_CHILDREN parent=60168
+GONE pid=47768
+NO_CHILDREN parent=47768
+GONE pid=33160
+NO_CHILDREN parent=33160
+GONE pid=66900
+NO_CHILDREN parent=66900
+GONE pid=58584
+NO_CHILDREN parent=58584
+GONE pid=61248
+NO_CHILDREN parent=61248
+GONE pid=66516
+NO_CHILDREN parent=66516
+GONE pid=34420
+NO_CHILDREN parent=34420
+GONE pid=5760
+NO_CHILDREN parent=5760

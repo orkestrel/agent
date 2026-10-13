@@ -1,0 +1,1144 @@
+{
+ "summary": [
+  {
+   "run": "f4-compaction-v1",
+   "calls": 45,
+   "agent": 45,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 18
+  },
+  {
+   "run": "f4-control-v1",
+   "calls": 14,
+   "agent": 14,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 14
+  },
+  {
+   "run": "f4-control-v2",
+   "calls": 14,
+   "agent": 14,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 14
+  },
+  {
+   "run": "f4-control-v3",
+   "calls": 14,
+   "agent": 14,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 14
+  },
+  {
+   "run": "f4-control-v4",
+   "calls": 14,
+   "agent": 14,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 14
+  },
+  {
+   "run": "f4-records-v1",
+   "calls": 21,
+   "agent": 21,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 19
+  },
+  {
+   "run": "f4-records-v2",
+   "calls": 22,
+   "agent": 22,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 20
+  },
+  {
+   "run": "f4-records-v3",
+   "calls": 21,
+   "agent": 21,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 19
+  },
+  {
+   "run": "f4-records-v4",
+   "calls": 22,
+   "agent": 22,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 20
+  },
+  {
+   "run": "t2-compaction-v1",
+   "calls": 61,
+   "agent": 28,
+   "summarizer": 33,
+   "cut": 1,
+   "empty": 0,
+   "near": 0,
+   "logged": 28
+  },
+  {
+   "run": "t2-control-v1",
+   "calls": 13,
+   "agent": 13,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 13
+  },
+  {
+   "run": "t2-records-v1",
+   "calls": 24,
+   "agent": 24,
+   "summarizer": 0,
+   "cut": 2,
+   "empty": 4,
+   "near": 0,
+   "logged": 22
+  },
+  {
+   "run": "t2a-records-v1",
+   "calls": 23,
+   "agent": 23,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 4,
+   "near": 0,
+   "logged": 21
+  },
+  {
+   "run": "t2a-records-v2",
+   "calls": 24,
+   "agent": 24,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 4,
+   "near": 0,
+   "logged": 22
+  },
+  {
+   "run": "t2a-records-v3",
+   "calls": 20,
+   "agent": 20,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 18
+  },
+  {
+   "run": "t2a-records-v4",
+   "calls": 19,
+   "agent": 19,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 2,
+   "near": 0,
+   "logged": 17
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "calls": 71,
+   "agent": 20,
+   "summarizer": 51,
+   "cut": 0,
+   "empty": 1,
+   "near": 0,
+   "logged": 20
+  },
+  {
+   "run": "t2w-control-v1",
+   "calls": 13,
+   "agent": 13,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 13
+  },
+  {
+   "run": "t2w-control-v2",
+   "calls": 21,
+   "agent": 21,
+   "summarizer": 0,
+   "cut": 2,
+   "empty": 0,
+   "near": 0,
+   "logged": 21
+  },
+  {
+   "run": "t2w-control-v3",
+   "calls": 16,
+   "agent": 16,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 1,
+   "near": 0,
+   "logged": 16
+  },
+  {
+   "run": "t2w-control-v4",
+   "calls": 16,
+   "agent": 16,
+   "summarizer": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 16
+  },
+  {
+   "run": "t2w-records-v1",
+   "calls": 23,
+   "agent": 23,
+   "summarizer": 0,
+   "cut": 2,
+   "empty": 4,
+   "near": 0,
+   "logged": 21
+  }
+ ],
+ "findings": [
+  {
+   "run": "f4-compaction-v1",
+   "file": "",
+   "kind": "count",
+   "detail": "45 wire calls (agent 45, summarizer 0) against 18 in the harness log"
+  },
+  {
+   "run": "f4-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v1",
+   "file": "",
+   "kind": "count",
+   "detail": "21 wire calls (agent 21, summarizer 0) against 19 in the harness log"
+  },
+  {
+   "run": "f4-records-v2",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v2",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v2",
+   "file": "",
+   "kind": "count",
+   "detail": "22 wire calls (agent 22, summarizer 0) against 20 in the harness log"
+  },
+  {
+   "run": "f4-records-v3",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v3",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v3",
+   "file": "",
+   "kind": "count",
+   "detail": "21 wire calls (agent 21, summarizer 0) against 19 in the harness log"
+  },
+  {
+   "run": "f4-records-v4",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v4",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "f4-records-v4",
+   "file": "",
+   "kind": "count",
+   "detail": "22 wire calls (agent 22, summarizer 0) against 20 in the harness log"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00001_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00005_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00007_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00008_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00009_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00011_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00012_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00013_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00015_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00016_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00017_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00020_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00021_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00022_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00027_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00028_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00032_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00033_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00034_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00035_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 1024 tokens, no content"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00039_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00040_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00044_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00045_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00046_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00049_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00050_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00051_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00052_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00055_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00056_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00057_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-compaction-v1",
+   "file": "00061_api_chat-request.json",
+   "kind": "status",
+   "detail": "HTTP 400: {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"request (4425 tokens) exceeds the available context size (4096 tokens), try increasing it\\\",\\\"type\\\":\\\"exceed_c"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 1024"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 1024"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00012_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 429 characters"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00013_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 1024 tokens, no content"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00084_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 295 characters"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "00085_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 1024 tokens, no content"
+  },
+  {
+   "run": "t2-records-v1",
+   "file": "",
+   "kind": "count",
+   "detail": "24 wire calls (agent 24, summarizer 0) against 22 in the harness log"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00012_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 542 characters"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "00083_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 295 characters"
+  },
+  {
+   "run": "t2a-records-v1",
+   "file": "",
+   "kind": "count",
+   "detail": "23 wire calls (agent 23, summarizer 0) against 21 in the harness log"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00043_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 722 characters"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "00084_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 318 characters"
+  },
+  {
+   "run": "t2a-records-v2",
+   "file": "",
+   "kind": "count",
+   "detail": "24 wire calls (agent 24, summarizer 0) against 22 in the harness log"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v3",
+   "file": "",
+   "kind": "count",
+   "detail": "20 wire calls (agent 20, summarizer 0) against 18 in the harness log"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2a-records-v4",
+   "file": "",
+   "kind": "count",
+   "detail": "19 wire calls (agent 19, summarizer 0) against 17 in the harness log"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00001_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00004_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00005_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00006_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00007_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00008_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00009_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00010_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00011_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00012_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00013_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00014_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00015_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00016_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00017_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00018_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00020_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00021_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00022_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00023_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00025_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00026_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00028_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00029_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00030_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00033_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00034_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00035_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00038_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00039_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00042_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00043_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00046_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00047_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00048_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00050_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00051_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00052_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00053_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00054_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 884 characters"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00056_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00057_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00060_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00061_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00063_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00064_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00065_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00068_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00069_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-compaction-v1",
+   "file": "00070_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-control-v2",
+   "file": "00009_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 2048 tokens, no content"
+  },
+  {
+   "run": "t2w-control-v2",
+   "file": "00010_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 2048 tokens, no content"
+  },
+  {
+   "run": "t2w-control-v3",
+   "file": "00015_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 229 characters"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "think",
+   "detail": "think false where the condition runs true"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00002_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "think",
+   "detail": "a tool-free call with thinking off outside t2a"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "predict",
+   "detail": "num_predict 1 where the condition caps 2048"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00003_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 0 characters"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00012_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 542 characters"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00013_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 2048 tokens, no content"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00083_api_chat-request.json",
+   "kind": "empty",
+   "detail": "no content and no tool call; thinking 295 characters"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "00084_api_chat-request.json",
+   "kind": "cut",
+   "detail": "done_reason length at 2048 tokens, no content"
+  },
+  {
+   "run": "t2w-records-v1",
+   "file": "",
+   "kind": "count",
+   "detail": "23 wire calls (agent 23, summarizer 0) against 21 in the harness log"
+  }
+ ]
+}

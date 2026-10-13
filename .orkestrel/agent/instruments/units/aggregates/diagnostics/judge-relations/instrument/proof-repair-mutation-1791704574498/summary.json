@@ -1,0 +1,22 @@
+{
+  "original": "b4c3d9a38a4b39ce7210d5b3cead494ff6d13919acb807d657a595e309e89879",
+  "mutant": "c7880f358ec7c092c01634a3674944a30297fd3a643496715f776b44220136a7",
+  "restored": {
+    "path": "tmp/units/aggregate-judge-counterfactual/Completion.ts",
+    "hash": "b4c3d9a38a4b39ce7210d5b3cead494ff6d13919acb807d657a595e309e89879",
+    "bytes": 1738
+  },
+  "removed": "\t\t\t\twriteArtifact(resolve(output, `${label}.normalized.json`), { availability: 'unavailable', error: { name: error instanceof Error ? error.name : 'Thrown value', message: error instanceof Error ? error.message : String(error) }, wall: performance.now() - started })",
+  "replacement": "\t\t\t\t// The scoped mutation disables rejected-result custody.",
+  "red": {
+    "path": "tmp/units/aggregate-judge-counterfactual/proof-repair-mutation-1791704574498/red.json",
+    "hash": "e934658e32685ff776ba70389aed52412f1e8c51f63b519a3915ee7e6da8f7ea",
+    "bytes": 1837
+  },
+  "green": {
+    "path": "tmp/units/aggregate-judge-counterfactual/proof-repair-mutation-1791704574498/green.json",
+    "hash": "acff1ad79859b565c53fb7adc1641c2cbdd77b29082814bcf072cb4414d39d23",
+    "bytes": 671
+  },
+  "inference": 0
+}

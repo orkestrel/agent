@@ -1,0 +1,27 @@
+{
+ "summary": [
+  {
+   "run": "t4-records-v4",
+   "calls": 17,
+   "agent": 15,
+   "summarizer": 0,
+   "calibration": 2,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 15
+  },
+  {
+   "run": "t4-control-v4",
+   "calls": 13,
+   "agent": 13,
+   "summarizer": 0,
+   "calibration": 0,
+   "cut": 0,
+   "empty": 0,
+   "near": 0,
+   "logged": 13
+  }
+ ],
+ "findings": []
+}

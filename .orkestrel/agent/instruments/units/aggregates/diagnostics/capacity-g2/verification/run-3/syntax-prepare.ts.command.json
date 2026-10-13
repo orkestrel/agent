@@ -1,0 +1,14 @@
+{
+  "name": "syntax-prepare.ts",
+  "command": [
+    "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+    "--check",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\prepare.ts"
+  ],
+  "expected": 0,
+  "exit": 0,
+  "signal": null,
+  "durationMs": 54.231599999999844,
+  "stdoutPath": "syntax-prepare.ts.stdout.txt",
+  "stderrPath": "syntax-prepare.ts.stderr.txt"
+}

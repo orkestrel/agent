@@ -1,0 +1,12 @@
+{
+  "executable": "C:\\Users\\mikes\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+  "args": [
+    "--check",
+    "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-capacity-g2-control\\prepare-offline.ts"
+  ],
+  "exit": 0,
+  "signal": null,
+  "stdout": "",
+  "stderr": "",
+  "duration": 55.258800000000065
+}

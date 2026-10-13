@@ -1,0 +1,2182 @@
+[
+	{
+		"id": "g01-luis-refund-amount/pass-withdrawn",
+		"child": "g01-luis-refund-amount",
+		"verdict": "pass",
+		"text": "Full refund $289; the 15% fee was scrapped.",
+		"source": "analysis"
+	},
+	{
+		"id": "g01-luis-refund-amount/pass-bound",
+		"child": "g01-luis-refund-amount",
+		"verdict": "pass",
+		"text": "Luis's refund for the stand mixer on LH-79215 is the full $289.00.",
+		"source": "constructed"
+	},
+	{
+		"id": "g01-luis-refund-amount/pass-21acdb74",
+		"child": "g01-luis-refund-amount",
+		"verdict": "pass",
+		"text": "The refund amount is $289.00 minus the restocking fee. Since the director scrapped the 15% fee, the refund is $289.00.",
+		"source": "recorded a5-records-v1 g01 (audit item 21acdb74)",
+		"note": "Ambiguous in the u9 audit; the widened pattern 3 must not hit it."
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-7e2e299b",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "The refund is $289.00 minus a 15% restocking fee, which equals **$243.65**.\n\nI'll pass that to you now.",
+		"source": "recorded p1-ledger-v6 g01 (audit item 7e2e299b)",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-a8c30a57",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "The refund amount depends on whether the restocking fee was applied or not, since that rule has been withdrawn:\n\n- **If the 15% fee was applied:** Refund = $289.00 × (1 - 0.15) = **$243.65**\n- **If the fee was NOT applied:** Refund = **$289.00**\n\nI'll need to know if the restocking fee was charged before I can give you the exact figure to pass along.",
+		"source": "recorded a1-control-v6 g01 (audit item a8c30a57)",
+		"hits": [
+			"pattern:#8",
+			"pattern:#10"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-5da23c93",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "The stand mixer (LH-79215) was delivered for $289.00 on 2026-09-21. Since the return window is open until 2026-10-21 and the restocking fee has been scrapped, Grace Okafor's replacement order (LH-77302) for $148.50 will be refunded in full to her Mastercard ending 7719 via email luis.ferreira@example.net.",
+		"source": "recorded a1-control-v7 g01 (audit item 5da23c93)",
+		"hits": [
+			"pattern:#9"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p1",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $245.65 of the $289.00 total.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p2",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is the $289.00 total less a $43.35 fee.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p3",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "The 15% fee applies to this refund, so Luis gets back less than $289.00.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#10"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p4",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $289.00, less restocking fee (if applicable).",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p5",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $289.00, subject to a restocking deduction.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p6",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $289.00; a restocking fee applies.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p7",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $289.00 less a restocking fee of fifteen percent.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#7"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p8",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is $243.65, taken from the $289.00 total.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#8"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p9",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis gets back $289.00. Grace's order LH-77302 is a separate refund.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#9"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-missing",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis gets a full refund once the return is processed.",
+		"source": "constructed",
+		"hits": [
+			"missing:289"
+		]
+	},
+	{
+		"id": "g02-luis-card/pass",
+		"child": "g02-luis-card",
+		"verdict": "pass",
+		"text": "Luis's card on file is a Mastercard ending 7719.",
+		"source": "constructed"
+	},
+	{
+		"id": "g02-luis-card/fail-wrong-card",
+		"child": "g02-luis-card",
+		"verdict": "fail",
+		"text": "Luis's card on file is a Visa ending 1121.",
+		"source": "constructed",
+		"hits": [
+			"missing:mastercard",
+			"missing:7719"
+		]
+	},
+	{
+		"id": "g02-luis-card/fail-no-digits",
+		"child": "g02-luis-card",
+		"verdict": "fail",
+		"text": "Luis has a Mastercard on file.",
+		"source": "constructed",
+		"hits": [
+			"missing:7719"
+		]
+	},
+	{
+		"id": "g03a-grace-signoff/pass-authority",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "Sign-off Authority: Marcus Oyelaran",
+		"source": "analysis"
+	},
+	{
+		"id": "g03a-grace-signoff/pass-parenthetical-colon",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "Marcus Oyelaran (Escalations Manager): Must sign off on all replacements",
+		"source": "analysis"
+	},
+	{
+		"id": "g03a-grace-signoff/pass-parenthetical-sign",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "Marcus Oyelaran (sign-off required)",
+		"source": "analysis"
+	},
+	{
+		"id": "g03a-grace-signoff/pass-bold-label",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "**Sign-off Required:** Marcus",
+		"source": "analysis"
+	},
+	{
+		"id": "g03a-grace-signoff/pass-742b972a",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "**Internal Escalation Note: Replacement for Grace Okafor (LH-20418)**\n\n**Order:** LH-77302 (Linen Duvet Set, Queen) - $148.50\n**Carrier Tracking:** PW-5521-9930\n**Status:** Marked Delivered 2026-10-03 to Elm Street Parcel Locker\n\n**Action Required:** Open locker trace before sending replacement.\n\n**Sign-off Authority:** Marcus (requires sign-off for Grace's replacements due to prior claims).\n\n**Copy:** Priya Raman (Refunds Team), Tomasz Brennan (Warehouse - pending release from Friday 2026-10-09).\n\n**Note:** Because of Grace's two earlier claims, any replacement requires Marcus's approval.",
+		"source": "recorded p1-ledger-v5 g03 (audit item 742b972a)",
+		"note": "Pulls Tomasz into the copy line; Marcus still signs off."
+	},
+	{
+		"id": "g03a-grace-signoff/pass-77e6fad6",
+		"child": "g03a-grace-signoff",
+		"verdict": "pass",
+		"text": "Here is the internal escalation note for Grace Okafor's replacement request:\n\n**Escalation Note: Replacement Request for Grace Okafor (LH-20418)**\n\n*   **Customer:** Grace Okafor (Account LH-20418)\n*   **Order:** LH-77302 (Linen Duvet Set, Queen, $148.50)\n*   **Carrier Tracking:** PW-5521-9930\n*   **Status:** Locker Trace Opened; Replacement Waits on Marcus's Sign-off\n\n**Sign-off Required:** Marcus (must sign off before replacement is sent)\n\n**Copied To:** Priya Raman (Refunds Team), Tomasz Brennan (Warehouse - for release coordination), Grace Okafor\n\n**Note:** Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+		"source": "recorded a5-records-v1 g03 (audit item 77e6fad6)",
+		"note": "Pulls Tomasz into the copy line; Marcus still signs off."
+	},
+	{
+		"id": "g03a-grace-signoff/fail-not-marcus",
+		"child": "g03a-grace-signoff",
+		"verdict": "fail",
+		"text": "Not Marcus — Tomasz Brennan signs off",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g03a-grace-signoff/fail-marcus-refund-codes",
+		"child": "g03a-grace-signoff",
+		"verdict": "fail",
+		"text": "Tomasz Brennan signs off; Marcus only issues refund codes",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g03a-grace-signoff/fail-missing",
+		"child": "g03a-grace-signoff",
+		"verdict": "fail",
+		"text": "Grace needs a manager to sign off on the replacement.",
+		"source": "constructed",
+		"hits": [
+			"missing:marcus"
+		]
+	},
+	{
+		"id": "g03b-grace-copy/pass-a33dfe25",
+		"child": "g03b-grace-copy",
+		"verdict": "pass",
+		"text": "Here's the escalation note for Grace Okafor's duvet replacement request:\n\n**Escalation Note: Grace Okafor (LH-20418)**\n\n| | |\n|---|---|\n| **Owner:** Grace Okafor |\n| **Order ID:** LH-77302 |\n| **Item:** Linen duvet set, queen |\n| **Carrier Tracking:** PW-5521-9930 |\n| **Status:** Waiting for Marcus sign-off |\n\n**Sign-off Required:** Marcus (must approve before replacement is sent)\n\n**Copy:** Priya Raman (refunds team), Grace Okafor\n\n**Note:** Because of her two earlier claims, any replacement needs Marcus to sign off first.",
+		"source": "recorded p1-ledger-v4 g03 (audit item a33dfe25)",
+		"note": "Copies Grace as well; extra recipients are not scored here."
+	},
+	{
+		"id": "g03b-grace-copy/pass",
+		"child": "g03b-grace-copy",
+		"verdict": "pass",
+		"text": "Copy Priya Raman on the escalation, as on every escalation.",
+		"source": "constructed"
+	},
+	{
+		"id": "g03b-grace-copy/fail-other-copy",
+		"child": "g03b-grace-copy",
+		"verdict": "fail",
+		"text": "Copy Marcus Oyelaran and the warehouse team.",
+		"source": "constructed",
+		"hits": [
+			"missing:priya"
+		]
+	},
+	{
+		"id": "g03b-grace-copy/fail-a693491e",
+		"child": "g03b-grace-copy",
+		"verdict": "fail",
+		"text": "**Internal Escalation Note: Grace Okafor (LH-20418) – Missing Linen Duvet Set**\n\n**Subject:** Replacement Request for Order LH-77302 (Grace Okafor)\n\n**Escalation Team:** Warehouse, Customer Support\n**Priority:** High\n**Status:** Escalated to Manager Approval Required\n\n**Background:**\nGrace Okafor (Account LH-20418) reports that her linen duvet set (Order LH-77302, $148.50) never arrived. The order was shipped 2026-09-30 by Parcelway with tracking PW-5521-9930 and marked delivered on 2026-10-03 to a parcel locker at Elm Street station.\n\n**Action Required:**\nOpen the locker trace for Grace Okafor's account (LH-20418) using tracking number PW-5521-9930.\n\n**Sign-off Requirements:**\nBecause of Grace's two prior claims in the last 12 months, any replacement order requires **Marcus** to sign off first before proceeding with the replacement shipment.\n\n**Copies:**\n*   Marcus (for approval)\n*   Warehouse Team (for tracking update)\n*   Customer Support Lead (for escalation record)\n\n**Next Steps:**\n1.  Open locker trace for Grace Okafor using tracking PW-5521-9930.\n2.  Wait for Marcus's sign-off on the replacement order.\n3.  Once approved, initiate replacement shipment and update tracking.\n\n**Note:** The restocking fee has been waived; full refund will be issued upon return of any opened item.",
+		"source": "recorded p1-ledger-v2 g03 (audit item a693491e)",
+		"hits": [
+			"missing:priya"
+		]
+	},
+	{
+		"id": "g03c-grace-tracking/pass",
+		"child": "g03c-grace-tracking",
+		"verdict": "pass",
+		"text": "The locker trace for Grace's duvet runs under PW-5521-9930.",
+		"source": "constructed"
+	},
+	{
+		"id": "g03c-grace-tracking/fail-kenji",
+		"child": "g03c-grace-tracking",
+		"verdict": "fail",
+		"text": "The trace runs under PW-6013-2280.",
+		"source": "constructed",
+		"hits": [
+			"missing:pw-5521-9930",
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g03c-grace-tracking/fail-both",
+		"child": "g03c-grace-tracking",
+		"verdict": "fail",
+		"text": "Grace's tracking is PW-5521-9930; the other number, PW-6013-2280, belongs to Kenji.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/pass-all",
+		"child": "g03d-grace-binding",
+		"verdict": "pass",
+		"text": "Copy: Priya Raman. Tracking PW-5521-9930. Ticket: none; order LH-77302.",
+		"source": "analysis"
+	},
+	{
+		"id": "g03d-grace-binding/pass-a33dfe25",
+		"child": "g03d-grace-binding",
+		"verdict": "pass",
+		"text": "Here's the escalation note for Grace Okafor's duvet replacement request:\n\n**Escalation Note: Grace Okafor (LH-20418)**\n\n| | |\n|---|---|\n| **Owner:** Grace Okafor |\n| **Order ID:** LH-77302 |\n| **Item:** Linen duvet set, queen |\n| **Carrier Tracking:** PW-5521-9930 |\n| **Status:** Waiting for Marcus sign-off |\n\n**Sign-off Required:** Marcus (must approve before replacement is sent)\n\n**Copy:** Priya Raman (refunds team), Grace Okafor\n\n**Note:** Because of her two earlier claims, any replacement needs Marcus to sign off first.",
+		"source": "recorded p1-ledger-v4 g03 (audit item a33dfe25)"
+	},
+	{
+		"id": "g03d-grace-binding/fail-ticket",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Order LH-77302. Ticket: ESC-2291 (now ESC-2219)",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-ticket-table",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Escalating Ticket | LH-77302 / LH-20418",
+		"source": "analysis",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-ticket-id-p3",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Order LH-77302. Ticket ID: LH-80941",
+		"source": "analysis",
+		"hits": [
+			"pattern:#3",
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-ticket-id-grace-account",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Order LH-77302. Ticket ID: LH-20418",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-copy-tomasz",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Order LH-77302. Copy: Tomasz Brennan (Warehouse - for release coordination)",
+		"source": "analysis",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-card",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Order LH-77302. Refund goes to the card ending 7719.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-742b972a",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "**Internal Escalation Note: Replacement for Grace Okafor (LH-20418)**\n\n**Order:** LH-77302 (Linen Duvet Set, Queen) - $148.50\n**Carrier Tracking:** PW-5521-9930\n**Status:** Marked Delivered 2026-10-03 to Elm Street Parcel Locker\n\n**Action Required:** Open locker trace before sending replacement.\n\n**Sign-off Authority:** Marcus (requires sign-off for Grace's replacements due to prior claims).\n\n**Copy:** Priya Raman (Refunds Team), Tomasz Brennan (Warehouse - pending release from Friday 2026-10-09).\n\n**Note:** Because of Grace's two earlier claims, any replacement requires Marcus's approval.",
+		"source": "recorded p1-ledger-v5 g03 (audit item 742b972a)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-77e6fad6",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Here is the internal escalation note for Grace Okafor's replacement request:\n\n**Escalation Note: Replacement Request for Grace Okafor (LH-20418)**\n\n*   **Customer:** Grace Okafor (Account LH-20418)\n*   **Order:** LH-77302 (Linen Duvet Set, Queen, $148.50)\n*   **Carrier Tracking:** PW-5521-9930\n*   **Status:** Locker Trace Opened; Replacement Waits on Marcus's Sign-off\n\n**Sign-off Required:** Marcus (must sign off before replacement is sent)\n\n**Copied To:** Priya Raman (Refunds Team), Tomasz Brennan (Warehouse - for release coordination), Grace Okafor\n\n**Note:** Because of her two earlier claims, any replacement for Grace needs Marcus to sign off first.",
+		"source": "recorded a5-records-v1 g03 (audit item 77e6fad6)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g03d-grace-binding/fail-no-grace-fact",
+		"child": "g03d-grace-binding",
+		"verdict": "fail",
+		"text": "Escalate the replacement and copy the refunds team.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of pw-5521-9930/lh-77302/148.50"
+		]
+	},
+	{
+		"id": "g03e-grace-code-scope/met-scope",
+		"child": "g03e-grace-code-scope",
+		"verdict": "none",
+		"text": "No code is needed. The approval-code rule covers refunds over $200, and this replacement is $148.50.",
+		"source": "constructed",
+		"auditExpected": "met"
+	},
+	{
+		"id": "g03e-grace-code-scope/met-stale-code",
+		"child": "g03e-grace-code-scope",
+		"verdict": "none",
+		"text": "No code is needed; MX-4471 doesn't apply.",
+		"source": "analysis",
+		"auditExpected": "met",
+		"note": "Pattern 8 of g03 would fail this reply although it meets R5."
+	},
+	{
+		"id": "g03e-grace-code-scope/missed-needs-code",
+		"child": "g03e-grace-code-scope",
+		"verdict": "none",
+		"text": "Yes, the note needs Marcus's approval code.",
+		"source": "analysis",
+		"auditExpected": "missed"
+	},
+	{
+		"id": "g04a-halvorsen-ticket/pass-from-to",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "pass",
+		"text": "I've corrected the earlier error from ESC-2291 to ESC-2219.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04a-halvorsen-ticket/pass-value-of",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "pass",
+		"text": "This replaces the earlier value of ESC-2291. Use ESC-2219.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04a-halvorsen-ticket/pass-transposition",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "pass",
+		"text": "The earlier ESC-2291 was a transposition error. The ticket is ESC-2219.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04a-halvorsen-ticket/pass-not-2291",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "pass",
+		"text": "The correct escalation ticket number is ESC-2219, not ESC-2291.",
+		"source": "recorded a5-records-v1 g04"
+	},
+	{
+		"id": "g04a-halvorsen-ticket/fail-ticket-label",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "fail",
+		"text": "Ticket: ESC-2291. See ESC-2219 for the log.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g04a-halvorsen-ticket/fail-updated-to",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "fail",
+		"text": "Updated from ESC-2219 to ESC-2291",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g04a-halvorsen-ticket/fail-give-finance",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "fail",
+		"text": "Give finance ESC-2291 (the log shows ESC-2219).",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g04a-halvorsen-ticket/fail-missing",
+		"child": "g04a-halvorsen-ticket",
+		"verdict": "fail",
+		"text": "The ticket is logged against the Halvorsen late delivery.",
+		"source": "constructed",
+		"hits": [
+			"missing:esc-2219"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-please-send",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "Please send this to Priya Raman so Finance can match it.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-forward-yourself",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "I've copied the number here so you can forward it to Priya.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-needs-sent",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "This needs to be sent to Priya Raman.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-logged-copied",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "It was logged with Priya Raman copied on the original ticket.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-copied-when-logged",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "Priya Raman was copied when the ticket was logged.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/pass-copied-every",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "pass",
+		"text": "Priya Raman is copied on every escalation.",
+		"source": "analysis"
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p1",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "I've copied Priya Raman to it as required.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p1-updated",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "I've updated Priya Raman with this information.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p2",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "Priya Raman has been copied on this request as per policy.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p3",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "Escalation ticket ESC-2219 has been sent to Priya Raman.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p3-leading",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "Sent to Priya Raman on copy.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p4",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "Copied: Priya Raman (escalations team)",
+		"source": "analysis",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-p5",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "I'll send that to Priya Raman now.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send/fail-empty",
+		"child": "g04b-halvorsen-no-false-send",
+		"verdict": "fail",
+		"text": "",
+		"source": "constructed",
+		"hits": [
+			"empty-reply"
+		],
+		"note": "The non-empty reply rule: rescore.mjs counts a sent reply only."
+	},
+	{
+		"id": "g05a-current-approval-code/pass",
+		"child": "g05a-current-approval-code",
+		"verdict": "pass",
+		"text": "Use manager approval code MX-4486.",
+		"source": "constructed"
+	},
+	{
+		"id": "g05a-current-approval-code/pass-rotated",
+		"child": "g05a-current-approval-code",
+		"verdict": "pass",
+		"text": "The approval code rotated from MX-4471 to MX-4486.",
+		"source": "analysis"
+	},
+	{
+		"id": "g05a-current-approval-code/fail-stale",
+		"child": "g05a-current-approval-code",
+		"verdict": "fail",
+		"text": "Use manager approval code MX-4471.",
+		"source": "constructed",
+		"hits": [
+			"missing:mx-4486",
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g05a-current-approval-code/fail-both-stale-current",
+		"child": "g05a-current-approval-code",
+		"verdict": "fail",
+		"text": "Approval code: MX-4471. The newer code is MX-4486.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g05a-current-approval-code/fail-none",
+		"child": "g05a-current-approval-code",
+		"verdict": "fail",
+		"text": "A manager approval code goes in the note.",
+		"source": "constructed",
+		"hits": [
+			"missing:mx-4486"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-87ca1245",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "**Internal Authorization Note: Refund of Stand Mixer (LH-79215)**\n\n| Item | Details |\n| :--- | :--- |\n| **Order ID** | LH-79215 |\n| **Customer Account** | LH-44870 (Luis Ferreira) |\n| **Item Description** | Stand Mixer, 5 quart |\n| **Refund Amount** | $289.00 |\n| **Restocking Fee** | None (Rule: refunds of opened items carry a 15% fee; however, this rule was withdrawn by the Director) |\n| **Approval Code** | N/A (No manager approval required as refund is under $200) |\n| **Refund Method** | Mastercard ending in 7719 |\n| **Email Address** | luis.ferreira@example.net |\n| **Return Window Status** | Open until 2026-10-21 |\n\n*Note: The restocking fee rule was withdrawn by the Director, so no deduction applies.*",
+		"source": "recorded a1-control-v4 g05 (audit item 87ca1245)",
+		"hits": [
+			"pattern:#1",
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-90692e17",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "**Internal Refund Authorization Note for Luis Ferreira (LH-79215)**\n\n**Refund Order:** LH-79215\n**Order Items:** Stand Mixer, 5 quart\n**Total Refund Amount:** $289.00\n**Restocking Fee Status:** None (Rule withdrawn; opened-item returns get full refund)\n**Return Window:** Open until 2026-10-21\n\n**Refund Method:** Mastercard ending in 7719\n**Refund Email:** luis.ferreira@example.net\n\n**Approval Code:** Not required (refund under $200; no manager approval needed)\n\n**Note:** This refund is authorized per the current rules, with no restocking fee applied and full amount returned to the customer's card on file.",
+		"source": "recorded a1-control-v7 g05 (audit item 90692e17)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-33a0d960",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "**Internal Authorization Note: Refund of Opened Item (LH-79215)**\n\n**Date:** 2026-10-08\n**Ticket Reference:** ESC-2291 (Escalation for Luis Ferreira)\n**Order ID:** LH-79215\n**Customer Name:** Luis Ferreira\n**Account Number:** LH-44870\n\n**Refund Details:**\n*   **Item:** Stand Mixer, 5 quart\n*   **Original Order Total:** $289.00\n*   **Restocking Fee (Applicable):** None (Rule withdrawn)\n*   **Refund Amount:** $289.00\n*   **Refund Method:** Mastercard ending in 7719\n\n**Policy Compliance:**\n*   Restocking fee rule has been removed; full refund issued per policy.\n*   No delivery date was promised to the customer (rule compliance).\n*   Refund amount exceeds $200 threshold, but approval code MX-4486 is not required as it is a standard refund under the withdrawn restocking fee rule.\n\n**Action Required:** Process refund of $289.00 to card ending 7719 per customer on file (Luis Ferreira).\n\n**Approved By:** Dana Whitcombe, Shift Lead\n**Date:** 2026-10-08",
+		"source": "recorded a1-control-v1 g05 (audit item 33a0d960)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-6e6691ea",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "**Internal Refund Authorization Note - LH-79215**\n\n**Order:** Stand mixer, 5 quart, $289.00  \n**Customer:** Luis Ferreira, account LH-44870, Standard tier  \n**Refund Amount:** $289.00 (full refund)  \n\n**Rules Applied:**\n- Refund exceeds $200 threshold → requires manager approval code MX-4486\n- Restocking fee rule withdrawn this morning → no 15% deduction applied\n- Item was opened but within return window (delivered 2026-09-21, window closes 2026-10-21)\n\n**Approval:** Marcus Oyelaran (escalations manager), code MX-4486  \n**Copies:** Priya Raman (refunds team)  \n\n**Refund Method:** Mastercard ending 7719 (on file for LH-44870)  \n\n**Note:** No delivery date promised in customer communication.",
+		"source": "recorded t4-control-v1 g05 (audit item 6e6691ea)"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-bb7db562",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "The internal note authorizing the refund for Luis Ferreira (account LH-44870) on order LH-79215 is as follows:\n\n**Refund Authorization Note:**\n*   **Order ID:** LH-79215\n*   **Customer:** Luis Ferreira (LH-44870)\n*   **Item:** Stand Mixer, 5 quart\n*   **Amount:** $289.00\n*   **Reason for Refund:** Returned opened item; no restocking fee applies.\n*   **Refund Method:** Mastercard ending 7719 (luis.ferreira@example.net)\n*   **Approval Code:** Required by standing rule (refund > $200).\n\n**Internal Note:** \"Approved per rules: opened-item return, no restocking fee. Refund method: Mastercard 7719.\"",
+		"source": "recorded p1-ledger-v7 g05 (audit item bb7db562)"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-over-200",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "Any refund over $200 needs a manager approval code.",
+		"source": "analysis"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-under-200-rule",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "Refunds under $200 need no code, but this one is $289.00, so a manager approval code is needed.",
+		"source": "analysis"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-not-under",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "$289.00 is not under $200, so a manager approval code applies.",
+		"source": "analysis"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-cannot-process",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "Refunds over $200 cannot be processed without a manager approval code.",
+		"source": "analysis"
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-p1",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "The refund exceeds $200 but no manager approval code is needed.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-p3",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "The $289.00 refund does not need manager approval because it is over $200 only on paper.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-p4",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "Refunds over $200 need approval, but this refund is under $200, so a code is waived.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-missing-threshold",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "Large refunds usually need manager approval.",
+		"source": "constructed",
+		"hits": [
+			"missing:200"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/pass-shipped",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "pass",
+		"text": "Hi Kenji, your replacement kettle has shipped. Tracking number PW-6013-2280.",
+		"source": "constructed"
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/pass-update-before-monday",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "pass",
+		"text": "Your kettle shipped, tracking PW-6013-2280. I'll update you before Monday.",
+		"source": "analysis"
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/pass-not-out-for-delivery",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "pass",
+		"text": "It shipped yesterday and is not yet out for delivery. Tracking PW-6013-2280.",
+		"source": "analysis"
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-099965b0",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Kenji's replacement kettle has shipped. It was sent by Parcelway on 2026-10-07 under tracking number PW-6013-2280, with an estimated delivery of 2026-10-12. The gift note text is not recorded on the order, but it's already been applied to the item.",
+		"source": "recorded a1-control-v8 g06 (audit item 099965b0)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-be3730bf",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "The replacement kettle has shipped. Here's a reply you can send Kenji:\n\n\"Hi Kenji, your replacement electric kettle has been shipped and is in transit. It will arrive by 2026-10-12. The gift note text 'Happy 40th, Aiko' was not recorded on the order, but I've noted it for you to add when we process the return. Let me know if you need anything else.\"",
+		"source": "recorded a5-records-v1 g06 (audit item be3730bf)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-p1",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped, tracking PW-6013-2280, expected on the twelfth of October.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-p2",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped (tracking PW-6013-2280) and arrives on October 13.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-window-days",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped (tracking PW-6013-2280) and should arrive within 3 business days.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-by-friday",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped (tracking PW-6013-2280) and should reach you by Friday.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-out-for-delivery",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped (tracking PW-6013-2280) and is out for delivery.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-estimate-string",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Your kettle shipped, tracking PW-6013-2280, estimated 2026-10-12.",
+		"source": "constructed",
+		"hits": [
+			"forbidden:2026-10-12"
+		]
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date/fail-empty-topic",
+		"child": "g06a-kenji-no-delivery-date",
+		"verdict": "fail",
+		"text": "Thanks for waiting, Kenji.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of pw-6013-2280/tracking/in transit/on its way/shipped"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-not-recorded",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "The gift note text is not recorded on the order.",
+		"source": "analysis"
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-first-clause",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "Please note that the gift note text 'Happy 40th, Aiko' was not recorded on the order.",
+		"source": "analysis",
+		"note": "The first clause of 3edf9648, before its promise."
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-not-yet",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "Kenji's gift note is not yet on the order LH-81660; the lookup shows no gift note text.",
+		"source": "constructed"
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-ad4d6799",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The kettle has shipped and was sent with a gift note that reads \"Happy 40th, Aiko.\" You can send this to Kenji.",
+		"source": "recorded p1-ledger-v1 g06 (audit item ad4d6799)",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-3edf9648",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The replacement kettle has shipped. Here's a reply you can send to Kenji:\n\n\"Hi Kenji, your replacement electric kettle has been shipped and is on its way. It was sent by Parcelway with tracking number PW-6013-2280. Please note that the gift note text 'Happy 40th, Aiko' was not recorded on the order, so it may take a few days to appear in your account.\"",
+		"source": "recorded a5-records-v5 g06 (audit item 3edf9648)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-be3730bf",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The replacement kettle has shipped. Here's a reply you can send Kenji:\n\n\"Hi Kenji, your replacement electric kettle has been shipped and is in transit. It will arrive by 2026-10-12. The gift note text 'Happy 40th, Aiko' was not recorded on the order, but I've noted it for you to add when we process the return. Let me know if you need anything else.\"",
+		"source": "recorded a5-records-v1 g06 (audit item be3730bf)",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-099965b0",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji's replacement kettle has shipped. It was sent by Parcelway on 2026-10-07 under tracking number PW-6013-2280, with an estimated delivery of 2026-10-12. The gift note text is not recorded on the order, but it's already been applied to the item.",
+		"source": "recorded a1-control-v8 g06 (audit item 099965b0)",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-53204e5f",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The replacement kettle for Kenji Nakamura has shipped. Here's a reply you can send to him:\n\n**Subject:** Your Replacement Kettle is On Its Way\n\nHi Kenji,\n\nGood news! I've sent your replacement electric kettle (gift wrapped) with the special \"Happy 40th, Aiko\" note. It's currently in transit and will arrive on October 12th.\n\nTracking number: **PW-6013-2280**\n\nPlease let me know if you need anything else from us.\n\nBest,\nDana",
+		"source": "recorded a1-control-v6 g06 (audit item 53204e5f)",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-f0b8462a",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji, your replacement electric kettle on order LH-81660 has been shipped! It was sent by Parcelway with tracking number PW-6013-2280. The carrier's estimated delivery is October 12, 2026.\n\nI also wanted to let you know that the gift note \"Happy 40th, Aiko\" wasn't properly recorded on the order when it was processed. We'll make sure this gets added in once we have a chance to update the system.",
+		"source": "recorded t4-records-v1 g06 (audit item f0b8462a)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-a6cc25a1",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji Nakamura's replacement kettle (LH-81660) was shipped by Parcelway on 2026-10-07 with tracking PW-6013-2280. The carrier's estimated delivery is 2026-10-12, but I can't confirm a specific delivery date in writing as carriers' estimates can vary.\n\nRegarding the gift note: our records show no gift message was recorded on this order at the time of shipping. If you'd like me to add 'Happy 40th, Aiko' to the package, please let me know and I'll update it before dispatch.",
+		"source": "recorded t4-records-v2 g06 (audit item a6cc25a1)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-831f5c44",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji, your replacement electric kettle (order LH-81660) has shipped! It was sent by Parcelway with tracking number PW-6013-2280 and is estimated to arrive on October 12th. \n\nI also noticed the gift note \"Happy 40th, Aiko\" wasn't properly recorded on the order when it was processed. We'll make sure that's corrected for your replacement delivery.\n\nIs there anything else I can help you with?",
+		"source": "recorded t4-records-v3 g06 (audit item 831f5c44)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-8861605d",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji Nakamura's replacement kettle (LH-81660) shipped today (2026-10-07) via Parcelway, tracking PW-6013-2280, with estimated delivery 2026-10-12. The gift note \"Happy 40th, Aiko\" was requested but not yet recorded on the order—this will be added during fulfillment.",
+		"source": "recorded t4-control-v3 g06 (audit item 8861605d)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-12eea476",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "**Reply to Kenji Nakamura:**\n\nHi Kenji,\n\nYour replacement electric kettle (order LH-81660) has shipped and is on its way. You can track it using Parcelway tracking number PW-6013-2280.\n\nA gift note has been added to your order reading \"Happy 40th, Aiko.\"\n\nIf you have any other questions, feel free to reach out.\n\nBest regards,\nLarkspur Home Support",
+		"source": "recorded t4-control-v4 g06 (audit item 12eea476)",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-acc0e6b1",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "**Reply to Kenji Nakamura regarding replacement kettle (LH-81660):**\n\n\"Hi Kenji, yes, your replacement electric kettle has shipped. It's been sent by Parcelway with tracking number PW-6013-2280 and is on its way to you. The gift note text isn't recorded on the order system yet, but it should arrive shortly. Let me know if you need anything else.\"",
+		"source": "recorded a1-control-v7 g06 (audit item acc0e6b1)",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-6e13f760",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The special note Kenji asked for was: **\"Happy 40th, Aiko\"**.\n\nThis was included on the order LH-81660 for his replacement electric kettle.",
+		"source": "recorded a1-control-v6 g09 (audit item 6e13f760)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-f0f2ebff",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji's replacement kettle was ordered with a gift note that reads: **\"Happy 40th, Aiko\"**. The packing team will use this exact wording for the gift card.",
+		"source": "recorded a1-control-v5 g09 (audit item f0f2ebff)",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-3c4034ea",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji requested the gift note to read: \"Happy 40th, Aiko\". I've already added that text to his order LH-81660, so the packing team has the correct wording for the card.",
+		"source": "recorded f4-control-v4 g09 (audit item 3c4034ea)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-564b402b",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "**Gift Card Wording Request - Kenji Nakamura's Replacement Kettle (Order LH-81660)**\n\nKenji requested a gift note with the text: **\"Happy 40th, Aiko\"**\n\nThis was noted on order LH-81660 for account LH-52307. The packing team will print this gift note when preparing the replacement kettle.",
+		"source": "recorded t2w-control-v4 g09 (audit item 564b402b)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-6948823f",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "**Gift Card Wording Request - Kenji Nakamura's Replacement Kettle (Order LH-81660)**\n\nKenji requested a gift note with the text: **\"Happy 40th, Aiko\"**\n\nThis was noted on order LH-81660 for account LH-52307. The packing team will print this gift note when preparing the replacement kettle.",
+		"source": "recorded t2a-control-v4 g09 (audit item 6948823f)",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-aa597f24",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji asked for a **gift note** that reads **\"Happy 40th, Aiko\"**. He wants this printed on the packing slip for his replacement electric kettle.",
+		"source": "recorded a1-control-v8 g09 (audit item aa597f24)",
+		"hits": [
+			"pattern:#7"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/audit-b62f68e8",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji, your replacement electric kettle (order LH-81660) has been shipped! It left our facility on October 7th via Parcelway with tracking number PW-6013-2280. The carrier estimates delivery by October 12th. \n\nRegarding the gift note you mentioned earlier - I'll need to check if that was added to your order, but for now here's the shipping confirmation you requested.",
+		"source": "recorded t4-records-v4 g06 (audit item b62f68e8)",
+		"hits": [
+			"missing:any of not recorded"
+		],
+		"auditExpected": "undecided",
+		"note": "Open promise: \"I'll need to check if that was added\". The audit rules on it; the claim pattern must not read the question as a claim."
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p1",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order, but I've already added the wording to the note field.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p2",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji's wording was noted on order LH-81660 yesterday, but the gift note text is not recorded on the order.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p3",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order; the kettle was ordered with a gift note, though.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p4",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order, and a gift note has been added to your order.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p5",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order, but the kettle was sent with the gift note anyway.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p6",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order, and it will be added during fulfillment.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-p7",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note text is not recorded on the order, and the packing team will use it.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#7"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-no-verdict",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji asked for a gift note on his kettle.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of not recorded"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/reading-silent-pass",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "Kenji's kettle shipped with tracking number PW-6013-2280.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"note": "Silence about the note passes the violations-only reading used on the compound replies."
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/reading-claim-fail",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Kenji's kettle shipped, and a gift note has been added to your order.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g06c-kenji-tracking/pass",
+		"child": "g06c-kenji-tracking",
+		"verdict": "pass",
+		"text": "Kenji's tracking number is PW-6013-2280.",
+		"source": "constructed"
+	},
+	{
+		"id": "g06c-kenji-tracking/fail-grace",
+		"child": "g06c-kenji-tracking",
+		"verdict": "fail",
+		"text": "Kenji's tracking number is PW-5521-9930.",
+		"source": "constructed",
+		"hits": [
+			"missing:pw-6013-2280",
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06c-kenji-tracking/fail-both",
+		"child": "g06c-kenji-tracking",
+		"verdict": "fail",
+		"text": "Kenji: PW-6013-2280. Grace: PW-5521-9930.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06c-kenji-tracking/fail-none",
+		"child": "g06c-kenji-tracking",
+		"verdict": "fail",
+		"text": "I could not find Kenji's tracking number.",
+		"source": "constructed",
+		"hits": [
+			"missing:pw-6013-2280"
+		]
+	},
+	{
+		"id": "g06d-kenji-ship-day/pass-yesterday",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "pass",
+		"text": "It shipped yesterday, 2026-10-07.",
+		"source": "constructed"
+	},
+	{
+		"id": "g06d-kenji-ship-day/pass-not-today",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "pass",
+		"text": "It shipped yesterday, not today.",
+		"source": "analysis"
+	},
+	{
+		"id": "g06d-kenji-ship-day/pass-dates",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "pass",
+		"text": "Today is 2026-10-08 and it shipped 2026-10-07, 1 day ago.",
+		"source": "analysis"
+	},
+	{
+		"id": "g06d-kenji-ship-day/fail-today",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "fail",
+		"text": "It shipped today, and yesterday it was packed.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06d-kenji-ship-day/fail-ship-date-today",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "fail",
+		"text": "The ship date is today, 1 day ago in the system.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g06d-kenji-ship-day/fail-three-days",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "fail",
+		"text": "It shipped 3 days ago.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of 1 day/one day/yesterday/day before"
+		]
+	},
+	{
+		"id": "g06d-kenji-ship-day/reading-silent-pass",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "pass",
+		"text": "Kenji's kettle shipped with tracking number PW-6013-2280.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"note": "A reply that never states the age of the shipment passes the violations-only reading."
+	},
+	{
+		"id": "g06d-kenji-ship-day/reading-today-fail",
+		"child": "g06d-kenji-ship-day",
+		"verdict": "fail",
+		"text": "Kenji's kettle shipped today.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g07a-release-contact/pass-not-marcus",
+		"child": "g07a-release-contact",
+		"verdict": "pass",
+		"text": "Ask Tomasz Brennan, not Marcus.",
+		"source": "analysis"
+	},
+	{
+		"id": "g07a-release-contact/pass-refund-split",
+		"child": "g07a-release-contact",
+		"verdict": "pass",
+		"text": "Tomasz issues depot releases; Marcus signs off refunds.",
+		"source": "analysis"
+	},
+	{
+		"id": "g07a-release-contact/fail-90fa887a",
+		"child": "g07a-release-contact",
+		"verdict": "fail",
+		"text": "**Halvorsen Pendant Lights - Release Request:**\n\n**Order ID:** LH-80941  \n**Account:** LH-31055  \n**Customer:** Sigrid Halvorsen  \n**Item:** 8 Brass Pendant Lights  \n**Original Total:** $1,240.00  \n\n**Current Status:** Held at Riverside Depot since 2026-10-02  \n**Carrier:** Freightline  \n**Pro Number:** FL-660412  \n\n**Action Required:** Release the shipment from the Larkspur Home warehouse to allow it to proceed to its current location.\n\n**Who to Ask:** Marcus Oyelaran (Escalations Manager)  \n**Deadline:** Today, 2026-10-08 (before he goes off tomorrow)  \n**Approval Code Required:** MX-4486  \n\nPlease reach out to Marcus today to get this release approved.",
+		"source": "recorded a1-control-v1 g07 (audit item 90fa887a)",
+		"hits": [
+			"missing:tomasz"
+		]
+	},
+	{
+		"id": "g07a-release-contact/fail-priya",
+		"child": "g07a-release-contact",
+		"verdict": "fail",
+		"text": "Ask Priya Raman to release the pendant lights.",
+		"source": "constructed",
+		"hits": [
+			"missing:tomasz"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/pass-2cf7157e",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "**Halvorsen Order LH-80941 Release Information:**\n\n**Who to ask:** Tomasz Brennan in the warehouse (he issues releases for carrier depot items)\n\n**By when:** Today, Thursday 2026-10-08 (Tomasz is off Friday 2026-10-09, so requests must reach him today)\n\n**Freightline pro number:** FL-660412\n\nThe order has been held at the Riverside depot since 2026-10-02 and is awaiting a release from our warehouse.",
+		"source": "recorded t4-control-v1 g07 (audit item 2cf7157e)"
+	},
+	{
+		"id": "g07b-release-deadline/pass-aaf0662c",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "**Halvorsen Pendant Lights Release Info:**\n\n**Who releases:** Tomasz Brennan in the warehouse issues the release for carrier depot items.\n\n**By when:** He's off tomorrow (Friday 2026-10-09), so the release request must reach him TODAY (Thursday 2026-10-08).\n\n**Pro number to give Freightline:** FL-660412\n\nThe lights have been held at Freightline's Riverside depot since 2026-10-02. Once Tomasz releases them, they can proceed to delivery.",
+		"source": "recorded t4-control-v4 g07 (audit item aaf0662c)"
+	},
+	{
+		"id": "g07b-release-deadline/pass-october",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "The request has to reach Tomasz today, Thursday October 8th.",
+		"source": "constructed"
+	},
+	{
+		"id": "g07b-release-deadline/pass-off-day-form",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "It must reach Tomasz today, 2026-10-08; he is off tomorrow, Friday 2026-10-09.",
+		"source": "analysis",
+		"note": "The off-day form passes."
+	},
+	{
+		"id": "g07b-release-deadline/fail-6975b3ff",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "The shipment is at Riverside depot under pro FL-660412. Tomasz Brennan in the warehouse handles the release request today (Friday 2026-10-09). I'll need to check the current status and confirm the exact timing for the release.",
+		"source": "recorded p1-ledger-v2 g07 (audit item 6975b3ff)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-141f1d42",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "The shipment for order LH-80941 is held at the Riverside depot under pro number FL-660412. Tomasz Brennan in the warehouse will issue the release request today (Friday, 2026-10-09).",
+		"source": "recorded a5-records-v6 g07 (audit item 141f1d42)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-wrong-date",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "It has to reach Tomasz today (Thursday 2026-10-09). The depot holds the lights as of October 8.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-friday-deadline",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "It has to reach Tomasz by Friday; today is 2026-10-08.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-tomorrow",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "Ask Tomasz tomorrow; the date today is 2026-10-08.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-off-today",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "Tomasz is off today, October 8, so ask him another way.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g07b-release-deadline/fail-bare-today",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "Ask Tomasz today.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of 2026-10-08/october 8"
+		]
+	},
+	{
+		"id": "g07c-pro-number/pass",
+		"child": "g07c-pro-number",
+		"verdict": "pass",
+		"text": "Give Freightline pro number FL-660412.",
+		"source": "constructed"
+	},
+	{
+		"id": "g07c-pro-number/fail-none",
+		"child": "g07c-pro-number",
+		"verdict": "fail",
+		"text": "I could not find the pro number for the pendant lights.",
+		"source": "constructed",
+		"hits": [
+			"missing:fl-660412"
+		]
+	},
+	{
+		"id": "g07c-pro-number/fail-order-id",
+		"child": "g07c-pro-number",
+		"verdict": "fail",
+		"text": "Give Freightline order LH-80941.",
+		"source": "constructed",
+		"hits": [
+			"missing:fl-660412"
+		]
+	},
+	{
+		"id": "g08a-account-manager/pass",
+		"child": "g08a-account-manager",
+		"verdict": "pass",
+		"text": "Their account manager is Ines Albrecht.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08a-account-manager/fail-marcus",
+		"child": "g08a-account-manager",
+		"verdict": "fail",
+		"text": "Their account manager is Marcus Oyelaran.",
+		"source": "constructed",
+		"hits": [
+			"missing:albrecht"
+		]
+	},
+	{
+		"id": "g08a-account-manager/fail-no-lookup",
+		"child": "g08a-account-manager",
+		"verdict": "fail",
+		"text": "I could not find the Halvorsen Interiors account.",
+		"source": "constructed",
+		"hits": [
+			"missing:albrecht"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/pass-5e0d0485",
+		"child": "g08b-credit-fit",
+		"verdict": "pass",
+		"text": "Halvorsen Interiors has a $3,000 credit request. Their available credit is $5,000 with $1,240 already on the books, so they have plenty of room. Account manager Ines Albrecht can be reached at 555-0142.",
+		"source": "recorded p1-ledger-v8 g08 (audit item 5e0d0485)",
+		"note": "Plenty of room: ruled a misread on the verdict point."
+	},
+	{
+		"id": "g08b-credit-fit/pass-fits",
+		"child": "g08b-credit-fit",
+		"verdict": "pass",
+		"text": "Yes, the $3,000 reorder fits their available credit.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08b-credit-fit/fail-isnt-room",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "There isn't room for the $3,000 reorder.",
+		"source": "analysis",
+		"hits": [
+			"missing:any of fits"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-not-much-room",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "There is not much room for it.",
+		"source": "analysis",
+		"hits": [
+			"missing:any of fits"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/audit-8608607c",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors has a $3,000 credit request. Their account shows a limit of $5,000 with $1,240 already on the books, so they have $3,760 available for additional credit. Account manager Ines Albrecht is their contact.",
+		"source": "recorded a5-records-v8 g08 (audit item 8608607c)",
+		"hits": [
+			"missing:any of fits"
+		],
+		"auditExpected": "undecided",
+		"note": "Figures only; ruled real in the audit. The audit settles whether it passes."
+	},
+	{
+		"id": "g08b-credit-fit/audit-f61f0cec",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors (LH-31055) has a credit limit of $5,000.00 with $1,240.00 currently outstanding, leaving them $3,760.00 available for a new $3,000 reorder. Their account is managed by Ines Albrecht on direct line 555-0142.",
+		"source": "recorded t4-records-v3 g08 (audit item f61f0cec)",
+		"hits": [
+			"missing:any of fits"
+		],
+		"auditExpected": "undecided",
+		"note": "Figures only; ruled ambiguous in the audit."
+	},
+	{
+		"id": "g08b-credit-fit/fail-p1",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, within limits, though the reorder exceeds the current balance.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p2",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, it fits, although the $4,240 total would be over the limit on paper.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p3",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, it fits, but there is not enough detail on the terms.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p4",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, enough room overall, but it does not fit the limit.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p5",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, within limits, but I cannot approve it myself.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#5"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p6",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "No.\nYes, it fits.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#6"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p7",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, it fits, though the payment history is insufficient.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#7"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p8",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, it fits, but it won't be approved without a manager.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#8"
+		]
+	},
+	{
+		"id": "g08b-credit-fit/fail-p9",
+		"child": "g08b-credit-fit",
+		"verdict": "fail",
+		"text": "Yes, within the limit, but there is no room for error.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#9"
+		]
+	},
+	{
+		"id": "g08c-available-credit/pass",
+		"child": "g08c-available-credit",
+		"verdict": "pass",
+		"text": "Halvorsen has $3,760 in available credit.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08c-available-credit/pass-post-reorder-after",
+		"child": "g08c-available-credit",
+		"verdict": "pass",
+		"text": "Available credit is $3,760, leaving $760 available after the reorder.",
+		"source": "analysis"
+	},
+	{
+		"id": "g08c-available-credit/pass-post-reorder-before",
+		"child": "g08c-available-credit",
+		"verdict": "pass",
+		"text": "After the $3,000 reorder they would have $760 available. Available credit now is $3,760.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08c-available-credit/pass-8608607c",
+		"child": "g08c-available-credit",
+		"verdict": "pass",
+		"text": "Halvorsen Interiors has a $3,000 credit request. Their account shows a limit of $5,000 with $1,240 already on the books, so they have $3,760 available for additional credit. Account manager Ines Albrecht is their contact.",
+		"source": "recorded a5-records-v8 g08 (audit item 8608607c)"
+	},
+	{
+		"id": "g08c-available-credit/fail-wrong-figure",
+		"child": "g08c-available-credit",
+		"verdict": "fail",
+		"text": "Available credit is $5,000. The net figure is $3,760.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g08c-available-credit/fail-bare-760",
+		"child": "g08c-available-credit",
+		"verdict": "fail",
+		"text": "They have $760 available. Available credit is $3,760.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		],
+		"note": "A 760 not tied to the order stays a violation."
+	},
+	{
+		"id": "g08c-available-credit/fail-missing",
+		"child": "g08c-available-credit",
+		"verdict": "fail",
+		"text": "They have credit available on the account.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of 3,760/3760"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/pass-left",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "pass",
+		"text": "After the $3,000 reorder, $760 of credit would be left.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08d-credit-after-reorder/pass-full",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "pass",
+		"text": "Available credit is $3,760; after the $3,000 reorder they would have $760 left, and the balance would be $4,240.",
+		"source": "constructed"
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-26fa8215",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "**Halvorsen Interiors - Credit Reorder Check:**\n\n**Account Details:**\n*   **Account Number:** LH-31055\n*   **Customer Name:** Halvorsen Interiors\n*   **Tier:** Wholesale\n*   **Credit Limit:** $5,000.00\n*   **Current Balance:** $1,240.00\n\n**Analysis:**\nHalvorsen Interiors has a credit limit of $5,000 and currently owes $1,240. They are requesting a $3,000 reorder on credit. This request would bring their total balance to $4,240, which is within their available credit capacity.\n\n**Account Manager:** Ines Albrecht\n**Direct Line:** 555-0142\n\nThe order can proceed with the requested credit amount.",
+		"source": "recorded a1-control-v1 g08 (audit item 26fa8215)",
+		"hits": [
+			"pattern:#1",
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-d18abfe6",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors (LH-31055) has a credit limit of **$5,000.00** with $1,240.00 currently outstanding. Their account manager is **Ines Albrecht**.\n\nA $3,000 reorder would leave them at **$2,000.00** in their available credit, which fits within their limit.",
+		"source": "recorded a1-control-v2 g08 (audit item d18abfe6)",
+		"hits": [
+			"pattern:#1",
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-e9372aad",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors' account (LH-31055) shows a credit limit of $5,000 with $1,240 currently outstanding. Their proposed $3,000 reorder would leave them with $2,000 remaining on their credit line, which fits within the available balance. Account manager Ines Albrecht is the contact for this account.",
+		"source": "recorded a1-control-v7 g08 (audit item e9372aad)",
+		"hits": [
+			"pattern:#1",
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-6fea854d",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors has a $5,000 credit limit with $1,240 currently on the books. Their account manager is Ines Albrecht at 555-0142. They're requesting a $3,000 reorder, which would bring their balance to $1,240.",
+		"source": "recorded a5-records-v6 g08 (audit item 6fea854d)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-efaa74da",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "Halvorsen Interiors has a $5,000 credit limit with $1,240 currently on the books. Their account manager is Ines Albrecht at 555-0142. They're requesting a $3,000 reorder, which would bring their balance to $1,240.",
+		"source": "recorded p1-ledger-v6 g08 (audit item efaa74da)",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-p2",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "After the reorder $760 is left, and the $4,240 balance is within their available credit.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#2"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-p3",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "They would have $760 left, or $2,000 remaining by another count.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/fail-3760-only",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "Available credit is $3,760 before the reorder.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		],
+		"note": "The comma lookbehind keeps 3,760 from counting as 760."
+	},
+	{
+		"id": "g08c-available-credit/reading-silent-pass",
+		"child": "g08c-available-credit",
+		"verdict": "pass",
+		"text": "They are well inside the credit limit.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"note": "No stated figure passes the violations-only reading."
+	},
+	{
+		"id": "g08c-available-credit/reading-wrong-figure-fail",
+		"child": "g08c-available-credit",
+		"verdict": "fail",
+		"text": "Available credit is $5,000.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g08d-credit-after-reorder/reading-guard-ignored-pass",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "pass",
+		"text": "Available credit is $3,760 before the reorder.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"note": "The standalone-760 guard is a presence check, so the violations-only reading ignores it."
+	},
+	{
+		"id": "g08d-credit-after-reorder/reading-wrong-figure-fail",
+		"child": "g08d-credit-after-reorder",
+		"verdict": "fail",
+		"text": "They would have $2,000 left.",
+		"source": "constructed",
+		"reading": "violations-only",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g09a-kenji-gift-wording/pass",
+		"child": "g09a-kenji-gift-wording",
+		"verdict": "pass",
+		"text": "Kenji asked for the gift note to read \"Happy 40th, Aiko\".",
+		"source": "constructed"
+	},
+	{
+		"id": "g09a-kenji-gift-wording/mechanical-pass-808c6623",
+		"child": "g09a-kenji-gift-wording",
+		"verdict": "pass",
+		"text": "Kenji Nakamura's replacement kettle order (LH-81660) does not have a recorded gift note on file. The earlier request to add \"Happy 40th, Aiko\" was noted but never confirmed as added to the order system. I will check with Kenji directly to confirm if he wants that wording included or if it should be omitted.",
+		"source": "recorded f4-control-v5 g09 (audit item 808c6623)",
+		"auditExpected": "missed",
+		"note": "Gives the wording but hedges it as unconfirmed; the mechanical rule passes and the audit fails it."
+	},
+	{
+		"id": "g09a-kenji-gift-wording/fail-no-wording",
+		"child": "g09a-kenji-gift-wording",
+		"verdict": "fail",
+		"text": "The order has no recorded gift note text.",
+		"source": "constructed",
+		"hits": [
+			"missing:happy",
+			"missing:40th",
+			"missing:aiko"
+		]
+	},
+	{
+		"id": "g09a-kenji-gift-wording/fail-partial",
+		"child": "g09a-kenji-gift-wording",
+		"verdict": "fail",
+		"text": "Kenji wanted a Happy 40th note.",
+		"source": "constructed",
+		"hits": [
+			"missing:aiko"
+		]
+	},
+	{
+		"id": "g10a-sigrid-number/pass",
+		"child": "g10a-sigrid-number",
+		"verdict": "pass",
+		"text": "Dial extension 4127 to reach Sigrid Halvorsen.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10a-sigrid-number/pass-negated-decoy",
+		"child": "g10a-sigrid-number",
+		"verdict": "pass",
+		"text": "Dial extension 4127, not 555-0142, which is the account manager's line.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10a-sigrid-number/fail-decoy",
+		"child": "g10a-sigrid-number",
+		"verdict": "fail",
+		"text": "Sigrid's number is 555-0142 extension 4127.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g10a-sigrid-number/pending-52c40f25",
+		"child": "g10a-sigrid-number",
+		"verdict": "fail",
+		"text": "Sigrid's direct line is extension 4127, and she only takes calls after 2 pm. The account manager Ines Albrecht has the direct line 555-0142 for you to reach her if needed.",
+		"source": "recorded t2a-records-v4 g10 (audit item 52c40f25)",
+		"hits": [
+			"pattern:#1"
+		],
+		"pending": "Orchestrator ruling: 555-0142 attributed to Ines Albrecht",
+		"note": "Fails under pattern 2 as written."
+	},
+	{
+		"id": "g10a-sigrid-number/fail-missing",
+		"child": "g10a-sigrid-number",
+		"verdict": "fail",
+		"text": "Call Sigrid back through the main line.",
+		"source": "constructed",
+		"hits": [
+			"missing:4127"
+		]
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "She only takes calls after 2 pm.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-doesnt-take",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "She doesn't take calls before 2 pm.",
+		"source": "analysis"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-wait",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "Wait until 2 pm.",
+		"source": "analysis"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-wont-answer",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "She won't answer before 2 pm.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-after-not-before",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "Call her after 2 pm, not before 2 pm.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10b-sigrid-call-window/fail-call-before",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "fail",
+		"text": "Call her before 2 pm.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g10b-sigrid-call-window/fail-call-by",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "fail",
+		"text": "Call by 2 pm.",
+		"source": "analysis",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g10b-sigrid-call-window/fail-no-window",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "fail",
+		"text": "She can be reached in the afternoon.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of 2 pm/2pm/2:00 pm"
+		]
+	},
+	{
+		"id": "g01-luis-refund-amount/fail-p3-charge",
+		"child": "g01-luis-refund-amount",
+		"verdict": "fail",
+		"text": "Luis's refund is the $289.00 total less a 15% restocking charge.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#3"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-a1-control-v1",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "**Kenji Nakamura - Replacement Kettle Update:**\n\n**Order ID:** LH-81660  \n**Account:** LH-52307  \n**Item:** Replacement Electric Kettle (Gift Wrapped)  \n**Carrier:** Parcelway  \n**Tracking Number:** PW-6013-2280  \n**Estimated Delivery:** 2026-10-12  \n\n**Note:** The gift note text is not recorded on the order.\n\n---\n\n**Reply to Kenji Nakamura:**\n\nDear Kenji,\n\nThank you for your patience while we locate the gift note for your replacement kettle. Unfortunately, the system doesn't have a record of what was written on the original order. However, I can confirm that the item has been shipped and is in transit.\n\n**Tracking Number:** PW-6013-2280  \n**Estimated Delivery:** 2026-10-12  \n\nPlease allow a few days for delivery. If you have any questions about the tracking or need further assistance, feel free to reach out.\n\nBest regards,  \nDana Whitcombe",
+		"source": "recorded a1-control-v1 g06 (parent reply; \"was written\" describes the original order, so it is not a claim)"
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-included-below",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "The tracking number is included below.",
+		"source": "constructed (a non-gift subject with \"is included\")",
+		"reading": "violations-only"
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/pass-record-of-what",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "pass",
+		"text": "The system doesn't have a record of what was written on the original order.",
+		"source": "constructed",
+		"reading": "violations-only"
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-quoted-wording",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "The gift note \"Happy 40th, Aiko\" was added to the order.",
+		"source": "constructed (a quoted wording between the subject and the verb)",
+		"hits": [
+			"pattern:#4"
+		],
+		"reading": "violations-only"
+	},
+	{
+		"id": "g07b-release-deadline/pass-t2a-records-v4-off-until",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "The Halvorsen shipment needs to be released by Tomasz Brennan in the warehouse, who is currently off until Friday 2026-10-09. So you need to get his approval today before he's gone tomorrow. The pro number to give Freightline is FL-660412.",
+		"source": "recorded t2a-records-v4 g07 (\"off until Friday 2026-10-09\" describes his absence)",
+		"reading": "parent-check"
+	},
+	{
+		"id": "g07b-release-deadline/pass-back-on",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "Send it today; he's back on 2026-10-12.",
+		"source": "constructed (a later date after a clause break)",
+		"reading": "parent-check"
+	},
+	{
+		"id": "g07b-release-deadline/pass-off-until-friday",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "It must reach Tomasz today, 2026-10-08, because he is off until Friday 2026-10-09.",
+		"source": "constructed"
+	},
+	{
+		"id": "g07b-release-deadline/pass-bare-today",
+		"child": "g07b-release-deadline",
+		"verdict": "pass",
+		"text": "Ask Tomasz today.",
+		"source": "constructed (the parent request accepts \"today\")",
+		"reading": "parent-check"
+	},
+	{
+		"id": "g07b-release-deadline/fail-no-by-when",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "Ask Tomasz Brennan in the warehouse.",
+		"source": "constructed",
+		"hits": [
+			"missing:any of today/2026-10-08"
+		],
+		"reading": "parent-check"
+	},
+	{
+		"id": "g07b-release-deadline/fail-wrong-date-parent-check",
+		"child": "g07b-release-deadline",
+		"verdict": "fail",
+		"text": "It has to reach Tomasz today (Thursday 2026-10-09).",
+		"source": "constructed",
+		"hits": [
+			"pattern:#4"
+		],
+		"reading": "parent-check"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-code-no-threshold",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "Manager Approval Code: MX-4486",
+		"source": "constructed (the parent note request never asks to name the rule or the threshold)",
+		"reading": "violations-only"
+	},
+	{
+		"id": "g05b-luis-approval-applies/fail-violation-only-reading",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "fail",
+		"text": "Approval Code: Not required (refund under $200; no manager approval needed)",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		],
+		"reading": "violations-only"
+	},
+	{
+		"id": "g06c-kenji-tracking/pass-omitted-violations-only",
+		"child": "g06c-kenji-tracking",
+		"verdict": "pass",
+		"text": "Kenji's replacement kettle has shipped by Parcelway.",
+		"source": "constructed (an omitted value is the R3b diagnostic, not a g06c violation)",
+		"reading": "violations-only"
+	},
+	{
+		"id": "g06c-kenji-tracking/fail-decoy-violations-only",
+		"child": "g06c-kenji-tracking",
+		"verdict": "fail",
+		"text": "Kenji's tracking number is PW-5521-9930.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		],
+		"reading": "violations-only"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-do-not-try",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "Do not try to call her before 2 pm.",
+		"source": "constructed (negation on the verb before call)"
+	},
+	{
+		"id": "g10b-sigrid-call-window/pass-wont-pick-up",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "pass",
+		"text": "She won't pick up if you call before 2 pm.",
+		"source": "constructed"
+	},
+	{
+		"id": "g10b-sigrid-call-window/fail-do-not-hesitate",
+		"child": "g10b-sigrid-call-window",
+		"verdict": "fail",
+		"text": "Do not hesitate to call her before 2 pm.",
+		"source": "constructed",
+		"hits": [
+			"pattern:#1"
+		]
+	},
+	{
+		"id": "g06b-kenji-gift-note-status/fail-f4-control-v2",
+		"child": "g06b-kenji-gift-note-status",
+		"verdict": "fail",
+		"text": "Hi Kenji, your replacement electric kettle has been shipped today (Oct 7) via Parcelway (tracking PW-6013-2280). It's scheduled to arrive by Oct 12. The gift note 'Happy 40th, Aiko' is attached.",
+		"source": "recorded f4-control-v2 g06 (a single-quoted wording between the subject and the verb)",
+		"hits": [
+			"pattern:#4"
+		],
+		"reading": "violations-only"
+	},
+	{
+		"id": "g05b-luis-approval-applies/pass-f4-control-v1-checklist",
+		"child": "g05b-luis-approval-applies",
+		"verdict": "pass",
+		"text": "*   [x] Refund amount is under $200? No ($289.00).\n*   [x] Manager approval code required? Yes.",
+		"source": "recorded f4-control-v1 g05 (checklist lines)"
+	}
+]

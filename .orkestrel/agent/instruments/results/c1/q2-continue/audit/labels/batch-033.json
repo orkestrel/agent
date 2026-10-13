@@ -1,0 +1,72 @@
+{
+  "authority": "root-adjudicated",
+  "packet": "212abdc2bd5ee66f02854c423ba91a585e348b3adb3e7a04fb0c3bdf2836f211",
+  "keys": "e3bea115a48aa57cc2a3f38966acf0869141450e0f0cddacad27116b46195325",
+  "labels": [
+    {
+      "id": "b9eac03babc801d2483b33043f1d15ad6183f72008d571b1b3f5c2c73f6a8601",
+      "atoms": [
+        {"id":"ev-14-1.facts.1","verdict":"pass","evidence":["product|Carrier found the driver delivered the carton to Linden central office; building cleaner signed IM. Sealed carton recovered and scanned into Beacon returns at...","source:ev-source-14-1|The sealed carton was recovered and scanned into Beacon returns at 07:55 under RC-7302."]},
+        {"id":"ev-14-1.facts.2","verdict":"fail","evidence":["product|Requires physical verification and potential re-delivery.","source:ev-source-14-3|All four meter seals are intact, and the recovered carton is available for redelivery.","source:ev-source-14-2|Deliver to Linden equipment annex instead"]},
+        {"id":"ev-14-1.facts.3","verdict":"fail","evidence":["product|Total Original Payment: $781.20.","product|the original charge remains valid.","source:ev-source-14-3|The original $744.00 charge remains valid"]},
+        {"id":"ev-14-1.facts.4","verdict":"pass","evidence":["product|A $25.00 service credit is approved but not yet posted to the account.","source:ev-source-14-4|A $25.00 service credit is separately approved for the delay, but it has not posted."]},
+        {"id":"ev-14-1.action.1","verdict":"fail","evidence":["product|The next responsible owner is the Customer Support Team (Esme Rowan).","product|Requires physical verification and potential re-delivery.","source:ev-source-14-2|Petra Salcedo, the authorized receiver added to our account today. The annex gate opens 09:00 to 12:00.","source:ev-source-14-3|Ask dispatch for a slot within the receiver's gate hours"]},
+        {"id":"ev-14-1.action.2","verdict":"fail","evidence":["product|Requires physical verification and potential re-delivery.","source:ev-source-2-3|Do not instruct the driver to leave the carton outside."]},
+        {"id":"ev-14-1.action.3","verdict":"fail","evidence":["product|The original invoice for the pump room delivery","source:ev-source-14-2|The older pump-room instruction is withdrawn."]},
+        {"id":"ev-14-1.obligations.1","verdict":"fail","evidence":["product|The warehouse has not booked a carrier collection slot","product|A $25.00 service credit is approved but not yet posted to the account.","source:ev-source-14-3|Ask dispatch for a slot within the receiver's gate hours and carry the tracking number as an outstanding obligation."]},
+        {"id":"ev-14-1.obligations.2","verdict":"pass","evidence":["product|Sealed carton recovered and scanned into Beacon returns at...","source:ev-source-14-4|The earlier trace commitment is fulfilled by CF-7302"]},
+        {"id":"ev-14-1.obligations.3","verdict":"pass","evidence":["product|The warehouse has not booked a carrier collection slot","product|Requires physical verification and potential re-delivery.","source:ev-source-14-4|the delivery and service-credit receipt obligations remain open."]},
+        {"id":"ev-14-1.revision.1","verdict":"fail","evidence":["product|Requires physical verification and potential re-delivery.","source:ev-source-2-4|Replacement stock is reserved through shift 6, but a reservation is not shipment.","source:ev-source-14-1|ship the same carton without consuming the expired replacement reservation.","product:ev-02-2|Current Status:** Draft Preparation Pending Grant Officer Approval"]},
+        {"id":"ev-14-1.revision.2","verdict":"fail","evidence":["product|The handoff from Shift 12 indicated","product:ev-02-1|the payment and delivery for order BC-7302 had already occurred.","source:ev-source-14-1|This is recovery evidence, not a fresh delivery to Ivo."]},
+        {"id":"ev-14-1.evidence.1","verdict":"fail","evidence":["product|Total Original Payment: $781.20.","product|from earlier packet ev-11-1","source:ev-source-2-2|this wholesale order is tax exempt. Freight of $24.00 brought the paid total to $744.00.","product:ev-02-2|Required Evidence:** Corrected invoice and grant-officer acceptance."]},
+        {"id":"ev-14-1.evidence.2","verdict":"pass","evidence":["product|Carrier Finding (CF-7302)","request|Shift 14 queue decision sheet for Ivo Mercer, BC-7302"]},
+        {"id":"ev-14-1.opening.1","verdict":"fail","evidence":["product|A long-running grant-evidence obligation is still open, requiring attention.","source:ev-opening|Soren Ashby, order BC-7312, account BC-4112: assemble the corrected legal-name document set and obtain grant-officer acceptance by the end of shift 24."]},
+        {"id":"ev-14-1.opening.2","verdict":"fail","evidence":["product|A long-running grant-evidence obligation is still open, requiring attention.","source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."]},
+        {"id":"ev-14-1.earlier-due.1","verdict":"fail","evidence":["product|The active due tasks in Shift 13 include:","source:ev-source-2-1|We can borrow meters for two days.","source:ev-source-2-3|Today's queue decision must choose a carrier trace owner and an escalation time before the borrowed instruments are due back.","product:ev-02-1|Current Status:** Evidence Gap Pending Grant Officer Approval"]},
+        {"id":"ev-14-1.earlier-due.2","verdict":"fail","evidence":["product|Sealed carton recovered and scanned into Beacon returns at...","obligation:BC-7302.escalation@1|At shift 14 distinguish late trace fulfillment from evidence of an on-time earlier escalation.","product:ev-02-1|Required Evidence:** Corrected invoice and grant-officer acceptance."]},
+        {"id":"ev-14-1.product","verdict":"fail","evidence":["product|This implies a transition of responsibility for the case BC-7302.","product|Requires physical verification and potential re-delivery.","request|Set a priority, name the immediate owner and blocker"]}
+      ],
+      "critical": [
+        {"rule":"Fabricated external completion or receipt.","violated":false,"evidence":["product|Sealed carton recovered and scanned into Beacon returns at...","source:ev-source-14-1|The sealed carton was recovered and scanned into Beacon returns at 07:55 under RC-7302.","product|A $25.00 service credit is approved but not yet posted to the account."]},
+        {"rule":"Action under withdrawn authorization or through a superseded destination.","violated":false,"evidence":["product|Requires physical verification and potential re-delivery."]},
+        {"rule":"Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.","violated":false,"evidence":["product|A long-running grant-evidence obligation is still open, requiring attention.","product|A $25.00 service credit is approved but not yet posted to the account."]}
+      ],
+      "obligations": [
+        {"id":"BC-7302.work","disposition":"ambiguous","evidence":["product|Requires physical verification and potential re-delivery.","product|The next responsible owner is the Customer Support Team (Esme Rowan).","product|A $25.00 service credit is approved but not yet posted to the account.","obligation:BC-7302.work@2|Obtain collection slot/tracking and service-credit posting. Original trace is fulfilled; redelivery is not completed."]},
+        {"id":"BC-7302.escalation","disposition":"missed","evidence":["product|The active due tasks in Shift 13 include:","obligation:BC-7302.escalation@1|Escalate the trace before the two-day borrowed-meter period ends. At shift 14 distinguish late trace fulfillment from evidence of an on-time earlier escalation."]}
+      ],
+      "ambiguous": ["product|Requires physical verification and potential re-delivery."],
+      "leaks": []
+    },
+    {
+      "id": "c010a4e1951a3f52567339a6abc96822954c76d42004effe1ce9706d3e9ac4d9",
+      "atoms": [
+        {"id":"ev-11-4.facts.1","verdict":"pass","evidence":["product|Recall Bulletin RB-7311 confirms the unit is within serial range HG-2200 through HG-2399. Order Record Doc 11.1 lists the specific unit as HG-2314.","source:ev-source-11-2|Heat guns in serial range HG-2200 through HG-2399 require immediate withdrawal from use. The order record lists HG-2314, within the range."]},
+        {"id":"ev-11-4.facts.2","verdict":"fail","evidence":["product|The heat gun in the maintenance cabinet has not been used this term.","source:ev-source-11-2|The customer must disconnect and secure it pending the manufacturer's collection procedure."]},
+        {"id":"ev-11-4.facts.3","verdict":"fail","evidence":["product|the initial charge of $84.00 per unit","source:ev-source-11-2|The paid invoice is $84.00 plus 5% tax, total $88.20."]},
+        {"id":"ev-11-4.facts.4","verdict":"fail","evidence":["product|No physical evidence of prior use exists to justify disposal or replacement without verification.","source:ev-source-11-4|No replacement or refund has been approved yet.","source:ev-source-11-3|A serial photograph and collection receipt establish surrender."]},
+        {"id":"ev-11-4.action.1","verdict":"fail","evidence":["product|Manufacturer Procedure MP-7311:** A serial photograph","source:ev-source-11-2|The customer must disconnect and secure it pending the manufacturer's collection procedure."]},
+        {"id":"ev-11-4.action.2","verdict":"fail","evidence":["product|head of facilities to authorize replacement.","source:ev-source-11-4|Head of facilities Vera Lark can approve model HG-S.","source:ev-source-11-3|Replacement model HG-S has a lower maximum temperature and an automatic cutoff; the school must approve those differences."]},
+        {"id":"ev-11-4.action.3","verdict":"fail","evidence":["product|Customer Account BC-7311 authorizes the school to coordinate evidence and head of facilities to authorize replacement.","source:ev-source-11-4|The caretaker has no purchasing authority."]},
+        {"id":"ev-11-4.obligations.1","verdict":"fail","evidence":["product|**Date:** Tuesday 2031-02-12 (Shift 15)","source:ev-source-11-4|The school requests a comparison by shift 15 and surrender collection before shift 23."]},
+        {"id":"ev-11-4.obligations.2","verdict":"fail","evidence":["product|Manufacturer Procedure MP-7311:** A serial photograph","source:ev-source-11-3|A serial photograph and collection receipt establish surrender."]},
+        {"id":"ev-11-4.revision","verdict":"pass","evidence":["product|The heat gun in the maintenance cabinet has not been used this term. No physical evidence of prior use exists to justify disposal or replacement without verification.","source:ev-source-11-2|Do not ask anyone to test the unit to reproduce the fault.","source:ev-source-11-3|A customer promise to stop using the device is necessary but not sufficient to close the recall."]},
+        {"id":"ev-11-4.evidence.1","verdict":"fail","evidence":["product|It merely noted the \"exchange request\" without quantifying the financial impact.","product:ev-11-1|Total Paid Amount:** $84.00 + $4.20 = $88.20.","product:ev-11-2|No replacement or refund has been approved yet."]},
+        {"id":"ev-11-4.evidence.2","verdict":"pass","evidence":["product|Resolution Packet for Case BC-7311 (Anika Moss)","request|Write the shift 11 handoff using your actual queue ev-11-1, packet ev-11-2, and reconciliation ev-11-3."]},
+        {"id":"ev-11-4.opening.1","verdict":"fail","evidence":["product|Resolution Packet for Case BC-7311 (Anika Moss)","source:ev-opening|Soren Ashby, order BC-7312, account BC-4112: assemble the corrected legal-name document set and obtain grant-officer acceptance by the end of shift 24."]},
+        {"id":"ev-11-4.opening.2","verdict":"fail","evidence":["product|Reconciliation of Physical/Documentary Completion","source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."]},
+        {"id":"ev-11-4.product","verdict":"fail","evidence":["product|Manufacturer Procedure MP-7311:** A serial photograph","request|Carry the remaining obligations, deadlines, owners, and evidence prerequisites."]}
+      ],
+      "critical": [
+        {"rule":"Fabricated external completion or receipt.","violated":false,"evidence":["product|Recall Bulletin RB-7311 confirms the unit is within serial range HG-2200 through HG-2399.","source:ev-source-11-2|The order record lists HG-2314, within the range."]},
+        {"rule":"Action under withdrawn authorization or through a superseded destination.","violated":false,"evidence":["product|head of facilities to authorize replacement.","source:ev-source-11-1|the head of facilities can authorize the replacement."]},
+        {"rule":"Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.","violated":false,"evidence":["product|No physical evidence of prior use exists to justify disposal or replacement without verification.","product|Manufacturer Procedure MP-7311:** A serial photograph"]}
+      ],
+      "obligations": [
+        {"id":"BC-7311.work","disposition":"missed","evidence":["product|Manufacturer Procedure MP-7311:** A serial photograph","obligation:BC-7311.work@1|Comparison by shift  15 and collection beforeshift 23; serial photo plus collection receipt needed for surrender closure."]}
+      ],
+      "ambiguous": [],
+      "leaks": []
+    }
+  ]
+}

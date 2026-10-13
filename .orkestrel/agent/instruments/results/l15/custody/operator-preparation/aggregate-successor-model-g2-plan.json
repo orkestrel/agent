@@ -1,0 +1,203 @@
+{
+  "root": "C:/Users/mikes/WebstormProjects/scaffold",
+  "results": "C:/Users/mikes/WebstormProjects/scaffold/.orkestrel/agent/instruments/results/l15",
+  "deployment": "C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-successor-daemon-deployment.json",
+  "seed": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+  "settings": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+  "sequence": "After root accepts source/build and the dedicated service, run g2 freezes and corpus/generation. Stop after generation for independent blind labels and root adjudication. Fit only after explicit root release; never retry generation for a refused fit.",
+  "commands": [
+    {
+      "sequence": 1,
+      "id": "g2-think0-freeze",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-think0-freeze.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-think0-freeze.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "freeze",
+        "--key",
+        "g2",
+        "--think",
+        "false",
+        "--seed",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+        "--settings",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+        "--deployment",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-daemon-deployment.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think0\\freeze",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think0\\freeze\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 2,
+      "id": "g2-think1-freeze",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-think1-freeze.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-think1-freeze.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\matrix.js",
+        "freeze",
+        "--key",
+        "g2",
+        "--think",
+        "true",
+        "--seed",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache\\judge.jsonl",
+        "--settings",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\bench5\\settings.json",
+        "--deployment",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-daemon-deployment.json",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think1\\freeze",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think1\\freeze\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 3,
+      "id": "g2-calibration-corpus",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-corpus.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-corpus.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "freeze",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think0\\freeze\\manifest.json",
+        "--cache",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l5\\pilot-resumption\\cache",
+        "--model",
+        "gemma4:e2b-it-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\corpus",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\corpus\\corpus.json",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\corpus\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 4,
+      "id": "g2-calibration-generate",
+      "capSeconds": 1800,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-generate.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-generate.err",
+        "--cap",
+        "1800",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "generate",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think0\\freeze\\manifest.json",
+        "--corpus",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\corpus",
+        "--cache",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\cache",
+        "--model",
+        "gemma4:e2b-it-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation",
+        "--live",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation\\attempts.jsonl",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation\\packet.jsonl",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation\\manifest.json"
+      ]
+    },
+    {
+      "sequence": 5,
+      "id": "g2-calibration-fit",
+      "capSeconds": 240,
+      "argv": [
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.agents\\skills\\orkestrel-dispatch\\scripts\\launch.ts",
+        "--journal",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-fit.jsonl",
+        "--errors",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\logs\\g2-calibration-fit.err",
+        "--cap",
+        "240",
+        "--status",
+        "--",
+        "node",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\harness\\.build\\bench5\\refit.js",
+        "fit",
+        "--frozen",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\g2-think0\\freeze\\manifest.json",
+        "--corpus",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\corpus",
+        "--attempts",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation",
+        "--labels",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\labels.json",
+        "--model",
+        "gemma4:e2b-it-q4_K_M",
+        "--out",
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\fit",
+        "--url",
+        "http://127.0.0.1:11435"
+      ],
+      "expected": [
+        "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\fit\\fit.json"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "key": "g2",
+      "packet": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\generation\\packet.jsonl",
+      "labels": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\labels.json",
+      "fit": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\results\\l15\\calibration\\g2\\fit\\fit.json"
+    }
+  ]
+}

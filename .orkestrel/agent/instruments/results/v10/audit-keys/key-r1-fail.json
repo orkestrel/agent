@@ -1,0 +1,422 @@
+[
+ {
+  "id": "bb98e8ba",
+  "run": "f4-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "74c9b952",
+  "run": "f4-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "84b8cba1",
+  "run": "f4-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "6c5c0a0e",
+  "run": "f4-compaction-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "567c022f",
+  "run": "f4-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "547ad032",
+  "run": "f4-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "5fedb941",
+  "run": "f4-control-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "63213bcd",
+  "run": "f4-control-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "ab7327ff",
+  "run": "f4-control-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "5c73ade1",
+  "run": "f4-control-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "80e82bdc",
+  "run": "f4-control-v3",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "1303cecb",
+  "run": "f4-control-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "d9b79e16",
+  "run": "f4-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "d8b2a72c",
+  "run": "f4-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "9440a13f",
+  "run": "f4-records-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "eba92532",
+  "run": "f4-records-v2",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7c337540",
+  "run": "f4-records-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "7c46b25e",
+  "run": "f4-records-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7ecba92b",
+  "run": "f4-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "6c9d12bc",
+  "run": "t2-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "d91e33e0",
+  "run": "t2-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "f54f9560",
+  "run": "t2-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "a6fe91e5",
+  "run": "t2-compaction-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "88275cd7",
+  "run": "t2-compaction-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": false
+ },
+ {
+  "id": "fc8d9a59",
+  "run": "t2-compaction-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "947b7dc9",
+  "run": "t2-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "17ca28c9",
+  "run": "t2-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "1c059f1a",
+  "run": "t2-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "c1cf02d1",
+  "run": "t2-control-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "cb3e3d4a",
+  "run": "t2-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "219e59a2",
+  "run": "t2-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": false
+ },
+ {
+  "id": "b4f077d6",
+  "run": "t2-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "7911d06d",
+  "run": "t2-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "92d158e4",
+  "run": "t2-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "9d85f318",
+  "run": "t2a-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b6a2c05e",
+  "run": "t2a-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "7529f4fd",
+  "run": "t2a-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "816f3e5c",
+  "run": "t2a-records-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "95b280c1",
+  "run": "t2a-records-v3",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "de2a3917",
+  "run": "t2a-records-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "817106f1",
+  "run": "t2a-records-v3",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "995c7315",
+  "run": "t2a-records-v3",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "c4b60987",
+  "run": "t2a-records-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "52c40f25",
+  "run": "t2a-records-v4",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "72fb182c",
+  "run": "t2w-compaction-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "e5f48adc",
+  "run": "t2w-compaction-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "e1add8ab",
+  "run": "t2w-compaction-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "b294e377",
+  "run": "t2w-compaction-v1",
+  "goal": "g09-kenji-gift-note",
+  "passed": false
+ },
+ {
+  "id": "f15601b2",
+  "run": "t2w-control-v1",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "50f76015",
+  "run": "t2w-control-v1",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "3a943d2e",
+  "run": "t2w-control-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "e61994bc",
+  "run": "t2w-control-v1",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "5ad3b493",
+  "run": "t2w-control-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "25610cda",
+  "run": "t2w-control-v2",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "fefced3f",
+  "run": "t2w-control-v2",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "8d3b3406",
+  "run": "t2w-control-v2",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "65bfc77c",
+  "run": "t2w-control-v3",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "1abcb603",
+  "run": "t2w-control-v3",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "4c3d1f77",
+  "run": "t2w-control-v3",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "47139484",
+  "run": "t2w-control-v3",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "ac89afcb",
+  "run": "t2w-control-v3",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "0866f641",
+  "run": "t2w-control-v4",
+  "goal": "g03-grace-escalation",
+  "passed": false
+ },
+ {
+  "id": "f84af43d",
+  "run": "t2w-control-v4",
+  "goal": "g05-luis-approval-note",
+  "passed": false
+ },
+ {
+  "id": "04b2a105",
+  "run": "t2w-control-v4",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "02487f8b",
+  "run": "t2w-control-v4",
+  "goal": "g07-depot-release",
+  "passed": false
+ },
+ {
+  "id": "09ded0f8",
+  "run": "t2w-control-v4",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ },
+ {
+  "id": "88cff3a7",
+  "run": "t2w-records-v1",
+  "goal": "g01-luis-refund-amount",
+  "passed": false
+ },
+ {
+  "id": "9f604967",
+  "run": "t2w-records-v1",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "c9f40cd8",
+  "run": "t2w-records-v1",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "000e6928",
+  "run": "t2w-records-v1",
+  "goal": "g10-sigrid-callback",
+  "passed": false
+ }
+]

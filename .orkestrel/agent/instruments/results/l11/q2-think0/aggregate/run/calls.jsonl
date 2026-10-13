@@ -1,0 +1,6 @@
+{"sent":true,"sequence":1,"role":"agent","started":1791739614448,"wall":4164,"status":200}
+{"sent":true,"sequence":2,"role":"agent","started":1791739618796,"wall":3146,"status":200}
+{"sent":true,"sequence":3,"role":"summarizer","goal":"g01-luis-refund-amount","started":1791739622610,"wall":5810,"status":200}
+{"sent":true,"sequence":4,"role":"judge","goal":"g01-luis-refund-amount","started":1791739628429,"wall":8699,"status":200}
+{"sent":false,"sequence":5,"role":"judge","goal":"g01-luis-refund-amount","started":1791739637129,"wall":1,"error":"Error: development integrity failure at request 4"}
+{"sent":false,"sequence":6,"role":"judge","goal":"g01-luis-refund-amount","started":1791739637130,"wall":1,"error":"Error: development integrity failure at request 4"}

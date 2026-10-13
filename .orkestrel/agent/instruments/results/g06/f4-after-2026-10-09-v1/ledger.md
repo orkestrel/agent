@@ -1,0 +1,7 @@
+# Larkspur Home support desk: ledger
+
+mode ledger, model qwen3.5:4b-q4_K_M, think off, reply terminal, judge mica (num_ctx 4096), categories choice, budget 0.7, tail 0.35, ctx 3072, profile refined, gate admit, horizon 99, date on, tail-answers drop, tail-requests drop, rules last, handles bare, cache stable, autopin named, report full, arm-tools recall, tally off, request-questions topics, answer-cue on, recall-budget 2, repeat-stop all, answer-view collapsed, recall-split on, recall-category off, records on, scenario /home/user/agent/tmp/bench/variants/g06/after-2026-10-09/v1.json, temperature 0, seed 7, presence_penalty 1.5, top_k 20, top_p 0.95. Seed pass: 1 questions, 68.9 s. Passed 0 of 1; ok any 0 of 1. Reply via: final 1, answered 0, held 0, tool 0, reminded 0, content 0, none 0. Lookup repeats 0. Goal facts at entry: 2 of 2 slots; goal facts plus the date line: 2 of 2 slots.
+
+| goal | success | answer | reply via | ok any | turns | lookup repeats | max prompt tokens | overflow | truncated | faults | judge calls | selection/view | asked/screened | wall s | in prompt | tools ok | summaries | sections | view | briefing recall | briefing precision | stale | judge questions | pins model/loop | denials |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| g06-kenji-shipping | no | reply | final | no | 2 | 0 | 1636 | 0 | 0 | 0 | 5 | 16/49 | - | 57.7 | yes | yes | 0 | 0 | 52 | 1 | 0.125 | 0 | 5 (0 pairs) | 0/1 | 0 |

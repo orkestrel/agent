@@ -1,0 +1,202 @@
+diff --git a/tmp/units/aggregate-successor-quality-b-join.ts b/tmp/units/aggregate-successor-quality-c-join.ts
+index 1acca70a0..3dd80f15a 100644
+--- a/tmp/units/aggregate-successor-quality-b-join.ts
++++ b/tmp/units/aggregate-successor-quality-c-join.ts
+@@ -2,9 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
+ import { createHash } from 'node:crypto'
+ import { resolve } from 'node:path'
+ 
+-const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-b/packet.json'
+-const judgmentPath = 'tmp/units/aggregate-successor-quality-b-judgments.json'
+-const joinsPath = 'tmp/units/aggregate-development-blind-packet-successor-b/private/joins.json'
++const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-c/packet.json'
++const judgmentPath = 'tmp/units/aggregate-successor-quality-c-judgments.json'
++const joinsPath = 'tmp/units/aggregate-development-blind-packet-successor-c/private/joins.json'
+ const scenarioPath = '.orkestrel/agent/instruments/harness/bench/variants/long/v1.json'
+ const expected = new Map([[packetPath, 'UNRELEASED_PACKET_SHA256'], [judgmentPath, 'UNRELEASED_JUDGMENTS_SHA256']])
+ 
+@@ -132,7 +132,7 @@ const relativeScenarioReference = resolveReference(`${scenarioPath}#/ledger/syst
+ const absoluteScenarioReference = resolveReference(`${resolve(scenarioPath)}#/ledger/system`)
+ const referenceFormsAgree = relativeScenarioReference.path === absoluteScenarioReference.path && relativeScenarioReference.fragment === absoluteScenarioReference.fragment
+ if (!referenceFormsAgree) throw new Error('Relative and absolute sealed-file references differ')
+-rejectControl('wrong-file reference', () => resolveReference('tmp/units/aggregate-successor-quality-b-judgments.json#/0'))
++rejectControl('wrong-file reference', () => resolveReference('tmp/units/aggregate-successor-quality-c-judgments.json#/0'))
+ const scenarioById = uniqueMap(scenarioGoals, 'id', 'scenario goal')
+ const authoredIds = scenarioGoals.map((goal, index) => string(goal.id, `scenario goal id ${index}`))
+ const goalsByRun = new Map<string, Set<string>>()
+@@ -305,16 +305,16 @@ const controls = {
+ 	actionControls
+ }
+ const report = { validated: true, controls, hashes, population: { entries: outputRows.length, uniquePacketIds: packetById.size, uniqueJudgmentIds: judgmentsById.size, uniqueJoinIds: joinsByOpaque.size, statusCounts }, armCounts: Object.fromEntries(armCounts), adjustedArmCounts: Object.fromEntries(adjusted), rows: outputRows }
+-const joinedPath = 'tmp/units/aggregate-successor-quality-b-joined.json'
+-const joinedMarkdownPath = 'tmp/units/aggregate-successor-quality-b-joined.md'
+-const validationPath = 'tmp/units/aggregate-successor-quality-b-join-validation.md'
++const joinedPath = 'tmp/units/aggregate-successor-quality-c-joined.json'
++const joinedMarkdownPath = 'tmp/units/aggregate-successor-quality-c-joined.md'
++const validationPath = 'tmp/units/aggregate-successor-quality-c-join-validation.md'
+ await writeFile(joinedPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' })
+ const table = ['| Arm | Goal | Status | Automatic pattern match | Semantic | System-tool | Listed-tool | Complete-work | Reason |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+ for (const row of outputRows) { const verdicts = object(row.verdicts, 'joined verdicts'); table.push(`| ${row.arm} | ${row.goal} | ${row.status} | ${row.automatic ?? 'unattempted'} | ${verdicts.semantic} | ${verdicts.systemTool} | ${verdicts.listedTool} | ${verdicts.completeWork} | ${string(row.reason, 'reason').replaceAll('|', '\\|')} |`) }
+-await writeFile(joinedMarkdownPath, `# Successor alias b sealed quality join\n\nValidated ${outputRows.length} unique judgments against packet, authored scenario goals, private retained identities, and run rows. Verdicts and reasons are copied unchanged.\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts }, null, 2)}\n\`\`\`\n\n## Per-goal judgments\n\n${table.join('\n')}\n`, { flag: 'wx' })
++await writeFile(joinedMarkdownPath, `# Successor alias c sealed quality join\n\nValidated ${outputRows.length} unique judgments against packet, authored scenario goals, private retained identities, and run rows. Verdicts and reasons are copied unchanged.\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts }, null, 2)}\n\`\`\`\n\n## Per-goal judgments\n\n${table.join('\n')}\n`, { flag: 'wx' })
+ const outputHashes = {}
+ for (const path of [joinedPath, joinedMarkdownPath]) outputHashes[path] = digest(await readFile(path))
+-const validation = `# Successor alias b quality join validation\n\nThe successor-b checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, and wrong-file controls were rejected by their checking paths. Synthetic objects outside the measured population exercised absent-row status/reply/actions, completion, and served/failed action-axis rejection. The synthetic absent-row positive control retained all four verdicts. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
++const validation = `# Successor alias c quality join validation\n\nThe successor-c checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, and wrong-file controls were rejected by their checking paths. Synthetic objects outside the measured population exercised absent-row status/reply/actions, completion, and served/failed action-axis rejection. The synthetic absent-row positive control retained all four verdicts. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
+ await writeFile(validationPath, validation, { flag: 'wx' })
+ const validationHash = digest(await readFile(validationPath))
+ console.log(JSON.stringify({ output: joinedPath, joinedMarkdown: joinedMarkdownPath, validation: validationPath, hashes, outputHashes: { ...outputHashes, [validationPath]: validationHash }, counts: report.armCounts, adjusted: report.adjustedArmCounts, population: report.population, controls }, null, 2))
+diff --git a/tmp/units/aggregate-successor-quality-b-boundary.ts b/tmp/units/aggregate-successor-quality-c-boundary.ts
+index 222936139..ccc806794 100644
+--- a/tmp/units/aggregate-successor-quality-b-boundary.ts
++++ b/tmp/units/aggregate-successor-quality-c-boundary.ts
+@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
+ import { readFile, writeFile } from 'node:fs/promises'
+ import { resolve } from 'node:path'
+ 
+-const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-b/packet.json'
+-const judgmentPath = 'tmp/units/aggregate-successor-quality-b-judgments.json'
++const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-c/packet.json'
++const judgmentPath = 'tmp/units/aggregate-successor-quality-c-judgments.json'
+ const scenarioPath = '.orkestrel/agent/instruments/harness/bench/variants/long/v1.json'
+ const packetHash = 'UNRELEASED_PACKET_SHA256'
+ const judgmentHash = 'UNRELEASED_JUDGMENTS_SHA256'
+@@ -136,7 +136,7 @@ const referenceFormsAgree = relativeReference.path === absoluteReference.path &&
+ if (!referenceFormsAgree) throw new Error('Relative and absolute sealed-file references differ')
+ let wrongFileControlRejected = false
+ try {
+-	resolveReference('tmp/units/aggregate-successor-quality-b-judgments.json#/0')
++	resolveReference('tmp/units/aggregate-successor-quality-c-judgments.json#/0')
+ } catch {
+ 	wrongFileControlRejected = true
+ }
+@@ -155,7 +155,7 @@ const result = {
+ 	controls: { nestedBoundaryControlRejected, servedAnswerControlRejected, wrongFileControlRejected, referenceFormsAgree },
+ 	hashes,
+ }
+-const addendumPath = 'tmp/units/aggregate-successor-quality-b-boundary-addendum.md'
++const addendumPath = 'tmp/units/aggregate-successor-quality-c-boundary-addendum.md'
+ const addendum = `# L14 alias b quality-boundary validation addendum\n\nThe read-only boundary check resolved ${packetReferences} packet references and ${scenarioReferences} scenario references across ${judgments.length} sealed judgments, including ${nestedSeedReferences} nested seed-content pointers. It rejected the nested seed path /seed/1/content at inclusive boundary 0, a wrong-file reference, and semantic unattempted with status served and a nonempty reply. Relative and absolute references to the sealed scenario resolved to the same file and fragment.\n\n## Sealed input hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Check result\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`
+-await writeFile(addendumPath, addendum.replace('# L14 alias b quality-boundary validation addendum', '# Successor alias b quality-boundary validation addendum'), { flag: 'wx' })
++await writeFile(addendumPath, addendum.replace('# L14 alias b quality-boundary validation addendum', '# Successor alias c quality-boundary validation addendum'), { flag: 'wx' })
+ console.log(JSON.stringify({ ...result, addendum: addendumPath }, null, 2))
+diff --git a/tmp/units/aggregate-successor-quality-b-brief.md b/tmp/units/aggregate-successor-quality-c-brief.md
+index 183f28fbd..c3cd5efdc 100644
+--- a/tmp/units/aggregate-successor-quality-b-brief.md
++++ b/tmp/units/aggregate-successor-quality-c-brief.md
+@@ -1,4 +1,4 @@
+-# Unit aggregate-successor-quality-b — Grade anonymized work against the original conversation and required actions
++# Unit aggregate-successor-quality-c — Grade anonymized work against the original conversation and required actions
+ 
+ Read the governing instructions and original scenario to prepare the grading boundary, then wait for root to attach the public packet path and hash before grading. Return a readiness message after this preparation. Do not inspect any run or other campaign record while waiting.
+ 
+@@ -24,7 +24,7 @@ Arm, model, order, costs, and prior grades are deliberately hidden. Do not infer
+ 
+ ## Scope
+ 
+-- **Owned.** Only tmp/units/aggregate-successor-quality-b-judgments.json, tmp/units/aggregate-successor-quality-b-report.md, and a temporary reader under the same prefix if needed. Preserve all other files.
++- **Owned.** Only tmp/units/aggregate-successor-quality-c-judgments.json, tmp/units/aggregate-successor-quality-c-report.md, and a temporary reader under the same prefix if needed. Preserve all other files.
+ - **Shared (read-only).** Only the public packet root supplies, the original scenario named here, and the governing instruction files.
+ - **Off-limits.** Private joins, run directories, request prompts, selected summaries, automatic scores, previous reports/grades, RESULTS, progress, plan, ledger, git history, model calls, source/build edits, and other audit answers.
+ - **Made false by this change.** None; return judgments only.
+diff --git a/tmp/units/aggregate-successor-quality-b-join.ts b/tmp/units/aggregate-successor-quality-d-join.ts
+index 1acca70a0..087374545 100644
+--- a/tmp/units/aggregate-successor-quality-b-join.ts
++++ b/tmp/units/aggregate-successor-quality-d-join.ts
+@@ -2,9 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
+ import { createHash } from 'node:crypto'
+ import { resolve } from 'node:path'
+ 
+-const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-b/packet.json'
+-const judgmentPath = 'tmp/units/aggregate-successor-quality-b-judgments.json'
+-const joinsPath = 'tmp/units/aggregate-development-blind-packet-successor-b/private/joins.json'
++const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-d/packet.json'
++const judgmentPath = 'tmp/units/aggregate-successor-quality-d-judgments.json'
++const joinsPath = 'tmp/units/aggregate-development-blind-packet-successor-d/private/joins.json'
+ const scenarioPath = '.orkestrel/agent/instruments/harness/bench/variants/long/v1.json'
+ const expected = new Map([[packetPath, 'UNRELEASED_PACKET_SHA256'], [judgmentPath, 'UNRELEASED_JUDGMENTS_SHA256']])
+ 
+@@ -132,7 +132,7 @@ const relativeScenarioReference = resolveReference(`${scenarioPath}#/ledger/syst
+ const absoluteScenarioReference = resolveReference(`${resolve(scenarioPath)}#/ledger/system`)
+ const referenceFormsAgree = relativeScenarioReference.path === absoluteScenarioReference.path && relativeScenarioReference.fragment === absoluteScenarioReference.fragment
+ if (!referenceFormsAgree) throw new Error('Relative and absolute sealed-file references differ')
+-rejectControl('wrong-file reference', () => resolveReference('tmp/units/aggregate-successor-quality-b-judgments.json#/0'))
++rejectControl('wrong-file reference', () => resolveReference('tmp/units/aggregate-successor-quality-d-judgments.json#/0'))
+ const scenarioById = uniqueMap(scenarioGoals, 'id', 'scenario goal')
+ const authoredIds = scenarioGoals.map((goal, index) => string(goal.id, `scenario goal id ${index}`))
+ const goalsByRun = new Map<string, Set<string>>()
+@@ -305,16 +305,16 @@ const controls = {
+ 	actionControls
+ }
+ const report = { validated: true, controls, hashes, population: { entries: outputRows.length, uniquePacketIds: packetById.size, uniqueJudgmentIds: judgmentsById.size, uniqueJoinIds: joinsByOpaque.size, statusCounts }, armCounts: Object.fromEntries(armCounts), adjustedArmCounts: Object.fromEntries(adjusted), rows: outputRows }
+-const joinedPath = 'tmp/units/aggregate-successor-quality-b-joined.json'
+-const joinedMarkdownPath = 'tmp/units/aggregate-successor-quality-b-joined.md'
+-const validationPath = 'tmp/units/aggregate-successor-quality-b-join-validation.md'
++const joinedPath = 'tmp/units/aggregate-successor-quality-d-joined.json'
++const joinedMarkdownPath = 'tmp/units/aggregate-successor-quality-d-joined.md'
++const validationPath = 'tmp/units/aggregate-successor-quality-d-join-validation.md'
+ await writeFile(joinedPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' })
+ const table = ['| Arm | Goal | Status | Automatic pattern match | Semantic | System-tool | Listed-tool | Complete-work | Reason |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+ for (const row of outputRows) { const verdicts = object(row.verdicts, 'joined verdicts'); table.push(`| ${row.arm} | ${row.goal} | ${row.status} | ${row.automatic ?? 'unattempted'} | ${verdicts.semantic} | ${verdicts.systemTool} | ${verdicts.listedTool} | ${verdicts.completeWork} | ${string(row.reason, 'reason').replaceAll('|', '\\|')} |`) }
+-await writeFile(joinedMarkdownPath, `# Successor alias b sealed quality join\n\nValidated ${outputRows.length} unique judgments against packet, authored scenario goals, private retained identities, and run rows. Verdicts and reasons are copied unchanged.\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts }, null, 2)}\n\`\`\`\n\n## Per-goal judgments\n\n${table.join('\n')}\n`, { flag: 'wx' })
++await writeFile(joinedMarkdownPath, `# Successor alias d sealed quality join\n\nValidated ${outputRows.length} unique judgments against packet, authored scenario goals, private retained identities, and run rows. Verdicts and reasons are copied unchanged.\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts }, null, 2)}\n\`\`\`\n\n## Per-goal judgments\n\n${table.join('\n')}\n`, { flag: 'wx' })
+ const outputHashes = {}
+ for (const path of [joinedPath, joinedMarkdownPath]) outputHashes[path] = digest(await readFile(path))
+-const validation = `# Successor alias b quality join validation\n\nThe successor-b checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, and wrong-file controls were rejected by their checking paths. Synthetic objects outside the measured population exercised absent-row status/reply/actions, completion, and served/failed action-axis rejection. The synthetic absent-row positive control retained all four verdicts. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
++const validation = `# Successor alias d quality join validation\n\nThe successor-d checker accepted ${outputRows.length} unique judgments, packet IDs, private join IDs, and all planned status rows. The missing-ID, served-answer, and wrong-file controls were rejected by their checking paths. Synthetic objects outside the measured population exercised absent-row status/reply/actions, completion, and served/failed action-axis rejection. The synthetic absent-row positive control retained all four verdicts. Relative and absolute references resolved to the same sealed files; per-goal verdicts and reasons were copied unchanged.\n\n## Evidence hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Output hashes\n\n${Object.entries(outputHashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Totals\n\n\`\`\`json\n${JSON.stringify({ statusCounts: report.population.statusCounts, armCounts: report.armCounts, adjustedArmCounts: report.adjustedArmCounts, controls }, null, 2)}\n\`\`\`\n`
+ await writeFile(validationPath, validation, { flag: 'wx' })
+ const validationHash = digest(await readFile(validationPath))
+ console.log(JSON.stringify({ output: joinedPath, joinedMarkdown: joinedMarkdownPath, validation: validationPath, hashes, outputHashes: { ...outputHashes, [validationPath]: validationHash }, counts: report.armCounts, adjusted: report.adjustedArmCounts, population: report.population, controls }, null, 2))
+diff --git a/tmp/units/aggregate-successor-quality-b-boundary.ts b/tmp/units/aggregate-successor-quality-d-boundary.ts
+index 222936139..d6d4bb5b7 100644
+--- a/tmp/units/aggregate-successor-quality-b-boundary.ts
++++ b/tmp/units/aggregate-successor-quality-d-boundary.ts
+@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
+ import { readFile, writeFile } from 'node:fs/promises'
+ import { resolve } from 'node:path'
+ 
+-const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-b/packet.json'
+-const judgmentPath = 'tmp/units/aggregate-successor-quality-b-judgments.json'
++const packetPath = 'tmp/units/aggregate-development-blind-packet-successor-d/packet.json'
++const judgmentPath = 'tmp/units/aggregate-successor-quality-d-judgments.json'
+ const scenarioPath = '.orkestrel/agent/instruments/harness/bench/variants/long/v1.json'
+ const packetHash = 'UNRELEASED_PACKET_SHA256'
+ const judgmentHash = 'UNRELEASED_JUDGMENTS_SHA256'
+@@ -136,7 +136,7 @@ const referenceFormsAgree = relativeReference.path === absoluteReference.path &&
+ if (!referenceFormsAgree) throw new Error('Relative and absolute sealed-file references differ')
+ let wrongFileControlRejected = false
+ try {
+-	resolveReference('tmp/units/aggregate-successor-quality-b-judgments.json#/0')
++	resolveReference('tmp/units/aggregate-successor-quality-d-judgments.json#/0')
+ } catch {
+ 	wrongFileControlRejected = true
+ }
+@@ -155,7 +155,7 @@ const result = {
+ 	controls: { nestedBoundaryControlRejected, servedAnswerControlRejected, wrongFileControlRejected, referenceFormsAgree },
+ 	hashes,
+ }
+-const addendumPath = 'tmp/units/aggregate-successor-quality-b-boundary-addendum.md'
++const addendumPath = 'tmp/units/aggregate-successor-quality-d-boundary-addendum.md'
+ const addendum = `# L14 alias b quality-boundary validation addendum\n\nThe read-only boundary check resolved ${packetReferences} packet references and ${scenarioReferences} scenario references across ${judgments.length} sealed judgments, including ${nestedSeedReferences} nested seed-content pointers. It rejected the nested seed path /seed/1/content at inclusive boundary 0, a wrong-file reference, and semantic unattempted with status served and a nonempty reply. Relative and absolute references to the sealed scenario resolved to the same file and fragment.\n\n## Sealed input hashes\n\n${Object.entries(hashes).map(([path, hash]) => `- \`${path}\`: ${hash}`).join('\n')}\n\n## Check result\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`
+-await writeFile(addendumPath, addendum.replace('# L14 alias b quality-boundary validation addendum', '# Successor alias b quality-boundary validation addendum'), { flag: 'wx' })
++await writeFile(addendumPath, addendum.replace('# L14 alias b quality-boundary validation addendum', '# Successor alias d quality-boundary validation addendum'), { flag: 'wx' })
+ console.log(JSON.stringify({ ...result, addendum: addendumPath }, null, 2))
+diff --git a/tmp/units/aggregate-successor-quality-b-brief.md b/tmp/units/aggregate-successor-quality-d-brief.md
+index 183f28fbd..83a9122c2 100644
+--- a/tmp/units/aggregate-successor-quality-b-brief.md
++++ b/tmp/units/aggregate-successor-quality-d-brief.md
+@@ -1,4 +1,4 @@
+-# Unit aggregate-successor-quality-b — Grade anonymized work against the original conversation and required actions
++# Unit aggregate-successor-quality-d — Grade anonymized work against the original conversation and required actions
+ 
+ Read the governing instructions and original scenario to prepare the grading boundary, then wait for root to attach the public packet path and hash before grading. Return a readiness message after this preparation. Do not inspect any run or other campaign record while waiting.
+ 
+@@ -24,7 +24,7 @@ Arm, model, order, costs, and prior grades are deliberately hidden. Do not infer
+ 
+ ## Scope
+ 
+-- **Owned.** Only tmp/units/aggregate-successor-quality-b-judgments.json, tmp/units/aggregate-successor-quality-b-report.md, and a temporary reader under the same prefix if needed. Preserve all other files.
++- **Owned.** Only tmp/units/aggregate-successor-quality-d-judgments.json, tmp/units/aggregate-successor-quality-d-report.md, and a temporary reader under the same prefix if needed. Preserve all other files.
+ - **Shared (read-only).** Only the public packet root supplies, the original scenario named here, and the governing instruction files.
+ - **Off-limits.** Private joins, run directories, request prompts, selected summaries, automatic scores, previous reports/grades, RESULTS, progress, plan, ledger, git history, model calls, source/build edits, and other audit answers.
+ - **Made false by this change.** None; return judgments only.

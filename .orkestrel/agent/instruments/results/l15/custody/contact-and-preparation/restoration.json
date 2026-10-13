@@ -1,0 +1,390 @@
+{
+  "head": "bd31e6573562045fc5ea190edc839960fe4fac92",
+  "archive": ".orkestrel/agent/instruments/results/l15/custody/contact-and-preparation",
+  "files": [
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-aggregates.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-aggregates.json",
+      "bytes": 89461,
+      "sha256": "c16bc1db60563ac8b2f5490e175f5f743b5b3985295218f6559790f1b26516cc"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-body-263.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-body-263.txt",
+      "bytes": 2490,
+      "sha256": "3298ca264c83f0c99a977b284b1b506aa9cd6cab9217eb8fcd46848e70a9a3a3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-body-264.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-body-264.txt",
+      "bytes": 2937,
+      "sha256": "06dbc13923e6337c5e3639c649e31a87b2f64b01ba75c65a814f62b4750c9f83"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-body-265.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-body-265.txt",
+      "bytes": 127,
+      "sha256": "65cb4b693f95bb28e3a1177b4861f1cce8badc98cd82533fbd6759e6b208bb04"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-body-266.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-body-266.txt",
+      "bytes": 5478,
+      "sha256": "5939a1c43ecc2babd3fa226697d7ba1020fb290eb0da25908c9de06a76018804"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-calls.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-calls.json",
+      "bytes": 1627,
+      "sha256": "13236057e60498e95037997ad31d849e65f2d01da913121a16e7a52600abaa85"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-messages.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-messages.json",
+      "bytes": 1411,
+      "sha256": "881f2dbd96d8fe6aef3b6bfcd36b155f73f28a09ad296295e43f64cd9c145508"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-readable-263.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-readable-263.txt",
+      "bytes": 2405,
+      "sha256": "085dbfac34526333c37a835bb1941a2fbff99730a1d9c83bc3d69eafcabb6e42"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-readable-264.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-readable-264.txt",
+      "bytes": 2842,
+      "sha256": "5973e9d39f3baac9ee6c260e71bc8d31efe4a7b011ca0586a19950f926eb028e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-readable-265.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-readable-265.txt",
+      "bytes": 68,
+      "sha256": "dcd1f95824598311a569bcd1889e84f2e5c11f6633681ef65798cda98a1769aa"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-readable-266.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-readable-266.txt",
+      "bytes": 4770,
+      "sha256": "e43f3335bbca26210bd7e2fd0f8d29e248093f988bf7723f07511de230d7c995"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-request-263.jsonl",
+      "archive": "aggregate-successor-contact-trace-aggregate-request-263.jsonl",
+      "bytes": 27414,
+      "sha256": "8245253936a522b08aa16441ad6babd2001d824bd6762c5311d74c5511eec33f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-request-264.jsonl",
+      "archive": "aggregate-successor-contact-trace-aggregate-request-264.jsonl",
+      "bytes": 27877,
+      "sha256": "09ad63a362b21d2332990ba97ea52b3c068b16a49c7c0291424c1a3586649b60"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-request-265.jsonl",
+      "archive": "aggregate-successor-contact-trace-aggregate-request-265.jsonl",
+      "bytes": 1078,
+      "sha256": "447ef0f9c85058c7432d16d009bcbea2884700cf70e0479319c274d0be9c6960"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-request-266.jsonl",
+      "archive": "aggregate-successor-contact-trace-aggregate-request-266.jsonl",
+      "bytes": 17369,
+      "sha256": "df0682e094ceb5fbd4a011a5c0120db78b45c07bbd6cba47006673d3939776cf"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-requests.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-requests.json",
+      "bytes": 168199,
+      "sha256": "28f6c5b9c8a1f7209b3ca5b209fad88fc8975f476de1e93899e60a752a6329a9"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-response-263.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-response-263.txt",
+      "bytes": 384,
+      "sha256": "b92d6bd69274fc9bef521a8dbf84a0d708eb4889965a4c33b4bf6238bb2ad2e3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-response-264.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-response-264.txt",
+      "bytes": 384,
+      "sha256": "b92d6bd69274fc9bef521a8dbf84a0d708eb4889965a4c33b4bf6238bb2ad2e3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-response-265.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-response-265.txt",
+      "bytes": 1,
+      "sha256": "a83dd0ccbffe39d071cc317ddf6e97f5c6b1c87af91919271f9fa140b0508c6c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-response-266.txt",
+      "archive": "aggregate-successor-contact-trace-aggregate-response-266.txt",
+      "bytes": 241,
+      "sha256": "b368eba0bcbde025214478756aad15633df9a15fd6cfd4c1677cd331325677f4"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-rows.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-rows.json",
+      "bytes": 3049,
+      "sha256": "19ae482be72209d4550850372d3b3014594994965a778ca6cc2459f0a916bf6d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-selections.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-selections.json",
+      "bytes": 9812,
+      "sha256": "a24ffb4b2e365c876c13014a041c235392d24031bc51c2c21db2622ada5f82ef"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-aggregate-turns.json",
+      "archive": "aggregate-successor-contact-trace-aggregate-turns.json",
+      "bytes": 264,
+      "sha256": "7d0c9f073640a745bf9ff1bf7c76681de84c598814e416a6fcc962a3d2fbb3d2"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-brief.md",
+      "archive": "aggregate-successor-contact-trace-brief.md",
+      "bytes": 5830,
+      "sha256": "c02b61386e2545ce7f9034e4e0821f85fb68aa6343d3d8ad93739b11ca4e4967"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-comparison.json",
+      "archive": "aggregate-successor-contact-trace-comparison.json",
+      "bytes": 84,
+      "sha256": "56475becb081c1186de834f7effe0f6675e1f6d01c2d586409f9acc6deb143fe"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-hashes.json",
+      "archive": "aggregate-successor-contact-trace-hashes.json",
+      "bytes": 2732,
+      "sha256": "b70bde004a0ccbe1a802738ec4a8efd9d317de88123ce7172949359026450dbd"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-judgments.json",
+      "archive": "aggregate-successor-contact-trace-judgments.json",
+      "bytes": 1459,
+      "sha256": "56aa6e51c8e9c6e3e7df52963e9da3ac9736a86e733b978a87979f854e39b46c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-maintained.json",
+      "archive": "aggregate-successor-contact-trace-maintained.json",
+      "bytes": 2827,
+      "sha256": "51294ef0b47cdd68d9e8b00cb17f85f4cffa998015479e0ca8cde030605d277d"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-reader.ts",
+      "archive": "aggregate-successor-contact-trace-reader.ts",
+      "bytes": 5398,
+      "sha256": "7a63864d5fe062b42a32c432acca3ede98f4c880ad7f0d18f4199b6a758713d3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-body-53.txt",
+      "archive": "aggregate-successor-contact-trace-records-body-53.txt",
+      "bytes": 127,
+      "sha256": "65cb4b693f95bb28e3a1177b4861f1cce8badc98cd82533fbd6759e6b208bb04"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-body-54.txt",
+      "archive": "aggregate-successor-contact-trace-records-body-54.txt",
+      "bytes": 5751,
+      "sha256": "28b504844b5dc72ffadedd777b93139d2b0b70869f10ae938113c802d33b0f54"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-body-55.txt",
+      "archive": "aggregate-successor-contact-trace-records-body-55.txt",
+      "bytes": 7151,
+      "sha256": "aa0f836db46f57c03430812f0b38b540231bf2c011ea4882c2af1768faf6211a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-calls.json",
+      "archive": "aggregate-successor-contact-trace-records-calls.json",
+      "bytes": 1286,
+      "sha256": "f3f8c5984b63098804398718e4725f26c65c652bb86a72b9c4fe78e99d6225e3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-messages.json",
+      "archive": "aggregate-successor-contact-trace-records-messages.json",
+      "bytes": 5064,
+      "sha256": "683b45c5e6b1045af167d18ad90ee0e1291e34d62c6fdb9b1f179f24feebef49"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-readable-53.txt",
+      "archive": "aggregate-successor-contact-trace-records-readable-53.txt",
+      "bytes": 68,
+      "sha256": "dcd1f95824598311a569bcd1889e84f2e5c11f6633681ef65798cda98a1769aa"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-readable-54.txt",
+      "archive": "aggregate-successor-contact-trace-records-readable-54.txt",
+      "bytes": 4985,
+      "sha256": "ed2231630c808998b7c8f80f8e5fa3839feedeb784ed88427a32426850904a7e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-readable-55.txt",
+      "archive": "aggregate-successor-contact-trace-records-readable-55.txt",
+      "bytes": 6221,
+      "sha256": "e1c411a31513c0f2a7967192e47048741f9b5a62dbec2348440419e9ef6010dd"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-request-53.jsonl",
+      "archive": "aggregate-successor-contact-trace-records-request-53.jsonl",
+      "bytes": 1081,
+      "sha256": "9d2bf5d8da9211b2425a0cbec999d018acda4e82345286636266a5f2931f31dc"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-request-54.jsonl",
+      "archive": "aggregate-successor-contact-trace-records-request-54.jsonl",
+      "bytes": 7615,
+      "sha256": "822662a1bc92b87de73b86ba6c41931c0b1aeea7d6a7b77d0290234a9f090333"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-request-55.jsonl",
+      "archive": "aggregate-successor-contact-trace-records-request-55.jsonl",
+      "bytes": 23422,
+      "sha256": "8d3a68fff6ba7ec748364cc0781b69eab4af0e813a58cbc14df51b5c3686db88"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-requests.json",
+      "archive": "aggregate-successor-contact-trace-records-requests.json",
+      "bytes": 75729,
+      "sha256": "7a29b4bb8a71bd998a1a5a704b720aa8f9a150b73934d9e53213b4b5bab9b69c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-response-53.txt",
+      "archive": "aggregate-successor-contact-trace-records-response-53.txt",
+      "bytes": 1,
+      "sha256": "a83dd0ccbffe39d071cc317ddf6e97f5c6b1c87af91919271f9fa140b0508c6c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-response-54.txt",
+      "archive": "aggregate-successor-contact-trace-records-response-54.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-response-55.txt",
+      "archive": "aggregate-successor-contact-trace-records-response-55.txt",
+      "bytes": 386,
+      "sha256": "8b2eb019040dd5eb9c2c923cff213816fdcb3835cf7aa4cb283eaa467c66b9e1"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-rows.json",
+      "archive": "aggregate-successor-contact-trace-records-rows.json",
+      "bytes": 4309,
+      "sha256": "feba64d575917c277a316516324f0e036431e84d50c83c4a60037084d04e9805"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-selections.json",
+      "archive": "aggregate-successor-contact-trace-records-selections.json",
+      "bytes": 10432,
+      "sha256": "3811665ba8fda59f0bbcff7e6e1ecfc79b2bc9c803816e4ea1766a3e6d9cbb7c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-records-turns.json",
+      "archive": "aggregate-successor-contact-trace-records-turns.json",
+      "bytes": 525,
+      "sha256": "657eab58da2ed49e769c2e92a0324cd5a45131f507c76a8a304bbba4ded6a241"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-report.md",
+      "archive": "aggregate-successor-contact-trace-report.md",
+      "bytes": 10009,
+      "sha256": "8a3f99ee1a6ff124971fcf36c9d88f4e7539e4c12dc663426a6e64c318569f6b"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-trace-source.json",
+      "archive": "aggregate-successor-contact-trace-source.json",
+      "bytes": 4976,
+      "sha256": "13625e1866d50355916ad72ec7bd88ae49280943a7f3666b0b4edc30c35818a6"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-model-g2-generation-brief.md",
+      "archive": "aggregate-successor-model-g2-generation-brief.md",
+      "bytes": 4614,
+      "sha256": "a8905db71c40671c4e222eeb69c59a4952d2279b1cfb76a512e9f11990363b09"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-model-q2-generation-brief.md",
+      "archive": "aggregate-successor-model-q2-generation-brief.md",
+      "bytes": 4609,
+      "sha256": "661bfa4ca26b05baeb83dd1617f92d6f0bc9f56f5561ae5c9cae6bdaf229d67c"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-boundary.ts",
+      "archive": "aggregate-successor-quality-b-boundary.ts",
+      "bytes": 8408,
+      "sha256": "98ef967bada3beab4c2376cd32fb2ef31818750df4317160cc140cea613b4c54"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-brief.md",
+      "archive": "aggregate-successor-quality-b-brief.md",
+      "bytes": 7248,
+      "sha256": "1ffe42923b9357c3686f227fba96a3dcd75663e06828249abce46e451f01a13a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-join.ts",
+      "archive": "aggregate-successor-quality-b-join.ts",
+      "bytes": 23820,
+      "sha256": "bd5b8103c7af57475e4dfbe8531bc99e9edfbb3edfa3fbb9a89e0c8faebca19f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-preparation-brief.md",
+      "archive": "aggregate-successor-quality-b-preparation-brief.md",
+      "bytes": 4565,
+      "sha256": "b0195bc3b4ca9ae1afd7d2f5de1a5e52fff30b45808a9e2ba36909fc5f1b612f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-preparation-report.md",
+      "archive": "aggregate-successor-quality-b-preparation-report.md",
+      "bytes": 5152,
+      "sha256": "51966425813cc8e2cea392d59c1e9ac6a26f82bc3231704865cc658910eed6c7"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-quality-b-preparation.diff",
+      "archive": "aggregate-successor-quality-b-preparation.diff",
+      "bytes": 11865,
+      "sha256": "2981ad9a07cca4bca7859c35988c66082341999ac7c8b8eef06f9a0b93413a33"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-remaining-generation-briefs-brief.md",
+      "archive": "aggregate-successor-remaining-generation-briefs-brief.md",
+      "bytes": 4119,
+      "sha256": "1824b968355b7afffa5ceb6d2b1b31b5b4294e1eddcd83a949ad9322138dad12"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-remaining-generation-briefs-report.md",
+      "archive": "aggregate-successor-remaining-generation-briefs-report.md",
+      "bytes": 4390,
+      "sha256": "670ee015788f22c237fb463d793cd666e018e05414d09cca6ff5a9e0a7ba8b6f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-remaining-generation-briefs.diff",
+      "archive": "aggregate-successor-remaining-generation-briefs.diff",
+      "bytes": 12845,
+      "sha256": "5d6bc9b0e8c82d239f406a9162c7fa12ed1390fe715f679689c37f0730c9d08a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-retention-brief.md",
+      "archive": "aggregate-successor-contact-retention-brief.md",
+      "bytes": 5033,
+      "sha256": "cb6901bcd1a5d5bef922c69da238817726e676bbac6303698088102a8f64a643"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-retention-preparation.md",
+      "archive": "aggregate-successor-contact-retention-preparation.md",
+      "bytes": 17421,
+      "sha256": "006be983a834179da242d36f419b6e9b4c53fba7f0cf75fad813d937953486e8"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-retain.diff",
+      "archive": "aggregate-successor-contact-retain.diff",
+      "bytes": 21329,
+      "sha256": "62f4fa3e14519dc90250d52532b23ab6cbb27e7481ac5306421a4bc7bc938eb4"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-contact-retain.ts",
+      "archive": "aggregate-successor-contact-retain.ts",
+      "bytes": 23601,
+      "sha256": "6c357f6709a1cc61d9dcafd62be6948a8af9868a03c8937f248cd8411bcb2c19"
+    }
+  ]
+}

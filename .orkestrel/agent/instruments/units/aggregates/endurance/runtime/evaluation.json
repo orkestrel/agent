@@ -1,0 +1,1753 @@
+{
+	"id": "endurance-evaluation-v 1",
+	"system": "You are the support operator for Beacon Cooperative. Maintain one continuous work history and answer the current desk request. Treat external source messages and actual lookup receipts as evidence. Distinguish approval, draft preparation, initiation, and completion. Preserve unfinished obligations and revise your earlier work when facts change. Do not invent tool receipts, sent messages, completed refunds, shipments, deliveries, or closed cases. Available read-only lookup tools are lookup_order with an id and lookup_customer with an account. They reveal the version released by the current source boundary. Your written packet is a draft unless an external source confirms the action.",
+	"topics": [
+		{
+			"name": "Mara Ellison",
+			"criterion": "Facts and obligations for Mara Ellison, BC-4101, and BC-7301."
+		},
+		{
+			"name": "Ivo Mercer",
+			"criterion": "Facts and obligations for Ivo Mercer, BC-4102, and BC-7302."
+		},
+		{
+			"name": "Nadia Solano",
+			"criterion": "Facts and obligations for Nadia Solano, BC-4103, and BC-7303."
+		},
+		{
+			"name": "Tomas Wren",
+			"criterion": "Facts and obligations for Tomas Wren, BC-4104, and BC-7304."
+		},
+		{
+			"name": "Leonie Hart",
+			"criterion": "Facts and obligations for Leonie Hart, BC-4105, and BC-7305."
+		},
+		{
+			"name": "Oren Vale",
+			"criterion": "Facts and obligations for Oren Vale, BC-4106, and BC-7306."
+		},
+		{
+			"name": "Celia Quill",
+			"criterion": "Facts and obligations for Celia Quill, BC-4107, and BC-7307."
+		},
+		{
+			"name": "Bram Fenwick",
+			"criterion": "Facts and obligations for Bram Fenwick, BC-4108, and BC-7308."
+		},
+		{
+			"name": "Esme Rowan",
+			"criterion": "Facts and obligations for Esme Rowan, BC-4109, and BC-7309."
+		},
+		{
+			"name": "Dario Finch",
+			"criterion": "Facts and obligations for Dario Finch, BC-4110, and BC-7310."
+		},
+		{
+			"name": "Anika Moss",
+			"criterion": "Facts and obligations for Anika Moss, BC-4111, and BC-7311."
+		},
+		{
+			"name": "Soren Ashby",
+			"criterion": "Facts and obligations for Soren Ashby, BC-4112, and BC-7312."
+		}
+	],
+	"days": [
+		{
+			"date": "2031-02-02",
+			"from": 2
+		},
+		{
+			"date": "2031-02-03",
+			"from": 6
+		},
+		{
+			"date": "2031-02-04",
+			"from": 10
+		},
+		{
+			"date": "2031-02-05",
+			"from": 14
+		},
+		{
+			"date": "2031-02-06",
+			"from": 18
+		},
+		{
+			"date": "2031-02-07",
+			"from": 23
+		},
+		{
+			"date": "2031-02-08",
+			"from": 27
+		},
+		{
+			"date": "2031-02-09",
+			"from": 32
+		},
+		{
+			"date": "2031-02-10",
+			"from": 37
+		},
+		{
+			"date": "2031-02-11",
+			"from": 42
+		},
+		{
+			"date": "2031-02-12",
+			"from": 47
+		},
+		{
+			"date": "2031-02-13",
+			"from": 51
+		},
+		{
+			"date": "2031-02-14",
+			"from": 55
+		},
+		{
+			"date": "2031-02-15",
+			"from": 59
+		},
+		{
+			"date": "2031-02-16",
+			"from": 63
+		},
+		{
+			"date": "2031-02-17",
+			"from": 67
+		},
+		{
+			"date": "2031-02-18",
+			"from": 71
+		},
+		{
+			"date": "2031-02-19",
+			"from": 75
+		},
+		{
+			"date": "2031-02-20",
+			"from": 79
+		},
+		{
+			"date": "2031-02-21",
+			"from": 83
+		},
+		{
+			"date": "2031-02-22",
+			"from": 87
+		},
+		{
+			"date": "2031-02-23",
+			"from": 91
+		},
+		{
+			"date": "2031-02-24",
+			"from": 95
+		},
+		{
+			"date": "2031-02-25",
+			"from": 99
+		}
+	],
+	"seed": [
+		{
+			"id": "ev-opening",
+			"shift": 0,
+			"date": "2031-02-01",
+			"role": "user",
+			"content": "Beacon Cooperative support desk opening note. Each numbered shift is one workday. Preserve unresolved commitments across shifts and distinguish a prepared draft from an externally completed action. Customer remedies require the case-specific approval and evidence. Money is in USD; round monetary results to cents. A confirmed posting, collection, delivery, or acceptance needs its own receipt. The desk holds an early grant-evidence obligation for Soren Ashby, order BC-7312, account BC-4112: assemble the corrected legal-name document set and obtain grant-officer acceptance by the end of shift 24. The payment and delivery already occurred, but the corrected invoice and grant acceptance have not. Keep this obligation open until its actual final evidence arrives. Mara Ellison's BC-7301 case will have no updates during shifts 2 through 12; do not invent progress while it is dormant."
+		},
+		{
+			"id": "ev-register",
+			"shift": 0,
+			"date": "2031-02-01",
+			"role": "user",
+			"content": "Customer/order register. Each entry is one continuing thread; a shared surname is not proof of identity.\nMara Ellison; account BC-4101; order BC-7301; subject ceramic filter breakage.\nIvo Mercer; account BC-4102; order BC-7302; subject meter delivery to a locked site.\nNadia Solano; account BC-4103; order BC-7303; subject duplicate bench-vise charge.\nTomas Wren; account BC-4104; order BC-7304; subject pump warranty diagnosis.\nLeonie Hart; account BC-4105; order BC-7305; subject cut cable quantity correction.\nOren Vale; account BC-4106; order BC-7306; subject credit-account release hold.\nCelia Quill; account BC-4107; order BC-7307; subject rental return and deposit.\nBram Fenwick; account BC-4108; order BC-7308; subject partial tool-kit cancellation.\nEsme Rowan; account BC-4109; order BC-7309; subject sensor compatibility exchange.\nDario Finch; account BC-4110; order BC-7310; subject backordered lamp allocation.\nAnika Moss; account BC-4111; order BC-7311; subject safety recall and replacement consent.\nSoren Ashby; account BC-4112; order BC-7312; subject year-end grant reimbursement evidence.\nThe register identifies the queued cases but does not supply approval, payment, or receipt evidence. Use the scheduled source messages and the lookup versions available at the time of the request."
+		},
+		{
+			"id": "ev-source-1-1",
+			"shift": 1,
+			"date": "2031-02-02",
+			"role": "user",
+			"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.1] Customer message, Mara Ellison: I ordered six ceramic filters for the Alderbrook repair workshop. Two arrived with cracks across the threaded neck; the other four passed our water test and are installed. The workshop has no need for replacement filters after the winter session. Please price a refund for the damaged pair only. The cardholder name matches my account, but the workshop treasurer controls the card. I can send photographs today; do not mistake my willingness to send them for receipt by your warehouse. The damaged pieces remain packed in the original cartons because our caretaker cannot dispose of them without written clearance."
+		},
+		{
+			"id": "ev-source-1-2",
+			"shift": 1,
+			"date": "2031-02-02",
+			"role": "user",
+			"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.2] Invoice BC-7301, accounts clerk: Six filters at $42.50 each produce a merchandise subtotal of $255.00. The invoice applies a 10% merchandise discount before 8% tax. Freight is $18.00 and is not taxable. The customer paid $265.86. A refund for a damaged unit returns its discounted price and the associated tax. Freight is refundable only if every unit is unusable. No restocking deduction applies to damage confirmed by intake. The invoice has no credit already applied. Do not convert the remaining four installed units into a return claim merely to recover freight."
+		},
+		{
+			"id": "ev-source-1-3",
+			"shift": 1,
+			"date": "2031-02-02",
+			"role": "user",
+			"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.3] Intake coordinator, document IN-7301: The reported cracks could have been caused in transit, but the photographs are not in the intake folder. The evidence required is a photograph showing both serial stickers and both cracked necks, plus a written count from the customer. A draft request can be sent to the account contact in the lookup. An approved refund requires the intake finding, not a carrier claim number. Keep the cartons until intake records whether a pickup is necessary. The carrier deadline expires after shift 14, and the support desk owns the reminder."
+		},
+		{
+			"id": "ev-source-1-4",
+			"shift": 1,
+			"date": "2031-02-02",
+			"role": "user",
+			"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.4] Authorization desk, memo AU-7301: Mara may receive a damage-remedy draft while intake is pending. No one has authorized a refund posting. Team lead Dana Voss can approve up to $100.00 after the evidence arrives; larger amounts go to finance. The customer asked for email, not a telephone callback. Place the tentative amount, evidence gap, and approver in the work packet. This case will receive no external update until shift 13; absence of a message is not a denial, and another case's warehouse receipt cannot satisfy this one."
+		},
+		{
+			"id": "ev-source-2-1",
+			"shift": 2,
+			"date": "2031-02-03",
+			"role": "user",
+			"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.1] Ivo Mercer, site supervisor: Four moisture meters for the Linden pump room show delivered in tracking, but none is in our stores. The carrier photograph shows a blue door; our stores entrance is green. A contract electrician was on site and could have signed, but they are not authorized to accept equipment for us. Please find where the parcel went before promising another set. We can borrow meters for two days. After that we must delay a scheduled inspection. Our purchase order names the pump room, while the invoice uses our central office billing address."
+		},
+		{
+			"id": "ev-source-2-2",
+			"shift": 2,
+			"date": "2031-02-03",
+			"role": "user",
+			"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.2] Dispatch docket DP-7302: Four meters cost $180.00 each. There was no discount, and this wholesale order is tax exempt. Freight of $24.00 brought the paid total to $744.00. The carrier marks delivered at 14:08 yesterday under signature IM. The driver has not identified the signer. A no-charge reshipment requires either a written carrier loss finding or recovery of the misdelivered carton into Beacon custody. A tracking status alone proves neither loss nor correct delivery. Freight is included in a full non-delivery refund if finance later authorizes that option."
+		},
+		{
+			"id": "ev-source-2-3",
+			"shift": 2,
+			"date": "2031-02-03",
+			"role": "user",
+			"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.3] Operations note OP-7302: The central office address cannot accept meters because its mail room closes before the carrier route arrives. The usable delivery point is the pump room stores gate. The gate opens 07:30 to 11:00 on workdays and requires the purchase-order number on the label. The customer contact can nominate an authorized signer through the account record. Do not instruct the driver to leave the carton outside. Today's queue decision must choose a carrier trace owner and an escalation time before the borrowed instruments are due back."
+		},
+		{
+			"id": "ev-source-2-4",
+			"shift": 2,
+			"date": "2031-02-03",
+			"role": "user",
+			"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.4] Authority AU-7302: Dana Voss has authorized a carrier trace and a draft explaining the evidence gap. Replacement stock is reserved through shift 6, but a reservation is not shipment. Warehouse will release it only after the required carrier evidence and a verified destination. Finance has not approved a refund. Keep the original charge outstanding in reconciliation and track the stock reservation separately from the customer's money. If a trace fails, seek a loss finding; do not turn silence from the carrier into a loss confirmation."
+		},
+		{
+			"id": "ev-source-3-1",
+			"shift": 3,
+			"date": "2031-02-04",
+			"role": "user",
+			"content": "[2031-02-04; Nadia Solano; BC-7303; document 3.1] Nadia Solano, Fernridge studio: Our bank feed appears to show two charges for the bench vise, both for $318.00. We placed one order and received one vise. The checkout page timed out before showing a confirmation, so I pressed the button again. I want the extra charge reversed, but please leave the delivered order in place. The studio manager can provide a statement with unrelated transactions redacted. Do not ask us to return a working vise to resolve a payment duplication."
+		},
+		{
+			"id": "ev-source-3-2",
+			"shift": 3,
+			"date": "2031-02-04",
+			"role": "user",
+			"content": "[2031-02-04; Nadia Solano; BC-7303; document 3.2] Payments review PY-7303: The gateway shows a settled $318.00 capture CAP-7303 and a separate $318.00 authorization AUTH-7303. The authorization is pending, not captured. The bank feed labels both as card activity. The invoice is $300.00 merchandise plus 6% tax and no freight. A capture refund would reduce the legitimate paid order; an authorization release is the correct request if the second entry is still pending. Obtain the status from lookup_order before drafting a remedy, because settlement can change after a screenshot is taken."
+		},
+		{
+			"id": "ev-source-3-3",
+			"shift": 3,
+			"date": "2031-02-04",
+			"role": "user",
+			"content": "[2031-02-04; Nadia Solano; BC-7303; document 3.3] Customer service policy memo CS-7303: State the distinction between a pending hold and money collected. A release request can be raised by payments without finance refund approval, but only payments can confirm that it was submitted. The issuer controls when a released hold disappears from the customer's display. Do not promise a date that Beacon cannot enforce. Give Nadia the reference and a concrete follow-up point after payments responds. A screenshot showing the pending entry does not establish a duplicate settled charge."
+		},
+		{
+			"id": "ev-source-3-4",
+			"shift": 3,
+			"date": "2031-02-04",
+			"role": "user",
+			"content": "[2031-02-04; Nadia Solano; BC-7303; document 3.4] Payments queue note PQ-7303: Analyst Sora Kemp will inspect AUTH-7303 after this shift's packet. Until then the second entry remains unresolved. Keep the amount $318.00 visible as a disputed hold, without subtracting it from the settled invoice balance. The studio has a bookkeeping cutoff at shift 7. Supply an explanation they can use at that cutoff if the issuer still displays the hold. Your reconciliation must distinguish bank-display exposure from Beacon's recognized sales receipts."
+		},
+		{
+			"id": "ev-source-4-1",
+			"shift": 4,
+			"date": "2031-02-05",
+			"role": "user",
+			"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.1] Tomas Wren, Eastmere greenhouse: The circulation pump stops after about twenty minutes. It restarts after cooling. We bought it five months ago and need a dependable repair before planting resumes. I have not opened the housing because the warranty sticker says doing so can affect coverage. The controller displays code T4. Please tell me what evidence your service team needs before I ship a wet pump. A quick replacement would help, but I am not asking you to assume that a symptom proves a manufacturing defect."
+		},
+		{
+			"id": "ev-source-4-2",
+			"shift": 4,
+			"date": "2031-02-05",
+			"role": "user",
+			"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.2] Warranty desk WD-7304: This pump has a twelve-month parts warranty. Coverage requires a serial photograph and a technician's fault classification. The customer's code report is useful diagnostic evidence but not the classification. A blocked inlet is maintained at the customer's expense; an internal thermal-switch defect is covered. The paid invoice is $460.00 plus 5% tax, total $483.00. A warranty replacement is no charge and does not refund the paid invoice. Shipping instructions require a drain-and-pack declaration before a collection can be booked."
+		},
+		{
+			"id": "ev-source-4-3",
+			"shift": 4,
+			"date": "2031-02-05",
+			"role": "user",
+			"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.3] Technical service TS-7304: Ask for the inlet-screen photograph and the serial sticker, and ask whether the pump sits on the supplied mounting feet. Do not direct Tomas to defeat the thermal cutoff. Technician Elin Park will review the images. Until their classification arrives, quote no diagnosis as confirmed. The customer can suspend use and isolate power. If the packet proposes collection, describe it as conditional on the drain-and-pack declaration, and name the missing declaration as the next action."
+		},
+		{
+			"id": "ev-source-4-4",
+			"shift": 4,
+			"date": "2031-02-05",
+			"role": "user",
+			"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.4] Operations authorization OA-7304: A loan pump may be reserved for Eastmere through shift 9. The reservation costs Beacon $35.00 internally and must not appear as a customer repair charge. Sending the loan requires confirmation that its connector matches the greenhouse's plumbing. No connector dimensions are in the order record yet. Carry that compatibility check separately from the warranty claim. A promise of a loan shipment would be premature even if the original pump is eventually covered."
+		},
+		{
+			"id": "ev-source-5-1",
+			"shift": 5,
+			"date": "2031-02-06",
+			"role": "user",
+			"content": "[2031-02-06; Leonie Hart; BC-7305; document 5.1] Leonie Hart, Rivermill lighting: We requested a continuous 40-metre length of cable. Your packing slip says 40 metres, but our measured length is 34 metres. We have not cut it further. The installation needs the full continuous run, so six metres added on another reel would not solve it. We can send a photograph with both ends against our marked floor scale. Please propose a remedy that preserves one continuous run rather than treating this as six missing individual parts."
+		},
+		{
+			"id": "ev-source-5-2",
+			"shift": 5,
+			"date": "2031-02-06",
+			"role": "user",
+			"content": "[2031-02-06; Leonie Hart; BC-7305; document 5.2] Invoice IV-7305: Cable is $7.20 per metre. The ordered 40 metres cost $288.00 before 5% tax; freight is $12.00 untaxed. The total paid is $314.40. Custom-cut goods normally carry a 15% return deduction, but a verified short cut is supplier error and exempt. A replacement of the whole run requires return authorization and measurement confirmation. A partial credit would equal the missing length at invoice rate plus associated tax, but the customer has not accepted that remedy."
+		},
+		{
+			"id": "ev-source-5-3",
+			"shift": 5,
+			"date": "2031-02-06",
+			"role": "user",
+			"content": "[2031-02-06; Leonie Hart; BC-7305; document 5.3] Cutting-room log CL-7305: The saw operator recorded roll marker 118 through 158. The marker system is measured in metres, but the end marker on this reel is smeared. Supervisor Jules Ren will compare the production photograph with the customer's length image. Do not declare the customer's measurement false merely because the slip says 40. Preserve both readings in the internal note, identify the evidence needed to reconcile them, and avoid assigning blame before the review."
+		},
+		{
+			"id": "ev-source-5-4",
+			"shift": 5,
+			"date": "2031-02-06",
+			"role": "user",
+			"content": "[2031-02-06; Leonie Hart; BC-7305; document 5.4] Purchasing note PN-7305: Stock can supply a continuous 40-metre replacement after shift 11. The customer's installation was planned for shift 10. Ask whether a revised date is acceptable before treating replacement as feasible. A refund is an alternative only if finance approves it and Leonie chooses it. Carry the installation timing conflict to the queue sheet. No current source authorizes a restocking fee or a credit for six metres as the final resolution."
+		},
+		{
+			"id": "ev-side-5",
+			"shift": 5,
+			"date": "2031-02-06",
+			"role": "user",
+			"content": "Payments closure PC-7303-H: The issuer confirms AUTH-7303 is no longer displayed as an active hold. The hold-only enquiry is closed; the legitimate CAP-7303 sale remains settled. This receipt is not a promise that a later capture can never occur. Keep the completed hold investigation distinct from a future duplicate-charge complaint."
+		},
+		{
+			"id": "ev-source-6-1",
+			"shift": 6,
+			"date": "2031-02-07",
+			"role": "user",
+			"content": "[2031-02-07; Oren Vale; BC-7306; document 6.1] Oren Vale, Stonebridge joinery: Our order for twelve clamps is waiting for credit release. I transferred money yesterday and sent the bank confirmation. The timber work starts soon, so please ask accounts what is still missing. We use one trading account for two sites; a payment reference can name the other site without being a different company. Do not create a second account or split the order to get around the hold. I need an accurate outstanding-balance explanation for our bookkeeper."
+		},
+		{
+			"id": "ev-source-6-2",
+			"shift": 6,
+			"date": "2031-02-07",
+			"role": "user",
+			"content": "[2031-02-07; Oren Vale; BC-7306; document 6.2] Credit statement ST-7306: Stonebridge has a $2, 000.00 credit limit and $1, 760.00 of older unpaid invoices. This order is $480.00, tax exempt, with no freight charge. Adding it produces $2, 240.00 exposure before any confirmed payment. The bank advice names a $400.00 transfer, but Beacon has no cleared receipt. A payment advice is not a settled remittance. Credit manager Farah Drew can release an order only after cleared allocation brings exposure within the limit or after a signed temporary-limit approval."
+		},
+		{
+			"id": "ev-source-6-3",
+			"shift": 6,
+			"date": "2031-02-07",
+			"role": "user",
+			"content": "[2031-02-07; Oren Vale; BC-7306; document 6.3] Remittance desk RD-7306: The advice references the south site and invoice SB-291. The trading account owns both sites, but the amount must be matched to an actual bank receipt before allocation. Ask the bookkeeper for the sending-bank reference if the receipt cannot be located. Do not subtract the advised $400.00 as already paid. Show both the confirmed exposure and the contingent exposure if it clears, and label the assumption. No one has granted a temporary increase."
+		},
+		{
+			"id": "ev-source-6-4",
+			"shift": 6,
+			"date": "2031-02-07",
+			"role": "user",
+			"content": "[2031-02-07; Oren Vale; BC-7306; document 6.4] Warehouse hold WH-7306: Twelve clamps are picked but remain in Beacon's cage. Dispatch cannot release them on a customer screenshot. The crew deadline is shift 12; if credit remains blocked then, notify Oren and retain the order without promising an unconfirmed shipment. A handoff must identify Farah as the decision owner, the remittance match as the blocker, and the invoice that needs allocation. The picked status is useful readiness evidence, not proof of dispatch."
+		},
+		{
+			"id": "ev-source-7-1",
+			"shift": 7,
+			"date": "2031-02-08",
+			"role": "user",
+			"content": "[2031-02-08; Celia Quill; BC-7307; document 7.1] Celia Quill, Westhaven theatre: The rented portable extractor was collected yesterday, but our deposit has not come back. We paid for five rental days and believe the collection was on the fifth day. The driver gave our stage manager a paper collection slip, which is attached. We had asked for collection a day earlier, but your desk said the route was full. Please reconcile the rental dates before charging us for a sixth day. The theatre has a charity audit at shift 22."
+		},
+		{
+			"id": "ev-source-7-2",
+			"shift": 7,
+			"date": "2031-02-08",
+			"role": "user",
+			"content": "[2031-02-08; Celia Quill; BC-7307; document 7.2] Rental ledger RL-7307: Rental is $36.00 per day for five booked days, total $180.00, tax exempt. The security deposit is $240.00 and must be shown separately from rental revenue. The customer paid $420.00. A late-day charge applies only when the customer retains equipment beyond the agreed collection slot. A carrier delay after a timely collection request is Beacon's responsibility. Deposit release requires warehouse return and condition inspection, not only a carrier collection slip."
+		},
+		{
+			"id": "ev-source-7-3",
+			"shift": 7,
+			"date": "2031-02-08",
+			"role": "user",
+			"content": "[2031-02-08; Celia Quill; BC-7307; document 7.3] Route log RT-7307: Westhaven requested collection within the original term. Beacon changed the route to the following morning and noted the change in dispatch. Do not bill the customer for that extra route day. The carrier collection slip confirms pickup, but the extractor has not been checked into the warehouse. Returns inspector Malik Hsu owns the condition report. If the tool is still in transit, describe that as the deposit blocker rather than alleging damage or unpaid rent."
+		},
+		{
+			"id": "ev-source-7-4",
+			"shift": 7,
+			"date": "2031-02-08",
+			"role": "user",
+			"content": "[2031-02-08; Celia Quill; BC-7307; document 7.4] Accounts instruction AI-7307: Prepare an audit-friendly statement that separates the $180.00 rental charge, $240.00 deposit held, and any proven adjustments. No extra-day fee is authorized. Do not label the deposit refunded until a payment receipt exists. Preserve the original timely-request evidence because the apparent sixth day in a later warehouse scan can otherwise look like customer lateness. Carry the charity-audit deadline through the handoff, even while other cases need faster operational attention."
+		},
+		{
+			"id": "ev-side-7",
+			"shift": 7,
+			"date": "2031-02-08",
+			"role": "user",
+			"content": "Remittance correction RR-7306: Oren's bookkeeper corrects the advice reference from SB-291 to SB-219. The sending amount remains $400.00. Beacon still has no cleared allocation. Use the corrected reference in the match request and mark SB-291 inactive. The correction does not itself clear a payment or release clamps."
+		},
+		{
+			"id": "ev-source-8-1",
+			"shift": 8,
+			"date": "2031-02-09",
+			"role": "user",
+			"content": "[2031-02-09; Bram Fenwick; BC-7308; document 8.1] Bram Fenwick, Moorfield training: We ordered eight tool kits for trainees, but two trainees have withdrawn. Six kits are still needed. Please cancel two if they have not shipped and tell us whether the training discount changes. Our finance officer does not want a general store credit. The courier booking shows a label created, which may not mean the carton left your warehouse. Please check the actual release state before promising that the cancellation can still be made."
+		},
+		{
+			"id": "ev-source-8-2",
+			"shift": 8,
+			"date": "2031-02-09",
+			"role": "user",
+			"content": "[2031-02-09; Bram Fenwick; BC-7308; document 8.2] Pricing sheet PS-7308: Eight kits at $75.00 each receive a 12% training discount when the retained quantity is at least six. Tax is 5% on discounted merchandise. Freight is $20.00 untaxed and stays charged if any kits ship. The customer paid $574.40. A two-kit cancellation retaining six therefore preserves the discount; do not reprice the retained kits at the undiscounted rate. Cancellation must precede the carrier's physical collection. A label-generated event is not collection evidence."
+		},
+		{
+			"id": "ev-source-8-3",
+			"shift": 8,
+			"date": "2031-02-09",
+			"role": "user",
+			"content": "[2031-02-09; Bram Fenwick; BC-7308; document 8.3] Warehouse status WS-7308: Eight kits are sealed in one carton at the dispatch bench. The carrier label exists, but there is no collection scan. Supervisor Emery Holt can reopen and repack before 15:00 today. Ask the supervisor to confirm the cancellation and adjusted packing count. The support desk may prepare the proposed refund calculation in parallel, but cannot claim the two kits were removed until the warehouse responds. The retained six must stay on the original training order."
+		},
+		{
+			"id": "ev-source-8-4",
+			"shift": 8,
+			"date": "2031-02-09",
+			"role": "user",
+			"content": "[2031-02-09; Bram Fenwick; BC-7308; document 8.4] Finance rule FN-7308: An accepted pre-collection cancellation returns the discounted kit prices and associated tax for the cancelled units. Original freight remains payable. Refund to the original card after the warehouse count is confirmed. No finance posting receipt is present. The handoff must prevent two common errors: describing a created label as dispatch, and reversing the full order even though six kits remain required. The training session starts at shift 16."
+		},
+		{
+			"id": "ev-side-8",
+			"shift": 8,
+			"date": "2031-02-09",
+			"role": "user",
+			"content": "Operations withdrawal OW-7304: The loan-pump supplier withdraws the reserved loan before shipment because its electrical test failed. Do not send it under the prior reservation even if connector dimensions arrive. Tomas still needs the warranty diagnosis and permanent remedy. The failed loan is unavailable; this does not decide whether his own pump is covered."
+		},
+		{
+			"id": "ev-source-9-1",
+			"shift": 9,
+			"date": "2031-02-10",
+			"role": "user",
+			"content": "[2031-02-10; Esme Rowan; BC-7309; document 9.1] Esme Rowan, Hazelwick observatory: The temperature sensor has a five-pin connector, but the logger requires a four-pin plug. Our purchase request mentioned logger model HZ-4. The sensor box is opened, although the probe has not been installed or powered. Please check whether sales supplied the wrong model. We can accept an exchange if the compatible probe reads the same temperature range. Do not ship an adapter without confirming that its signal wiring is correct."
+		},
+		{
+			"id": "ev-source-9-2",
+			"shift": 9,
+			"date": "2031-02-10",
+			"role": "user",
+			"content": "[2031-02-10; Esme Rowan; BC-7309; document 9.2] Sales specification SS-7309: The ordered sensor model ST-5 costs $96.00 plus 5% tax, total $100.80, with free shipping. The quote note names logger HZ-4, which requires ST-4. ST-4 costs $88.00 before the same tax. The opened box alone does not settle responsibility; a sales specification mismatch is a no-fee exchange after verification. An exchange to the cheaper probe returns the price difference including tax. The original invoice remains the financial source until an exchange credit posts."
+		},
+		{
+			"id": "ev-source-9-3",
+			"shift": 9,
+			"date": "2031-02-10",
+			"role": "user",
+			"content": "[2031-02-10; Esme Rowan; BC-7309; document 9.3] Technical review TV-7309: The connector photograph confirms five pins. The logger's rear-panel label is not visible, so technical service still needs its model label before approving compatibility. The requested range is minus 20 to plus 80 degrees Celsius; both probes cover it, but the logger interface differs. Ask for the missing label and prevent an improvised wiring remedy. The current next action is evidence collection, not diagnosis of a faulty probe."
+		},
+		{
+			"id": "ev-source-9-4",
+			"shift": 9,
+			"date": "2031-02-10",
+			"role": "user",
+			"content": "[2031-02-10; Esme Rowan; BC-7309; document 9.4] Warehouse plan WP-7309: Compatible ST-4 stock can be reserved pending technical confirmation. Exchange requires return of the unused ST-5, not a destructive modification. Supervisor Rowan Pike owns the stock reservation; their surname is unrelated to the customer. Record the named owner carefully. The observatory's calibration window begins at shift 23. A promised exchange delivery must be checked against that date after dispatch is known."
+		},
+		{
+			"id": "ev-side-9",
+			"shift": 9,
+			"date": "2031-02-10",
+			"role": "user",
+			"content": "Contact supersession CS-7305: Leonie verifies leonie.finance@rivermill.example as the correspondence route for the refund/return matter. The former leonie.hart@bc-4105.example route is retired. The authorization to change contact does not approve a remedy or post money. Carry this route into later work even if the physical case is quiet."
+		},
+		{
+			"id": "ev-source-10-1",
+			"shift": 10,
+			"date": "2031-02-11",
+			"role": "user",
+			"content": "[2031-02-11; Dario Finch; BC-7310; document 10.1] Dario Finch, Brookfen museum: We ordered ten display lamps, but your update says only seven are available. The exhibition can open with seven if the remaining three arrive before the evening preview. Please tell me what is actually committed. A substitute lamp may alter the colour of the exhibits, so our curator must approve any alternative. Do not cancel the backorder or substitute a different temperature without asking. Our existing deposit is not permission for another charge."
+		},
+		{
+			"id": "ev-source-10-2",
+			"shift": 10,
+			"date": "2031-02-11",
+			"role": "user",
+			"content": "[2031-02-11; Dario Finch; BC-7310; document 10.2] Order ledger OL-7310: Ten lamps cost $54.00 each, tax exempt, with $15.00 freight. The total order value is $555.00. Brookfen paid a $200.00 deposit; the remaining $355.00 is not captured. Seven units are allocated and three remain on backorder. The deposit is held against the whole order, not seven completed deliveries. Finance will charge the balance when the final delivery plan is authorized. Do not report the order fully paid or refund an uncaptured balance."
+		},
+		{
+			"id": "ev-source-10-3",
+			"shift": 10,
+			"date": "2031-02-11",
+			"role": "user",
+			"content": "[2031-02-11; Dario Finch; BC-7310; document 10.3] Supply bulletin SB-7310: The remaining three lamps are expected at Beacon after shift 19, but the supplier has not provided a dispatch notice. This is an estimate, not stock receipt. An alternative warm-white lamp is in stock at $49.00, but its colour differs from the specified neutral-white lamp. Curator approval is mandatory. The preview is on shift 24. The queue sheet must surface the gap between an unconfirmed supplier arrival and the customer's event deadline."
+		},
+		{
+			"id": "ev-source-10-4",
+			"shift": 10,
+			"date": "2031-02-11",
+			"role": "user",
+			"content": "[2031-02-11; Dario Finch; BC-7310; document 10.4] Customer account rule CA-7310: Dario coordinates logistics; curator Hana Bell approves changes in lamp specification. Museum finance authorizes charges. Neither can be silently substituted for the other. Prepare a choice draft explaining the allocation, uncertain backorder, and substitute-approval requirement. Keep the seven allocated lamps from shipping until the customer confirms whether a split shipment is acceptable. A stock allocation does not prove shipment and does not authorize the remaining card charge."
+		},
+		{
+			"id": "ev-side-10",
+			"shift": 10,
+			"date": "2031-02-11",
+			"role": "user",
+			"content": "Training invoice confirmation TI-7308: Accounts rechecks the original eight-kit invoice and confirms the $75.00 unit rate, 12% discount, 5% tax, and $20.00 freight unchanged. This is a repeated fact, not another invoice, another payment, or a second cancellation. The warehouse still owns whether the attempted cancellation physically occurred."
+		},
+		{
+			"id": "ev-source-11-1",
+			"shift": 11,
+			"date": "2031-02-12",
+			"role": "user",
+			"content": "[2031-02-12; Anika Moss; BC-7311; document 11.1] Anika Moss, Brackenfield school: We saw a recall notice for the heat gun we bought from you. Ours is in the locked maintenance cabinet and has not been used this term. Please check the serial number before we dispose of school property. We need a safe replacement, but purchasing rules require a written comparison if the replacement model differs. The caretaker cannot approve a changed specification. I can coordinate evidence, and the head of facilities can authorize the replacement."
+		},
+		{
+			"id": "ev-source-11-2",
+			"shift": 11,
+			"date": "2031-02-12",
+			"role": "user",
+			"content": "[2031-02-12; Anika Moss; BC-7311; document 11.2] Recall bulletin RB-7311: Heat guns in serial range HG-2200 through HG-2399 require immediate withdrawal from use. The order record lists HG-2314, within the range. The customer must disconnect and secure it pending the manufacturer's collection procedure. Do not ask anyone to test the unit to reproduce the fault. The paid invoice is $84.00 plus 5% tax, total $88.20. The manufacturer funds either a no-charge approved replacement or a full refund after verified surrender."
+		},
+		{
+			"id": "ev-source-11-3",
+			"shift": 11,
+			"date": "2031-02-12",
+			"role": "user",
+			"content": "[2031-02-12; Anika Moss; BC-7311; document 11.3] Manufacturer procedure MP-7311: A serial photograph and collection receipt establish surrender. A customer promise to stop using the device is necessary but not sufficient to close the recall. Replacement model HG-S has a lower maximum temperature and an automatic cutoff; the school must approve those differences. The collection contractor cannot leave a replacement automatically. The support packet must separate immediate safe handling, surrender evidence, and the decision about the final remedy."
+		},
+		{
+			"id": "ev-source-11-4",
+			"shift": 11,
+			"date": "2031-02-12",
+			"role": "user",
+			"content": "[2031-02-12; Anika Moss; BC-7311; document 11.4] Purchasing contact PC-7311: Head of facilities Vera Lark can approve model HG-S. Anika remains the communication contact. The caretaker has no purchasing authority. The school requests a comparison by shift 15 and surrender collection before shift 23. Keep those deadlines distinct. No replacement or refund has been approved yet. The recall task remains active even if the customer temporarily prefers to defer a purchasing decision."
+		},
+		{
+			"id": "ev-source-12-1",
+			"shift": 12,
+			"date": "2031-02-13",
+			"role": "user",
+			"content": "[2031-02-13; Soren Ashby; BC-7312; document 12.1] Soren Ashby, Willowreach makerspace: The grant officer requires proof that our accessible workbench was delivered and paid for. We received it, but the delivery docket lists our former charity name. The bank receipt has the right amount and our trading account name. Please prepare a document set that connects the charity names without pretending they are separate buyers. The reimbursement deadline is the end of shift 24. We raised this obligation when the support period began; the long wait does not remove it."
+		},
+		{
+			"id": "ev-source-12-2",
+			"shift": 12,
+			"date": "2031-02-13",
+			"role": "user",
+			"content": "[2031-02-13; Soren Ashby; BC-7312; document 12.2] Grant order GO-7312: The accessible workbench cost $1, 200.00, tax exempt, plus $80.00 freight. The settled payment is $1, 280.00. The old charity name was Willow Workshop Trust; the registered successor name is Willowreach Makerspace Trust. Account BC-4112 belongs to the same legal charity under a name change. The grant covers merchandise but excludes freight. A reimbursement calculation therefore cannot claim the full settled payment as eligible grant expenditure."
+		},
+		{
+			"id": "ev-source-12-3",
+			"shift": 12,
+			"date": "2031-02-13",
+			"role": "user",
+			"content": "[2031-02-13; Soren Ashby; BC-7312; document 12.3] Document review DV-7312: The warehouse docket proves physical delivery but bears the old name. A signed registry-name-change letter and a corrected invoice can connect the names. The charity has supplied the letter, but finance has not issued the corrected invoice. Do not alter the wording of a signed warehouse docket or fabricate a signature. Prepare a cover note that cites the original docket, name-change letter, invoice, and settled payment separately. The grant officer requires exact document references."
+		},
+		{
+			"id": "ev-source-12-4",
+			"shift": 12,
+			"date": "2031-02-13",
+			"role": "user",
+			"content": "[2031-02-13; Soren Ashby; BC-7312; document 12.4] Account instruction AT-7312: Soren may receive the packet and answer factual questions. Only grant officer Lila Reed can confirm acceptance for reimbursement. A customer acknowledgment is not grant acceptance. Keep the invoice correction as the present blocker and the officer's acceptance as the final closure evidence. Retain the obligation through the final shift even if every commercial payment is already settled. The work is documentary, and a refund would not resolve it."
+		},
+		{
+			"id": "ev-source-13-1",
+			"shift": 13,
+			"date": "2031-02-14",
+			"role": "user",
+			"content": "[2031-02-14; Mara Ellison; BC-7301; document 13.1] Intake finding IN-7301-R, signed at 08:10: Mara's images show two cracked filters with the expected serial stickers. Both match the original shipping record. Intake confirms transit damage and waives pickup because the fragments cannot travel safely. This finding authorizes disposal, but it does not authorize or execute the card refund. The four installed filters remain outside the claim. Send disposal instructions only to the contact in the customer lookup, which changed during the workshop's office relocation. Record this finding as the evidence that resolves the earlier photograph blocker."
+		},
+		{
+			"id": "ev-source-13-2",
+			"shift": 13,
+			"date": "2031-02-14",
+			"role": "user",
+			"content": "[2031-02-14; Mara Ellison; BC-7301; document 13.2] Finance correction FC-7301: The line discount on the original invoice was 12%, not 10%. The corrected merchandise charge is $224.40, tax is $17.95, and freight remains $18.00. The settled card charge is $260.35. Refund each damaged filter at the corrected discounted unit price and 8% tax; round the combined refund to cents. The correction applies to the remedy that is still unposted. If your earlier packet used the old discount, show the old total as superseded and state the difference. Do not claim that the customer has received either amount."
+		},
+		{
+			"id": "ev-source-13-3",
+			"shift": 13,
+			"date": "2031-02-14",
+			"role": "user",
+			"content": "[2031-02-14; Mara Ellison; BC-7301; document 13.3] Account administrator, contact notice CT-7301: Mara moved workshops. The prior address mara@alderbrook.example is no longer authorized for customer correspondence. Use mara.ellison@repairguild.example. The old address remains on an archived invoice and may be mentioned only as a retired route. The phone number has not changed, but the customer still requests email. The effective contact is visible in lookup_customer for BC-4101 from this shift. A message sent to the retired address would need correction even if its monetary calculation were accurate."
+		},
+		{
+			"id": "ev-source-13-4",
+			"shift": 13,
+			"date": "2031-02-14",
+			"role": "user",
+			"content": "[2031-02-14; Mara Ellison; BC-7301; document 13.4] Approval AU-7301-R: Dana Voss approves the corrected damaged-pair refund, after the packet is checked against FC-7301 and IN-7301-R. Finance has not yet returned a posting receipt. Request the refund through the usual finance queue and carry its receipt as a blocker to closure. The carrier notice can be filed before shift 14 without waiting for card settlement. Link the notice to the earlier carton reminder and the disposal finding. A draft or this approval memo is not evidence that the refund was issued."
+		},
+		{
+			"id": "ev-source-14-1",
+			"shift": 14,
+			"date": "2031-02-15",
+			"role": "user",
+			"content": "[2031-02-15; Ivo Mercer; BC-7302; document 14.1] Carrier finding CF-7302, issued this morning: The driver delivered the carton to Linden central office and the building cleaner signed IM. The sealed carton was recovered and scanned into Beacon returns at 07:55 under RC-7302. The carrier accepts the destination error. This is recovery evidence, not a fresh delivery to Ivo. Warehouse can inspect the seals and ship the same carton without consuming the expired replacement reservation. Retain the signature discrepancy in the internal note; the customer does not need the cleaner's personal name."
+		},
+		{
+			"id": "ev-source-14-2",
+			"shift": 14,
+			"date": "2031-02-15",
+			"role": "user",
+			"content": "[2031-02-15; Ivo Mercer; BC-7302; document 14.2] Customer correction, Ivo Mercer: The pump room is closed for electrical work this week. Deliver to Linden equipment annex instead, and ask for Petra Salcedo, the authorized receiver added to our account today. The annex gate opens 09:00 to 12:00. The older pump-room instruction is withdrawn. I approve redelivery of the recovered carton if the seals are intact; I do not approve a second sale. Please explain how your proposed delivery relates to the earlier trace update so our accounts team does not book duplicate meters."
+		},
+		{
+			"id": "ev-source-14-3",
+			"shift": 14,
+			"date": "2031-02-15",
+			"role": "user",
+			"content": "[2031-02-15; Ivo Mercer; BC-7302; document 14.3] Warehouse inspection WH-7302: All four meter seals are intact, and the recovered carton is available for redelivery. The order lookup contains a revised redelivery docket with the annex destination and no additional customer charge. The warehouse has not booked a carrier collection slot. Keep the shipment state as ready pending collection. Ask dispatch for a slot within the receiver's gate hours and carry the tracking number as an outstanding obligation. The original $744.00 charge remains valid; no customer credit is due for a second, nonexistent sale."
+		},
+		{
+			"id": "ev-source-14-4",
+			"shift": 14,
+			"date": "2031-02-15",
+			"role": "user",
+			"content": "[2031-02-15; Ivo Mercer; BC-7302; document 14.4] Finance and service note FS-7302: Beacon will absorb a $16.00 carrier redelivery charge as an internal expense. Ivo is not to be charged that amount. A $25.00 service credit is separately approved for the delay, but it has not posted. Show the original paid balance, proposed credit, and eventual net charge as different columns. Do not say the net charge has settled until a credit receipt arrives. The earlier trace commitment is fulfilled by CF-7302; the delivery and service-credit receipt obligations remain open."
+		},
+		{
+			"id": "ev-source-15-1",
+			"shift": 15,
+			"date": "2031-02-16",
+			"role": "user",
+			"content": "[2031-02-16; Nadia Solano; BC-7303; document 15.1] Gateway correction GC-7303: The second authorization captured during overnight processing after the earlier review. CAP-7303-B is a settled duplicate for $318.00. The original CAP-7303 remains the valid sale. The earlier pending-hold explanation was accurate when issued, but it no longer describes the duplicate. Do not repeat it as the active status. Payments requires a duplicate-capture refund against CAP-7303-B specifically; refunding both captures would erase the legitimate purchase."
+		},
+		{
+			"id": "ev-source-15-2",
+			"shift": 15,
+			"date": "2031-02-16",
+			"role": "user",
+			"content": "[2031-02-16; Nadia Solano; BC-7303; document 15.2] Finance approval FA-7303: Finance authorizes $318.00 back to the card for CAP-7303-B. No return of the vise is required. The capture references must appear in the internal note so the operator selects the duplicate. The customer draft must acknowledge the changed status and explain the corrective action without saying the money has arrived. A refund initiation receipt, when available, proves submission; a settled card credit proves completion. Keep those receipt stages separate in the work record."
+		},
+		{
+			"id": "ev-source-15-3",
+			"shift": 15,
+			"date": "2031-02-16",
+			"role": "user",
+			"content": "[2031-02-16; Nadia Solano; BC-7303; document 15.3] Payments receipt PR-7303: The refund request REF-7303-B for $318.00 was accepted by the processor at 10:12. The processor state is processing. There is no settled credit confirmation. This receipt closes the task of requesting the refund and opens the task of monitoring its outcome. If an earlier handoff asked Sora to release the authorization, mark that request obsolete because the transaction has captured. Do not ask Sora to release a captured authorization or create another refund request."
+		},
+		{
+			"id": "ev-source-15-4",
+			"shift": 15,
+			"date": "2031-02-16",
+			"role": "user",
+			"content": "[2031-02-16; Nadia Solano; BC-7303; document 15.4] Nadia Solano, follow-up: Thank you for identifying the duplicate. Our treasurer wants the final message to separate what has happened from what we are waiting for. I can retain the case reference, but I cannot confirm a credit that is not on our bank statement. Please follow up at shift 19. The account email remains valid. We will send a redacted statement if the credit is still absent then. The studio no longer needs the temporary pending-hold explanation prepared for its earlier bookkeeping cutoff."
+		},
+		{
+			"id": "ev-source-16-1",
+			"shift": 16,
+			"date": "2031-02-17",
+			"role": "user",
+			"content": "[2031-02-17; Tomas Wren; BC-7304; document 16.1] Technician report TR-7304: The inlet photograph is clear, and the screen is unobstructed. The pump is mounted correctly. Bench testing after approved collection found an internal thermal-switch defect. Warranty coverage is accepted. The returns record RC-7304 confirms that the drained pump reached Beacon; it is not evidence that a replacement reached the greenhouse. The loan reservation expired without connector confirmation and cannot be described as an active option. Supply the accepted diagnosis in the revised customer draft."
+		},
+		{
+			"id": "ev-source-16-2",
+			"shift": 16,
+			"date": "2031-02-17",
+			"role": "user",
+			"content": "[2031-02-17; Tomas Wren; BC-7304; document 16.2] Warehouse bulletin WB-7304: A replacement pump with the same connector is ready, serial EP-8816. The support agent may request dispatch under the accepted warranty, but warehouse requires Tomas to confirm a delivery date because the greenhouse gate is unattended during planting preparation. Do not ship to an unattended gate. If your earlier packet offered a loan, explain why that temporary route ended and how the replacement supersedes it. The replacement is free; the $483.00 purchase remains a settled warranty sale."
+		},
+		{
+			"id": "ev-source-16-3",
+			"shift": 16,
+			"date": "2031-02-17",
+			"role": "user",
+			"content": "[2031-02-17; Tomas Wren; BC-7304; document 16.3] Tomas Wren, availability: I can receive the replacement on the morning of shift 20. The caretaker will open the east gate between 08:00 and 10:00. I authorize that delivery slot. The previous suggestion of leaving it by the boiler shed is withdrawn after a theft nearby. Please confirm the slot only after dispatch actually books it. I do not require a refund if the replacement arrives. Use the greenhouse contact on my account rather than the temporary address used by the installer."
+		},
+		{
+			"id": "ev-source-16-4",
+			"shift": 16,
+			"date": "2031-02-17",
+			"role": "user",
+			"content": "[2031-02-17; Tomas Wren; BC-7304; document 16.4] Dispatch receipt DR-7304: The replacement booking has been accepted for shift 20, 08:00 to 10:00, under consignment EW-5204. This receipt proves a booking, not delivery. Carrier scans will be available later. Close the compatibility and booking tasks, keep delivery verification open, and carry the instruction against unattended delivery into the handoff. No source authorizes closing the whole warranty case before the delivery result. A replacement serial number by itself is not a dispatch or delivery receipt."
+		},
+		{
+			"id": "ev-source-17-1",
+			"shift": 17,
+			"date": "2031-02-18",
+			"role": "user",
+			"content": "[2031-02-18; Leonie Hart; BC-7305; document 17.1] Cutting-room finding CR-7305: Both photographs establish a 34-metre cut. The production log copied a planned end marker instead of the actual one. The customer's complaint is accepted. The 15% custom-cut deduction does not apply. A short-cut credit could be $45.36 for six metres including tax, but Leonie has declined a partial remedy because continuity is essential. Do not offer that amount as an agreed settlement. Link this finding to the uncertainty recorded in your first packet."
+		},
+		{
+			"id": "ev-source-17-2",
+			"shift": 17,
+			"date": "2031-02-18",
+			"role": "user",
+			"content": "[2031-02-18; Leonie Hart; BC-7305; document 17.2] Leonie Hart, choice of remedy: The installation contractor bought a suitable cable elsewhere. Please take back the untouched short reel and refund this order in full. I accept the collection instructions, but I cannot take time off for an unspecified all-day slot. Rivermill has a staffed loading door from 13:00 to 15:00 on shift 18. The old replacement request is withdrawn. I do not authorize a restocking deduction or an exchange credit instead of the card refund."
+		},
+		{
+			"id": "ev-source-17-3",
+			"shift": 17,
+			"date": "2031-02-18",
+			"role": "user",
+			"content": "[2031-02-18; Leonie Hart; BC-7305; document 17.3] Finance authorization FA-7305: Approve $314.40, including original freight, after return receipt. Supplier error waives every restocking deduction on this order. The authorization is conditional and cannot be treated as a posted refund. Returns have booked the staffed-door collection under CO-7305 for shift 18. The carrier has not collected the reel. Keep collection, warehouse receipt, and refund posting as ordered prerequisites, with the return receipt explicitly before the refund task."
+		},
+		{
+			"id": "ev-source-17-4",
+			"shift": 17,
+			"date": "2031-02-18",
+			"role": "user",
+			"content": "[2031-02-18; Leonie Hart; BC-7305; document 17.4] Returns service RS-7305: The label in the customer portal still shows the old exchange workflow. It has been withdrawn, and label RL-7305-R is the active refund-return label. The corrected order lookup names RL-7305-R. In the customer draft, tell Leonie which label to use and state that the old exchange label is inactive. Ask them to remove the old label if already attached. Your reconciliation must retain the full original payment as settled until finance posts the conditional refund."
+		},
+		{
+			"id": "ev-source-18-1",
+			"shift": 18,
+			"date": "2031-02-19",
+			"role": "user",
+			"content": "[2031-02-19; Oren Vale; BC-7306; document 18.1] Bank receipt BR-7306: Beacon received $400.00 with the sending reference supplied by Stonebridge. The account allocation originally placed the payment against a separate deposit balance; accounts corrected it to the older trading invoices. The cleared outstanding balance is $1, 360.00. The clamp order remains $480.00, so assess release against the unchanged $2, 000.00 limit. The earlier contingent calculation can be promoted to a confirmed one, but only with BR-7306 and the corrected allocation as evidence."
+		},
+		{
+			"id": "ev-source-18-2",
+			"shift": 18,
+			"date": "2031-02-19",
+			"role": "user",
+			"content": "[2031-02-19; Oren Vale; BC-7306; document 18.2] Credit release CR-7306: Farah Drew approves release of the twelve clamps after checking the corrected allocation. No temporary credit-limit increase was granted. Record that distinction because the customer asked whether the limit had changed. The warehouse lookup carries the release reference, but no carrier consignment has been created. A support draft may explain that credit clearance is complete and dispatch is the remaining step. Do not tell Oren the order has shipped on the strength of this approval alone."
+		},
+		{
+			"id": "ev-source-18-3",
+			"shift": 18,
+			"date": "2031-02-19",
+			"role": "user",
+			"content": "[2031-02-19; Oren Vale; BC-7306; document 18.3] Oren Vale, delivery instruction: The crew moved from our south site to Stonebridge north yard. Use the north-yard account destination for this order. The bookkeeper remains the billing contact; the yard foreperson is the delivery receiver. The south-site destination in the old handoff is inactive. The north yard cannot accept delivery after 14:00. We accept the original clamp order and price, and we are not asking you to divide the shipment. Please carry the revised receiver and time restriction into dispatch."
+		},
+		{
+			"id": "ev-source-18-4",
+			"shift": 18,
+			"date": "2031-02-19",
+			"role": "user",
+			"content": "[2031-02-19; Oren Vale; BC-7306; document 18.4] Dispatch confirmation DC-7306: Consignment SB-8806 was collected at 11:20 for the north yard with the before-14:00 requirement attached. This confirmation supports shipped status. It does not establish delivery, nor does it change the $480.00 invoice amount. The account exposure after release includes the order and the cleared older balance. Keep proof of delivery open for shift 21. Close the credit-match obligation with its actual receipt, then show the delivery obligation as a separate follow-on task."
+		},
+		{
+			"id": "ev-source-19-1",
+			"shift": 19,
+			"date": "2031-02-20",
+			"role": "user",
+			"content": "[2031-02-20; Celia Quill; BC-7307; document 19.1] Warehouse return WR-7307: The extractor arrived and Malik completed inspection. Its casing and motor are sound. A hose coupling is missing, and the customer's outbound checkout photograph shows that the coupling was present. The replacement coupling costs $18.00. This finding supplies condition evidence; it does not determine whether the customer accepts a deposit deduction. The carrier route delay remains Beacon's responsibility and must not be reintroduced as a rental day."
+		},
+		{
+			"id": "ev-source-19-2",
+			"shift": 19,
+			"date": "2031-02-20",
+			"role": "user",
+			"content": "[2031-02-20; Celia Quill; BC-7307; document 19.2] Celia Quill, response: Our stage manager confirms that the hose coupling was left in a scenery crate and cannot be found. I accept the $18.00 deduction from the deposit. Please return the rest and issue a statement for the charity auditor. I do not accept any sixth-day rental charge. We will retain your route-delay explanation with the statement. Use the theatre finance mailbox listed on the account, because the production mailbox will close after this show."
+		},
+		{
+			"id": "ev-source-19-3",
+			"shift": 19,
+			"date": "2031-02-20",
+			"role": "user",
+			"content": "[2031-02-20; Celia Quill; BC-7307; document 19.3] Finance receipt FR-7307: A $222.00 deposit refund posted to the original card at 09:14. The $18.00 accepted coupling deduction is posted as a damage-replacement charge. Rental revenue remains $180.00. This is a completed refund receipt, distinct from the earlier request or condition report. Reconcile the original $420.00 payment into retained rental, retained coupling charge, and returned deposit. The payment tasks can close, but the customer statement still needs preparation and delivery through the authorized contact."
+		},
+		{
+			"id": "ev-source-19-4",
+			"shift": 19,
+			"date": "2031-02-20",
+			"role": "user",
+			"content": "[2031-02-20; Celia Quill; BC-7307; document 19.4] Account-contact update AC-7307: The production mailbox celia.production@westhaven.example is retired. The authorized finance route is celia.accounts@westhaven.example. Both identify Celia Quill, but only the finance route can receive the audit statement. The old mailbox can appear in a historical contact log if marked inactive. Complete the statement by shift 22 and carry its transmission receipt until confirmed. A draft statement in this conversation is not evidence that Westhaven received it."
+		},
+		{
+			"id": "ev-source-20-1",
+			"shift": 20,
+			"date": "2031-02-21",
+			"role": "user",
+			"content": "[2031-02-21; Bram Fenwick; BC-7308; document 20.1] Warehouse correction WC-7308: The earlier packing note overstated the chance to cancel. The carrier collected the sealed eight-kit carton at 14:42 before Emery reached it. The pre-collection cancellation did not occur. The customer must receive the carton and return two sealed kits under the ordinary unused-return route. Do not preserve the earlier cancellation language as an accomplished action. The training discount still applies to six retained kits, so the changed physical workflow does not remove the quantity discount."
+		},
+		{
+			"id": "ev-source-20-2",
+			"shift": 20,
+			"date": "2031-02-21",
+			"role": "user",
+			"content": "[2031-02-21; Bram Fenwick; BC-7308; document 20.2] Bram Fenwick, return consent: All eight kits reached us, and we opened six for the course. The remaining two are sealed. We agree to return the sealed pair. We did not authorize anyone to cancel the whole order, and we still need the six in use. Please send the return instructions to me. Our finance officer accepts the original freight remaining on the order. A warehouse mistake caused this extra handling, so please ask whether the normal return deduction can be waived."
+		},
+		{
+			"id": "ev-source-20-3",
+			"shift": 20,
+			"date": "2031-02-21",
+			"role": "user",
+			"content": "[2031-02-21; Bram Fenwick; BC-7308; document 20.3] Authorization revision AR-7308: Emery confirms the missed cancellation and approves a waiver of the normal 10% unused-return deduction. Finance will refund the two discounted kits and associated tax after warehouse receipt of the sealed pair. Return label MR-7308 is active. The customer has not yet handed the parcel to the carrier. The old pre-collection approval is withdrawn and cannot justify posting a refund without the return receipt. Show the transition from attempted cancellation to approved return explicitly."
+		},
+		{
+			"id": "ev-source-20-4",
+			"shift": 20,
+			"date": "2031-02-21",
+			"role": "user",
+			"content": "[2031-02-21; Bram Fenwick; BC-7308; document 20.4] Service note SN-7308: The training course has begun with the six retained kits. There is no remaining obligation to expedite those six. The live obligations are obtaining the return scan, verifying two sealed kits at intake, and then obtaining the refund receipt. Keep the expected refund calculation in the reconciliation as a conditional liability. A statement that the refund was issued would be fabricated. If an earlier handoff promised cancellation, repair the customer draft and tell the next operator which earlier promise became inaccurate."
+		},
+		{
+			"id": "ev-source-21-1",
+			"shift": 21,
+			"date": "2031-02-22",
+			"role": "user",
+			"content": "[2031-02-22; Esme Rowan; BC-7309; document 21.1] Technical acceptance TA-7309: Esme supplied the HZ-4 label. Sales confirms it recommended the incompatible ST-5 despite the logger detail. Approve exchange to ST-4 with no return fee. The ST-5 remains unused. A replacement record in lookup_order contains the compatible model and the original range requirement. Do not state that the original sensor was defective; the evidence supports a compatibility error. Carry the technical acceptance into the revised authorization note."
+		},
+		{
+			"id": "ev-source-21-2",
+			"shift": 21,
+			"date": "2031-02-22",
+			"role": "user",
+			"content": "[2031-02-22; Esme Rowan; BC-7309; document 21.2] Intake and dispatch record ID-7309: Beacon received the unused ST-5 under return RC-7309 and dispatched ST-4 under consignment HZ-9309. The carrier expects delivery before the calibration window, but there is no delivery scan yet. This record satisfies the return prerequisite and proves dispatch. It does not close delivery verification. If your earlier work reserved ST-4 stock, replace the reservation-only status with the actual dispatch reference rather than treating them as two shipments."
+		},
+		{
+			"id": "ev-source-21-3",
+			"shift": 21,
+			"date": "2031-02-22",
+			"role": "user",
+			"content": "[2031-02-22; Esme Rowan; BC-7309; document 21.3] Finance credit FC-7309: The exchange price difference is $8.00 before tax and $8.40 including tax. A credit for $8.40 has posted to the original card. The retained net purchase charge is $92.40. The record carries receipt XR-7309. Customer support can describe that credit as posted, while still describing the physical probe as in transit. Do not merge the financial completion and delivery completion into one closed flag."
+		},
+		{
+			"id": "ev-source-21-4",
+			"shift": 21,
+			"date": "2031-02-22",
+			"role": "user",
+			"content": "[2031-02-22; Esme Rowan; BC-7309; document 21.4] Esme Rowan, timing message: Our calibration bench is available only on shift 23. If the probe misses that window, we will need another appointment. Please retain a delivery-check task before that shift rather than assuming the carrier estimate is a guarantee. My account email remains the correct route. The earlier connector question is resolved, so another request for the same logger photograph would waste the remaining preparation time."
+		},
+		{
+			"id": "ev-source-22-1",
+			"shift": 22,
+			"date": "2031-02-23",
+			"role": "user",
+			"content": "[2031-02-23; Dario Finch; BC-7310; document 22.1] Supplier withdrawal SW-7310: The expected shipment of the remaining three neutral-white lamps is cancelled. No replacement arrival date is available before the preview. Retire the earlier after-shift-19 estimate. Seven allocated units remain available. The supplier cancellation does not itself authorize a customer cancellation or a substitute. The revised lookup separates those states so the support packet can identify what Brookfen must decide before the event."
+		},
+		{
+			"id": "ev-source-22-2",
+			"shift": 22,
+			"date": "2031-02-23",
+			"role": "user",
+			"content": "[2031-02-23; Dario Finch; BC-7310; document 22.2] Curator Hana Bell, approval HB-7310: I approve three warm-white alternatives at $49.00 each for the side display, while the seven neutral-white units stay on the main wall. This is permission for the product change only. Dario agrees to one combined delivery before the preview. Museum finance will decide the amended balance. Do not quote my approval as card-charge authority. Keep the colour distinction in the customer draft so the receiving team places the lamps correctly."
+		},
+		{
+			"id": "ev-source-22-3",
+			"shift": 22,
+			"date": "2031-02-23",
+			"role": "user",
+			"content": "[2031-02-23; Dario Finch; BC-7310; document 22.3] Finance authorization MF-7310: Museum finance approves the amended total: seven lamps at $54.00, three at $49.00, and the unchanged $15.00 freight. Apply the existing $200.00 deposit and charge only the remaining balance. This is not an additional deposit. Beacon payments has not yet captured the balance. The reconciliation must show original order value, amended value, deposit already held, and authorized uncaptured remainder. If your earlier packet used $355.00, state why that amount no longer applies."
+		},
+		{
+			"id": "ev-source-22-4",
+			"shift": 22,
+			"date": "2031-02-23",
+			"role": "user",
+			"content": "[2031-02-23; Dario Finch; BC-7310; document 22.4] Dispatch plan DP-7310-R: Warehouse has picked the approved mixture and can send it after the balance capture. There is no carrier booking or payment receipt. Keep capture before dispatch and delivery verification before case closure. The preview deadline is still shift 24. Escalate a missing receipt to payments with the approved amount, and give dispatch the lamp-placement note after capture. A draft escalation in this conversation does not count as an external payment or a delivered shipment."
+		},
+		{
+			"id": "ev-source-23-1",
+			"shift": 23,
+			"date": "2031-02-24",
+			"role": "user",
+			"content": "[2031-02-24; Anika Moss; BC-7311; document 23.1] School authorization VA-7311: Vera approved HG-S after reviewing the lower maximum temperature and automatic cutoff. Anika supplied the photograph of HG-2314 in the locked cabinet. The customer has confirmed withdrawal from use. Those records resolve the specification and identity questions; they do not prove surrender. The manufacturer will release the replacement after contractor collection is scanned. Do not tell the school that the recall is complete on approval alone."
+		},
+		{
+			"id": "ev-source-23-2",
+			"shift": 23,
+			"date": "2031-02-24",
+			"role": "user",
+			"content": "[2031-02-24; Anika Moss; BC-7311; document 23.2] Contractor receipt CC-7311: HG-2314 was collected from Brackenfield at 08:40 and scanned against the recall ticket. The school no longer holds the recalled unit. Manufacturer warehouse allocated HG-S to the case, but its dispatch record is absent. The surrender obligation can close with CC-7311, while replacement dispatch and delivery remain open. Retain the original serial reference in the internal record so the old device is not confused with the replacement."
+		},
+		{
+			"id": "ev-source-23-3",
+			"shift": 23,
+			"date": "2031-02-24",
+			"role": "user",
+			"content": "[2031-02-24; Anika Moss; BC-7311; document 23.3] Authorization withdrawal VW-7311: Vera reports that the school's task changed, and the lower-temperature HG-S will not meet its needs. She withdraws the replacement approval and requests the full recall refund instead. No replacement has shipped. The manufacturer accepts the choice change because surrender is already verified. Cancel the unshipped allocation through the manufacturer queue. Do not dispatch HG-S using the superseded approval, and do not request another surrender of a device already collected."
+		},
+		{
+			"id": "ev-source-23-4",
+			"shift": 23,
+			"date": "2031-02-24",
+			"role": "user",
+			"content": "[2031-02-24; Anika Moss; BC-7311; document 23.4] Manufacturer finance response MR-7311: The full $88.20 refund is approved against CC-7311. Beacon has not received the refund-posting confirmation. A draft may state that surrender is complete and the refund is approved, with payment confirmation pending. The replacement allocation remains to be explicitly withdrawn by the warehouse. Carry both the cancellation receipt and the refund receipt in the handoff. If your earlier packet selected HG-S, repair that recommendation against the later withdrawal."
+		},
+		{
+			"id": "ev-source-24-1",
+			"shift": 24,
+			"date": "2031-02-25",
+			"role": "user",
+			"content": "[2031-02-25; Soren Ashby; BC-7312; document 24.1] Corrected invoice CI-7312: Finance issued the invoice under Willowreach Makerspace Trust and cross-referenced the old name, original order, and registry letter NL-7312. Merchandise remains $1, 200.00 and freight $80.00; no money changed hands during the correction. The payment receipt BR-7312 still shows $1, 280.00 settled. This satisfies the corrected-invoice prerequisite. The grant-eligible claim remains $1, 200.00 because the freight exclusion did not change."
+		},
+		{
+			"id": "ev-source-24-2",
+			"shift": 24,
+			"date": "2031-02-25",
+			"role": "user",
+			"content": "[2031-02-25; Soren Ashby; BC-7312; document 24.2] Grant officer clarification GR-7312: Lila Reed accepts a packet with the original delivery docket, CI-7312, NL-7312, and BR-7312. The cover note must show that the legal entity remained the same and separate eligible merchandise from excluded freight. This clarification describes what can be accepted; it is not an acceptance receipt for a packet not yet submitted. The deadline remains the end of this shift. Soren's earlier acknowledgment cannot substitute for the officer's final response."
+		},
+		{
+			"id": "ev-source-24-3",
+			"shift": 24,
+			"date": "2031-02-25",
+			"role": "user",
+			"content": "[2031-02-25; Soren Ashby; BC-7312; document 24.3] Submission receipt SR-7312: The grant portal received the document set at 11:05 with application WR-6212. The upload checksum list names the original docket, CI-7312, NL-7312, and BR-7312. This proves submission. The application remains awaiting officer review. Repair any earlier handoff that still calls the corrected invoice missing. Keep acceptance open and give the precise next action: monitor WR-6212 and contact Lila before the deadline if review remains pending."
+		},
+		{
+			"id": "ev-source-24-4",
+			"shift": 24,
+			"date": "2031-02-25",
+			"role": "user",
+			"content": "[2031-02-25; Soren Ashby; BC-7312; document 24.4] Grant decision GD-7312 at 14:15: Lila Reed accepted WR-6212 for $1, 200.00 of eligible merchandise expenditure. Freight of $80.00 is excluded. The officer's acceptance closes the early evidence obligation. It does not prove the grant cash was paid; the decision schedules reimbursement through the grant programme later. The final handoff must close document acceptance with GD-7312, preserve the cash-payment distinction, and reconcile its status against the earlier same-arm document packet and submission plan."
+		}
+	],
+	"tools": {
+		"lookup_order": {},
+		"lookup_customer": {}
+	},
+	"lookups": [
+		{
+			"tool": "lookup_order",
+			"id": "BC-7301",
+			"from": 5,
+			"text": "Invoice BC-7301; owner Mara Ellison; six ceramic filters; paid $265.86; no refund posted; intake photographs pending; contact mara@alderbrook.example."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4101",
+			"from": 5,
+			"text": "Account BC-4101; owner Mara Ellison; order BC-7301; authorized correspondence follows the account-contact notice in this case. Active email mara@alderbrook.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7302",
+			"from": 9,
+			"text": "Order BC-7302; owner Ivo Mercer; four moisture meters; $744.00 settled; disputed carrier delivery; destination Linden pump room; no replacement or refund authorized."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4102",
+			"from": 9,
+			"text": "Account BC-4102; owner Ivo Mercer; order BC-7302; authorized correspondence follows the account-contact notice in this case. Active email ivo.mercer@bc-4102.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7303",
+			"from": 13,
+			"text": "Order BC-7303; owner Nadia Solano; CAP-7303 settled $318.00; AUTH-7303 pending $318.00; one vise delivered; no duplicate capture confirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4103",
+			"from": 13,
+			"text": "Account BC-4103; owner Nadia Solano; order BC-7303; authorized correspondence follows the account-contact notice in this case. Active email nadia.solano@bc-4103.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7304",
+			"from": 17,
+			"text": "Order BC-7304; owner Tomas Wren; pump $483.00 settled; warranty diagnosis pending; loan connector unknown; no collection booking."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4104",
+			"from": 17,
+			"text": "Account BC-4104; owner Tomas Wren; order BC-7304; authorized correspondence follows the account-contact notice in this case. Active email tomas.wren@bc-4104.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7305",
+			"from": 22,
+			"text": "Order BC-7305; owner Leonie Hart; 40 metres ordered; 34 metres reported; paid $314.40; supplier error not yet verified; continuous replacement requested."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4105",
+			"from": 22,
+			"text": "Account BC-4105; owner Leonie Hart; order BC-7305; authorized correspondence follows the account-contact notice in this case. Active email leonie.hart@bc-4105.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7306",
+			"from": 26,
+			"text": "Order BC-7306; owner Oren Vale; twelve clamps $480.00; older unpaid $1, 760.00; credit limit $2, 000.00; $400.00 advised but uncleared; shipment held."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4106",
+			"from": 26,
+			"text": "Account BC-4106; owner Oren Vale; order BC-7306; authorized correspondence follows the account-contact notice in this case. Active email oren.vale@bc-4106.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7307",
+			"from": 31,
+			"text": "Order BC-7307; owner Celia Quill; rental $180.00; deposit $240.00; total paid $420.00; carrier collected; warehouse inspection pending; no late fee authorized."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4107",
+			"from": 31,
+			"text": "Account BC-4107; owner Celia Quill; order BC-7307; authorized correspondence follows the account-contact notice in this case. Active email celia.production@westhaven.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7308",
+			"from": 36,
+			"text": "Order BC-7308; owner Bram Fenwick; eight kits $574.40 paid; six required; 12% discount retained at six; label created, no collection scan; cancellation requested."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4108",
+			"from": 36,
+			"text": "Account BC-4108; owner Bram Fenwick; order BC-7308; authorized correspondence follows the account-contact notice in this case. Active email bram.fenwick@bc-4108.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7309",
+			"from": 41,
+			"text": "Order BC-7309; owner Esme Rowan; ST-5 $100.80 paid; HZ-4 logger reported; compatibility label missing; ST-4 $88.00 before tax; exchange unapproved."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4109",
+			"from": 41,
+			"text": "Account BC-4109; owner Esme Rowan; order BC-7309; authorized correspondence follows the account-contact notice in this case. Active email esme.rowan@bc-4109.example."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4105",
+			"from": 41,
+			"text": "Account BC-4105; owner Leonie Hart; order BC-7305; active email leonie.finance@rivermill.example; leonie.hart@bc-4105.example retired under CS-7305."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7310",
+			"from": 46,
+			"text": "Order BC-7310; owner Dario Finch; ten lamps $555.00 total; $200.00 deposit settled; seven allocated, three backordered; $355.00 uncaptured; no split-shipment consent."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4110",
+			"from": 46,
+			"text": "Account BC-4110; owner Dario Finch; order BC-7310; authorized correspondence follows the account-contact notice in this case. Active email dario.finch@bc-4110.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7311",
+			"from": 50,
+			"text": "Order BC-7311; owner Anika Moss; heat gun HG-2314 recalled; $88.20 paid; withdrawal from use required; Vera Lark approves remedy; surrender unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4111",
+			"from": 50,
+			"text": "Account BC-4111; owner Anika Moss; order BC-7311; authorized correspondence follows the account-contact notice in this case. Active email anika.moss@bc-4111.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7312",
+			"from": 54,
+			"text": "Order BC-7312; owner Soren Ashby; accessible workbench $1, 200.00 and freight $80.00 settled; name-change letter NL-7312 present; corrected invoice absent; grant evidence due shift 24."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4112",
+			"from": 54,
+			"text": "Account BC-4112; owner Soren Ashby; order BC-7312; authorized correspondence follows the account-contact notice in this case. Active email soren.ashby@bc-4112.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7301",
+			"from": 58,
+			"text": "Invoice BC-7301 revision FC-7301; owner Mara Ellison; paid $260.35; 12% merchandise discount; intake finding IN-7301-R accepted; Dana Voss approval AU-7301-R; no refund posting receipt."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4101",
+			"from": 58,
+			"text": "Account BC-4101; owner Mara Ellison; order BC-7301; authorized correspondence follows the account-contact notice in this case. Active email mara.ellison@repairguild.example; mara@alderbrook.example is retired."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7302",
+			"from": 62,
+			"text": "Order BC-7302; owner Ivo Mercer; recovered carton RC-7302; intact seals; destination Linden equipment annex; receiver Petra Salcedo; collection unbooked; $25.00 service credit approved but unposted."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4102",
+			"from": 62,
+			"text": "Account BC-4102; owner Ivo Mercer; order BC-7302; authorized correspondence follows the account-contact notice in this case. Active email ivo.mercer@bc-4102.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7303",
+			"from": 66,
+			"text": "Order BC-7303; owner Nadia Solano; CAP-7303 valid $318.00; CAP-7303-B duplicate $318.00; refund REF-7303-B processing under PR-7303; no settled refund receipt."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4103",
+			"from": 66,
+			"text": "Account BC-4103; owner Nadia Solano; order BC-7303; authorized correspondence follows the account-contact notice in this case. Active email nadia.solano@bc-4103.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7304",
+			"from": 70,
+			"text": "Order BC-7304; owner Tomas Wren; covered thermal-switch defect TR-7304; replacement serial EP-8816; consignment EW-5204 booked for shift 20; delivery unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4104",
+			"from": 70,
+			"text": "Account BC-4104; owner Tomas Wren; order BC-7304; authorized correspondence follows the account-contact notice in this case. Active email tomas.wren@bc-4104.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7305",
+			"from": 74,
+			"text": "Order BC-7305; owner Leonie Hart; short cut verified CR-7305; full refund $314.40 conditional on return; replacement withdrawn; active return label RL-7305-R; collection shift 18 pending."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4105",
+			"from": 74,
+			"text": "Account BC-4105; owner Leonie Hart; order BC-7305; active email leonie.finance@rivermill.example; leonie.hart@bc-4105.example retired under CS-7305."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7306",
+			"from": 78,
+			"text": "Order BC-7306; owner Oren Vale; cleared older balance $1, 360.00 under BR-7306; credit release CR-7306; consignment SB-8806 collected for Stonebridge north yard; delivery unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4106",
+			"from": 78,
+			"text": "Account BC-4106; owner Oren Vale; order BC-7306; authorized correspondence follows the account-contact notice in this case. Active email oren.vale@bc-4106.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7307",
+			"from": 82,
+			"text": "Order BC-7307; owner Celia Quill; inspection WR-7307; $18.00 coupling deduction accepted; $222.00 refund posted FR-7307; audit statement still required; finance contact celia.accounts@westhaven.example."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4107",
+			"from": 82,
+			"text": "Account BC-4107; owner Celia Quill; order BC-7307; authorized correspondence follows the account-contact notice in this case. Active email celia.accounts@westhaven.example; production route retired."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7308",
+			"from": 86,
+			"text": "Order BC-7308; owner Bram Fenwick; eight delivered, six retained, two sealed awaiting return; cancellation failed; return label MR-7308; 10% deduction waived; refund conditional on intake."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4108",
+			"from": 86,
+			"text": "Account BC-4108; owner Bram Fenwick; order BC-7308; authorized correspondence follows the account-contact notice in this case. Active email bram.fenwick@bc-4108.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7309",
+			"from": 90,
+			"text": "Order BC-7309; owner Esme Rowan; sales compatibility error accepted TA-7309; ST-5 returned RC-7309; ST-4 shipped HZ-9309; $8.40 credit posted XR-7309; delivery unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4109",
+			"from": 90,
+			"text": "Account BC-4109; owner Esme Rowan; order BC-7309; authorized correspondence follows the account-contact notice in this case. Active email esme.rowan@bc-4109.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7310",
+			"from": 94,
+			"text": "Order BC-7310; owner Dario Finch; seven neutral-white at $54.00 and three warm-white at $49.00 approved HB-7310; $15.00 freight; $200.00 deposit; amended balance approved but uncaptured; no dispatch."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4110",
+			"from": 94,
+			"text": "Account BC-4110; owner Dario Finch; order BC-7310; authorized correspondence follows the account-contact notice in this case. Active email dario.finch@bc-4110.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7311",
+			"from": 98,
+			"text": "Order BC-7311; owner Anika Moss; surrender CC-7311 complete; HG-S approval withdrawn VW-7311 before dispatch; $88.20 refund approved but unposted; allocation cancellation receipt pending."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4111",
+			"from": 98,
+			"text": "Account BC-4111; owner Anika Moss; order BC-7311; authorized correspondence follows the account-contact notice in this case. Active email anika.moss@bc-4111.example."
+		},
+		{
+			"tool": "lookup_order",
+			"id": "BC-7312",
+			"from": 102,
+			"text": "Order BC-7312; owner Soren Ashby; corrected invoice CI-7312; submission WR-6212 accepted GD-7312 for $1, 200.00; $80.00 freight excluded; grant cash payment unconfirmed."
+		},
+		{
+			"tool": "lookup_customer",
+			"id": "BC-4112",
+			"from": 102,
+			"text": "Account BC-4112; owner Soren Ashby; order BC-7312; authorized correspondence follows the account-contact notice in this case. Active email soren.ashby@bc-4112.example."
+		}
+	],
+	"goals": [
+		{
+			"id": "ev-01-1",
+			"shift": 1,
+			"after": 5,
+			"request": "Shift 1 queue decision sheet for Mara Ellison, BC-7301, concerning ceramic filter breakage. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-01-2",
+			"shift": 1,
+			"after": 5,
+			"request": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-01-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-01-3",
+			"shift": 1,
+			"after": 5,
+			"request": "Reconcile BC-7301 against your actual packet ev-01-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-01-4",
+			"shift": 1,
+			"after": 5,
+			"request": "Write the shift 1 handoff using your actual queue ev-01-1, packet ev-01-2, and reconciliation ev-01-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-02-1",
+			"shift": 2,
+			"after": 9,
+			"request": "Shift 2 queue decision sheet for Ivo Mercer, BC-7302, concerning meter delivery to a locked site. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-02-2",
+			"shift": 2,
+			"after": 9,
+			"request": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-02-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-02-3",
+			"shift": 2,
+			"after": 9,
+			"request": "Reconcile BC-7302 against your actual packet ev-02-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-02-4",
+			"shift": 2,
+			"after": 9,
+			"request": "Write the shift 2 handoff using your actual queue ev-02-1, packet ev-02-2, and reconciliation ev-02-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-03-1",
+			"shift": 3,
+			"after": 13,
+			"request": "Shift 3 queue decision sheet for Nadia Solano, BC-7303, concerning duplicate bench-vise charge. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-03-2",
+			"shift": 3,
+			"after": 13,
+			"request": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-03-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-03-3",
+			"shift": 3,
+			"after": 13,
+			"request": "Reconcile BC-7303 against your actual packet ev-03-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-03-4",
+			"shift": 3,
+			"after": 13,
+			"request": "Write the shift 3 handoff using your actual queue ev-03-1, packet ev-03-2, and reconciliation ev-03-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-04-1",
+			"shift": 4,
+			"after": 17,
+			"request": "Shift 4 queue decision sheet for Tomas Wren, BC-7304, concerning pump warranty diagnosis. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-04-2",
+			"shift": 4,
+			"after": 17,
+			"request": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-04-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-04-3",
+			"shift": 4,
+			"after": 17,
+			"request": "Reconcile BC-7304 against your actual packet ev-04-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-04-4",
+			"shift": 4,
+			"after": 17,
+			"request": "Write the shift 4 handoff using your actual queue ev-04-1, packet ev-04-2, and reconciliation ev-04-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-05-1",
+			"shift": 5,
+			"after": 22,
+			"request": "Shift 5 queue decision sheet for Leonie Hart, BC-7305, concerning cut cable quantity correction. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-05-2",
+			"shift": 5,
+			"after": 22,
+			"request": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-05-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-05-3",
+			"shift": 5,
+			"after": 22,
+			"request": "Reconcile BC-7305 against your actual packet ev-05-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-05-4",
+			"shift": 5,
+			"after": 22,
+			"request": "Write the shift 5 handoff using your actual queue ev-05-1, packet ev-05-2, and reconciliation ev-05-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-06-1",
+			"shift": 6,
+			"after": 26,
+			"request": "Shift 6 queue decision sheet for Oren Vale, BC-7306, concerning credit-account release hold. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-06-2",
+			"shift": 6,
+			"after": 26,
+			"request": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-06-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-06-3",
+			"shift": 6,
+			"after": 26,
+			"request": "Reconcile BC-7306 against your actual packet ev-06-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-06-4",
+			"shift": 6,
+			"after": 26,
+			"request": "Write the shift 6 handoff using your actual queue ev-06-1, packet ev-06-2, and reconciliation ev-06-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-07-1",
+			"shift": 7,
+			"after": 31,
+			"request": "Shift 7 queue decision sheet for Celia Quill, BC-7307, concerning rental return and deposit. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-07-2",
+			"shift": 7,
+			"after": 31,
+			"request": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-07-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-07-3",
+			"shift": 7,
+			"after": 31,
+			"request": "Reconcile BC-7307 against your actual packet ev-07-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-07-4",
+			"shift": 7,
+			"after": 31,
+			"request": "Write the shift 7 handoff using your actual queue ev-07-1, packet ev-07-2, and reconciliation ev-07-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-08-1",
+			"shift": 8,
+			"after": 36,
+			"request": "Shift 8 queue decision sheet for Bram Fenwick, BC-7308, concerning partial tool-kit cancellation. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-08-2",
+			"shift": 8,
+			"after": 36,
+			"request": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-08-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-08-3",
+			"shift": 8,
+			"after": 36,
+			"request": "Reconcile BC-7308 against your actual packet ev-08-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-08-4",
+			"shift": 8,
+			"after": 36,
+			"request": "Write the shift 8 handoff using your actual queue ev-08-1, packet ev-08-2, and reconciliation ev-08-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-09-1",
+			"shift": 9,
+			"after": 41,
+			"request": "Shift 9 queue decision sheet for Esme Rowan, BC-7309, concerning sensor compatibility exchange. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-09-2",
+			"shift": 9,
+			"after": 41,
+			"request": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-09-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-09-3",
+			"shift": 9,
+			"after": 41,
+			"request": "Reconcile BC-7309 against your actual packet ev-09-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-09-4",
+			"shift": 9,
+			"after": 41,
+			"request": "Write the shift 9 handoff using your actual queue ev-09-1, packet ev-09-2, and reconciliation ev-09-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-10-1",
+			"shift": 10,
+			"after": 46,
+			"request": "Shift 10 queue decision sheet for Dario Finch, BC-7310, concerning backordered lamp allocation. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-10-2",
+			"shift": 10,
+			"after": 46,
+			"request": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-10-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-10-3",
+			"shift": 10,
+			"after": 46,
+			"request": "Reconcile BC-7310 against your actual packet ev-10-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-10-4",
+			"shift": 10,
+			"after": 46,
+			"request": "Write the shift 10 handoff using your actual queue ev-10-1, packet ev-10-2, and reconciliation ev-10-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-11-1",
+			"shift": 11,
+			"after": 50,
+			"request": "Shift 11 queue decision sheet for Anika Moss, BC-7311, concerning safety recall and replacement consent. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-11-2",
+			"shift": 11,
+			"after": 50,
+			"request": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-11-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-11-3",
+			"shift": 11,
+			"after": 50,
+			"request": "Reconcile BC-7311 against your actual packet ev-11-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-11-4",
+			"shift": 11,
+			"after": 50,
+			"request": "Write the shift 11 handoff using your actual queue ev-11-1, packet ev-11-2, and reconciliation ev-11-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-12-1",
+			"shift": 12,
+			"after": 54,
+			"request": "Shift 12 queue decision sheet for Soren Ashby, BC-7312, concerning year-end grant reimbursement evidence. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-12-2",
+			"shift": 12,
+			"after": 54,
+			"request": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-12-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-12-3",
+			"shift": 12,
+			"after": 54,
+			"request": "Reconcile BC-7312 against your actual packet ev-12-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-12-4",
+			"shift": 12,
+			"after": 54,
+			"request": "Write the shift 12 handoff using your actual queue ev-12-1, packet ev-12-2, and reconciliation ev-12-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-13-1",
+			"shift": 13,
+			"after": 58,
+			"request": "Shift 13 queue decision sheet for Mara Ellison, BC-7301, concerning ceramic filter breakage. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-01-1 through ev-01-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-13-2",
+			"shift": 13,
+			"after": 58,
+			"request": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-13-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-01-1 through ev-01-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-13-3",
+			"shift": 13,
+			"after": 58,
+			"request": "Reconcile BC-7301 against your actual packet ev-13-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-13-4",
+			"shift": 13,
+			"after": 58,
+			"request": "Write the shift 13 handoff using your actual queue ev-13-1, packet ev-13-2, and reconciliation ev-13-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-14-1",
+			"shift": 14,
+			"after": 62,
+			"request": "Shift 14 queue decision sheet for Ivo Mercer, BC-7302, concerning meter delivery to a locked site. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-02-1 through ev-02-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-14-2",
+			"shift": 14,
+			"after": 62,
+			"request": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-14-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-02-1 through ev-02-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-14-3",
+			"shift": 14,
+			"after": 62,
+			"request": "Reconcile BC-7302 against your actual packet ev-14-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-14-4",
+			"shift": 14,
+			"after": 62,
+			"request": "Write the shift 14 handoff using your actual queue ev-14-1, packet ev-14-2, and reconciliation ev-14-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-15-1",
+			"shift": 15,
+			"after": 66,
+			"request": "Shift 15 queue decision sheet for Nadia Solano, BC-7303, concerning duplicate bench-vise charge. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-03-1 through ev-03-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-15-2",
+			"shift": 15,
+			"after": 66,
+			"request": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-15-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-03-1 through ev-03-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-15-3",
+			"shift": 15,
+			"after": 66,
+			"request": "Reconcile BC-7303 against your actual packet ev-15-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-15-4",
+			"shift": 15,
+			"after": 66,
+			"request": "Write the shift 15 handoff using your actual queue ev-15-1, packet ev-15-2, and reconciliation ev-15-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-16-1",
+			"shift": 16,
+			"after": 70,
+			"request": "Shift 16 queue decision sheet for Tomas Wren, BC-7304, concerning pump warranty diagnosis. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-04-1 through ev-04-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-16-2",
+			"shift": 16,
+			"after": 70,
+			"request": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-16-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-04-1 through ev-04-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-16-3",
+			"shift": 16,
+			"after": 70,
+			"request": "Reconcile BC-7304 against your actual packet ev-16-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-16-4",
+			"shift": 16,
+			"after": 70,
+			"request": "Write the shift 16 handoff using your actual queue ev-16-1, packet ev-16-2, and reconciliation ev-16-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-17-1",
+			"shift": 17,
+			"after": 74,
+			"request": "Shift 17 queue decision sheet for Leonie Hart, BC-7305, concerning cut cable quantity correction. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-05-1 through ev-05-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-17-2",
+			"shift": 17,
+			"after": 74,
+			"request": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-17-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-05-1 through ev-05-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-17-3",
+			"shift": 17,
+			"after": 74,
+			"request": "Reconcile BC-7305 against your actual packet ev-17-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-17-4",
+			"shift": 17,
+			"after": 74,
+			"request": "Write the shift 17 handoff using your actual queue ev-17-1, packet ev-17-2, and reconciliation ev-17-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-18-1",
+			"shift": 18,
+			"after": 78,
+			"request": "Shift 18 queue decision sheet for Oren Vale, BC-7306, concerning credit-account release hold. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-06-1 through ev-06-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-18-2",
+			"shift": 18,
+			"after": 78,
+			"request": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-18-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-06-1 through ev-06-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-18-3",
+			"shift": 18,
+			"after": 78,
+			"request": "Reconcile BC-7306 against your actual packet ev-18-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-18-4",
+			"shift": 18,
+			"after": 78,
+			"request": "Write the shift 18 handoff using your actual queue ev-18-1, packet ev-18-2, and reconciliation ev-18-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-19-1",
+			"shift": 19,
+			"after": 82,
+			"request": "Shift 19 queue decision sheet for Celia Quill, BC-7307, concerning rental return and deposit. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-07-1 through ev-07-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-19-2",
+			"shift": 19,
+			"after": 82,
+			"request": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-19-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-07-1 through ev-07-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-19-3",
+			"shift": 19,
+			"after": 82,
+			"request": "Reconcile BC-7307 against your actual packet ev-19-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-19-4",
+			"shift": 19,
+			"after": 82,
+			"request": "Write the shift 19 handoff using your actual queue ev-19-1, packet ev-19-2, and reconciliation ev-19-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-20-1",
+			"shift": 20,
+			"after": 86,
+			"request": "Shift 20 queue decision sheet for Bram Fenwick, BC-7308, concerning partial tool-kit cancellation. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-08-1 through ev-08-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-20-2",
+			"shift": 20,
+			"after": 86,
+			"request": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-20-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-08-1 through ev-08-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-20-3",
+			"shift": 20,
+			"after": 86,
+			"request": "Reconcile BC-7308 against your actual packet ev-20-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-20-4",
+			"shift": 20,
+			"after": 86,
+			"request": "Write the shift 20 handoff using your actual queue ev-20-1, packet ev-20-2, and reconciliation ev-20-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-21-1",
+			"shift": 21,
+			"after": 90,
+			"request": "Shift 21 queue decision sheet for Esme Rowan, BC-7309, concerning sensor compatibility exchange. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-09-1 through ev-09-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-21-2",
+			"shift": 21,
+			"after": 90,
+			"request": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-21-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-09-1 through ev-09-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-21-3",
+			"shift": 21,
+			"after": 90,
+			"request": "Reconcile BC-7309 against your actual packet ev-21-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-21-4",
+			"shift": 21,
+			"after": 90,
+			"request": "Write the shift 21 handoff using your actual queue ev-21-1, packet ev-21-2, and reconciliation ev-21-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-22-1",
+			"shift": 22,
+			"after": 94,
+			"request": "Shift 22 queue decision sheet for Dario Finch, BC-7310, concerning backordered lamp allocation. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-10-1 through ev-10-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-22-2",
+			"shift": 22,
+			"after": 94,
+			"request": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-22-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-10-1 through ev-10-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-22-3",
+			"shift": 22,
+			"after": 94,
+			"request": "Reconcile BC-7310 against your actual packet ev-22-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-22-4",
+			"shift": 22,
+			"after": 94,
+			"request": "Write the shift 22 handoff using your actual queue ev-22-1, packet ev-22-2, and reconciliation ev-22-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-23-1",
+			"shift": 23,
+			"after": 98,
+			"request": "Shift 23 queue decision sheet for Anika Moss, BC-7311, concerning safety recall and replacement consent. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-11-1 through ev-11-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-23-2",
+			"shift": 23,
+			"after": 98,
+			"request": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-23-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-11-1 through ev-11-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-23-3",
+			"shift": 23,
+			"after": 98,
+			"request": "Reconcile BC-7311 against your actual packet ev-23-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-23-4",
+			"shift": 23,
+			"after": 98,
+			"request": "Write the shift 23 handoff using your actual queue ev-23-1, packet ev-23-2, and reconciliation ev-23-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved."
+		},
+		{
+			"id": "ev-24-1",
+			"shift": 24,
+			"after": 102,
+			"request": "Shift 24 queue decision sheet for Soren Ashby, BC-7312, concerning year-end grant reimbursement evidence. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-12-1 through ev-12-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote."
+		},
+		{
+			"id": "ev-24-2",
+			"shift": 24,
+			"after": 102,
+			"request": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-24-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-12-1 through ev-12-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"id": "ev-24-3",
+			"shift": 24,
+			"after": 102,
+			"request": "Reconcile BC-7312 against your actual packet ev-24-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred."
+		},
+		{
+			"id": "ev-24-4",
+			"shift": 24,
+			"after": 102,
+			"request": "Write the shift 24 handoff using your actual queue ev-24-1, packet ev-24-2, and reconciliation ev-24-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Close only obligations whose final evidence has arrived, and explicitly reconcile the grant task that began at the opening of the period."
+		}
+	]
+}

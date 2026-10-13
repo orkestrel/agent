@@ -1,0 +1,12 @@
+Q2 fit execution receipt
+Command: node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal .orkestrel/agent/instruments/results/l15/logs/q2-calibration-fit.jsonl --errors .orkestrel/agent/instruments/results/l15/logs/q2-calibration-fit.err --cap 240 --status -- node .orkestrel/agent/instruments/harness/.build/bench5/refit.js fit --frozen .orkestrel/agent/instruments/results/l15/q2-think0/freeze/manifest.json --corpus .orkestrel/agent/instruments/results/l15/calibration/q2/corpus --attempts .orkestrel/agent/instruments/results/l15/calibration/q2/generation --labels .orkestrel/agent/instruments/results/l15/calibration/q2/labels.json --model qwen3.5:2b --out .orkestrel/agent/instruments/results/l15/calibration/q2/fit --url http://127.0.0.1:11435
+Fit launch: pid=62172 exit=3 signal=none capped=false durationMs=1573
+Fit bare stdout bytes=0; terminal stderr: exit=3 signal=none capped=false duration_ms=1573
+Fit directory output: diagnosis.json only, 357 bytes; no fit.json.
+Reader command: node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal tmp/units/aggregate-successor-q2-fit-validation.stdout.jsonl --errors tmp/units/aggregate-successor-q2-fit-validation.err --cap 60 -- node tmp/units/aggregate-successor-q2-fit-read.ts
+Reader launch: pid=59784 exit=1 signal=none capped=false durationMs=162
+Reader bare stdout bytes=0; reader error: reproducible refit diagnosis required
+Reader raw error is preserved in aggregate-successor-q2-fit-validation.err.
+Preflight and closure: HEAD 1491e6b2b8913f814d308c3d45ff002e1506abe4; build 0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc; frozen manifest 442dfeb697d843e28ab3c8985aabb720d768d9f9646b33a128124a74560b53fd; labels wrapper ae937346c5e0abdc1b4543511b171e93ec117f795b90b9fd93af87e67b53f661.
+After hashes: build 0db4bd7e9f43a7ba8fff1e79a826a52d114db6c8e90de34b8e139737de43b3fc; frozen 442dfeb697d843e28ab3c8985aabb720d768d9f9646b33a128124a74560b53fd; labels ae937346c5e0abdc1b4543511b171e93ec117f795b90b9fd93af87e67b53f661; generation manifest 10e654ee24fe25b7a32af7e8f6610467154a8c1c5cc65dcbebb2c6335e722d23; attempts f4c2077126abaf6cfff9d442c951becfd266598926e2773f5c8e19b28b207cb9; diagnosis 9a758e404506394fb752d4941b4d2328804d7cac46fbc116d85722f58ab6bcc9 (357 bytes).
+PID closure: 62172 gone; 59784 gone. The listener on 127.0.0.1:11435 remained PID 1620; separate user service PID 32104 remained present.

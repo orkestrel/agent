@@ -1,0 +1,197 @@
+{
+  "verified": 70,
+  "entries": [
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-export.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-development-blind-packet-export.ts",
+      "bytes": 12057,
+      "hash": "c6f1e212ef8bca0035862b78556fbafc564123ad1590d9f3e27211585b385fb9"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-brief.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-brief.md",
+      "bytes": 5654,
+      "hash": "e72126a57ed26ed50d4d41e084503ad9e6eb8bab19ba084ffd8c6c6134e6b9ac"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-custody.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-custody.json",
+      "bytes": 49238,
+      "hash": "e334c0a642423f24e121114bdd2e7416e4de8702ec605e2041f3db293822a9a9"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-custody.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-custody.ts",
+      "bytes": 2376,
+      "hash": "a8eafe5052fc3410a9031b90271ccbe14272b95c010c25c91119ffc54d6f00ca"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-report.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-report.md",
+      "bytes": 5835,
+      "hash": "cfad8139b7260ce1e174b63d1a35795294d3bd471e026c7066b417236b2f0b93"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-retain.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-retain.ts",
+      "bytes": 3245,
+      "hash": "ac25e0bed83f49e9d93b4493268476e15b025d9aa5e1253f8fb96b4cebfdadc2"
+    },
+    {
+      "original": "tmp/units/aggregate-final-q4-pilot-validate.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-q4-pilot-validate.ts",
+      "bytes": 5180,
+      "hash": "ebc3940f5073e1fc8dcf73e52b6d595a96e9a168239a10da9d3c3cb9af9c7aef"
+    },
+    {
+      "original": "tmp/units/aggregate-final-qualification-repair-2.patch",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-qualification-repair-2.patch",
+      "bytes": 18603,
+      "hash": "76cb1f35ca519737cd059bd24ac6a55a0387c9c61fb916f14adbe7d99790e8a6"
+    },
+    {
+      "original": "tmp/units/aggregate-final-qualification-repair-report-2.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-final-qualification-repair-report-2.md",
+      "bytes": 18609,
+      "hash": "da0d621863f278de5fe199b8a726b01cf844da8a4298b5e86c92622acdaae930"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-launch.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-daemon-launch.ts",
+      "bytes": 1670,
+      "hash": "f5ef2dcb4b1285bfe389a99cf716d4b37407095596952abf2c48a87fdd51b2f4"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-daemon-materialize.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-daemon-materialize.ts",
+      "bytes": 2755,
+      "hash": "314c8f2f2eda265c9535bc5fc2ba3584d7416ff70f83aaa9b7d8ac5bb88c961e"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-2.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-2.ts",
+      "bytes": 12879,
+      "hash": "6f66bdf67dd93d65a59a171b319c2126b50f8da2e240344b8b7f3a9bfc2f0936"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-3.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-3.ts",
+      "bytes": 12864,
+      "hash": "5678562cea61d0fca01832188377e259b661b224802fdabd84d7c73caf0ce5e7"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-brief-2.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-brief-2.md",
+      "bytes": 4607,
+      "hash": "d89017c6f4a414d09362f165f088d42b948cb7806a60cfcfa5c58c4536eb86fd"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-brief-3.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-brief-3.md",
+      "bytes": 5153,
+      "hash": "994cf4e15092d26aa24c4fdf4f0008e2140fd486e533fad1d2578235e2509faa"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-brief.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-brief.md",
+      "bytes": 3504,
+      "hash": "34100a107151918870b9761abd4451464c67ef7860468c166f025e23307e030f"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-report-2.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-report-2.md",
+      "bytes": 5320,
+      "hash": "747efb980604f8595d91c8abd0027323d6acd01bdb0c95d9fedf83af61394ff3"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-report-3.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-report-3.md",
+      "bytes": 3183,
+      "hash": "9e8564b1aadde67cd7a4cf1edd8e0fe79f605bdde48187d91db1dc606b322f25"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-report.md",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-report.md",
+      "bytes": 4589,
+      "hash": "3651f4966462b066db430e47a7d73953895b68dd56e0cd9e3af4ca817aab1d08"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-result-2.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-result-2.json",
+      "bytes": 4433,
+      "hash": "c25dca109679072e8efd60d8392e210fac57842d0b4d48cbebb5275aebe2e46a"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-result-3.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-result-3.json",
+      "bytes": 4432,
+      "hash": "d5193b982645b244343ceefe2d6e20a4b49e0c02678c8a320eb661f5fa985a71"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check-result.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check-result.json",
+      "bytes": 4559,
+      "hash": "29d2c1469c48961cdcba12d985c750095fd51528b0f324e347b7929fe25c0abc"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-preparation-check.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-preparation-check.ts",
+      "bytes": 7398,
+      "hash": "fcd4ca668d9aa362a7d3d8212474e7113f562b8fa5d0813a4649aa1fcaf88486"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-command-plan.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-q4-command-plan.json",
+      "bytes": 9985,
+      "hash": "fbc73fbc19ebd34910fd977a87322ed5be296df9dcb5e761ab0661d1ff54fbb0"
+    },
+    {
+      "original": "tmp/units/aggregate-successor-q4-plan.ts",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/aggregate-successor-q4-plan.ts",
+      "bytes": 2687,
+      "hash": "3e6097ff21ea21d56ea9dacf13f63b656c1eadb05e93f72428673e844e057758"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l14/logs/q4-think0-pilot.err",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/q4-think0-pilot.err",
+      "bytes": 53,
+      "hash": "403df495f295580f28bf9e3af4733b4f29e7ff3b6fbc865f600e83b75d1a9afe"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l14/logs/q4-think0-pilot.jsonl",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/q4-think0-pilot.jsonl",
+      "bytes": 1567,
+      "hash": "bb315bc96a37611d6ca25274da004fc601911d9ec3832f1775c9f967406f5870"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l14/logs/q4-think0-pilot.jsonl.pid",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/q4-think0-pilot.jsonl.pid",
+      "bytes": 6,
+      "hash": "a8c92ce91b50e8032ab9b63bccfa6b9f7cf5778b57e1a9bc5237d99bc942e977"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l14/logs/q4-think0-pilot.jsonl.status-after.txt",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/q4-think0-pilot.jsonl.status-after.txt",
+      "bytes": 460,
+      "hash": "dd014c34f9eabebfe13f93d8fbf22da41730c29d1eba38b5411699ce1ed1e8cc"
+    },
+    {
+      "original": ".orkestrel/agent/instruments/results/l14/logs/q4-think0-pilot.jsonl.status-before.txt",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/q4-think0-pilot.jsonl.status-before.txt",
+      "bytes": 102,
+      "hash": "f92404fe0e35a222e37545ebc558f58e24f064f456a644d88f4a51d06bb412d6"
+    },
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-l14-b/packet.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/packet.json",
+      "bytes": 255138,
+      "hash": "14b3d53e58eeb7dac1f975c6160974df0a133b6ae8a0cb76a0558c6e73ebfef7"
+    },
+    {
+      "original": "tmp/units/aggregate-development-blind-packet-l14-b/private/joins.json",
+      "retained": ".orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-pilot/joins.json",
+      "bytes": 26591,
+      "hash": "cc1ef80f9f5bed19ae84956195e0accae726a5ad05a645ae4e5a1f278900b69d"
+    }
+  ]
+}

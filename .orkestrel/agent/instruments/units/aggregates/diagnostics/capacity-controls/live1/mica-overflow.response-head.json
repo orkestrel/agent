@@ -1,0 +1,22 @@
+{
+  "status": 400,
+  "text": "Bad Request",
+  "url": "http://127.0.0.1:11434/api/generate",
+  "redirected": false,
+  "headers": [
+    [
+      "content-length",
+      "223"
+    ],
+    [
+      "content-type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "date",
+      "Sun, 11 Oct 2026 11:08:54 GMT"
+    ]
+  ],
+  "at": "2026-10-11T11:08:54.801Z",
+  "duration": 4681.165000000037
+}

@@ -1,0 +1,2 @@
+{"offline":true,"message":"No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.","host":"Windows; controlled attached daemon; exclusive serial client; no other service requests"}
+{"offline":true,"message":"No daemon started. Root must dispatch --start through the canonical launcher after closing the prior recorded tree."}

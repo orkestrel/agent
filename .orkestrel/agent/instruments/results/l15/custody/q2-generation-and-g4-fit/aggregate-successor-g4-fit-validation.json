@@ -1,0 +1,76 @@
+{
+  "validated": true,
+  "fit": {
+    "present": false
+  },
+  "diagnosis": {
+    "accepted": false,
+    "strictCutoff": 0.79,
+    "exploratoryCutoff": 0.61,
+    "reasons": [
+      "end-to-end admission below 0.5"
+    ],
+    "errors": [],
+    "occurrences": {
+      "supported": 136,
+      "scored": 136,
+      "admitted": 36,
+      "conditional": 0.2647058823529412,
+      "admission": 0.2647058823529412
+    },
+    "distinct": {
+      "supported": 36,
+      "scored": 36,
+      "admitted": 6,
+      "conditional": 0.16666666666666666,
+      "admission": 0.16666666666666666
+    },
+    "lexicalFailures": 25,
+    "missingScores": 0
+  },
+  "cost": {
+    "wire": [
+      {
+        "phase": "trajectory",
+        "role": "summarizer",
+        "requests": 53,
+        "wall": 688320.8044000006,
+        "prompt": 37103,
+        "completion": 6342,
+        "missing": 0
+      },
+      {
+        "phase": "trajectory",
+        "role": "judge",
+        "requests": 165,
+        "wall": 634676.1718999995,
+        "prompt": 177349,
+        "completion": 165,
+        "missing": 0
+      }
+    ],
+    "failures": [],
+    "controls": [
+      {
+        "role": "judge",
+        "requests": 25,
+        "wall": 56496.79340000008,
+        "prompt": 18236,
+        "completion": 25,
+        "missing": 0
+      }
+    ],
+    "replay": 448
+  },
+  "rowCounts": {
+    "attemptRows": 179,
+    "validAttempts": 179,
+    "readings": 191
+  },
+  "hashes": {
+    "diagnosis": "a459c9fa0ab48114163d9257e6178d7c2a55dd7c140f15de0e1350a01fa4e1ba",
+    "controls": "ef68d00bb430d3b6cd56a8ccf7076f862694fcbf2d08761a38090e0daeb9c499",
+    "generationManifest": "b9c622ed08613260e489f87a8539b8d7c177ece7a20e5fe0ea8108799fc74d26",
+    "attempts": "a47701990322dce8ea572b41be2454feed000e691bf79b60c2e8947c27191591"
+  }
+}

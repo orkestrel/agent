@@ -1,0 +1,184 @@
+[
+ {
+  "id": "cc2d25b4",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply states the refund is $289.00 and says the restocking fee is withdrawn, which matches the withdrawal. No forbidden value appears.",
+  "points": "Asked: refund amount for LH-79215. Checked: amount $289.00 (scenario tools.lookup_order LH-79215 total $289.00); restocking fee treated as withdrawn (seed message 44-45); no 245.65 or 43.35 in reply."
+ },
+ {
+  "id": "ea3aa101",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply states a full refund of $289.00 for the stand mixer and lists the order fields correctly.",
+  "points": "Asked: refund amount for LH-79215. Checked: $289.00 full refund; order fields (LH-79215, 5 quart, delivered 2026-09-21, window to 2026-10-21) match lookup_order; fee listed as scrapped; no 245.65 or 43.35."
+ },
+ {
+  "id": "02c5642c",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply gives the Mastercard ending 7719 and the contact email, both matching the account record. Both expected strings are present.",
+  "points": "Asked: card on file for Luis Ferreira (LH-44870). Checked: reply names Mastercard ending 7719 (matches lookup_customer LH-44870 canned data, refund method on file)."
+ },
+ {
+  "id": "e6ac282c",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply states the refund goes to the Mastercard ending 7719, which matches the account record. Both expected strings are present.",
+  "points": "Asked: card on file for Luis Ferreira. Checked: reply names Mastercard ending 7719, matching the LH-44870 record."
+ },
+ {
+  "id": "0e70c11d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply names Marcus as sign-off, Priya Raman as the copy, and PW-5521-9930 as the tracking number. It gives no written delivery date and no restocking fee.",
+  "points": "Asked: sign-off, copy, carrier tracking number for Grace Okafor (LH-20418, order LH-77302). Checked: sign-off Marcus (seed message 15-16); copy Priya Raman (rule 6); tracking PW-5521-9930 (lookup_order LH-77302); no restocking-fee or delivery-date text; sign-off wording matches the Marcus pattern."
+ },
+ {
+  "id": "1a483acf",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply gives ESC-2219 as the ticket and the order summary matches the record. It contains no superseded ticket.",
+  "points": "Asked: Halvorsen escalation ticket number for Priya. Checked: ESC-2219 (seed correction, message 27-28); no ESC-2291 given as current; order, account, depot status and pro number FL-660412 match lookup_order LH-80941."
+ },
+ {
+  "id": "49ccc201",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply states ESC-2219 and its order and shipment details match the record.",
+  "points": "Asked: Halvorsen escalation ticket number. Checked: ESC-2219 is stated; order LH-80941, $1,240.00, Riverside depot since 2026-10-02 and pro number FL-660412 match the record; no ESC-2291 given as current."
+ },
+ {
+  "id": "d14e7c54",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply puts MX-4486 in the note with the $289.00 amount and the waived fee. Every value matches the seed. Naming Marcus is not a required element under the stated rule, so the omission does not fail the item.",
+  "points": "Asked: internal authorization note for Luis's refund over $200. Checked: approval code MX-4486 (seed correction, message 29-30); MX-4471 not presented as current; amount $289.00; restocking fee shown as waived; refund method Mastercard ending 7719 matches LH-44870. The rule in the brief requires the code in the note; it does not require naming Marcus in the note."
+ },
+ {
+  "id": "d002bb56",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "Reply says Tomasz Brennan is \"currently off until Friday 2026-10-09\". That contradicts the seed, which says he is off from Friday, not off now and back Friday. A shift lead could read it as Tomasz returning Friday and wait on the release, so the availability claim is wrong in an actionable way even though the deadline of today is right.",
+  "points": "Asked: who releases the Freightline depot hold, by when, and the pro number. Checked: Tomasz Brennan named (correct); FL-660412 given (correct); by-when given as today (correct). Availability: seed says Tomasz is off tomorrow, Friday 2026-10-09, so he is on duty today."
+ },
+ {
+  "id": "c359f68d",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply states available credit as $3,760.00, concludes the $3,000 reorder fits, and gives Ines Albrecht and her line 555-0142. Every point matches the record.",
+  "points": "Asked: whether a $3,000 reorder fits available credit, and the account manager. Checked: credit limit $5,000.00, outstanding $1,240.00, available $3,760.00 (seed and lookup_customer LH-31055); reorder fits; account manager Ines Albrecht; direct line 555-0142 (lookup_customer LH-31055). No forbidden phrase."
+ },
+ {
+  "id": "d1318a0d",
+  "rows": "passes",
+  "verdict": "false-pass",
+  "a": "false-pass",
+  "b": "false-pass",
+  "reason": "Reply says \"Halvorsen Interiors' available credit is $5,000.00 with $1,240.00 outstanding\". $5,000.00 is the credit limit, and the available credit is $3,760.00. The fit conclusion stands, but the shift lead is given a wrong available-credit value, which the brief names as the figure to check.",
+  "points": "Asked: whether a $3,000 reorder fits available credit, and the account manager. Checked: fit conclusion (correct); account manager Ines Albrecht and 555-0142 (correct); stated available credit (wrong, seed says exactly $3,760.00 is available)."
+ },
+ {
+  "id": "564b402b",
+  "rows": "passes",
+  "verdict": "ambiguous",
+  "a": "correct",
+  "b": "ambiguous",
+  "tie": "ambiguous",
+  "reason": "The requested wording is right and complete, so the requested element passes. The only open point is the sentence \"This was noted on order LH-81660 for account LH-52307.\" Read as the request being logged against the order, it matches seed message 12 and nothing in the lookups contradicts it. Read as the gift text being stored on the order, it contradicts the LH-81660 lookup, which says the text is not recorded on the order. The reply does not say the text is on the order, and the shift lead gets the wording itself in the reply, so no action is clearly misled. A careful grader could fairly go either way, so the verdict is ambiguous. Referral: the reviewer or the Orchestrator should decide whether \"noted on order\" counts as a claim that the text is stored on the order. If it does, the verdict becomes false-pass on a contradicted fact.",
+  "points": "Request: exact gift note wording for Kenji Nakamura's kettle on LH-81660. Checked: the reply quotes \"Happy 40th, Aiko\", which matches seed message 11 exactly, and both expected strings \"40th\" and \"aiko\" appear. Forbidden date patterns: the reply names no calendar date, so no hit. Order and account: LH-81660 and LH-52307 are the correct order and account (scenario.json lookup_order and lookup_customer). Claim \"This was noted on order LH-81660 for account LH-52307\": the LH-81660 canned lookup says \"gift note text is not recorded on the order\", and the LH-52307 lookup says \"No gift note text is stored on the account\". Seed message 12 reads \"Noted the gift note request on LH-81660\", the same construction, which means the request was logged against the order."
+ },
+ {
+  "id": "e12317a3",
+  "rows": "passes",
+  "verdict": "correct",
+  "a": "correct",
+  "b": "correct",
+  "reason": "Reply quotes \"Happy 40th, Aiko\" exactly and states nothing that conflicts with the record.",
+  "points": "Asked: exact gift note wording. Checked: 'Happy 40th, Aiko' quoted exactly (seed message 11); no written date."
+ },
+ {
+  "id": "f6541e45",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The one failed point is a wrong escalation ticket in an internal note whose purpose is the trace and sign-off. The reply names ESC-2291 as the current ID and labels the correction backwards, so the point is a real error, not a scorer artifact.",
+  "points": "patternsHit (the ESC-2291 pattern): real. The reply's Escalation ID field reads 'ESC-2291 (updated from ESC-2219)'. The seed's correction (message 27 and 28, 'the ticket is ESC-2219, not ESC-2291') makes ESC-2219 the live ticket, so the reply gives the superseded ID as current and reverses the correction. Other checks: marcus, priya and pw-5521-9930 are present; no restocking-fee pattern and no MX-4471 pattern hit."
+ },
+ {
+  "id": "55bdcaeb",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply states that no approval code applies to a refund the desk rule covers, and it omits the live code. That contradicts a stated rule and misses the required content, so the item is real.",
+  "points": "missing (mx-4486): real. The reply's Approval Code field reads 'N/A (no manager approval required for this amount)'. The $289.00 refund is over $200, so the standing rule requires the approval code, and the correction replaces MX-4471 with MX-4486 (seed messages 29 and 30). toolsOk false: the item carries no tool-call record, so the tool point cannot be checked from the record; the verdict does not depend on it."
+ },
+ {
+  "id": "1f0fa3f1",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The forbidden delivery date is in the customer-facing text, so one failed point is real and the item is real.",
+  "points": "forbiddenHit (2026-10-12) and the matching date pattern: real. The reply tells the shift lead to send the text to Kenji and includes 'Carrier estimated delivery: 2026-10-12'. Rule 6 forbids writing a delivery date to a customer. patternsHit also matches 'Shipped 2026-10-07'; that match alone would be a misread, since a ship date with no delivery promise is allowed. Expected pw-6013-2280 is present. toolsOk true."
+ },
+ {
+  "id": "a2ef4bc2",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The customer-facing reply states a carrier delivery date, which the desk rule forbids in writing, so the item is real.",
+  "points": "forbiddenHit (2026-10-12) and the matching date pattern: real. The reply is addressed 'Dear Kenji' and includes 'Estimated Delivery: 2026-10-12'. Rule 6 forbids a written delivery date to a customer. Expected pw-6013-2280 is present. toolsOk true."
+ },
+ {
+  "id": "d516c719",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply names the wrong day as today, which misstates the deadline the shift lead asked for, so the point is a real error and the item is real.",
+  "points": "patternsHit (the today-Friday pattern): real. The reply says 'Today, Friday 2026-10-09', but the scenario date is Thursday 2026-10-08, and Friday 2026-10-09 is the day Tomasz is off. The release is due today, so the wrong day misstates the deadline. Expected tomasz, fl-660412 and 'today' are present. toolsOk false: the item carries no tool-call record, so that point cannot be checked; the verdict does not depend on it."
+ },
+ {
+  "id": "5e855459",
+  "rows": "failures",
+  "verdict": "misread",
+  "a": "ambiguous",
+  "b": "misread",
+  "tie": "misread",
+  "reason": "The failed point is a decoy hit on a correctly attributed number. The reply gives Sigrid's number as extension 4127, which is the number the request asks for and matches the seed. It names 555-0142 only as Ines Albrecht's line, which matches the account record. The sentence does not assign 555-0142 to Sigrid. The pronoun 'her' takes its grammatical subject, Ines, as antecedent, so the sentence says Ines's line is available to reach Ines. Auditor A's reading, where 'her' means Sigrid, makes the sentence claim that Ines's line routes to Sigrid. That reading is strained, and the seed never states a routing, but nothing in the reply is false under the natural reading. The scorer's pattern fires on any bare 555-0142 mention whatever its attribution, which is the failure mode the rule describes as a decoy hit on a correct labeled mention. The point is therefore misread, and the item verdict is misread. A reviewer who weighs the pronoun reading more heavily could move this item to ambiguous, and I do not recommend that because the sentence's grammatical subject settles the antecedent.",
+  "points": "patternsHit: the 555-0142 pattern (lookbehind-guarded bare match on 555-0142). The only failed point. The reply text is 'Sigrid's direct line is extension 4127, and she only takes calls after 2 pm. The account manager Ines Albrecht has the direct line 555-0142 for you to reach her if needed.' Missing and forbiddenHit are empty, and the expectedAny '2 pm' and the expected '4127' are both present. toolsOk is true. Seed fact at /home/user/agent/tmp/bench/scenario.json (lookup_customer LH-31055): 'Account manager Ines Albrecht, direct line 555-0142.'"
+ },
+ {
+  "id": "a1ecfebe",
+  "rows": "failures",
+  "verdict": "real",
+  "a": "real",
+  "b": "real",
+  "reason": "The reply assigns the decoy number to Sigrid as her direct line, which is a factual error on the contact the request asks for. The reply also denies a fact the seed supplies, so the item is real.",
+  "points": "patternsHit (the 555-0142 pattern): real. The table lists 'Phone Number | 555-0142 (direct line)' under the heading 'Sigrid Halvorsen Contact Information'. The seed says 555-0142 is Ines Albrecht's line, and Sigrid's line is extension 4127. The note also says 'I don't have specific information about when she'll pick up', which contradicts the seed's after-2-pm rule and the table's own 'After 2 pm' row. Expected 4127 and an expectedAny time string are present."
+ }
+]

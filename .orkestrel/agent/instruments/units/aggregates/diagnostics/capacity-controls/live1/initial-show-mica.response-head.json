@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "text": "OK",
+  "url": "http://127.0.0.1:11434/api/show",
+  "redirected": false,
+  "headers": [
+    [
+      "content-type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "date",
+      "Sun, 11 Oct 2026 11:03:49 GMT"
+    ],
+    [
+      "transfer-encoding",
+      "chunked"
+    ]
+  ],
+  "at": "2026-10-11T11:03:49.616Z",
+  "duration": 74.20189999999991
+}

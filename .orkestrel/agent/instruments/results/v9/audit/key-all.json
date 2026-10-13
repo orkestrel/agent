@@ -1,0 +1,347 @@
+[
+ {
+  "id": "022e0cf1",
+  "run": "a1-control-v1",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "20812ef1",
+  "run": "a1-control-v1",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "c05b27f6",
+  "run": "a1-control-v1",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "c927315b",
+  "run": "a1-control-v1",
+  "goal": "g09-kenji-gift-note"
+ },
+ {
+  "id": "1fcf11e2",
+  "run": "a1-control-v1",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "43b176c5",
+  "run": "a1-control-v2",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "3e044ddf",
+  "run": "a1-control-v2",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "022bc8e5",
+  "run": "a1-control-v2",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "b1437ed0",
+  "run": "a1-control-v2",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "424e32c5",
+  "run": "a1-control-v3",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "740c436d",
+  "run": "a1-control-v3",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "74332835",
+  "run": "a1-control-v3",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "f5d4111a",
+  "run": "a1-control-v3",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "cc160ee2",
+  "run": "a1-control-v3",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "59b5ce79",
+  "run": "a1-control-v4",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "f6eadfa3",
+  "run": "a1-control-v4",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "a2d243c1",
+  "run": "a1-control-v5",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "813efafa",
+  "run": "a1-control-v5",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "53e81ae6",
+  "run": "a1-control-v5",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "49504698",
+  "run": "a1-control-v5",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "886b1aea",
+  "run": "a1-control-v5",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "349ea4df",
+  "run": "a1-control-v6",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "411d93af",
+  "run": "a1-control-v6",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "52572b2b",
+  "run": "a1-control-v6",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "679164c9",
+  "run": "a1-control-v6",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "490caa8a",
+  "run": "a1-control-v6",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "00a3ea39",
+  "run": "a1-control-v7",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "7d066c9f",
+  "run": "a1-control-v7",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "64952363",
+  "run": "a1-control-v7",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "b2d33931",
+  "run": "a1-control-v8",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "4dd4b308",
+  "run": "a1-control-v8",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "3fce8efe",
+  "run": "a1-control-v8",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "ff8614fc",
+  "run": "a3-refined-v1",
+  "goal": "g04-halvorsen-ticket"
+ },
+ {
+  "id": "e63875c7",
+  "run": "a3-refined-v1",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "03bd4cc0",
+  "run": "a3-refined-v1",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "58600b17",
+  "run": "a3-refined-v2",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "7b5f4c7a",
+  "run": "a3-refined-v2",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "31c85b8b",
+  "run": "a3-refined-v3",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "47e48b65",
+  "run": "a3-refined-v3",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "b5003f73",
+  "run": "a3-refined-v3",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "6aa35151",
+  "run": "a3-refined-v3",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "39267a11",
+  "run": "a4-refined-v1",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "bd903650",
+  "run": "a4-refined-v1",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "b98155f5",
+  "run": "a4-refined-v1",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "0ae43d88",
+  "run": "a4-refined-v2",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "c290deb7",
+  "run": "a4-refined-v2",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "5b3a9d2a",
+  "run": "a4-refined-v3",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "3eb0eb17",
+  "run": "a4-refined-v3",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "2305ce3a",
+  "run": "a4-refined-v3",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "034a519e",
+  "run": "a4-refined-v3",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "59f856bd",
+  "run": "a4-refined-v4",
+  "goal": "g05-luis-approval-note"
+ },
+ {
+  "id": "3ab75faa",
+  "run": "a4-refined-v4",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "9c419b77",
+  "run": "a4-refined-v4",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "385c7541",
+  "run": "a4-refined-v5",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "f651b726",
+  "run": "a4-refined-v5",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "f06a5408",
+  "run": "a4-refined-v5",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "62d973a7",
+  "run": "a4-refined-v2",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "4bb98d89",
+  "run": "a4-refined-v6",
+  "goal": "g03-grace-escalation"
+ },
+ {
+  "id": "e3951e48",
+  "run": "a4-refined-v6",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "2116eee6",
+  "run": "a4-refined-v6",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "6791a02e",
+  "run": "a4-refined-v6",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "d20dbfce",
+  "run": "a4-refined-v6",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "7a8bd5e5",
+  "run": "a4-refined-v7",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "e133427f",
+  "run": "a4-refined-v7",
+  "goal": "g07-depot-release"
+ },
+ {
+  "id": "e421c7ac",
+  "run": "a4-refined-v7",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "6b5892f0",
+  "run": "a4-refined-v7",
+  "goal": "g10-sigrid-callback"
+ },
+ {
+  "id": "8deba591",
+  "run": "a4-refined-v8",
+  "goal": "g06-kenji-shipping"
+ },
+ {
+  "id": "8607b631",
+  "run": "a4-refined-v8",
+  "goal": "g08-halvorsen-credit"
+ },
+ {
+  "id": "089570e2",
+  "run": "a4-refined-v8",
+  "goal": "g10-sigrid-callback"
+ }
+]

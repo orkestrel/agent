@@ -1,0 +1,11 @@
+{
+  "id": "g2-generation",
+  "complete": true,
+  "breached": false,
+  "bytes": 2730,
+  "hash": "2689fded73b54191d5b2e23eda7689ce673fc983c9991c13fb7cfeb1cda7ebf3",
+  "status": 200,
+  "started": "2026-10-11T11:06:27.508Z",
+  "finished": "2026-10-11T11:06:48.916Z",
+  "duration": 21407.467800000013
+}

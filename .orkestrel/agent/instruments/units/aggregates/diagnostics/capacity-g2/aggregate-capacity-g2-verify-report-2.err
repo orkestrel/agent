@@ -1,0 +1,27 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+file:///C:/Users/mikes/WebstormProjects/scaffold/tmp/units/aggregate-capacity-g2-verification/verify.ts:197
+    const reported = reportedLogs.find((entry) => entry.path === path)
+    if (actual === undefined || reported === undefined) throw new Error(Missing active-log custody: C:\Users\mikes\WebstormProjects\scaffold\tmp\units\aggregate-capacity-g2-verification\verify.ts)
+                                                                                ^^^^^^
+    if (actual.bytes !== reported.actualBytes || actual.hash !== reported.actualHash || expected.bytes !== reported.baselineBytes || expected.hash !== reported.baselineHash || reported.prefixHash !== expected.hash || reported.actualBytes < expected.bytes || reported.appendedBytes !== reported.actualBytes - expected.bytes) throw new Error(Active-log prefix custody mismatch: C:\Users\mikes\WebstormProjects\scaffold\tmp\units\aggregate-capacity-g2-verification\verify.ts)
+
+SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expected ',', got 'ident'
+    at parseTypeScript (node:internal/modules/typescript:72:36)
+    at processTypeScriptCode (node:internal/modules/typescript:146:42)
+    at stripTypeScriptModuleTypes (node:internal/modules/typescript:215:22)
+    at ModuleLoader.<anonymous> (node:internal/modules/esm/translators:680:29)
+    at #translate (node:internal/modules/esm/loader:438:20)
+    at afterLoad (node:internal/modules/esm/loader:506:29)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:511:12)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:564:36)
+    at afterResolve (node:internal/modules/esm/loader:611:52)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:617:12) {
+  code: 'ERR_INVALID_TYPESCRIPT_SYNTAX'
+}
+
+Node.js v24.21.0
+
+exit=1 signal=none capped=false duration_ms=104

@@ -1,0 +1,11 @@
+{
+  "id": "g4-restored",
+  "complete": true,
+  "breached": false,
+  "bytes": 354,
+  "hash": "4d0d72a65ca2137c128dd4437ceafd3f6ef1964e0c11a57f13e4589c56a022c7",
+  "status": 200,
+  "started": "2026-10-11T11:07:37.407Z",
+  "finished": "2026-10-11T11:07:48.461Z",
+  "duration": 11054.208199999994
+}

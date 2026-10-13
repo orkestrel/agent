@@ -1,0 +1,71 @@
+[
+  {
+    "line": 20,
+    "raw": "{\"resource\":[],\"goal\":\"g20-copperline-manager\",\"copy\":1,\"model\":\"qwen3.5:4b-q4_K_M\",\"arm\":\"records\",\"success\":false,\"reply\":\"Copperline's account manager is Tobias Lindqvist, who has been managing their account since 2026-10-09. However, please note that there was an earlier mention of Ines Albrecht as well; the most recent information indicates Tobias Lindqvist is the current account manager.\\n\\nTheir preferred contact is Owen Pritchard, the buyer, who can be reached on extension 4310 (corrected from 4301).\",\"via\":\"final\",\"missing\":[],\"violations\":[],\"patterns\":[\"(?<!\\\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\\\s+(?:(?:a|an|the)\\\\s+)?)(?:\\\\bines\\\\s+albrecht|(?<!\\\\bines\\\\s+)\\\\balbrecht)\\\\b(?!\\\\s*(?:[,;:]\\\\s*)?(?:(?:is|are|was|were|has|have|had)\\\\s+)?(?:already\\\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\\\b)\"],\"passes\":1,\"usage\":{\"prompt\":6228,\"completion\":142,\"total\":6370},\"partial\":false,\"faults\":0,\"wall\":18596.74039999995,\"stage\":0,\"flush\":5577.2596000000485,\"first\":53,\"last\":55,\"prompt\":2307,\"entry\":1881,\"overflow\":false,\"recalls\":{\"calls\":1,\"closed\":0,\"size\":321.5923913043478},\"lookups\":{\"calls\":0,\"repeats\":0},\"questions\":{\"category\":{\"fresh\":0,\"hits\":1},\"topic\":{\"fresh\":0,\"hits\":11}},\"briefing\":{\"tokens\":589.5860507246377,\"facts\":1,\"stale\":0,\"digest\":\"1b8528263437ac1bc4293b246d3ad32a99a0c68ce0337f3af022f68da96716a6\"},\"scale\":1.1403985507246377,\"tail\":\"66b08a9e6a36c6f3bc735a39439ce90418d6c6b4bce29321b5e92e2db8599612\",\"rendered\":[],\"cut\":[],\"withheld\":[],\"emptied\":[],\"summary\":0,\"filtered\":0,\"sole\":0}",
+    "value": {
+      "resource": [],
+      "goal": "g20-copperline-manager",
+      "copy": 1,
+      "model": "qwen3.5:4b-q4_K_M",
+      "arm": "records",
+      "success": false,
+      "reply": "Copperline's account manager is Tobias Lindqvist, who has been managing their account since 2026-10-09. However, please note that there was an earlier mention of Ines Albrecht as well; the most recent information indicates Tobias Lindqvist is the current account manager.\n\nTheir preferred contact is Owen Pritchard, the buyer, who can be reached on extension 4310 (corrected from 4301).",
+      "via": "final",
+      "missing": [],
+      "violations": [],
+      "patterns": [
+        "(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\bines\\s+albrecht|(?<!\\bines\\s+)\\balbrecht)\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+      ],
+      "passes": 1,
+      "usage": {
+        "prompt": 6228,
+        "completion": 142,
+        "total": 6370
+      },
+      "partial": false,
+      "faults": 0,
+      "wall": 18596.74039999995,
+      "stage": 0,
+      "flush": 5577.2596000000485,
+      "first": 53,
+      "last": 55,
+      "prompt": 2307,
+      "entry": 1881,
+      "overflow": false,
+      "recalls": {
+        "calls": 1,
+        "closed": 0,
+        "size": 321.5923913043478
+      },
+      "lookups": {
+        "calls": 0,
+        "repeats": 0
+      },
+      "questions": {
+        "category": {
+          "fresh": 0,
+          "hits": 1
+        },
+        "topic": {
+          "fresh": 0,
+          "hits": 11
+        }
+      },
+      "briefing": {
+        "tokens": 589.5860507246377,
+        "facts": 1,
+        "stale": 0,
+        "digest": "1b8528263437ac1bc4293b246d3ad32a99a0c68ce0337f3af022f68da96716a6"
+      },
+      "scale": 1.1403985507246377,
+      "tail": "66b08a9e6a36c6f3bc735a39439ce90418d6c6b4bce29321b5e92e2db8599612",
+      "rendered": [],
+      "cut": [],
+      "withheld": [],
+      "emptied": [],
+      "summary": 0,
+      "filtered": 0,
+      "sole": 0
+    }
+  }
+]

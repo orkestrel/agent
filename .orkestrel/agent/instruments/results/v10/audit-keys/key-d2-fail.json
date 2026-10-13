@@ -1,0 +1,26 @@
+[
+ {
+  "id": "46dc1bdb",
+  "run": "f4-records-v8",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "46b87041",
+  "run": "f4-records-v8",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ },
+ {
+  "id": "c73456f0",
+  "run": "f4-control-v8",
+  "goal": "g06-kenji-shipping",
+  "passed": false
+ },
+ {
+  "id": "d1c1709e",
+  "run": "f4-control-v8",
+  "goal": "g08-halvorsen-credit",
+  "passed": false
+ }
+]

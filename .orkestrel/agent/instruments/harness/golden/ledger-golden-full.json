@@ -1,0 +1,1973 @@
+{
+	"calls": [
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "Account BW-20931: Brightwater Studio. Refund is $148.50.",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			],
+			"options": {
+				"think": false
+			}
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "Account BW-20931: Brightwater Studio. Refund is $148.50.",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				}
+			],
+			"options": {
+				"think": false
+			}
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n- Account BW-20931: Brightwater Studio.\n- Refund is $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "lookup {\"id\":\"BW-20931\"}: result shown under Pinned in the system message",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Check BW-20931."
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			]
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n- Account BW-20931: Brightwater Studio.\n- Refund is $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "lookup {\"id\":\"BW-20931\"}: result shown under Pinned in the system message",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Check BW-20931."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "read",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "Account BW-20931: Brightwater Studio. Refund is $148.50.",
+					"call": "read"
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			]
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "lookup {\"id\":\"BW-20931\"}: result not shown; call recall with BW-20931",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "What do we know about refunds?"
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			]
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "lookup {\"id\":\"BW-20931\"}: result not shown; call recall with BW-20931",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "What do we know about refunds?"
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "recall",
+							"name": "recall",
+							"arguments": {
+								"topic": "refunds"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "Correction: refunds need a manager over $250.\nRefunds over $100 need a manager.",
+					"call": "recall"
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			]
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "assistant",
+					"content": "",
+					"calls": [
+						{
+							"id": "seed",
+							"name": "lookup",
+							"arguments": {
+								"id": "BW-20931"
+							}
+						}
+					]
+				},
+				{
+					"role": "tool",
+					"content": "lookup {\"id\":\"BW-20931\"}: result not shown; call recall with BW-20931",
+					"call": "seed"
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Anything else?"
+				}
+			],
+			"tools": [
+				{
+					"name": "lookup",
+					"description": "Read an owner record.",
+					"parameters": {
+						"type": "object"
+					}
+				},
+				{
+					"name": "recall",
+					"description": "Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics refunds. Returns source lines, newest first.",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"topic": {
+								"type": "string",
+								"description": "An owner name, an id, or a desk topic"
+							}
+						},
+						"required": [
+							"topic"
+						]
+					}
+				}
+			]
+		},
+		{
+			"messages": [
+				{
+					"role": "system",
+					"content": "Serve the desk.\n\n## Rules\n- Refunds over $100 need a manager.\n- Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Keep the loading dock at warehouse 42 clear."
+				},
+				{
+					"role": "user",
+					"content": "Refunds over $100 need a manager."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 0 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 1 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 2 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 3 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 4 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 5 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 6 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 7 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 8 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 9 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 10 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 11 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 12 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 13 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 14 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 15 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 16 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 17 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 18 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Delivery 19 arrived Tuesday with a completed receipt."
+				},
+				{
+					"role": "user",
+					"content": "Correction: refunds need a manager over $250."
+				},
+				{
+					"role": "user",
+					"content": "Anything else?"
+				},
+				{
+					"role": "user",
+					"content": "[Desk] Give your complete answer now as your final message, from what you already have."
+				}
+			],
+			"options": {
+				"think": false
+			}
+		}
+	],
+	"judge": [
+		{
+			"state": "user: Keep the loading dock at warehouse 42 clear.",
+			"questions": {
+				"[\"category\",\"#0\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Refunds over $100 need a manager.",
+			"questions": {
+				"[\"category\",\"#1\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 0 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#4\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 1 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#5\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 2 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#6\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 3 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#7\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 4 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#8\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 5 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#9\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 6 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#10\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 7 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#11\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 8 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#12\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 9 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#13\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 10 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#14\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 11 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#15\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 12 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#16\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 13 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#17\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 14 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#18\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 15 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#19\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 16 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#20\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 17 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#21\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 18 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#22\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 19 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"category\",\"#23\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Correction: refunds need a manager over $250.",
+			"questions": {
+				"[\"category\",\"#24\"]": {
+					"form": "choice",
+					"instructions": "Which category best describes what this support-desk message states?",
+					"criteria": {
+						"fact": "States a fact about a customer, an order, an account, the desk, or the day",
+						"rule": "States a standing rule, policy, or instruction the desk must follow",
+						"correction": "Corrects, replaces, or withdraws a value or rule stated earlier",
+						"request": "Asks the assistant to do a task or to answer a question",
+						"opinion": "States a personal view or judgment rather than a fact",
+						"chatter": "Talk with the agent that states nothing the desk acts on",
+						"distractor": "A statement about something outside the desk's work"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Keep the loading dock at warehouse 42 clear.",
+			"questions": {
+				"[\"topic\",\"#0\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Refunds over $100 need a manager.",
+			"questions": {
+				"[\"topic\",\"#1\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 0 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#4\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 1 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#5\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 2 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#6\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 3 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#7\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 4 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#8\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 5 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#9\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 6 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#10\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 7 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#11\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 8 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#12\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 9 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#13\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 10 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#14\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 11 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#15\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 12 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#16\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 13 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#17\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 14 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#18\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 15 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#19\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 16 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#20\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 17 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#21\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 18 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#22\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Delivery 19 arrived Tuesday with a completed receipt.",
+			"questions": {
+				"[\"topic\",\"#23\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Correction: refunds need a manager over $250.",
+			"questions": {
+				"[\"topic\",\"#24\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Check BW-20931.",
+			"questions": {
+				"[\"topic\",\"#25\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "Earlier message: user: Refunds over $100 need a manager.\nLater message: user: Correction: refunds need a manager over $250.",
+			"questions": {
+				"[\"amends\",\"#1\",\"#24\"]": {
+					"form": "noul",
+					"instructions": "Does the later message replace or withdraw any value or rule the earlier message states?",
+					"criteria": {
+						"true": "The later message replaces or withdraws at least one value or rule the earlier message states",
+						"false": "Every value and rule the earlier message states stays in force after the later message"
+					}
+				}
+			}
+		},
+		{
+			"state": "Earlier message: user: Refunds over $100 need a manager.\nLater message: user: Correction: refunds need a manager over $250.",
+			"questions": {
+				"[\"supersedes\",\"#1\",\"#24\"]": {
+					"form": "noul",
+					"instructions": "Does the later message replace or withdraw everything the earlier message states?",
+					"criteria": {
+						"true": "The later message replaces or withdraws everything the earlier message states",
+						"false": "Some value or rule the earlier message states stays in force after the later message"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: What do we know about refunds?",
+			"questions": {
+				"[\"topic\",\"#29\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		},
+		{
+			"state": "user: Anything else?",
+			"questions": {
+				"[\"topic\",\"#33\",\"refunds\"]": {
+					"form": "noul",
+					"instructions": "Does this support-desk message concern the named desk topic?",
+					"criteria": {
+						"true": "The message concerns refunds: Refund amounts",
+						"false": "The message does not concern refunds"
+					}
+				}
+			}
+		}
+	],
+	"results": [
+		{
+			"content": "The account is Brightwater Studio.",
+			"partial": false,
+			"passes": 1,
+			"usage": {
+				"prompt": 820,
+				"completion": 20,
+				"total": 840
+			}
+		},
+		{
+			"content": "Refunds over $250 need a manager.",
+			"partial": false,
+			"passes": 1,
+			"usage": {
+				"prompt": 930,
+				"completion": 19,
+				"total": 949
+			}
+		},
+		{
+			"content": "Nothing else is pending.",
+			"partial": false,
+			"passes": 2,
+			"usage": {
+				"prompt": 920,
+				"completion": 7,
+				"total": 927
+			}
+		}
+	],
+	"calibrated": {
+		"scale": 0.7524752475247525,
+		"overhead": 20
+	},
+	"final": {
+		"scale": 0.9033613445378151,
+		"overhead": 20
+	}
+}

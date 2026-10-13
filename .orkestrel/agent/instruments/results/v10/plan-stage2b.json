@@ -1,0 +1,52 @@
+[
+	{
+		"name": "f4-records-v8",
+		"harness": "bench3",
+		"estimate": 1600,
+		"args": [
+			"--mode",
+			"ledger",
+			"--profile",
+			"refined",
+			"--scenario",
+			"/home/user/agent/tmp/bench/variants/ledger/v8.json",
+			"--ctx",
+			"3072",
+			"--budget",
+			"0.7",
+			"--judge",
+			"mica",
+			"--judge-ctx",
+			"4096",
+			"--tail",
+			"0.35",
+			"--judgments",
+			"/home/user/agent/tmp/bench/results/v3/cal-categories.jsonl",
+			"--reply",
+			"terminal",
+			"--records",
+			"on",
+			"--model",
+			"qwen3.5:4b-q4_K_M"
+		]
+	},
+	{
+		"name": "f4-control-v8",
+		"harness": "bench",
+		"estimate": 400,
+		"args": [
+			"--mode",
+			"none",
+			"--ctx",
+			"6144",
+			"--search",
+			"words",
+			"--reply",
+			"terminal",
+			"--scenario",
+			"/home/user/agent/tmp/bench/variants/v8.json",
+			"--model",
+			"qwen3.5:4b-q4_K_M"
+		]
+	}
+]

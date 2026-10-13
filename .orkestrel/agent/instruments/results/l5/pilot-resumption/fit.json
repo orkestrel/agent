@@ -1,0 +1,32 @@
+{
+  "change": 0.56,
+  "agree": 0.82,
+  "separated": true,
+  "counts": {
+    "summaries": {
+      "asked": 90,
+      "passed": 36,
+      "failed": 54
+    },
+    "change": {
+      "positives": 15,
+      "negatives": 49,
+      "refused": 0,
+      "failed": 0,
+      "cached": 0,
+      "recalled": 3,
+      "leaked": 0,
+      "separated": true
+    },
+    "agree": {
+      "positives": 19,
+      "negatives": 23,
+      "refused": 0,
+      "failed": 0,
+      "cached": 0,
+      "recalled": 3,
+      "leaked": 0,
+      "separated": true
+    }
+  }
+}

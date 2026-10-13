@@ -1,0 +1,18 @@
+﻿{
+  "command": "node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal tmp/units/aggregate-successor-label-c-verifier-stdout.jsonl --errors tmp/units/aggregate-successor-label-c-verifier-stderr.txt --cap 60 -- node tmp/units/aggregate-successor-label-c-verifier-check.ts",
+  "pid": 42848,
+  "exitCode": 0,
+  "signal": null,
+  "capped": false,
+  "durationMs": 135,
+  "stdoutBytes": 222,
+  "stderrBytes": 49,
+  "inputsUnchanged": true,
+  "beforeAfter": {
+    "packet": { "bytes": 2719417, "sha256": "a67c510650eaa2ffae29fe5c461fcf56d4cd91e9e3376a3ac4b5fba2b3c14999" },
+    "labels": { "bytes": 185358, "sha256": "0fd4b82e90bf22f7abf661c6c13465481c68c8df7a2bf9c6666614196c82e394" },
+    "report": { "bytes": 36425, "sha256": "67195a66780cf92488fc2159efa141aecee59932263ed900e2769243c9732168" },
+    "aliasAReader": { "bytes": 3892, "sha256": "ddc5045b85fae720bbabb1374bfb058712efa233449863f715ee557dc1c347e1" },
+    "aliasACheck": { "bytes": 3818, "sha256": "3f05be0f95b30230e5d4d57e153e08785c9214367aa97397366e231d685e3a40" }
+  }
+}

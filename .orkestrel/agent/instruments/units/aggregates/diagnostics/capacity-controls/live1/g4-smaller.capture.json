@@ -1,0 +1,11 @@
+{
+  "id": "g4-smaller",
+  "complete": true,
+  "breached": false,
+  "bytes": 349,
+  "hash": "55932cc9cf3fcc246fb63922a0fa8ef5de5aeb20370a6a7eab2d15e5ecc67171",
+  "status": 200,
+  "started": "2026-10-11T11:07:36.790Z",
+  "finished": "2026-10-11T11:07:37.404Z",
+  "duration": 613.7662999999884
+}
