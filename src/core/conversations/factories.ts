@@ -44,14 +44,14 @@ import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js
  * // Append the instruction as the FINAL user turn: a chat model emits nothing when the prompt
  * // ends on an assistant turn, so a leading-system instruction is unreliable.
  * const conversation = createConversation({
- * 	summarize: async (messages) =>
+ * 	summarize: async (messages, signal) =>
  * 		(
  * 			await provider.generate(
  * 				[
  * 					...messages,
  * 					{ id: 's', role: 'user', content: 'Summarize the conversation so far concisely.' },
  * 				],
- * 				AbortSignal.timeout(30_000),
+ * 				signal ?? AbortSignal.timeout(30_000), // the compact() call's signal, when it passed one
  * 			)
  * 		).content,
  * 	keep: 2, // retain at least the 2 most recent messages verbatim on each compaction

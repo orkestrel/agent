@@ -1723,10 +1723,12 @@ await new GuideCommand({
 					gauge: { scale: 1, overhead: 0 },
 				}),
 			)
-			const response = await ledger.respond('Review the desk.')
-			expect(response.passes.map((pass) => pass.partial)).toEqual([false, true])
+			await expect(ledger.respond('Review the desk.')).rejects.toThrow('exhausted at turn 1')
 			expect(provider.started).toBe(2)
 			expect(ledger.conversation.view().at(-1)?.content).toBe(LEDGER_NOTES.cue)
+			expect(guideText).toContain(
+				'A rejected first pass counts as unfinished. When the answer pass rejects as well, the `respond` method rejects with that pass\'s error, and the ledger stays free for a later request.',
+			)
 			const selections = createRecorder<readonly [Selection]>()
 			ledger.agent.emitter.on('select', selections.handler)
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))

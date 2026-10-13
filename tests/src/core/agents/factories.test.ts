@@ -1,10 +1,12 @@
 import type { AgentJobInput, AgentResult } from '@src/core'
-import { createRecorder, waitForCondition } from '@orkestrel/test'
+import type { QueueEventMap } from '@orkestrel/queue'
+import { createRecorder, waitForCondition, waitForEvent } from '@orkestrel/test'
 import {
 	JOB_USAGE,
 	PARTIAL_TURNS,
 	AGENT_JOB_SHAPE,
 	createObservedGatedProvider,
+	createTurnRegistry,
 } from '../../../setup.js'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
@@ -17,6 +19,7 @@ import {
 	createInstructionManager,
 	createScope,
 	AgentJobError,
+	isAgentError,
 	isAgentJobError,
 	ProviderAbortError,
 } from '@src/core'
@@ -267,25 +270,6 @@ describe('createAgentQueue — durability (serializable jobs survive a restart)'
 		expect(loaded[0]).toEqual({ id: 'job-1', input, attempts: 0 })
 	})
 
-	it('restore() re-runs an outstanding job — rehydrated through the registry', async () => {
-		const provider = createScriptedProvider([{ content: 'resumed', usage: JOB_USAGE }])
-		const registry = createAgentRegistry({ providers: { main: provider } })
-		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
-		// Simulate a crash that left one outstanding row in the store.
-		const outstanding: AgentJobInput = {
-			provider: 'main',
-			messages: [{ role: 'user', content: 'resume me' }],
-		}
-		await store.save({ id: 'job-1', input: outstanding, attempts: 0 })
-		// A fresh queue over the same store re-runs the row on restore() — the registry
-		// rehydrates the live agent from the serialized names + data.
-		const queue = createAgentQueue({ registry, store })
-		await queue.restore()
-		// Wait for the rehydrated job to run + settle (its row is removed on completion).
-		await waitForCondition('job row drained', async () => (await store.load()).length === 0)
-		expect(provider.started).toBe(1) // the outstanding job actually ran
-		expect(await store.load()).toEqual([]) // the row was removed after it completed
-	})
 })
 
 describe('createAgentRunner', () => {
@@ -476,6 +460,16 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		expect(provider.started).toBe(2) // retried once
 	})
 
+	it('a construction TIMEOUT bounds every attempt of every job and retries it', async () => {
+		const provider = createScriptedProvider([{ content: 'slow' }], { delay: 50 })
+		const registry = createAgentRegistry({ providers: { main: provider } })
+		const queue = createAgentQueue({ registry, timeout: 5, retries: 1 })
+		const caught = await queue.enqueue(createAgentJob()).catch((error: unknown) => error)
+		expect(isAgentJobError(caught)).toBe(false)
+		expect(isQueueError(caught) ? caught.message : undefined).toBe('queue attempt timed out')
+		expect(provider.started).toBe(2)
+	})
+
 	it('a pre-aborted entry signal HARD-cancels: rejects with the signal reason, never runs, never retries', async () => {
 		const provider = createScriptedProvider([{ content: 'never' }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
@@ -568,31 +562,35 @@ describe('createAgentQueue — lifecycle + batch', () => {
 // provider is never run).
 
 describe('createAgentQueue — durability, extended', () => {
-	it('restore() re-runs an outstanding job and produces its REAL result, then removes the row', async () => {
-		const provider = createScriptedProvider([{ content: 'rehydrated-answer', usage: JOB_USAGE }])
+	it('restore() re-runs an outstanding job, settles its REAL result under the stored id, then removes the row', async () => {
+		const provider = createScriptedProvider([{ content: 'rehydrated-answer', usage: JOB_USAGE }], {
+			recorded: true,
+		})
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const store = createMemoryQueueStore(AGENT_JOB_SHAPE)
+		// Simulate a crash that left one outstanding row in the store.
 		const outstanding: AgentJobInput = {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'resume me' }],
 		}
 		await store.save({ id: 'job-1', input: outstanding, attempts: 0 })
-		// Capture the rehydrated job's settled result by enqueuing through a queue that wraps
-		// the SAME registry — restore re-enqueues internally (no caller promise), so to assert
-		// the produced content the test enqueues the identical job and compare, then prove
-		// restore drained the persisted row.
+		// A fresh queue over the same store re-runs the row on restore(); restore hands back no
+		// result promise, so the queue's own `success` event carries the restored job's result.
 		const queue = createAgentQueue({ registry, store })
+		const succeeded = waitForEvent<QueueEventMap<AgentResult>['success']>(
+			(listener) => queue.emitter.on('success', listener),
+			'the restored job succeeds',
+		)
 		await queue.restore()
+		const [id, result] = await succeeded
+		expect(id).toBe('job-1')
+		expect(result).toEqual({ content: 'rehydrated-answer', usage: JOB_USAGE, partial: false })
+		// The registry rehydrated the stored seed: the provider saw the replayed user message.
+		expect(provider.calls.map((call) => call.messages.map((message) => message.content))).toEqual([
+			['resume me'],
+		])
 		await waitForCondition('job row drained', async () => (await store.load()).length === 0)
-		expect(provider.started).toBe(1) // the persisted job genuinely ran once
-		expect(await store.load()).toEqual([]) // its row was removed on completion
-
-		// And the rehydration produces the scripted content (a fresh provider + queue, the
-		// same registry shape) — proving the rehydrated agent ran the real turn, not a stub.
-		const checkProvider = createScriptedProvider([{ content: 'rehydrated-answer' }])
-		const checkRegistry = createAgentRegistry({ providers: { main: checkProvider } })
-		const direct = await createAgentQueue({ registry: checkRegistry }).enqueue(outstanding)
-		expect(direct.content).toBe('rehydrated-answer')
+		expect(await store.load()).toEqual([])
 	})
 
 	it('a job naming a provider MISSING from the registry rejects loudly on enqueue', async () => {
@@ -762,5 +760,50 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 			await runner.execute([parent]).then((results) => results.map((result) => result.content)),
 		).toEqual(['parent', 'child'])
 		expect(provider.started).toBe(2)
+	})
+
+	it("spawns a parent's declared children once when its failed first attempt retries", async () => {
+		// Attempt 1 exhausts `limit: 1` on a tool turn (partial ⇒ AgentJobError ⇒ retry); attempt 2
+		// answers. The child provider's start count shows how many times the child ran.
+		const parent = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'c', name: 'loop', arguments: {} }] }, { content: 'parent' }],
+			{ repeat: false },
+		)
+		const child = createScriptedProvider([{ content: 'child' }])
+		const registry = createAgentRegistry({
+			providers: { main: parent, child },
+			tools: { loop: createLoopTool() },
+		})
+		const runner = createAgentRunner({ registry, retries: 1, concurrency: 2 })
+		const results = await runner.execute([
+			createAgentJob({
+				tools: ['loop'],
+				limit: 1,
+				children: [createAgentJob({ provider: 'child' })],
+			}),
+		])
+		expect(parent.started).toBe(2)
+		expect(child.started).toBe(1)
+		expect(results.map((result) => result.content)).toEqual(['parent', 'child'])
+	})
+
+	it('fails the run with the error of a child that cannot be rehydrated', async () => {
+		const runner = createAgentRunner({ registry: createTurnRegistry({ content: 'parent' }) })
+		const caught = await runner
+			.execute([createAgentJob({ children: [createAgentJob({ provider: 'ghost' })] })])
+			.catch((error: unknown) => error)
+		expect(isAgentError(caught) ? caught.context : undefined).toEqual({
+			category: 'provider',
+			name: 'ghost',
+		})
+	})
+
+	it("bounds each unit with the runner's per-attempt timeout and cancels its agent", async () => {
+		const provider = createScriptedProvider([{ content: 'slow' }], { delay: 50, recorded: true })
+		const registry = createAgentRegistry({ providers: { main: provider } })
+		const runner = createAgentRunner({ registry, timeout: 5 })
+		const caught = await runner.execute([createAgentJob()]).catch((error: unknown) => error)
+		expect(isQueueError(caught) ? caught.message : undefined).toBe('queue attempt timed out')
+		expect(provider.calls.map((call) => call.signal.aborted)).toEqual([true])
 	})
 })

@@ -29,8 +29,8 @@ import { extractQueueOptions, handleAgentQueueJob, handleAgentRunnerJob } from '
  * `generate` and a live `stream`.
  *
  * @remarks
- * One private loop drives the turn; `generate` drains the same stream `stream`
- * exposes, so they can never diverge. Each turn is bounded by one cancel folded from
+ * One private loop drives the turn; `generate` awaits the settled result of the same run
+ * `stream` exposes and leaves its live chunks undrained, so they can never diverge. Each turn is bounded by one cancel folded from
  * `signal` + `timeout` + `budget` (through `AbortSignal.any`) — any trip (or `abort()`)
  * commits a partial result (the stream's `result` resolves on a cancel, rejects only
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
@@ -177,9 +177,10 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  *   through `store` (+ `restore()` after a crash) are all the backing Queue's. `enqueue`
  *   returns a per-job promise.
  * - **Durable + serializable.** Because `AgentJobInput` is JSON-serializable, a `store`
- *   (for example `createMemoryQueueStore` / `createDatabaseQueueStore`) persists outstanding
- *   jobs; `restore()` re-enqueues them after a restart and the `registry` rehydrates the
- *   live pieces from the names — so a job survives a crash.
+ *   persists outstanding jobs; `restore()` re-enqueues them and the `registry` rehydrates the
+ *   live pieces from the names. A job survives a crash only through a store whose rows outlive
+ *   the process (for example `createDatabaseQueueStore`); a `createMemoryQueueStore` row is
+ *   gone when the process exits.
  * - **Partial policy.** A partial result throws an
  *   {@link import('./errors.js').AgentJobError} by default, so a job cancelled by its
  *   attempt deadline / a queue abort retries while attempts remain; `partial: true`
@@ -194,11 +195,13 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
  *
  * @example
  * ```ts
+ * import type { AgentJobInput, ProviderInterface } from '@orkestrel/agent'
+ * import type { QueueStoreInterface } from '@orkestrel/queue'
  * import { createAgentQueue, createAgentRegistry } from '@orkestrel/agent'
- * import { createMemoryQueueStore } from '@orkestrel/queue'
  *
+ * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
+ * declare const store: QueueStoreInterface<AgentJobInput> // a durable store the host supplies
  * const registry = createAgentRegistry({ providers: { main: provider } })
- * const store = createMemoryQueueStore(agentJobShape) // survives a restart through restore()
  * const queue = createAgentQueue({ registry, concurrency: 2, retries: 1, store })
  * const result = await queue.enqueue({ provider: 'main', messages: [{ role: 'user', content: 'ok?' }] })
  * ```
@@ -226,7 +229,9 @@ export function createAgentQueue(
  *   the handler adds only rehydration + the partial policy.
  * - **Sub-agent fan-out.** Each unit's handler receives a `ControllerInterface` whose
  *   `spawn(childJob)` launches a child agent job through the same bounded queue (the
- *   child's result joins the run after the declared units, in spawn order). On a bounded
+ *   child's result joins the run after the declared units, in spawn order). A unit spawns its
+ *   declared `children` on its first attempt only, so a retried parent never runs a child
+ *   twice. On a bounded
  *   runner, fan out and return — do not await a spawn inline from within the handler (a
  *   slot-holding handler awaiting its own spawn can deadlock; see `ControllerInterface`).
  * - **Partial policy + cancellation.** Same as `createAgentQueue`: a partial result
@@ -256,6 +261,6 @@ export function createAgentRunner(
 	const { registry, partial = false } = options
 	return createRunner<AgentJobInput, AgentResult>({
 		...extractQueueOptions(options),
-		handler: handleAgentRunnerJob.bind(undefined, registry, partial),
+		handler: handleAgentRunnerJob.bind(undefined, registry, partial, new Set<string>()),
 	})
 }

@@ -280,7 +280,8 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `system` — an optional system prompt prepended to the turn (seeds the context).
  * - `tools` — an optional pre-built {@link ToolManagerInterface} the loop dispatches
  *   the model's calls through; an empty one is created when omitted.
- * - `limit` — the maximum number of tool-iteration turns before the loop stops.
+ * - `limit` — the maximum number of tool-iteration turns before the loop stops, a nonnegative
+ *   safe integer; construction throws an `AgentError` with code `'LIMIT'` when it is not.
  *   Default: `DEFAULT_AGENT_LIMIT`.
  * - `timeout` — an optional wall-clock deadline (ms) for the whole turn; its signal
  *   folds into the turn's bound, committing a partial result on expiry.
@@ -344,7 +345,10 @@ export interface AgentOptions {
 	 * compaction fold, or a compaction rebuild.
 	 */
 	readonly scope?: ScopeInterface
-	/** Caps the tool-iteration turns before the loop stops. Default: `DEFAULT_AGENT_LIMIT`. */
+	/**
+	 * Caps the tool-iteration turns before the loop stops, as a nonnegative safe integer.
+	 * Thrown as an `AgentError` with code `'LIMIT'` when it is not. Default: `DEFAULT_AGENT_LIMIT`.
+	 */
 	readonly limit?: number
 	/** Sets a wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
 	readonly timeout?: number
@@ -428,7 +432,8 @@ export interface AgentRunOptions {
 	readonly schema?: Readonly<Record<string, unknown>>
 	/**
 	 * Overrides {@link AgentOptions.limit} for this run only — the max tool-iteration turns
-	 * before the loop stops. Omitted ⇒ the agent's constructed `limit` applies.
+	 * before the loop stops, as a nonnegative safe integer; the call throws an `AgentError` with
+	 * code `'LIMIT'` when it is not. Omitted ⇒ the agent's constructed `limit` applies.
 	 */
 	readonly limit?: number
 	/**
@@ -456,8 +461,8 @@ export interface AgentRunOptions {
  *
  * @remarks
  * - **One loop, two faces.** `generate` and `stream` share one private run, so they
- *   can never diverge: `generate` drains the same stream `stream` exposes, then
- *   resolves its settled {@link AgentResult}.
+ *   can never diverge: `generate` awaits the settled {@link AgentResult} of the run `stream`
+ *   exposes and leaves its live chunks undrained.
  * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
  *   `timeout` deadline, and the `budget` signal (through `AbortSignal.any`); any of them —
  *   or `abort()` — stops the loop and settles the result `partial: true`.
@@ -489,20 +494,21 @@ export interface AgentInterface {
 	readonly status: AgentStatus
 	readonly context: AgentContextInterface
 	/**
-	 * Runs the turn to completion, discarding the live chunks — drains the shared stream and
-	 * resolves the settled {@link AgentResult} (`partial: true` when cancelled).
+	 * Runs the turn to completion — awaits the settled {@link AgentResult} (`partial: true` when
+	 * cancelled) and leaves the live chunks undrained.
 	 *
 	 * @remarks
-	 * A concurrent run on a shared accounting agent throws an
-	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) — and it throws
-	 * synchronously, before any `Promise` is returned. A fire-and-forget
-	 * `agent.generate().catch(...)` therefore will not catch it (the throw happens on the call
-	 * itself, ahead of the `.catch` ever attaching) — await the call (inside a `try`/`catch`)
-	 * or wrap the call expression itself in `try`/`catch`.
+	 * A run started while another is live throws an {@link import('./errors.js').AgentError} with
+	 * `code: 'CONCURRENCY'` when the agent carries a `window`, or when the run's effective
+	 * `budget` is the instance a live run holds; a run whose `limit` is not a nonnegative safe
+	 * integer throws one with `code: 'LIMIT'`. Both throw synchronously, before any `Promise` is
+	 * returned. A fire-and-forget `agent.generate().catch(...)` therefore will not catch them (the
+	 * throw happens on the call itself, ahead of the `.catch` ever attaching) — await the call
+	 * (inside a `try`/`catch`) or wrap the call expression itself in `try`/`catch`.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
-	 * @throws {AgentError} Thrown when a concurrent run shares construction accounting (`code: 'CONCURRENCY'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window` or the budget instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
@@ -511,14 +517,16 @@ export interface AgentInterface {
 	 * on a genuine error.
 	 *
 	 * @remarks
-	 * Like `generate()`, a concurrent run on a shared accounting agent throws an
-	 * {@link import('./errors.js').AgentError} (`code: 'CONCURRENCY'`) synchronously — before the
+	 * Like `generate()`, a run that would share the `window` or a live run's budget instance
+	 * throws an {@link import('./errors.js').AgentError} with `code: 'CONCURRENCY'`, and an invalid
+	 * `limit` throws one with `code: 'LIMIT'`, synchronously — before the
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
-	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`.
+	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. A `signal` that
+	 * `AbortSignal.any` refuses throws its `TypeError` the same way, before any deadline is armed.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
-	 * @throws {AgentError} Thrown when a concurrent run shares construction accounting (`code: 'CONCURRENCY'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window` or the budget instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
@@ -718,7 +726,7 @@ export interface AgentRegistryInterface {
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
-	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`)
+	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`), or when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`)
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
 }
@@ -793,5 +801,5 @@ export interface AgentRunnerOptions {
 	readonly timeout?: number
 }
 
-/** Names the machine-readable agent concurrency and registry failures. */
-export type AgentErrorCode = 'CONCURRENCY' | 'REGISTRY'
+/** Names the machine-readable agent concurrency, limit, and registry failures. */
+export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY'

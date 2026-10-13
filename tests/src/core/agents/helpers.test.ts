@@ -4,6 +4,7 @@ import {
 	createMessage,
 	CountingAgentResult,
 	createInvalidAgentResultCases,
+	createRecordedBudget,
 	createTurnRegistry,
 	AGENT_USAGE,
 } from '../../../setup.js'
@@ -17,11 +18,14 @@ import {
 	IMAGE_TOKEN_ESTIMATE,
 	isAgentJobError,
 	MESSAGE_TOKEN_OVERHEAD,
+	renderToolValue,
 	settleAgentJob,
 	requireEntry,
+	requireLimit,
 	extractQueueOptions,
 } from '@src/core'
-import { createBudget } from '@orkestrel/budget'
+import { isRecord } from '@orkestrel/contract'
+import { createRecorder } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { createToolCall, createTokenUsage } from '../../../setup.js'
 
@@ -33,8 +37,76 @@ describe('requireEntry', () => {
 
 	it('reports the category and missing name with a registry code', () => {
 		expect(() => requireEntry(new Map(), 'tool', 'missing')).toThrow(
-			expect.objectContaining({ code: 'REGISTRY', message: 'unknown tool: missing' }),
+			expect.objectContaining({
+				code: 'REGISTRY',
+				message: 'unknown tool: missing',
+				context: { category: 'tool', name: 'missing' },
+			}),
 		)
+	})
+})
+
+describe('requireLimit', () => {
+	it('returns a nonnegative safe integer unchanged, including 0', () => {
+		expect(requireLimit(0)).toBe(0)
+		expect(requireLimit(3)).toBe(3)
+		expect(requireLimit(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER)
+	})
+
+	it('refuses every other number with a LIMIT code naming the value', () => {
+		for (const limit of [
+			Number.NaN,
+			-1,
+			1.5,
+			Number.POSITIVE_INFINITY,
+			Number.NEGATIVE_INFINITY,
+			2 ** 53,
+		]) {
+			expect(() => requireLimit(limit)).toThrow(
+				expect.objectContaining({ code: 'LIMIT', context: { limit } }),
+			)
+		}
+	})
+})
+
+describe('renderToolValue', () => {
+	it('passes a string through unchanged', () => {
+		expect(renderToolValue('sunny in Lisbon')).toBe('sunny in Lisbon')
+		expect(renderToolValue('')).toBe('')
+	})
+
+	it('renders a value JSON carries as its JSON text', () => {
+		expect(renderToolValue({ text: 'first\n"second"', count: 2 })).toBe(
+			'{"text":"first\\n\\"second\\"","count":2}',
+		)
+		expect(renderToolValue(5)).toBe('5')
+		expect(renderToolValue(null)).toBe('null')
+		expect(renderToolValue([1, 'two'])).toBe('[1,"two"]')
+	})
+
+	it('renders undefined as empty content', () => {
+		expect(renderToolValue(undefined)).toBe('')
+	})
+
+	it('falls back to the string form for a value JSON cannot carry', () => {
+		const graph: Record<string, unknown> = { name: 'route' }
+		graph.next = graph
+		expect(renderToolValue(10n)).toBe('10')
+		expect(renderToolValue(graph)).toBe('[object Object]')
+		expect(renderToolValue(Symbol('route'))).toBe('Symbol(route)')
+		expect(
+			renderToolValue({
+				toJSON: () => {
+					throw new Error('unserializable')
+				},
+			}),
+		).toBe('[object Object]')
+	})
+
+	it('renders empty content when neither JSON nor the string form can carry the value', () => {
+		const bare: Record<string, unknown> = Object.create(null)
+		bare.self = bare
+		expect(renderToolValue(bare)).toBe('')
 	})
 })
 
@@ -49,18 +121,8 @@ describe('extractQueueOptions', () => {
 	})
 })
 
-// Agent-owned pure helpers: estimateMessages is the default context-budget token estimator
-// (the per-message sum of the estimateTokens char heuristic). Plus settleAgentJob —
-// the shared job-handler step both createAgentQueue / createAgentRunner settle each
-// rehydrated agent through: a natural finish resolves with its result, a PARTIAL throws
-// an AgentJobError when partials are disallowed and resolves when allowed (driven over a
-// scripted provider — no Ollama, real behavior).
-
-// A minimal Message fixture — only the fields estimateMessages reads (content);
-// id/role round out the shape so it is a real message, not a partial.
-
 describe('agentResultToJSON', () => {
-	it('keeps the projection field map exhaustive over AgentResult', () => {
+	it('projects exactly the declared AgentResult fields and drops an extra member', () => {
 		const fields = {
 			content: true,
 			thinking: true,
@@ -68,7 +130,16 @@ describe('agentResultToJSON', () => {
 			partial: true,
 		} satisfies Readonly<Record<keyof AgentResult, true>>
 
-		expect(Object.keys(fields)).toEqual(['content', 'thinking', 'usage', 'partial'])
+		const projected = agentResultToJSON({
+			content: 'done',
+			thinking: 'reasoning',
+			usage: { prompt: 2, completion: 1, total: 3 },
+			partial: false,
+			model: 'drop',
+		})
+
+		if (!isRecord(projected)) throw new Error('expected a projected record')
+		expect(Object.keys(projected).sort()).toEqual(Object.keys(fields).sort())
 	})
 
 	it('projects a full result to a fresh exact JSON object', () => {
@@ -369,30 +440,18 @@ describe('denyCall — the synthesized denial result', () => {
 
 describe('chargeUsage — the residual budget charge', () => {
 	it('consumes the full prompt and only the residual over what was charged', () => {
-		const seen: TokenUsage[] = []
-		const budget = createBudget<TokenUsage>({
-			max: 1000,
-			consumer: (usage) => {
-				seen.push(usage)
-				return usage.total
-			},
-		})
+		const seen = createRecorder<[TokenUsage]>()
+		const budget = createRecordedBudget(seen, 1000)
 		chargeUsage(budget, { prompt: 20, completion: 30, total: 50 }, 10)
-		expect(seen).toEqual([{ prompt: 20, completion: 20, total: 40 }])
+		expect(seen.calls).toEqual([[{ prompt: 20, completion: 20, total: 40 }]])
 		expect(budget.consumed).toBe(40)
 	})
 
 	it('floors the residual at 0 when the estimate already exceeds the report', () => {
-		const seen: TokenUsage[] = []
-		const budget = createBudget<TokenUsage>({
-			max: 1000,
-			consumer: (usage) => {
-				seen.push(usage)
-				return usage.total
-			},
-		})
+		const seen = createRecorder<[TokenUsage]>()
+		const budget = createRecordedBudget(seen, 1000)
 		chargeUsage(budget, { prompt: 5, completion: 3, total: 8 }, 12)
-		expect(seen).toEqual([{ prompt: 5, completion: 0, total: 0 }])
+		expect(seen.calls).toEqual([[{ prompt: 5, completion: 0, total: 0 }]])
 		expect(budget.consumed).toBe(0)
 	})
 

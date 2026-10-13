@@ -40,7 +40,8 @@ import { requireEntry } from './helpers.js'
  *   the threaded `signal`; seed its context with the job's `messages`; return it. The
  *   `signal` is the queue attempt's / runner unit's cancel, so a bounded abort propagates
  *   into the agent (which commits a partial — the job's `partial` policy then
- *   decides success vs. retry).
+ *   decides success vs. retry). A job `limit` that is not a nonnegative safe integer throws an
+ *   {@link AgentError} carrying `code: 'LIMIT'` from the agent's construction.
  * - **Event-free.** A pure resolver — no Emitter, no events.
  *
  * @example

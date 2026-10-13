@@ -1,4 +1,5 @@
 import type { AgentErrorCode, AgentResult } from './types.js'
+import type { CodedErrorOptions } from '../types.js'
 import { isInstance } from '@orkestrel/contract'
 
 // A real error type, not a sentinel. An agent job treats a partial result
@@ -58,34 +59,44 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 	return isInstance(value, AgentJobError)
 }
 
-// A real error type, not a sentinel. Concurrent runs on one Agent whose
-// construction carries a shared accounting instance (a `window` context budget, or a
-// construction-level `budget` with no per-run override) would corrupt that shared
-// accounting — so `stream()` throws this synchronously, before any state mutation or
-// emit, rather than letting the runs race. An `AgentRegistry` accessor throws it too, when a
-// rehydration name is absent from its pool. Carries a machine-readable `code` so a `catch`
-// branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
+// A real error type, not a sentinel. A run that would share an accounting instance with a live
+// run would corrupt that accounting, so `stream()` throws this synchronously, before any state
+// mutation or emit, rather than letting the runs race. Carries a machine-readable `code` so a
+// `catch` branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports a concurrent run sharing construction accounting or a name absent from a registry pool. The `stream` and `generate` methods and registry accessors throw synchronously, before returning a handle or promise. Await the call inside `try`/`catch` to catch it.
+ * Reports a run sharing accounting with a live run, a `limit` that is not a nonnegative safe integer, or a name absent from a registry pool. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
- * `'CONCURRENCY'` reports a run already in flight on the same agent, plus a construction-level
- * `window` (a shared context budget) or a construction-level `budget` with no per-run override
- * (a shared cost budget) — a second concurrent `stream()` would race its charges against the
- * same shared instance, corrupting the accounting. Use separate agents, or per-run `budget`
- * overrides with no `window`, for genuinely concurrent runs. `'REGISTRY'` reports a rehydration
- * name absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` /
- * `build`. Narrow a caught value with {@link isAgentError} and branch on `error.code`.
+ * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
+ * agent carries a `window` (a shared context budget) or when the run's effective `budget` is the
+ * instance a live run holds — the second run's `start()` would replace the budget's signal and
+ * race its charges against the first run's. Use separate agents, or a distinct budget instance
+ * per run with no `window`, for concurrent runs. Its `context` names the `agent` id.
+ * `'LIMIT'` reports a construction or per-run `limit` that is not a nonnegative safe integer,
+ * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
+ * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`;
+ * its `context` names the `category` and the `name`. Narrow a caught value with
+ * {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'CONCURRENCY'`: a concurrent run on a shared accounting agent; `'REGISTRY'`: a rehydration name absent from its registry pool. */
+	/** Names the machine-readable condition — `'CONCURRENCY'`: a run sharing accounting with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool. */
 	readonly code: AgentErrorCode
+	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
+	readonly context: Readonly<Record<string, unknown>> | undefined
 
-	constructor(code: AgentErrorCode, message: string) {
-		super(message)
+	/**
+	 * Creates the error with its code, message, and optional cause and context.
+	 *
+	 * @param code - The machine-readable {@link AgentErrorCode}
+	 * @param message - The human-readable description
+	 * @param options - The optional {@link CodedErrorOptions}; `cause` reaches `Error.cause` only when present
+	 */
+	constructor(code: AgentErrorCode, message: string, options?: CodedErrorOptions) {
+		super(message, options?.cause === undefined ? undefined : { cause: options.cause })
 		this.name = 'AgentError'
 		this.code = code
+		this.context = options?.context
 	}
 }
 

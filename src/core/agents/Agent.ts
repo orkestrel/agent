@@ -7,7 +7,6 @@ import type {
 	AgentRunOptions,
 	AgentStatus,
 	AgentStreamInterface,
-	AuthorityDecision,
 	AuthorityInterface,
 	AgentRunResult,
 } from './types.js'
@@ -21,6 +20,7 @@ import type { ToolCall, ToolManagerInterface, ToolResult } from '@orkestrel/tool
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
+import { attempt } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
 import { errorToMessage } from '@orkestrel/workflow'
@@ -28,7 +28,14 @@ import { AgentContext } from '../contexts/index.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError } from './errors.js'
 import { Channel } from './Channel.js'
-import { assembleResult, chargeUsage, denyCall, estimateTokens } from './helpers.js'
+import {
+	assembleResult,
+	chargeUsage,
+	denyCall,
+	estimateTokens,
+	renderToolValue,
+	requireLimit,
+} from './helpers.js'
 import {
 	filterAllowList,
 	joinThinking,
@@ -113,15 +120,16 @@ export class Agent implements AgentInterface {
 	// The label the last run settled on. `status` derives the live answer from `#runs`, so an
 	// overlapping run can never report `done` while another is still in flight.
 	#settled: AgentStatus = 'idle'
-	// Every in-flight run's abort handle — a run adds its handle on `stream()` and the
-	// pump removes it when it settles, so `abort()` fires every live run, not only the
-	// most recent. Per-run, never a single shared slot a later `stream()` could clobber:
-	// `generate`/`stream` are reusable and may overlap, and each run must cancel
-	// independently (its own `stream.abort()` fires its own handle; `agent.abort()` fires
-	// them all).
-	readonly #runs = new Set<AbortInterface>()
+	// Every in-flight run's abort handle, mapped to the budget instance that run holds — a run
+	// adds its entry on `stream()` and the pump removes it when it settles, so `abort()` fires every
+	// live run, not only the most recent, and the concurrency guard reads which budgets are held.
+	// Per-run, never a single shared slot a later `stream()` could clobber: `generate`/`stream` are
+	// reusable and may overlap, and each run must cancel independently (its own `stream.abort()`
+	// fires its own handle; `agent.abort()` fires them all).
+	readonly #runs = new Map<AbortInterface, BudgetInterface<TokenUsage> | undefined>()
 
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
+		this.#limit = requireLimit(options?.limit ?? DEFAULT_AGENT_LIMIT)
 		this.#id = crypto.randomUUID()
 		this.#provider = provider
 		this.#replay = provider.replay ?? 'none'
@@ -134,7 +142,6 @@ export class Agent implements AgentInterface {
 			...(options?.conversations === undefined ? {} : { conversations: options.conversations }),
 			...(options?.select === undefined ? {} : { select: options.select }),
 		})
-		this.#limit = options?.limit ?? DEFAULT_AGENT_LIMIT
 		this.#timeoutMs = options?.timeout
 		this.#budget = options?.budget
 		this.#scheduler = options?.scheduler
@@ -172,40 +179,40 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
-		// Concurrency guard: a run already in flight plus a shared construction-level
-		// accounting instance (a `window` context budget, or a construction `budget` with no
-		// per-run override) would race its charges against that shared instance — corrupting
-		// the accounting. Thrown synchronously, before any state mutation or emit, so a
-		// sequential/awaited caller is never affected and a concurrent run with no `window` and
-		// a per-run `budget` override is still allowed.
+		// Resolve effective per-run bounds — a per-run override wins, else the construction
+		// default. `limit` and `budget` also thread into `#execute` (the loop bound + the mid-stream
+		// charging); `budget` is the same instance folded into `#combineSignals`, so its trip both
+		// aborts the run and is the budget `#execute` charges against.
+		const limit = options?.limit === undefined ? this.#limit : requireLimit(options.limit)
+		const budget = options?.budget ?? this.#budget
+		// Concurrency guard: a `window` is one context budget every run clears and measures, and a
+		// budget instance carries one signal that `start()` replaces — a second live run on either
+		// would race the first run's accounting or orphan its bound. Thrown synchronously, before
+		// any state mutation or emit, so a sequential/awaited caller is never affected and runs
+		// holding distinct budget instances with no `window` still overlap.
 		if (
 			this.#runs.size > 0 &&
-			(this.#window !== undefined || (this.#budget !== undefined && options?.budget === undefined))
+			(this.#window !== undefined ||
+				(budget !== undefined && [...this.#runs.values()].includes(budget)))
 		) {
 			throw new AgentError(
 				'CONCURRENCY',
-				'concurrent runs on one agent with a shared construction window/budget corrupt accounting; use separate agents or per-run budgets',
+				'a live run on this agent holds the window or this budget instance; use separate agents or a distinct budget per run',
+				{ context: { agent: this.#id } },
 			)
 		}
-		// Resolve effective per-run bounds — a per-run override wins, else the
-		// construction default. `limit` and `budget` also thread into `#execute` (the loop bound
-		// + the mid-stream charging); `budget` here is the same instance folded into `#combineSignals`,
-		// so its trip both aborts the run and is the budget `#execute` charges against.
+		// The deadline is created unarmed: its signal keeps its identity when `start()` arms it, so
+		// it can be composed first and armed only after nothing left can throw.
 		const timeoutMs = options?.timeout ?? this.#timeoutMs
 		const timeout = timeoutMs === undefined ? undefined : createTimeout({ ms: timeoutMs })
-		timeout?.start()
-		const budget = options?.budget ?? this.#budget
-		// A construction-level budget (`this.#budget`, not a per-run `options?.budget` override) is
-		// a shared cumulative tally across every sequential run on this agent — concurrent streams
-		// on one agent race their charges against the same instance. Use separate agents (or a
-		// per-run `options.budget`) for concurrent streams that must not share a budget.
+		// `start()` replaces the budget's signal, so it precedes the composition that reads it.
 		budget?.start()
-		const limit = options?.limit ?? this.#limit
 		// Fold every present bound (external signal + a per-run signal + deadline + budget)
 		// into one cancel the run races against; this run's own `abort()` fires this handle.
 		const signal = this.#combineSignals(timeout, budget, options?.signal)
 		const abort = createAbort(signal === undefined ? {} : { signal })
-		this.#runs.add(abort)
+		timeout?.start()
+		this.#runs.set(abort, budget)
 		// Observe the run begin — after the run joins `#runs` (which is what `status` derives
 		// `running` from), so a swallowed listener throw can't perturb the state the pump is
 		// about to drive.
@@ -246,7 +253,7 @@ export class Agent implements AgentInterface {
 		// Cancel every in-flight run — iterate a snapshot so a settle-driven `#runs.delete`
 		// (a cancelled run unwinding) can't disturb the walk. Aborting is idempotent, so an
 		// already-finished or already-cancelled handle is a harmless no-op.
-		for (const abort of [...this.#runs]) abort.abort(reason)
+		for (const abort of [...this.#runs.keys()]) abort.abort(reason)
 	}
 
 	// The eager pump — the drive behind both faces. Kicked off synchronously in `stream` (not lazily
@@ -294,7 +301,8 @@ export class Agent implements AgentInterface {
 		} finally {
 			timeout?.clear()
 			// This run is settling — drop its handle so a later `agent.abort()` no longer
-			// fires it (and the set never leaks finished runs).
+			// fires it and release its budget instance to the next run (the map never leaks
+			// finished runs).
 			this.#runs.delete(abort)
 			if (failure === undefined) {
 				this.#settled = 'done'
@@ -562,9 +570,7 @@ export class Agent implements AgentInterface {
 					const toolMessage = this.#context.messages.add({
 						role: 'tool',
 						content: outcomeResult.success
-							? typeof outcomeResult.value === 'string'
-								? outcomeResult.value
-								: JSON.stringify(outcomeResult.value)
+							? renderToolValue(outcomeResult.value)
 							: outcomeResult.error,
 						call: call.id,
 					})
@@ -645,8 +651,13 @@ export class Agent implements AgentInterface {
 		if (!this.#window.exhausted) return false
 		let section: Awaited<ReturnType<typeof conversation.compact>>
 		try {
-			section = await conversation.compact()
+			// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
+			// commits nothing, even when the summarizer ignores the signal.
+			section = await conversation.compact({ signal: abort.signal })
 		} catch (error) {
+			// A cancel wins over the failure it caused, as on the select path: the run settles
+			// partial without a `fault`, and strict mode does not turn the cancel into an error.
+			if (abort.signal.aborted) return false
 			// Surface the summarizer failure observably first (always). Lenient (default): skip
 			// compaction this turn and continue over-window. Strict: rethrow after the event so
 			// the caught error propagates through `#execute` and the run settles `error` instead.
@@ -749,20 +760,19 @@ export class Agent implements AgentInterface {
 			// cleared, so it must not run. Synthesize a denial (carrying the error's message)
 			// instead of letting the throw reject the whole run — the tool stays unexecuted and
 			// the model still receives a denial it can react to, exactly like an explicit `deny`.
-			let decision: AuthorityDecision
-			try {
-				decision = authority.evaluate({ call })
-			} catch (error) {
+			const evaluated = attempt(() => authority.evaluate({ call }))
+			if (!evaluated.success) {
 				// The declared `@orkestrel/workflow` normalizer, so a fail-closed denial carries a
 				// non-empty explanation the model can read: an `Error` with an empty `message`
 				// normalizes to real text, and a throw whose stringification itself fails is caught
 				// rather than escaping the gate and rejecting the run.
-				const reason = errorToMessage(error)
+				const reason = errorToMessage(evaluated.error)
 				denials.set(index, denyCall(call, reason))
 				// Observe the fail-closed denial with the thrown reason.
 				this.#emitter.emit('deny', call, reason)
 				continue
 			}
+			const decision = evaluated.value
 			if (decision.allowed) allowed.set(index, call)
 			else {
 				denials.set(index, denyCall(call, decision.reason))

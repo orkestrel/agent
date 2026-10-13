@@ -21,6 +21,8 @@ import {
 } from '@orkestrel/contract'
 import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
+import { hasCalls, renderJSON } from '../helpers.js'
+import { isNonNegativeSafeInteger } from '../validators.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
@@ -124,10 +126,10 @@ export function estimateTokens(text: string): number {
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
  * It is the fully-swappable default an agent's auto-compaction context budget charges each
  * turn's new messages through; a caller wanting a sharper count supplies its own `consumer` to
- * `createBudget` instead. A `calls` `JSON.stringify` that throws (a
- * circular `ToolCall.arguments`) is caught and replaced with a fixed contribution of
+ * `createBudget` instead. A `calls` list JSON cannot carry (a circular or `BigInt`
+ * `ToolCall.arguments`) contributes a fixed
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
- * instead of estimating the (unreachable) serialized length.
+ * instead of an estimate of the (unreachable) serialized length.
  *
  * @param messages - The messages to estimate (a turn's appended assistant + tool messages)
  * @returns The summed estimated token count (`0` when empty)
@@ -142,16 +144,9 @@ export function estimateMessages(messages: readonly Message[]): number {
 	return messages.reduce((sum, message) => {
 		const content = estimateTokens(message.content) + MESSAGE_TOKEN_OVERHEAD
 		let calls = 0
-		if (message.calls?.length) {
-			// `JSON.stringify` over `ToolCall.arguments` can throw (a circular reference) even
-			// for a typed message — so the serialization is wrapped; a
-			// throw falls back to a fixed contribution (the same per-message overhead
-			// scale) instead of an unreachable serialized-length estimate.
-			try {
-				calls = estimateTokens(JSON.stringify(message.calls))
-			} catch {
-				calls = MESSAGE_TOKEN_OVERHEAD
-			}
+		if (hasCalls(message)) {
+			const rendered = renderJSON(message.calls)
+			calls = rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
 		}
 		const images = (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE
 		const thinking = message.thinking === undefined ? 0 : estimateTokens(message.thinking)
@@ -218,31 +213,39 @@ export function handleAgentQueueJob(
 }
 
 /**
- * Handles one runner agent job by fanning out its declared children, rehydrating the
- * parent through a registry with the controller signal, and applying the shared
+ * Handles one runner agent job by fanning out its declared children once per unit, rehydrating
+ * the parent through a registry with the controller signal, and applying the shared
  * partial-result policy.
  *
  * @remarks
  * Children are fired and tracked through the runner controller without awaiting them
- * inline, preserving bounded-runner progress.
+ * inline, preserving bounded-runner progress. The runner calls the handler once per attempt
+ * with the same unit id, so `spawned` records each unit whose children were spawned and a retried
+ * attempt spawns none again. The handler adds to `spawned` and never removes from it; bind one set
+ * per runner.
  *
  * @param registry - The registry that rehydrates serializable jobs
  * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
+ * @param spawned - The ids of the units whose children were already spawned, shared by every attempt
  * @param controller - The runner controller for this parent job
  * @returns The settled parent agent result
  *
  * @example
  * ```ts
- * const result = await handleAgentRunnerJob(registry, false, controller)
+ * const result = await handleAgentRunnerJob(registry, false, new Set<string>(), controller)
  * ```
  */
 export function handleAgentRunnerJob(
 	registry: AgentRegistryInterface,
 	partial: boolean,
+	spawned: Set<string>,
 	controller: ControllerInterface<AgentJobInput, AgentResult>,
 ): Promise<AgentResult> {
 	const children = controller.input.children
-	if (children !== undefined) for (const child of children) void controller.spawn(child)
+	if (children !== undefined && !spawned.has(controller.id)) {
+		spawned.add(controller.id)
+		for (const child of children) void controller.spawn(child)
+	}
 	return settleAgentJob(registry.build(controller.input, controller.signal), partial)
 }
 
@@ -338,12 +341,69 @@ export function chargeUsage(
 }
 
 /**
+ * Returns a tool-iteration cap after checking it is a nonnegative safe integer, or throws a coded
+ * error.
+ *
+ * @remarks
+ * The check is {@link import('../validators.js').isNonNegativeSafeInteger}, so `0` and `-0`
+ * pass while `NaN`, a fraction, a negative, and either infinity are refused. The error's `context`
+ * carries the refused value as `limit`.
+ *
+ * @param limit - The tool-iteration cap to check
+ * @returns The cap unchanged
+ * @throws {AgentError} Thrown when `limit` is not a nonnegative safe integer (code `'LIMIT'`)
+ *
+ * @example
+ * ```ts
+ * requireLimit(3) // 3
+ * requireLimit(1.5) // throws AgentError ('LIMIT')
+ * ```
+ */
+export function requireLimit(limit: number): number {
+	if (!isNonNegativeSafeInteger(limit)) {
+		throw new AgentError('LIMIT', 'a limit must be a nonnegative safe integer', {
+			context: { limit },
+		})
+	}
+	return limit
+}
+
+/**
+ * Renders a tool's output as the string content of its tool message.
+ *
+ * @remarks
+ * A string passes through unchanged and `undefined` renders as `''`. Any other value renders as
+ * its `JSON.stringify` text, byte for byte, when JSON can carry it. A value JSON cannot carry (a
+ * `BigInt`, a cycle, a symbol, a throwing `toJSON`) renders as `String(value)`, and as `''` when
+ * that conversion throws too, so a tool's output never rejects the run that dispatched it.
+ *
+ * @param value - The tool's output (`ToolSuccess.value`, which may be `undefined`)
+ * @returns The message content
+ *
+ * @example
+ * ```ts
+ * renderToolValue('sunny') // 'sunny'
+ * renderToolValue({ count: 2 }) // '{"count":2}'
+ * renderToolValue(undefined) // ''
+ * renderToolValue(10n) // '10'
+ * ```
+ */
+export function renderToolValue(value: unknown): string {
+	if (typeof value === 'string') return value
+	if (value === undefined) return ''
+	const rendered = renderJSON(value)
+	if (rendered !== undefined) return rendered
+	const fallback = attempt(() => String(value))
+	return fallback.success ? fallback.value : ''
+}
+
+/**
  * Returns a registered value or throws when its name is absent.
  * @param pool - The named values
  * @param category - The registry category named in an error
  * @param name - The requested key
  * @returns The registered value
- * @throws {AgentError} Thrown when the name is absent, with code REGISTRY.
+ * @throws {AgentError} Thrown when the name is absent, with code REGISTRY and a `context` naming the `category` and the `name`.
  * @example
  * ```ts
  * requireEntry(new Map([['main', provider]]), 'provider', 'main') // provider
@@ -351,7 +411,11 @@ export function chargeUsage(
  */
 export function requireEntry<T>(pool: ReadonlyMap<string, T>, category: string, name: string): T {
 	const value = pool.get(name)
-	if (value === undefined) throw new AgentError('REGISTRY', `unknown ${category}: ${name}`)
+	if (value === undefined) {
+		throw new AgentError('REGISTRY', `unknown ${category}: ${name}`, {
+			context: { category, name },
+		})
+	}
 	return value
 }
 

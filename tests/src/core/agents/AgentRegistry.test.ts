@@ -1,5 +1,6 @@
 import type { AgentJobInput } from '@src/core'
 import { describe, expect, it } from 'vitest'
+import { captureError, requireValue } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -9,10 +10,11 @@ import {
 	isAgentError,
 } from '@src/core'
 import {
+	AGENT_USAGE,
 	createAddTool,
 	createRecordingScheduler,
 	createScriptedProvider,
-	createTokenUsage,
+	createTurnRegistry,
 	createLoopTool,
 } from '../../../setup.js'
 
@@ -23,8 +25,6 @@ import {
 // / timeout / budget / authority / scheduler wired (asserted behaviourally, because they're
 // `#private` on Agent), the cancel threaded; a `budget` number becomes a token budget;
 // `tools` names resolve into the agent's manager. The job descriptor IS serializable.
-
-const USAGE = createTokenUsage()
 
 describe('AgentRegistry — accessors', () => {
 	it('resolves a registered provider / tool / authority / scheduler by name', () => {
@@ -45,9 +45,7 @@ describe('AgentRegistry — accessors', () => {
 	})
 
 	it('throws a clear, kind-specific error on an unknown name', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'ok' })
 		expect(() => registry.provider('ghost')).toThrow('unknown provider: ghost')
 		expect(() => registry.tool('ghost')).toThrow('unknown tool: ghost')
 		expect(() => registry.authority('ghost')).toThrow('unknown authority: ghost')
@@ -55,25 +53,19 @@ describe('AgentRegistry — accessors', () => {
 	})
 
 	it('throws an AgentError carrying code REGISTRY, so a catch branches without parsing the message', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
-		let caught: unknown
-		try {
-			registry.tool('ghost')
-		} catch (error) {
-			caught = error
-		}
+		const registry = createTurnRegistry({ content: 'ok' })
+		const caught = captureError(() => registry.tool('ghost'))
 		if (!isAgentError(caught)) throw new Error('expected an AgentError')
 		expect(caught.code).toBe('REGISTRY')
 		expect(caught.name).toBe('AgentError')
 		expect(caught.message).toBe('unknown tool: ghost')
+		expect(caught.context).toEqual({ category: 'tool', name: 'ghost' })
 	})
 })
 
 describe('AgentRegistry — build (rehydration)', () => {
 	it('seeds the conversation + system prompt so they reach the agent and the provider', async () => {
-		const provider = createScriptedProvider([{ content: 'done', usage: USAGE }])
+		const provider = createScriptedProvider([{ content: 'done', usage: AGENT_USAGE }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const input: AgentJobInput = {
 			provider: 'main',
@@ -93,7 +85,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
 		expect(result.partial).toBe(false)
-		expect(result.usage).toEqual(USAGE)
+		expect(result.usage).toEqual(AGENT_USAGE)
 	})
 
 	it("resolves the `tools` names into the agent's tool manager", () => {
@@ -119,9 +111,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 	})
 
 	it('throws when a job names an unknown tool (loud failure, not a silent skip)', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'ok' })
 		expect(() => registry.build({ provider: 'main', messages: [], tools: ['ghost'] })).toThrow(
 			'unknown tool: ghost',
 		)
@@ -148,7 +138,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		// exact form). Turn-1 completion is 7; a ceiling of 5 (< 7) fires the budget after turn
 		// 1, so the loop commits a partial before turn 2 — proving the ceiling became a budget.
 		const provider = createScriptedProvider([
-			{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: USAGE },
+			{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: AGENT_USAGE },
 			{ content: 'b' },
 		])
 		const registry = createAgentRegistry({
@@ -188,6 +178,15 @@ describe('AgentRegistry — build (rehydration)', () => {
 		// Every turn requested the tool, so the wired limit was exhausted with
 		// unresolved tool intent — the result is partial.
 		expect(result.partial).toBe(true)
+	})
+
+	it('refuses a rehydrated `limit` that is not a nonnegative safe integer, and accepts 0', () => {
+		const registry = createTurnRegistry({ content: 'ok' })
+		for (const limit of [Number.NaN, -1, Number.POSITIVE_INFINITY, 1.5]) {
+			const caught = captureError(() => registry.build({ provider: 'main', messages: [], limit }))
+			expect(isAgentError(caught) ? caught.code : undefined).toBe('LIMIT')
+		}
+		expect(registry.build({ provider: 'main', messages: [], limit: 0 }).status).toBe('idle')
 	})
 
 	it('resolves a `scheduler` name and the rehydrated loop paces through it', async () => {
@@ -279,9 +278,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 	it('throws on an unknown provider name — the whole rehydration fails before any agent exists', () => {
 		// `provider` is the one required field; an unknown one is the first thing `build`
 		// resolves, so it throws before constructing anything.
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'ok' })
 		expect(() => registry.build({ provider: 'ghost', messages: [] })).toThrow(
 			'unknown provider: ghost',
 		)
@@ -290,9 +287,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 
 describe('AgentRegistry — build (field wiring completeness)', () => {
 	it('seeds many messages IN ORDER and an empty array seeds nothing', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'ok' })
 		// Many → every message reaches the context in the job's declared order.
 		const many = registry.build({
 			provider: 'main',
@@ -313,9 +308,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 	})
 
 	it('omits the system message from build() when the job declares no `system`', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'ok' })
 		const agent = registry.build({
 			provider: 'main',
 			messages: [{ role: 'user', content: 'hi' }],
@@ -414,7 +407,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 
 	it('wires no budget when `budget` is absent — the agent runs to a natural finish', async () => {
 		// No `budget` on the job → no cost bound; the single-turn run finishes normally.
-		const provider = createScriptedProvider([{ content: 'done', usage: USAGE }])
+		const provider = createScriptedProvider([{ content: 'done', usage: AGENT_USAGE }])
 		const registry = createAgentRegistry({ providers: { main: provider } })
 		const agent = registry.build({
 			provider: 'main',
@@ -535,9 +528,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 	})
 
 	it('is repeatable — building the same input twice yields equivalent, independently runnable agents', async () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'twice' }]) },
-		})
+		const registry = createTurnRegistry({ content: 'twice' })
 		const input: AgentJobInput = {
 			provider: 'main',
 			system: 'be brief',
@@ -582,24 +573,27 @@ describe('AgentRegistry — conversation store seam', () => {
 		expect(first.context.conversations.active?.id).not.toBe(second.context.conversations.active?.id)
 	})
 
-	it('build stays synchronous even when a store is configured (no hydration on build)', () => {
+	it('build stays synchronous even when a store is configured (no hydration on build)', async () => {
+		const store = createMemoryConversationStore()
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-			store: createMemoryConversationStore(),
-		})
-		// No `await` — a synchronous call proves `build` never returns a Promise.
-		const agent = registry.build({ provider: 'main', messages: [] })
-		expect(agent).toBeDefined()
-	})
-
-	it('omits the store — behavior identical to today (a registry-only manager)', () => {
-		const registry = createAgentRegistry({
-			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+			store,
 		})
 		const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'hi' }] })
-		// Spot-check an existing assertion still passes unchanged.
+		expect(agent instanceof Promise).toBe(false)
+		// The seed is readable in the same turn, and nothing reached the store before a `save`.
+		expect(agent.context.messages.messages().map((message) => message.content)).toEqual(['hi'])
+		expect(await store.get(requireValue(agent.context.conversations.active).id)).toBeUndefined()
+	})
+
+	it('omits the store — a built agent seeds its conversation and cannot save it', async () => {
+		const registry = createTurnRegistry({ content: 'ok' })
+		const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'hi' }] })
 		expect(agent.context.messages.messages()).toHaveLength(1)
 		expect(agent.context.messages.messages()[0]).toMatchObject({ role: 'user', content: 'hi' })
+		expect(
+			await agent.context.conversations.save(requireValue(agent.context.conversations.active).id),
+		).toBe(false)
 	})
 })
 
