@@ -832,6 +832,114 @@ await new GuideCommand({
 			)
 		})
 
+		it('runs compact() calls one at a time and commits nothing a remove dropped (the compaction concurrency sentences)', async () => {
+			const gate = Promise.withResolvers<string>()
+			const calls = createRecorder<readonly [readonly Message[]]>()
+			const conversation = createConversation({
+				async summarize(messages) {
+					calls.handler(messages)
+					return gate.promise
+				},
+			})
+			const [first] = conversation.add([
+				{ role: 'user', content: 'My name is Ada.' },
+				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+				{ role: 'user', content: 'What did I say my name was?' },
+			])
+			const folding = conversation.compact()
+			const queued = conversation.compact()
+			await waitForCondition('the first summarizer call', () => calls.count === 1)
+			conversation.remove(requireValue(first, 'Missing message').id)
+			gate.resolve('recap')
+
+			expect(await folding).toBeUndefined()
+			expect(await queued).toBeUndefined()
+			expect(calls.count).toBe(1)
+			expect(conversation.sections).toEqual([])
+			expect(guideText).toContain(
+				'Calls to `compact()` run one at a time: a call made while another is in flight waits for it, then folds from the live tail it finds. A fold commits only when every folded message is still the same live entry after the summarizer settles, so a `remove` or `clear` during the summarizer makes `compact()` resolve `undefined` and leaves no section.',
+			)
+		})
+
+		it('rejects a cancelled compact() with the reason and hands the summarizer the signal (the compaction cancel sentence)', async () => {
+			const gate = Promise.withResolvers<string>()
+			const signals = createRecorder<readonly [AbortSignal | undefined]>()
+			const conversation = createConversation({
+				async summarize(_messages, signal) {
+					signals.handler(signal)
+					return gate.promise
+				},
+			})
+			conversation.add([
+				{ role: 'user', content: 'My name is Ada.' },
+				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+				{ role: 'user', content: 'What did I say my name was?' },
+			])
+			const controller = new AbortController()
+			const reason = new Error('cancelled')
+			const folding = conversation.compact({ signal: controller.signal })
+			await waitForCondition('the summarizer call', () => signals.count === 1)
+			controller.abort(reason)
+
+			expect(await folding.catch((cause: unknown) => cause)).toBe(reason)
+			expect(signals.calls).toEqual([[controller.signal]])
+			gate.resolve('late recap')
+			expect(conversation.sections).toEqual([])
+			expect(guideText).toContain(
+				"Pass `CompactOptions.signal` to cancel a fold: the summarizer receives the signal as its second argument, and an abort rejects `compact()` with the signal's reason at once, even when the summarizer ignores the signal, and commits nothing.",
+			)
+		})
+
+		it('refuses a keep that is not a nonnegative safe integer before any summarizer call (the KEEP sentence)', async () => {
+			const stub = createStubSummarizer()
+			const conversation = createConversation({ summarize: stub.summarize })
+			conversation.add({ role: 'assistant', content: 'Nice to meet you, Ada.' })
+			const refused = await Promise.all(
+				[Number.NaN, 1.5, -1, Number.POSITIVE_INFINITY].map(async (keep) => {
+					const error: unknown = await conversation
+						.compact({ keep })
+						.catch((cause: unknown) => cause)
+					return barrel.isConversationError(error) ? error.code : undefined
+				}),
+			)
+
+			expect(refused).toEqual(['KEEP', 'KEEP', 'KEEP', 'KEEP'])
+			expect(stub.calls).toHaveLength(0)
+			expect(guideText).toContain(
+				'`keep` must be a nonnegative safe integer: `NaN`, a fraction, a negative, or `Infinity` throws `ConversationError` with code `KEEP` before any summarizer call.',
+			)
+		})
+
+		it('forwards error through add and keeps a conversation registered during open (the manager sentences)', async () => {
+			const errors = createRecorder<readonly [error: unknown, event: string]>()
+			const boom = new Error('observer boom')
+			const store = createMemoryConversationStore()
+			await store.set({ id: 'ada', sections: [], messages: [] })
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				store,
+			})
+			const observed = conversations.add({
+				error: errors.handler,
+				on: {
+					compact() {
+						throw boom
+					},
+				},
+			})
+			observed.add({ role: 'assistant', content: 'Nice to meet you, Ada.' })
+			await observed.compact()
+			const opening = conversations.open('ada')
+			const live = conversations.add({ id: 'ada' })
+
+			expect(errors.calls).toEqual([[boom, 'compact']])
+			expect(await opening).toBe(live)
+			expect(conversations.active).toBe(live)
+			expect(guideText).toContain(
+				"`add` forwards the input's `on` hooks and `error` handler to the conversation's emitter, so a throwing listener reports to that handler. `open(id)` returns the conversation registered under `id` while its store read was pending rather than overwriting it, and resolves `undefined` for a stored snapshot whose `id` is not `id`.",
+			)
+		})
+
 		it('folds nothing after an abort and folds on the next invocation (the no-fold-after-cancel bullet)', async () => {
 			const stub = createStubSummarizer()
 			const conversations = createConversationManager({ summarize: stub.summarize })
