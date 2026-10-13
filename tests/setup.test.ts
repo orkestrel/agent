@@ -45,6 +45,7 @@ import {
 	createFailingScheduler,
 } from './setup.js'
 import {
+	Classifier,
 	LedgerError,
 	LEDGER_QUESTIONS,
 	buildRecords,
@@ -141,7 +142,16 @@ import {
 	buildLedgerExchange,
 	buildLedgerResponse,
 	createLedgerJudge,
+	buildDeliverySeed,
+	buildLedgerPairJudgment,
+	buildLedgerTopicJudgment,
+	buildUncalibratedOptions,
+	createForeignSignal,
+	createRecordedBudget,
+	createRecordedTool,
+	createRelayHop,
 } from './setup.js'
+import type { TokenUsage } from '@orkestrel/budget'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { rawShape, stringShape } from '@orkestrel/contract'
 
@@ -1786,5 +1796,228 @@ describe('buildLedgerTailScenario', () => {
 		expect(second).toEqual(first)
 		expect(second.seed).not.toBe(first.seed)
 		expect(second.boundaries[0]).not.toBe(first.boundaries[0])
+	})
+})
+
+describe('shared agent builders', () => {
+	it('createRecordedBudget records each consumed usage and charges its total', () => {
+		const recorder = createRecorder<[TokenUsage]>()
+		const budget = createRecordedBudget(recorder)
+		expect(budget.max).toBe(1_000_000)
+		const first = createTokenUsage()
+		const second = createTokenUsage({ prompt: 1, completion: 1, total: 2 })
+		budget.consume(first)
+		budget.consume(second)
+		expect(recorder.calls).toEqual([[first], [second]])
+		expect(budget.consumed).toBe(first.total + second.total)
+		expect(budget.exhausted).toBe(false)
+		const bounded = createRecordedBudget(createRecorder<[TokenUsage]>(), 10)
+		expect(bounded.max).toBe(10)
+		bounded.consume(first)
+		expect(bounded.exhausted).toBe(true)
+	})
+
+	it('createRecordedTool records its arguments and returns the supplied output', async () => {
+		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const context = { signal: new AbortController().signal }
+		const plain = createRecordedTool('save', recorder)
+		expect(plain.name).toBe('save')
+		expect(await plain.execute({ id: 1 }, context)).toBe('ok')
+		const counted = createRecordedTool('add', recorder, 5)
+		expect(counted.name).toBe('add')
+		expect(await counted.execute({ id: 2 }, context)).toBe(5)
+		expect(recorder.calls).toEqual([[{ id: 1 }], [{ id: 2 }]])
+	})
+
+	it('createForeignSignal is signal-shaped, inert, and refused by AbortSignal.any', () => {
+		const foreign = createForeignSignal()
+		expect(foreign.aborted).toBe(false)
+		expect(foreign.reason).toBeUndefined()
+		expect(foreign instanceof AbortSignal).toBe(false)
+		expect(() => foreign.throwIfAborted()).not.toThrow()
+		expect(() => AbortSignal.any([foreign])).toThrow(TypeError)
+		expect(AbortSignal.any([new AbortController().signal]).aborted).toBe(false)
+	})
+})
+
+describe('shared ledger builders', () => {
+	const earlier: Message = { id: 'e1', role: 'user', content: 'Refunds over $100 need a manager.' }
+	const later: Message = {
+		id: 'l1',
+		role: 'user',
+		content: 'Correction: refunds need a manager over $250.',
+	}
+	const topic = { name: 'refunds', criterion: 'Refund amounts' }
+
+	it('buildLedgerPairJudgment equals the pair literal the ledger tests hold', () => {
+		for (const head of ['amends', 'supersedes'] as const) {
+			const literal = {
+				id: JSON.stringify([head, earlier.id, later.id]),
+				question: LEDGER_QUESTIONS[head],
+				sources: [earlier.id, later.id],
+				state: `Earlier message: ${earlier.role}: ${earlier.content}\nLater message: user: ${later.content}`,
+				model: 'recording-model',
+				answer: { form: 'noul', noul: head === 'amends' ? 1 : 0 },
+			}
+			const built = buildLedgerPairJudgment(head, earlier, later, head === 'amends' ? 1 : 0)
+			expect(JSON.stringify(built)).toBe(JSON.stringify(literal))
+		}
+	})
+
+	it('buildLedgerTopicJudgment equals the topic literal the ledger tests hold', () => {
+		for (const message of [earlier, { ...later, role: 'assistant' } satisfies Message]) {
+			const literal = {
+				id: JSON.stringify(['topic', message.id, 'refunds']),
+				question: {
+					form: 'noul',
+					instructions: LEDGER_QUESTIONS.topic,
+					criteria: {
+						true: 'The message concerns refunds: Refund amounts',
+						false: 'The message does not concern refunds',
+					},
+				},
+				sources: [message.id],
+				state: `${message.role}: ${message.content}`,
+				model: 'recording-model',
+				answer: { form: 'noul', noul: 1 },
+			}
+			expect(JSON.stringify(buildLedgerTopicJudgment(message, topic, 1))).toBe(
+				JSON.stringify(literal),
+			)
+		}
+	})
+
+	it('files pair and topic judgments the real classifier accepts without asking again', async () => {
+		const asks: string[][] = []
+		for (const preloaded of [false, true]) {
+			const conversation = createConversation()
+			const first = conversation.add({ role: 'user', content: earlier.content })
+			const second = conversation.add({ role: 'user', content: later.content })
+			if (preloaded) {
+				conversation.judgments.add(buildLedgerTopicJudgment(first, topic, 1))
+				conversation.judgments.add(buildLedgerTopicJudgment(second, topic, 1))
+				conversation.judgments.add(buildLedgerPairJudgment('amends', first, second, 0.9))
+			}
+			const asked: string[] = []
+			const inner = createPhraseJudge(['Refunds over'], ['Correction'])
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation,
+					judge: createLedgerJudge(
+						asked,
+						(request) => inner.ask(request, new AbortController().signal),
+						'recording-model',
+					),
+					topics: [topic],
+				}),
+			)
+			await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+			asks.push(asked.map((key) => key.replace(first.id, 'first').replace(second.id, 'second')))
+		}
+		const [fresh, filed] = asks
+		expect(fresh).toEqual(
+			expect.arrayContaining([
+				JSON.stringify(['topic', 'first', 'refunds']),
+				JSON.stringify(['topic', 'second', 'refunds']),
+				JSON.stringify(['amends', 'first', 'second']),
+				JSON.stringify(['supersedes', 'first', 'second']),
+			]),
+		)
+		expect(filed).not.toContain(JSON.stringify(['topic', 'first', 'refunds']))
+		expect(filed).not.toContain(JSON.stringify(['topic', 'second', 'refunds']))
+		expect(filed).not.toContain(JSON.stringify(['amends', 'first', 'second']))
+		expect(filed).toContain(JSON.stringify(['supersedes', 'first', 'second']))
+	})
+
+	it('buildUncalibratedOptions drops only the gauge and leaves its input whole', () => {
+		const options = buildLedgerOptions()
+		const uncalibrated = buildUncalibratedOptions(options)
+		expect('gauge' in uncalibrated).toBe(false)
+		expect(options.gauge).toEqual({ scale: 1, overhead: 0 })
+		expect(Object.keys(uncalibrated).sort()).toEqual(
+			Object.keys(options)
+				.filter((key) => key !== 'gauge')
+				.sort(),
+		)
+		expect(uncalibrated.judge).toBe(options.judge)
+		expect(uncalibrated.capacity).toBe(options.capacity)
+	})
+
+	it('buildDeliverySeed names each delivery by its index', () => {
+		expect(buildDeliverySeed(2)).toEqual([
+			{ role: 'user', content: 'Delivery 0 arrived Tuesday with a completed receipt.' },
+			{ role: 'user', content: 'Delivery 1 arrived Tuesday with a completed receipt.' },
+		])
+		expect(buildDeliverySeed(0)).toEqual([])
+		expect(buildDeliverySeed(20)).toHaveLength(20)
+		expect(buildDeliverySeed(20).at(-1)?.content).toBe(
+			'Delivery 19 arrived Tuesday with a completed receipt.',
+		)
+	})
+})
+
+describe('createRelayHop', () => {
+	it('drives the real relay handler through Fetch objects by default', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }])
+		const hop = createRelayHop({ provider: upstream })
+		expect(await hop.generate([], new AbortController().signal)).toEqual({ content: 'admitted' })
+		expect(upstream.started).toBe(1)
+	})
+
+	it('refuses a body over the limit before the upstream provider starts', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }])
+		await expect(
+			createRelayHop({ provider: upstream, limit: 1 }).generate([], new AbortController().signal),
+		).rejects.toMatchObject({ code: 'HTTP', status: 413 })
+		expect(upstream.started).toBe(0)
+	})
+
+	it('carries the supplied headers to the authorization hook', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }])
+		const authorize = (request: Request): boolean =>
+			request.headers.get('authorization') === 'Bearer accepted'
+		const refused = createRelayHop({
+			provider: upstream,
+			authorize,
+			headers: () => ({ authorization: 'Bearer refused' }),
+		})
+		await expect(refused.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 401,
+		})
+		expect(upstream.started).toBe(0)
+		const accepted = createRelayHop({
+			provider: upstream,
+			authorize,
+			headers: () => ({ authorization: 'Bearer accepted' }),
+		})
+		expect(await accepted.generate([], new AbortController().signal)).toEqual({
+			content: 'admitted',
+		})
+	})
+
+	it('hands the handler the request its builder returns and the observer the response', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }])
+		const urls = createRecorder<[string]>()
+		const bodies = createRecorder<[string]>()
+		const hop = createRelayHop({
+			provider: upstream,
+			url: 'http://relay.test/exact?route=turn',
+			request: (input, init) => {
+				const request = new Request(input, init)
+				urls.handler(request.url)
+				return new Request(request, { body: '{"messages":null}' })
+			},
+			response: async (response) => {
+				bodies.handler(await response.clone().text())
+			},
+		})
+		await expect(hop.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'HTTP',
+			status: 400,
+		})
+		expect(urls.calls).toEqual([['http://relay.test/exact?route=turn']])
+		expect(bodies.count).toBe(1)
+		expect(upstream.started).toBe(0)
 	})
 })

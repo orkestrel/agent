@@ -1,4 +1,11 @@
-import type { LedgerLookup, LedgerTopic, LedgerResult, RelayProvider } from '@src/core'
+import type {
+	LedgerLookup,
+	LedgerTopic,
+	LedgerResult,
+	RelayOptions,
+	RelayProvider,
+	RelayProviderOptions,
+} from '@src/core'
 import { Classifier, createLedger, createRelay, createRelayProvider, renderStub } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
@@ -61,7 +68,7 @@ import type {
 	ThinkingReplay,
 	ThinkSplitterInterface,
 } from '@src/core'
-import type { TokenUsage } from '@orkestrel/budget'
+import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { DriverInterface } from '@orkestrel/database'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
@@ -1424,6 +1431,49 @@ export function createAddTool(): ToolInterface {
  */
 export function createLoopTool(): ToolInterface {
 	return createTool({ name: 'loop', execute: () => 'again' })
+}
+
+/**
+ * Creates a real token budget that records every consumed usage and charges its `total`.
+ * The default ceiling is generous, so a case that proves metering never trips the budget.
+ *
+ * @param recorder - The recorder that receives each consumed usage
+ * @param max - The cumulative ceiling. Default: 1_000_000
+ * @returns A cumulative budget over {@link TokenUsage} whose consumer records before it charges
+ */
+export function createRecordedBudget(
+	recorder: RecorderInterface<[TokenUsage]>,
+	max = 1_000_000,
+): BudgetInterface<TokenUsage> {
+	return createBudget<TokenUsage>({
+		max,
+		consumer: (value) => {
+			recorder.handler(value)
+			return value.total
+		},
+	})
+}
+
+/**
+ * Creates a real tool that records its arguments and returns a fixed output.
+ *
+ * @param name - The tool name a provider call selects
+ * @param recorder - The recorder that receives each call's arguments
+ * @param output - The value each execution returns. Default: 'ok'
+ * @returns A working tool whose execution records, then returns the output
+ */
+export function createRecordedTool(
+	name: string,
+	recorder: RecorderInterface<[Readonly<Record<string, unknown>>]>,
+	output: unknown = 'ok',
+): ToolInterface {
+	return createTool({
+		name,
+		execute: (args) => {
+			recorder.handler(args)
+			return output
+		},
+	})
 }
 
 /**
@@ -3673,6 +3723,81 @@ export function buildLedgerJudgment(
 }
 
 /**
+ * Builds an amendment or supersession judgment whose identity and state match a source pair.
+ * @param head - The pair question, amends or supersedes
+ * @param earlier - The earlier source message
+ * @param later - The later source message
+ * @param noul - The noul answer for the pair
+ * @returns The pair judgment input
+ */
+export function buildLedgerPairJudgment(
+	head: 'amends' | 'supersedes',
+	earlier: Message,
+	later: Message,
+	noul: number,
+): JudgmentInput {
+	return {
+		id: JSON.stringify([head, earlier.id, later.id]),
+		question: LEDGER_QUESTIONS[head],
+		sources: [earlier.id, later.id],
+		state: `Earlier message: ${earlier.role}: ${earlier.content}\nLater message: ${later.role}: ${later.content}`,
+		model: 'recording-model',
+		answer: { form: 'noul', noul },
+	}
+}
+
+/**
+ * Builds a topic judgment whose identity and state match a source message.
+ * @param message - The source message
+ * @param topic - The desk topic the question names
+ * @param noul - The noul answer for the topic
+ * @returns The topic judgment input
+ */
+export function buildLedgerTopicJudgment(
+	message: Message,
+	topic: LedgerTopic,
+	noul: number,
+): JudgmentInput {
+	return {
+		id: JSON.stringify(['topic', message.id, topic.name]),
+		question: {
+			form: 'noul',
+			instructions: LEDGER_QUESTIONS.topic,
+			criteria: {
+				true: `The message concerns ${topic.name}: ${topic.criterion}`,
+				false: `The message does not concern ${topic.name}`,
+			},
+		},
+		sources: [message.id],
+		state: `${message.role}: ${message.content}`,
+		model: 'recording-model',
+		answer: { form: 'noul', noul },
+	}
+}
+
+/**
+ * Removes the calibrated gauge from ledger options so the ledger measures its own.
+ * @param options - The ledger options to copy
+ * @returns The options without a gauge
+ */
+export function buildUncalibratedOptions(options: LedgerOptions): Omit<LedgerOptions, 'gauge'> {
+	const { gauge: _gauge, ...uncalibrated } = options
+	return uncalibrated
+}
+
+/**
+ * Builds the delivery history that fills a conversation with distinct user statements.
+ * @param count - The number of deliveries
+ * @returns The user messages to append to a conversation
+ */
+export function buildDeliverySeed(count: number): readonly MessageInput[] {
+	return Array.from({ length: count }, (_unused, at): MessageInput => ({
+		role: 'user',
+		content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+	}))
+}
+
+/**
  * Builds the assistant call and tool result of a seeded lookup exchange.
  * @param content - The result text
  * @param id - The call id
@@ -3807,12 +3932,7 @@ export async function planLedgerDelivery(
 			gauge: { scale: 1, overhead: 0 },
 		}),
 	)
-	ledger.conversation.add(
-		Array.from({ length: 40 }, (_unused, at): MessageInput => ({
-			role: 'user',
-			content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
-		})),
-	)
+	ledger.conversation.add(buildDeliverySeed(40))
 	await ledger.respond('Review the desk.')
 	return requireValue(provider.calls[0], 'Missing first call').messages.map(({ role, content }) => [
 		role,
@@ -4044,6 +4164,63 @@ export function collectMessageThinking(messages: readonly Message[]): readonly s
 	return messages.flatMap((message) => (message.thinking === undefined ? [] : [message.thinking]))
 }
 
+/** Builds the request a relay hop hands to its handler from the arguments of one fetch. */
+export type RelayHopRequest = (
+	input: Parameters<typeof globalThis.fetch>[0],
+	init: Parameters<typeof globalThis.fetch>[1],
+) => Request | Promise<Request>
+
+/**
+ * Configures a relay hop.
+ *
+ * @remarks
+ * - `provider` - The upstream provider the real handler drives.
+ * - `limit` - The request body byte limit. Default: the handler's own.
+ * - `url` - The relay destination. Default: `http://relay.test/`.
+ * - `headers` - The headers the relay provider sends with each call.
+ * - `authorize` - The handler's authorization hook. Default: admits every request.
+ * - `request` - Builds the request the handler receives; observes or rewrites it. Default: the
+ *   request the fetch arguments describe.
+ * - `response` - Observes the handler's response, for example to read a clone of its frames.
+ */
+export interface RelayHopOptions {
+	readonly provider: ProviderInterface
+	readonly limit?: number
+	readonly url?: string
+	readonly headers?: RelayProviderOptions['headers']
+	readonly authorize?: RelayOptions['authorize']
+	readonly request?: RelayHopRequest
+	readonly response?: (response: Response) => void | Promise<void>
+}
+
+/**
+ * Creates a relay provider connected in process to a real relay handler.
+ *
+ * @param options - The upstream provider, byte limit, destination, and observation seams
+ * @returns The provider driving the handler through Fetch objects
+ */
+export function createRelayHop(options: RelayHopOptions): RelayProvider {
+	const handler = createRelay({
+		provider: options.provider,
+		authorize: options.authorize ?? (() => true),
+		...(options.limit === undefined ? {} : { limit: options.limit }),
+	})
+	return createRelayProvider({
+		url: options.url ?? 'http://relay.test/',
+		parser: createParser,
+		...(options.headers === undefined ? {} : { headers: options.headers }),
+		fetch: async (input, init) => {
+			const request =
+				options.request === undefined
+					? new Request(input, init)
+					: await options.request(input, init)
+			const response = await handler(request)
+			await options.response?.(response)
+			return response
+		},
+	})
+}
+
 /**
  * Creates a relay provider connected to a real byte-limited handler.
  * @param upstream - The provider the handler drives
@@ -4051,12 +4228,25 @@ export function collectMessageThinking(messages: readonly Message[]): readonly s
  * @returns The provider driving the handler through Fetch objects
  */
 export function createBoundedRelay(upstream: ProviderInterface, limit: number): RelayProvider {
-	return createRelayProvider({
-		url: 'https://app.example/relay',
-		parser: createParser,
-		fetch: (input, init) =>
-			createRelay({ provider: upstream, authorize: () => true, limit })(new Request(input, init)),
-	})
+	return createRelayHop({ provider: upstream, limit, url: 'https://app.example/relay' })
+}
+
+/**
+ * Creates an inert object shaped like an `AbortSignal` from another realm.
+ * `AbortSignal.any` checks its brand and refuses it with a `TypeError`.
+ *
+ * @returns A never-aborted signal-shaped object
+ */
+export function createForeignSignal(): AbortSignal {
+	return {
+		aborted: false,
+		reason: undefined,
+		onabort: null,
+		throwIfAborted: () => undefined,
+		addEventListener: () => undefined,
+		removeEventListener: () => undefined,
+		dispatchEvent: () => false,
+	}
 }
 /**
  * Builds options for the guide desk with no lookups unless supplied.
