@@ -12,7 +12,7 @@ Closed on 2026-10-14. The thinking series and both blind audits are finished. No
 
 ## Results
 
-The graded comparison is in the scaffold's [RESULTS.md](../../../scaffold/RESULTS.md). The package implications and preservation proposal are in [direction.md](direction.md).
+The graded comparison and bounded capacity failures are in Agent's [RESULTS.md](../../RESULTS.md). The package implications and preservation proposal are in [direction.md](direction.md).
 
 | Key | Records | Compaction | Valid report verdict |
 | --- | --- | --- | --- |

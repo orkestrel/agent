@@ -28,6 +28,8 @@ Core and custody extraction run as disjoint Sol high units from agent checkpoint
 
 ## Preservation
 
+On2026-10-14 the user required scaffold cleanup before any series restart: move Agent campaign work to Agent and generic Study work to Study. The read-only Luna max inventory is tmp/units/scaffold-campaign-inventory-report.md. Root performs verified moves and reference repairs after identifying live daemon and historical absolute-path dependencies. Keep actual scaffold product changes in scaffold. No series restart may precede closure of that cleanup.
+
 Do not change the active capacity comparison, either frozen harness, its build or dependencies, raw results, frozen manifests, daemon or private oracle. The extended series launcher is77892, journal agent/tmp/codex/c1-capacity-extended-series.jsonl; actual runs are under agent/.orkestrel/agent/instruments/harness-capacity/tmp/c1-capacity-extended/runs. Its dedicated daemon is11435; the user's11434 is untouched. No parallel GPU work.
 
 The temporary ignore for agent/.orkestrel/agent/instruments/harness/.build is restored. Sweep that build and remove the ignore only after the series and dependent grading/reporting/custody checks no longer need it. Cleanup may remove closed and archived design artifacts, superseded app wiring and duplicate source after verified transfer; it must preserve current implementation inputs and frozen evidence.

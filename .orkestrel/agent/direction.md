@@ -1,6 +1,6 @@
 # Direction for `@orkestrel/agent` after the c1 comparison
 
-Updated 2026-10-14 from the graded thinking-off and thinking-on c1 runs in the scaffold's [RESULTS.md](../../../scaffold/RESULTS.md), the hardening accepted at `901c786` (no version bump yet), and the falsify verdicts. Each direction names the evidence behind it, the change it implies, the measurement that must move, and what it must not break.
+Updated 2026-10-14 from the graded thinking-off and thinking-on c1 runs in Agent's [RESULTS.md](../../RESULTS.md), the hardening accepted at `901c786` (no version bump yet), and the falsify verdicts. Each direction names the evidence behind it, the change it implies, the measurement that must move, and what it must not break.
 
 ## 1. Plan generation room above the reserve
 
@@ -56,4 +56,4 @@ Before retiring the campaign, preserve the ignored raw runs and emitted builds w
 
 Promote the complete-capture golden probe and its negative controls into the package's ledger tests as a separate implementation unit. The recording then makes any deliberate request-byte re-baseline reviewable. The baseline materializer remains campaign evidence.
 
-The original thinking pass is graded. The bounded capacity comparison remains active under [capacity.md](capacity.md), and both frozen harnesses stay in place until that comparison closes. Preservation follows the study design after the historical evidence is secured.
+The original thinking pass is graded. The extended bounded comparison stopped after48completed q4records goals when attempt49 exhausted8192output tokens without an answer. See [capacity.md](capacity.md). Preserve both frozen harnesses and their evidence while custody closes. The user requires Agent and Study campaign cleanup in scaffold before any series restart.
