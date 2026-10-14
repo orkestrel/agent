@@ -1,5 +1,7 @@
 # c1 thinking results and retained harness
 
+The user has since requested a capacity repair and a new bounded comparison. The active successor is tracked in [capacity.md](capacity.md). The closed baseline below remains unchanged evidence.
+
 Closed on 2026-10-14. The thinking series and both blind audits are finished. No generation, labeling, merge, or report is waiting to run. The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.
 
 ## Results
