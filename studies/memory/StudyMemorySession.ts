@@ -14,11 +14,7 @@ import type {
 	StudyProduct,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type {
-	StudyMemoryActivity,
-	StudyMemoryInput,
-	StudyMemorySessionOptions,
-} from './types.js'
+import type { StudyMemoryActivity, StudyMemoryInput, StudyMemorySessionOptions } from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'

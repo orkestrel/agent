@@ -10,11 +10,11 @@ Protocol `c1`: one serial trajectory per arm and model on the published `@orkest
 
 ### Verdicts
 
-| Key | Records | Compaction | Full view | Report verdict |
-| --- | --- | --- | --- | --- |
-| q4 | complete, 96 of 96 served | complete, 96 of 96 served | context-length refusal at goal 3 | `records`: no conservative acceptable-product gain for compaction (overall -1 to 0, final 0 to 0); 40 critical regressions against records |
-| q2 | complete, 96 of 96 served | `failed` at goal 15 under the pre-registered stop policy: the model repeated one `lookup_order` call seven times until the step cap | context-length refusal at goal 3 | `records`: no gain on the 14 goals compaction served; 8 critical regressions |
-| q2, continue policy | the same records trajectory, bound to the stop manifest | complete, 89 of 96 served; 7 goals unserved on identical-lookup loops (51 repeated lookups) | not run | the report pairs nothing because the continue run binds its own manifest; the cross-report reading follows |
+| Key                 | Records                                                 | Compaction                                                                                                                          | Full view                        | Report verdict                                                                                                                             |
+| ------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| q4                  | complete, 96 of 96 served                               | complete, 96 of 96 served                                                                                                           | context-length refusal at goal 3 | `records`: no conservative acceptable-product gain for compaction (overall -1 to 0, final 0 to 0); 40 critical regressions against records |
+| q2                  | complete, 96 of 96 served                               | `failed` at goal 15 under the pre-registered stop policy: the model repeated one `lookup_order` call seven times until the step cap | context-length refusal at goal 3 | `records`: no gain on the 14 goals compaction served; 8 critical regressions                                                               |
+| q2, continue policy | the same records trajectory, bound to the stop manifest | complete, 89 of 96 served; 7 goals unserved on identical-lookup loops (51 repeated lookups)                                         | not run                          | the report pairs nothing because the continue run binds its own manifest; the cross-report reading follows                                 |
 
 The `full` arm is the overflow control: both models refused the third goal's prompt at the daemon's context length, as the design expected.
 
@@ -22,21 +22,21 @@ The `full` arm is the overflow control: both models refused the third goal's pro
 
 Overall, 96 goals, every arm served and judged:
 
-| Arm | Facts | Work | Obligations | Revision | Evidence | Critical | Folded | Omitted |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| records | 53% (213/402) | 36% (109/304) | 31% (109/350) | 26% (60/228) | 66% (126/192) | 10 | 0 | 94 |
-| compaction | 11% (43/402) | 10% (29/304) | 10% (34/350) | 10% (23/228) | 35% (68/192) | 42 | 95 | 23 |
+| Arm        | Facts         | Work          | Obligations   | Revision     | Evidence      | Critical | Folded | Omitted |
+| ---------- | ------------- | ------------- | ------------- | ------------ | ------------- | -------- | ------ | ------- |
+| records    | 53% (213/402) | 36% (109/304) | 31% (109/350) | 26% (60/228) | 66% (126/192) | 10       | 0      | 94      |
+| compaction | 11% (43/402)  | 10% (29/304)  | 10% (34/350)  | 10% (23/228) | 35% (68/192)  | 42       | 95     | 23      |
 
 By four-shift interval, the facts pass rate and the critical violations, records then compaction:
 
-| Shifts | Facts | Critical |
-| --- | --- | --- |
-| 1 to 4 | 62% / 26% | 0 / 3 |
-| 5 to 8 | 62% / 18% | 2 / 3 |
-| 9 to 12 | 60% / 8% | 1 / 7 |
-| 13 to 16 | 49% / 10% | 2 / 10 |
-| 17 to 20 | 46% / 4% | 4 / 13 |
-| 21 to 24 | 43% / 0% | 1 / 6 |
+| Shifts   | Facts     | Critical |
+| -------- | --------- | -------- |
+| 1 to 4   | 62% / 26% | 0 / 3    |
+| 5 to 8   | 62% / 18% | 2 / 3    |
+| 9 to 12  | 60% / 8%  | 1 / 7    |
+| 13 to 16 | 49% / 10% | 2 / 10   |
+| 17 to 20 | 46% / 4%  | 4 / 13   |
+| 21 to 24 | 43% / 0%  | 1 / 6    |
 
 Compaction's 42 violations are 15 fabricated external completions or receipts, 2 actions through withdrawn or superseded destinations, and 25 closures without the required source evidence. No product of either arm passed every atom of its rubric, so the report's acceptable-product pairing reads 95 ties and a gain of -1 to 0; the verdict `records` follows from the absence of a conservative gain and the 40 critical regressions.
 
@@ -44,23 +44,23 @@ Compaction's 42 violations are 15 fabricated external completions or receipts, 2
 
 Overall, records over 96 goals, the failed compaction run over the 14 goals it served, and the continue-policy compaction run over the 89 goals it served:
 
-| Arm | Facts | Work | Obligations | Revision | Evidence | Critical |
-| --- | --- | --- | --- | --- | --- | --- |
-| records | 39% (158/402) | 21% (63/304) | 18% (63/350) | 19% (44/228) | 63% (121/192) | 16 |
-| compaction, stop policy (14 goals) | 24% (14/59) | 0% (0/44) | 23% (14/60) | 4% (1/24) | 18% (5/28) | 8 |
-| compaction, continue policy (89 goals) | 31% (113/369) | 13% (37/282) | 19% (63/326) | 15% (30/206) | 34% (61/178) | 67 |
+| Arm                                    | Facts         | Work         | Obligations  | Revision     | Evidence      | Critical |
+| -------------------------------------- | ------------- | ------------ | ------------ | ------------ | ------------- | -------- |
+| records                                | 39% (158/402) | 21% (63/304) | 18% (63/350) | 19% (44/228) | 63% (121/192) | 16       |
+| compaction, stop policy (14 goals)     | 24% (14/59)   | 0% (0/44)    | 23% (14/60)  | 4% (1/24)    | 18% (5/28)    | 8        |
+| compaction, continue policy (89 goals) | 31% (113/369) | 13% (37/282) | 19% (63/326) | 15% (30/206) | 34% (61/178)  | 67       |
 
 Records on the 2B model decays with the horizon: facts 53% in shifts 1 to 4 and 22% in shifts 21 to 24, critical violations 0 and 8. The continue-policy compaction run reads 47% of facts in shifts 17 to 20 and 26% in the final interval, with 17 and 12 critical violations there, and left 7 goals unserved.
 
 ### Costs
 
-| Run | Agent requests | Agent tokens, prompt and completion | Summarizer tokens | Judge calls | Wall |
-| --- | --- | --- | --- | --- | --- |
-| q4 records | 209 | 438376 and 48790 | 0 | 2626 | 109 min, 63 of them the judge |
-| q4 compaction | 129 | 230104 and 37552 | 99609 and 26991 | 0 | 53 min |
-| q2 records | 461 | 976815 and 61403 | 0 | 2627 | 100 min, 56 of them the judge |
-| q2 compaction, stop | 29 | 51780 and 7896 | 16105 and 3530 | 0 | 5 min |
-| q2 compaction, continue | 176 | 324761 and 48634 | 112825 and 25054 | 0 | 36 min |
+| Run                     | Agent requests | Agent tokens, prompt and completion | Summarizer tokens | Judge calls | Wall                          |
+| ----------------------- | -------------- | ----------------------------------- | ----------------- | ----------- | ----------------------------- |
+| q4 records              | 209            | 438376 and 48790                    | 0                 | 2626        | 109 min, 63 of them the judge |
+| q4 compaction           | 129            | 230104 and 37552                    | 99609 and 26991   | 0           | 53 min                        |
+| q2 records              | 461            | 976815 and 61403                    | 0                 | 2627        | 100 min, 56 of them the judge |
+| q2 compaction, stop     | 29             | 51780 and 7896                      | 16105 and 3530    | 0           | 5 min                         |
+| q2 compaction, continue | 176            | 324761 and 48634                    | 112825 and 25054  | 0           | 36 min                        |
 
 Per served goal the records arm spent about 1.3 times the agent tokens of compaction at q4 and asked the judge 27 one-token questions; the judge's prompt tokens (767130 per run) are a filing cost the compaction arm has no counterpart for.
 
@@ -87,19 +87,19 @@ The q4 report is valid and its verdict is `inconclusive`: records overflowed bef
 
 The q4 run coverage is:
 
-| Arm | Terminal outcome | Products graded | Acceptable products | Critical violations |
-| --- | --- | --- | --- | --- |
-| records | overflow at goal 48; 47 complete goals | 48 | 1 | 11 |
-| compaction | complete; 4 of 96 goals unserved | 92 | 0 | 26 |
-| full | overflow at goal 5; 2 successful products | 2 | 0 | 0 |
+| Arm        | Terminal outcome                          | Products graded | Acceptable products | Critical violations |
+| ---------- | ----------------------------------------- | --------------- | ------------------- | ------------------- |
+| records    | overflow at goal 48; 47 complete goals    | 48              | 1                   | 11                  |
+| compaction | complete; 4 of 96 goals unserved          | 92              | 0                   | 26                  |
+| full       | overflow at goal 5; 2 successful products | 2               | 0                   | 0                   |
 
 The records overflow row retains a reply and is graded, but its observation is incomplete. The report's top-level `served` field counts attempted rows; the table uses successful products from its arm tallies. This distinction also explains why the full arm has 5 attempted rows and 2 graded products.
 
 The atom scores cover each arm's own served products, so these overall columns do not compare identical horizons:
 
-| Arm | Facts | Work | Obligations | Revision | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| records | 55% (105/190) | 37% (53/144) | 33% (58/176) | 30% (35/116) | 81% (78/96) |
+| Arm        | Facts         | Work         | Obligations  | Revision     | Evidence      |
+| ---------- | ------------- | ------------ | ------------ | ------------ | ------------- |
+| records    | 55% (105/190) | 37% (53/144) | 33% (58/176) | 30% (35/116) | 81% (78/96)   |
 | compaction | 51% (201/391) | 28% (82/292) | 26% (87/332) | 32% (68/213) | 62% (114/184) |
 
 On the 44 paired goals, compaction has no acceptable-product win, 1 loss, 43 ties, and 9 critical regressions against records. Compaction's final-interval facts score is 51% (37/72), compared with 0% in the thinking-off run. That observed difference does not isolate thinking: the reserve, window, `predict`, and adjudicator also differ. Records has no final-interval reading because it stopped during shift 12.
@@ -112,20 +112,20 @@ The q2 report is valid and its verdict is `records`. Records completed all 96 go
 
 The q2 coverage and critical violations are:
 
-| Arm | Terminal outcome | Products graded | Acceptable products | Critical violations |
-| --- | --- | --- | --- | --- |
-| records | complete; no unserved or partial rows | 96 | 0 | 52 |
-| compaction | complete; 58 of 96 goals unserved | 38 | 0 | 17 |
-| full | overflow at attempt 5; 3 successful products | 3 | 0 | 0 |
+| Arm        | Terminal outcome                             | Products graded | Acceptable products | Critical violations |
+| ---------- | -------------------------------------------- | --------------- | ------------------- | ------------------- |
+| records    | complete; no unserved or partial rows        | 96              | 0                   | 52                  |
+| compaction | complete; 58 of 96 goals unserved            | 38              | 0                   | 17                  |
+| full       | overflow at attempt 5; 3 successful products | 3               | 0                   | 0                   |
 
 The full control completed only its first goal consecutively; later successful products do not repair the earlier unserved goal. Of compaction's 58 unserved rows, 36 carry a length failure and 22 are partial rows. Its receipts contain 150 repeated lookups across 40 goals, compared with none in records. Repeated lookups and unserved goals measure different events.
 
 The q2 atom scores cover each arm's own served products:
 
-| Arm | Facts | Work | Obligations | Revision | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| records | 47% (187/402) | 26% (78/304) | 22% (77/350) | 25% (57/228) | 68% (130/192) |
-| compaction | 41% (61/149) | 17% (20/115) | 16% (22/141) | 24% (21/88) | 57% (43/76) |
+| Arm        | Facts         | Work         | Obligations  | Revision     | Evidence      |
+| ---------- | ------------- | ------------ | ------------ | ------------ | ------------- |
+| records    | 47% (187/402) | 26% (78/304) | 22% (77/350) | 25% (57/228) | 68% (130/192) |
+| compaction | 41% (61/149)  | 17% (20/115) | 16% (22/141) | 24% (21/88)  | 57% (43/76)   |
 
 On 38 paired goals, compaction has 38 acceptable-product ties, no gain, and 12 critical regressions against records. The records verdict is a relative comparison: records still has 52 critical violations across its full horizon. Its facts score falls from 68% in shifts 1 to 4 to 36% in shifts 21 to 24, while its critical violations rise from 5 to 13. Compaction serves only 2 of the final interval's 16 goals, so its 86% facts score there describes 6 of 7 atoms on those products.
 
@@ -135,12 +135,12 @@ Every q2 packet item has an accepted label: 140 labels including controls, with 
 
 The trajectory costs are:
 
-| Key | Arm | Agent requests | Agent prompt / completion tokens | Judge calls | Summarizer prompt / completion tokens | Elapsed |
-| --- | --- | --- | --- | --- | --- | --- |
-| q4 | records | 136 | 288337 / 100058 | 1291 | 0 / 0 | 77 min |
-| q4 | compaction | 152 | 278308 / 113474 | 0 | 114917 / 31275 | 83 min |
-| q2 | records | 329 | 666705 / 224381 | 2620 | 0 / 0 | 131 min |
-| q2 | compaction | 383 | 729433 / 144533 | 0 | 91759 / 20007 | 52 min |
+| Key | Arm        | Agent requests | Agent prompt / completion tokens | Judge calls | Summarizer prompt / completion tokens | Elapsed |
+| --- | ---------- | -------------- | -------------------------------- | ----------- | ------------------------------------- | ------- |
+| q4  | records    | 136            | 288337 / 100058                  | 1291        | 0 / 0                                 | 77 min  |
+| q4  | compaction | 152            | 278308 / 113474                  | 0           | 114917 / 31275                        | 83 min  |
+| q2  | records    | 329            | 666705 / 224381                  | 2620        | 0 / 0                                 | 131 min |
+| q2  | compaction | 383            | 729433 / 144533                  | 0           | 91759 / 20007                         | 52 min  |
 
 Agent figures exclude calibration. The q4 records overflow request has missing usage, so its token totals are incomplete. The records judge accounts for about 30 elapsed minutes at q4 and 57 at q2. At q4 the report flags length truncation in 36 records goal rows and 53 compaction goal rows; at q2 those counts are 80 and 61. These are goal counts, not reply counts. Repeated q4 lookups total 1 across 1 records goal and 9 across 3 compaction goals.
 
@@ -152,10 +152,10 @@ Thinking-off used reserve 512, window 3072, and `predict` 0; thinking-on used 10
 
 Both profiles passed their short execution qualification before the original 96-goal workload. Neither completed the first full trajectory. Their observed failures remain separate from the graded baselines.
 
-| Context | Output allowance | Q4 records completed | Terminal request | Remaining population |
-| --- | --- | --- | --- | --- |
-| 16,384 | 4,096 | 35 of 96 | Prompt 3,836; completion 4,096; length stop at `ev-09-4` | Not started |
-| 20,480 | 8,192 | 48 of 96 | Prompt 5,861; completion 8,192; length stop at `ev-13-1` | Not started |
+| Context | Output allowance | Q4 records completed | Terminal request                                         | Remaining population |
+| ------- | ---------------- | -------------------- | -------------------------------------------------------- | -------------------- |
+| 16,384  | 4,096            | 35 of 96             | Prompt 3,836; completion 4,096; length stop at `ev-09-4` | Not started          |
+| 20,480  | 8,192            | 48 of 96             | Prompt 5,861; completion 8,192; length stop at `ev-13-1` | Not started          |
 
 The extended request returned no answer text and 34,665 thinking characters after 173,719ms, within its 360,000ms request allowance. Character counts do not measure thinking tokens. No request followed either terminal failure. The fail-fast behavior worked; short qualification did not establish full-horizon output capacity. No further allowance increase or restart was selected. See [the frozen profiles, qualification readings and terminal custody](.orkestrel/agent/capacity.md).
 
@@ -177,11 +177,11 @@ Gemma4 records and full view completed on checkpoint `4acb51125`. Records used 8
 
 All l15 arms answered all 24 goals on frozen source. Clean Astra graded 72 anonymous entries before identities were joined. Independent checks passed, and root reviewed every reason against the original scenario without changing a judgment.
 
-| Arm | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens | Duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Records | 14/24 | 1/24 | 5/24 | 2/24 | 66490 | Selected-attempt duration unavailable |
-| Living aggregate | 14/24 | 1/24 | 5/24 | 2/24 | 345653 | 2086555 ms |
-| Full view | 16/24 | 2/24 | 7/24 | 4/24 | 205408 | 3979016 ms |
+| Arm              | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens |                              Duration |
+| ---------------- | --------------: | ----------------: | ----------------------: | ------------: | ---------: | ------------------------------------: |
+| Records          |           14/24 |              1/24 |                    5/24 |          2/24 |      66490 | Selected-attempt duration unavailable |
+| Living aggregate |           14/24 |              1/24 |                    5/24 |          2/24 |     345653 |                            2086555 ms |
+| Full view        |           16/24 |              2/24 |                    7/24 |          4/24 |     205408 |                            3979016 ms |
 
 Full view also has one ambiguous complete-work result. Records and aggregate received identical verdicts on every goal across all reported axes. Both missed closed work, revived superseded counter hours, added unsupported refund timing, and omitted mandatory fresh lookups. Full view recovered the required Dalia callback and reopened damage claim, but also falsely claimed an external ticket delivery and invented replacement-shipment details. Excluding the predeclared protocol-sensitive g06 leaves correct content at 14/23, 14/23, and 16/23, and complete work at 2/23, 2/23, and 4/23. Narrower per-goal action compliance is 16/23, 16/23, and 17/23; it does not waive the system requirements.
 
@@ -191,11 +191,11 @@ Aggregate passed operational qualification with maintained-summary exposure on 1
 
 All three l15 arms answered all 24 planned goals after the bounded qualification correction. A clean Astra auditor graded 72 anonymous entries before arm identities were joined. The grades and their source boundaries passed independent mechanical validation; root reviewed every joined reason without changing a grade.
 
-| Arm | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens | Duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Records | 18/24 | 1/24 | 4/24 | 3/24 | 82123 | 559417 ms |
-| Living aggregate | 17/24 | 1/24 | 4/24 | 3/24 | 350266 known | 3030068 ms |
-| Full view | 16/24 | 1/24 | 5/24 | 2/24 | 157589 | 1674884 ms |
+| Arm              | Correct content | Ambiguous content | Required system actions | Complete work |   Run tokens |   Duration |
+| ---------------- | --------------: | ----------------: | ----------------------: | ------------: | -----------: | ---------: |
+| Records          |           18/24 |              1/24 |                    4/24 |          3/24 |        82123 |  559417 ms |
+| Living aggregate |           17/24 |              1/24 |                    4/24 |          3/24 | 350266 known | 3030068 ms |
+| Full view        |           16/24 |              1/24 |                    5/24 |          2/24 |       157589 | 1674884 ms |
 
 Full view also has one ambiguous complete-work result. Aggregate matched records on 23 semantic verdicts and lost on one: it turned the buyer's contact details into the account manager's contact route. The exact request trace found no maintained summary exposed at that goal. Both arms received identical pinned account wording; records then recalled source records. The loss remains, but summary wording is not its established cause. Both arms missed the closed callback, completed shipment chases, expired sign-off cover, and reopened damage claim. Most incomplete work across all arms comes from missing mandatory fresh lookups; correct wording does not fulfill those actions. Excluding the predeclared protocol-sensitive g06 leaves correct content at 18/23, 17/23, and 16/23, and complete work at 3/23, 3/23, and 2/23. The narrower per-goal action lists pass 17/23, 17/23, and 16/23 and do not waive system requirements.
 
@@ -205,11 +205,11 @@ Summaries reached 18/24 aggregate goals. Aggregate used at least 4.26 times the 
 
 Records and aggregate served all 24 planned goals on frozen l14 source `5b9935430`. Full view served 22, failed at g23, and left g24 unattempted. Independent Astra graded the anonymous combined packet before identities were joined; failed and unattempted goals remain in the denominator.
 
-| Arm | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens | Duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Records | 17/24 | 1/24 | 4/24 | 3/24 | 82123 | 524338 ms |
-| Living aggregate | 13/24 | 2/24 | 4/24 | 3/24 | 349528 | 1835032 ms |
-| Full view | 16/24 | 1/24 | 5/24 | 3/24 | 148479 | 1490075 ms |
+| Arm              | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens |   Duration |
+| ---------------- | --------------: | ----------------: | ----------------------: | ------------: | ---------: | ---------: |
+| Records          |           17/24 |              1/24 |                    4/24 |          3/24 |      82123 |  524338 ms |
+| Living aggregate |           13/24 |              2/24 |                    4/24 |          3/24 |     349528 | 1835032 ms |
+| Full view        |           16/24 |              1/24 |                    5/24 |          3/24 |     148479 | 1490075 ms |
 
 Aggregate preserved the current refund approval and buyer corrections but added unsupported escalation recipients and delivery timing, misattributed a contact field, and made a callback route ambiguous. All arms frequently omitted mandatory fresh lookups; all missed active shipment-chase changes. Correct content alone does not count as completed work. Excluding the predeclared protocol-sensitive g06 leaves correct content at 17/23, 13/23, and 16/23, and complete work at 3/23 in every arm. Under the narrower per-goal tool lists, compliance is 17/23, 17/23, and 14/23; those lists do not waive system requirements.
 
@@ -219,11 +219,11 @@ Summaries reached 18/24 aggregate goals. Aggregate used 4.26 times the records t
 
 Each arm completed all 24 planned goals on frozen l14 source `5b9935430`. An independent Astra auditor graded the anonymous combined packet before arm identities were joined. The sealed judgments and mechanical checks passed; no verdict changed after identity disclosure.
 
-| Arm | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens | Duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Records | 15/24 | 1/24 | 6/24 | 3/24 | 72328 | 518644 ms |
-| Living aggregate | 13/24 | 1/24 | 6/24 | 2/24 | 397608 | 1944308 ms |
-| Full view | 14/24 | 2/24 | 5/24 | 2/24 | 164065 | 797218 ms |
+| Arm              | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens |   Duration |
+| ---------------- | --------------: | ----------------: | ----------------------: | ------------: | ---------: | ---------: |
+| Records          |           15/24 |              1/24 |                    6/24 |          3/24 |      72328 |  518644 ms |
+| Living aggregate |           13/24 |              1/24 |                    6/24 |          2/24 |     397608 | 1944308 ms |
+| Full view        |           14/24 |              2/24 |                    5/24 |          2/24 |     164065 |  797218 ms |
 
 Full view also has one ambiguous complete-work judgment. The aggregate used 5.50 times the records tokens and 3.75 times the duration, counting every recorded role with no unknown usage. Separate calibration costs remain in the campaign record. Full view used its disclosed larger input budget. These are single development runs, not repeated estimates of a general quality difference.
 
@@ -235,11 +235,11 @@ Maintained summaries reached the agent on 14/24 aggregate goals, and the initial
 
 Each arm emitted all 24 planned goal rows on source `0913a0966`. An independent Astra auditor graded the combined anonymous packet before arm identities were joined. Complete work requires correct content and the required actions; useful wording alone does not pass.
 
-| Arm | Correct content | Ambiguous content | Required system actions | Complete work | Run tokens | Duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Records | 12/24 | 1/24 | 4/24 | 3/24 | 105231 | 387868 ms |
-| Living aggregate | 10/24 | 1/24 | 5/24 | 4/24 | 360086 | 1117586 ms |
-| Full view | 7/24 | 0/24 | 7/24 | 4/24 | 271750 known | 936483 ms |
+| Arm              | Correct content | Ambiguous content | Required system actions | Complete work |   Run tokens |   Duration |
+| ---------------- | --------------: | ----------------: | ----------------------: | ------------: | -----------: | ---------: |
+| Records          |           12/24 |              1/24 |                    4/24 |          3/24 |       105231 |  387868 ms |
+| Living aggregate |           10/24 |              1/24 |                    5/24 |          4/24 |       360086 | 1117586 ms |
+| Full view        |            7/24 |              0/24 |                    7/24 |          4/24 | 271750 known |  936483 ms |
 
 Full view retained a failed goal with no final answer after an HTTP 500; that request's usage is unknown. Records and aggregate each also have one ambiguous complete-work judgment. Excluding the predeclared protocol-sensitive g06 gives correct content of 12/23, 10/23, and 7/23, and complete work of 3/23, 4/23, and 4/23. Under the narrower per-goal tool lists, compliance is 17/23, 18/23, and 19/23; those lists do not waive the system's fresh-lookup requirement.
 
@@ -259,16 +259,16 @@ Gemma2 generation closed without a cap in 1126851 ms; its generation stage took 
 
 The current l15 goal-run status is:
 
-| Decision model | Thinking | Records | Full view | Aggregate |
-| --- | --- | --- | --- | --- |
-| Qwen 4B | false | Complete; graded | Complete; graded | All answers graded; operational failure |
-| Qwen 4B | true | Complete; graded | Complete; graded | Complete; graded |
-| Gemma 4B | false | Complete; awaiting blind grading | Complete; awaiting blind grading | Interrupted after 16/24 goal rows; partial evidence preserved |
-| Gemma 4B | true | Pending | Pending | Pending |
-| Qwen 2B | false | Pending | Pending | Pending |
-| Qwen 2B | true | Pending | Pending | Pending |
-| Gemma 2B | false | Pending | Pending | Pending |
-| Gemma 2B | true | Pending | Pending | Pending |
+| Decision model | Thinking | Records                          | Full view                        | Aggregate                                                     |
+| -------------- | -------- | -------------------------------- | -------------------------------- | ------------------------------------------------------------- |
+| Qwen 4B        | false    | Complete; graded                 | Complete; graded                 | All answers graded; operational failure                       |
+| Qwen 4B        | true     | Complete; graded                 | Complete; graded                 | Complete; graded                                              |
+| Gemma 4B       | false    | Complete; awaiting blind grading | Complete; awaiting blind grading | Interrupted after 16/24 goal rows; partial evidence preserved |
+| Gemma 4B       | true     | Pending                          | Pending                          | Pending                                                       |
+| Qwen 2B        | false    | Pending                          | Pending                          | Pending                                                       |
+| Qwen 2B        | true     | Pending                          | Pending                          | Pending                                                       |
+| Gemma 2B       | false    | Pending                          | Pending                          | Pending                                                       |
+| Gemma 2B       | true     | Pending                          | Pending                          | Pending                                                       |
 
 Qwen4 thinking-enabled resource preparation selected window 3584/reserve 1024/output limit 512. Its accepted records run used 66490 tokens; the rejected first budget adds 11748 preparation tokens, all with known usage. Whole resource preparation took 706009 ms; a separate selected-attempt duration is unavailable. Records and aggregate share that accepted budget. Comparing thinking modes must also disclose their different resource settings.
 
@@ -280,16 +280,16 @@ The repaired measurement code is pushed at `5b9935430`. Independent review and s
 
 L14 has frozen all eight decision-mode configurations and completed its fixed calibration generations and independent labels. The actual goal-run status is:
 
-| Decision model | Thinking | Records run | Full-view run | Aggregate run |
-| --- | --- | --- | --- | --- |
-| Qwen 2B | false | Complete | Operational failure at g05 | Admission blocked |
-| Qwen 2B | true | Pending | Pending | Pending |
-| Gemma 2B | false | Complete | Complete | Complete; qualification refused |
-| Gemma 2B | true | Pending | Pending | Pending |
-| Gemma 4B | false | Pending | Pending | Pending |
-| Gemma 4B | true | Pending | Pending | Pending |
-| Qwen 4B | false | Complete | Operational failure at g23 | Complete; qualification refused |
-| Qwen 4B | true | Pending | Pending | Pending |
+| Decision model | Thinking | Records run | Full-view run              | Aggregate run                   |
+| -------------- | -------- | ----------- | -------------------------- | ------------------------------- |
+| Qwen 2B        | false    | Complete    | Operational failure at g05 | Admission blocked               |
+| Qwen 2B        | true     | Pending     | Pending                    | Pending                         |
+| Gemma 2B       | false    | Complete    | Complete                   | Complete; qualification refused |
+| Gemma 2B       | true     | Pending     | Pending                    | Pending                         |
+| Gemma 4B       | false    | Pending     | Pending                    | Pending                         |
+| Gemma 4B       | true     | Pending     | Pending                    | Pending                         |
+| Qwen 4B        | false    | Complete    | Operational failure at g23 | Complete; qualification refused |
+| Qwen 4B        | true     | Pending     | Pending                    | Pending                         |
 
 Root adjudication and fixed fits are complete and pushed at `708553ef9`. Gemma 2B passed strict calibration at AGREE 0.59, admitting 112/131 supported occurrences and 21/29 distinct supported identities. Qwen 4B passed at 0.61, admitting 136/154 and 35/43. Qwen 2B and Gemma 4B were refused because their strict cutoffs admitted too few supported summaries; their predeclared exploratory cutoffs are 0.67 and 0.57. These are calibration outcomes, not task-quality wins. See [the calibration evidence and costs](https://github.com/orkestrel/agent/blob/e85f5eea2e0f3150213d767cd414a3385fa429c7/.orkestrel/agent/instruments/results/l14/README.md).
 

@@ -2468,7 +2468,10 @@ export class RecordedTransport {
 		return this.#signals
 	}
 
-	async #request(input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response> {
+	async #request(
+		input: Parameters<typeof globalThis.fetch>[0],
+		init?: RequestInit,
+	): Promise<Response> {
 		const { signal, ...options } = init ?? {}
 		if (signal !== undefined && signal !== null) this.#signals.push(signal)
 		// Record headers and body without adding a Request-owned listener to the observed signal.
