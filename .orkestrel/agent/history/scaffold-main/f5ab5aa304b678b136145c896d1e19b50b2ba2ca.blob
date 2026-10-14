@@ -1,0 +1,1716 @@
+{
+  "commit": "3b9f9be5c5975644040d681b075aba3391cf99a2",
+  "root": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments",
+  "targets": [
+    {
+      "name": "bench",
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench",
+      "actual": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench",
+      "physical": [
+        {
+          "path": ".orkestrel/agent/instruments/bench/bench.mjs",
+          "sha256": "b5c49ee4c16b31c849ddceb68c93296da360e2271a4a5a5cd076ca791c04e0a5"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/BRIEFING.md",
+          "sha256": "3f981bf230a0e70f2176406132175b4393f3e124bccff27366f909aa9968685a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/check-long.mjs",
+          "sha256": "1ed8cf278bb7473d81a17ef6612b7a9e48c8be47653dc9dbebcd9a29cd558628"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/README.md",
+          "sha256": "5922adbcaf0db4be292bfccd02e67096072a73b0796069fb5e1f6a58f3dbcc99"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/rescore.mjs",
+          "sha256": "6019bdd29a6e8ceecf7515c5471ce9026a39ed448b435b2f8f070c62cf0f36fd"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/scenario-long.json",
+          "sha256": "94e70c7cac1cbf2c2a92d98305e796e11dbbd9a414e7df19652e5a3b6ece6738"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/scenario.json",
+          "sha256": "6ac003e9cd044dc47ff7e65eb33d124039d324a602432783699bd22fef85b71d"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/check.mjs",
+          "sha256": "8d5bd1a599e10837bd66e6db1f754cb476e3050522bd976a0f6da3ecc1e99008"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json",
+          "sha256": "96255b969d65e22b88c6da74a25df30aeb32a4d0df35c999a58974c3a0dc58b5"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-adverb",
+          "sha256": "6db57f76aeaf5fb94d57cb7df65c4329032d6db66313fb825fa3510793d46ae7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-negation",
+          "sha256": "5af1ab87daf38a2d3480089106f6a17a22c24e1a92a61efef55d0bcf03530576"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-revert",
+          "sha256": "880e11793be3a378d7b4de54d0be1d963d0ebd02bf4a26c764a56ad37a337ba0"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-room",
+          "sha256": "34177edae12702f79c6acbc5cc3d6ce954f99e4c702cbd071356d7774ffeab33"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-room2",
+          "sha256": "f7fb2404a276116206b9b1ff4b3b560079f5c8c14ab6b259843738af738c8e0b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json",
+          "sha256": "a23257886015afa4b7b59d1307c541e4afeb534156b93af4aeb06006ab571d56"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-adverb",
+          "sha256": "f36168934fc3e0511c6662959bbfa4246e2b3341d1b801357fb1f53ab26440a8"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-negation",
+          "sha256": "b1d980348d7f3f64eb879048fe9ccea8a629d058fa055f5a30f64f2243c6cb49"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-revert",
+          "sha256": "141827116ebc23c4a89f2bf6cb8a1db576e7ea352a2d98d13ec06f495ec44fbd"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-room",
+          "sha256": "6dc92408932709fa7394cd859ef105a48be25e6d3a30263cd67993e3a675f803"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-room2",
+          "sha256": "5111b3446c03249f025f89c42f15d304655c63552c94742704fbafe1b554a1b7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json",
+          "sha256": "1e8e85afdd7fbc065670b1710c69aa6dc847bbf280b40130cb6759a253fadfe1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-adverb",
+          "sha256": "4a9033a4ab266aa67ae6655ec084181c2db6e83e46fb5f558e78f3dfa8c4c4f3"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-negation",
+          "sha256": "13b628fc1c9da736a8b1b3e34a48bd3bead6162745f172fc8ad6cb9434a47e5c"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-revert",
+          "sha256": "787d979e1aa0cc3cbd78fc9a5247fd8b6b962dc3092fffdf29fdb31d9eb4cebb"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-room",
+          "sha256": "cd07719e505335843ecb18900391ddc58b9a8499a3bad4027908bf2dceeae52a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-room2",
+          "sha256": "b32f3af94891c185398c6820c49f534e3a0697ea0573a1b9c782e8f6317c7a6f"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json",
+          "sha256": "3f36abab2364b9bd1e60d377c8e7ce46102730cce471acf7725ac1deb2c30282"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-adverb",
+          "sha256": "314139379a437d960f19e011fdf5fdcefbfd0b3982d54446494e3f7fb566b7bc"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-negation",
+          "sha256": "e3a737421462e113aae191520cd7ee0766666e98db26295aefdf8f332fdd8715"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-revert",
+          "sha256": "013ddee6586a36c0a575d7dbfa55858b4dc0eb6e70e730e25fc64c95c36b0c8a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-room",
+          "sha256": "b5a52e5e551efbf6e0f2a6fee445dc95d11c90068303cb8302122e34e8c600f1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-room2",
+          "sha256": "58861571826107a7479163e539d0aae9f1523c9b9a048568cedc6083eaa6c7b7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json",
+          "sha256": "aa49091b64898aaf30def27b4105d6053f339ddba3ae85362ac16df75010a0cc"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-adverb",
+          "sha256": "8c50f133110d41f9fd324a184932fff21d0f77d07db5814cc68a409c1f5d4fc8"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-negation",
+          "sha256": "3bc7b859f72058d3f5a5f5a657d025280e8a44fed4dde7ec6797929d70e7b10f"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-revert",
+          "sha256": "e880e9d640d4020d43c985536d53328e889c6b51b8f5363c5fbcd05cdd7db335"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-room",
+          "sha256": "7540dd737b29391a59fbd53c10ae0641bea73a140c9d56b6832b9f6576889d81"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-room2",
+          "sha256": "f3e23d36589ae14603940cfddc5e699c38b55fd13a2f4d040e8e49bd308db70a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json",
+          "sha256": "5e1010ab6d5ac02d60fd8060d8ac31fe05bdfb10977f99790407ade586690d94"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-adverb",
+          "sha256": "2fc77a3d18577e39c967e408f3b5b2d40aa3636750aa1cd4e2ab22802e2b42c2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-negation",
+          "sha256": "4e3bdb17bb6d504902ece98c5be40e88b80d87e6bf9980f42765549c1f763ba4"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-revert",
+          "sha256": "04ae297890ffb3a36e7f71e5bae71277fde3d7eab849a642da04d399b8219f12"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-room",
+          "sha256": "1eb4f3808907e54b598df0087bb05381ed68f9eb8c6a50510a3df9fa54e595f7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-room2",
+          "sha256": "4d430f076108b8ff127b99598817e2c83d0b26ee33cd44c8c10f05e8306ec555"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json",
+          "sha256": "d44ca23b23a3ad3527fc38cf485ce95d3d2c0df2a42f36fa5d4dd0eeb3f3eb18"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-adverb",
+          "sha256": "871f114fe0bd0c16896783eaf455daf98dc03dc50b7b93461e68ecc19256fa4d"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-negation",
+          "sha256": "ab75e2ea4be6fd613de95af6d74fc1ec2fa7b2aea9fd779e9b50958bba5ca9a3"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-revert",
+          "sha256": "8955b13bf17c86a78b895d095f5d379131b6d13b58039eb2694ed5452498e7ce"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-room",
+          "sha256": "1f658b6014e62ad2cf417c010ef60a093eaec1449c75a4fef9369bd8dd2552b5"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-room2",
+          "sha256": "1b9a8d148a144527e270c871a966f8ecfbbb0c6ccd7b9d778f59421828f04950"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json",
+          "sha256": "0affd7392923e42978fc5351faa07905da3af95891c968701eb7c6d517e52b72"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-adverb",
+          "sha256": "e9291901de5af579b788e9917521088bc0d0b26a0361b6f42cae09ffb3392298"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-negation",
+          "sha256": "a3b12b3cdde613ed075a50cbf52766d7e3d718998e3ba0d3d07609389a50203b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-revert",
+          "sha256": "03222e10c2b03285488b1d56e198c69248e475a891d2ec7b99bb75426d537df7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-room",
+          "sha256": "74018ed117c8b76139db7cbdd5c5174c3609a0a31d028f3f11b93eed99d8daa6"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-room2",
+          "sha256": "af3795a76bf3f5cb765c045351105382b63b79e127e886e492591f4f84106b19"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json",
+          "sha256": "a2f987eb27043c77d5ae00d04d1d5464c21aad3ff5c09c62472df718a0d21e34"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-adverb",
+          "sha256": "f6850ab31b6643ec439c6c54cb8a3053be3c4d1863994f685b871015d229f57b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-negation",
+          "sha256": "2c2a578ac2007bf858c9514bab725abfc90242b52dffa3cf8cf657a865e77802"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-revert",
+          "sha256": "e0ca6f6beebbdcfe3f56a0632ac9ffab134a3f9414c90abae6ed8f895209f5d7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-room",
+          "sha256": "d2879f5cb108f87c985b104d9f35ee96b5f1bcd22b550744b44f75f9116dc2a2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-room2",
+          "sha256": "4efe2d7e2d74fccaface4e92ba042ef9c7841e256ba14f3cdfdbc2d643501948"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json",
+          "sha256": "2663475822e1a02b0250b57f392f4cd57c3609768b70d0bd64a48a343552c5e9"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-adverb",
+          "sha256": "cadc44298f1fedd1ee90486b841e53e990604ad02cae4e0ce2ffef3d7ee6295b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-negation",
+          "sha256": "79a16575332b26d2ad52d69d091af0bbac645044dd1846250afac3eeee7fdb06"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-revert",
+          "sha256": "e7393cea04b12cc49bd8ca9df171f311da2f3bbdf55542f935c5ef595d0b154c"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-room",
+          "sha256": "e8403d15eae9825b71cc07488555a46178fce29e19086d200c20ec100d0e79eb"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-room2",
+          "sha256": "948d98140cb28ca9ecef83318a1f7681694a59bf6d5a1c785a3954f4bdba3a6b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json",
+          "sha256": "d64367561ac4e63d445c79d85f6eba27155f22e500794569faaf4c402c81646e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-adverb",
+          "sha256": "80af6143d2bb99d2d88d9a2cd635025f78f99fe401442b23ea1db9649aaad0ca"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-negation",
+          "sha256": "dda28fbad4833eef802bbda5855286d514f8cf3764ebbd927a76c466d03343a9"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-revert",
+          "sha256": "9ef5a17711e53e5f76a116840c886baf4b535589516a0b4981fda81bf21779d7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-room",
+          "sha256": "ac91346845cfcec9150a317144e6c742eab0cc88607eb3ddd3c527b5e3c69b18"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-room2",
+          "sha256": "02fc9ed4763fb96ec18e7905b1485a97aa82ad94a07d48236faca341a36fda7b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json",
+          "sha256": "df4220b9bea9fd29ecd24349bed88d5f9eef4d1e95399a0935752fc145bb7fc3"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-adverb",
+          "sha256": "e80a4add7834f2fcf342727bd760d96d62ec9490bf91a8d3e20d6d96a3dffad9"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-negation",
+          "sha256": "1c7a5b7572ed5da07eb1c9a3bce56a73d54d19db55c88325130b7d773bee40fb"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-revert",
+          "sha256": "bc88436b568b0c40db5cd40fd09bbea8d52c6b76fd97642a6dcdcef1aba9d3eb"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-room",
+          "sha256": "82d5bb988bc9e77e385d292d287e0a4d90a96d91de25d79a32df800ddb469414"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-room2",
+          "sha256": "7eecd537bfc80dac68f3a50e3310599d1f6014aace31339f09dc0ce5d5419d23"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json",
+          "sha256": "3e0da791ed1b83c0ea2b49abae040404529861f6aa0719b9f123ee174f73721d"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-adverb",
+          "sha256": "b73d708e6979f8cbb6640d8494b8582a8cb746cc2fb4b993f351b40582539122"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-negation",
+          "sha256": "43713e5c74722c71447774ed4bb7b2ebe1d5e45e65dbe036b0b70a1199fb9fdc"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-revert",
+          "sha256": "889401a098d6720edb4647d9824092c0fd900e4abd58c2a6e1610e6eb38d0666"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-room",
+          "sha256": "da4f4bd8a358ac2aedba6fad054d0fa60c86a77c7aa5a405d97cc229aef2688f"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-room2",
+          "sha256": "663e6a21af75c481ae975638604a1ccb663baae79b041c0552e85e6d768ae8e1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json",
+          "sha256": "0699287c6ffec907dadbabd680b86b6395192a120dfd50b846ecd42ff774ac66"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-adverb",
+          "sha256": "859b460339a1372788882d2c58432a8eaa0cb72f683a3f3ce030b1b66f30a733"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-negation",
+          "sha256": "9806fa3c3a7f34cdad5482bf257ef9711aeaaa1d5583633abd5c6e749f97eca8"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-revert",
+          "sha256": "af0338259cea20d9ca9a690b4acf7e86c44132448ac13799ba6b60d80bf3303c"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-room",
+          "sha256": "d1fd107deb1f0822f2459fa7c3f3d5c24885a4f8f8d2968885445e28e83af4c6"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-room2",
+          "sha256": "bc4b7a0378c0b2e36a90bbecf4c7605fecaf5d5df126110fb4f904c7c5a0e1b2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json",
+          "sha256": "dd6ace441dba53887c940bae7c573e97801413e9c269d0561ebe82c56872c127"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-adverb",
+          "sha256": "3b3ba6af28fa969bceb8898157684b869d073a268637453d2510b5afe8db3290"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-negation",
+          "sha256": "5107e377fd8cdb0dbdad61c5bb33cfc87ec14a46faa44076d82f5ca145f8208c"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-revert",
+          "sha256": "855d530e5a3258199623a75c3c872b7c48e5181bb8dbc447a954a357e784819f"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-room",
+          "sha256": "72c1103a44ebf805a64f2e1ef8d1f77a84eab673a3f2f69e6a8384297572d2fc"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-room2",
+          "sha256": "cc8c2da32333ced7741eeb0633277c8e6d7d2922d4ce7e981c1893f5d7b8c9cb"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json",
+          "sha256": "82b23d0e119b8c63aab7e08ce5c1bd6d1ead0e1339631aaf98e9e683f542d641"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-adverb",
+          "sha256": "e00db17ccc8db5b69efcdb516abda4908ecfbf90faba96a559a2af32841ea3ec"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-negation",
+          "sha256": "75d9f46934c1678aceaa731cefa00d1993a5ead87cac1a48ad65cf3df321b9a2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-revert",
+          "sha256": "327d06ebf570c70b4b5380d53885507537d8ec71a337b0d15fa59e18bf360332"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-room",
+          "sha256": "eec6351ffe6df4216a5d5dca2408fd5d12b84d621b0405323cee6446dbdf8cd7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-room2",
+          "sha256": "4c10e93289b7fbab0a020de2ec03d74cd8a5db892036db324d088d8b1bcfa93e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v1.json",
+          "sha256": "0b43ee606f46db079d5469e3101056f355c759abc38d62914fcc28adda2dca07"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v2.json",
+          "sha256": "fd4b1374dfcf719f1df56fdc658ea09dc931a05817aa25e7122e2692201ed457"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v3.json",
+          "sha256": "8af72040f1e37ea09c9534ba7751c44a75501b887348eae6146c2ff631f99e1f"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v4.json",
+          "sha256": "d79b99c54448074dd3a53f7b32b945b0b54e79865e3216fd4389a02c2dfc0d50"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v1.json",
+          "sha256": "1458f521de16719cd7e3ec63081cb01893b79a72ce73aad6250f671efd4e7c35"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v2.json",
+          "sha256": "aac4a90100eb57097c4bac5865d362c7178bef981faf3ff7262a28e2b13e09d1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v3.json",
+          "sha256": "50c5932fe0f6982a3c55722bb325f9981cfae99d2613e1a9254572e935fd3498"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v4.json",
+          "sha256": "35e24fda6f2f32c1c19d43409326b23c6751c0e00a52b2009c779ebe36e9cc7b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v1.json",
+          "sha256": "3c83a45ae26867e10c7c8620d5d7dbbb8d777d7aa0b5699f5feb3b81a2522c20"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v2.json",
+          "sha256": "c63381c98711661318f2da181a3669142ae7ed378293e0ff9fc63ed07ce020d7"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v3.json",
+          "sha256": "a9789eb65f96631201031f53296a656b804321fbe21c3df1f14ba60d071c361b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v4.json",
+          "sha256": "22d16d5be0146a563de9123642e504945dcd196e0b9b4540933b15f1d321be7a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v1.json",
+          "sha256": "45c186c3b682ca167c8531aaffdde6595d4758d96978109c00666e499ab2478d"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v2.json",
+          "sha256": "1c8aeec35578ff9a0c4ec9682e71c722dc6a9a0fe812898d2d6e64afdb543382"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v3.json",
+          "sha256": "00d2d9950907c1e1d98de56c44b0a69c239cbc2baa5daa141feb7671cbdc9d8e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v4.json",
+          "sha256": "a0431119ec3168d74837a62ade426e3b4464ff149feaa644cb5c5704b2eafaad"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v5.json",
+          "sha256": "36d579c45aa842fe3d13c11900ebb57f085367a5e72538cee497906f6271a470"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v6.json",
+          "sha256": "9f30df43fda77f25994dcd3e0f00e2cf587343e12b65f38aba98ef77783e16e0"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v7.json",
+          "sha256": "671e130ed6aa6cdd3d803e70f668cec7e42bdeb889b2fd9ce9508afa47ecd102"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v8.json",
+          "sha256": "45e6b66097fd1a8bf8266c9379fe04558cb106ebaa7faef2f25c6af4f3da81b1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v1.json",
+          "sha256": "b4df7485554986803539df8e016c68033dd13649b040a749b503d420eb92449e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v2.json",
+          "sha256": "1e3bc2a64db71319505e76dd56e189ac713bf0cd67ffafa8a012df05c3356392"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v3.json",
+          "sha256": "4db1f7f1491e71e07cd1ac42e6afe889453bb2edf73c981f6140a0b1b836a631"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v4.json",
+          "sha256": "c4647a9756170845981d4f1b98396446735184a95d6a8cad566045ea7a8247c1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v5.json",
+          "sha256": "ebb4731343d8f29b7cb8281dae5fffff90f190548535fb0d8b05d3ca77fb4681"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v6.json",
+          "sha256": "e3eb8a076ac185001260d0ef62d09c9cef232619770b2c4f3190f169650b30c2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v7.json",
+          "sha256": "19a3226a9b518558bf3016d533ced8934fdd35e4a3d508e7bde577187288a12a"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v8.json",
+          "sha256": "fb9f6aa07900c0819346cbe0ef282b8ad7feb3071ea8edc99fa5454112abbf18"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/apply.mjs",
+          "sha256": "4ab8f8f079fe152c999cf8e12b02964ed4befe490774c1733eb6dc03df916d5c"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/compare.md",
+          "sha256": "4d54c8fdea9e8a1a86adcc755f8d94b1e8d3c2c3c74f7ca3992760efed190dfe"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/compare.mjs",
+          "sha256": "3005ff6e84919fa0d9b8fc2033335882b4034b5a236898a1426a0740303a676e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/fixtures.json",
+          "sha256": "9c67272649d2827b3346d55105f755be4c81d2b139fa9d5351e5465c77b006d8"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/gates.json",
+          "sha256": "ed4a2a45aeba9eef60d68a51091ba8a39a5e1e5593f0fd7f026ae63bb947d0ce"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/rules.json",
+          "sha256": "bb56d9743f77402b1ee6f15db5b107f9db9c2a89b65c5c130194f661ee763bc2"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/u2/verify.ts",
+          "sha256": "6834a539c287a70d365e84dc2098c9e22deed5db411c52f06b26a80b633932df"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/check.mjs",
+          "sha256": "cc6bd6e8cb445897eb9ba04db024fca6f2c0c98586f131e15f78db689f1f2c60"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/constants.mjs",
+          "sha256": "9f23253f22cc8a2a9a952048dab0011a1eac0cca7b0352579ee0a5db23f5f1e0"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/dates.mjs",
+          "sha256": "2f3d01a2eb397facd698db98b62a2e2c08569acb647fb3dd582b40d9cd2aeb18"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/gates.json",
+          "sha256": "5eae04da1e84061873bd62271e093e8b1cbd504108b935978c82a4bfe2323251"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/helpers.mjs",
+          "sha256": "3153f44950d135ccd8daca48d4890440d4cd5d5f5e0c053e9de4b45715bcbf7b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/render.mjs",
+          "sha256": "8c4362c7bd5a786b20b6613e6f841709f92bcbfb15aaec4cba852bc99bc871b3"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/Renderer.mjs",
+          "sha256": "62edfd3bd2f070ff389e7644bed076365caa4f6949f69224783bc0733e34044d"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/rules-2026-10-09.json",
+          "sha256": "d206602211813062640a90f5b3cf1c6f07126432389dc71fe996c684205b29a1"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/scoring.json",
+          "sha256": "03507b9367db6b83e44bbec01a605e603e555d67b1470efb937cf43e71000c44"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/table.json",
+          "sha256": "f406786771dab17c2fcf4cb22758f00f137ddea6d953d1664cadd523c17b2c11"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench/dated/types.ts",
+          "sha256": "814e4a2cf8097c97358d75232fe84678a4df5e881d3fdbec5b08633b5b21a37e"
+        }
+      ]
+    },
+    {
+      "name": "bench3",
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench3",
+      "actual": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench3",
+      "physical": [
+        {
+          "path": ".orkestrel/agent/instruments/bench3/bench.mjs",
+          "sha256": "67c863b179dcd56d9d096b930c7794264743635c1f75367157d0cb45bf5ce611"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/BRIEFING.md",
+          "sha256": "c67e2088153e11f1aa773707d5b466c8168f54f9b12b00071d0dc50a87348ddc"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/README.md",
+          "sha256": "0cd28068e7ddd002e328260d17be8ef5dcb43aacaa8af1317f8895d596578d80"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/records-check.mjs",
+          "sha256": "af6a637f1549fcd768b9341716c5ecf3cefb46e1eb502e84f1a37d94271df7aa"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/records-fixtures.json",
+          "sha256": "d483e910ffe0768c4e1d17920fcb75b42bea4ffc1c14b934523bbe2f33431982"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/records.mjs",
+          "sha256": "03f20c9029f5fbdeb2c0328ac90520abc6bc41773c823e5020d32fcb89d23f61"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench3/scenario.json",
+          "sha256": "a33b4d3e8d6d2a9ce6f00f5eef71b8270c1b95b99b5b28721662f6aad98a13dd"
+        }
+      ]
+    },
+    {
+      "name": "bench4",
+      "path": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench4",
+      "actual": "C:\\Users\\mikes\\WebstormProjects\\scaffold\\.orkestrel\\agent\\instruments\\bench4",
+      "physical": [
+        {
+          "path": ".orkestrel/agent/instruments/bench4/constants.mjs",
+          "sha256": "ed255eeb8d465a5841d3db6070341e76071c48e7e484196e0a8cdd3cfea1864e"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench4/driver.mjs",
+          "sha256": "f13e884203bf41af38bcb03650b84bdfc497fba893e6dc037eb2ff31172bbe3b"
+        },
+        {
+          "path": ".orkestrel/agent/instruments/bench4/helpers.mjs",
+          "sha256": "84146147337618289b5ba78187f61781ec519e0fec22b9a5899fff59b8cada52"
+        }
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "path": ".orkestrel/agent/instruments/bench/BRIEFING.md",
+      "blob": "dda20771d389510a1661c88f6c9b8641c8864b43",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/BRIEFING.md",
+      "retained": "dda20771d389510a1661c88f6c9b8641c8864b43",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/README.md",
+      "blob": "35c8e3dfd5f383dcd95bd2cec9b37584a0f5da49",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/README.md",
+      "retained": "35c8e3dfd5f383dcd95bd2cec9b37584a0f5da49",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/bench.mjs",
+      "blob": "78dda4ba7d28b0538545dfdbe551f3eedb14cea0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/bench.mjs",
+      "retained": "7d8ed8a6652adc2dc24ba783ecf3082f96dc8001",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/check-long.mjs",
+      "blob": "f675040a6af91eb43bf2a4803f291c17abd8e902",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/check-long.mjs",
+      "retained": "f675040a6af91eb43bf2a4803f291c17abd8e902",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/Renderer.mjs",
+      "blob": "151339f4f221ac9f3d97021cc847052f1ce95a12",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/Renderer.mjs",
+      "retained": "151339f4f221ac9f3d97021cc847052f1ce95a12",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/check.mjs",
+      "blob": "814d47073588f33f813fc667ac6affc6ad7a8d81",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/check.mjs",
+      "retained": "d9b8bd0417c141abe72600e5c4d35f6cef437301",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/constants.mjs",
+      "blob": "e5bc2b2954eb98a575196ab26d9f29fa604102e0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/constants.mjs",
+      "retained": "e5bc2b2954eb98a575196ab26d9f29fa604102e0",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/dates.mjs",
+      "blob": "0d87ca02c37d368c3d2304178bf7f47704556d63",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/dates.mjs",
+      "retained": "0d87ca02c37d368c3d2304178bf7f47704556d63",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/gates.json",
+      "blob": "69817b78b4f9349d5cb1f8986c004d2749483001",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/gates.json",
+      "retained": "69817b78b4f9349d5cb1f8986c004d2749483001",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/helpers.mjs",
+      "blob": "076d5b7bae2f9649f63ba51da854f2ebeb2b4506",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/helpers.mjs",
+      "retained": "076d5b7bae2f9649f63ba51da854f2ebeb2b4506",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/render.mjs",
+      "blob": "2df65bd538099749c27794725c8f2044eaeae0ae",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/render.mjs",
+      "retained": "2df65bd538099749c27794725c8f2044eaeae0ae",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/rules-2026-10-09.json",
+      "blob": "ef492e81654f78c64bff0e39935c15ff44f77f82",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/rules-2026-10-09.json",
+      "retained": "ef492e81654f78c64bff0e39935c15ff44f77f82",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/scoring.json",
+      "blob": "8d909e303dbcfba9892ed4040a0303a95a9b2a35",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/scoring.json",
+      "retained": "8d909e303dbcfba9892ed4040a0303a95a9b2a35",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/table.json",
+      "blob": "d2086a20a589f011b77cb79a4c73f8c0d2068d91",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/table.json",
+      "retained": "d2086a20a589f011b77cb79a4c73f8c0d2068d91",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/dated/types.ts",
+      "blob": "64e4f80ff25a8281cd768a2af17e26b5f73fdaa1",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/dated/types.ts",
+      "retained": "64e4f80ff25a8281cd768a2af17e26b5f73fdaa1",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/rescore.mjs",
+      "blob": "002b9d506d1771e73687b028e1582d8e8a10f243",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/rescore.mjs",
+      "retained": "002b9d506d1771e73687b028e1582d8e8a10f243",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/scenario-long.json",
+      "blob": "f6db15c4bb9234b85429615ca9bf2dcab32ae4a8",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/scenario-long.json",
+      "retained": "f6db15c4bb9234b85429615ca9bf2dcab32ae4a8",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/scenario.json",
+      "blob": "69cccc9f72a18d609d14ce6c7d065cd7780103ad",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/scenario.json",
+      "retained": "69cccc9f72a18d609d14ce6c7d065cd7780103ad",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/apply.mjs",
+      "blob": "85b4300f176006d263f3e4f46006a3c6761a29ad",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/apply.mjs",
+      "retained": "85b4300f176006d263f3e4f46006a3c6761a29ad",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/compare.md",
+      "blob": "458e0e24c71145e7cf4c8a179d19d98c94c65117",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/compare.md",
+      "retained": "458e0e24c71145e7cf4c8a179d19d98c94c65117",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/compare.mjs",
+      "blob": "47e55f0b004741bc3bd893797ab1cad499fa537d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/compare.mjs",
+      "retained": "40c4aaf98badd90be7caf404dcb979b2e54df28e",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/fixtures.json",
+      "blob": "163b522372f53f4ae7a8243f1f2ba504dc0061ef",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/fixtures.json",
+      "retained": "163b522372f53f4ae7a8243f1f2ba504dc0061ef",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/gates.json",
+      "blob": "3d89d79f04730905c8c003020337cac842dc3c0e",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/gates.json",
+      "retained": "3d89d79f04730905c8c003020337cac842dc3c0e",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/rules.json",
+      "blob": "e2ec3e74c0f2dc208d980cbdfffcfa379256d083",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/rules.json",
+      "retained": "e2ec3e74c0f2dc208d980cbdfffcfa379256d083",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/u2/verify.ts",
+      "blob": "afdd49f646a6d8b3604713799bd033cd828c7160",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/u2/verify.ts",
+      "retained": "afdd49f646a6d8b3604713799bd033cd828c7160",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/check.mjs",
+      "blob": "d93d5c1494655ded479e1fa360a96e2e4181ca84",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/check.mjs",
+      "retained": "7915be0d1f46f6862b727abe1d369fdaffb52a7a",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v1.json",
+      "blob": "b224c11f614772f98e5b4bb1abe4c38b7cfdc558",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v1.json",
+      "retained": "b224c11f614772f98e5b4bb1abe4c38b7cfdc558",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v2.json",
+      "blob": "218eab8f6a2e0d7aeaea8c025b7f9e8e35dcc962",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v2.json",
+      "retained": "218eab8f6a2e0d7aeaea8c025b7f9e8e35dcc962",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v3.json",
+      "blob": "c77689f8a896e43c27e6fc337db8c6735d9605b6",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v3.json",
+      "retained": "c77689f8a896e43c27e6fc337db8c6735d9605b6",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v4.json",
+      "blob": "187977571d36909ac11ad83d6c257640a73783be",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v4.json",
+      "retained": "187977571d36909ac11ad83d6c257640a73783be",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v5.json",
+      "blob": "ec1bc3c11b45b910542273ab133aca8f8c8d8ecf",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v5.json",
+      "retained": "ec1bc3c11b45b910542273ab133aca8f8c8d8ecf",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v6.json",
+      "blob": "d25345e605f51d541de06f482f23ede15524d99b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v6.json",
+      "retained": "d25345e605f51d541de06f482f23ede15524d99b",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v7.json",
+      "blob": "d1873f62cecc9f4549532951f343568f216388c5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v7.json",
+      "retained": "d1873f62cecc9f4549532951f343568f216388c5",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/after-2026-10-09/v8.json",
+      "blob": "23a0fbe35ceb93132841bd01525d17c7f1318bdd",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/after-2026-10-09/v8.json",
+      "retained": "23a0fbe35ceb93132841bd01525d17c7f1318bdd",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v1.json",
+      "blob": "70d61938a7970ed3f76145300b2f12b5913a9f64",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v1.json",
+      "retained": "70d61938a7970ed3f76145300b2f12b5913a9f64",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v2.json",
+      "blob": "6614a79515437ec8db53e7e08315622029051149",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v2.json",
+      "retained": "6614a79515437ec8db53e7e08315622029051149",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v3.json",
+      "blob": "799b5e81f8d133ec4abe563284fe605bce189efa",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v3.json",
+      "retained": "799b5e81f8d133ec4abe563284fe605bce189efa",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v4.json",
+      "blob": "68d6610f82d90876e2f2cc9f40e6867f38d2a9f5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v4.json",
+      "retained": "68d6610f82d90876e2f2cc9f40e6867f38d2a9f5",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v5.json",
+      "blob": "1b119845661eda87a4400b01d2bb82236eb63a62",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v5.json",
+      "retained": "1b119845661eda87a4400b01d2bb82236eb63a62",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v6.json",
+      "blob": "51a443a955a93df1020c9722b8a09e15ae321487",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v6.json",
+      "retained": "51a443a955a93df1020c9722b8a09e15ae321487",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v7.json",
+      "blob": "ea1a179743c9cdb7b4bd96d0a33916ce8740c472",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v7.json",
+      "retained": "ea1a179743c9cdb7b4bd96d0a33916ce8740c472",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/before/v8.json",
+      "blob": "42f1389d8d89a64e090c53e9391a9ba54ee6041b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/before/v8.json",
+      "retained": "42f1389d8d89a64e090c53e9391a9ba54ee6041b",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v1.json",
+      "blob": "80f55d6a9c568902dc6b6896d7b51786f4ec84d9",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/records-plain-2026-10-09/v1.json",
+      "retained": "80f55d6a9c568902dc6b6896d7b51786f4ec84d9",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v2.json",
+      "blob": "09621097be767150296f8ae90c9ed19297435725",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/records-plain-2026-10-09/v2.json",
+      "retained": "09621097be767150296f8ae90c9ed19297435725",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v3.json",
+      "blob": "5552106cd925f231a3e7d116ac15cd3a0af95108",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/records-plain-2026-10-09/v3.json",
+      "retained": "5552106cd925f231a3e7d116ac15cd3a0af95108",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/records-plain-2026-10-09/v4.json",
+      "blob": "aca90571a3a145f4ce8ff8428f4b6f296d07cbaf",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/records-plain-2026-10-09/v4.json",
+      "retained": "aca90571a3a145f4ce8ff8428f4b6f296d07cbaf",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v1.json",
+      "blob": "223b05c5899bfcf39af85b2b3ec9dbeaa5a43d9b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-2026-10-09/v1.json",
+      "retained": "223b05c5899bfcf39af85b2b3ec9dbeaa5a43d9b",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v2.json",
+      "blob": "1f1e691e208e7b0ffe6b101e8b44b7467ec94644",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-2026-10-09/v2.json",
+      "retained": "1f1e691e208e7b0ffe6b101e8b44b7467ec94644",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v3.json",
+      "blob": "4b228eb6d58e5024317576da2c78fb4eed6e0f9d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-2026-10-09/v3.json",
+      "retained": "4b228eb6d58e5024317576da2c78fb4eed6e0f9d",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-2026-10-09/v4.json",
+      "blob": "943baf00c87c95188a35aa28a547eb0ac6ce707c",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-2026-10-09/v4.json",
+      "retained": "943baf00c87c95188a35aa28a547eb0ac6ce707c",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v1.json",
+      "blob": "5862c8ebfac8076c3511197231f73f6145c4bf04",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-plain-2026-10-09/v1.json",
+      "retained": "5862c8ebfac8076c3511197231f73f6145c4bf04",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v2.json",
+      "blob": "3679451425d9cd67d859d3279e57db84ef19d05b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-plain-2026-10-09/v2.json",
+      "retained": "3679451425d9cd67d859d3279e57db84ef19d05b",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v3.json",
+      "blob": "7305613806e728fdc13040e0d7252c37a6820522",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-plain-2026-10-09/v3.json",
+      "retained": "7305613806e728fdc13040e0d7252c37a6820522",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/g06/view-plain-2026-10-09/v4.json",
+      "blob": "75f937b9e71caa6c0a5e9a90365fdf6abea70bbe",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/g06/view-plain-2026-10-09/v4.json",
+      "retained": "75f937b9e71caa6c0a5e9a90365fdf6abea70bbe",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json",
+      "blob": "148fb7dfa9fb409bd6934ae0b4bb8b1969486543",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json",
+      "retained": "148fb7dfa9fb409bd6934ae0b4bb8b1969486543",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-adverb",
+      "blob": "d574b68a6f57e9a38680b012752db429c71c2c25",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-negation",
+      "blob": "4ba10a1108abe997cee6ce57a7674441de2ed089",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-revert",
+      "blob": "e2dfb72719d5af23551ea194742afdb49103a1d9",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-room",
+      "blob": "886b6ef22013340567fc54966245ea873a7bb308",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v1.json.pre-room2",
+      "blob": "c7fc372d25181ecb684f50e2d81db9c28d99076e",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v1.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json",
+      "blob": "7816f96020df88b37e8d8f768c6ab57243d8ff43",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json",
+      "retained": "7816f96020df88b37e8d8f768c6ab57243d8ff43",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-adverb",
+      "blob": "2369308270a744767cee17d9b81db13cbb7141cc",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-negation",
+      "blob": "7a512c5861d45a8b9fe2138c944799081d6a4f7f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-revert",
+      "blob": "088994523d749a0a159638ea3389f558ba52841f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-room",
+      "blob": "5379dd9e64e70999043c1eebe7d680ea61ebfb63",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v2.json.pre-room2",
+      "blob": "d17673c8f4004055ee9f877b087e671d194bc5d0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v2.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json",
+      "blob": "1bf99077b8a94a3428386f0964add542d54b9d3d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json",
+      "retained": "1bf99077b8a94a3428386f0964add542d54b9d3d",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-adverb",
+      "blob": "8ac12989d2ace774bccca86cad691e96a4ceb6c5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-negation",
+      "blob": "dd184f917838c28838268d36bc9cd072a93b3d9c",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-revert",
+      "blob": "d96c3ca1ed02eb7427ede742d0bf015bb68ddca4",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-room",
+      "blob": "d1c46a7c4642589a2dbac65cd5d970896a9dffa7",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v3.json.pre-room2",
+      "blob": "2582c0ad8fd3762f25c0039b758762eb2ee9beda",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v3.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json",
+      "blob": "f9824559938c80cb12a01395943b7605a0cf5c58",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json",
+      "retained": "f9824559938c80cb12a01395943b7605a0cf5c58",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-adverb",
+      "blob": "b38d70ab131680e5b0928d9f09357bc3fe96a04f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-negation",
+      "blob": "82dc1e6b6e4cde4ed4c10069600995d94fa229e7",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-revert",
+      "blob": "f6e03780f944847d9942d2fc28b8154c7f15a1a4",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-room",
+      "blob": "a3e92c0b659eb1ef5229b12e210450fa831c4517",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v4.json.pre-room2",
+      "blob": "de54cf13282782c642aec2b19376d30807c1f0e0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v4.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json",
+      "blob": "310add9b3f76f3b3935aeddd8e2f212b154d15ed",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json",
+      "retained": "310add9b3f76f3b3935aeddd8e2f212b154d15ed",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-adverb",
+      "blob": "83ed7cb816f8b4f9f5e259e5f5897f25cc134a2c",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-negation",
+      "blob": "1b90cd692eedf92f8e2ec815b31bced174c106ec",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-revert",
+      "blob": "825d40a0ef7af05a3583c2a6b3fbdff7c30b40af",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-room",
+      "blob": "3f2461a972d3367d10e1c6f20f81c2f289b93e9f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v5.json.pre-room2",
+      "blob": "d41f921efd569ca0a3e49acd6e0faf1d7150d3b4",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v5.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json",
+      "blob": "68bcff969035ec5175d0f0588b15ca52562d21ef",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json",
+      "retained": "68bcff969035ec5175d0f0588b15ca52562d21ef",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-adverb",
+      "blob": "5077a3363a3f94a512b4d80fa8692bc6a81959b2",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-negation",
+      "blob": "2844eae2ab2927ab0c788dc873bcd4800d20dffb",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-revert",
+      "blob": "3dcb10e90c4d9b9a13562099d710824b2c80092b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-room",
+      "blob": "77c2b76e49238efbca6620758b59efd03e7c3f28",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v6.json.pre-room2",
+      "blob": "cd3c52e63216d7cbd3d299297f87ee920a0aef0a",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v6.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json",
+      "blob": "a837f595670695f4d7c43005b7a1d9232c6fa77e",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json",
+      "retained": "a837f595670695f4d7c43005b7a1d9232c6fa77e",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-adverb",
+      "blob": "d8f55d4caeb0582d5db223b0ebc823e10be9432d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-negation",
+      "blob": "ce53ff2047b343074764c76feebeaa68a944f67a",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-revert",
+      "blob": "dbb04421669765229c3bc89dc1cd830ad0388e1e",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-room",
+      "blob": "bee6e342307c57fbcda51a20e4707d06adee01cc",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v7.json.pre-room2",
+      "blob": "fcf2e5b8b02b3b1605217188a31fce6bddea82ae",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v7.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json",
+      "blob": "4062b7fd0f5daf1f819b6083e0734d7e3b8ce9b1",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json",
+      "retained": "4062b7fd0f5daf1f819b6083e0734d7e3b8ce9b1",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-adverb",
+      "blob": "b7b27e826200518507452623a7f76a4981acd96e",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-negation",
+      "blob": "554c60f411fbbb5bd6ad1139293d92fd1e3bf1b9",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-revert",
+      "blob": "bcb0f7f5233691dcc0884ff01d27fb1ec5395079",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-room",
+      "blob": "32123166c78fe931cdd70113d91b7e49b5c6c53b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/ledger/v8.json.pre-room2",
+      "blob": "edca46cbcb77c179b01ef1b50561cff133e454b5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/ledger/v8.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json",
+      "blob": "fe7076db50b88e1d571fc73f3e84e2da2cb94bb0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json",
+      "retained": "fe7076db50b88e1d571fc73f3e84e2da2cb94bb0",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-adverb",
+      "blob": "e549030c3801809b811488487481c90266827fe0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-negation",
+      "blob": "593ef1dc415251ca49b225ec2eeed2a5d8817668",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-revert",
+      "blob": "1e8798c5252a357571fa64e54c8562f87517bb77",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-room",
+      "blob": "57de1f21a29cef70bf556b7851c9cc929855dbb7",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v1.json.pre-room2",
+      "blob": "49e26063df054c4756d0fdbec0a467d06b6af82a",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v1.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json",
+      "blob": "b03d5077993550771bb3ec4c01ef4b2326362e1f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json",
+      "retained": "b03d5077993550771bb3ec4c01ef4b2326362e1f",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-adverb",
+      "blob": "a39e44d85c33198f9324449c4e182e825695c123",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-negation",
+      "blob": "d9041afab072516cfab60e407c8a06505135b263",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-revert",
+      "blob": "6797ea94b5e53b44aeeee88a197af210b47cfca2",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-room",
+      "blob": "a12481f8eb03abdedf26b0eec9a6bce0032b8e30",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v2.json.pre-room2",
+      "blob": "2c954fa57beddf000fe6ec2a625b8030c1f0841d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v2.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json",
+      "blob": "b403e8018209e46b6746b33d1bf8f960d40cc7cf",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json",
+      "retained": "b403e8018209e46b6746b33d1bf8f960d40cc7cf",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-adverb",
+      "blob": "00f5f9e8d38816fc1fe86fd5570d8a899d5c02fe",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-negation",
+      "blob": "b8e5e8a7908e0ca39e405b95eeac98f8a088d7a4",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-revert",
+      "blob": "419ef891e4344d6659151e911d04f283b0e3dc23",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-room",
+      "blob": "f735185f9f170b4e211f32c8bbaffb5824c6bd9d",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v3.json.pre-room2",
+      "blob": "cfb11588c01ecc8a850e8a1091e2d2ff22f22bdc",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v3.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json",
+      "blob": "2fd6c7d12de6a8ccb58d791476be77edc055a906",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json",
+      "retained": "2fd6c7d12de6a8ccb58d791476be77edc055a906",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-adverb",
+      "blob": "dc11b97d4cbbad90052ad3a69fce47745a57eab3",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-negation",
+      "blob": "810305aee8ef8f4a0eef247bb99c01b43fd94c74",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-revert",
+      "blob": "0c8c253c0ee76638d9db56849848cf916315ce66",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-room",
+      "blob": "27b4c9ed77e1d61f9c594d4ce7d93d941c47bd7f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v4.json.pre-room2",
+      "blob": "fef9863a865d51486c9e22bd0fee0f265d534cef",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v4.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json",
+      "blob": "1f0e8b5c2e3da78de692ab74e881cc8580cb9f06",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json",
+      "retained": "1f0e8b5c2e3da78de692ab74e881cc8580cb9f06",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-adverb",
+      "blob": "997ad0d03b56d82a6c72f3b4918071448d59dd20",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-negation",
+      "blob": "912d38863d019a74c0b07c9ea576c113d3172fa6",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-revert",
+      "blob": "270e3c44c523a0b3387eec8d754fa52bfeb9911f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-room",
+      "blob": "5b17b4ef82599476e1c53da3d391d030edea6d0b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v5.json.pre-room2",
+      "blob": "2890005bb3bd6310e6497d4c04b6aae76fd9ed98",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v5.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json",
+      "blob": "37708843c9598f6065bda0f68885b00796689713",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json",
+      "retained": "37708843c9598f6065bda0f68885b00796689713",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-adverb",
+      "blob": "aeae397e9d408f285d597a6530353ff2488d5e97",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-negation",
+      "blob": "7c2216f60e41bff95e9be5b404a6d73c76b43f5a",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-revert",
+      "blob": "1ed5703d7d4c1df71b6b65ff7c977ebd054009d9",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-room",
+      "blob": "16efd05211832ee4db92fdef128ee57d731bdda6",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v6.json.pre-room2",
+      "blob": "a16bedbb21380bc71dd7d1e1a2fac8ee7ead9fba",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v6.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json",
+      "blob": "d4da5b6936a48ced0521f57c2275ad0b1f920dec",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json",
+      "retained": "d4da5b6936a48ced0521f57c2275ad0b1f920dec",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-adverb",
+      "blob": "3dea5c4fe714173bf82851cac42070beea4abfa0",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-negation",
+      "blob": "cc02e456a5856da24d288c559ee70b134f0a00c6",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-revert",
+      "blob": "d8386ded38ae13b89499c5c9de354f1ea19785ab",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-room",
+      "blob": "dfc71fbccc63a4baab01ee429df01b13a939e409",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v7.json.pre-room2",
+      "blob": "6f5a470ef965e061c8fc693c595f271767df5b2b",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v7.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json",
+      "blob": "d39f5b9f012971d5b7d6fd93c7da9670b0d74bd9",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json",
+      "retained": "d39f5b9f012971d5b7d6fd93c7da9670b0d74bd9",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-adverb",
+      "blob": "623160a86d8c7cbd12f7fafa47a1f3bcee8797c5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json.pre-adverb",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-negation",
+      "blob": "1e36a5da963a62952b1b0ff03ed3e72d331813cd",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json.pre-negation",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-revert",
+      "blob": "786096361ae3582796aa40b3e8fd61184d796092",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json.pre-revert",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-room",
+      "blob": "9ce159a4265bcd85bfb6cf80bf1df25f71fc808c",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json.pre-room",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench/variants/v8.json.pre-room2",
+      "blob": "b15cc10b8e09347505c2d59b6194586c7ca6d99f",
+      "relocated": ".orkestrel/agent/instruments/harness/bench/variants/v8.json.pre-room2",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/BRIEFING.md",
+      "blob": "40488c2a0d1653dc6f23677e565a7c9341e1dd35",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/BRIEFING.md",
+      "retained": "40488c2a0d1653dc6f23677e565a7c9341e1dd35",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/README.md",
+      "blob": "5082eade0de2cba0ee26555d2a7eec8d27c0d859",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/README.md",
+      "retained": "5082eade0de2cba0ee26555d2a7eec8d27c0d859",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/bench.mjs",
+      "blob": "d20781a6cf8e4df47d04c13cc8b0270a1af22616",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/bench.mjs",
+      "retained": "06553a31a804fdb0f5b5677d663eeeb8cf2d2a14",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/records-check.mjs",
+      "blob": "bbefb4796a00b69c63c34abe05793749b7e87ecb",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/records-check.mjs",
+      "retained": "cc8832ea1f87bd974db577ce8ac2ae5372ba2b5b",
+      "status": "relocated"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/records-fixtures.json",
+      "blob": "8e6db6779a8f15343756128feab1f9b7d738fa85",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/records-fixtures.json",
+      "retained": "8e6db6779a8f15343756128feab1f9b7d738fa85",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/records.mjs",
+      "blob": "e6ecfadd4db45ff9bacde4251f81c62b73af0562",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/records.mjs",
+      "retained": "e6ecfadd4db45ff9bacde4251f81c62b73af0562",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench3/scenario.json",
+      "blob": "af0412401f4b836284674c61808074764fe53214",
+      "relocated": ".orkestrel/agent/instruments/harness/bench3/scenario.json",
+      "retained": "af0412401f4b836284674c61808074764fe53214",
+      "status": "identical"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench4/Driver.mjs",
+      "blob": "3d9dc29197655322b0e76ad319c84a98ec1f05e1",
+      "relocated": ".orkestrel/agent/instruments/harness/bench4/Driver.mjs",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench4/constants.mjs",
+      "blob": "aac18231b591fb7ea4374327717b14a22bae56e5",
+      "relocated": ".orkestrel/agent/instruments/harness/bench4/constants.mjs",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench4/driver.mjs",
+      "blob": "9056b9187b965a8165c56f658e017ba1bf7cb1e7",
+      "relocated": ".orkestrel/agent/instruments/harness/bench4/driver.mjs",
+      "status": "history-only"
+    },
+    {
+      "path": ".orkestrel/agent/instruments/bench4/helpers.mjs",
+      "blob": "6edb93ac371996993a12bf9d70d935a3cf42d383",
+      "relocated": ".orkestrel/agent/instruments/harness/bench4/helpers.mjs",
+      "status": "history-only"
+    }
+  ],
+  "changed": [
+    ".orkestrel/agent/instruments/bench4/Driver.mjs"
+  ],
+  "note": "The original bench4 class and entry are distinct Git blobs on a case-folding host. Typed relocation is separately verified. Historical backup variants remain in Git history."
+}
