@@ -50,7 +50,7 @@ The q2 thinking receipts contain 150 repeated lookups across 40 compaction goals
 
 ## 5. Preserving the harness for development use
 
-Adopt the agent-owned, unpublished `studies/` development tree and `study` command proposed in [the study design](../../../study/.orkestrel/study/study.md). The user-requested Opus review and Fable synthesis supersede the earlier scaffold `bench/agent/` sketch. Keep local checks, paid capacity execution, paid memory comparison, versioned grading, and report rendering separate. This is a design recommendation; no command or move is implemented.
+The portable package and command are implemented; see [Study's guide](../../../study/guides/study.md). Agent owns its unpublished `studies/` adapters and inputs, with results under `tmp/studies/`. Study's git history through `3b7d6f3` retains the user-requested Opus review and Fable synthesis that superseded the scaffold `bench/agent/` sketch. Keep local checks, capacity execution, memory comparison, versioned grading and report rendering separate. Historical harness preservation remains distinct from this completed extraction.
 
 Before retiring the campaign, preserve the ignored raw runs and emitted builds with their digests. Keep historical manifests unchanged as provenance; their absolute paths must not be rewritten to imply replayability. Future studies must identify the artifact actually loaded as vendor, workspace, or installed tarball. Keep held-out truth outside agent-visible input and published artifacts. The tracked development oracle is not secret merely because its folder is named private.
 
