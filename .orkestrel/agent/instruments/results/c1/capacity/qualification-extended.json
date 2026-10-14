@@ -1,0 +1,1946 @@
+{
+  "policy": "execution-only",
+  "passed": true,
+  "calls": 256,
+  "tokens": 617325,
+  "elapsed": 1639413,
+  "readings": [
+    {
+      "cell": {
+        "key": "q4",
+        "arm": "records"
+      },
+      "reading": {
+        "outcome": {
+          "attempted": 4,
+          "successful": 4,
+          "unsuccessful": 0,
+          "partial": 0,
+          "empty": 0
+        },
+        "calls": 86,
+        "tokens": 168481,
+        "prompt": 9668,
+        "completion": 874,
+        "roles": {
+          "agent": 16,
+          "flush": 4,
+          "judge": 66
+        },
+        "reasons": {
+          "length": 72,
+          "stop": 14
+        },
+        "thinking": true,
+        "options": [
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          }
+        ],
+        "lookups": 10,
+        "folds": 0
+      }
+    },
+    {
+      "cell": {
+        "key": "q4",
+        "arm": "compaction"
+      },
+      "reading": {
+        "outcome": {
+          "attempted": 4,
+          "successful": 4,
+          "unsuccessful": 0,
+          "partial": 0,
+          "empty": 0
+        },
+        "calls": 18,
+        "tokens": 81380,
+        "prompt": 10436,
+        "completion": 883,
+        "roles": {
+          "agent": 13,
+          "flush": 4,
+          "summarizer": 1
+        },
+        "reasons": {
+          "length": 6,
+          "stop": 12
+        },
+        "thinking": true,
+        "options": [
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "summarizer",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 2048,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          }
+        ],
+        "lookups": 12,
+        "folds": 1
+      }
+    },
+    {
+      "cell": {
+        "key": "q2",
+        "arm": "records"
+      },
+      "reading": {
+        "outcome": {
+          "attempted": 4,
+          "successful": 4,
+          "unsuccessful": 0,
+          "partial": 0,
+          "empty": 0
+        },
+        "calls": 99,
+        "tokens": 276365,
+        "prompt": 10784,
+        "completion": 1505,
+        "roles": {
+          "agent": 29,
+          "flush": 4,
+          "judge": 66
+        },
+        "reasons": {
+          "length": 72,
+          "stop": 27
+        },
+        "thinking": true,
+        "options": [
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "judge",
+            "num_ctx": 4096,
+            "num_predict": 1,
+            "temperature": 1
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          }
+        ],
+        "lookups": 19,
+        "folds": 0
+      }
+    },
+    {
+      "cell": {
+        "key": "q2",
+        "arm": "compaction"
+      },
+      "reading": {
+        "outcome": {
+          "attempted": 4,
+          "successful": 3,
+          "unsuccessful": 1,
+          "partial": 1,
+          "empty": 1
+        },
+        "calls": 21,
+        "tokens": 91099,
+        "prompt": 10778,
+        "completion": 945,
+        "roles": {
+          "agent": 16,
+          "flush": 4,
+          "summarizer": 1
+        },
+        "reasons": {
+          "length": 6,
+          "stop": 15
+        },
+        "thinking": true,
+        "options": [
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "summarizer",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 2048,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "flush",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 1,
+            "think": false
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          },
+          {
+            "role": "agent",
+            "temperature": 0,
+            "seed": 7,
+            "presence_penalty": 1.5,
+            "top_k": 20,
+            "top_p": 0.95,
+            "num_ctx": 20480,
+            "num_predict": 8192,
+            "think": true
+          }
+        ],
+        "lookups": 21,
+        "folds": 1
+      }
+    }
+  ],
+  "limitation": "Execution coverage and capacity observations do not guarantee full-horizon semantic quality."
+}

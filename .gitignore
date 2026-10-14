@@ -41,3 +41,6 @@ playwright-report/
 
 # The c1 harness's emitted build (rebuilt from its sources with tools/build.ts)
 .orkestrel/agent/instruments/harness/.build/
+
+# Raw extended qualification stays at its frozen absolute paths.
+.orkestrel/agent/instruments/results/c1/capacity/preflight-extended/
