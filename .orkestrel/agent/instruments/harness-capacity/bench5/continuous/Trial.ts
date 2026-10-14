@@ -10,7 +10,7 @@ import type {
 } from '../../vendor/agent-0.0.30-trimmed/index.js'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import type { EnduranceRuntime } from '../endurance/types.js'
-import type { MatrixBudget, MatrixFailure, MatrixRequest } from '../matrix/types.js'
+import type { MatrixFailure, MatrixRequest } from '../matrix/types.js'
 import type { SustainedReceipt } from '../sustained/types.js'
 import type { CallRole, Copy, CopyGoal, JudgeStats } from '../types.js'
 import type {
@@ -22,9 +22,13 @@ import type {
 	ContinuousStatus,
 	TrialArm,
 	TrialConfig,
+	ContinuousBudget,
+	ContinuousTerminal,
 } from './types.js'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
+import { isRecord } from '@orkestrel/contract'
 import { createToolManager } from '@orkestrel/tool'
 import {
 	CONVERSATION_RECAP_PREFIX,
@@ -37,7 +41,7 @@ import {
 	estimateMessages,
 	stripThinking,
 } from '../../vendor/agent-0.0.30-trimmed/index.js'
-import { createOllama, createOllamaJudge } from '../../vendor/ollama/index.js'
+import { createOllama, createOllamaJudge, mapMessages } from '../../vendor/ollama/index.js'
 import { INSTRUCTION_DATE } from '../aggregates/constants.js'
 import {
 	DAEMON,
@@ -64,7 +68,8 @@ import { readModelDigest } from '../matrix/helpers.js'
 import { Mirror } from '../Mirror.js'
 import { hashFile } from '../refit/helpers.js'
 import { PlainArm } from './arms/PlainArm.js'
-import { CONTINUOUS_FAILURE, CONTINUOUS_FILES } from './constants.js'
+import { GuardedProvider } from './arms/GuardedProvider.js'
+import { CONTINUOUS_FILES } from './constants.js'
 import { createLookups } from './factories.js'
 import {
 	collectHistory,
@@ -73,6 +78,8 @@ import {
 	matchesOverflow,
 	nameContinuous,
 	readContinuousManifest,
+	unloadModels,
+	classifyContinuousRequest,
 } from './helpers.js'
 
 /**
@@ -89,7 +96,7 @@ import {
  */
 export class Trial {
 	readonly #config: TrialConfig
-	readonly #budget: MatrixBudget
+	readonly #budget: ContinuousBudget
 	readonly #started = Date.now()
 	readonly #walls = new Map<CallRole, number>()
 	readonly #requests = new Set<string>()
@@ -134,6 +141,12 @@ export class Trial {
 	#unserved = 0
 	#flushed = 0
 	#status: ContinuousStatus = 'started'
+	#terminal: ContinuousTerminal | undefined
+	#goal: AbortController | undefined
+	#goalTimer: ReturnType<typeof setTimeout> | undefined
+	#goalSent = 0
+	#native = new Map<CallRole, readonly Message[]>()
+	#reserved = 0
 
 	/**
 	 * Holds the validated configuration.
@@ -148,11 +161,12 @@ export class Trial {
 	 * Runs the trajectory to its end.
 	 *
 	 * @returns 0 when every goal was served, 3 when the run ended at a design outcome (a context-length refusal, a limit, or a goal with no product) or reached the horizon past a goal with no product
-	 * @remarks Thrown when the output exists, the daemon's models or version differ from the freeze, a transport or harness fault ends the run, or the judge cache faults; the run directory keeps what was written.
+	 * @remarks Thrown when custody differs or output exists. Operational termination returns 3 and retains its structured reason and raw wire evidence.
 	 */
 	async execute(): Promise<number> {
 		const { manifest, arm, out, reference } = this.#config
-		const { runtime } = readContinuousManifest(reference.path)
+		const { runtime, manifest: retained } = readContinuousManifest(reference.path)
+		if (!isDeepStrictEqual(retained, manifest) || !isDeepStrictEqual(hashFile(reference.path), reference)) throw new Error('trial configuration differs from frozen manifest identity')
 		this.#runtime = runtime
 		if (existsSync(out)) throw new Error(`run output already exists: ${out}`)
 		mkdirSync(out, { recursive: true })
@@ -169,31 +183,42 @@ export class Trial {
 		})
 		for (const name of CONTINUOUS_FILES)
 			if (name.endsWith('.jsonl')) writeFileSync(join(out, name), '', { flag: 'wx' })
-		await this.#inventory(out)
 		const copy = projectCopy(runtime)
 		const system = buildSystem({ ledger: { system: copy.system } })
 		const lookups = createLookups(copy.tables, () => this.#position)
 		const judge = arm === 'records' ? this.#createCache(out) : this.#createInertJudge()
 		this.#report(out, 'started', undefined)
 		let built: TrialArm | undefined
+		const timer = setTimeout(() => this.#terminate('limit', 'trajectory deadline', 'metadata'), manifest.limits.wall)
+		const series = this.#config.signal
+		const standalone = series === undefined ? setTimeout(() => this.#terminate('limit', 'series deadline', 'metadata'), manifest.limits.series) : undefined
+		const listener = this.#stopSeries.bind(this)
+		series?.addEventListener('abort', listener, { once: true })
 		try {
+			if (series?.aborted) listener()
+			await unloadModels(this.#config.url, this.#abort.signal, (input, init) => this.#metadata(input, init), manifest.limits.metadata)
+			await this.#inventory(out)
 			const first = copy.goals[0]
 			if (first === undefined) throw new Error('the runtime has no goal to serve')
 			this.#gauge = await this.#calibrate(copy, system, judge, lookups, first.after)
 			this.#report(out, 'calibrated', undefined)
 			built = this.#build(copy, system, judge, lookups, this.#gauge, out)
-			this.#advance(built, copy, first.after)
 			this.#status = 'running'
 			for (const goal of copy.goals) {
 				if (!(await this.#serve(built, goal, copy, out))) break
 			}
 			if (this.#status === 'running') this.#status = 'complete'
 		} catch (error) {
-			this.#status = this.#abort.signal.aborted ? 'fault' : 'failed'
+			if (this.#terminal === undefined) this.#terminate('fault', describeError(error), 'metadata')
+			this.#status = this.#terminal?.status ?? 'fault'
 			this.#report(out, this.#status, describeError(error))
-			throw error
 		} finally {
+			clearTimeout(timer)
+			if (standalone !== undefined) clearTimeout(standalone)
+			if (this.#goalTimer !== undefined) clearTimeout(this.#goalTimer)
+			series?.removeEventListener('abort', listener)
 			if (built instanceof PlainArm) built.destroy()
+			built?.agent.abort('trajectory finished')
 			if (built !== undefined) this.#dump(built, out)
 		}
 		this.#report(out, this.#status, undefined)
@@ -202,15 +227,15 @@ export class Trial {
 
 	async #inventory(out: string): Promise<void> {
 		const { manifest, url, arm } = this.#config
-		const tags = await fetch(new URL('/api/tags', url))
+		const tags = await this.#metadata(new URL('/api/tags', url))
 		if (!tags.ok) throw new Error(`model inventory HTTP ${tags.status}`)
 		const inventory: unknown = await tags.json()
 		writeFileSync(join(out, 'model-inventory.json'), JSON.stringify(inventory), { flag: 'wx' })
-		const roles = arm === 'records' ? [manifest.decision, manifest.judge] : [manifest.decision]
+		const roles = arm === 'records' ? [manifest.decision, manifest.judge] : arm === 'compaction' ? [manifest.decision, manifest.summarizer] : [manifest.decision]
 		for (const role of roles)
 			if (readModelDigest(inventory, role.model) !== role.digest)
 				throw new Error(`actual model digest changed after the freeze: ${role.model}`)
-		const version = await fetch(new URL('/api/version', url))
+		const version = await this.#metadata(new URL('/api/version', url))
 		const value: unknown = await version.json()
 		if (
 			typeof value !== 'object' ||
@@ -228,7 +253,7 @@ export class Trial {
 			model: manifest.judge.model,
 			system: MICA_SYSTEM,
 			calibration: { temperature: MICA_CALIBRATION },
-			options: { num_ctx: MICA_CONTEXT },
+			options: { num_ctx: Math.min(MICA_CONTEXT, this.#budget.window) },
 			keepAlive: '5m',
 			timeout: manifest.timeout,
 			fetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
@@ -241,7 +266,7 @@ export class Trial {
 			path,
 			live,
 			retry: manifest.retry,
-			abort: (fault) => this.#abort.abort(fault),
+			abort: (fault) => this.#terminate('fault', describeError(fault), 'judge'),
 		})
 		this.#cache = cache
 		return cache
@@ -259,9 +284,9 @@ export class Trial {
 
 	#createProvider(role: CallRole, options: Readonly<Record<string, number>>): ProviderInterface {
 		const { manifest, url } = this.#config
-		return createOllama({
+		const provider = createOllama({
 			url,
-			model: manifest.decision.model,
+			model: role === 'summarizer' ? manifest.summarizer.model : manifest.decision.model,
 			think: role === 'agent' ? manifest.think : false,
 			keepAlive: role === 'judge' ? '5m' : '30m',
 			timeout: manifest.timeout,
@@ -269,6 +294,7 @@ export class Trial {
 			fetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
 				this.#fetch(role, input, init),
 		})
+		return new GuardedProvider({ provider, prepare: (messages) => this.#native.set(role, messages) })
 	}
 
 	#assemble(
@@ -291,12 +317,12 @@ export class Trial {
 				topics: copy.topics,
 				questions: LEDGER_QUESTIONS,
 				thresholds: FIT,
-				capacity: this.#budget.window,
+				capacity: this.#budget.window - this.#budget.safety,
 				predict: this.#budget.predict,
 				think: manifest.think,
 				share: { ...DEFAULT_LEDGER_SHARE },
 				recall: { limit: DEFAULT_RECALL_LIMIT },
-				agent: { limit: DEFAULT_LEDGER_LIMIT, timeout: manifest.timeout },
+				agent: { limit: DEFAULT_LEDGER_LIMIT, timeout: manifest.limits.goal },
 				lookups,
 				...(gauge === undefined ? {} : { gauge }),
 			},
@@ -354,7 +380,7 @@ export class Trial {
 				system,
 				tools,
 				limit: DEFAULT_LEDGER_LIMIT,
-				timeout: manifest.timeout,
+				timeout: manifest.limits.goal,
 				...(this.#config.arm === 'compaction'
 					? {
 							compaction: {
@@ -401,6 +427,7 @@ export class Trial {
 		agent.emitter.on('tool', (call, result) => this.#count(call, result))
 		agent.emitter.on('fault', (error) => {
 			this.#faults.push(`${this.#current?.id ?? ''}: ${describeError(error)}`)
+			this.#terminate('fault', describeError(error), 'summarizer')
 			process.stderr.write(`fault ${this.#current?.id ?? ''}: ${describeError(error)}\n`)
 		})
 		conversation.emitter.on('compact', (section) => this.#fold('compact', section, out))
@@ -415,6 +442,13 @@ export class Trial {
 	}
 
 	#begin(goal: CopyGoal): void {
+		if (this.#goalTimer !== undefined) clearTimeout(this.#goalTimer)
+		this.#goal = new AbortController()
+		this.#goalSent = 0
+		this.#goalTimer = setTimeout(() => {
+			this.#goal?.abort(new Error('goal deadline'))
+			this.#terminate('limit', 'goal deadline', 'agent')
+		}, this.#config.manifest.limits.goal)
 		this.#current = goal
 		this.#selectedSources.clear()
 		this.#foldedSources.clear()
@@ -439,6 +473,7 @@ export class Trial {
 	async #serve(arm: TrialArm, goal: CopyGoal, copy: Copy, out: string): Promise<boolean> {
 		const { manifest } = this.#config
 		this.#begin(goal)
+		const first = this.#sequence + 1
 		this.#advance(arm, copy, goal.after)
 		this.#date = renderDate(findDay(copy.days, goal.after)?.date ?? '')
 		arm.agent.context.instructions.add({
@@ -448,7 +483,6 @@ export class Trial {
 		})
 		await this.#flush()
 		const before = this.#cache?.stats() ?? { hits: {}, misses: {}, transient: 0 }
-		const first = this.#sequence + 1
 		const known = new Set(collectHistory(arm.conversation).map((message) => message.id))
 		const started = Date.now()
 		let result: LedgerResult | undefined
@@ -456,7 +490,7 @@ export class Trial {
 		try {
 			result = await arm.respond(
 				goal.request,
-				AbortSignal.any([AbortSignal.timeout(manifest.timeout), this.#abort.signal]),
+				this.#abort.signal,
 			)
 		} catch (fault) {
 			error = describeError(fault)
@@ -473,7 +507,7 @@ export class Trial {
 		}
 		if (this.#cache?.fault !== undefined) throw this.#cache.fault
 		if (this.#stopped !== undefined) error ??= this.#stopped
-		const reply = result === undefined || result.partial ? '' : result.content.trim()
+		const reply = result === undefined || result.partial || this.#terminal !== undefined ? '' : result.content.trim()
 		const row: ContinuousRow = {
 			goal: goal.id,
 			arm: this.#config.arm,
@@ -521,12 +555,14 @@ export class Trial {
 		appendFileSync(join(out, 'rows.jsonl'), `${JSON.stringify(row)}\n`)
 		this.#observeWork(arm, goal, row, out)
 		if (!row.success) this.#unserved += 1
-		if (this.#stopped !== undefined) this.#status = 'limit'
+		if (this.#terminal !== undefined) this.#status = this.#terminal.status
 		else if (this.#overflow) this.#status = 'overflow'
 		else if (error !== undefined || reply === '')
-			this.#status = (manifest.failure ?? CONTINUOUS_FAILURE) === 'continue' ? 'running' : 'failed'
+			this.#status = manifest.failure === 'continue' ? 'running' : 'failed'
 		else this.#status = 'running'
 		this.#report(out, this.#status, error)
+		if (this.#goalTimer !== undefined) clearTimeout(this.#goalTimer)
+		this.#goal = undefined
 		console.log(
 			`${goal.id}: ${reply === '' ? 'EMPTY' : 'OK'} status=${this.#status} wall=${wall}ms prompt=${row.prompt} sections=${row.sections} requests=${first}-${this.#sequence}`,
 		)
@@ -797,28 +833,48 @@ export class Trial {
 		let responseText: string | undefined
 		let buffered: number | undefined
 		let result: Response
+		const deadline = new AbortController()
+		const timer = setTimeout(() => deadline.abort(new Error(`${role} request deadline`)), role === 'judge' || role === 'flush' || this.#calibrating ? limits.metadata : this.#config.manifest.timeout)
+		let charge = 0
+		let caller: AbortSignal | undefined
 		try {
 			const request = new Request(input, init)
-			if (this.#stopped !== undefined) throw new Error(this.#stopped)
-			if (
-				this.#sent >= limits.calls ||
-				this.#tokens >= limits.tokens ||
-				Date.now() - this.#started >= limits.wall
-			) {
-				this.#stopped = `c1 whole-trajectory limit reached at request ${sequence}`
-				throw new Error(this.#stopped)
-			}
+			caller = request.signal
+			this.#admit(role)
 			if (!this.#config.live && new URL(request.url).port === new URL(DAEMON).port)
 				throw new Error(`fetch guard: request ${sequence} (${role}) refused; --live is required`)
 			const body = shapeBody(role, await request.text(), this.#calibrating)
 			raw = JSON.parse(body)
+			if (!isRecord(raw) || !isRecord(raw.options)) throw new Error('wire request options missing')
+			const output = role === 'judge' || role === 'flush' || this.#calibrating ? 1 : role === 'summarizer' ? this.#config.manifest.compaction.predict : this.#budget.reserve
+			const context = role === 'judge' ? Math.min(MICA_CONTEXT, this.#budget.window) : this.#budget.window
+			if (raw.options.num_ctx !== context || raw.options.num_predict !== output || (role !== 'judge' && raw.truncate !== false) || (role === 'agent' && raw.shift !== false) || ((role !== 'agent' || this.#calibrating) && role !== 'judge' && raw.think !== false)) throw new Error('wrong wire context/output/thinking settings')
+			charge = this.#budget.window
+			if (this.#tokens + this.#reserved + charge > limits.tokens) {
+				this.#terminate('limit', 'hard token admission', role)
+				throw new Error('hard token admission')
+			}
+			const native = this.#native.get(role)
+			if (role === 'agent' || role === 'summarizer') {
+				if (native === undefined || !isDeepStrictEqual(mapMessages(native), raw.messages)) throw new Error('native input differs from actual wire messages')
+				const gauge = this.#gauge
+				if (gauge !== undefined && !this.#calibrating && (role === 'summarizer' || this.#config.arm !== 'full')) {
+					const estimate = estimateMessages(native) * gauge.scale * 1.06 + gauge.overhead
+					if (estimate + output + this.#budget.safety > this.#budget.window) {
+						this.#terminate('limit', 'calibrated prompt admission', role)
+						throw new Error('calibrated prompt admission')
+					}
+				}
+			}
+			this.#reserved += charge
 			sent = true
 			this.#sent += 1
+			this.#goalSent += 1
 			const response = await globalThis.fetch(request.url, {
 				method: request.method,
 				headers: request.headers,
 				body,
-				signal: request.signal,
+				signal: AbortSignal.any([request.signal, this.#abort.signal, deadline.signal, ...(this.#goal === undefined ? [] : [this.#goal.signal]), ...(this.#config.signal === undefined ? [] : [this.#config.signal])]),
 			})
 			status = response.status
 			const bytes = new Uint8Array(await response.arrayBuffer())
@@ -833,6 +889,8 @@ export class Trial {
 			error = describeError(cause)
 			throw cause
 		} finally {
+			clearTimeout(timer)
+			if (sent) this.#reserved -= charge
 			const reading = readWireReading({ body: raw }, { text: responseText })
 			const failures = sent
 				? listContinuousFailures(
@@ -845,14 +903,6 @@ export class Trial {
 						this.#calibrating,
 					)
 				: []
-			if (
-				role === 'agent' &&
-				sent &&
-				!this.#calibrating &&
-				(error !== undefined || (status ?? 0) >= 400) &&
-				matchesOverflow(responseText ?? error)
-			)
-				this.#overflow = true
 			for (const failure of failures) this.#failures.add(failure)
 			const wall = (buffered ?? Date.now()) - started
 			const evidence: MatrixRequest = {
@@ -875,12 +925,71 @@ export class Trial {
 				failures,
 				wall,
 			}
-			this.#tokens += (reading.prompt ?? 0) + (reading.completion ?? 0)
+			if (reading.complete && reading.prompt !== undefined && reading.completion !== undefined) this.#tokens += reading.prompt + reading.completion
 			this.#walls.set(role, (this.#walls.get(role) ?? 0) + wall)
 			if (this.#out !== undefined)
 				appendFileSync(join(this.#out, 'requests.jsonl'), `${JSON.stringify(evidence)}\n`)
+			if (this.#terminal === undefined) {
+				const disposition = classifyContinuousRequest(evidence, this.#config.manifest, this.#config.arm, this.#calibrating)
+				if (error !== undefined && (caller?.aborted || deadline.signal.aborted || this.#abort.signal.aborted || this.#goal?.signal.aborted || this.#config.signal?.aborted)) this.#terminate('limit', error, role)
+				else if (disposition !== undefined) this.#terminate(disposition.status, disposition.reason, role, disposition.expected)
+				else if (this.#tokens > limits.tokens) this.#terminate('limit', 'actual token bound exceeded', role)
+			}
 		}
+		if (this.#terminal !== undefined) throw new Error(this.#terminal.reason)
 		return result
+	}
+
+	#admit(role: CallRole | 'metadata'): void {
+		if (this.#terminal !== undefined || this.#abort.signal.aborted) throw new Error(this.#terminal?.reason ?? 'trajectory aborted')
+		const limits = this.#config.manifest.limits
+		if (this.#sent >= limits.calls || (this.#current !== undefined && this.#goalSent >= limits.requests)) {
+			this.#terminate('limit', 'hard request admission', role)
+			throw new Error('hard request admission')
+		}
+		if (this.#config.signal?.aborted || this.#goal?.signal.aborted || Date.now() - this.#started >= limits.wall) {
+			this.#terminate('limit', 'lifetime admission', role)
+			throw new Error('lifetime admission')
+		}
+	}
+
+	#stopSeries(): void { this.#terminate('limit', 'series aborted', 'metadata') }
+
+	#terminate(status: ContinuousTerminal['status'], reason: string, role: ContinuousTerminal['role'], expected = false): void {
+		if (this.#terminal !== undefined) return
+		this.#terminal = { status, reason, role, sequence: this.#sequence, expected }
+		this.#stopped = reason
+		this.#overflow = status === 'overflow'
+		this.#status = status
+		if (this.#out !== undefined) this.#report(this.#out, status, expected ? undefined : reason)
+		this.#abort.abort(new Error(reason))
+	}
+
+	async #metadata(input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
+		const deadline = new AbortController()
+		const timer = setTimeout(() => deadline.abort(new Error('metadata deadline')), this.#config.manifest.limits.metadata)
+		const started = Date.now()
+		let status: number | undefined
+		let error: string | undefined
+		let sent = false
+		let caller: AbortSignal | undefined
+		try {
+			this.#admit('metadata')
+			this.#sent += 1
+			this.#goalSent += 1
+			sent = true
+			const request = new Request(input, init)
+			caller = request.signal
+			const response = await globalThis.fetch(request, { signal: AbortSignal.any([request.signal, this.#abort.signal, deadline.signal, ...(this.#config.signal === undefined ? [] : [this.#config.signal])]) })
+			status = response.status
+			const bytes = new Uint8Array(await response.arrayBuffer())
+			if (!response.ok) throw new Error(`metadata HTTP ${response.status}`)
+			return new Response([204, 205, 304].includes(response.status) ? null : bytes, { status: response.status, headers: response.headers })
+		} catch (cause) { error = describeError(cause); throw cause } finally {
+			clearTimeout(timer)
+			if (this.#out !== undefined) appendFileSync(join(this.#out, 'metadata.jsonl'), `${JSON.stringify({ started, finished: Date.now(), url: String(input), sent, status, error })}\n`)
+			if (error !== undefined) this.#terminate(caller?.aborted || deadline.signal.aborted || this.#abort.signal.aborted || this.#config.signal?.aborted ? 'limit' : 'fault', error, 'metadata')
+		}
 	}
 
 	#dump(arm: TrialArm, out: string): void {
@@ -922,6 +1031,7 @@ export class Trial {
 		const execution = this.#execution
 		const finished = Date.now()
 		const stats: JudgeStats | undefined = this.#cache?.stats()
+		const failure = error ?? (this.#terminal?.expected === false ? this.#terminal.reason : undefined)
 		writeFileSync(
 			join(out, 'run.json'),
 			`${JSON.stringify(
@@ -935,7 +1045,8 @@ export class Trial {
 					arm,
 					think: manifest.think,
 					status,
-					...(error === undefined ? {} : { error }),
+					terminal: this.#terminal,
+					...(failure === undefined ? {} : { error: failure }),
 					live,
 					url,
 					goals: this.#runtime?.goals.map((goal) => goal.id) ?? [],

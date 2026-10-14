@@ -19,7 +19,9 @@ The scoped repair is medium: capacity and termination change the harness protoco
 - Luna scout: exact capacity, wire, failure, and build-isolation evidence; report in `tmp/units/c1-capacity-scout-report.md`.
 - Astra analyst: one bounded design opinion; brief in `tmp/units/c1-capacity-design-brief.md`.
 - Luna verifier: dedicated-daemon health and exact retained start configuration, without process changes.
-- Implementation, independent review, proofs, preflight, and successor trajectories remain pending.
+- Isolated implementation and qualification driver are built. Independent Luna gates passed fourteen continuous tests and eight driver tests, with the original source unchanged.
+- Independent Astra review found an explicit-truncation acceptance/resume defect, reproduced by root, and insufficient attribution in deadline tests. The prescribed fixes and the separately reviewed Agent lifetime correction are closed by thirteen independent root mutation controls and twenty-seven passing Luna protocol tests. Acceptance and limits are retained in `capacity-proof.md`.
+- The dedicated daemon is offline. Its prepared replacement uses the same deployment settings on port 11435 under a 24-hour launcher cap; it has not been started. Port 11434 remains outside this work.
 
 ## Accepted successor contract
 
@@ -27,8 +29,12 @@ The initial profile uses physical context 12288, decision output 4096 including 
 
 Decision/summary requests have 180-second deadlines (360 seconds in the extended profile); judge/flush/metadata requests have 30 seconds. A goal has 15 minutes and 128 fresh wire requests. An evaluation trajectory has four hours, 4096 calls, eight million prompt-plus-completion tokens, and the original 96 goals. The complete serial series has 12 hours. Every actual request composes request, goal, trajectory, and series cancellation, including response consumption. Operational retries are disabled.
 
+The provider's timeout implements the per-request bound. The encompassing agent timeout must use the goal bound: applying the request timeout to an entire multi-call response would silently shorten the advertised goal allowance. Root found that mismatch during timer attribution and assigned the two agent-level settings plus a real cumulative-call regression; the provider deadline remains unchanged. An independent narrow review covers this added lifetime claim.
+
 The raw recorder retains the first capacity, truncation, usage, transport, or deadline failure and prohibits further requests. Ordinary model failures remain benchmark outcomes under continue. Only verified context exhaustion is an expected full-history control outcome; memory allocation failures and output truncation with context remaining are invalid. A series stops on operational invalidity and cannot silently skip an invalid prior run.
 
 The successor source is isolated at `instruments/harness-capacity/` (checkpoint `7e4b5d9`), with a separate emitted build and a junction to the original pinned dependency directory. No dependency is installed or changed. Sol owns its continuous implementation/tests; a separate Sol unit owns `tools/capacity/` for the disjoint qualification driver. The driver's public synthetic fixture runs the same model/arm population under a 30-minute, 512-call, one-million-token qualification cap. It requires an independent proof receipt before live execution. An Astra reviewer and Luna verifier will examine the integrated change before qualification.
 
 Neither a larger context nor a passed canary guarantees task quality across the horizon. New measurements will remain separate from the original comparison because prompt and generation budgets changed.
+
+The qualification fixture uses one synthetic shift, twelve arrivals plus an opening, and four goals at the shift boundary. The canonical workload validator requires four products per shift and boundary-aligned goals; the initial proposed six-shift/four-goal fixture was incompatible. The fixture was corrected before any live call. It stresses initial selection, compaction, lookups, and subsequent products, and makes no claim to prove cross-shift behavior.

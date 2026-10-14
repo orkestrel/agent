@@ -10,9 +10,9 @@ import type {
 	ContinuousSelection,
 	ContinuousStatus,
 	ContinuousTurn,
+	ContinuousBudget,
 } from './types.js'
 import { arrayOf, attempt, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
-import { isMatrixBudget } from '../matrix/validators.js'
 import { isRefitFile } from '../refit/validators.js'
 import { isSustainedObservation } from '../sustained/validators.js'
 import { CONTINUOUS_ARMS, CONTINUOUS_FAILURE_POLICIES } from './constants.js'
@@ -55,6 +55,7 @@ export function isContinuousManifest(value: unknown): value is ContinuousManifes
 		() =>
 			isRecord(value) &&
 			value.protocol === 'c1' &&
+			value.capacity === 1 &&
 			isString(value.key) &&
 			typeof value.think === 'boolean' &&
 			['decision', 'summarizer', 'judge'].every(
@@ -63,20 +64,23 @@ export function isContinuousManifest(value: unknown): value is ContinuousManifes
 			) &&
 			isRecord(value.sampler) &&
 			Object.values(value.sampler).every(isFiniteNumber) &&
-			isMatrixBudget(value.budget) &&
+			isContinuousBudget(value.budget) &&
 			isRecord(value.compaction) &&
 			isCount(value.compaction.predict) &&
 			value.compaction.predict > 0 &&
+			value.compaction.predict + value.budget.safety < value.budget.window &&
 			isCount(value.compaction.sections) &&
 			value.compaction.sections > 0 &&
 			isCount(value.compaction.keep) &&
-			isCount(value.retry) &&
+			value.retry === 0 &&
 			isCount(value.timeout) &&
 			value.timeout > 0 &&
+			value.timeout <= 2147483647 &&
 			isRecord(value.limits) &&
-			[value.limits.calls, value.limits.tokens, value.limits.wall, value.limits.goals].every(
+			[value.limits.calls, value.limits.tokens, value.limits.wall, value.limits.goals, value.limits.metadata, value.limits.goal, value.limits.requests, value.limits.series].every(
 				(one) => isCount(one) && one > 0,
 			) &&
+			[value.limits.metadata, value.limits.goal, value.limits.wall, value.limits.series].every((one) => typeof one === 'number' && one <= 2147483647) &&
 			['workload', 'runtime', 'oracle', 'agent', 'ollama', 'tags'].every((key) =>
 				isRefitFile(value[key]),
 			) &&
@@ -87,9 +91,17 @@ export function isContinuousManifest(value: unknown): value is ContinuousManifes
 			value.arms.length > 0 &&
 			new Set(value.arms).size === value.arms.length &&
 			isCount(value.blind) &&
-			(value.failure === undefined || isContinuousFailurePolicy(value.failure)),
+			isContinuousFailurePolicy(value.failure),
 	)
 	return result.success && result.value
+}
+
+/** Checks aligned physical/planner output reservations and positive prompt room.
+ * @param value - The untrusted frozen budget
+ * @returns True if the capacity contract is valid; false otherwise
+ */
+export function isContinuousBudget(value: unknown): value is ContinuousBudget {
+	return isRecord(value) && ['window', 'reserve', 'predict', 'ceiling'].every((key) => isCount(value[key]) && value[key] > 0) && isCount(value.safety) && value.predict === value.reserve && value.ceiling === value.window && typeof value.reserve === 'number' && typeof value.window === 'number' && value.reserve + value.safety < value.window
 }
 
 /** Checks one trajectory's execution binding. */

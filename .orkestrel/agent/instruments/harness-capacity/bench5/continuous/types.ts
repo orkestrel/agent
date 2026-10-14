@@ -4,6 +4,7 @@ import type {
 	LedgerGauge,
 	LedgerResult,
 	ProviderInterface,
+	Message,
 } from '../../vendor/agent-0.0.30-trimmed/index.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolManagerInterface } from '@orkestrel/tool'
@@ -48,6 +49,10 @@ export interface ContinuousCompaction {
 
 /** Holds the finite whole-trajectory limits frozen before the first request. */
 export interface ContinuousLimits {
+	readonly metadata: number
+	readonly goal: number
+	readonly requests: number
+	readonly series: number
 	readonly calls: number
 	readonly tokens: number
 	readonly wall: number
@@ -63,13 +68,14 @@ export interface ContinuousDaemon {
 /** Freezes one model configuration, its budget, the workload custody, and the arms a series serves. */
 export interface ContinuousManifest {
 	readonly protocol: 'c1'
+	readonly capacity: 1
 	readonly key: string
 	readonly think: boolean
 	readonly decision: ContinuousModel
 	readonly summarizer: ContinuousModel
 	readonly judge: ContinuousModel
 	readonly sampler: Readonly<Record<string, number>>
-	readonly budget: MatrixBudget
+	readonly budget: ContinuousBudget
 	readonly compaction: ContinuousCompaction
 	readonly retry: number
 	readonly timeout: number
@@ -83,8 +89,39 @@ export interface ContinuousManifest {
 	readonly daemon: ContinuousDaemon
 	readonly arms: readonly ContinuousArm[]
 	readonly blind: number
-	/** Holds the policy at a goal with no product; a manifest frozen before the member existed stops. */
-	readonly failure?: ContinuousFailurePolicy
+	/** Holds the required successor policy at a goal with no product. */
+	readonly failure: ContinuousFailurePolicy
+}
+
+/** Holds the physical output reservation and independent safety allowance. */
+export interface ContinuousBudget extends MatrixBudget {
+	readonly safety: number
+}
+
+/** Records the first operational termination without losing its wire evidence. */
+export interface ContinuousTerminal {
+	readonly status: 'overflow' | 'limit' | 'fault'
+	readonly reason: string
+	readonly role: CallRole | 'metadata'
+	readonly sequence: number
+	readonly expected: boolean
+}
+
+/** Describes the operational disposition of one actual retained wire request. */
+export type ContinuousDisposition = Pick<ContinuousTerminal, 'status' | 'reason' | 'expected'>
+
+/** Holds the CLI capacity profile before custody files are frozen. */
+export interface ContinuousProfile {
+	readonly budget: ContinuousBudget
+	readonly recap: number
+	readonly timeout: number
+	readonly limits: Omit<ContinuousLimits, 'goals'>
+}
+
+/** Captures native messages before their provider performs a wire request. */
+export interface ContinuousProviderOptions {
+	readonly provider: ProviderInterface
+	readonly prepare: (messages: readonly Message[]) => void
 }
 
 /** Binds one trajectory to its frozen manifest, arm, and runtime bytes. */
@@ -235,6 +272,7 @@ export interface TrialConfig {
 	readonly out: string
 	readonly url: string
 	readonly live: boolean
+	readonly signal?: AbortSignal
 }
 
 /** Holds one planned run of a series and how it ended. */

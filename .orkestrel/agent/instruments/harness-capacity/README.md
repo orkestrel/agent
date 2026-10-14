@@ -1,6 +1,32 @@
-# Larkspur benchmark harness
+# Capacity successor harness
 
-This directory holds the harness that measures the records arm against the full view on the Larkspur support shift: two agent builds, the scenario files, the scorer, the series tools, and the blind-audit kit. Everything in it finds its siblings from its own location, so you can run it from any working directory. A relative path that you pass (`--plan`, `--base`, `--out`) resolves against your working directory.
+This isolated successor implements the c1 capacity repair. The sibling `harness/` directory preserves the original source, emitted build, and baseline results. Keep those bytes unchanged; do not pool successor measurements with baseline measurements. No live qualification or completed successor comparison is claimed.
+
+From the repository root, build and execute the successor canonical CLI with explicit paths.
+
+```text
+node .orkestrel/agent/instruments/harness-capacity/tools/build.ts --compiler node_modules/typescript/bin/tsc --types node_modules/@types
+node .orkestrel/agent/instruments/harness-capacity/.build/bench5/continuous.js freeze --key q4 --out FREEZE_DIR --live --url DAEMON_URL --think true --failure continue --window 12288 --reserve 4096 --safety 512 --recap 2048 --timeout 180000 --metadata 30000 --goal 900000 --requests 128 --wall 14400000 --calls 4096 --tokens 8000000 --series 43200000 --workload WORKLOAD_FILE --runtime RUNTIME_FILE --oracle ORACLE_FILE
+node .orkestrel/agent/instruments/harness-capacity/.build/bench5/continuous.js series --manifest MANIFEST_FILE --base OUTPUT_DIR --live --url DAEMON_URL
+```
+
+Replace uppercase placeholders with explicit paths and the daemon URL. Freeze binds the complete supplied workload and requires custody for its runtime and oracle. `capacity: 1` manifests require aligned `predict = reserve`, `ceiling = window`, positive integer bounds, and `reserve + safety < window`; old manifests are refused. The ledger receives logical capacity `window - safety`; Ollama receives physical `num_ctx = window` and decision `num_predict = reserve`. Compaction uses calibrated scale and overhead with a drift allowance. Summaries cap generation at 2048 tokens with thinking off. Retries are zero. The sole planned manual escalation is `--window 16384 --reserve 8192 --timeout 360000`; this harness performs no automatic escalation.
+
+The freeze flags in the example state the defaults. Durations are milliseconds; `--requests` counts every actual wire attempt within a goal, beginning before advance and flush. `--calls` includes model inventory and unload attempts within the trajectory. Chat/generate calls reserve a physical context charge before sending, then charge validated actual usage. `run.json` retains totals and a sticky `terminal` object with `status`, `reason`, `role`, `sequence`, and `expected`; `requests.jsonl` retains model wire evidence, and `metadata.jsonl` retains inventory/unload evidence. Freeze inventory requests precede the trajectory and are accounted separately by qualification tooling.
+
+Caller, role request, goal, trajectory, and series cancellation cover response-body consumption. Operational failures stop subsequent HTTP sends even if an upstream fallback catches the error. Missing usage, protocol/transport/allocation faults, output exhaustion, insufficient output headroom, and configured limits invalidate the trajectory and stop the series. Only a verified full-history context boundary is expected overflow and permits the next arm. Completed semantic failures under `failure: continue` remain benchmark outcomes. Limited or failed attempts are never silently resumed; only exact bound complete runs or expected full overflow can be skipped. Run outputs are create-only, and the series journal appends across invocations.
+
+Run the offline protocol proofs with the emitted successor tests.
+
+```text
+node --test .orkestrel/agent/instruments/harness-capacity/.build/bench5/tests/continuous/Capacity.test.js .orkestrel/agent/instruments/harness-capacity/.build/bench5/tests/continuous/Trial.test.js .orkestrel/agent/instruments/harness-capacity/.build/bench5/tests/continuous/Audit.test.js
+```
+
+Use the successor canonical reader and CLI for successor runs. The inherited `tools/c1/c1-integrity.ts` script still names the original `.build`, and `c1-summary.ts` defaults to the original `tmp/c1`; do not use their defaults for successor evidence. Keep the shared pinned dependency junction unchanged. The inherited material that follows documents older benchmark tools and does not define the successor c1 contract.
+
+## Inherited Larkspur harness
+
+The inherited tree holds the records arm, full view, scenario files, scorer, series tools, and blind-audit kit. A relative path passed as `--plan`, `--base`, or `--out` resolves against the working directory.
 
 `MIGRATION.md` maps every file to its source under the untracked tree this harness was copied from, with both checksums and the exact lines that changed.
 

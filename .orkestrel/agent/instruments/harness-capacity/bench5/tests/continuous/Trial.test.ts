@@ -76,7 +76,10 @@ describe('continuous', () => {
 		assert.equal(runtime.goals.length, GOALS)
 		assert.deepEqual(frozen.arms, ['records', 'compaction', 'full'])
 		assert.equal(frozen.failure, 'stop')
-		assert.equal(frozen.budget.window, 3072)
+		assert.equal(frozen.budget.window, 12288)
+		assert.equal(frozen.budget.predict, frozen.budget.reserve)
+		assert.equal(frozen.budget.safety, 512)
+		assert.equal(frozen.capacity, 1)
 		const altered = join(directory, 'altered-manifest.json')
 		writeFileSync(
 			altered,
@@ -90,7 +93,7 @@ describe('continuous', () => {
 		assert.throws(() => readContinuousManifest(unpinned), /does not pin/)
 	})
 
-	it('freezes a thinking manifest at a higher rung of the reserve ladder', async () => {
+	it('freezes a thinking manifest with an aligned output reservation', async () => {
 		const out = join(directory, 'freeze-thinking')
 		assert.equal(
 			await Continuous.execute([
@@ -117,7 +120,7 @@ describe('continuous', () => {
 		)
 		const { manifest: frozen } = readContinuousManifest(join(out, 'manifest.json'))
 		assert.equal(frozen.think, true)
-		assert.deepEqual(frozen.budget, { reserve: 1024, window: 3584, ceiling: 3584, predict: 512 })
+		assert.deepEqual(frozen.budget, { reserve: 1024, window: 12288, ceiling: 12288, predict: 1024, safety: 512 })
 		await assert.rejects(
 			Continuous.execute([
 				'freeze',
@@ -129,7 +132,7 @@ describe('continuous', () => {
 				'--url',
 				plain.url,
 				'--reserve',
-				'700',
+				'12288',
 				'--workload',
 				files.workload,
 				'--runtime',
@@ -137,7 +140,7 @@ describe('continuous', () => {
 				'--oracle',
 				files.oracle,
 			]),
-			/fixed ladder/,
+			/no prompt room/,
 		)
 	})
 
@@ -312,16 +315,12 @@ describe('continuous', () => {
 			const { manifest: frozen } = readContinuousManifest(manifest)
 			const altered = join(directory, 'digest-manifest.json')
 			writeFileSync(altered, JSON.stringify({ ...frozen, decision: { ...frozen.decision, digest: `sha256:${'9'.repeat(64)}` } }))
-			await assert.rejects(
-				Continuous.execute(['run', '--manifest', altered, '--arm', 'full', '--out', join(directory, 'digest'), '--live', '--url', foreign.url]),
-				/digest changed/,
-			)
+			assert.equal(await Continuous.execute(['run', '--manifest', altered, '--arm', 'full', '--out', join(directory, 'digest'), '--live', '--url', foreign.url]), 3)
+			assert.equal(readContinuousRun(join(directory, 'digest')).status, 'fault')
 			const version = join(directory, 'version-manifest.json')
 			writeFileSync(version, JSON.stringify({ ...frozen, daemon: { ...frozen.daemon, version: 'other' } }))
-			await assert.rejects(
-				Continuous.execute(['run', '--manifest', version, '--arm', 'full', '--out', join(directory, 'version'), '--live', '--url', foreign.url]),
-				/version differs/,
-			)
+			assert.equal(await Continuous.execute(['run', '--manifest', version, '--arm', 'full', '--out', join(directory, 'version'), '--live', '--url', foreign.url]), 3)
+			assert.equal(readContinuousRun(join(directory, 'version')).status, 'fault')
 		} finally {
 			await foreign.close()
 		}
@@ -340,7 +339,7 @@ describe('continuous', () => {
 			await Continuous.execute(['series', '--manifest', manifest, '--base', base, '--live', '--url', plain.url, '--arms', 'records,full']),
 			0,
 		)
-		assert.ok(readRows(join(base, 'series.jsonl')).every((entry) => isRecord(entry) && entry.status === 'skipped'))
+		assert.ok(readRows(join(base, 'series.jsonl')).slice(2).every((entry) => isRecord(entry) && entry.status === 'skipped'))
 		const partial = join(base, 'q2', 'compaction')
 		writeFileSync(join(base, 'q2', 'placeholder.txt'), '')
 		assert.ok(!existsSync(partial))

@@ -6,14 +6,18 @@ import type { ContinuousKey } from '../../continuous/audit/types.js'
 import type { EnduranceOracle, EnduranceRuntime } from '../../endurance/types.js'
 import type { SustainedItem, SustainedLabel } from '../../sustained/audit/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import type { CapacityFault, CapacityStall } from './types.js'
 import { mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { COMPACTION_SYSTEM } from '../../continuous/constants.js'
 import { FLUSH_SYSTEM } from '../../Driver.js'
 import { hashFile } from '../../refit/helpers.js'
 
 export interface DaemonOptions {
+	readonly pause?: number
+	readonly fault?: CapacityFault
 	/** Multiplies the reported prompt tokens, which sets the calibrated scale a run measures. */
 	readonly factor: number
 	/** Refuses a chat whose message characters exceed this count, as the daemon refuses an over-window prompt. */
@@ -27,6 +31,9 @@ export interface DaemonOptions {
 export interface Daemon {
 	readonly url: string
 	readonly requests: readonly unknown[]
+	readonly metadata: readonly string[]
+	readonly closed: readonly string[]
+	readonly stalls: readonly CapacityStall[]
 	close(): Promise<void>
 }
 
@@ -182,8 +189,14 @@ async function handle(
 	options: DaemonOptions,
 	requests: unknown[],
 	called: Set<string>,
+	stalls: CapacityStall[],
 ): Promise<void> {
 	const path = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
+	if (options.fault?.role === 'metadata' && request.method === 'GET' && (options.fault.path === undefined || options.fault.path === path)) {
+		stalls.push({ role: 'metadata', started: Date.now() })
+		if (options.fault.response === 'body') { response.writeHead(200, { 'content-type': 'application/json' }); response.write('{'); return }
+		if (options.fault.response === 'request') return
+	}
 	if (request.method === 'GET' && path === '/api/version')
 		return sendJSON(response, 200, { version: DAEMON_VERSION })
 	if (request.method === 'GET' && path === '/api/tags')
@@ -202,6 +215,27 @@ async function handle(
 		body = text
 	}
 	requests.push(body)
+	const messages = isRecord(body) && Array.isArray(body.messages) ? body.messages.filter(isRecord) : []
+	const system = messages.find((message) => message.role === 'system')?.content
+	const wire = isRecord(body) && isRecord(body.options) ? body.options : {}
+	const role = path === '/api/generate' ? 'judge' : system === FLUSH_SYSTEM ? 'flush' : typeof system === 'string' && system.startsWith(COMPACTION_SYSTEM) ? 'summarizer' : wire.num_predict === 1 ? 'calibration' : 'agent'
+	const last = messages.at(-1)
+	if (role === 'agent' && options.pause !== undefined && (last?.role === 'tool' || (last?.role === 'user' && typeof last.content === 'string' && last.content.includes('LOOKUP')))) await delay(options.pause)
+	if (options.fault !== undefined && options.fault.role === role) {
+		const fault = options.fault.response
+		if (fault === 'request' || fault === 'body') stalls.push({ role: options.fault.role, started: Date.now() })
+		if (fault === 'http' || fault === 'oom') return sendJSON(response, 400, { error: fault === 'oom' ? 'out of memory: cannot allocate model buffer' : 'fixture transport refused' })
+		if (fault === 'request') return
+		if (fault === 'body') { response.writeHead(200, { 'content-type': 'application/x-ndjson' }); response.write('{"done":false}\n'); return }
+		const context = typeof wire.num_ctx === 'number' ? wire.num_ctx : 0
+		const output = typeof wire.num_predict === 'number' ? wire.num_predict : 0
+		if (['truncated', 'truncation', 'protocol', 'combined'].includes(fault)) {
+			const ordinary = role === 'judge' && isRecord(body) && typeof body.prompt === 'string' ? answerJudge(body.prompt) : { model: 'fixture', done: true, done_reason: 'stop', message: { role: 'assistant', content: 'Complete diagnostic answer.' }, prompt_eval_count: fault === 'combined' ? context - 1 : 120, eval_count: 1 }
+			return sendJSON(response, 200, { ...(isRecord(ordinary) ? ordinary : {}), ...(fault === 'protocol' ? { error: 'explicit fixture protocol error' } : fault === 'truncation' ? { truncation: true } : { truncated: true }) })
+		}
+		const frame = { model: 'fixture', done: true, done_reason: fault === 'length' ? 'length' : 'stop', message: { role: 'assistant', content: 'Diagnostic cut text.' }, prompt_eval_count: fault === 'usage' ? undefined : fault === 'headroom' ? context - output + 1 : fault === 'boundary' ? context - 1 : 120, eval_count: fault === 'usage' ? undefined : fault === 'boundary' || fault === 'headroom' ? 1 : output }
+		return sendJSON(response, 200, frame)
+	}
 	if (request.method === 'POST' && path === '/api/generate') {
 		if (!isRecord(body) || typeof body.prompt !== 'string') return sendJSON(response, 200, {})
 		return sendJSON(response, 200, answerJudge(body.prompt))
@@ -244,14 +278,19 @@ function closeServer(server: Server): Promise<void> {
  */
 export async function startDaemon(options: DaemonOptions): Promise<Daemon> {
 	const requests: unknown[] = []
+	const metadata: string[] = []
+	const closed: string[] = []
+	const stalls: CapacityStall[] = []
 	const called = new Set<string>()
 	const server = createServer((request, response) => {
-		handle(request, response, options, requests, called).catch((error: unknown) => {
+		if (request.method === 'GET') metadata.push(request.url ?? '/')
+		response.on('close', () => closed.push(request.url ?? '/'))
+		handle(request, response, options, requests, called, stalls).catch((error: unknown) => {
 			sendJSON(response, 500, { error: error instanceof Error ? error.message : String(error) })
 		})
 	})
 	const port = await listenOn(server)
-	return { url: `http://127.0.0.1:${port}`, requests, close: () => closeServer(server) }
+	return { url: `http://127.0.0.1:${port}`, requests, metadata, closed, stalls, close: () => closeServer(server) }
 }
 
 /**

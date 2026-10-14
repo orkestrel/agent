@@ -3,6 +3,7 @@ import type {
 	ContinuousCompaction,
 	ContinuousFailurePolicy,
 	ContinuousLimits,
+	ContinuousBudget,
 } from './types.js'
 import { join } from 'node:path'
 import { HARNESS } from '../constants.js'
@@ -17,19 +18,26 @@ export const CONTINUOUS_ARMS: readonly ContinuousArm[] = Object.freeze([
 /** Holds the prospective per-trajectory limits; a run that reaches one ends with status `limit`. */
 export const CONTINUOUS_LIMITS: Omit<ContinuousLimits, 'goals'> = Object.freeze({
 	calls: 4096,
-	tokens: 4000000,
-	wall: 28800000,
+	tokens: 8000000,
+	wall: 14400000,
+	metadata: 30000,
+	goal: 900000,
+	requests: 128,
+	series: 43200000,
 })
 
 /** Configures the compaction arm: a bounded recap list with the newest exchange kept live. */
 export const CONTINUOUS_COMPACTION: ContinuousCompaction = Object.freeze({
-	predict: 320,
+	predict: 2048,
 	sections: 3,
 	keep: 0,
 })
 
 /** Holds the reserve of the fixed ladder every arm runs under; `buildBudget` maps it to the window. */
-export const CONTINUOUS_RESERVE = 512
+export const CONTINUOUS_BUDGET: ContinuousBudget = Object.freeze({ window: 12288, ceiling: 12288, reserve: 4096, predict: 4096, safety: 512 })
+
+/** Bounds each decision and summary request in milliseconds. */
+export const CONTINUOUS_TIMEOUT = 180000
 
 /** Holds the packet randomization seed the freeze records. */
 export const CONTINUOUS_BLIND = 29
@@ -61,13 +69,13 @@ export const CONTINUOUS_FILES: readonly string[] = Object.freeze([
 	'observations.jsonl',
 	'sections.jsonl',
 	'model-inventory.json',
+	'metadata.jsonl',
 ])
 
 /** Names the terminal statuses a series treats as a finished run. */
 export const CONTINUOUS_TERMINAL: readonly string[] = Object.freeze([
 	'complete',
 	'overflow',
-	'limit',
 ])
 
 /** Points at the endurance workload custody the freeze binds by default. */

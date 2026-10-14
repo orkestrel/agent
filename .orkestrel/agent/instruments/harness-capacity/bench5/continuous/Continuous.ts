@@ -2,12 +2,14 @@ import type {
 	ContinuousArm,
 	ContinuousFailurePolicy,
 	ContinuousManifest,
+	ContinuousProfile,
 	SeriesEntry,
 } from './types.js'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { isRecord } from '@orkestrel/contract'
+import { isDeepStrictEqual } from 'node:util'
 import { readBuild, readWorkload } from '../build/helpers.js'
 import {
 	DAEMON,
@@ -15,14 +17,12 @@ import {
 	MICA_MODEL,
 	MODELS,
 	SAMPLER,
-	TIMEOUT,
 	VENDOR_AGENT,
 	VENDOR_OLLAMA,
 } from '../constants.js'
-import { readSettings } from '../Driver.js'
 import { readRuntime } from '../endurance/helpers.js'
 import { describeError, readJSON } from '../helpers.js'
-import { buildBudget, readModelDigest } from '../matrix/helpers.js'
+import { readModelDigest } from '../matrix/helpers.js'
 import { hashFile } from '../refit/helpers.js'
 import {
 	CONTINUOUS_ARMS,
@@ -30,14 +30,12 @@ import {
 	CONTINUOUS_COMPACTION,
 	CONTINUOUS_FAILURE,
 	CONTINUOUS_LIMITS,
-	CONTINUOUS_RESERVE,
-	CONTINUOUS_TERMINAL,
 	ENDURANCE_ORACLE,
 	ENDURANCE_RUNTIME,
 	ENDURANCE_WORKLOAD,
 } from './constants.js'
 import { Audit } from './audit/Audit.js'
-import { readContinuousManifest, readContinuousWorkload, unloadModels } from './helpers.js'
+import { readContinuousManifest, readContinuousWorkload, unloadModels, readContinuousProfile, readContinuousRun, classifyContinuousRequest } from './helpers.js'
 import { Trial } from './Trial.js'
 import { isContinuousArm, isContinuousFailurePolicy, isContinuousStatus } from './validators.js'
 
@@ -63,6 +61,17 @@ export class Continuous {
 				key: { type: 'string' },
 				think: { type: 'string' },
 				reserve: { type: 'string' },
+				window: { type: 'string' },
+				safety: { type: 'string' },
+				recap: { type: 'string' },
+				timeout: { type: 'string' },
+				metadata: { type: 'string' },
+				goal: { type: 'string' },
+				requests: { type: 'string' },
+				wall: { type: 'string' },
+				calls: { type: 'string' },
+				tokens: { type: 'string' },
+				series: { type: 'string' },
 				failure: { type: 'string' },
 				out: { type: 'string' },
 				url: { type: 'string' },
@@ -70,7 +79,6 @@ export class Continuous {
 				workload: { type: 'string' },
 				runtime: { type: 'string' },
 				oracle: { type: 'string' },
-				settings: { type: 'string' },
 				manifest: { type: 'string', multiple: true },
 				arm: { type: 'string' },
 				arms: { type: 'string' },
@@ -91,20 +99,17 @@ export class Continuous {
 				throw new Error('--think must be true or false')
 			if (values.failure !== undefined && !isContinuousFailurePolicy(values.failure))
 				throw new Error('--failure must be stop or continue')
-			const reserve = values.reserve === undefined ? CONTINUOUS_RESERVE : Number(values.reserve)
-			if (!Number.isSafeInteger(reserve) || reserve <= 0)
-				throw new Error('--reserve must be a positive whole number of tokens on the fixed ladder')
+			const profile = readContinuousProfile(values)
 			return await runner.#freeze(
 				values.key,
 				values.think === 'true',
 				values.failure ?? CONTINUOUS_FAILURE,
-				reserve,
+				profile,
 				resolve(values.out),
 				values.url ?? DAEMON,
 				values.workload,
 				values.runtime,
 				values.oracle,
-				values.settings,
 			)
 		}
 		if (phase === 'run') {
@@ -168,21 +173,27 @@ export class Continuous {
 		key: string,
 		think: boolean,
 		failure: ContinuousFailurePolicy,
-		reserve: number,
+		profile: ContinuousProfile,
 		out: string,
 		url: string,
 		workloadPath: string | undefined,
 		runtimePath: string | undefined,
 		oraclePath: string | undefined,
-		settingsPath: string | undefined,
 	): Promise<number> {
 		const model = Object.entries(MODELS).find(([name]) => name === key)?.[1]
 		if (model === undefined) throw new Error(`--key must be one of ${Object.keys(MODELS).join(', ')}`)
-		const tags = await fetch(new URL('/api/tags', url))
+		const deadline = new AbortController()
+		const timer = setTimeout(() => deadline.abort(new Error('freeze metadata deadline')), profile.limits.metadata)
+		let inventory: unknown
+		let reported: unknown
+		try {
+		const tags = await fetch(new URL('/api/tags', url), { signal: deadline.signal })
 		if (!tags.ok) throw new Error(`model inventory HTTP ${tags.status}`)
-		const inventory: unknown = await tags.json()
-		const version = await fetch(new URL('/api/version', url))
-		const reported: unknown = await version.json()
+		inventory = await tags.json()
+		const version = await fetch(new URL('/api/version', url), { signal: deadline.signal })
+		if (!version.ok) throw new Error(`daemon version HTTP ${version.status}`)
+		reported = await version.json()
+		} finally { clearTimeout(timer) }
 		if (!isRecord(reported) || typeof reported.version !== 'string')
 			throw new Error('daemon reports no version')
 		const runtime = hashFile(resolve(runtimePath ?? ENDURANCE_RUNTIME))
@@ -193,25 +204,22 @@ export class Continuous {
 		if (![runtime, oracle].every((file) => pinned.some((entry) => entry.hash === file.hash)))
 			throw new Error('workload manifest does not pin the runtime and the oracle')
 		const goals = readRuntime(runtime.path).goals.length
-		const settings = readSettings(
-			settingsPath === undefined ? join(HARNESS, 'bench5', 'settings.json') : resolve(settingsPath),
-			key,
-		)
 		mkdirSync(out, { recursive: true })
 		writeFileSync(join(out, 'tags.json'), `${JSON.stringify(inventory, null, 2)}\n`, { flag: 'wx' })
 		const manifest: ContinuousManifest = {
 			protocol: 'c1',
+			capacity: 1,
 			key,
 			think,
 			decision: { model, digest: readModelDigest(inventory, model) },
 			summarizer: { model, digest: readModelDigest(inventory, model) },
 			judge: { model: MICA_MODEL, digest: readModelDigest(inventory, MICA_MODEL) },
 			sampler: { ...SAMPLER },
-			budget: buildBudget(reserve),
-			compaction: CONTINUOUS_COMPACTION,
-			retry: settings.retry,
-			timeout: TIMEOUT,
-			limits: { ...CONTINUOUS_LIMITS, goals },
+			budget: profile.budget,
+			compaction: { ...CONTINUOUS_COMPACTION, predict: profile.recap },
+			retry: 0,
+			timeout: profile.timeout,
+			limits: { ...profile.limits, goals },
 			workload,
 			runtime,
 			oracle,
@@ -227,7 +235,7 @@ export class Continuous {
 		writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' })
 		readContinuousManifest(path)
 		console.log(
-			`frozen ${key} think=${think} reserve=${reserve} failure=${failure} daemon=${reported.version} goals=${goals} at ${path}`,
+			`frozen ${key} think=${think} window=${profile.budget.window} reserve=${profile.budget.reserve} safety=${profile.budget.safety} failure=${failure} daemon=${reported.version} goals=${goals} at ${path}`,
 		)
 		return 0
 	}
@@ -258,12 +266,21 @@ export class Continuous {
 		arms: readonly ContinuousArm[],
 	): Promise<number> {
 		mkdirSync(base, { recursive: true })
-		const entries: SeriesEntry[] = []
 		const journal = join(base, 'series.jsonl')
+		const startedSeries = Date.now()
+		const controller = new AbortController()
+		let timer = setTimeout(() => controller.abort(new Error('series deadline')), CONTINUOUS_LIMITS.series)
+		let bound = CONTINUOUS_LIMITS.series
+		try {
 		for (const path of paths) {
 			const reference = hashFile(path)
 			const { manifest } = readContinuousManifest(path)
+			bound = Math.min(bound, manifest.limits.series)
+			clearTimeout(timer)
+			if (Date.now() - startedSeries >= bound) return 3
+			timer = setTimeout(() => controller.abort(new Error('series deadline')), bound - (Date.now() - startedSeries))
 			for (const arm of manifest.arms) {
+				if (controller.signal.aborted) return 3
 				if (arms.length > 0 && !arms.includes(arm)) continue
 				const out = join(base, manifest.key, arm)
 				const started = Date.now()
@@ -272,15 +289,23 @@ export class Continuous {
 					const info = existsSync(join(out, 'run.json')) ? readJSON(join(out, 'run.json')) : undefined
 					const status =
 						isRecord(info) && isContinuousStatus(info.status) ? info.status : undefined
-					if (status === undefined || !CONTINUOUS_TERMINAL.includes(status))
+					const execution = existsSync(join(out, 'execution.json')) ? readJSON(join(out, 'execution.json')) : undefined
+					const expected = isRecord(info) && isRecord(info.terminal) && info.terminal.status === 'overflow' && info.terminal.expected === true && arm === 'full'
+					if (status === undefined || (status !== 'complete' && !(status === 'overflow' && expected)) || !isRecord(info) || info.error !== undefined || !Array.isArray(info.faults) || info.faults.length !== 0 || !isRecord(execution) || execution.arm !== arm || !isDeepStrictEqual(execution.manifest, reference) || !isDeepStrictEqual(info.manifest, reference) || (status === 'complete' && info.terminal !== undefined))
 						throw new Error(`run output exists without a terminal status: ${out}`)
+					const retained = readContinuousRun(out)
+					for (const request of retained.requests) {
+						const disposition = classifyContinuousRequest(request, manifest, arm, request.role === 'agent' && request.goal === undefined)
+						if (disposition === undefined) continue
+						if (!(status === 'overflow' && expected && disposition.expected && isRecord(info.terminal) && info.terminal.sequence === request.sequence && !retained.requests.some((later) => later.sent && later.sequence > request.sequence))) throw new Error(`retained operational request ${request.sequence}: ${disposition.reason}`)
+					}
+					if (retained.failures.length > 0 || (status === 'complete' && retained.rows.length !== manifest.limits.goals)) throw new Error(`retained run is invalid: ${out}`)
 					entry = { manifest: reference, key: manifest.key, arm, out, status: 'skipped', wall: 0 }
 				} else {
 					const daemon = url ?? manifest.daemon.url
 					let error: string | undefined
 					try {
-						await unloadModels(daemon)
-						await new Trial({ manifest, reference, arm, out, url: daemon, live: true }).execute()
+						await new Trial({ manifest, reference, arm, out, url: daemon, live: true, signal: controller.signal }).execute()
 					} catch (fault) {
 						error = describeError(fault)
 					}
@@ -297,17 +322,18 @@ export class Continuous {
 						wall: Date.now() - started,
 					}
 				}
-				entries.push(entry)
-				writeFileSync(journal, `${entries.map((one) => JSON.stringify(one)).join('\n')}\n`)
+				appendFileSync(journal, `${JSON.stringify(entry)}\n`)
 				console.log(
 					`series ${manifest.key} ${arm}: ${entry.status}${entry.error === undefined ? '' : ` (${entry.error})`} wall=${entry.wall}ms`,
 				)
+				if (entry.status !== 'skipped') {
+					const info = existsSync(join(out, 'run.json')) ? readJSON(join(out, 'run.json')) : undefined
+					const expected = isRecord(info) && isRecord(info.terminal) && info.terminal.expected === true && info.terminal.status === 'overflow' && arm === 'full'
+					if (entry.error !== undefined || !isRecord(info) || (entry.status !== 'complete' && !(entry.status === 'overflow' && expected)) || (entry.status === 'complete' && info.terminal !== undefined) || (info.error !== undefined && !expected) || !Array.isArray(info.faults) || info.faults.length !== 0) return 3
+				}
 			}
 		}
-		return entries.every(
-			(entry) => entry.status === 'skipped' || CONTINUOUS_TERMINAL.includes(entry.status),
-		)
-			? 0
-			: 3
+		return controller.signal.aborted ? 3 : 0
+		} finally { clearTimeout(timer) }
 	}
 }
