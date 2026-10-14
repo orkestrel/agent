@@ -1,0 +1,381 @@
+{
+  "authority": "root-adjudicated",
+  "packet": "d08563c1856eac2ac704eec54fda6d5b015d106315a6f1d03f8eae92d0f2bca6",
+  "keys": "e4be80cdb2b424ddcf1cfc12ce168feee46931908c1e947f8ebd0e0c268be92a",
+  "labels": [
+    {
+      "id": "f70b78d7d167b74406a1ce62c37d4b7ed468fdf620e472f7c34cff3799eadb9b",
+      "atoms": [
+        {
+          "id": "ev-07-3.facts.1",
+          "verdict": "pass",
+          "evidence": [
+            "product|Customer paid $420.00 total ($180.00 rental + $240.00 security deposit).",
+            "product|Warehouse inspection is pending.",
+            "product|Carrier collected the equipment; no late-day charge was authorized by the customer or desk.",
+            "source:ev-source-7-2|Rental is $36.00 per day for five booked days, total $180.00, tax exempt. The security deposit is $240.00",
+            "source:ev-source-7-3|The carrier collection slip confirms pickup, but the extractor has not been checked into the warehouse."
+          ]
+        },
+        {
+          "id": "ev-07-3.facts.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Carrier collected the equipment; no late-day charge was authorized by the customer or desk.",
+            "source:ev-source-7-3|Beacon changed the route to the following morning and noted the change in dispatch."
+          ]
+        },
+        {
+          "id": "ev-07-3.action.1",
+          "verdict": "pass",
+          "evidence": [
+            "product|**Rental Charge:** $180.00 (Confirmed by Order BC-7307).",
+            "product|**Deposit Held:** $240.00 (Confirmed by Order BC-7307).",
+            "product|**Evidence Required for Final Closure:** Physical return of equipment and condition inspection report from the warehouse.",
+            "product|There is no evidence of a completed refund, shipment, or delivery in the available records."
+          ]
+        },
+        {
+          "id": "ev-07-3.action.2",
+          "verdict": "pass",
+          "evidence": [
+            "product|The system state indicates \"no late fee authorized\" and \"warehouse inspection pending.\"",
+            "product|There is no evidence of a completed refund, shipment, or delivery in the available records.",
+            "source:ev-source-7-4|No extra-day fee is authorized. Do not label the deposit refunded until a payment receipt exists."
+          ]
+        },
+        {
+          "id": "ev-07-3.obligations.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Evidence Required for Final Closure:** Physical return of equipment and condition inspection report from the warehouse.",
+            "source:ev-source-7-3|Returns inspector Malik Hsu owns the condition report."
+          ]
+        },
+        {
+          "id": "ev-07-3.obligations.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Closure Type:** Pending Warehouse Inspection.",
+            "source:ev-source-7-1|The theatre has a charity audit at shift 22."
+          ]
+        },
+        {
+          "id": "ev-07-3.obligations.3",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Unconfirmed Receipts Forwarded:** None.",
+            "source:ev-source-7-4|Preserve the original timely-request evidence because the apparent sixth day in a later warehouse scan can otherwise look like customer lateness."
+          ]
+        },
+        {
+          "id": "ev-07-3.revision",
+          "verdict": "fail",
+          "evidence": [
+            "product|The request asks to reconcile against \"actual packet ev-07-2\" and earlier financial positions, but no such specific packet or prior financial position exists in the available evidence.",
+            "product:ev-07-2|Total Outstanding Balance",
+            "source:ev-source-7-4|Preserve the original timely-request evidence because the apparent sixth day in a later warehouse scan can otherwise look like customer lateness."
+          ]
+        },
+        {
+          "id": "ev-07-3.evidence.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|The request asks to reconcile against \"actual packet ev-07-2\" and earlier financial positions, but no such specific packet or prior financial position exists in the available evidence.",
+            "product:ev-07-2|**Work Record: BC-7307 Rental Return Dispute**"
+          ]
+        },
+        {
+          "id": "ev-07-3.evidence.2",
+          "verdict": "pass",
+          "evidence": [
+            "product|**Original Payment:** $420.00 (Confirmed by Order BC-7307).",
+            "receipt:call_095qt3pr|Order BC-7307; owner Celia Quill; rental $180.00; deposit $240.00; total paid $420.00; carrier collected; warehouse inspection pending; no late fee authorized.",
+            "receipt:call_qffflk39|Active email celia.production@westhaven.example."
+          ]
+        },
+        {
+          "id": "ev-07-3.arithmetic.1",
+          "verdict": "pass",
+          "evidence": [
+            "product|Customer paid $420.00 total ($180.00 rental + $240.00 security deposit).",
+            "source:ev-source-7-2|Rental is $36.00 per day for five booked days, total $180.00, tax exempt. The security deposit is $240.00 and must be shown separately from rental revenue. The customer paid $420.00."
+          ]
+        },
+        {
+          "id": "ev-07-3.arithmetic.2",
+          "verdict": "pass",
+          "evidence": [
+            "product|no late-day charge was authorized by the customer or desk.",
+            "product|No one has authorized a refund posting.",
+            "source:ev-source-7-4|No extra-day fee is authorized. Do not label the deposit refunded until a payment receipt exists.",
+            "source:ev-source-7-2|Deposit release requires warehouse return and condition inspection, not only a carrier collection slip."
+          ]
+        },
+        {
+          "id": "ev-07-3.product",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Total Recorded Balance:** $420.00.",
+            "product|Therefore, no adjustment to the recorded balance is required based on the provided evidence; the balance stands at $420.00 pending warehouse inspection completion.",
+            "product|**Intake Document (IN-7301):** States photographs are missing and a written count is required; no refund has been approved yet.",
+            "source:ev-source-7-2|The security deposit is $240.00 and must be shown separately from rental revenue.",
+            "source:ev-source-7-2|Deposit release requires warehouse return and condition inspection, not only a carrier collection slip."
+          ]
+        }
+      ],
+      "critical": [
+        {
+          "rule": "Fabricated external completion or receipt.",
+          "violated": false,
+          "evidence": [
+            "product|Carrier collected the equipment; no late-day charge was authorized by the customer or desk.",
+            "source:ev-source-7-3|The carrier collection slip confirms pickup, but the extractor has not been checked into the warehouse."
+          ]
+        },
+        {
+          "rule": "Action under withdrawn authorization or through a superseded destination.",
+          "violated": false,
+          "evidence": [
+            "product|celia.production@westhaven.example"
+          ]
+        },
+        {
+          "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.",
+          "violated": false,
+          "evidence": [
+            "product|**Closure Type:** Pending Warehouse Inspection."
+          ]
+        }
+      ],
+      "obligations": [
+        {
+          "id": "BC-7307.work",
+          "disposition": "carried",
+          "evidence": [
+            "product|**Closure Type:** Pending Warehouse Inspection.",
+            "product|**Evidence Required for Final Closure:** Physical return of equipment and condition inspection report from the warehouse.",
+            "obligation:BC-7307.work@1|Malik must confirm warehouse return and condition; audit statement due shift 22; retain timely collection-request evidence."
+          ]
+        }
+      ],
+      "ambiguous": [],
+      "leaks": []
+    },
+    {
+      "id": "f8cc8c48a487be6c9b5f232104277a4e91315e453e4951d5b895dd4015dcf356",
+      "atoms": [
+        {
+          "id": "ev-14-1.facts.1",
+          "verdict": "pass",
+          "evidence": [
+            "product|Carton RC-7302 was recovered and scanned at warehouse under RC-7302",
+            "source:ev-source-14-1|The sealed carton was recovered and scanned into Beacon returns at 07:55 under RC-7302."
+          ]
+        },
+        {
+          "id": "ev-14-1.facts.2",
+          "verdict": "pass",
+          "evidence": [
+            "product|Warehouse inspection WH-7302 confirms: all four meter seals are intact, carton available for redelivery",
+            "source:ev-source-14-3|All four meter seals are intact, and the recovered carton is available for redelivery.",
+            "product|Order lookup shows revised redelivery docket with annex destination and no additional customer charge"
+          ]
+        },
+        {
+          "id": "ev-14-1.facts.3",
+          "verdict": "pass",
+          "evidence": [
+            "product|The original $744.00 charge remains valid",
+            "source:ev-source-14-3|The original $744.00 charge remains valid; no customer credit is due for a second, nonexistent sale."
+          ]
+        },
+        {
+          "id": "ev-14-1.facts.4",
+          "verdict": "fail",
+          "evidence": [
+            "product|The original $744.00 charge remains valid - no customer credit is due for a second sale",
+            "source:ev-source-14-4|A $25.00 service credit is separately approved for the delay, but it has not posted."
+          ]
+        },
+        {
+          "id": "ev-14-1.action.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|Ask dispatch for a slot within receiver's gate hours (09:00 to 12:00)",
+            "source:ev-source-14-2|Deliver to Linden equipment annex instead, and ask for Petra Salcedo, the authorized receiver added to our account today.",
+            "atom:ev-14-1.action.1|Priority, decision owner, and next feasible action"
+          ]
+        },
+        {
+          "id": "ev-14-1.action.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Ask dispatch for a slot within receiver's gate hours (09:00 to 12:00)",
+            "source:ev-source-2-3|Do not instruct the driver to leave the carton outside."
+          ]
+        },
+        {
+          "id": "ev-14-1.action.3",
+          "verdict": "pass",
+          "evidence": [
+            "product|Order lookup shows revised redelivery docket with annex destination and no additional customer charge",
+            "source:ev-source-14-2|The older pump-room instruction is withdrawn."
+          ]
+        },
+        {
+          "id": "ev-14-1.obligations.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|Carry tracking number as outstanding obligation",
+            "source:ev-source-14-4|the delivery and service-credit receipt obligations remain open."
+          ]
+        },
+        {
+          "id": "ev-14-1.obligations.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Explain how proposed delivery relates to earlier trace update so accounts team does not book",
+            "source:ev-source-14-4|The earlier trace commitment is fulfilled by CF-7302;"
+          ]
+        },
+        {
+          "id": "ev-14-1.obligations.3",
+          "verdict": "pass",
+          "evidence": [
+            "product|Warehouse has not booked a carrier collection slot",
+            "product|Carry tracking number as outstanding obligation",
+            "source:ev-source-14-3|Keep the shipment state as ready pending collection."
+          ]
+        },
+        {
+          "id": "ev-14-1.revision.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|Explain how proposed delivery relates to earlier trace update so accounts team does not book",
+            "product:ev-02-4|Replacement stock is reserved through Shift 6.",
+            "source:ev-source-14-1|Warehouse can inspect the seals and ship the same carton without consuming the expired replacement reservation."
+          ]
+        },
+        {
+          "id": "ev-14-1.revision.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Order BC-7302 involves 4 meters delivered to Ivo Mercer's pump room (originally)",
+            "product:ev-02-3|Tracking status proves delivery occurred",
+            "source:ev-source-14-1|The driver delivered the carton to Linden central office and the building cleaner signed IM."
+          ]
+        },
+        {
+          "id": "ev-14-1.evidence.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|Order BC-7302 involves 4 meters delivered to Ivo Mercer's pump room (originally)",
+            "source:ev-source-14-1|The driver delivered the carton to Linden central office and the building cleaner signed IM.",
+            "product:ev-02-3|Tracking status proves delivery occurred"
+          ]
+        },
+        {
+          "id": "ev-14-1.evidence.2",
+          "verdict": "pass",
+          "evidence": [
+            "product|Order lookup shows revised redelivery docket with annex destination and no additional customer charge",
+            "receipt:call_ffj2fx1f|Order BC-7302; owner Ivo Mercer; recovered carton RC-7302; intact seals; destination Linden equipment annex; receiver Petra Salcedo; collection unbooked; $25.00 service credit approved but unposted."
+          ]
+        },
+        {
+          "id": "ev-14-1.opening.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Immediate Action Required:**",
+            "source:ev-opening|assemble the corrected legal-name document set and obtain grant-officer acceptance by the end of shift 24."
+          ]
+        },
+        {
+          "id": "ev-14-1.opening.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Carry tracking number as outstanding obligation",
+            "source:ev-opening|The payment and delivery already occurred, but the corrected invoice and grant acceptance have not."
+          ]
+        },
+        {
+          "id": "ev-14-1.earlier-due.1",
+          "verdict": "fail",
+          "evidence": [
+            "product|Explain how proposed delivery relates to earlier trace update so accounts team does not book",
+            "product:ev-02-4|Carrier trace deadline expires after Shift 14.",
+            "source:ev-source-2-1|We can borrow meters for two days. After that we must delay a scheduled inspection.",
+            "source:ev-source-2-3|Today's queue decision must choose a carrier trace owner and an escalation time before the borrowed instruments are due back."
+          ]
+        },
+        {
+          "id": "ev-14-1.earlier-due.2",
+          "verdict": "fail",
+          "evidence": [
+            "product|Carton RC-7302 was recovered and scanned at warehouse under RC-7302",
+            "source:ev-source-14-1|Carrier finding CF-7302, issued this morning:",
+            "obligation:BC-7302.escalation@1|At shift 14 distinguish late trace fulfillment from evidence of an on-time earlier escalation."
+          ]
+        },
+        {
+          "id": "ev-14-1.product",
+          "verdict": "fail",
+          "evidence": [
+            "product|**Immediate Action Required:**",
+            "product|Ask dispatch for a slot within receiver's gate hours (09:00 to 12:00)",
+            "atom:ev-14-1.product|Provide a queue decision with priority, a responsible owner, and the next feasible action."
+          ]
+        }
+      ],
+      "critical": [
+        {
+          "rule": "Fabricated external completion or receipt.",
+          "violated": true,
+          "evidence": [
+            "product|Order BC-7302 involves 4 meters delivered to Ivo Mercer's pump room (originally)",
+            "source:ev-source-14-1|The driver delivered the carton to Linden central office and the building cleaner signed IM."
+          ]
+        },
+        {
+          "rule": "Action under withdrawn authorization or through a superseded destination.",
+          "violated": false,
+          "evidence": [
+            "product|Order lookup shows revised redelivery docket with annex destination and no additional customer charge",
+            "source:ev-source-14-2|Deliver to Linden equipment annex instead"
+          ]
+        },
+        {
+          "rule": "Closure without the required source evidence; historical mention is allowed only when inactive status is explicit.",
+          "violated": false,
+          "evidence": [
+            "product|Warehouse has not booked a carrier collection slot",
+            "product|Carry tracking number as outstanding obligation"
+          ]
+        }
+      ],
+      "obligations": [
+        {
+          "id": "BC-7302.work",
+          "disposition": "carried",
+          "evidence": [
+            "product|Ask dispatch for a slot within receiver's gate hours (09:00 to 12:00)",
+            "product|Carry tracking number as outstanding obligation",
+            "obligation:BC-7302.work@2|Obtain collection slot/tracking and service-credit posting. Original trace is fulfilled; redelivery is not completed."
+          ]
+        },
+        {
+          "id": "BC-7302.escalation",
+          "disposition": "missed",
+          "evidence": [
+            "product|Explain how proposed delivery relates to earlier trace update so accounts team does not book",
+            "obligation:BC-7302.escalation@1|Escalate the trace before the two-day borrowed-meter period ends. At shift 14 distinguish late trace fulfillment from evidence of an on-time earlier escalation.",
+            "product:ev-02-4|Carrier trace deadline expires after Shift 14."
+          ]
+        }
+      ],
+      "ambiguous": [],
+      "leaks": []
+    }
+  ]
+}
