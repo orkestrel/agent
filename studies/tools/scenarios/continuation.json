@@ -1,0 +1,35 @@
+{
+	"id": "continuation",
+	"goals": [
+		{
+			"id": "save",
+			"input": {
+				"prompt": "Create the scratch note before the continuation.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "carried",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "carried-value" }
+							}
+						]
+					},
+					{ "content": "Stored.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "continue",
+			"input": {
+				"prompt": "Continue using the actual prior write tool result from this trial.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [{ "content": "", "calls": [], "consume": "carried" }]
+			}
+		}
+	]
+}

@@ -140,6 +140,36 @@ it('enforces all criterion references, complete goal coverage, purpose and room 
 			{ ...rubric, version: '2' },
 			profile,
 		),
+	).not.toThrow()
+})
+
+it('binds rubric paths independently of versioned regrading over the same execution', () => {
+	const original = buildStudyManifest()
+	const manifest = { ...original, definition: { ...original.definition, rubric: 'rubric.json' } }
+	const rubric = buildStudyRubric()
+	const grading = buildStudyGrading(manifest.schedule)
+	expect(() =>
+		validateStudyInputs(manifest.definition, manifest.scenarios, rubric, buildStudyProfile()),
+	).not.toThrow()
+	const first = computeStudyScores(manifest, rubric, grading)
+	const revised = { ...rubric, version: '2' }
+	expect(computeStudyScores(manifest, revised, { ...grading, rubric: 'd'.repeat(64) })).toEqual(
+		first,
+	)
+	expect(manifest.definition.rubric).toBe('rubric.json')
+	expect(manifest.schedule).toBe(original.schedule)
+	expect(() =>
+		computeStudyScores(manifest, { ...revised, criteria: revised.criteria.slice(1) }, grading),
+	).toThrow(StudyError)
+	expect(() =>
+		computeStudyScores(
+			manifest,
+			{
+				...revised,
+				criteria: revised.criteria.map((criterion) => ({ ...criterion, goal: 'foreign' })),
+			},
+			grading,
+		),
 	).toThrow(StudyError)
 })
 

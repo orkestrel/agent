@@ -1,9 +1,11 @@
 import type {
 	StudyAttempt,
 	StudyManifest,
+	StudyProduct,
 	StudySinkInterface,
 } from '../../../core/studies/types.js'
 import type { FileHandle } from 'node:fs/promises'
+import type { JSONValue } from '@orkestrel/contract'
 
 /** Holds the inert execution store configuration. */
 export interface StudyResultOptions {
@@ -51,6 +53,32 @@ export interface StudyGradingOptions {
 	readonly result: StudySealedResult
 	readonly rubric: Uint8Array
 	readonly labels?: Uint8Array
+	readonly packet?: StudyPacketBundle
+}
+
+/** Holds exact neutral public packet bytes and private mapping bytes. */
+export interface StudyPacketBundle {
+	readonly content: Uint8Array
+	readonly mapping: Uint8Array
+}
+
+/** Holds one neutral semantic grading input without treatment or model identifiers. */
+export interface StudyPacketEntry {
+	readonly trial: string
+	readonly criterion: string
+	readonly input: JSONValue
+	readonly product: StudyProduct | undefined
+	readonly assertion: JSONValue
+}
+
+/** Holds the neutral identity mapping to a sealed semantic trial-criterion pair. */
+export interface StudyPacketLink {
+	readonly trial: string
+	readonly criterion: string
+	readonly source: {
+		readonly trial: string
+		readonly criterion: string
+	}
 }
 
 /** Holds the evidence sink's shared admission budget. */

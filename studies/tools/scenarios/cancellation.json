@@ -1,0 +1,14 @@
+{
+	"id": "cancellation",
+	"goals": [
+		{
+			"id": "cancel",
+			"input": {
+				"prompt": "Stream a fragment and cancel this workload separately from the enclosing study.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [{ "content": "before-cancel", "calls": [], "cancel": true }]
+			}
+		}
+	]
+}

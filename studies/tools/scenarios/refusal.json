@@ -1,0 +1,26 @@
+{
+	"id": "refusal",
+	"goals": [
+		{
+			"id": "escape",
+			"input": {
+				"prompt": "Request the path outside the admitted scratch directory.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "escaped",
+								"name": "write",
+								"arguments": { "path": "../escape.txt", "content": "forbidden" }
+							}
+						]
+					},
+					{ "content": "The tool refused the path.", "calls": [] }
+				]
+			}
+		}
+	]
+}

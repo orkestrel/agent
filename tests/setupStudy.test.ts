@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildCustodyAttempt, buildCustodyManifest, createStudyMeterFixture } from './setupStudy.js'
+import {
+	buildCompactCustodyManifest,
+	buildCustodyAttempt,
+	buildCustodyManifest,
+	createStudyMeterFixture,
+} from './setupStudy.js'
 
 describe('study meter fixture lifecycle', () => {
 	it('owns its primitive lifetimes and closes admission without cancelling completed work', () => {
@@ -16,6 +21,15 @@ describe('study meter fixture lifecycle', () => {
 })
 
 describe('study declaration fixtures', () => {
+	it('keeps both scenarios in the compact custody population', () => {
+		const manifest = buildCompactCustodyManifest()
+		expect(
+			manifest.schedule.map(({ scenario, arm, repetition }) => ({ scenario, arm, repetition })),
+		).toEqual([
+			{ scenario: 'first', arm: 'small', repetition: 0 },
+			{ scenario: 'second', arm: 'small', repetition: 0 },
+		])
+	})
 	it('builds independent declarations and terminal horizons from their actual schedule', () => {
 		const first = buildCustodyManifest()
 		const second = buildCustodyManifest()

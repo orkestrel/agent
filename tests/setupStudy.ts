@@ -47,7 +47,7 @@ export function buildStudyDefinition(change: Partial<StudyDefinition> = {}): Stu
 			['small', 'large'],
 		],
 		retries: 0,
-		rubric: '1',
+		rubric: 'rubric.json',
 		...change,
 	}
 }
@@ -216,6 +216,23 @@ export function buildCustodyManifest(changes: Partial<StudyManifest> = {}): Stud
 		},
 		...changes,
 	}
+}
+
+/**
+ * Builds a small complete custody horizon for lifecycle and tamper proofs.
+ * @returns The declared scenarios with one arm and one repetition
+ */
+export function buildCompactCustodyManifest(): StudyManifest {
+	const baseline = buildCustodyManifest()
+	const definition: StudyDefinition = {
+		...baseline.definition,
+		arms: ['small'],
+		order: [['small']],
+	}
+	return buildCustodyManifest({
+		definition,
+		schedule: buildStudySchedule(definition, baseline.scenarios),
+	})
 }
 
 /**

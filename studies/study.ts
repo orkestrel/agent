@@ -32,6 +32,7 @@ class StudyLauncher {
 		process.on('SIGTERM', this.#signal)
 		try {
 			let duration = 60000
+			let execution = arguments_
 			if (arguments_[0] === 'execute') {
 				const check = ['check', ...arguments_.slice(1)]
 				const out = check.indexOf('--out')
@@ -60,10 +61,17 @@ class StudyLauncher {
 					throw new Error(
 						'Study execution requires a validated series duration within the 24-hour host ceiling',
 					)
+				if (
+					!('fingerprint' in value) ||
+					typeof value.fingerprint !== 'string' ||
+					!/^[a-f0-9]{64}$/.test(value.fingerprint)
+				)
+					throw new Error('Study check did not return an execution fingerprint')
 				duration = value.bounds.series.duration + 15000
+				execution = [...arguments_, '--expected', value.fingerprint]
 			}
 			if (this.#interrupted) return 130
-			return (await this.#launch(entry, arguments_, duration, true)).code
+			return (await this.#launch(entry, execution, duration, true)).code
 		} finally {
 			process.removeListener('SIGINT', this.#signal)
 			process.removeListener('SIGTERM', this.#signal)

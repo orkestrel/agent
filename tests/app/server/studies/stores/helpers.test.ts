@@ -2,9 +2,17 @@ import { createScratch } from '@orkestrel/test/server'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildCustodyManifest } from '../../../../setupStudy.js'
+import {
+	buildCompactCustodyManifest,
+	buildCustodyManifest,
+	buildStudyRubric,
+} from '../../../../setupStudy.js'
+import { buildCustodyPacketLabels, retainStudyFixture } from '../../../../setupServer.js'
 import {
 	checkStudyDirectory,
+	buildStudyPacket,
+	buildStudyPacketLinks,
+	computeStudyPacketDigest,
 	computeStudySealId,
 	encodeStudyJSON,
 	hashStudyBytes,
@@ -12,10 +20,75 @@ import {
 	readStudyResult,
 	scanStudyExecution,
 	validateStudyEvidenceBytes,
+	translateStudyPacketLabels,
 	writeStudyBytes,
 } from '../../../../../app/server/studies/stores/helpers.js'
 
 describe('study custody helpers', () => {
+	it('constructs a neutral complete semantic packet and translates only its bound label identities', async () => {
+		const scratch = createScratch()
+		try {
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
+			const rubric = buildStudyRubric()
+			const digest = hashStudyBytes(encodeStudyJSON(rubric))
+			const packet = buildStudyPacket(result, rubric, digest)
+			if (packet === undefined) throw new Error('Missing packet fixture')
+			const links = buildStudyPacketLinks(result, rubric)
+			expect(new Set(links.map((link) => link.source.criterion))).toEqual(
+				new Set(['first-read', 'second-read']),
+			)
+			expect(new Set(links.map((link) => link.source.trial))).toEqual(
+				new Set(result.manifest.schedule.map((trial) => trial.id)),
+			)
+			expect(
+				links.every(
+					(link) => link.trial !== link.source.trial && link.criterion !== link.source.criterion,
+				),
+			).toBe(true)
+			expect(new TextDecoder().decode(packet.content)).not.toContain('"arm"')
+			expect(new TextDecoder().decode(packet.content)).not.toContain('small')
+			expect(computeStudyPacketDigest(packet)).not.toBe(hashStudyBytes(packet.content))
+			expect(computeStudyPacketDigest({ ...packet, mapping: encodeStudyJSON({}) })).not.toBe(
+				computeStudyPacketDigest(packet),
+			)
+			const labels = buildCustodyPacketLabels(result, rubric)
+			expect(translateStudyPacketLabels(result, rubric, digest, labels)).toMatchObject([
+				{
+					trial: result.manifest.schedule[0]?.id,
+					criterion: 'first-read',
+					verdict: 'achieved',
+					method: 'human',
+				},
+			])
+			expect(() =>
+				translateStudyPacketLabels(result, rubric, digest, { ...labels, packet: 'f'.repeat(64) }),
+			).toThrow('different semantic packet')
+			expect(() =>
+				translateStudyPacketLabels(result, rubric, digest, {
+					...labels,
+					judgments: labels.judgments.map((judgment) => ({
+						...judgment,
+						criterion: 'first-write',
+					})),
+				}),
+			).toThrow('foreign semantic packet identity')
+			expect(
+				buildStudyPacket(
+					result,
+					{
+						...rubric,
+						criteria: rubric.criteria.map((criterion) => ({ ...criterion, method: 'state' })),
+					},
+					digest,
+				),
+			).toBeUndefined()
+		} finally {
+			scratch.destroy()
+		}
+	})
 	it('encodes stable keys and omitted optional fields and hashes exact bytes', () => {
 		expect(
 			Buffer.from(encodeStudyJSON({ optional: undefined, nested: { z: 2, a: 1 } })).toString(),

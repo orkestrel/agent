@@ -1,12 +1,25 @@
-import type { StudyAttempt, StudyManifest } from '../../../core/studies/types.js'
-import type { StudyFile, StudyResultReading } from './types.js'
+import type {
+	StudyAttempt,
+	StudyJudgment,
+	StudyLabels,
+	StudyManifest,
+	StudyRubric,
+} from '../../../core/studies/types.js'
+import type {
+	StudyFile,
+	StudyPacketBundle,
+	StudyPacketEntry,
+	StudyPacketLink,
+	StudyResultReading,
+	StudySealedResult,
+} from './types.js'
 import { canonicalStringify, parseJSON } from '@orkestrel/contract'
 import { constants } from 'node:fs'
 import { lstat, open, readdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, join, parse, relative, resolve, sep } from 'node:path'
 import { StudyError } from '../../../core/studies/errors.js'
-import { STUDY_CUSTODY_BYTES } from './constants.js'
+import { STUDY_CUSTODY_BYTES, STUDY_PACKET_DISCLOSURE } from './constants.js'
 import {
 	isStudyCustodyAttempt,
 	isStudyCustodyEvidence,
@@ -42,6 +55,157 @@ export function encodeStudyJSON(value: unknown): Uint8Array {
  */
 export function hashStudyBytes(bytes: Uint8Array): string {
 	return createHash('sha256').update(bytes).digest('hex')
+}
+
+/**
+ * Builds neutral semantic identities for the complete eligible sealed horizon.
+ * @param result - The verified sealed execution
+ * @param rubric - The compatible independently held rubric
+ * @returns Deterministically sorted neutral mappings
+ * @example
+ * ```ts
+ * buildStudyPacketLinks(result, rubric)
+ * ```
+ */
+export function buildStudyPacketLinks(
+	result: StudySealedResult,
+	rubric: StudyRubric,
+): readonly StudyPacketLink[] {
+	const links: StudyPacketLink[] = []
+	let bytes = 256
+	for (const trial of result.manifest.schedule) {
+		for (const criterion of rubric.criteria) {
+			if (criterion.method !== 'semantic' || criterion.scenario !== trial.scenario) continue
+			const link = {
+				trial: `t-${hashStudyBytes(encodeStudyJSON([result.seal.id, 'trial', trial.id]))}`,
+				criterion: `c-${hashStudyBytes(encodeStudyJSON([result.seal.id, 'criterion', criterion.id]))}`,
+				source: { trial: trial.id, criterion: criterion.id },
+			}
+			bytes += encodeStudyJSON(link).byteLength
+			if (bytes > STUDY_CUSTODY_BYTES)
+				throw new StudyError('CAPACITY', 'Semantic packet mapping exceeds its custody allowance')
+			links.push(link)
+		}
+	}
+	return Object.freeze(
+		links.sort((left, right) =>
+			`${left.trial}/${left.criterion}` < `${right.trial}/${right.criterion}`
+				? -1
+				: `${left.trial}/${left.criterion}` > `${right.trial}/${right.criterion}`
+					? 1
+					: 0,
+		),
+	)
+}
+
+/**
+ * Builds deterministic public semantic inputs and a separately retained private map.
+ * @param result - The verified sealed execution
+ * @param rubric - The compatible semantic criterion declaration
+ * @param digest - The exact imported rubric-byte identity
+ * @returns The packet bundle, or undefined for a purely mechanical rubric
+ * @throws StudyError - Thrown when a semantic pair has no declared input or terminal record
+ * @example
+ * ```ts
+ * buildStudyPacket(result, rubric, rubricDigest)
+ * ```
+ */
+export function buildStudyPacket(
+	result: StudySealedResult,
+	rubric: StudyRubric,
+	digest: string,
+): StudyPacketBundle | undefined {
+	const links = buildStudyPacketLinks(result, rubric)
+	if (links.length === 0) return undefined
+	let length = encodeStudyJSON({
+		version: 1,
+		disclosure: STUDY_PACKET_DISCLOSURE,
+		entries: [],
+	}).byteLength
+	const entries: StudyPacketEntry[] = links.map((link) => {
+		const trial = result.manifest.schedule.find((entry) => entry.id === link.source.trial)
+		const criterion = rubric.criteria.find((entry) => entry.id === link.source.criterion)
+		const scenario = result.manifest.scenarios.find((entry) => entry.id === trial?.scenario)
+		const goal = scenario?.goals.find((entry) => entry.id === criterion?.goal)
+		const observation = result.attempts
+			.find((entry) => entry.trial.id === link.source.trial)
+			?.observations.find((entry) => entry.goal === criterion?.goal)
+		if (criterion === undefined || goal === undefined || observation === undefined)
+			throw new StudyError('EVIDENCE', 'Semantic packet refers to an absent sealed horizon')
+		const entry = {
+			trial: link.trial,
+			criterion: link.criterion,
+			input: goal.input,
+			product: observation.product,
+			assertion: criterion.assertion,
+		}
+		length += encodeStudyJSON(entry).byteLength
+		if (length > STUDY_CUSTODY_BYTES)
+			throw new StudyError('CAPACITY', 'Semantic packet content exceeds its custody allowance')
+		return entry
+	})
+	return Object.freeze({
+		content: encodeStudyJSON({ version: 1, disclosure: STUDY_PACKET_DISCLOSURE, entries }),
+		mapping: encodeStudyJSON({
+			version: 1,
+			result: result.seal.id,
+			rubric: digest,
+			entries: links,
+		}),
+	})
+}
+
+/**
+ * Computes a bundle identity binding exact public packet and private map bytes.
+ * @param packet - The immutable grading packet bundle
+ * @returns The exact bundle digest
+ * @example
+ * ```ts
+ * computeStudyPacketDigest(packet)
+ * ```
+ */
+export function computeStudyPacketDigest(packet: StudyPacketBundle): string {
+	return hashStudyBytes(
+		encodeStudyJSON({
+			content: hashStudyBytes(packet.content),
+			mapping: hashStudyBytes(packet.mapping),
+		}),
+	)
+}
+
+/**
+ * Translates bound neutral imported labels through the sealed semantic horizon.
+ * @param result - The verified sealed execution
+ * @param rubric - The retained rubric
+ * @param digest - The exact retained rubric-byte identity
+ * @param labels - The original imported neutral labels
+ * @returns Judgments translated to scheduled trial and criterion identities
+ * @throws StudyError - Thrown when the packet or a label identity is foreign
+ * @example
+ * ```ts
+ * translateStudyPacketLabels(result, rubric, rubricDigest, labels)
+ * ```
+ */
+export function translateStudyPacketLabels(
+	result: StudySealedResult,
+	rubric: StudyRubric,
+	digest: string,
+	labels: StudyLabels,
+): readonly StudyJudgment[] {
+	const packet = buildStudyPacket(result, rubric, digest)
+	if (packet === undefined || labels.packet !== hashStudyBytes(packet.content))
+		throw new StudyError('EVIDENCE', 'Labels bind a different semantic packet')
+	const links = buildStudyPacketLinks(result, rubric)
+	return Object.freeze(
+		labels.judgments.map((judgment) => {
+			const link = links.find(
+				(entry) => entry.trial === judgment.trial && entry.criterion === judgment.criterion,
+			)
+			if (link === undefined || (judgment.method !== 'human' && judgment.method !== 'model'))
+				throw new StudyError('EVIDENCE', 'Label refers to a foreign semantic packet identity')
+			return { ...judgment, trial: link.source.trial, criterion: link.source.criterion }
+		}),
+	)
 }
 
 /**

@@ -1,0 +1,12 @@
+{
+	"name": "tools",
+	"version": "1",
+	"question": "Does the built Agent dispatch and refuse real scratch tools, retain their results, cancel declared work and isolate repeated trials?",
+	"purpose": "mechanism",
+	"driver": "tools",
+	"arms": ["agent"],
+	"scenarios": ["write", "refusal", "admission", "cancellation", "continuation"],
+	"order": [["agent"], ["agent"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

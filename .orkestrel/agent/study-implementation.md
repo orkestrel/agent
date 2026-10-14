@@ -1,5 +1,7 @@
 # Implement optional studies
 
+This implementation's mechanisms remain the extraction baseline, but its private runtime placement is superseded by the user-selected @orkestrel/study package. Follow [the cross-package registry](../study.md) for current ownership and migration. Do not implement the abandoned scaffold study axis or run the retired root-axis migration script.
+
 Implement the optional `study` development surface in the agent checkout. Use the agent package as the first testing ground, and derive a reusable study contract from actual agent, tool, and protocol use. The user authorized implementation on 2026-10-14 while the capacity comparison continues.
 
 ## Standing constraints
@@ -41,7 +43,7 @@ The Luna readers completed without side effects. Their reports are `tmp/units/st
 
 The final Fable invocation completed successfully in session `6bf873ab-5f40-43eb-a9c2-759d5b697192`, exit 0 uncapped in 302339 ms. Its final proposal and the blind positions are retained in the adjacent study-implementation files; `study-implementation-round.json` binds their bytes. No further Fable invocation is authorized.
 
-Root selects the private app/core and app/server design. Offline checks inspect bytes and schemas without importing caller-selected code. Operational deadlines stop execution promptly, as do capacity and infrastructure failures; ordinary unsuccessful products may continue. Mechanical predicates judge observable state and traces; prose semantics remain unknown until separately imported blind judgments. Artifact identity must cover an admitted dependency inventory, not only an entry. The historical c1 instrument and its results are retained separately.
+The user selected an optional root study/core and study/server surface with scaffold support on 2026-10-14. This supersedes the earlier private app placement. Runtime moves from app/core/studies and app/server/studies into those roots, tests mirror tests/study, and declarations and the native launcher move from studies into study. Scaffold owns the new axis, generated configurations and boundary enforcement; no local configuration exception substitutes for that support. Offline checks inspect bytes and schemas without importing caller-selected code. Operational deadlines stop execution promptly, as do capacity and infrastructure failures; ordinary unsuccessful products may continue. Mechanical predicates judge observable state and traces; prose semantics remain unknown until separately imported blind judgments. Artifact identity covers an admitted dependency inventory. Historical c1 instruments and results remain separate and unchanged.
 
 U0's installed scaffold probe found that app/server requires a declared middleware dependency, even for the empty CLI starter. The user authorized it. Version 0.0.16 conflicted with the installed server peer; root installed the compatible published middleware 0.0.24. Registry readings at 2026-10-14T16:24:51Z confirmed every declared Orkestrel dependency's installed version matched its published latest tag. The supported scaffold repair wired the app projects and build without changing the frozen harness. Commits d512bf4 and 8d21f7d retain the dependency and wiring changes. Artifact scoped lint passed after repair.
 
@@ -69,6 +71,11 @@ The user restored the temporary instruments/harness/.build ignore on 2026-10-14.
 | U6 concrete tools | Next bounded unit after engine and loader | Real built agent/tool operations, filesystem state and trace grading, mechanism-only evidence |
 | U7 memory/capacity | Next bounded unit after engine and loader | Public actual adapters, bounded protocol fixtures, qualification binding and unknown semantic grading |
 | U8 integration | Root, serial shared files | Supported wiring, optional launcher, guide parity, real CPU operation, independent integrated review and gates |
+| Root study surface | Astra in scaffold, brief tmp/units/study-surface-brief.md there | Optional study/core and study/server axis, declarations, physical discovery, scripts, aliases, boundary proofs and generated build; preserve unrelated scaffold dirt |
+
+The process bridge checkpoint is 2239d63. Its actual built Agent/tools/engine/store composition passed with fresh child processes, retained within-trial state, reset repeated state, pre-dispatch budget refusal, finite cleanup and real custody failure. Independent integrated acceptance remains pending. Model profiles now require both serving artifact digests; grading parsing normalizes an absent optional packet. Shared command, tool and neutral-label fixtures stay in setupStudy and the existing setupServer, checkpoint ccca4f7.
+
+Root prepares the serial relocation with tmp/units/study-migrate.ts, whose default operation prints a bounded plan. Run --apply only after the agent writers checkpoint. Never move a frozen harness or its evidence. The successor memory/capacity consumer brief is tmp/units/study-memory-brief.md; dispatch it after relocation, with CPU protocol fixtures only while the comparison uses the GPU.
 
 The user also requested parallel model and records research. Luna max owns `system-models` and `records-research`, with reports under tmp/units. These units cannot download or run models, mutate strategy code, or touch the frozen campaign. Model replacement and strategy changes will be separate ablations. Research does not authorize tuning on the held-out oracle.
 

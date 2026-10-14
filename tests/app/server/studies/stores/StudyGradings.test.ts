@@ -2,20 +2,78 @@ import { createScratch } from '@orkestrel/test/server'
 import { appendFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildStudyRubric } from '../../../../setupStudy.js'
+import { buildCompactCustodyManifest, buildStudyRubric } from '../../../../setupStudy.js'
 import {
 	buildCustodyGrading,
 	buildCustodyLabels,
+	buildCustodyPacketLabels,
 	retainStudyFixture,
 } from '../../../../setupServer.js'
 import { StudyGradings } from '../../../../../app/server/studies/stores/StudyGradings.js'
-import { encodeStudyJSON } from '../../../../../app/server/studies/stores/helpers.js'
+import {
+	buildStudyPacket,
+	computeStudyPacketDigest,
+	encodeStudyJSON,
+	hashStudyBytes,
+} from '../../../../../app/server/studies/stores/helpers.js'
 
 describe('StudyGradings', () => {
+	it('binds neutral packet and private map bytes and refuses forged, tampered or foreign packet custody', async () => {
+		const scratch = createScratch()
+		try {
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
+			const rubric = buildStudyRubric()
+			const base = buildCustodyGrading(result, rubric)
+			const packet = buildStudyPacket(result, rubric, base.rubric)
+			if (packet === undefined) throw new Error('Missing packet fixture')
+			const grading = { ...base, packet: computeStudyPacketDigest(packet) }
+			const store = new StudyGradings({ result, rubric: encodeStudyJSON(rubric), packet })
+			const original = await readFile(join(result.directory, 'execution', 'manifest.json'))
+			const id = await store.write(grading)
+			expect(await store.write(grading)).toBe(id)
+			await appendFile(join(result.directory, 'grades', id, `${grading.packet}.packet.json`), ' ')
+			await expect(store.read(id)).rejects.toMatchObject({ code: 'CUSTODY' })
+			const later = await store.write({ ...grading, grader: 'packet-v2' })
+			await appendFile(
+				join(result.directory, 'grades', later, `${grading.packet}.mapping.json`),
+				' ',
+			)
+			await expect(store.read(later)).rejects.toMatchObject({ code: 'CUSTODY' })
+			const forged = { ...packet, mapping: encodeStudyJSON({ version: 1, entries: [] }) }
+			await expect(
+				new StudyGradings({ result, rubric: encodeStudyJSON(rubric), packet: forged }).write({
+					...grading,
+					packet: computeStudyPacketDigest(forged),
+				}),
+			).rejects.toMatchObject({ code: 'CUSTODY' })
+			const labels = buildCustodyPacketLabels(result, rubric)
+			const foreign = {
+				...labels,
+				judgments: labels.judgments.map((judgment) => ({ ...judgment, criterion: 'first-write' })),
+			}
+			await expect(
+				new StudyGradings({
+					result,
+					rubric: encodeStudyJSON(rubric),
+					packet,
+					labels: encodeStudyJSON(foreign),
+				}).write({ ...grading, labels: hashStudyBytes(encodeStudyJSON(foreign)) }),
+			).rejects.toMatchObject({ code: 'EVIDENCE' })
+			expect(await readFile(join(result.directory, 'execution', 'manifest.json'))).toEqual(original)
+		} finally {
+			scratch.destroy()
+		}
+	})
 	it('reproduces the same exact predicate grading identity and preserves execution bytes', async () => {
 		const scratch = createScratch()
 		try {
-			const result = await retainStudyFixture(join(scratch.path, 'result'))
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
 			const rubric = buildStudyRubric()
 			const grades = new StudyGradings({ result, rubric: encodeStudyJSON(rubric) })
 			const original = await Promise.all(
@@ -49,23 +107,39 @@ describe('StudyGradings', () => {
 	it('imports exact labels bytes and assigns distinct identities to changed label provenance', async () => {
 		const scratch = createScratch()
 		try {
-			const result = await retainStudyFixture(join(scratch.path, 'result'))
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
 			const rubric = buildStudyRubric()
-			const labels = buildCustodyLabels(result)
-			const grading = buildCustodyGrading(result, rubric, labels)
+			const originalLabels = buildCustodyLabels(result)
+			const base = buildCustodyGrading(result, rubric, originalLabels)
+			const packet = buildStudyPacket(result, rubric, base.rubric)
+			if (packet === undefined) throw new Error('Missing packet fixture')
+			const labels = buildCustodyPacketLabels(result, rubric)
+			const grading = {
+				...base,
+				labels: hashStudyBytes(encodeStudyJSON(labels)),
+				packet: computeStudyPacketDigest(packet),
+			}
 			const first = new StudyGradings({
 				result,
 				rubric: encodeStudyJSON(rubric),
 				labels: encodeStudyJSON(labels),
+				packet,
 			})
 			const id = await first.write(grading)
-			const changed = buildCustodyLabels(result, 'human-v2')
+			const changed = { ...labels, labeler: 'human-v2' }
 			const second = new StudyGradings({
 				result,
 				rubric: encodeStudyJSON(rubric),
 				labels: encodeStudyJSON(changed),
+				packet,
 			})
-			const later = await second.write(buildCustodyGrading(result, rubric, changed))
+			const later = await second.write({
+				...grading,
+				labels: hashStudyBytes(encodeStudyJSON(changed)),
+			})
 			expect(later).not.toBe(id)
 			expect(
 				await readFile(join(result.directory, 'grades', id, `${grading.labels}.labels.json`)),
@@ -80,7 +154,10 @@ describe('StudyGradings', () => {
 	it('refuses omitted coverage, foreign attempt identities, artifact bindings, and unbound semantic success', async () => {
 		const scratch = createScratch()
 		try {
-			const result = await retainStudyFixture(join(scratch.path, 'result'))
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
 			const rubric = buildStudyRubric()
 			const grades = new StudyGradings({ result, rubric: encodeStudyJSON(rubric) })
 			const grading = buildCustodyGrading(result, rubric)
@@ -118,7 +195,10 @@ describe('StudyGradings', () => {
 	it('detects tampered grading, artifact, and execution bytes and never overwrites them', async () => {
 		const scratch = createScratch()
 		try {
-			const result = await retainStudyFixture(join(scratch.path, 'result'))
+			const result = await retainStudyFixture(
+				join(scratch.path, 'result'),
+				buildCompactCustodyManifest(),
+			)
 			const rubric = buildStudyRubric()
 			const grades = new StudyGradings({ result, rubric: encodeStudyJSON(rubric) })
 			const grading = buildCustodyGrading(result, rubric)

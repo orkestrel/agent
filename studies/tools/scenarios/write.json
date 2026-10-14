@@ -1,0 +1,41 @@
+{
+	"id": "write",
+	"goals": [
+		{
+			"id": "save",
+			"input": {
+				"prompt": "Create the scratch note.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "saved",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "alpha" }
+							}
+						]
+					},
+					{ "content": "Saved.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "recall",
+			"input": {
+				"prompt": "Read the scratch note and use the tool's returned text.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [{ "id": "recalled", "name": "read", "arguments": { "path": "note.txt" } }]
+					},
+					{ "content": "", "calls": [], "consume": "recalled" }
+				]
+			}
+		}
+	]
+}

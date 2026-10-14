@@ -1,0 +1,98 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "write-file",
+			"scenario": "write",
+			"goal": "save",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": true, "content": "alpha" }
+		},
+		{
+			"id": "write-tool",
+			"scenario": "write",
+			"goal": "save",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "tool", "name": "write", "success": true }
+		},
+		{
+			"id": "write-recall",
+			"scenario": "write",
+			"goal": "recall",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false, "content": "alpha" }
+		},
+		{
+			"id": "refusal-file",
+			"scenario": "refusal",
+			"goal": "escape",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "refusal-tool",
+			"scenario": "refusal",
+			"goal": "escape",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "tool", "name": "write", "success": false }
+		},
+		{
+			"id": "admission-file",
+			"scenario": "admission",
+			"goal": "denied",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "admission-denial",
+			"scenario": "admission",
+			"goal": "denied",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "denial", "name": "write" }
+		},
+		{
+			"id": "cancel-result",
+			"scenario": "cancellation",
+			"goal": "cancel",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": true, "content": "before-cancel" }
+		},
+		{
+			"id": "cancel-file",
+			"scenario": "cancellation",
+			"goal": "cancel",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "continuation-file",
+			"scenario": "continuation",
+			"goal": "save",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "file",
+				"path": "note.txt",
+				"exists": true,
+				"content": "carried-value"
+			}
+		},
+		{
+			"id": "continuation-result",
+			"scenario": "continuation",
+			"goal": "continue",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false, "content": "stored note.txt" }
+		}
+	]
+}

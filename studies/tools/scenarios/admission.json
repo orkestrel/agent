@@ -1,0 +1,26 @@
+{
+	"id": "admission",
+	"goals": [
+		{
+			"id": "denied",
+			"input": {
+				"prompt": "Request a write under a workload that denies tool admission.",
+				"admitted": false,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "denied",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "forbidden" }
+							}
+						]
+					},
+					{ "content": "No write was admitted.", "calls": [] }
+				]
+			}
+		}
+	]
+}

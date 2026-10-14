@@ -119,8 +119,6 @@ export function validateStudyInputs(
 	buildStudySchedule(definition, scenarios)
 	if (!isStudyRubric(rubric) || !isStudyProfile(profile))
 		throw new StudyError('CONFIG', 'Invalid rubric or profile')
-	if (definition.rubric !== rubric.version)
-		throw new StudyError('CONFIG', 'Rubric version does not match the study')
 	if (
 		profile.bounds.request.tokens > profile.room.context - profile.room.safety ||
 		profile.room.output > profile.bounds.request.tokens
@@ -165,8 +163,6 @@ export function computeStudyScores(
 	const expected = buildStudySchedule(manifest.definition, manifest.scenarios)
 	if (canonicalStringify(expected) !== canonicalStringify(manifest.schedule))
 		throw new StudyError('EVIDENCE', 'Manifest schedule differs from the declared population')
-	if (manifest.definition.rubric !== rubric.version)
-		throw new StudyError('EVIDENCE', 'Rubric version differs from the study')
 	const trials = new Map(expected.map((trial) => [trial.id, trial]))
 	if (
 		grading.attempts.length !== expected.length ||

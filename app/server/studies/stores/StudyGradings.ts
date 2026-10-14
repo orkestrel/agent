@@ -1,5 +1,5 @@
 import type { StudyGrading, StudyLabels, StudyRubric } from '../../../core/studies/types.js'
-import type { StudyGradingOptions, StudySealedResult } from './types.js'
+import type { StudyGradingOptions, StudyPacketBundle, StudySealedResult } from './types.js'
 import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
 import { lstat, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -14,10 +14,13 @@ import { isStudyDigest } from '../../../core/studies/validators.js'
 import { STUDY_CUSTODY_BYTES } from './constants.js'
 import {
 	checkStudyDirectory,
+	buildStudyPacket,
+	computeStudyPacketDigest,
 	encodeStudyJSON,
 	hashStudyBytes,
 	readStudyBytes,
 	readStudyResult,
+	translateStudyPacketLabels,
 	writeStudyBytes,
 } from './helpers.js'
 
@@ -31,6 +34,7 @@ export class StudyGradings {
 	readonly #labels: StudyLabels | undefined
 	readonly #labelsBytes: Uint8Array | undefined
 	readonly #labelsDigest: string | undefined
+	readonly #packet: StudyPacketBundle | undefined
 	#tail: Promise<unknown> = Promise.resolve()
 
 	/**
@@ -62,6 +66,19 @@ export class StudyGradings {
 				: parseStudyLabels(
 						parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(this.#labelsBytes)),
 					)
+		if (
+			options.packet !== undefined &&
+			(options.packet.content.byteLength > STUDY_CUSTODY_BYTES ||
+				options.packet.mapping.byteLength > STUDY_CUSTODY_BYTES)
+		)
+			throw new StudyError('CAPACITY', 'Packet exceeds the grading metadata allowance')
+		this.#packet =
+			options.packet === undefined
+				? undefined
+				: {
+						content: new Uint8Array(options.packet.content),
+						mapping: new Uint8Array(options.packet.mapping),
+					}
 	}
 
 	/**
@@ -112,6 +129,9 @@ export class StudyGradings {
 			'grading.json',
 			`${grading.rubric}.rubric.json`,
 			...(grading.labels === undefined ? [] : [`${grading.labels}.labels.json`]),
+			...(grading.packet === undefined
+				? []
+				: [`${grading.packet}.packet.json`, `${grading.packet}.mapping.json`]),
 		]
 		const entries = await readdir(directory, { withFileTypes: true })
 		if (
@@ -142,7 +162,20 @@ export class StudyGradings {
 				parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(labelsBytes)),
 			)
 		}
-		this.#validate(grading, result, rubric, labels)
+		let packet: StudyPacketBundle | undefined
+		if (grading.packet !== undefined) {
+			packet = {
+				content: await readStudyBytes(
+					join(directory, `${grading.packet}.packet.json`),
+					STUDY_CUSTODY_BYTES,
+				),
+				mapping: await readStudyBytes(
+					join(directory, `${grading.packet}.mapping.json`),
+					STUDY_CUSTODY_BYTES,
+				),
+			}
+		}
+		this.#validate(grading, result, rubric, labels, packet)
 		await this.#verifyResult()
 		return grading
 	}
@@ -151,7 +184,7 @@ export class StudyGradings {
 		const result = await this.#verifyResult()
 		if (grading.rubric !== this.#rubricDigest || grading.labels !== this.#labelsDigest)
 			throw new StudyError('EVIDENCE', 'Grading does not bind the imported artifact bytes')
-		this.#validate(grading, result, this.#rubric, this.#labels)
+		this.#validate(grading, result, this.#rubric, this.#labels, this.#packet)
 		const id = hashStudyBytes(bytes)
 		const root = join(result.directory, 'grades')
 		try {
@@ -177,6 +210,10 @@ export class StudyGradings {
 			return id
 		}
 		await writeStudyBytes(join(directory, `${this.#rubricDigest}.rubric.json`), this.#rubricBytes)
+		if (this.#packet !== undefined && grading.packet !== undefined) {
+			await writeStudyBytes(join(directory, `${grading.packet}.packet.json`), this.#packet.content)
+			await writeStudyBytes(join(directory, `${grading.packet}.mapping.json`), this.#packet.mapping)
+		}
 		if (this.#labelsBytes !== undefined && this.#labelsDigest !== undefined)
 			await writeStudyBytes(join(directory, `${this.#labelsDigest}.labels.json`), this.#labelsBytes)
 		await writeStudyBytes(join(directory, 'grading.json'), bytes)
@@ -196,10 +233,26 @@ export class StudyGradings {
 		result: StudySealedResult,
 		rubric: StudyRubric,
 		labels: StudyLabels | undefined,
+		packet: StudyPacketBundle | undefined,
 	): void {
 		if (grading.result !== result.seal.id)
 			throw new StudyError('EVIDENCE', 'Grading binds a different execution seal')
 		computeStudyScores(result.manifest, rubric, grading)
+		if (grading.packet !== (packet === undefined ? undefined : computeStudyPacketDigest(packet)))
+			throw new StudyError('CUSTODY', 'Grading packet bytes do not match their bundle identity')
+		if (packet !== undefined) {
+			const expected = buildStudyPacket(result, rubric, grading.rubric)
+			if (
+				expected === undefined ||
+				hashStudyBytes(expected.content) !== hashStudyBytes(packet.content) ||
+				hashStudyBytes(expected.mapping) !== hashStudyBytes(packet.mapping)
+			)
+				throw new StudyError('CUSTODY', 'Grading packet differs from the sealed semantic horizon')
+		}
+		if (labels !== undefined && packet === undefined)
+			throw new StudyError('EVIDENCE', 'Imported labels require a retained semantic packet')
+		const translated =
+			labels === undefined ? [] : translateStudyPacketLabels(result, rubric, grading.rubric, labels)
 		for (const trial of result.manifest.schedule) {
 			for (const criterion of rubric.criteria) {
 				if (criterion.scenario !== trial.scenario) continue
@@ -211,14 +264,12 @@ export class StudyGradings {
 				if (
 					criterion.method === 'semantic' &&
 					judgment.verdict !== 'unknown' &&
-					!labels?.judgments.some(
-						(entry) => canonicalStringify(entry) === canonicalStringify(judgment),
-					)
+					!translated.some((entry) => canonicalStringify(entry) === canonicalStringify(judgment))
 				)
 					throw new StudyError('EVIDENCE', 'Semantic verdict has no bound imported label')
 			}
 		}
-		for (const judgment of labels?.judgments ?? []) {
+		for (const judgment of translated) {
 			if (
 				!grading.judgments.some(
 					(entry) => canonicalStringify(entry) === canonicalStringify(judgment),
