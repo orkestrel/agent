@@ -1,5 +1,6 @@
 import type {
 	CapacityCell,
+	CapacityExit,
 	CapacityFile,
 	CapacityOptions,
 	CapacityProfile,
@@ -19,6 +20,7 @@ import {
 	buildCapacityFixture,
 	collectCapacityReading,
 	hashCapacityFile,
+	inspectCapacityExecution,
 	readCapacityCount,
 	readCapacityJSON,
 	readCapacityLines,
@@ -26,7 +28,7 @@ import {
 	writeCapacityJSON,
 } from './helpers.ts'
 import { Runner } from './Runner.ts'
-import { isCapacityFaultless, isCapacityRecord } from './validators.ts'
+import { isCapacityRecord } from './validators.ts'
 
 /** Qualifies one frozen candidate without semantic scoring or automatic escalation. */
 export class Qualifier {
@@ -76,6 +78,7 @@ export class Qualifier {
 		}
 		writeCapacityJSON(join(out, 'plan.json'), {
 			schema: 1,
+			policy: 'execution-only',
 			qualified: false,
 			options: this.#options,
 			profile: this.#profile,
@@ -158,15 +161,16 @@ export class Qualifier {
 				const capacity = await this.#capacity(cell)
 				writeCapacityJSON(join(directory, 'capacity.json'), capacity)
 				if (
-					executed.code !== 0 ||
+					(executed.code !== 0 && executed.code !== 3) ||
 					executed.expired ||
+					executed.signal !== null ||
 					executed.error !== undefined ||
 					info === undefined
 				)
 					throw new Error(
 						`cell failed for ${cell.key}/${cell.arm}; see exact child and run evidence`,
 					)
-				const reading = this.#inspectCell(cell, info)
+				const reading = this.#inspectCell(cell, info, executed)
 				writeCapacityJSON(join(directory, 'reading.json'), reading)
 				readings.push({ cell, reading })
 				if (cell.arm === 'compaction') {
@@ -186,6 +190,7 @@ export class Qualifier {
 				)
 			}
 			writeCapacityJSON(join(out, 'qualification.json'), {
+				policy: 'execution-only',
 				passed: true,
 				calls: this.#calls,
 				tokens: this.#tokens,
@@ -197,6 +202,7 @@ export class Qualifier {
 			return 0
 		} catch (error) {
 			writeCapacityJSON(join(out, 'qualification.json'), {
+				policy: 'execution-only',
 				passed: false,
 				calls: this.#calls,
 				tokens: this.#tokens,
@@ -253,7 +259,7 @@ export class Qualifier {
 			'--think',
 			'true',
 			'--failure',
-			'stop',
+			'continue',
 			'--runtime',
 			files.runtime.path,
 			'--oracle',
@@ -340,43 +346,17 @@ export class Qualifier {
 		return safe
 	}
 
-	#inspectCell(cell: CapacityCell, info: Readonly<Record<string, unknown>>): CapacityReading {
+	#inspectCell(
+		cell: CapacityCell,
+		info: Readonly<Record<string, unknown>>,
+		exit: CapacityExit,
+	): CapacityReading {
 		const directory = join(this.#cellDirectory(cell), 'run')
-		if (
-			info.status !== 'complete' ||
-			info.error !== undefined ||
-			info.terminal !== undefined ||
-			!isCapacityFaultless(info.faults)
-		)
-			throw new Error('operationally invalid qualification cell')
 		const rows = readCapacityLines(join(directory, 'rows.jsonl'))
 		const expected = buildCapacityFixture().runtime.goals.map((goal) => goal.id)
-		if (
-			rows.length !== expected.length ||
-			!rows.every(
-				(row, index) =>
-					row.goal === expected[index] &&
-					row.success === true &&
-					row.partial === false &&
-					typeof row.reply === 'string' &&
-					row.reply.trim() !== '' &&
-					row.error === undefined &&
-					row.overflow === false &&
-					Array.isArray(row.failures) &&
-					row.failures.length === 0,
-			)
-		)
-			throw new Error('insufficient qualification: complete nonempty nonpartial horizon required')
 		const requests = readCapacityLines(join(directory, 'requests.jsonl'))
 		const observations = readCapacityLines(join(directory, 'observations.jsonl'))
-		if (
-			observations.length !== expected.length ||
-			!observations.every(
-				(observation, index) =>
-					observation.goal === expected[index] && observation.complete === true,
-			)
-		)
-			throw new Error('insufficient qualification: incomplete observation horizon')
+		inspectCapacityExecution(info, rows, observations, requests, expected, exit)
 		const sections = existsSync(join(directory, 'sections.jsonl'))
 			? readCapacityLines(join(directory, 'sections.jsonl'))
 			: []

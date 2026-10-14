@@ -62,6 +62,18 @@ test('plan materializes identical public custody without contacting an unavailab
 			hashCapacityFile(join(extended, 'oracle.json')).hash,
 		)
 		assert.equal(readCapacityJSON(join(initial, 'plan.json')).qualified, false)
+		assert.equal(readCapacityJSON(join(initial, 'plan.json')).policy, 'execution-only')
+		const commands = readCapacityJSON(join(initial, 'plan.json')).commands
+		assert.ok(Array.isArray(commands))
+		for (const command of commands) {
+			assert.ok(
+				typeof command === 'object' &&
+					command !== null &&
+					'freeze' in command &&
+					Array.isArray(command.freeze),
+			)
+			assert.equal(command.freeze[command.freeze.indexOf('--failure') + 1], 'continue')
+		}
 		await assert.rejects(
 			new Qualifier(
 				parseCapacityOptions(['--out', initial, '--url', 'http://127.0.0.1:1', '--plan']),
@@ -118,7 +130,14 @@ test('wire metadata counts fresh usage and detects supplied thinking without ret
 			},
 			{ sent: false, role: 'agent', error: 'admission refusal', failures: [] },
 		],
-		[{ lookups: { calls: 1, repeats: 1 } }],
+		[
+			{
+				success: true,
+				partial: false,
+				reply: 'Synthetic complete product',
+				lookups: { calls: 1, repeats: 1 },
+			},
+		],
 		[{ event: 'compact' }, { event: 'collapse' }],
 	)
 	assert.equal(reading.calls, 2)

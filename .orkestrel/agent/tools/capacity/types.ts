@@ -63,6 +63,7 @@ export interface CapacityExit {
 
 /** Holds safe aggregate evidence without product bodies. */
 export interface CapacityReading {
+	readonly outcome: CapacityOutcome
 	readonly calls: number
 	readonly tokens: number
 	readonly prompt: number
@@ -73,4 +74,13 @@ export interface CapacityReading {
 	readonly options: ReadonlyArray<Readonly<Record<string, unknown>>>
 	readonly lookups: number
 	readonly folds: number
+}
+
+/** Holds semantic outcomes separately from operational execution qualification. */
+export interface CapacityOutcome {
+	readonly attempted: number
+	readonly successful: number
+	readonly unsuccessful: number
+	readonly partial: number
+	readonly empty: number
 }

@@ -1,5 +1,7 @@
 # Capacity qualification
 
+This prospective policy qualifies operational execution separately from semantic task success. Plans and results identify `policy: "execution-only"`. Every cell freezes `failure: continue`, so an ordinary unfinished or empty product remains unsuccessful while subsequent goals are attempted. Earlier strict-policy attempts and their receipts remain failed and unchanged; this policy does not resume or reclassify them. Root must bind the new qualifier policy, code and tests in a fresh verified receipt or policy record before another create-only live attempt.
+
 Materialize the public fixture and immutable launch plan without calls:
 
 ```text
@@ -24,8 +26,12 @@ The retained 12288/4096 prefill attempt completed two goals, then refused a tool
 
 The public fixture uses one synthetic shift, twelve arrivals plus opening, fictitious customers and orders, an arrival-six quantity correction, and status/reconciliation/queue/handoff goals after the final arrival. Each goal requests roughly 300–500 words. This shape retains the harness's required four-product shift contract. It exercises a long initial history and repeated requests; it does not qualify transitions between shifts. Fixture bytes are identical across candidates and cells. The derived public oracle provides the well-formed schema companion; qualification never grades semantic correctness or sends oracle content to a model.
 
-A sufficient result requires every cell's complete nonempty nonpartial horizon, valid wire evidence, matching loaded model digest and loaded context at least the physical window. Each model must produce an observed lookup and an actual compaction fold across its cells. Missing coverage ends the attempt as insufficient qualification. The driver records aggregate role counts, usage maxima, finish reasons, thinking presence where supplied, wire options and safe loaded-capacity/memory metadata. It never prints product bodies and does not infer exact token fit from character counts.
+A sufficient execution result requires every prescribed goal to have a row, observation and actual agent-request evidence in the exact frozen order, with run status complete and no operational terminal, error or faults. Every row and wire request must remain free of operational errors, overflow and failure flags. Existing usage, output/headroom/options, loaded-model/context, custody and aggregate bounds still apply. Each model must produce an observed lookup and an actual compaction fold across its cells. Missing horizon or mechanism coverage remains insufficient qualification.
+
+Attempted means the goal was executed and recorded; served means its product succeeded. Each cell's `reading.outcome` reports attempted, successful, unsuccessful, partial and empty counts. A partial remains unsuccessful, and its observation keeps `complete: false`; observation presence is distinct from product completion. The observed completion flag and retained unserved count must agree with the actual rows. A clean child exit0 is accepted only without unserved goals. A clean child exit3 is accepted only with a complete operationally valid horizon and consistent unserved goals. Expired, signaled or errored children and operational exit3 remain invalid. Even zero successful products can qualify execution if every operational and mechanism requirement is met; that is no evidence of task capability.
+
+The driver records aggregate role counts, usage maxima, finish reasons, thinking presence where supplied, wire options and safe loaded-capacity/memory metadata. It never prints product bodies and does not infer exact token fit from character counts. Public synthetic preflight measures execution coverage and capacity, not semantic quality on the original workload.
 
 Negative capacity/output controls and stalled-request/body cancellation belong to the successor's protocol-faithful offline proofs. Root must verify them before issuing the receipt. The driver does not manufacture passing controls or deliberately spend live model calls on failures. Passing capacity qualification cannot guarantee full-horizon answer quality. No live-success claim is made here.
 
-Run the driver proofs with `node --test .orkestrel/agent/tools/capacity/Runner.test.ts`.
+Run the driver proofs with `node --test .orkestrel/agent/tools/capacity/Runner.test.ts .orkestrel/agent/tools/capacity/Qualifier.test.ts`. Protocol fixtures drive actual frozen canonical children through unfinished eight-step loops and operational faults; they make no live model calls.

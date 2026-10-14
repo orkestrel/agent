@@ -1,4 +1,11 @@
-import type { CapacityFile, CapacityFixture, CapacityProof, CapacityReading } from './types.ts'
+import type {
+	CapacityExit,
+	CapacityFile,
+	CapacityFixture,
+	CapacityOutcome,
+	CapacityProof,
+	CapacityReading,
+} from './types.ts'
 import type {
 	EnduranceOracle,
 	EnduranceRuntime,
@@ -7,7 +14,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { CAPACITY_BUILD, CAPACITY_CUSTOMERS } from './constants.ts'
-import { isCapacityRecord } from './validators.ts'
+import { isCapacityFaultless, isCapacityRecord } from './validators.ts'
 
 /** Reads one JSON object without coercion.
  * @param path - File path
@@ -256,6 +263,117 @@ export function readCapacityCount(value: unknown): number {
 	return value
 }
 
+/** Derives semantic counts without requiring successful products.
+ * @param rows - Retained goal outcomes
+ * @returns Attempted, successful, unsuccessful, partial and empty counts
+ */
+export function collectCapacityOutcome(
+	rows: ReadonlyArray<Readonly<Record<string, unknown>>>,
+): CapacityOutcome {
+	let successful = 0,
+		partial = 0,
+		empty = 0
+	for (const row of rows) {
+		if (
+			typeof row.success !== 'boolean' ||
+			typeof row.partial !== 'boolean' ||
+			typeof row.reply !== 'string'
+		)
+			throw new Error('malformed semantic outcome')
+		const absent = row.reply.trim() === ''
+		if (row.success !== (!row.partial && !absent)) throw new Error('inconsistent semantic outcome')
+		if (row.success) successful += 1
+		if (row.partial) partial += 1
+		if (absent) empty += 1
+	}
+	return {
+		attempted: rows.length,
+		successful,
+		unsuccessful: rows.length - successful,
+		partial,
+		empty,
+	}
+}
+
+/** Validates complete operational execution while retaining unsuccessful products.
+ * @param info - Retained run metadata
+ * @param rows - Goal rows in their recorded order
+ * @param observations - Observation records in their recorded order
+ * @param requests - Retained wire evidence
+ * @param expected - Exact frozen goal order
+ * @param exit - Actual child outcome
+ * @returns Semantic outcomes independent of execution acceptance
+ */
+export function inspectCapacityExecution(
+	info: Readonly<Record<string, unknown>>,
+	rows: ReadonlyArray<Readonly<Record<string, unknown>>>,
+	observations: ReadonlyArray<Readonly<Record<string, unknown>>>,
+	requests: ReadonlyArray<Readonly<Record<string, unknown>>>,
+	expected: readonly string[],
+	exit: CapacityExit,
+): CapacityOutcome {
+	if (
+		info.status !== 'complete' ||
+		info.error !== undefined ||
+		info.terminal !== undefined ||
+		!isCapacityFaultless(info.faults)
+	)
+		throw new Error('operationally invalid qualification cell')
+	if (
+		rows.length !== expected.length ||
+		observations.length !== expected.length ||
+		!Array.isArray(info.goals) ||
+		info.goals.length !== expected.length ||
+		!info.goals.every((goal: unknown, index) => goal === expected[index])
+	)
+		throw new Error('insufficient qualification: exact attempted horizon required')
+	for (const [index, row] of rows.entries()) {
+		if (
+			row.goal !== expected[index] ||
+			row.error !== undefined ||
+			row.overflow !== false ||
+			!isCapacityFaultless(row.failures)
+		)
+			throw new Error('operationally invalid goal row')
+		const observation = observations[index]
+		const complete =
+			row.partial === false && typeof row.reply === 'string' && row.reply.trim() !== ''
+		if (
+			observation === undefined ||
+			observation.goal !== row.goal ||
+			observation.complete !== complete
+		)
+			throw new Error('inconsistent goal observation')
+		if (
+			!requests.some(
+				(request) => request.goal === row.goal && request.role === 'agent' && request.sent === true,
+			)
+		)
+			throw new Error('insufficient qualification: per-goal request evidence required')
+	}
+	for (const request of requests) {
+		if (
+			request.error !== undefined ||
+			!isCapacityFaultless(request.failures) ||
+			(typeof request.status === 'number' && request.status >= 400)
+		)
+			throw new Error('wire request failed')
+	}
+	const outcome = collectCapacityOutcome(rows)
+	if (readCapacityCount(info.unserved) !== outcome.unsuccessful)
+		throw new Error('inconsistent unserved semantic count')
+	if (
+		exit.expired ||
+		exit.signal !== null ||
+		exit.error !== undefined ||
+		(exit.code !== 0 && exit.code !== 3) ||
+		(exit.code === 0 && outcome.unsuccessful !== 0) ||
+		(exit.code === 3 && outcome.unsuccessful === 0)
+	)
+		throw new Error('child exit does not match complete operational outcome')
+	return outcome
+}
+
 /** Collects safe role and wire measurements from retained artifacts.
  * @param requests - Wire evidence
  * @param rows - Product outcomes
@@ -317,6 +435,7 @@ export function collectCapacityReading(
 		0,
 	)
 	return {
+		outcome: collectCapacityOutcome(rows),
 		calls,
 		tokens,
 		prompt,
