@@ -55,7 +55,7 @@ export class Driver {
 		}
 		if (this.#options.plan) {
 			this.#pending = batches.filter((batch) => !existsSync(batch.output) || !this.#check(batch))
-			console.log(JSON.stringify({ items: ids.length, batches: batches.length, pending: this.#pending.length, concurrency: this.#options.concurrency, limit: this.#options.limit, cap: this.#options.cap, model: 'gpt-6.1-sol', effort: 'high' }))
+			console.log(JSON.stringify({ harness: this.#options.harness, items: ids.length, batches: batches.length, pending: this.#pending.length, concurrency: this.#options.concurrency, limit: this.#options.limit, cap: this.#options.cap, model: 'gpt-6.1-sol', effort: 'high' }))
 			return
 		}
 		const lock = join(audit, 'c1-label.lock')
@@ -79,7 +79,7 @@ export class Driver {
 		if (!Array.isArray(labels) || labels.length !== batch.ids.length) throw new Error(`${batch.name}: assigned ids differ`)
 		const ids = labels.map((label: unknown) => typeof label === 'object' && label !== null ? Reflect.get(label, 'id') : undefined)
 		if (new Set(ids).size !== batch.ids.length || !batch.ids.every((id) => ids.includes(id))) throw new Error(`${batch.name}: assigned ids differ`)
-		const result = spawnSync(process.execPath, [join(this.#root, '.orkestrel/agent/instruments/harness/.build/bench5/continuous.js'), 'labels', '--packet', this.#options.packet, '--labels', batch.output], { cwd: this.#root, encoding: 'utf8', windowsHide: true })
+		const result = spawnSync(process.execPath, [join(this.#options.harness, '.build', 'bench5', 'continuous.js'), 'labels', '--packet', this.#options.packet, '--labels', batch.output], { cwd: this.#root, encoding: 'utf8', windowsHide: true })
 		if (result.status !== 0 || !/^.*\brefused 0\b.*$/m.test(result.stdout) || /^REFUSED\b/m.test(result.stdout)) throw new Error(`${batch.name}: checker refused\n${result.stdout}${result.stderr}`)
 		return true
 	}
@@ -104,8 +104,9 @@ export class Driver {
 		const journal = join(directory, 'journal.jsonl')
 		const errors = join(directory, 'journal.err')
 		const last = join(directory, 'journal-last.md')
-		const rubric = readFileSync(join(this.#root, '.orkestrel/agent/instruments/harness/tools/c1/c1-label-brief.md'), 'utf8').replace('Claude Opus 5.5', 'GPT-6.1 Sol').replace('from the scaffold root', `from ${this.#root}`)
-		writeFileSync(brief, `${rubric}\n\n## Assignment\n\nRead only these assigned item files: ${batch.ids.map((id) => join(dirname(this.#options.packet), 'items', `${id}.json`)).join(', ')}.\nWrite only ${batch.output}.\nUse packet hash ${this.#options.hashes.packet} and keys hash ${this.#options.hashes.keys}.\nRun from ${this.#root}:\n\n\`\`\`text\nnode .orkestrel/agent/instruments/harness/.build/bench5/continuous.js labels --packet "${this.#options.packet}" --labels "${batch.output}"\n\`\`\`\n`, { flag: 'wx' })
+		const checker = join(this.#options.harness, '.build', 'bench5', 'continuous.js')
+		const rubric = readFileSync(join(this.#options.harness, 'tools', 'c1', 'c1-label-brief.md'), 'utf8').replace('Claude Opus 5.5', 'GPT-6.1 Sol').replace('from the scaffold root', `from ${this.#root}`).replace(/^node .+continuous\.js labels --packet PACKET_PATH --labels YOUR_LABELS_PATH$/gm, () => `node "${checker}" labels --packet PACKET_PATH --labels YOUR_LABELS_PATH`)
+		writeFileSync(brief, `${rubric}\n\n## Assignment\n\nRead only these assigned item files: ${batch.ids.map((id) => join(dirname(this.#options.packet), 'items', `${id}.json`)).join(', ')}.\nWrite only ${batch.output}.\nUse packet hash ${this.#options.hashes.packet} and keys hash ${this.#options.hashes.keys}.\nRun from ${this.#root}:\n\n\`\`\`text\nnode "${checker}" labels --packet "${this.#options.packet}" --labels "${batch.output}"\n\`\`\`\n`, { flag: 'wx' })
 		const code = await new Promise<number>((complete, reject) => {
 			const child = spawn(process.execPath, [join(this.#root, 'node_modules/@orkestrel/scaffold/dist/agents/skills/orkestrel-dispatch/scripts/launch.js'), '--journal', journal, '--errors', errors, '--cap', String(this.#options.cap), '--status', '--', 'codex', 'exec', '--json', '-C', this.#root, '--sandbox', process.platform === 'win32' ? 'danger-full-access' : 'workspace-write', '--model', 'gpt-6.1-sol', '-c', 'model_reasoning_effort="high"', '-c', 'mcp_servers.tactica-probe.enabled=false', '--output-last-message', last, `Read ${brief} from disk and execute it exactly. Your final message is the report it specifies.`], { cwd: this.#root, shell: false, windowsHide: true, stdio: ['ignore', 'inherit', 'inherit'] })
 			child.on('error', reject)

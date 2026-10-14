@@ -4,6 +4,18 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
+import { parseOptions } from './parsers.ts'
+
+test('selected harness requires both canonical checker and rubric before planning', () => {
+	const directory = mkdtempSync(resolve('tmp/units/c1-capacity-label-path-fixture-'))
+	const args = ['--harness', directory, '--packet', 'inert-public-packet.json', '--packet-hash', 'a'.repeat(64), '--keys-hash', 'b'.repeat(64), '--unit', 'fixture', '--cap', '1', '--plan']
+	assert.throws(() => parseOptions(args), /canonical checker or rubric/)
+	mkdirSync(join(directory, '.build', 'bench5'), { recursive: true })
+	writeFileSync(join(directory, '.build', 'bench5', 'continuous.js'), '')
+	assert.throws(() => parseOptions(args), /c1-label-brief\.md/)
+	assert.equal(existsSync(join(directory, 'c1-label.lock')), false)
+	assert.equal(existsSync(join(directory, 'labels')), false)
+})
 
 test('real processes plan read-only, refuse invalid input, and validate resume with canonical checker', () => {
 	const directory = mkdtempSync(resolve('tmp/units/c1-label-driver-fixture-'))
@@ -16,11 +28,25 @@ test('real processes plan read-only, refuse invalid input, and validate resume w
 	writeFileSync(join(directory, 'items', 'index.json'), JSON.stringify([{ id }]))
 	writeFileSync(join(directory, 'items', `${id}.json`), JSON.stringify(item))
 	const hash = createHash('sha256').update(readFileSync(packet)).digest('hex')
-	const args = ['.orkestrel/agent/tools/c1/main.ts', '--packet', packet, '--packet-hash', hash, '--keys-hash', keys, '--unit', 'fixture', '--cap', '1']
+	const harness = resolve('.orkestrel/agent/instruments/harness')
+	const base = ['.orkestrel/agent/tools/c1/main.ts', '--packet', packet, '--packet-hash', hash, '--keys-hash', keys, '--unit', 'fixture', '--cap', '1']
+	const args = [...base, '--harness', '.orkestrel/agent/instruments/harness']
 	const before = readdirSync(directory)
-	let result = spawnSync(process.execPath, [...args, '--plan'], { encoding: 'utf8' })
+	let result = spawnSync(process.execPath, [...base, '--plan'], { encoding: 'utf8' })
+	assert.equal(result.status, 3)
+	assert.match(result.stderr, /--harness DIR is required/)
+	assert.deepEqual(readdirSync(directory), before)
+	for (const invalid of [join(directory, 'absent-harness'), packet, directory]) {
+		result = spawnSync(process.execPath, [...base, '--harness', invalid, '--plan'], { encoding: 'utf8' })
+		assert.equal(result.status, 3)
+		assert.match(result.stderr, /--harness/)
+		assert.deepEqual(readdirSync(directory), before)
+	}
+	result = spawnSync(process.execPath, [...args, '--plan'], { encoding: 'utf8' })
 	assert.equal(result.status, 0, result.stderr)
 	assert.match(result.stdout, /"pending":1/)
+	const planned: unknown = JSON.parse(result.stdout)
+	assert.equal(typeof planned === 'object' && planned !== null ? Reflect.get(planned, 'harness') : undefined, harness)
 	assert.deepEqual(readdirSync(directory), before)
 	writeFileSync(join(directory, 'items', `${id}.json`), JSON.stringify({ ...item, product: 'Stale inert text.' }))
 	result = spawnSync(process.execPath, [...args, '--plan'], { encoding: 'utf8' })

@@ -1,5 +1,6 @@
 /** Describes validated driver inputs and spending bounds. */
 export interface Options {
+	readonly harness: string
 	readonly packet: string
 	readonly hashes: { readonly packet: string; readonly keys: string }
 	readonly unit: string
