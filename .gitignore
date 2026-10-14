@@ -41,3 +41,6 @@ playwright-report/
 
 # Temporary campaign results exclusion.
 .orkestrel/agent/instruments/results/*
+
+# Temporary frozen harness build; remove after the series and dependent reporting finish.
+.orkestrel/agent/instruments/harness/.build/

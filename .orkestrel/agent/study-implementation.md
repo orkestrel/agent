@@ -57,6 +57,8 @@ U5 found a rubric path/version mismatch in U2. Definition.rubric names the input
 
 Cleanup follows the user's request to prune while working. The read-only sweep ran on 2026-10-14. Initial naming-round positions are archived in cdb94447248fc0b135dc62dd3a81ae244d8bb2a9; the round receipt, accepted findings and final synthesis remain. Active implementation inputs, capacity acceptance reports bound by hash, frozen instruments, manifests and raw runs remain in place. Do not run a broad tmp sweep beside live journals.
 
+The user restored the temporary instruments/harness/.build ignore on 2026-10-14. Remove that build and its ignore only after the active series and all dependent grading, reporting, and custody checks no longer need it. Do not treat generation completion alone as permission to remove a bound instrument.
+
 | Unit | Owner and files | Acceptance |
 | --- | --- | --- |
 | U1 contract | Root: app/core/studies/types.ts, constants.ts, errors.ts, environment barrel | Typed public inputs, nested finite allowances, outcomes distinct from judgments; strict compiler proof passed |
