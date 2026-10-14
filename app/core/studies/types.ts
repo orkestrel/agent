@@ -131,7 +131,7 @@ export interface StudyUsage {
 	readonly role: StudyRole
 	readonly calls: number
 	readonly tokens: number | undefined
-	readonly bytes: number
+	readonly bytes: number | undefined
 	readonly duration: number
 }
 
