@@ -6,7 +6,7 @@ Implement the optional `study` development surface in the agent checkout. Use th
 
 Preserve the running capacity series and its daemon. Do not edit or rebuild either campaign harness, the qualification tool, frozen manifests, pinned dependencies, or raw evidence. Do not start another GPU workload. Keep implementation in a separate durable tree. Defer archive moves and campaign retirement until the series and its grading finish.
 
-The user authorizes one final focused Fable 5.1 implementation-design pass. After that invocation, do not use Fable again without fresh explicit user permission. Keep its packet read-only and bounded; record the invocation and outcome here. Opus 5.5 remains authorized for adversarial and subjective roles in this Codex session. Luna at max effort remains the user's choice for absorption and research. These explicit preferences override the default routing where they differ.
+The final authorized Fable 5.1 implementation-design invocation launched at 2026-10-14T15:51:12Z under launcher PID 74112, with a 600-second cap, 16-turn cap, and 5 USD API-equivalent accounting ceiling. Its read-only packet and journal are `tmp/claude/study-final/` and `tmp/claude/study-final.jsonl`. This consumes the user's final allowance: do not invoke Fable again without fresh explicit user permission, including after a failed or capped call. Opus 5.5 remains authorized for adversarial and subjective roles in this Codex session. Luna at max effort remains the user's choice for absorption and research. These explicit preferences override the default routing where they differ.
 
 Do not add dependencies, publish, or bump a version. Preserve unrelated workspace changes and historical evidence.
 
@@ -34,6 +34,8 @@ Scout map: `tmp/units/study-implementation-map.txt`, generated from the named pa
 Read-only absorption runs in parallel: `study_portability` on Luna max maps package contracts, installed primitives, and workspace wiring; `study_practices` on Luna max researches primary-source consequences for the implementation. Their briefs are under `tmp/units/`.
 
 Reconcile their evidence into a bounded implementation brief. Give the expanded implementation contract one blind subjective/objective design round, then the user's final focused Fable pass. Freeze types and disjoint writer ownership before dispatch. Run one integrated adversarial review and independent gates. Record accepted units and measurements here.
+
+The Luna readers completed without side effects. Their reports are `tmp/units/study-portability-report.md` and `tmp/units/study-practices-report.md`. The blind Opus position completed in session `e3d1fcae-1b76-4069-9ff2-b50822b9eb2b`, uncapped exit 0 after 163128 ms; its report is `tmp/units/study-design-report.md`. Native Astra's independent position is distilled in `tmp/units/study-analysis-report.md`. Both recommend a fresh prospective consumer, independently of the campaign instrument. The final Fable packet includes both positions, the reader evidence, authority, and focused questions about unresolved wiring, artifact closure, grading, and failure semantics.
 
 ## Live comparison
 
