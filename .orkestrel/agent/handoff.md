@@ -2,6 +2,10 @@
 
 The user has since requested a capacity repair and a new bounded comparison. The active successor is tracked in [capacity.md](capacity.md). The closed baseline below remains unchanged evidence.
 
+Active implementation is in [study-implementation.md](study-implementation.md). Middleware0.0.24 and supported app wiring are committed; the study contract, core validation and artifact loader are implemented, while execution, custody and concrete consumers remain in integration. The user's final Fable allowance is consumed; do not invoke it again. Use published latest versions of declared Orkestrel dependencies for working builds, preserving frozen runs. Consolidate study fixtures by surface, never per item.
+
+The verified extended capacity series launched at2026-10-14T16:40:08Z under launcherPID77892 with its12-hour series deadline. Its journal is tmp/codex/c1-capacity-extended-series.jsonl, and raw runs are instruments/harness-capacity/tmp/c1-capacity-extended/runs. See capacity.md for exact frozen identities and limits. No parallel GPU work or harness rebuild is permitted.
+
 The evaluation research and user-requested adversarial round closed on 2026-10-14. See [study.md](study.md) for the recommendation, [Fable's synthesis](study-synthesis.md) for the complete design, and [the round record](study-round.md) for the independent Opus proposal, Opus review, model custody, and root reconciliation. Adopt `study` for the optional development command and an unpublished `studies/` tree owned by the agent checkout. This supersedes the earlier scaffold ownership proposal and `bench` umbrella name; no move, command, or public API is implemented. The supplied-article review, methods research, and naming evidence remain linked from the proposal. Local model execution remains serial.
 
 Closed on 2026-10-14. The thinking series and both blind audits are finished. No generation, labeling, merge, or report is waiting to run. The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.

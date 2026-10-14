@@ -49,6 +49,8 @@ U2 completed its parsers, guards, schedule, and whole-horizon scoring. Its scope
 
 The model and records research is distilled in experiments.md with adjacent source reports. No model download or GPU work accompanied it.
 
+The user's fixture correction on 2026-10-14 requires one setup per layer or surface. Use tests/setupStudy.ts and its mirrored test for shared study fixtures. Keep genuinely host-dependent resource orchestration in the existing server setup when environment isolation requires it. Do not create setup files per engine, store, tool, process, or command. Root has assigned the consolidation before successor consumers; parallel units return shared fixture changes for serial integration.
+
 | Unit | Owner and files | Acceptance |
 | --- | --- | --- |
 | U1 contract | Root: app/core/studies/types.ts, constants.ts, errors.ts, environment barrel | Typed public inputs, nested finite allowances, outcomes distinct from judgments; strict compiler proof passed |
