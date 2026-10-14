@@ -1,5 +1,13 @@
 # Handoff for the next session
 
+## Resume checkpoint: 2026-10-14 00:12 EDT
+
+q4 thinking grading finished: the canonical report is valid and `inconclusive` because records overflowed. The packet has 145 accepted labels, 0 refused, and 0 unlabeled. Records has 48 graded products but only 47 complete goals; compaction has 92 graded products across 96 attempts. Records has 1 acceptable product and 11 critical violations; compaction has 0 and 26. The report records no design leaks and one missed ambiguous control under the retained per-adjudicator rule. See `instruments/results/c1/q4-think/audit/report.md` and `report.json`.
+
+The q4 finish launcher ended with exit 0, uncapped, duration 2488467 ms. Its child Sol journals retain the session receipts. The scaffold RESULTS.md and this folder's direction.md include the q4 reading, with the changed-budget and unequal-horizon limits. Luna independently verified the canonical labels check (exit 0, refused 0, unlabeled 0), raw integrity (exit 0, failures 0 for every arm), empty harness diff, and the prose measurements. The missed ambiguous control flags its batch summary but does not invalidate the retained labels or overall report. The canonical regenerated `q4-think/audit/items/` directory remains untracked: command policy rejected its removal, and no alternative deletion was attempted.
+
+q2 records reached `ev-18-3` with no faults. The series and daemon remain live. The q2 completion chain from the preceding checkpoint is still waiting for the series terminal event, then will build the blind packet and run Sol grading at concurrency 6. Do not relaunch it, rebuild the frozen harness, or sweep its files. Read its journal and errors at `tmp/codex/c1-think-q2-finish.jsonl` and `.err`. After it closes, verify the q2 report and raw integrity, add its reading to RESULTS.md and direction.md, replace the pending statements in those files, and commit custody. No bump, publication, or preservation move has been requested.
+
 ## Resume checkpoint: 2026-10-13 23:26 EDT
 
 The T3/Codex session continued from `ef83b30` without stopping the series, daemon, or existing Claude workers. The user confirmed that allowance is sufficient and requested parallel work with appropriate models and no quality reduction. No version bump or publication is authorized by this checkpoint.
