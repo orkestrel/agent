@@ -1,5 +1,7 @@
 # Results
 
+**Study execution, 2026-10-14.** The prospective thinking-disabled capacity attempt stopped before model requests because the captured loader rejected the provider's installed Agent dependency. Both trials are sealed infrastructure failures: 192 unexecuted goals, no products, and zero calls across every measured role. The CLI exited 1, uncapped, in 4520 ms; independent grading and reporting succeeded. This measures a workspace-loading failure, not model capacity or task quality. Quality execution did not start. See [the execution record](.orkestrel/agent/handoff.md).
+
 **Capacity successor, 2026-10-14.** The extended comparison stopped after q4 records completed 48 of 96 goals and exhausted its 8,192-token output allowance on attempt 49. The remaining arms never started. This is a retained capacity failure, not a completed quality comparison. See [the capacity record](.orkestrel/agent/capacity.md).
 
 **Graded baseline, 2026-10-14.** The comparison is the records design against the package's own window compaction, with the whole history as the overflow control, on the 96-goal continuous workload with Qwen 3.5 4B and 2B. Both original thinking settings are graded. With thinking enabled, the valid q4 report is inconclusive because records overflowed; the valid q2 report favors records, which served every goal while compaction served 38 of 96. The campaign and result custody live in this Agent checkout. See [the handoff](.orkestrel/agent/handoff.md) and [the package direction](.orkestrel/agent/direction.md).
