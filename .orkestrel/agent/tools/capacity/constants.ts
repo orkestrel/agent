@@ -30,14 +30,14 @@ export const CAPACITY_LIMITS = Object.freeze({
 })
 /** Freezes the initial candidate. */
 export const CAPACITY_INITIAL: CapacityProfile = Object.freeze({
-	window: 12288,
+	window: 16384,
 	reserve: 4096,
 	safety: 512,
 	timeout: 180000,
 })
 /** Freezes the root-selected escalation candidate. */
 export const CAPACITY_EXTENDED: CapacityProfile = Object.freeze({
-	window: 16384,
+	window: 20480,
 	reserve: 8192,
 	safety: 512,
 	timeout: 360000,

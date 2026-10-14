@@ -1,0 +1,13 @@
+# Prompt-room candidate acceptance
+
+Root accepts one separately retained context-only qualification attempt on 2026-10-14. Initial context is 16384, decision output and planning reserve 4096, safety 512, request deadline 180000ms, auxiliary deadline 90000ms, and goal deadline 900000ms. The full qualification remains limited to 1800000ms, 512 calls, and 1000000 tokens across the same model/arm population. Retries remain disabled.
+
+The retained prefill attempt at `tmp/units/c1-capacity-initial-prefill-live` completed calibration and two q4 records goals, then refused a tool-expanded prompt before sending it. The input estimate 5964, scale 1.2303168025665019, overhead 464, and drift 1.06 priced the prompt at 8241.866 tokens. Output 4096 and safety 512 exceeded the 12288 admission envelope by 561.866. Successful recall results contributed 9822 characters of the 10128-character tool-result batch. No actual server usage exists for the refused request; this is conservative admission exhaustion, not a measured physical overflow. The qualifier exited 3 uncapped after 450892ms, before later cells, with 85 total HTTP calls and 118625 known tokens.
+
+Independent Astra review found no double-drift defect in initial planning. Within-turn recall uses observed room and adaptive pricing, so it can disagree with the guard's fixed calibration envelope. The unchanged refused input would leave 3534.134 tokens under the selected context. Larger capacity can also enlarge live selections and recalls; the candidate is not a success claim. The accepted review is retained in `c1-capacity-room-review.md`.
+
+The output-only contingency becomes context 20480/output 8192/safety 512/request 360000ms, preserving the selected initial candidate's prompt allowance. It is unselected and requires a separate root decision on observed output exhaustion. A timeout, prompt refusal, or infrastructure fault does not select it.
+
+Independent Luna gates in `tmp/units/c1-capacity-room-verify.md` passed strict qualifier typecheck, scoped lint and format, eight Runner tests (950.1619ms), and fresh initial/extended plan audits across every cell. The original receipt verifies. The frozen successor build-manifest SHA256 remains `21f65be21acf15f14dbd84d074c3a3fa1fac6b6e9e373adf4535d991fafe8bd2`; neither harness changed. The accepted instrument proofs remain in `capacity-proof.md`. Earlier reports, receipts, and attempts remain immutable.
+
+The receipt bound to this document authorizes the separately named room attempt only. All completion, loaded capacity, lookup/fold, wire, and usage criteria remain required before freezing the held-out comparison.
