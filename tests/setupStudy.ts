@@ -15,6 +15,23 @@ import type { StudyMeterFixture } from './app/core/studies/engines/types.js'
 import { StudyControl, StudyMeter, StudyScope } from '../app/core/studies/engines/index.js'
 import { buildStudySchedule } from '../app/core/studies/helpers.js'
 
+/** Supplies malformed command tokens that must refuse before custody or child work. */
+export const STUDY_COMMAND_INVALID_ARGUMENTS: ReadonlyArray<readonly string[]> = Object.freeze([
+	[],
+	['unknown', 'tools'],
+	['check'],
+	['check', '../escape'],
+	['check', 'tools', '--profile'],
+	['check', 'tools', '--profile', 'local', '--profile', 'local'],
+	['check', 'tools', '--unknown', 'local'],
+	['check', 'tools', '--out', '/unused'],
+	['execute', 'tools', '--out', 'relative'],
+	['execute', 'tools', '--expected', 'invalid'],
+	['grade', 'result'],
+	['label', 'result', '--grading', 'a'.repeat(64)],
+	['report', 'result', '--grading', 'invalid'],
+])
+
 /** Returns a declared two-arm, two-scenario, two-repetition population. */
 export function buildStudyDefinition(change: Partial<StudyDefinition> = {}): StudyDefinition {
 	return {

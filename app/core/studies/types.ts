@@ -49,7 +49,7 @@ export interface StudyDefinition {
 	readonly driver: string
 	readonly arms: readonly string[]
 	readonly scenarios: readonly string[]
-	readonly order: readonly (readonly string[])[]
+	readonly order: ReadonlyArray<readonly string[]>
 	readonly retries: 0
 	readonly rubric: string
 }
