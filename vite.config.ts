@@ -3,7 +3,7 @@ import { mergeConfig } from 'vite'
 import { defineConfig } from 'vitest/config'
 import manifest from './package.json' with { type: 'json' }
 import tsconfig from './tsconfig.json' with { type: 'json' }
-import { enforceBuildLog, environmentBoundary, outputBoundary } from './configs/helpers.js'
+import { enforceBuildLog } from './configs/helpers.js'
 import { fileURLToPath, URL } from 'node:url'
 
 export function resolveWorkspacePath(relativePath: string): string {
@@ -137,60 +137,6 @@ export function srcCore(override?: UserConfig): UserConfig {
 	return mergeOverride(project, override)
 }
 
-export function appCore(override?: UserConfig): UserConfig {
-	const project: UserConfig = {
-		resolve,
-		publicDir: false,
-		plugins: [environmentBoundary('app/core')],
-		test: {
-			name: { label: 'app:core', color: 'cyan' },
-			include: ['tests/app/core/**/*.test.ts'],
-			setupFiles: ['./tests/setup.ts'],
-			environment: 'node',
-			browser: { enabled: false },
-		},
-	}
-	return mergeOverride(project, override)
-}
-
-function resolveAppFilename(): string {
-	return 'main.cjs'
-}
-
-function resolveAppExternal(id: string): boolean {
-	return id.startsWith('node:')
-}
-
-export function appServer(override?: UserConfig): UserConfig {
-	const project: UserConfig = {
-		resolve,
-		publicDir: false,
-		plugins: [outputBoundary('dist/app/server'), environmentBoundary('app/server')],
-		build: {
-			emptyOutDir: true,
-			lib: {
-				entry: resolveWorkspacePath('app/server/main.ts'),
-				formats: ['cjs'],
-				fileName: resolveAppFilename,
-			},
-			outDir: resolveWorkspacePath('dist/app/server'),
-			target: 'node22',
-			rolldownOptions: {
-				onLog: enforceBuildLog,
-				external: resolveAppExternal,
-			},
-		},
-		test: {
-			name: { label: 'app:server', color: 'green' },
-			include: ['tests/app/server/**/*.test.ts'],
-			setupFiles: ['./tests/setup.ts', './tests/setupServer.ts'],
-			environment: 'node',
-			browser: { enabled: false },
-		},
-	}
-	return mergeOverride(project, override)
-}
-
 export function policy(override?: UserConfig): UserConfig {
 	const project: UserConfig = {
 		resolve,
@@ -255,6 +201,27 @@ export function guides(override?: UserConfig): UserConfig {
 	return mergeOverride(project, override)
 }
 
+// The caller prepares the live external services before this project.
+// `tests/setupService.ts` verifies readiness, and the project stays out of `npm test`
+// because a real service answers it.
+export function service(override?: UserConfig): UserConfig {
+	const project: UserConfig = {
+		resolve,
+		test: {
+			name: { label: 'service', color: 'red' },
+			include: ['tests/service/**/*.test.ts'],
+			setupFiles: ['./tests/setup.ts', './tests/setupService.ts'],
+			environment: 'node',
+			browser: { enabled: false },
+			testTimeout: 120_000,
+			hookTimeout: 120_000,
+			fileParallelism: false,
+			sequence: { groupOrder: 1 },
+		},
+	}
+	return mergeOverride(project, override)
+}
+
 export function distribution(override?: UserConfig): UserConfig {
 	const project: UserConfig = {
 		resolve,
@@ -298,6 +265,6 @@ export function probe(override?: UserConfig): UserConfig {
 export default defineConfig({
 	resolve,
 	test: {
-		projects: [srcCore, appCore, appServer, policy, config, setup, guides, distribution, probe],
+		projects: [srcCore, policy, config, setup, guides, service, distribution, probe],
 	},
 })

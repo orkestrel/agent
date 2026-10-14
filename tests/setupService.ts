@@ -1,8 +1,22 @@
-import type { MemoryContextFixture, MemoryModuleFixture, MemoryProfileFixture, MemoryReplyFixture, MemoryServerFixture, MemoryWireFixture } from './service/studies/memory/types.js'
+import type {
+	MemoryContextFixture,
+	MemoryModuleFixture,
+	MemoryProfileFixture,
+	MemoryReplyFixture,
+	MemoryServerFixture,
+	MemoryWireFixture,
+} from './service/studies/memory/types.js'
 import type { StudyEvidence, StudyProfile } from '@orkestrel/study'
 import type { StudyToolsFixture } from './service/studies/tools/types.js'
 import { parseJSON } from '@orkestrel/contract'
-import { parseStudyDefinition, parseStudyProfile, parseStudyRubric, parseStudyScenario, buildStudySchedule, validateStudyInputs } from '@orkestrel/study'
+import {
+	parseStudyDefinition,
+	parseStudyProfile,
+	parseStudyRubric,
+	parseStudyScenario,
+	buildStudySchedule,
+	validateStudyInputs,
+} from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
 import { createServer } from 'node:http'
 import { cp, mkdir, mkdtemp, rm, symlink, readFile } from 'node:fs/promises'
@@ -11,15 +25,25 @@ import { pathToFileURL } from 'node:url'
 import { StudyControl, StudyMeter, StudyScope } from '@orkestrel/study'
 
 /** Starts a native loopback Ollama protocol fixture on an ephemeral port. */
-export async function createMemoryServer(responses: readonly MemoryWireFixture[] = []): Promise<MemoryServerFixture> {
+export async function createMemoryServer(
+	responses: readonly MemoryWireFixture[] = [],
+): Promise<MemoryServerFixture> {
 	const queue = [...responses]
 	const requests: MemoryServerFixture['requests'] = []
 	const server = createServer(async (request, response) => {
 		const chunks: Buffer[] = []
-		for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+		for await (const chunk of request)
+			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
 		requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
 		if (request.url === '/api/tags' && queue[0]?.path !== '/api/tags') {
-			response.end(JSON.stringify({ models: [{ name: 'model', digest: 'a'.repeat(64) }, { name: 'judge', digest: 'b'.repeat(64) }] }))
+			response.end(
+				JSON.stringify({
+					models: [
+						{ name: 'model', digest: 'a'.repeat(64) },
+						{ name: 'judge', digest: 'b'.repeat(64) },
+					],
+				}),
+			)
 			return
 		}
 		const supplied = queue[0]?.path === request.url ? queue.shift() : undefined
@@ -30,19 +54,54 @@ export async function createMemoryServer(responses: readonly MemoryWireFixture[]
 			return
 		}
 		if (request.url === '/api/show') {
-			response.end(JSON.stringify({ model_info: { 'general.architecture': 'fixture', 'fixture.context_length': 32768 } }))
+			response.end(
+				JSON.stringify({
+					model_info: { 'general.architecture': 'fixture', 'fixture.context_length': 32768 },
+				}),
+			)
 			return
 		}
 		if (request.url === '/api/generate') {
-			response.end(JSON.stringify({ model: 'judge', done: true, done_reason: 'length', response: 'A', prompt_eval_count: 10, eval_count: 1, logprobs: [{ token: 'A', logprob: -0.01, top_logprobs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'].map((token, index) => ({ token, logprob: index === 0 || token === 'Yes' ? -0.01 : -8 })) }] }))
+			response.end(
+				JSON.stringify({
+					model: 'judge',
+					done: true,
+					done_reason: 'length',
+					response: 'A',
+					prompt_eval_count: 10,
+					eval_count: 1,
+					logprobs: [
+						{
+							token: 'A',
+							logprob: -0.01,
+							top_logprobs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'].map(
+								(token, index) => ({ token, logprob: index === 0 || token === 'Yes' ? -0.01 : -8 }),
+							),
+						},
+					],
+				}),
+			)
 			return
 		}
 		response.end(buildMemoryReply())
 	})
-	await new Promise<void>((resolveListen, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolveListen) })
+	await new Promise<void>((resolveListen, reject) => {
+		server.once('error', reject)
+		server.listen(0, '127.0.0.1', resolveListen)
+	})
 	const address = server.address()
-	if (address === null || typeof address === 'string') throw new Error('Missing native fixture address')
-	return { url: `http://127.0.0.1:${address.port}`, requests, responses: queue, close: () => new Promise<void>((resolveClose, reject) => { server.closeAllConnections(); server.close((error) => error === undefined ? resolveClose() : reject(error)) }) }
+	if (address === null || typeof address === 'string')
+		throw new Error('Missing native fixture address')
+	return {
+		url: `http://127.0.0.1:${address.port}`,
+		requests,
+		responses: queue,
+		close: () =>
+			new Promise<void>((resolveClose, reject) => {
+				server.closeAllConnections()
+				server.close((error) => (error === undefined ? resolveClose() : reject(error)))
+			}),
+	}
 }
 
 /** Builds inert protocol output consumed by the actual Ollama package. */
@@ -52,18 +111,62 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 
 /** Builds a finite CPU-only profile with explicit fixture digests. */
 export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile {
-	return { name: 'cpu-fixture', subject: 'dist/src/core/index.js', roots: [], qualification: 'tmp/unused-capacity', provider: { entry: 'unchanged-staged-ollama', url: options.url, model: 'model', judge: 'judge', digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) } }, room: { context: 32768, output: 512, safety: 128, recap: 256, think: false, ...options.room }, bounds: { request: { duration: 2000, calls: 1, tokens: 32768, bytes: 1048576 }, goal: { duration: 15000, calls: 256, tokens: 8388608, bytes: 268435456 }, trial: { duration: 30000, calls: 512, tokens: 16777216, bytes: 536870912 }, series: { duration: 60000, calls: 1024, tokens: 33554432, bytes: 1073741824 } } }
+	return {
+		name: 'cpu-fixture',
+		subject: 'dist/src/core/index.js',
+		roots: [],
+		qualification: 'tmp/unused-capacity',
+		provider: {
+			entry: 'unchanged-staged-ollama',
+			url: options.url,
+			model: 'model',
+			judge: 'judge',
+			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+		},
+		room: { context: 32768, output: 512, safety: 128, recap: 256, think: false, ...options.room },
+		bounds: {
+			request: { duration: 2000, calls: 1, tokens: 32768, bytes: 1048576 },
+			goal: { duration: 15000, calls: 256, tokens: 8388608, bytes: 268435456 },
+			trial: { duration: 30000, calls: 512, tokens: 16777216, bytes: 536870912 },
+			series: { duration: 60000, calls: 1024, tokens: 33554432, bytes: 1073741824 },
+		},
+	}
 }
 
 /** Creates actual hierarchical request accounting and an evidence recorder. */
-export function createMemoryContext(profile: StudyProfile, signal = new AbortController().signal): MemoryContextFixture {
+export function createMemoryContext(
+	profile: StudyProfile,
+	signal = new AbortController().signal,
+): MemoryContextFixture {
 	const control = new StudyControl(signal)
 	const series = new StudyScope({ label: 'series', limit: profile.bounds.series, control })
 	const trial = new StudyScope({ label: 'trial', limit: profile.bounds.trial, control })
 	const goal = new StudyScope({ label: 'goal', limit: profile.bounds.goal, control })
-	const meter = new StudyMeter({ request: profile.bounds.request, scopes: [series, trial, goal], control })
+	const meter = new StudyMeter({
+		request: profile.bounds.request,
+		scopes: [series, trial, goal],
+		control,
+	})
 	const evidence: StudyEvidence[] = []
-	return { context: { signal, meter, evidence: { append: async (row) => { evidence.push(row) } } }, evidence, close: () => { meter.close(); goal.close(); trial.close(); series.close(); control.close() } }
+	return {
+		context: {
+			signal,
+			meter,
+			evidence: {
+				append: async (row) => {
+					evidence.push(row)
+				},
+			},
+		},
+		evidence,
+		close: () => {
+			meter.close()
+			goal.close()
+			trial.close()
+			series.close()
+			control.close()
+		},
+	}
 }
 
 /** Stages unchanged public provider bytes with ordinary resolution to the selected Agent. */
@@ -76,11 +179,24 @@ export async function createMemoryModules(): Promise<MemoryModuleFixture> {
 		await cp(resolve('../ollama/package.json'), join(packages, 'ollama/package.json'))
 		await cp(resolve('../ollama/dist'), join(packages, 'ollama/dist'), { recursive: true })
 		await symlink(resolve('.'), join(packages, 'agent'), 'junction')
-		await symlink(resolve('../ollama/node_modules/@orkestrel/ndjson'), join(packages, 'ndjson'), 'junction')
+		await symlink(
+			resolve('../ollama/node_modules/@orkestrel/ndjson'),
+			join(packages, 'ndjson'),
+			'junction',
+		)
 		const subject: unknown = await import(pathToFileURL(resolve('dist/src/core/index.js')).href)
-		const provider: unknown = await import(pathToFileURL(join(packages, 'ollama/dist/src/core/index.js')).href)
-		return { subject, provider, close: () => rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 }) }
-	} catch (error) { await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 }); throw error }
+		const provider: unknown = await import(
+			pathToFileURL(join(packages, 'ollama/dist/src/core/index.js')).href
+		)
+		return {
+			subject,
+			provider,
+			close: () => rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 }),
+		}
+	} catch (error) {
+		await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 })
+		throw error
+	}
 }
 
 /**
@@ -108,7 +224,13 @@ export async function loadStudyToolsFixture(): Promise<StudyToolsFixture> {
 		version: 1 as const,
 		id: 'a'.repeat(64),
 		created: '2026-10-14T12:00:00.000Z',
-		identity: { subject: 'a'.repeat(64), provider: undefined, instrument: 'b'.repeat(64), fixtures: 'c'.repeat(64), profile: 'd'.repeat(64) },
+		identity: {
+			subject: 'a'.repeat(64),
+			provider: undefined,
+			instrument: 'b'.repeat(64),
+			fixtures: 'c'.repeat(64),
+			profile: 'd'.repeat(64),
+		},
 		qualification: undefined,
 		host: {},
 		definition,
@@ -142,4 +264,3 @@ export async function readStudyToolsEvidence(
 	}
 	return Object.freeze(rows)
 }
-

@@ -1,4 +1,11 @@
-import type { StudyAttempt, StudyBounds, StudyGrading, StudyJudgment, StudyManifest, StudyTrial } from '@orkestrel/study'
+import type {
+	StudyAttempt,
+	StudyBounds,
+	StudyGrading,
+	StudyJudgment,
+	StudyManifest,
+	StudyTrial,
+} from '@orkestrel/study'
 import type { StudyMeterFixture } from './service/studies/tools/types.js'
 import { StudyControl, StudyMeter, StudyScope } from '@orkestrel/study'
 
@@ -74,4 +81,3 @@ export function buildCustodyAttempt(manifest: StudyManifest, trial: StudyTrial):
 		duration: 0,
 	}
 }
-

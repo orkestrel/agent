@@ -22,8 +22,6 @@
 		"noEmit": true,
 		"paths": {
 			"@src/core": ["./src/core/index.ts"],
-			"@app/core": ["./app/core/index.ts"],
-			"@app/server": ["./app/server/index.ts"],
 			"@orkestrel/agent": ["./src/core/index.ts"]
 		}
 	},

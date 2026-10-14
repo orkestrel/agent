@@ -63,4 +63,3 @@ describe('createFixtureServer', () => {
 		expect(server.address).toBeUndefined()
 	})
 })
-

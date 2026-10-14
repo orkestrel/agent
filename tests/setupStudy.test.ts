@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-	buildCustodyAttempt,
-	buildStudyGrading,
-	createStudyMeterFixture,
-} from './setupStudy.js'
+import { buildCustodyAttempt, buildStudyGrading, createStudyMeterFixture } from './setupStudy.js'
 import { loadStudyToolsFixture } from './setupService.js'
 
 describe('study meter fixture lifecycle', () => {
@@ -31,9 +27,13 @@ describe('study declaration fixtures', () => {
 		const attempt = buildCustodyAttempt(first, trial)
 		expect(attempt.trial).toEqual(trial)
 		expect(attempt.observations.map((observation) => observation.goal)).toEqual(
-			first.scenarios.find((scenario) => scenario.id === trial.scenario)?.goals.map((goal) => goal.id),
+			first.scenarios
+				.find((scenario) => scenario.id === trial.scenario)
+				?.goals.map((goal) => goal.id),
 		)
-		expect(buildStudyGrading(first.schedule).attempts).toEqual(first.schedule.map((item) => item.id))
+		expect(buildStudyGrading(first.schedule).attempts).toEqual(
+			first.schedule.map((item) => item.id),
+		)
 		expect(() => buildCustodyAttempt(first, { ...trial, scenario: 'foreign' })).toThrow(
 			'no scenario',
 		)
