@@ -75,6 +75,7 @@ export interface StudyProvider {
 export interface StudyProfile {
 	readonly name: string
 	readonly subject: string
+	readonly roots: readonly string[]
 	readonly bounds: StudyBounds
 	readonly room: StudyRoom
 	readonly provider: StudyProvider | undefined

@@ -1015,7 +1015,7 @@ export function createRelayRequest(
 	const options = {
 		method: 'POST',
 		body,
-		...(typeof body === 'string' ? {} : { duplex: 'half' }),
+		...(typeof body === 'string' ? {} : { duplex: 'half' as const }),
 		...(signal === undefined ? {} : { signal }),
 	}
 	return new Request('http://relay.test/', options)
@@ -2425,7 +2425,7 @@ export class RecordedHeaders {
  * @throws Error Thrown when `init` carries no signal
  */
 export async function rejectTransportOnAbort(
-	_input: RequestInfo | URL,
+	_input: Parameters<typeof globalThis.fetch>[0],
 	init?: RequestInit,
 ): Promise<Response> {
 	await waitForAbort(requireValue(init?.signal))
@@ -2468,7 +2468,7 @@ export class RecordedTransport {
 		return this.#signals
 	}
 
-	async #request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+	async #request(input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response> {
 		const { signal, ...options } = init ?? {}
 		if (signal !== undefined && signal !== null) this.#signals.push(signal)
 		// Record headers and body without adding a Request-owned listener to the observed signal.
@@ -2580,7 +2580,7 @@ export async function drainProvider(
  */
 export function recordGlobalTransport(
 	this: unknown,
-	input: RequestInfo | URL,
+	input: Parameters<typeof globalThis.fetch>[0],
 	init?: RequestInit,
 ): Promise<Response> {
 	return Promise.resolve(

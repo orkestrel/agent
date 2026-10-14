@@ -8,7 +8,7 @@ Preserve the running capacity series and its daemon. Do not edit or rebuild eith
 
 The final authorized Fable 5.1 implementation-design invocation launched at 2026-10-14T15:51:12Z under launcher PID 74112, with a 600-second cap, 16-turn cap, and 5 USD API-equivalent accounting ceiling. Its read-only packet and journal are `tmp/claude/study-final/` and `tmp/claude/study-final.jsonl`. This consumes the user's final allowance: do not invoke Fable again without fresh explicit user permission, including after a failed or capped call. Opus 5.5 remains authorized for adversarial and subjective roles in this Codex session. Luna at max effort remains the user's choice for absorption and research. These explicit preferences override the default routing where they differ.
 
-Do not add dependencies, publish, or bump a version. Preserve unrelated workspace changes and historical evidence.
+Use the latest published version of every declared Orkestrel package for working builds, as the user instructed on 2026-10-14. Keep frozen comparison artifacts pinned to their recorded bytes. The user explicitly authorized the required middleware dev dependency. Add no unrelated dependency, publish nothing, and bump no version. Preserve unrelated workspace changes and historical evidence.
 
 ## Exit criterion
 
@@ -37,15 +37,17 @@ Reconcile their evidence into a bounded implementation brief. Give the expanded 
 
 The Luna readers completed without side effects. Their reports are `tmp/units/study-portability-report.md` and `tmp/units/study-practices-report.md`. The blind Opus position completed in session `e3d1fcae-1b76-4069-9ff2-b50822b9eb2b`, uncapped exit 0 after 163128 ms; its report is `tmp/units/study-design-report.md`. Native Astra's independent position is distilled in `tmp/units/study-analysis-report.md`. Both recommend a fresh prospective consumer, independently of the campaign instrument. The final Fable packet includes both positions, the reader evidence, authority, and focused questions about unresolved wiring, artifact closure, grading, and failure semantics.
 
-## Live comparison
-
 ## Implementation reconciliation and ownership
 
 The final Fable invocation completed successfully in session `6bf873ab-5f40-43eb-a9c2-759d5b697192`, exit 0 uncapped in 302339 ms. Its final proposal and the blind positions are retained in the adjacent study-implementation files; `study-implementation-round.json` binds their bytes. No further Fable invocation is authorized.
 
 Root selects the private app/core and app/server design. Offline checks inspect bytes and schemas without importing caller-selected code. Operational deadlines stop execution promptly, as do capacity and infrastructure failures; ordinary unsuccessful products may continue. Mechanical predicates judge observable state and traces; prose semantics remain unknown until separately imported blind judgments. Artifact identity must cover an admitted dependency inventory, not only an entry. The historical c1 instrument and its results are retained separately.
 
-U0's installed scaffold probe found that app/server unconditionally requires a declared middleware dependency, even for the empty CLI starter. The existing manifest lacks it. Root requested authorization for `@orkestrel/middleware@^0.0.16` as a dev dependency, citing the coding contract's explicit-dependency rule; no installation or declaration change has occurred. The published bin route cannot import private app code and would change the intended publication surface. Continue independent units while that authorization is pending.
+U0's installed scaffold probe found that app/server requires a declared middleware dependency, even for the empty CLI starter. The user authorized it. Version 0.0.16 conflicted with the installed server peer; root installed the compatible published middleware 0.0.24. Registry readings at 2026-10-14T16:24:51Z confirmed every declared Orkestrel dependency's installed version matched its published latest tag. The supported scaffold repair wired the app projects and build without changing the frozen harness. Commits d512bf4 and 8d21f7d retain the dependency and wiring changes. Artifact scoped lint passed after repair.
+
+U2 completed its parsers, guards, schedule, and whole-horizon scoring. Its scoped app core check and 19 tests passed; denominator and uniqueness mutations each failed before restoration. Independent integrated review remains pending. U3 owns execution and meters; U5 owns filesystem custody. A persistence rejection leaves execution unsealed and rejects the engine; the command must never seal a rejected execution. Ordinary operational failures retain the declared unexecuted horizon when custody remains available.
+
+The model and records research is distilled in experiments.md with adjacent source reports. No model download or GPU work accompanied it.
 
 | Unit | Owner and files | Acceptance |
 | --- | --- | --- |
