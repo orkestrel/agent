@@ -2,6 +2,8 @@
 
 The user has since requested a capacity repair and a new bounded comparison. The active successor is tracked in [capacity.md](capacity.md). The closed baseline below remains unchanged evidence.
 
+Parallel evaluation research requested on 2026-10-14 is retained in [study.md](study.md), with the supplied-article review in [study-article.md](study-article.md), independent methods in [study-methods.md](study-methods.md), and repository naming/ownership evidence in [study-canon.md](study-canon.md). Root recommends `study` for an optional development command and a durable scaffold `studies/agent/` home. This supersedes `bench` as the recommended umbrella name, but implements no move, command, or public API. The user explicitly selected Luna at max effort for research; local model execution remains serial.
+
 Closed on 2026-10-14. The thinking series and both blind audits are finished. No generation, labeling, merge, or report is waiting to run. The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.
 
 ## Results
