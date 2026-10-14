@@ -1,0 +1,62 @@
+{
+	"id": "handoff",
+	"goals": [
+		{
+			"id": "opening",
+			"input": {
+				"prompt": "Read reference MP-6101 and prepare a handoff listing confirmed deposits, unresolved custody checks and the statement obligation. This is a draft only.",
+				"arrivals": [
+					{
+						"id": "mp-policy",
+						"content": "Morrow Packing support desk: a pallet deposit is released only after an identity scan. Collection, depot receipt, payment posting and statement delivery require separate evidence. A draft performs no external action."
+					},
+					{
+						"id": "mp-opening",
+						"content": "Iona Reed has pallets A through D with a $30 deposit each, paid. The handling charge of $20 is separate and earned. She needs a closing statement by Friday even if deposits are paid sooner."
+					},
+					{
+						"id": "mp-count",
+						"content": "Clerk Theo initially recorded three returned pallets from the driver's verbal report. Signed collection docket MC-17 lists A and B only. Depot identity scans have not yet arrived. Pallets C and D remain with Iona."
+					}
+				],
+				"records": [
+					{
+						"id": "MP-6101",
+						"name": "Iona Reed",
+						"content": "Opening account receipt MR-11: deposit $120 and separate handling $20 settled. Current verified refund mandate MB-7 ends 4062. Archived mandate MB-2 is inactive. Read-only reference; no payment or delivery action is available."
+					}
+				]
+			}
+		},
+		{
+			"id": "correction",
+			"input": {
+				"prompt": "Repair the earlier handoff using the new receipt. State the amount now eligible for release and which obligations remain unfulfilled. Preserve source references.",
+				"arrivals": [
+					{
+						"id": "mp-scan",
+						"content": "Depot scan MS-22 confirms only pallets A and B arrived intact. Theo withdraws the earlier count of three. C and D are still in circulation. Iona authorizes refund of the two confirmed deposits to active mandate MB-7; treasury has not posted a payment."
+					},
+					{
+						"id": "mp-handoff",
+						"content": "Iona's case transfers to clerk Jun. Jun must retain the Friday statement obligation, reconcile all four pallet identities and seek a bank posting receipt before recording a completed refund."
+					}
+				],
+				"records": []
+			}
+		},
+		{
+			"id": "closure",
+			"input": {
+				"prompt": "Prepare the final shift handoff. Distinguish completed refund posting from outstanding deposits and statement delivery. Do not imply that this draft sends anything.",
+				"arrivals": [
+					{
+						"id": "mp-payment",
+						"content": "Treasury receipt MT-31 confirms $60 posted to mandate MB-7 for A and B. C and D have no return scans. The Friday statement exists as a draft but has no delivery receipt. Jun remains responsible for delivery evidence."
+					}
+				],
+				"records": []
+			}
+		}
+	]
+}

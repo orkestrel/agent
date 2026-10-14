@@ -1,0 +1,15 @@
+{
+	"name": "Prospective desk capacity",
+	"version": "1",
+	"question": "Can the declared serving profile complete every goal of the shared memory trajectory within its finite operational bounds?",
+	"purpose": "capacity",
+	"driver": "memory",
+	"arms": ["records", "compaction", "full"],
+	"scenarios": ["handoff"],
+	"order": [
+		["records", "compaction", "full"],
+		["full", "compaction", "records"]
+	],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

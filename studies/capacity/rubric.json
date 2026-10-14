@@ -1,0 +1,29 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "opening-operational",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "operational" }
+		},
+		{
+			"id": "correction-operational",
+			"scenario": "handoff",
+			"goal": "correction",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "operational" }
+		},
+		{
+			"id": "closure-operational",
+			"scenario": "handoff",
+			"goal": "closure",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "operational" }
+		}
+	]
+}

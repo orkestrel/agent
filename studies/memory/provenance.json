@@ -1,0 +1,7 @@
+{
+	"source": ".orkestrel/agent/instruments/units/aggregates/endurance/runtime/development.json",
+	"bytes": 185488,
+	"sha256": "361b92cf427cd1edcd4f54fa4e349f174fc5ea896c4a68c86de50913fc00ca49",
+	"slice": ["system", "seed:dv-desk", "seed:dv-opening-0", "seed:dv-source-1"],
+	"adaptation": "Prospective authored scenario with new names, identifiers, amounts and horizon. Public separation of custody, authorization, posting and document delivery is retained. No historical equivalence or calibrated quality claim. No held-out evaluation or private labels were read."
+}

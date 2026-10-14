@@ -1,136 +1,6 @@
-import type {
-	StudyAttempt,
-	StudyBounds,
-	StudyCriterion,
-	StudyDefinition,
-	StudyGrading,
-	StudyJudgment,
-	StudyManifest,
-	StudyProfile,
-	StudyRubric,
-	StudyScenario,
-	StudyTrial,
-} from '../app/core/studies/types.js'
-import type { StudyMeterFixture } from './app/core/studies/engines/types.js'
-import { StudyControl, StudyMeter, StudyScope } from '../app/core/studies/engines/index.js'
-import { buildStudySchedule } from '../app/core/studies/helpers.js'
-
-/** Supplies malformed command tokens that must refuse before custody or child work. */
-export const STUDY_COMMAND_INVALID_ARGUMENTS: ReadonlyArray<readonly string[]> = Object.freeze([
-	[],
-	['unknown', 'tools'],
-	['check'],
-	['check', '../escape'],
-	['check', 'tools', '--profile'],
-	['check', 'tools', '--profile', 'local', '--profile', 'local'],
-	['check', 'tools', '--unknown', 'local'],
-	['check', 'tools', '--out', '/unused'],
-	['execute', 'tools', '--out', 'relative'],
-	['execute', 'tools', '--expected', 'invalid'],
-	['grade', 'result'],
-	['label', 'result', '--grading', 'a'.repeat(64)],
-	['report', 'result', '--grading', 'invalid'],
-])
-
-/** Returns a declared two-arm, two-scenario, two-repetition population. */
-export function buildStudyDefinition(change: Partial<StudyDefinition> = {}): StudyDefinition {
-	return {
-		name: 'study',
-		version: '1',
-		question: 'Does state survive?',
-		purpose: 'quality',
-		driver: 'memory',
-		arms: ['small', 'large'],
-		scenarios: ['first', 'second'],
-		order: [
-			['large', 'small'],
-			['small', 'large'],
-		],
-		retries: 0,
-		rubric: 'rubric.json',
-		...change,
-	}
-}
-
-/** Returns a two-goal scenario with public JSON inputs. */
-export function buildStudyScenario(id = 'first'): StudyScenario {
-	return {
-		id,
-		goals: [
-			{ id: 'write', input: { text: 'remember' } },
-			{ id: 'read', input: ['recall'] },
-		],
-	}
-}
-
-/** Returns a rubric covering both declared scenarios and goals. */
-export function buildStudyRubric(): StudyRubric {
-	return {
-		version: '1',
-		criteria: ['first', 'second'].flatMap((scenario): readonly StudyCriterion[] => [
-			{
-				id: `${scenario}-write`,
-				scenario,
-				goal: 'write',
-				method: 'state',
-				critical: true,
-				assertion: { equals: 'remember' },
-			},
-			{
-				id: `${scenario}-read`,
-				scenario,
-				goal: 'read',
-				method: 'semantic',
-				critical: false,
-				assertion: { relevant: true },
-			},
-		]),
-	}
-}
-
-/** Returns a profile whose request and output allowances fit the room. */
-export function buildStudyProfile(): StudyProfile {
-	const request = { duration: 100, calls: 1, tokens: 100, bytes: 100 }
-	return {
-		name: 'local',
-		subject: 'subject-v1',
-		roots: ['dist'],
-		bounds: {
-			request,
-			goal: { ...request, calls: 2 },
-			trial: { ...request, calls: 4 },
-			series: { ...request, calls: 32 },
-		},
-		room: { context: 512, output: 32, safety: 16, recap: 32, think: false },
-		provider: undefined,
-		qualification: undefined,
-	}
-}
-
-/** Returns a complete sealed declaration with its real schedule. */
-export function buildStudyManifest(): StudyManifest {
-	const definition = buildStudyDefinition()
-	const scenarios = [buildStudyScenario(), buildStudyScenario('second')]
-	const profile = buildStudyProfile()
-	return {
-		version: 1,
-		id: 'a'.repeat(64),
-		created: '2026-10-14T12:00:00.000Z',
-		definition,
-		scenarios,
-		identity: {
-			subject: 'a'.repeat(64),
-			provider: undefined,
-			instrument: 'b'.repeat(64),
-			fixtures: 'c'.repeat(64),
-			profile: 'd'.repeat(64),
-		},
-		schedule: buildStudySchedule(definition, scenarios),
-		bounds: profile.bounds,
-		qualification: undefined,
-		host: {},
-	}
-}
+import type { StudyAttempt, StudyBounds, StudyGrading, StudyJudgment, StudyManifest, StudyTrial } from '@orkestrel/study'
+import type { StudyMeterFixture } from './service/studies/tools/types.js'
+import { StudyControl, StudyMeter, StudyScope } from '@orkestrel/study'
 
 /** Returns independently attributed grading over the supplied scheduled attempts. */
 export function buildStudyGrading(
@@ -146,23 +16,6 @@ export function buildStudyGrading(
 		attempts: schedule.map((trial) => trial.id),
 		labels: undefined,
 		judgments,
-	}
-}
-
-/** Returns an evidence-backed judgment with an explicit verdict and method. */
-export function buildStudyJudgment(
-	trial: string,
-	criterion = 'first-write',
-	verdict: StudyJudgment['verdict'] = 'achieved',
-	method: StudyJudgment['method'] = 'state',
-): StudyJudgment {
-	return {
-		trial,
-		criterion,
-		verdict,
-		method,
-		reason: 'Recorded evidence',
-		references: ['attempts/trace.ndjson#1'],
 	}
 }
 
@@ -200,42 +53,6 @@ export function createStudyMeterFixture(
 }
 
 /**
- * Builds a fresh execution declaration with enough encoded custody room.
- * @param changes - The scenario-specific declaration changes
- * @returns The independently owned manifest
- */
-export function buildCustodyManifest(changes: Partial<StudyManifest> = {}): StudyManifest {
-	const manifest = buildStudyManifest()
-	return {
-		...manifest,
-		bounds: {
-			request: { duration: 1000, calls: 1, tokens: 1000, bytes: 1024 },
-			goal: { duration: 2000, calls: 2, tokens: 2000, bytes: 4096 },
-			trial: { duration: 4000, calls: 4, tokens: 4000, bytes: 8192 },
-			series: { duration: 32000, calls: 32, tokens: 32000, bytes: 65536 },
-		},
-		...changes,
-	}
-}
-
-/**
- * Builds a small complete custody horizon for lifecycle and tamper proofs.
- * @returns The declared scenarios with one arm and one repetition
- */
-export function buildCompactCustodyManifest(): StudyManifest {
-	const baseline = buildCustodyManifest()
-	const definition: StudyDefinition = {
-		...baseline.definition,
-		arms: ['small'],
-		order: [['small']],
-	}
-	return buildCustodyManifest({
-		definition,
-		schedule: buildStudySchedule(definition, baseline.scenarios),
-	})
-}
-
-/**
  * Builds a complete terminal horizon from the supplied scheduled trial.
  * @param manifest - The authoritative goal horizon
  * @param trial - The scheduled trial
@@ -258,12 +75,3 @@ export function buildCustodyAttempt(manifest: StudyManifest, trial: StudyTrial):
 	}
 }
 
-/** Supplies hostile seal mutations that the offline reader must refuse. */
-export const STUDY_CUSTODY_MUTATIONS = Object.freeze([
-	'tampered',
-	'missing',
-	'extra',
-	'extra-directory',
-	'wrong-horizon',
-	'partial-evidence',
-])

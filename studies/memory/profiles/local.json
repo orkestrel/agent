@@ -1,0 +1,20 @@
+{
+	"name": "local",
+	"subject": "dist/src/core/index.js",
+	"roots": ["."],
+	"provider": {
+		"entry": "REQUIRED_CALLER_SELECTED_OLLAMA_ENTRY",
+		"url": "http://127.0.0.1:1",
+		"model": "REQUIRED_MODEL_NAME",
+		"judge": "REQUIRED_JUDGE_NAME",
+		"digest": { "model": "REQUIRED_ACTUAL_SHA256", "judge": "REQUIRED_ACTUAL_SHA256" }
+	},
+	"qualification": "tmp/results/memory-capacity",
+	"room": { "context": 32768, "output": 2048, "safety": 1024, "recap": 1024, "think": false },
+	"bounds": {
+		"request": { "duration": 120000, "calls": 1, "tokens": 32768, "bytes": 1048576 },
+		"goal": { "duration": 600000, "calls": 256, "tokens": 8388608, "bytes": 268435456 },
+		"trial": { "duration": 1800000, "calls": 768, "tokens": 25165824, "bytes": 805306368 },
+		"series": { "duration": 10800000, "calls": 4608, "tokens": 150994944, "bytes": 4831838208 }
+	}
+}
