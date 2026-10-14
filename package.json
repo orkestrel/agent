@@ -89,7 +89,7 @@
 		"@orkestrel/ollama": "^0.0.23",
 		"@orkestrel/probe": "^0.0.23",
 		"@orkestrel/router": "^0.0.17",
-		"@orkestrel/scaffold": "^0.0.100",
+		"@orkestrel/scaffold": "^0.0.101",
 		"@orkestrel/server": "^0.0.23",
 		"@orkestrel/study": "file:../study",
 		"@orkestrel/test": "^0.0.25",
