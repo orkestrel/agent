@@ -33,6 +33,7 @@ import { cpSync, lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /** Composes the selected built Agent with the installed public Ollama provider. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
@@ -225,12 +226,26 @@ export function executeStudyService(
 	arguments_: readonly string[],
 	duration = 60000,
 ): Promise<StudyServiceResult> {
+	return executeStudyProcess([fixture.entry, ...arguments_], fixture.scratch.path, duration)
+}
+
+/** Executes a real Node entry with bounded output and preserves failure diagnostics.
+ * @param arguments_ - Exact Node arguments, including its JavaScript entry.
+ * @param root - Native working directory.
+ * @param duration - Outer process deadline in milliseconds.
+ * @returns Native exit and separate stdout/stderr bytes.
+ */
+export function executeStudyProcess(
+	arguments_: readonly string[],
+	root: string,
+	duration: number,
+): Promise<StudyServiceResult> {
 	return new Promise((done) =>
 		execFile(
 			process.execPath,
-			[fixture.entry, ...arguments_],
+			[...arguments_],
 			{
-				cwd: fixture.scratch.path,
+				cwd: root,
 				windowsHide: true,
 				timeout: duration,
 				maxBuffer: 16 * 1024 * 1024,
@@ -243,6 +258,69 @@ export function executeStudyService(
 				}),
 		),
 	)
+}
+
+/** Captures and loads the actual q4 dependency topology in one disposable CPU process.
+ * @param scratch - Exclusive worker-file owner, cleaned by the caller in finally.
+ * @param roots - Optional root selection for admission refusal controls; defaults to q4 roots.
+ * @returns Native exit and JSON observations without instantiating sessions or providers.
+ * @remarks Package imports remain at their installed native locations. No package bytes are copied.
+ */
+export function executeStudyTopology(
+	scratch: ScratchInterface,
+	roots?: readonly string[],
+): Promise<StudyServiceResult> {
+	const entry = scratch.write(
+		'topology.ts',
+		`// Self-contained disposable entry: imported test setup would preload the measured modules.
+import { createHash } from 'node:crypto'
+import { readFileSync, realpathSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/contract/dist/src/core/index.js')).href)}
+import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
+import { Artifacts } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
+
+const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')))
+const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
+if (!isRecord(selection) || (selection.roots !== undefined && (!isArray(selection.roots) || !selection.roots.every((root) => typeof root === 'string'))))
+	throw new Error('Invalid topology root selection')
+const roots = (selection.roots ?? profile.roots).map((root) => realpathSync(root))
+const subject = realpathSync(profile.subject)
+if (profile.provider === undefined) throw new Error('Missing q4 provider')
+const provider = realpathSync(profile.provider.entry)
+const dependency = realpathSync(fileURLToPath(import.meta.resolve('@orkestrel/agent', pathToFileURL(provider).href)))
+const installed = realpathSync('node_modules/@orkestrel/agent')
+const entries = roots.includes(installed) ? [subject, provider, dependency] : [subject, provider]
+const identities = [subject, dependency, provider].map((path) => ({
+	path,
+	digest: createHash('sha256').update(readFileSync(path)).digest('hex'),
+}))
+console.log(JSON.stringify({ event: 'selection', roots, entries, subject, provider, dependency, identities }))
+const artifacts = new Artifacts({ roots, entries })
+const inventory = artifacts.inspect()
+console.log(JSON.stringify({ event: 'inventory', ...inventory }))
+const selected = await artifacts.load(subject)
+console.log(JSON.stringify({ event: 'subject', loaded: true }))
+const ollama = await artifacts.load(provider)
+const agent = await artifacts.load(dependency)
+if (!isRecord(selected) || !isRecord(ollama) || !isRecord(agent)) throw new Error('Invalid captured namespace')
+if (typeof ollama.OllamaProvider !== 'function' || typeof ollama.OllamaJudge !== 'function')
+	throw new Error('Missing captured provider classes')
+console.log(JSON.stringify({
+	event: 'loaded',
+	subject: { agent: typeof selected.Agent === 'function', ledger: typeof selected.createLedger === 'function' },
+	provider: {
+		installed: Object.getPrototypeOf(ollama.OllamaProvider) === agent.AgentProvider,
+		selected: Object.getPrototypeOf(ollama.OllamaProvider) === selected.AgentProvider,
+	},
+	judge: {
+		installed: Object.getPrototypeOf(ollama.OllamaJudge) === agent.AgentJudge,
+		selected: Object.getPrototypeOf(ollama.OllamaJudge) === selected.AgentJudge,
+	},
+}))
+`,
+	)
+	return executeStudyProcess(['--experimental-import-meta-resolve', entry], resolve('.'), 60000)
 }
 
 /** Starts a native loopback Ollama protocol fixture on an ephemeral port. */

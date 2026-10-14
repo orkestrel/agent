@@ -3,6 +3,7 @@
 	"subject": "dist/src/core/index.js",
 	"roots": [
 		".",
+		"node_modules/@orkestrel/agent",
 		"node_modules/@orkestrel/ollama",
 		"node_modules/@orkestrel/study",
 		"node_modules/@orkestrel/abort",
@@ -29,7 +30,7 @@
 			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
 		}
 	},
-	"qualification": "tmp/studies/endurance-capacity",
+	"qualification": "tmp/studies/endurance-capacity-2",
 	"room": {
 		"context": 20480,
 		"output": 8192,

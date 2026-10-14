@@ -13,10 +13,32 @@ import {
 	captureServicePackages,
 	createStudyServiceFixture,
 	executeStudyService,
+	executeStudyProcess,
+	executeStudyTopology,
 	readMemoryToolResults,
 } from './setupService.js'
 
 describe('study service fixtures', () => {
+	it('preserves fresh topology worker diagnostics and runs bounded native entries', async () => {
+		const scratch = createScratch({ prefix: 'study-topology-setup-' })
+		try {
+			const entry = scratch.write(
+				'receipt.mjs',
+				"console.log(process.argv[2])\nconsole.error('retained diagnostic')\nprocess.exitCode = 7\n",
+			)
+			expect(await executeStudyProcess([entry, 'retained output'], scratch.path, 60000)).toEqual({
+				code: 7,
+				stdout: 'retained output\n',
+				stderr: 'retained diagnostic\n',
+			})
+			const refused = await executeStudyTopology(scratch, [])
+			expect(refused.code).toBe(1)
+			expect(refused.stdout).toContain('"roots":[]')
+			expect(refused.stderr).toContain('Artifact entry must be admitted built ESM:')
+		} finally {
+			await destroyScratch(scratch)
+		}
+	})
 	it('reads tool receipts from actual wire shapes and refuses malformed messages', () => {
 		expect(
 			readMemoryToolResults(

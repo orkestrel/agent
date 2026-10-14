@@ -1,18 +1,141 @@
 import { isArray, isRecord, parseJSON } from '@orkestrel/contract'
-import { isStudyJudgment, parseStudyGrading, parseStudyRubric } from '@orkestrel/study'
+import {
+	isStudyJudgment,
+	parseStudyGrading,
+	parseStudyProfile,
+	parseStudyRubric,
+} from '@orkestrel/study'
 import { readStudyResult } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { readFileSync, realpathSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import {
 	createMemoryServer,
 	createStudyServiceFixture,
 	executeStudyService,
+	executeStudyTopology,
 	readStudyToolsEvidence,
 	STUDY_MEMORY_GOALS,
 	STUDY_MEMORY_SCHEDULE,
 } from '../../../setupService.js'
+
+it('loads the actual q4 native topology with two distinct captured Agent occurrences', async () => {
+	const scratch = createScratch({ prefix: 'study-memory-topology-' })
+	try {
+		const result = await executeStudyTopology(scratch)
+		const rows = result.stdout
+			.split(/\r\n|\n/)
+			.filter((line) => line !== '')
+			.map(parseJSON)
+		const selection = rows.find((row) => isRecord(row) && row.event === 'selection')
+		if (!isRecord(selection) || !isArray(selection.identities))
+			throw new Error('Missing actual native selection evidence')
+		const profile = parseStudyProfile(
+			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+		)
+		const subject = realpathSync('dist/src/core/index.js')
+		const dependency = realpathSync('node_modules/@orkestrel/agent/dist/src/core/index.js')
+		const provider = realpathSync('node_modules/@orkestrel/ollama/dist/src/core/index.js')
+		expect(profile.subject).toBe('dist/src/core/index.js')
+		expect(selection).toMatchObject({
+			roots: profile.roots.map((root) => realpathSync(root)),
+			entries: [subject, provider, dependency],
+			subject,
+			provider,
+			dependency,
+			identities: [subject, dependency, provider].map((path) => ({
+				path,
+				digest: createHash('sha256').update(readFileSync(path)).digest('hex'),
+			})),
+		})
+		expect(dependency).not.toBe(subject)
+		expect(result).toMatchObject({ code: 0, stderr: '' })
+		const inventory = rows.find((row) => isRecord(row) && row.event === 'inventory')
+		if (!isRecord(inventory) || !isArray(inventory.packages) || !isArray(inventory.files))
+			throw new Error('Missing captured native inventory')
+		expect(inventory.entries).toEqual([subject, provider, dependency].sort())
+		expect(
+			inventory.packages.filter((entry) => isRecord(entry) && entry.name === '@orkestrel/agent'),
+		).toEqual(
+			[resolve('.'), resolve('node_modules/@orkestrel/agent')].map((root) => {
+				const manifest = parseJSON(readFileSync(join(root, 'package.json'), 'utf8'))
+				if (!isRecord(manifest)) throw new Error('Invalid actual Agent manifest')
+				return { root: realpathSync(root), name: '@orkestrel/agent', version: manifest.version }
+			}),
+		)
+		for (const identity of selection.identities) {
+			if (!isRecord(identity) || typeof identity.path !== 'string')
+				throw new Error('Invalid entry identity')
+			expect(inventory.files).toContainEqual({
+				path: identity.path,
+				digest: identity.digest,
+				size: readFileSync(identity.path).length,
+			})
+		}
+		expect(rows.find((row) => isRecord(row) && row.event === 'loaded')).toEqual({
+			event: 'loaded',
+			subject: { agent: true, ledger: true },
+			provider: { installed: true, selected: false },
+			judge: { installed: true, selected: false },
+		})
+	} finally {
+		await destroyScratch(scratch)
+	}
+})
+
+it('refuses a repeated canonical root in a fresh q4 native topology worker', async () => {
+	const scratch = createScratch({ prefix: 'study-memory-repeated-root-' })
+	try {
+		const profile = parseStudyProfile(
+			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+		)
+		const roots = profile.roots.filter((root) => root !== 'node_modules/@orkestrel/agent')
+		const result = await executeStudyTopology(scratch, [...roots, realpathSync('.')])
+		expect(result.code).toBe(1)
+		expect(result.stderr).toContain('Artifact package identity is duplicated: @orkestrel/agent')
+		expect(result.stdout).toContain('"event":"selection"')
+		expect(result.stdout).not.toContain('"event":"inventory"')
+	} finally {
+		await destroyScratch(scratch)
+	}
+})
+
+it('refuses Ollama import when its installed Agent root is omitted in a fresh q4 native topology worker', async () => {
+	const scratch = createScratch({ prefix: 'study-memory-omitted-root-' })
+	try {
+		const profile = parseStudyProfile(
+			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+		)
+		const result = await executeStudyTopology(
+			scratch,
+			profile.roots.filter((root) => root !== 'node_modules/@orkestrel/agent'),
+		)
+		expect(result.code).toBe(1)
+		expect(result.stderr).toContain('Artifact dependency is not admitted ESM:')
+		expect(result.stderr).toContain('node_modules/@orkestrel/agent/dist/src/core/index.js')
+		const rows = result.stdout
+			.split(/\r\n|\n/)
+			.filter((line) => line !== '')
+			.map(parseJSON)
+		const inventory = rows.find((row) => isRecord(row) && row.event === 'inventory')
+		if (!isRecord(inventory) || !isArray(inventory.files))
+			throw new Error('Missing omitted-root inventory')
+		expect(
+			inventory.files.some(
+				(entry) =>
+					isRecord(entry) &&
+					entry.path === realpathSync('node_modules/@orkestrel/agent/dist/src/core/index.js'),
+			),
+		).toBe(false)
+		expect(rows).toContainEqual({ event: 'subject', loaded: true })
+		expect(rows.some((row) => isRecord(row) && row.event === 'loaded')).toBe(false)
+	} finally {
+		await destroyScratch(scratch)
+	}
+})
 
 it('drives captured installed Agent and Ollama through qualification, complete execution, grading and reports', async () => {
 	const scratch = createScratch({ prefix: 'study-memory-installed-' })

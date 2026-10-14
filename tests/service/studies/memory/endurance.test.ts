@@ -250,7 +250,7 @@ describe('prospective public endurance declarations', () => {
 		expect(q4).toMatchObject({
 			name: 'q4',
 			subject: 'dist/src/core/index.js',
-			qualification: 'tmp/studies/endurance-capacity',
+			qualification: 'tmp/studies/endurance-capacity-2',
 			provider: {
 				entry: 'node_modules/@orkestrel/ollama/dist/src/core/index.js',
 				url: 'http://127.0.0.1:11435',
