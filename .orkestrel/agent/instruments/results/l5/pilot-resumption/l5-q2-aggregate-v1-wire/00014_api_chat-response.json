@@ -1,5 +1,0 @@
-{
- "status": 200,
- "ms": 2616,
- "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:36:31.4584361Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_08jua1na\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"Halvorsen Interiors\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-10T17:36:31.4678097Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":2614609700,\"load_duration\":10442700,\"prompt_eval_count\":1437,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":2286337000,\"eval_count\":30,\"eval_duration\":277542000}\n"
-}

@@ -1,5 +1,0 @@
-{
- "status": 200,
- "ms": 14276,
- "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:59:59.913585909Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_h4wm1qff\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"Kenji Nakamura (account LH-52307)\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:59:59.982181653Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":14273353708,\"load_duration\":3773895566,\"prompt_eval_count\":1533,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":7846450000,\"eval_count\":39,\"eval_duration\":2645648000}\n"
-}

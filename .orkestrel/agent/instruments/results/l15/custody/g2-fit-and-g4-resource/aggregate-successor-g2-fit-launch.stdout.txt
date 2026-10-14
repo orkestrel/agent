@@ -1,2 +1,0 @@
-{"pid":10792,"journal":".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl","errors":".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err"}
-{"pid":10792,"exit":0,"signal":null,"capped":false,"durationMs":2549,"journal":".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.jsonl","errors":".orkestrel/agent/instruments/results/l15/logs/g2-calibration-fit.err"}

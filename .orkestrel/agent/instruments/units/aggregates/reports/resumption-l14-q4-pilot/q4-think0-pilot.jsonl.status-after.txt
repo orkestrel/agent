@@ -1,9 +1,0 @@
- M .orkestrel/agent/instruments/bench4/Driver.mjs
- M .orkestrel/agent/ledger.md
- M .orkestrel/agent/plan.md
- M .orkestrel/agent/progress.md
- M RESULTS.md
-?? .orkestrel/agent/instruments/harness/.orkestrel/
-?? .orkestrel/agent/instruments/results/l14/q4-think0/pilot/
-?? .orkestrel/agent/instruments/units/aggregates/reports/resumption-l14-q4-diagnostic/
-?? .orkestrel/agent/instruments/units/aggregates/reports/resumption-qualification-correction-direction.md

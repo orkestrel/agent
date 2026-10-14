@@ -1,7 +1,0 @@
-# Accept the corrected focus labels
-
-Root accepts the independent analyst's corrected focus labels before any focused-model request. Under admission-focus-r2.json, statement-a is unsupported / false, and statement-b is supported / true. These labels apply to the exact declared focuses, interpreted in their complete candidates, not to every assertion in the complete candidates. See [the immutable adjudication](resumption-focus-labels-corrected.md) and [the frozen corrected specification](../admission-focus-r2.json).
-
-Statement-b preserves the source's reopening instruction and defect report verbatim with matching date/role framing. It asserts no completed state transition. Statement-a adds an electrician-repair prerequisite absent from the complete ordered sources. The possible replacement referent does not make that requirement supported under either interpretation. Root read the exact source chronology, both candidates, and the complete returned analysis independently.
-
-The first focus adjudication and the correction remain preserved. No historic judge score supplied either corrected label. The strict discriminator requires statement-b's score to exceed statement-a's score separately in each forward and reverse pass. A tie or reversal refuses this local focused mechanism; incomplete custody or responses leave the run unmeasured. Full-candidate qualification and adoption remain separate.

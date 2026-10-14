@@ -1,3 +1,0 @@
-node tmp/units/aggregate-successor-g2-fit-read.ts
-exit=0
-stderr_bytes=0

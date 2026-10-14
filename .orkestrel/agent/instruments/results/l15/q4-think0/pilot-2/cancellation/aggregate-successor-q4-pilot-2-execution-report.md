@@ -1,9 +1,0 @@
-# User-canceled Q4 pilot-2
-
-The user canceled the live pilot while another session needed Ollama. Root terminated only the recorded campaign client tree; this observation is user-canceled, with no feasibility or refusal decision.
-
-The pilot produced 10 completed rows and 129 sent request records before cancellation. The recorded requests contain 116,070 prompt tokens and 3,323 completion tokens: agent 40,936/976, judge 64,179/80, summarizer 10,735/2,257, and flush 220/10. These are partial saved-event totals; the records contain no unsent requests, unknown usage, or request failures. See `tmp/units/aggregate-successor-q4-pilot-2-cancellation-summary.json:1` and `.orkestrel/agent/instruments/results/l15/q4-think0/pilot-2/development/l6-q4-think0-aggregate-v1/rows.jsonl:10`.
-
-The dispatcher recorded exit 1, no signal, `capped=false`, and 781,517 ms. Its error receipt ends with `exit=1 signal=none capped=false duration_ms=781517`; the recorded PID was 64012. Root reports that `taskkill /PID 64012 /T /F` returned success and follow-up CIM found PID 64012 and all descendants absent. Root also reports daemon 4668 and user service 32104 remained alive. See `tmp/units/aggregate-successor-q4-pilot-2-execution.stdout.txt:1`, `.orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.err:1`, and `.orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.jsonl.pid:1`.
-
-The run ended before terminal manifest closure. No saved-reader audit or additional model call ran. Partial raw evidence remains in `.orkestrel/agent/instruments/results/l15/q4-think0/pilot-2`; the launcher captured its before/after status at `.orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.jsonl.status-before.txt:1` and `.orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.jsonl.status-after.txt:1`.

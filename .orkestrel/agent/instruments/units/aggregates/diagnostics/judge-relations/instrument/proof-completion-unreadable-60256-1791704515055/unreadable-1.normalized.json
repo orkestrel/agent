@@ -1,8 +1,0 @@
-{
-  "availability": "unavailable",
-  "error": {
-    "name": "JudgeError",
-    "message": "judge error: question agree mica read requires a completed response"
-  },
-  "wall": 0.0438999999999794
-}

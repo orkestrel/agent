@@ -1,7 +1,0 @@
-﻿{
-    "command":  "node tmp/units/aggregate-successor-quality-b-boundary-sealed.ts",
-    "exit":  0,
-    "durationMs":  165,
-    "stdout":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-quality-b-boundary.stdout.txt",
-    "stderr":  "C:\\Users\\mikes\\WebstormProjects\\scaffold\\tmp\\units\\aggregate-successor-quality-b-boundary.stderr.txt"
-}

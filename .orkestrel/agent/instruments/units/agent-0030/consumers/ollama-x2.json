@@ -1,8 +1,0 @@
-{
-  "base": "3947d4e75dfc39be1db36c0dd2d480808c9e5575",
-  "patch": "673134c39c4fb9c71107cad53e78000722c923b1b18a3bcd1ac94bb5ba1622c4",
-  "build": "e20c21422b985163e0fea7932047160eeb1a4687ddb732d9723c0c4680b258d0",
-  "declarations": "547d79ebcb0fc3f97d1874fa9c35c2bacc7fd4514e84f5f5ce881550c19fa570",
-  "guide": "Qualified replay provider-input filtering; mapper omits stored reasoning on wire.",
-  "pending": "After agent publication, pin @orkestrel/agent ^0.0.30, regenerate lock, bump from registry, run published-artifact and live-service gates, then publish with separate user authority."
-}

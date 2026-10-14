@@ -1,2 +1,0 @@
-{"pid":45972,"journal":"tmp/units/aggregate-successor-label-d-verifier-stdout.jsonl","errors":"tmp/units/aggregate-successor-label-d-verifier-stderr.txt"}
-{"pid":45972,"exit":0,"signal":null,"capped":false,"durationMs":150,"journal":"tmp/units/aggregate-successor-label-d-verifier-stdout.jsonl","errors":"tmp/units/aggregate-successor-label-d-verifier-stderr.txt"}

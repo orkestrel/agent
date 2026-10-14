@@ -1,9 +1,0 @@
-# Recorded full-view capacity
-
-Root accepts the observed context clamp. Qwen's large-bound requests asked for 1068663 tokens; the daemon warned that the request exceeded the model's training context and launched a runner with `n_ctx=262144` and `n_ctx_seq=262144`. Root read the immutable report, the bounded excerpts, the extraction source, and the original warning, launch, and allocation lines. See [the report](report.md), SHA-256 `662b5acb8a10986022833bd43a7ab72a2bc3f055dd249d9f971fcd93ba5a298a`, and [the retained excerpts](excerpts.md).
-
-The full-run interval has 66 chat access records and 66 request records. Its runner releases report `truncated=0`; the final successful response and runner log both report 12685 prompt tokens. The daemon records cannot bind every API request to an individual runner instance, and request 20 has no returned token usage. The HTTP 500 remains an operational failure. These observations establish a configured runner capacity during the recorded interval, not an allocation of the requested 1068663 tokens or an accepted full-view phase.
-
-The excerpt's fields labeled `snapshot started` and `snapshot ended` are the source file modification times before and after the read, as the retained extraction code shows. They are not elapsed capture timestamps. Its `Capture time` is the script's start time. The source byte hashes identify the read prefixes. This correction leaves the raw excerpt unchanged.
-
-Before a successor full-view run qualifies, its contract must distinguish the calculated history bound, requested window, and observed effective capacity. The run must retain complete chronology and reject actual truncation or capacity overflow. The accepted lookup prescribes no budget change or daemon repair; the existing prepared retry remains held with the other feasibility runs until that contract and the admission build are settled. No inference ran for this lookup.

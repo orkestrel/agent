@@ -1,8 +1,0 @@
-{
-  "url": "http://127.0.0.1:11434/api/ps",
-  "method": "GET",
-  "headers": {},
-  "started": "2026-10-11T11:05:51.562Z",
-  "timeout": 30000,
-  "limit": 1048576
-}

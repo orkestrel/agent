@@ -1,1 +1,0 @@
-{"occurrences":179,"propositions":581,"sha256":"51e53477083dad07e229b951a796b857017f58627310a3e595d844dabfbb53cf","rejected":["missing occurrence","wrong item hash","non-source quotation","incorrect verdict aggregation"]}

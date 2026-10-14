@@ -1,1 +1,0 @@
-{"model":"gemma4:e4b-it-q4_K_M","created_at":"2026-10-11T11:07:37.4025267Z","message":{"role":"assistant","content":"PARCEL-CEDAR-7319"},"done":true,"done_reason":"stop","total_duration":610462300,"load_duration":11558400,"prompt_eval_count":59,"prompt_eval_cached_count":0,"prompt_eval_duration":450022000,"eval_count":11,"eval_duration":147378000}

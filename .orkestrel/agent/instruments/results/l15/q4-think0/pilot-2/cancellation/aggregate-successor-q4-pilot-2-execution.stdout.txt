@@ -1,1 +1,0 @@
-{"pid":64012,"exit":1,"signal":null,"capped":false,"durationMs":781517,"journal":".orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.jsonl","errors":".orkestrel/agent/instruments/results/l15/logs/q4-think0-pilot-2.err"}

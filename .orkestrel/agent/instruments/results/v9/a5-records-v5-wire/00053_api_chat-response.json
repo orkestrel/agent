@@ -1,5 +1,0 @@
-{
- "status": 200,
- "ms": 13806,
- "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:43:09.730328114Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_kbimpvr5\",\"function\":{\"index\":0,\"name\":\"lookup_order\",\"arguments\":{\"id\":\"LH-81660\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:43:09.806433376Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":13804211332,\"load_duration\":3772395782,\"prompt_eval_count\":1498,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":7679330000,\"eval_count\":33,\"eval_duration\":2345391000}\n"
-}

@@ -1,5 +1,0 @@
-{
- "status": 200,
- "ms": 15063,
- "text": "{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:18:10.855820213Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_66c3ooef\",\"function\":{\"index\":0,\"name\":\"recall\",\"arguments\":{\"topic\":\"Grace Okafor\"}}}]},\"done\":false}\n{\"model\":\"qwen3.5:2b-q4_K_M\",\"created_at\":\"2026-10-09T09:18:10.931146569Z\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":15060540611,\"load_duration\":3812744059,\"prompt_eval_count\":1668,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":9288781000,\"eval_count\":29,\"eval_duration\":1947088000}\n"
-}

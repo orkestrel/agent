@@ -1,9 +1,0 @@
- M .orkestrel/agent/instruments/bench4/Driver.mjs
- M .orkestrel/agent/ledger.md
- M .orkestrel/agent/progress.md
- M RESULTS.md
-?? .orkestrel/agent/instruments/harness/.orkestrel/
-?? .orkestrel/agent/instruments/results/l15/calibration/g2/fit/
-?? .orkestrel/agent/instruments/results/l15/calibration/g2/labels.json
-?? .orkestrel/agent/instruments/results/l15/calibration/g2/review-labels.json
-?? .orkestrel/agent/instruments/results/l15/g4-think0/resource/

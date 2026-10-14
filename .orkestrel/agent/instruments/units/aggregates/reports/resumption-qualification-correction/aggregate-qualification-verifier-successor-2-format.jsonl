@@ -1,6 +1,0 @@
-Checking formatting...
-
-.orkestrel/agent/instruments/harness/bench5/tests/matrix.test.ts (3ms)
-
-Format issues found in above 1 files. Run without `--check` to fix.
-Finished in 8ms on 7 files using 16 threads.

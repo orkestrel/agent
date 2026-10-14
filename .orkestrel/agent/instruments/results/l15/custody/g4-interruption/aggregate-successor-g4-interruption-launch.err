@@ -1,7 +1,0 @@
-aggregate owner:LH-44870 at g01-luis-refund-amount: Error: local capped summary unavailable at request 36
-aggregate owner:LH-31055 at g04-halvorsen-ticket: Error: local capped summary unavailable at request 68
-aggregate owner:LH-31055 at g07-depot-release: Error: local capped summary unavailable at request 82
-aggregate owner:LH-31055 at g08-halvorsen-credit: Error: local capped summary unavailable at request 85
-aggregate owner:LH-52307 at g09-kenji-gift-note: Error: local capped summary unavailable at request 89
-aggregate owner:LH-31055 at g10-sigrid-callback: Error: local capped summary unavailable at request 93
-aggregate owner:LH-71592 at g12-copperline-gesture: Error: local capped summary unavailable at request 167

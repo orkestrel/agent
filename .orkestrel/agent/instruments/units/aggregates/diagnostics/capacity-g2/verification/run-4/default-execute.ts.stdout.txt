@@ -1,2 +1,0 @@
-{"offline":true,"message":"No HTTP or service mutation. Explicit --prepare or exact-hash --execute required.","host":"Windows; controlled attached daemon; exclusive serial client; no other service requests"}
-{"witness":true,"global":0,"native":0}

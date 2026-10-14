@@ -1,7 +1,0 @@
-MESSAGE 0 ROLE system
-Reply with one token.
-
-
-MESSAGE 1 ROLE user
-
-

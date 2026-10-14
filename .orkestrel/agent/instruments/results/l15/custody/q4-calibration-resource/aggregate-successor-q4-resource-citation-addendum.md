@@ -1,3 +1,0 @@
-# Q4 resource evidence citations
-
-These repository-root-relative citations resolve the retained evidence without changing the accepted resource report: [emitted-reader evidence summary](tmp/units/aggregate-successor-q4-resource-evidence.json:1), [resource manifest](.orkestrel/agent/instruments/results/l15/q4-think0/resource/manifest.json:1), [complete dispatcher journal](.orkestrel/agent/instruments/results/l15/logs/q4-think0-resource.jsonl:1), [terminal launcher result](.orkestrel/agent/instruments/results/l15/logs/q4-think0-resource.err:1), and [recorded launcher PID](.orkestrel/agent/instruments/results/l15/logs/q4-think0-resource.jsonl.pid:1).

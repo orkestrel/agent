@@ -1,7 +1,0 @@
-{
-  "source": ".orkestrel/agent/instruments/results/l15/calibration/g4/generation/packet.jsonl",
-  "target": "tmp/units/aggregate-successor-label-b-packet.jsonl",
-  "sha256": "64b0f89566458745c8099e9351db3b44686102145721ef9395bbd8e06e9d57f5",
-  "bytes": 3263411,
-  "items": 179
-}
