@@ -8,7 +8,7 @@ import type {
 	StudyToolsSubject,
 	StudyToolsWrite,
 } from './types.js'
-import { isArray, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
+import { holds, isArray, isConstructor, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 import { matchesStudyKeys } from '@orkestrel/study'
 import { isStudyCustodyName } from '@orkestrel/study/server'
@@ -29,13 +29,7 @@ import {
  * ```
  */
 export function isStudyToolsSubject(value: unknown): value is StudyToolsSubject {
-	try {
-		if (!isObject(value) || !('Agent' in value) || typeof value.Agent !== 'function') return false
-		Reflect.construct(Object, [], value.Agent)
-		return true
-	} catch {
-		return false
-	}
+	return holds(() => isObject(value) && 'Agent' in value && isConstructor(value.Agent))
 }
 
 /**
@@ -48,8 +42,8 @@ export function isStudyToolsSubject(value: unknown): value is StudyToolsSubject 
  * ```
  */
 export function isStudyToolsAgent(value: unknown): value is StudyToolsAgentInterface {
-	try {
-		return (
+	return holds(
+		() =>
 			isObject(value) &&
 			'generate' in value &&
 			typeof value.generate === 'function' &&
@@ -64,11 +58,8 @@ export function isStudyToolsAgent(value: unknown): value is StudyToolsAgentInter
 			'emitter' in value &&
 			isObject(value.emitter) &&
 			'destroy' in value.emitter &&
-			typeof value.emitter.destroy === 'function'
-		)
-	} catch {
-		return false
-	}
+			typeof value.emitter.destroy === 'function',
+	)
 }
 
 /**
@@ -99,8 +90,8 @@ export function isStudyToolsFileName(value: unknown): value is string {
  * ```
  */
 export function isStudyToolsResponse(value: unknown): value is StudyToolsResponse {
-	try {
-		return (
+	return holds(
+		() =>
 			isRecord(value) &&
 			matchesStudyKeys(value, ['content', 'calls'], ['consume', 'cancel', 'tokens', 'bytes']) &&
 			typeof value.content === 'string' &&
@@ -118,11 +109,8 @@ export function isStudyToolsResponse(value: unknown): value is StudyToolsRespons
 				(key) =>
 					value[key] === undefined ||
 					(typeof value[key] === 'number' && Number.isSafeInteger(value[key]) && value[key] >= 0),
-			)
-		)
-	} catch {
-		return false
-	}
+			),
+	)
 }
 
 /**
@@ -135,8 +123,8 @@ export function isStudyToolsResponse(value: unknown): value is StudyToolsRespons
  * ```
  */
 export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
-	try {
-		return (
+	return holds(
+		() =>
 			isRecord(value) &&
 			matchesStudyKeys(value, ['prompt', 'responses', 'files', 'admitted']) &&
 			typeof value.prompt === 'string' &&
@@ -152,11 +140,8 @@ export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
 			value.files.length <= STUDY_TOOLS_CALLS &&
 			value.files.every(isStudyToolsFileName) &&
 			new Set(value.files).size === value.files.length &&
-			isJSONValue(value.files)
-		)
-	} catch {
-		return false
-	}
+			isJSONValue(value.files),
+	)
 }
 
 /**
@@ -169,17 +154,14 @@ export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
  * ```
  */
 export function isStudyToolsWrite(value: unknown): value is StudyToolsWrite {
-	try {
-		return (
+	return holds(
+		() =>
 			isRecord(value) &&
 			matchesStudyKeys(value, ['path', 'content']) &&
 			typeof value.path === 'string' &&
 			typeof value.content === 'string' &&
-			new TextEncoder().encode(value.content).byteLength <= STUDY_TOOLS_TEXT
-		)
-	} catch {
-		return false
-	}
+			new TextEncoder().encode(value.content).byteLength <= STUDY_TOOLS_TEXT,
+	)
 }
 
 /**
@@ -192,11 +174,9 @@ export function isStudyToolsWrite(value: unknown): value is StudyToolsWrite {
  * ```
  */
 export function isStudyToolsRead(value: unknown): value is StudyToolsRead {
-	try {
-		return isRecord(value) && matchesStudyKeys(value, ['path']) && typeof value.path === 'string'
-	} catch {
-		return false
-	}
+	return holds(
+		() => isRecord(value) && matchesStudyKeys(value, ['path']) && typeof value.path === 'string',
+	)
 }
 
 /**
@@ -209,7 +189,7 @@ export function isStudyToolsRead(value: unknown): value is StudyToolsRead {
  * ```
  */
 export function isStudyToolsAssertion(value: unknown): value is StudyToolsAssertion {
-	try {
+	return holds(() => {
 		if (!isRecord(value)) return false
 		if (value.observation === 'file')
 			return (
@@ -235,9 +215,7 @@ export function isStudyToolsAssertion(value: unknown): value is StudyToolsAssert
 			typeof value.partial === 'boolean' &&
 			(value.content === undefined || typeof value.content === 'string')
 		)
-	} catch {
-		return false
-	}
+	})
 }
 
 /**
@@ -250,8 +228,8 @@ export function isStudyToolsAssertion(value: unknown): value is StudyToolsAssert
  * ```
  */
 export function isStudyToolsFile(value: unknown): value is StudyToolsFile {
-	try {
-		return (
+	return holds(
+		() =>
 			isRecord(value) &&
 			matchesStudyKeys(value, ['path', 'exists'], ['content', 'bytes']) &&
 			isStudyToolsFileName(value.path) &&
@@ -261,9 +239,6 @@ export function isStudyToolsFile(value: unknown): value is StudyToolsFile {
 					typeof value.bytes === 'number' &&
 					Number.isSafeInteger(value.bytes) &&
 					value.bytes >= 0
-				: value.content === undefined && value.bytes === undefined)
-		)
-	} catch {
-		return false
-	}
+				: value.content === undefined && value.bytes === undefined),
+	)
 }

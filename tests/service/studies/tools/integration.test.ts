@@ -1,15 +1,24 @@
 import type { StudyEvidence } from '@orkestrel/study'
-import { cloneJSONValue } from '@orkestrel/contract'
+import { cloneJSONValue, parseJSON } from '@orkestrel/contract'
 import { createScratch } from '@orkestrel/test/server'
 import { realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { parseJSON } from '@orkestrel/contract'
 import { expect, it } from 'vitest'
-import { StudySeries } from '@orkestrel/study'
-import { buildStudySchedule, computeStudyScores } from '@orkestrel/study'
-import { StudyResults } from '@orkestrel/study/server'
-import { encodeStudyJSON, hashStudyBytes, readStudyResult } from '@orkestrel/study/server'
+import {
+	StudySeries,
+	buildStudySchedule,
+	computeStudyScores,
+	isStudyJudgment,
+	parseStudyProfile,
+} from '@orkestrel/study'
+import {
+	StudyArtifacts,
+	StudyResults,
+	encodeStudyJSON,
+	hashStudyBytes,
+	readStudyResult,
+} from '@orkestrel/study/server'
 import {
 	gradeStudyTools,
 	parseStudyToolsInput,
@@ -17,8 +26,6 @@ import {
 } from '../../../../studies/tools/index.js'
 import { loadStudyToolsFixture, readStudyToolsEvidence } from '../../../setupService.js'
 import { buildStudyGrading } from '../../../setupStudy.js'
-import { parseStudyProfile } from '@orkestrel/study'
-import { StudyArtifacts } from '@orkestrel/study/server'
 
 it('inspects the shipped package-root profile against the real offline artifact inventory', async () => {
 	const root = realpathSync(resolve('.'))
@@ -93,6 +100,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 			evidence[trial.id] = await readStudyToolsEvidence(directory, trial.id)
 		const judgments = gradeStudyTools(result.manifest, fixture.rubric, result.attempts, evidence)
 		expect(judgments).toHaveLength(22)
+		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
 		expect(
 			judgments.every(
 				(judgment) => judgment.verdict === 'achieved' && judgment.references.length === 1,

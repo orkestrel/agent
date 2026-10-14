@@ -240,7 +240,7 @@ export function validateStudyMemoryInventory(value: unknown, profile: StudyProfi
 	}
 }
 
-/** Grades observable mechanisms while leaving meaning for blind labels. @param input - Sealed attempts, evidence and independent rubric. @returns Attributable mechanical readings. */
+/** Grades observable mechanisms while leaving meaning for blind labels. @param input - Sealed attempts, evidence and independent rubric. @returns Attributable mechanical readings citing retained attempt files and one-based evidence rows. */
 export function gradeStudyMemory(input: StudyAdjudication): readonly StudyJudgment[] {
 	const judgments: StudyJudgment[] = []
 	for (const attempt of input.attempts)
@@ -248,53 +248,58 @@ export function gradeStudyMemory(input: StudyAdjudication): readonly StudyJudgme
 			if (criterion.scenario !== attempt.trial.scenario) continue
 			const observation = attempt.observations.find((entry) => entry.goal === criterion.goal)
 			const rows = input.evidence[attempt.trial.id] ?? []
+			const file = `trials/${attempt.trial.id}/attempt.json`
+			const evidence = `trials/${attempt.trial.id}/evidence.jsonl`
 			let verdict: StudyJudgment['verdict'] = 'unknown'
-			let reference: number | undefined
+			let references: readonly string[] = []
 			const assertion = criterion.assertion
 			if (
 				criterion.method !== 'semantic' &&
 				isStudyMemoryAssertion(assertion) &&
 				observation !== undefined
 			) {
-				if (assertion.observation === 'operational')
-					verdict =
-						observation.failure === undefined &&
-						observation.product !== undefined &&
-						attempt.failure === undefined
-							? 'achieved'
-							: 'unsuccessful'
-				else if (assertion.observation === 'result' && observation.product !== undefined)
-					verdict = observation.product.partial === assertion.partial ? 'achieved' : 'unsuccessful'
-				else {
-					reference = rows.findIndex(
+				const complete = observation.failure === undefined && observation.product !== undefined
+				if (assertion.observation === 'operational') {
+					verdict = complete && attempt.failure === undefined ? 'achieved' : 'unsuccessful'
+					references = [file]
+				} else if (assertion.observation === 'result') {
+					if (observation.product !== undefined) {
+						verdict =
+							observation.product.partial === assertion.partial ? 'achieved' : 'unsuccessful'
+						references = [file]
+					}
+				} else {
+					const index = rows.findIndex(
 						(row) =>
 							row.goal === criterion.goal &&
 							row.event === assertion.observation &&
 							(assertion.observation === 'summary' ||
 								(isRecord(row.value) && 'id' in assertion && row.value.id === assertion.id)),
 					)
-					verdict =
-						reference >= 0
-							? 'achieved'
-							: observation.failure === undefined && observation.product !== undefined
-								? 'unsuccessful'
-								: 'unknown'
+					if (index >= 0) {
+						verdict = 'achieved'
+						references = [`${evidence}#${index + 1}`]
+					} else if (complete) {
+						verdict = 'unsuccessful'
+						references = [file, evidence]
+					}
 				}
 			}
-			judgments.push({
-				trial: attempt.trial.id,
-				criterion: criterion.id,
-				verdict,
-				method: criterion.method === 'semantic' ? 'human' : criterion.method,
-				reason:
-					criterion.method === 'semantic'
-						? 'Requires an independent blind semantic label'
-						: 'Retained observable mechanism evidence',
-				references:
-					reference !== undefined && reference >= 0
-						? [`${attempt.trial.id}:evidence:${reference}`]
-						: [],
-			})
+			judgments.push(
+				Object.freeze({
+					trial: attempt.trial.id,
+					criterion: criterion.id,
+					verdict,
+					method: criterion.method === 'semantic' ? 'human' : criterion.method,
+					reason:
+						criterion.method === 'semantic'
+							? 'Requires an independent blind semantic label'
+							: verdict === 'unknown'
+								? 'No retained observation for the declared mechanism'
+								: 'Retained observable mechanism evidence',
+					references: Object.freeze(references),
+				}),
+			)
 		}
-	return judgments
+	return Object.freeze(judgments)
 }

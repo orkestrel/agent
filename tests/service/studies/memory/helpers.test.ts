@@ -1,3 +1,4 @@
+import { isStudyJudgment } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import {
 	gradeStudyMemory,
@@ -153,9 +154,17 @@ describe('memory declaration and mechanical evidence', () => {
 		).toThrow('support')
 	})
 
-	it('keeps semantic criteria unknown and permits nonfault partial products for operational capacity', () => {
+	it('cites retained attempts and one-based rows, keeps unknowns empty and admits nonfault partial products', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		const trial = { id: 'trial', arm: 'full', scenario: 'desk', repetition: 0 }
+		const complete = { id: 'complete', arm: 'full', scenario: 'desk', repetition: 0 }
+		const faulted = { id: 'faulted', arm: 'full', scenario: 'desk', repetition: 1 }
+		const evidence = {
+			complete: [
+				{ event: 'summary', goal: 'other', value: 'unrelated' },
+				{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
+			],
+			faulted: [],
+		}
 		const judgments = gradeStudyMemory({
 			manifest: {
 				version: 1,
@@ -174,7 +183,7 @@ describe('memory declaration and mechanical evidence', () => {
 					rubric: 'rubric.json',
 				},
 				scenarios: [],
-				schedule: [trial],
+				schedule: [complete, faulted],
 				bounds: profile.bounds,
 				qualification: undefined,
 				host: {},
@@ -213,11 +222,27 @@ describe('memory declaration and mechanical evidence', () => {
 						critical: false,
 						assertion: { observation: 'arrival', id: 'receipt' },
 					},
+					{
+						id: 'lookup',
+						scenario: 'desk',
+						goal: 'goal',
+						method: 'trace',
+						critical: false,
+						assertion: { observation: 'lookup', id: 'record' },
+					},
+					{
+						id: 'result',
+						scenario: 'desk',
+						goal: 'goal',
+						method: 'state',
+						critical: false,
+						assertion: { observation: 'result', partial: false },
+					},
 				],
 			},
 			attempts: [
 				{
-					trial,
+					trial: complete,
 					duration: 1,
 					failure: undefined,
 					observations: [
@@ -230,14 +255,62 @@ describe('memory declaration and mechanical evidence', () => {
 						},
 					],
 				},
+				{
+					trial: faulted,
+					duration: 1,
+					failure: { cause: 'capacity', message: 'Output cap', role: 'agent' },
+					observations: [
+						{
+							goal: 'goal',
+							product: undefined,
+							failure: { cause: 'capacity', message: 'Output cap', role: 'agent' },
+							usage: [],
+							duration: 1,
+						},
+					],
+				},
 			],
-			evidence: { trial: [{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } }] },
+			evidence,
 		})
-		expect(judgments.map((judgment) => judgment.verdict)).toEqual([
-			'achieved',
-			'unknown',
-			'achieved',
+		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
+		expect(
+			judgments.map((judgment) => [
+				judgment.trial,
+				judgment.criterion,
+				judgment.verdict,
+				judgment.references,
+			]),
+		).toEqual([
+			['complete', 'operational', 'achieved', ['trials/complete/attempt.json']],
+			['complete', 'meaning', 'unknown', []],
+			['complete', 'source', 'achieved', ['trials/complete/evidence.jsonl#2']],
+			[
+				'complete',
+				'lookup',
+				'unsuccessful',
+				['trials/complete/attempt.json', 'trials/complete/evidence.jsonl'],
+			],
+			['complete', 'result', 'unsuccessful', ['trials/complete/attempt.json']],
+			['faulted', 'operational', 'unsuccessful', ['trials/faulted/attempt.json']],
+			['faulted', 'meaning', 'unknown', []],
+			['faulted', 'source', 'unknown', []],
+			['faulted', 'lookup', 'unknown', []],
+			['faulted', 'result', 'unknown', []],
 		])
-		expect(judgments[2]?.references).toEqual(['trial:evidence:0'])
+		const retained = new Set(
+			Object.entries(evidence).flatMap(([id, rows]) => [
+				`trials/${id}/attempt.json`,
+				`trials/${id}/evidence.jsonl`,
+				...Array.from(rows.keys(), (index) => `trials/${id}/evidence.jsonl#${index + 1}`),
+			]),
+		)
+		for (const judgment of judgments) {
+			expect(judgment.references.every((reference) => retained.has(reference))).toBe(true)
+			expect(judgment.references.length === 0).toBe(judgment.verdict === 'unknown')
+			expect(
+				judgment.verdict === 'unsuccessful' &&
+					judgment.references.some((reference) => reference.includes('#')),
+			).toBe(false)
+		}
 	})
 })

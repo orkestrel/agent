@@ -1,4 +1,9 @@
-import type { StudyDriverInterface, StudySessionInterface, StudyTrial } from '@orkestrel/study'
+import type {
+	StudyDriverInterface,
+	StudyProfile,
+	StudySessionInterface,
+	StudyTrial,
+} from '@orkestrel/study'
 import type { StudyMemoryOptions, StudyMemoryProvider, StudyMemorySubject } from './types.js'
 import { StudyError } from '@orkestrel/study'
 import { validateStudyMemoryProfile } from './helpers.js'
@@ -7,7 +12,7 @@ import { isStudyMemoryArm, isStudyMemoryProvider, isStudyMemorySubject } from '.
 
 /** Opens fresh real runtime state for every arm and repetition. */
 export class StudyMemoryDriver implements StudyDriverInterface {
-	readonly #options: StudyMemoryOptions
+	readonly #profile: StudyProfile
 	readonly #subject: StudyMemorySubject
 	readonly #provider: StudyMemoryProvider
 	/** Validates the admitted runtime surfaces and finite profile. @param options - Admitted subject, provider and profile. */
@@ -18,7 +23,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 				'Memory requires the admitted Agent and Ollama public factories',
 			)
 		validateStudyMemoryProfile(options.profile)
-		this.#options = options
+		this.#profile = options.profile
 		this.#subject = options.subject
 		this.#provider = options.provider
 	}
@@ -29,7 +34,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 		return new StudyMemorySession({
 			subject: this.#subject,
 			provider: this.#provider,
-			profile: this.#options.profile,
+			profile: this.#profile,
 			arm: trial.arm,
 			signal,
 		})

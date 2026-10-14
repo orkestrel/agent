@@ -14,7 +14,11 @@ import type {
 	StudyProduct,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyMemoryInput, StudyMemorySessionOptions } from './types.js'
+import type {
+	StudyMemoryActivity,
+	StudyMemoryInput,
+	StudyMemorySessionOptions,
+} from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
@@ -40,7 +44,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #summary: ProviderInterface
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
-	#active: { readonly goal: string; readonly context: StudyContext } | undefined
+	#active: StudyMemoryActivity | undefined
 	#trace: StudyEvidence[] = []
 	#work: Promise<StudyProduct> | undefined
 	#closing: Promise<void> | undefined

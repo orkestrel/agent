@@ -31,7 +31,24 @@ it('validates actual admitted constructors and bounds every declared workload wi
 			),
 		),
 	).toBe(false)
+	expect(isStudyToolsSubject({ Agent: function Agent() {} })).toBe(true)
+	expect(
+		isStudyToolsSubject({
+			get Agent() {
+				throw new Error('getter')
+			},
+		}),
+	).toBe(false)
 	expect(isStudyToolsAgent({})).toBe(false)
+	expect(
+		isStudyToolsAgent({
+			generate: async () => undefined,
+			abort: () => undefined,
+			get context() {
+				throw new Error('getter')
+			},
+		}),
+	).toBe(false)
 	for (const scenario of fixture.manifest.scenarios) {
 		for (const goal of scenario.goals) {
 			expect(isStudyToolsInput(goal.input)).toBe(true)

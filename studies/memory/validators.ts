@@ -5,13 +5,13 @@ import type {
 	StudyMemoryProvider,
 	StudyMemorySubject,
 } from './types.js'
-import { isArray, isObject, isRecord } from '@orkestrel/contract'
+import { holds, isArray, isObject, isRecord } from '@orkestrel/contract'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
 /** Checks the admitted Agent factory surface. @param value - Admitted namespace. @returns Whether the required exports exist. */
 export function isStudyMemorySubject(value: unknown): value is StudyMemorySubject {
-	try {
-		return (
+	return holds(
+		() =>
 			isObject(value) &&
 			'Agent' in value &&
 			typeof value.Agent === 'function' &&
@@ -22,26 +22,20 @@ export function isStudyMemorySubject(value: unknown): value is StudyMemorySubjec
 			'estimateMessages' in value &&
 			typeof value.estimateMessages === 'function' &&
 			'LEDGER_QUESTIONS' in value &&
-			isObject(value.LEDGER_QUESTIONS)
-		)
-	} catch {
-		return false
-	}
+			isObject(value.LEDGER_QUESTIONS),
+	)
 }
 
 /** Checks the admitted Ollama factory surface. @param value - Admitted namespace. @returns Whether both public factories exist. */
 export function isStudyMemoryProvider(value: unknown): value is StudyMemoryProvider {
-	try {
-		return (
+	return holds(
+		() =>
 			isObject(value) &&
 			'createOllama' in value &&
 			typeof value.createOllama === 'function' &&
 			'createOllamaJudge' in value &&
-			typeof value.createOllamaJudge === 'function'
-		)
-	} catch {
-		return false
-	}
+			typeof value.createOllamaJudge === 'function',
+	)
 }
 
 /** Checks a supported memory arm. @param value - Trial arm. @returns Whether this driver implements the treatment. */
@@ -51,7 +45,7 @@ export function isStudyMemoryArm(value: unknown): value is StudyMemoryArm {
 
 /** Checks bounded public goal input. @param value - Public JSON input. @returns Whether messages and references are valid. */
 export function isStudyMemoryInput(value: unknown): value is StudyMemoryInput {
-	try {
+	return holds(() => {
 		if (
 			!isRecord(value) ||
 			typeof value.prompt !== 'string' ||
@@ -94,14 +88,12 @@ export function isStudyMemoryInput(value: unknown): value is StudyMemoryInput {
 			ids.add(record.id)
 		}
 		return true
-	} catch {
-		return false
-	}
+	})
 }
 
 /** Checks a mechanical assertion. @param value - Independent rubric assertion. @returns Whether the assertion is supported. */
 export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAssertion {
-	try {
+	return holds(() => {
 		if (!isRecord(value)) return false
 		if (value.observation === 'operational' || value.observation === 'summary') return true
 		if (value.observation === 'result') return typeof value.partial === 'boolean'
@@ -109,7 +101,5 @@ export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAsse
 			(value.observation === 'arrival' || value.observation === 'lookup') &&
 			typeof value.id === 'string'
 		)
-	} catch {
-		return false
-	}
+	})
 }
