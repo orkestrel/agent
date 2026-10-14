@@ -1,0 +1,85 @@
+{
+  "protocol": "c1",
+  "capacity": 1,
+  "key": "q2",
+  "think": true,
+  "decision": {
+    "model": "qwen3.5:2b-q4_K_M",
+    "digest": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11"
+  },
+  "summarizer": {
+    "model": "qwen3.5:2b-q4_K_M",
+    "digest": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11"
+  },
+  "judge": {
+    "model": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+    "digest": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+  },
+  "sampler": {
+    "temperature": 0,
+    "seed": 7,
+    "presence_penalty": 1.5,
+    "top_k": 20,
+    "top_p": 0.95,
+    "num_ctx": 3072
+  },
+  "budget": {
+    "window": 16384,
+    "ceiling": 16384,
+    "reserve": 4096,
+    "predict": 4096,
+    "safety": 512
+  },
+  "compaction": {
+    "predict": 2048,
+    "sections": 3,
+    "keep": 0
+  },
+  "retry": 0,
+  "timeout": 180000,
+  "limits": {
+    "calls": 4096,
+    "tokens": 8000000,
+    "wall": 14400000,
+    "metadata": 90000,
+    "goal": 900000,
+    "requests": 128,
+    "series": 43200000,
+    "goals": 96
+  },
+  "workload": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\units\\aggregates\\endurance\\manifest.json",
+    "hash": "bbd37cb0aa16522649d35c052baa25ff569adff50c872768431daa1d3067e741"
+  },
+  "runtime": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\units\\aggregates\\endurance\\runtime\\evaluation.json",
+    "hash": "e8b4143efbbc9251166852c2d993f6b1f0b3f44eaa181f0973c27878109a47f5"
+  },
+  "oracle": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\units\\aggregates\\endurance\\private\\evaluation.json",
+    "hash": "249a307bcdf31664676626b45090f1ce58aff10de39a31dcf447cec821650e6b"
+  },
+  "agent": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\harness-capacity\\vendor\\agent-0.0.30-trimmed\\index.js",
+    "hash": "8f040acf72b6426246b79e5c2f31d3644291e4c08f49434ad1224e16f176311d"
+  },
+  "ollama": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\harness-capacity\\vendor\\ollama\\index.js",
+    "hash": "e09277478a425e6227f37730a29b2df5d9f80cfc595740cd0335fa05da22b4a7"
+  },
+  "tags": {
+    "path": "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\results\\c1\\q2-capacity\\freeze\\tags.json",
+    "hash": "5e9013671018385102ce19fa6b3ccdd3557917eed65527532a252402d22d3e63"
+  },
+  "daemon": {
+    "url": "http://127.0.0.1:11435",
+    "version": "0.40.3"
+  },
+  "arms": [
+    "records",
+    "compaction",
+    "full"
+  ],
+  "blind": 29,
+  "failure": "continue"
+}
