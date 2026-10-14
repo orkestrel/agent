@@ -39,4 +39,27 @@ The Luna readers completed without side effects. Their reports are `tmp/units/st
 
 ## Live comparison
 
+## Implementation reconciliation and ownership
+
+The final Fable invocation completed successfully in session `6bf873ab-5f40-43eb-a9c2-759d5b697192`, exit 0 uncapped in 302339 ms. Its final proposal and the blind positions are retained in the adjacent study-implementation files; `study-implementation-round.json` binds their bytes. No further Fable invocation is authorized.
+
+Root selects the private app/core and app/server design. Offline checks inspect bytes and schemas without importing caller-selected code. Operational deadlines stop execution promptly, as do capacity and infrastructure failures; ordinary unsuccessful products may continue. Mechanical predicates judge observable state and traces; prose semantics remain unknown until separately imported blind judgments. Artifact identity must cover an admitted dependency inventory, not only an entry. The historical c1 instrument and its results are retained separately.
+
+U0's installed scaffold probe found that app/server unconditionally requires a declared middleware dependency, even for the empty CLI starter. The existing manifest lacks it. Root requested authorization for `@orkestrel/middleware@^0.0.16` as a dev dependency, citing the coding contract's explicit-dependency rule; no installation or declaration change has occurred. The published bin route cannot import private app code and would change the intended publication surface. Continue independent units while that authorization is pending.
+
+| Unit | Owner and files | Acceptance |
+| --- | --- | --- |
+| U1 contract | Root: app/core/studies/types.ts, constants.ts, errors.ts, environment barrel | Typed public inputs, nested finite allowances, outcomes distinct from judgments; strict compiler proof passed |
+| U2 core leaves | Sol: app/core/studies/validators.ts, parsers.ts, helpers.ts, local barrel and tests/app/core/studies leaves | Invalid/oversized definitions rejected; explicit repetition schedule; unknown-aware whole-horizon reporting; deterministic pure proofs |
+| U4 artifact custody | Astra: tools/artifacts and tests/tools/artifacts | Offline inspection has no import side effects; actual built ESM values and dependencies bound; drift and unsupported closure refused |
+| U3 execution | Next bounded unit after U1, disjoint engine/meter classes and tests | Real deadlines, pre-dispatch budget admission, fail-fast terminal state, isolation and no retries |
+| U5 store and command | Next bounded unit after U1/U4 | Exclusive results, byte seals, independent grading and tamper refusal |
+| U6 concrete tools | Next bounded unit after engine and loader | Real built agent/tool operations, filesystem state and trace grading, mechanism-only evidence |
+| U7 memory/capacity | Next bounded unit after engine and loader | Public actual adapters, bounded protocol fixtures, qualification binding and unknown semantic grading |
+| U8 integration | Root, serial shared files | Supported wiring, optional launcher, guide parity, real CPU operation, independent integrated review and gates |
+
+The user also requested parallel model and records research. Luna max owns `system-models` and `records-research`, with reports under tmp/units. These units cannot download or run models, mutate strategy code, or touch the frozen campaign. Model replacement and strategy changes will be separate ablations. Research does not authorize tuning on the held-out oracle.
+
+## Current comparison
+
 The capacity series launched at 2026-10-14T14:43:57Z under launcher PID 89936 and ended uncapped after4032693ms on q4 records output exhaustion at goal36. The retained request had3836prompt tokens and4096completion tokens under a4096output cap; no later request was sent. The remaining arms never started. See capacity.md for the separately verified predeclared8192output contingency. Keep the same no-mutation and no-GPU-work boundaries during the successor qualification and comparison. The dedicated daemon launcher remains PID12596 with childPID28348 on port11435. Fable's frozen packet predates this terminal reading; root will reconcile that factual change without another Fable call.
