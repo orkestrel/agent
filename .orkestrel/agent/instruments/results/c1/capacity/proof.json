@@ -1,0 +1,11 @@
+{
+    "report":  {
+                   "hash":  "b93ba90c8890a6b91a8f2e10bfccb3a1292aab3f7efb2786bc56f0289a8df1e4",
+                   "path":  "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\capacity-proof.md"
+               },
+    "build":  {
+                  "hash":  "21f65be21acf15f14dbd84d074c3a3fa1fac6b6e9e373adf4535d991fafe8bd2",
+                  "path":  "C:\\Users\\mikes\\WebstormProjects\\agent\\.orkestrel\\agent\\instruments\\harness-capacity\\.build\\build-manifest.json"
+              },
+    "passed":  true
+}
