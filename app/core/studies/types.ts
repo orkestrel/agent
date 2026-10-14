@@ -69,6 +69,11 @@ export interface StudyProvider {
 	readonly url: string
 	readonly model: string
 	readonly judge: string
+	/** Pins the serving inventory independently of mutable model names. */
+	readonly digest: {
+		readonly model: string
+		readonly judge: string
+	}
 }
 
 /** Holds execution settings independently of scenario and grading declarations. */

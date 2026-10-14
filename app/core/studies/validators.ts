@@ -255,18 +255,22 @@ export function isStudyRoom(value: unknown): value is StudyRoom {
  * @returns True if the declaration has a supported origin and nonempty names; false otherwise
  * @example
  * ```ts
- * isStudyProvider({ entry: 'dist/index.js', url: 'http://127.0.0.1:11435', model: 'qwen', judge: 'mica' }) // true
+ * isStudyProvider({ entry: 'dist/index.js' }) // false
  * ```
  */
 export function isStudyProvider(value: unknown): value is StudyProvider {
 	try {
 		if (
 			!isRecord(value) ||
-			!matchesStudyKeys(value, ['entry', 'url', 'model', 'judge']) ||
+			!matchesStudyKeys(value, ['entry', 'url', 'model', 'judge', 'digest']) ||
 			!['entry', 'url', 'model', 'judge'].every(
 				(key) => typeof value[key] === 'string' && value[key].length > 0,
 			) ||
-			typeof value.url !== 'string'
+			typeof value.url !== 'string' ||
+			!isRecord(value.digest) ||
+			!matchesStudyKeys(value.digest, ['model', 'judge']) ||
+			!isStudyDigest(value.digest.model) ||
+			!isStudyDigest(value.digest.judge)
 		)
 			return false
 		const url = new URL(value.url)

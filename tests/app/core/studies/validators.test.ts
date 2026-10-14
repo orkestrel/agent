@@ -112,10 +112,19 @@ it('requires positive room, finite bounds and credential-free HTTP origins', () 
 		url: 'http://127.0.0.1:11435',
 		model: 'subject',
 		judge: 'judge',
+		digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
 	}
 	expect(isStudyProfile(profile)).toBe(true)
 	expect(isStudyRoom(profile.room)).toBe(true)
 	expect(isStudyProvider(provider)).toBe(true)
+	expect(isStudyProvider({ ...provider, digest: undefined })).toBe(false)
+	expect(isStudyProvider({ ...provider, digest: { model: 'a'.repeat(64) } })).toBe(false)
+	expect(isStudyProvider({ ...provider, digest: { ...provider.digest, judge: 'mutable' } })).toBe(
+		false,
+	)
+	expect(
+		isStudyProvider({ ...provider, digest: { ...provider.digest, extra: 'c'.repeat(64) } }),
+	).toBe(false)
 	expect(isStudyProvider({ ...provider, url: 'http://user:secret@localhost' })).toBe(false)
 	expect(isStudyProvider({ ...provider, url: 'file:///models' })).toBe(false)
 	expect(isStudyProvider({ ...provider, url: 'http://localhost/model?key=value' })).toBe(false)

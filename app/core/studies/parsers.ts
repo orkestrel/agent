@@ -119,8 +119,12 @@ export function parseStudyRubric(value: unknown): StudyRubric {
 export function parseStudyGrading(value: unknown): StudyGrading {
 	try {
 		if (!isStudyGrading(value)) throw new StudyError('EVIDENCE', 'Invalid study grading')
-		const { labels, ...required } = value
-		const snapshot = cloneJSONValue({ ...required, ...(labels === undefined ? {} : { labels }) })
+		const { labels, packet, ...required } = value
+		const snapshot = cloneJSONValue({
+			...required,
+			...(labels === undefined ? {} : { labels }),
+			...(packet === undefined ? {} : { packet }),
+		})
 		if (isStudyGrading(snapshot)) return snapshot
 	} catch {
 		throw new StudyError('EVIDENCE', 'Invalid or unreadable study grading')

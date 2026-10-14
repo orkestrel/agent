@@ -61,6 +61,7 @@ it('parses real JSON grading and labels without coercion and preserves unknown t
 	const parsed = parseStudyGrading(JSON.parse(JSON.stringify(grading)))
 	expect(isStudyGrading(parsed)).toBe(true)
 	expect(parsed.judgments).toEqual(grading.judgments)
+	expect(parseStudyGrading({ ...grading, labels: undefined, packet: undefined })).toEqual(parsed)
 	expect(Object.isFrozen(parsed.judgments[0]?.references)).toBe(true)
 	const labels = {
 		packet: 'a'.repeat(64),
