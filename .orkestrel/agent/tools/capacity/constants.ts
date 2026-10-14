@@ -23,7 +23,7 @@ export const CAPACITY_LIMITS = Object.freeze({
 	wall: 1800000,
 	calls: 512,
 	tokens: 1000000,
-	metadata: 30000,
+	metadata: 90000,
 	goal: 900000,
 	requests: 128,
 	recap: 2048,
