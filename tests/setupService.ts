@@ -50,6 +50,82 @@ export const STUDY_MEMORY_SCHEDULE = Object.freeze([
 /** Pins the complete authored goal horizon. */
 export const STUDY_MEMORY_GOALS = Object.freeze(['opening', 'correction', 'closure'])
 
+/** Pins the independent before-release, initial, replacement and retained lookup trajectory. */
+export const STUDY_MEMORY_RELEASE_GOALS = Object.freeze([
+	Object.freeze({ id: 'before', records: Object.freeze([]) }),
+	Object.freeze({
+		id: 'initial',
+		records: Object.freeze([
+			Object.freeze({ id: 'order:BC-7301', name: 'Mara Ellison', content: 'Original $265.86' }),
+		]),
+	}),
+	Object.freeze({
+		id: 'replacement',
+		records: Object.freeze([
+			Object.freeze({
+				id: 'order:BC-7301',
+				name: 'Mara Ellison revised',
+				content: 'Corrected $260.35',
+			}),
+		]),
+	}),
+	Object.freeze({ id: 'retained', records: Object.freeze([]) }),
+])
+
+/** Pins independently chosen public arrival and lookup release boundaries. */
+export const STUDY_ENDURANCE_BOUNDARIES = Object.freeze([
+	Object.freeze([
+		'ev-01-1',
+		Object.freeze([
+			'endurance-desk',
+			'ev-opening',
+			'ev-register',
+			'endurance-day:2031-02-02',
+			'ev-source-1-1',
+			'ev-source-1-2',
+			'ev-source-1-3',
+			'ev-source-1-4',
+		]),
+		Object.freeze(['order:BC-7301', 'customer:BC-4101']),
+	] as const),
+	Object.freeze(['ev-01-2', Object.freeze([]), Object.freeze([])] as const),
+	Object.freeze([
+		'ev-09-1',
+		Object.freeze([
+			'endurance-day:2031-02-10',
+			'ev-source-9-1',
+			'ev-source-9-2',
+			'ev-source-9-3',
+			'ev-source-9-4',
+			'ev-side-9',
+		]),
+		Object.freeze(['order:BC-7309', 'customer:BC-4109', 'customer:BC-4105']),
+	] as const),
+	Object.freeze([
+		'ev-13-1',
+		Object.freeze([
+			'endurance-day:2031-02-14',
+			'ev-source-13-1',
+			'ev-source-13-2',
+			'ev-source-13-3',
+			'ev-source-13-4',
+		]),
+		Object.freeze(['order:BC-7301', 'customer:BC-4101']),
+	] as const),
+	Object.freeze([
+		'ev-24-1',
+		Object.freeze([
+			'endurance-day:2031-02-25',
+			'ev-source-24-1',
+			'ev-source-24-2',
+			'ev-source-24-3',
+			'ev-source-24-4',
+		]),
+		Object.freeze(['order:BC-7312']),
+	] as const),
+	Object.freeze(['ev-24-4', Object.freeze([]), Object.freeze([])] as const),
+])
+
 /** Copies manifest and dist bytes for a selected installed runtime dependency closure.
  * @param scratch - Exclusive owner of the copied tree.
  * @param selections - Initial package roots; an earlier selection wins throughout the graph.

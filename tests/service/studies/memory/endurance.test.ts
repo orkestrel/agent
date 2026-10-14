@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { buildStudySchedule, parseStudyProfile, validateStudyInputs } from '@orkestrel/study'
 import { createStudyAdapter, isStudyMemoryInput } from '../../../../studies/memory/index.js'
-import { buildMemoryProfile, loadMemoryInputs } from '../../../setupService.js'
+import {
+	buildMemoryProfile,
+	loadMemoryInputs,
+	STUDY_ENDURANCE_BOUNDARIES,
+} from '../../../setupService.js'
 
 describe('prospective public endurance declarations', () => {
 	it('preserves the complete pinned public goal and source population at their original boundaries', async () => {
@@ -205,58 +209,7 @@ describe('prospective public endurance declarations', () => {
 		)
 		const goals = fixture.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing endurance goals')
-		for (const [id, arrivals, records] of [
-			[
-				'ev-01-1',
-				[
-					'endurance-desk',
-					'ev-opening',
-					'ev-register',
-					'endurance-day:2031-02-02',
-					'ev-source-1-1',
-					'ev-source-1-2',
-					'ev-source-1-3',
-					'ev-source-1-4',
-				],
-				['order:BC-7301', 'customer:BC-4101'],
-			],
-			['ev-01-2', [], []],
-			[
-				'ev-09-1',
-				[
-					'endurance-day:2031-02-10',
-					'ev-source-9-1',
-					'ev-source-9-2',
-					'ev-source-9-3',
-					'ev-source-9-4',
-					'ev-side-9',
-				],
-				['order:BC-7309', 'customer:BC-4109', 'customer:BC-4105'],
-			],
-			[
-				'ev-13-1',
-				[
-					'endurance-day:2031-02-14',
-					'ev-source-13-1',
-					'ev-source-13-2',
-					'ev-source-13-3',
-					'ev-source-13-4',
-				],
-				['order:BC-7301', 'customer:BC-4101'],
-			],
-			[
-				'ev-24-1',
-				[
-					'endurance-day:2031-02-25',
-					'ev-source-24-1',
-					'ev-source-24-2',
-					'ev-source-24-3',
-					'ev-source-24-4',
-				],
-				['order:BC-7312'],
-			],
-			['ev-24-4', [], []],
-		] as const) {
+		for (const [id, arrivals, records] of STUDY_ENDURANCE_BOUNDARIES) {
 			const goal = goals.find((entry) => entry.id === id)
 			if (goal === undefined || !isStudyMemoryInput(goal.input))
 				throw new Error(`Missing chosen boundary ${id}`)

@@ -8,7 +8,7 @@ The extended capacity series stopped at2026-10-14T18:16:38Z, exit3 uncapped. Q4r
 
 The evaluation research and user-requested adversarial round closed on 2026-10-14. See [study.md](../../../study/.orkestrel/study/study.md) for the historical recommendation, [Fable's synthesis](../../../study/.orkestrel/study/study-synthesis.md) for its design, and [the round record](../../../study/.orkestrel/study/study-round.md) for the independent Opus proposal, Opus review, model custody, and reconciliation. The implemented portable package and its current contract are described in [Study's guide](../../../study/guides/study.md). This supersedes the earlier scaffold ownership proposal and bench umbrella name. Local model execution remains serial.
 
-Closed on 2026-10-14. The thinking series and both blind audits are finished. No generation, labeling, merge, or report is waiting to run. The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.
+The original thinking series and both blind audits closed on 2026-10-14. Their generation, labeling, merges, and reports are finished. The prospective Study endurance successor is separate work. Its implementation and fixture repair are accepted after independent review and verification; capacity execution precedes any quality execution under [the frozen protocol](endurance.md). The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.
 
 ## Results
 

@@ -10,6 +10,7 @@ import {
 	loadMemoryInputs,
 	readMemoryToolResults,
 	STUDY_MEMORY_MODULES,
+	STUDY_MEMORY_RELEASE_GOALS,
 } from '../../../setupService.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
@@ -35,20 +36,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				fixture.context.signal,
 			)
 			try {
-				for (const [index, goal] of [
-					{ id: 'before', records: [] },
-					{
-						id: 'initial',
-						records: [{ id: 'order:BC-7301', name: 'Mara Ellison', content: 'Original $265.86' }],
-					},
-					{
-						id: 'replacement',
-						records: [
-							{ id: 'order:BC-7301', name: 'Mara Ellison revised', content: 'Corrected $260.35' },
-						],
-					},
-					{ id: 'retained', records: [] },
-				].entries()) {
+				for (const [index, goal] of STUDY_MEMORY_RELEASE_GOALS.entries()) {
 					await session.execute(
 						{
 							id: goal.id,
