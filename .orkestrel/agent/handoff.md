@@ -2,7 +2,7 @@
 
 The user has since requested a capacity repair and a new bounded comparison. The active successor is tracked in [capacity.md](capacity.md). The closed baseline below remains unchanged evidence.
 
-Parallel evaluation research requested on 2026-10-14 is retained in [study.md](study.md), with the supplied-article review in [study-article.md](study-article.md), independent methods in [study-methods.md](study-methods.md), and repository naming/ownership evidence in [study-canon.md](study-canon.md). Root recommends `study` for an optional development command and a durable scaffold `studies/agent/` home. This supersedes `bench` as the recommended umbrella name, but implements no move, command, or public API. The user explicitly selected Luna at max effort for research; local model execution remains serial.
+The evaluation research and user-requested adversarial round closed on 2026-10-14. See [study.md](study.md) for the recommendation, [Fable's synthesis](study-synthesis.md) for the complete design, and [the round record](study-round.md) for the independent Opus proposal, Opus review, model custody, and root reconciliation. Adopt `study` for the optional development command and an unpublished `studies/` tree owned by the agent checkout. This supersedes the earlier scaffold ownership proposal and `bench` umbrella name; no move, command, or public API is implemented. The supplied-article review, methods research, and naming evidence remain linked from the proposal. Local model execution remains serial.
 
 Closed on 2026-10-14. The thinking series and both blind audits are finished. No generation, labeling, merge, or report is waiting to run. The package hardening remains accepted at `901c786`; the user's no-bump instruction remains in force.
 
@@ -61,7 +61,7 @@ The older aggregate-era tests refer to retired results and are outside the c1 pr
 
 Frozen manifests and raw runs bind absolute paths. The retained thinking-off raw runs bind the old scaffold location. Re-reading them requires the temporary junction procedure from the earlier handoff in git history; their graded reports can be read directly. Do not move the harness before deciding how to preserve those references.
 
-The user owns the durable preservation move described in direction.md: a scaffold `bench/agent/` home for the harness and oracle, and promotion of the complete-capture golden probe into package tests. The current work does not implement that move or change the package's generation budget, filing, or loop behavior.
+The accepted study design supersedes direction.md's scaffold `bench/agent/` preservation sketch. A later adoption unit must preserve the historical raw evidence and frozen identities before moving durable development tooling to the agent checkout's `studies/` tree. Promotion of the complete-capture golden probe into package tests remains an independent implementation proposal. The design round changes no package generation budget, filing, or loop behavior.
 
 A version bump remains unrequested. The accepted hardening records breaking changes to `scopes.add`, `createRelayProvider`, the run guard, `keep`, `isJudgment`, and `handleAgentRunnerJob(registry, partial, spawned, controller)`. Follow the publishing and falsify procedures when the user requests a release.
 
