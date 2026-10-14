@@ -1,5 +1,7 @@
 import { parseJSON } from '@orkestrel/contract'
-import { createScratch } from '@orkestrel/test/server'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { lstatSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
 	buildMemoryProfile,
@@ -8,9 +10,48 @@ import {
 	createMemoryServer,
 	loadStudyToolsFixture,
 	readStudyToolsEvidence,
+	captureServicePackages,
+	createStudyServiceFixture,
+	executeStudyService,
 } from './setupService.js'
 
 describe('study service fixtures', () => {
+	it('copies actual package closure with one selected Agent and retains exact native command diagnostics', async () => {
+		const scratch = createScratch()
+		try {
+			const fixture = createStudyServiceFixture(scratch, 'http://127.0.0.1:7')
+			expect(fixture.packages.filter((entry) => entry.name === '@orkestrel/agent')).toEqual([
+				{
+					name: '@orkestrel/agent',
+					source: resolve('.'),
+					target: join(scratch.path, 'node_modules', '@orkestrel/agent'),
+				},
+			])
+			for (const entry of fixture.packages) {
+				expect(lstatSync(entry.target).isSymbolicLink()).toBe(false)
+				expect(readFileSync(join(entry.target, 'package.json'))).toEqual(
+					readFileSync(join(entry.source, 'package.json')),
+				)
+			}
+			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toMatchObject({
+				qualification: 'tmp/studies/memory-capacity',
+				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
+				roots: fixture.packages.map((entry) => entry.target),
+			})
+			const help = await executeStudyService(fixture, ['--help'])
+			expect(help).toMatchObject({ code: 0 })
+			expect(help.stdout).toContain('study execute')
+			const refused = await executeStudyService(fixture, ['unsupported'])
+			expect(refused.code).toBe(64)
+			expect(refused.stderr).not.toBe('')
+			expect(() =>
+				captureServicePackages(scratch, new Map([['wrong-package', resolve('.')]])),
+			).toThrow('Malformed selected package')
+		} finally {
+			await destroyScratch(scratch)
+		}
+	})
+
 	it('serves queued protocol responses and owns real request accounting and cleanup', async () => {
 		const server = await createMemoryServer([
 			{ path: '/api/chat', status: 503, body: 'unavailable' },

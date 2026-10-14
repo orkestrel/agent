@@ -4,11 +4,15 @@ import type {
 	MemoryReplyFixture,
 	MemoryServerFixture,
 	MemoryWireFixture,
+	StudyServiceFixture,
+	StudyServicePackage,
+	StudyServiceResult,
 } from './service/studies/memory/types.js'
+import type { ScratchInterface } from '@orkestrel/test/server'
 import type { StudyEvidence, StudyProfile } from '@orkestrel/study'
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyToolsFixture } from './service/studies/tools/types.js'
-import { parseJSON } from '@orkestrel/contract'
+import { isRecord, parseJSON } from '@orkestrel/contract'
 import {
 	parseStudyDefinition,
 	parseStudyProfile,
@@ -16,17 +20,154 @@ import {
 	parseStudyScenario,
 	buildStudySchedule,
 	validateStudyInputs,
+	StudyControl,
+	StudyMeter,
+	StudyScope,
 } from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
 import * as subject from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
+import { execFile } from 'node:child_process'
+import { cpSync, lstatSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { StudyControl, StudyMeter, StudyScope } from '@orkestrel/study'
+import { dirname, join, resolve } from 'node:path'
 
 /** Composes the selected built Agent with the installed public Ollama provider. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
+
+/** Pins the authored trial order independently of native execution output. */
+export const STUDY_MEMORY_SCHEDULE = Object.freeze([
+	Object.freeze(['records', 0]),
+	Object.freeze(['compaction', 0]),
+	Object.freeze(['full', 0]),
+	Object.freeze(['full', 1]),
+	Object.freeze(['compaction', 1]),
+	Object.freeze(['records', 1]),
+])
+
+/** Pins the complete authored goal horizon. */
+export const STUDY_MEMORY_GOALS = Object.freeze(['opening', 'correction', 'closure'])
+
+/** Copies manifest and dist bytes for a selected installed runtime dependency closure.
+ * @param scratch - Exclusive owner of the copied tree.
+ * @param selections - Initial package roots; an earlier selection wins throughout the graph.
+ * @returns Every actual source and regular target package directory.
+ */
+export function captureServicePackages(
+	scratch: ScratchInterface,
+	selections: ReadonlyMap<string, string>,
+): readonly StudyServicePackage[] {
+	const sources = new Map(selections)
+	const packages: StudyServicePackage[] = []
+	for (const [name, source] of sources) {
+		const manifest = parseJSON(readFileSync(join(source, 'package.json'), 'utf8'))
+		if (!isRecord(manifest) || manifest.name !== name)
+			throw new Error(`Malformed selected package ${name}`)
+		const dependencies = manifest.dependencies
+		if (dependencies !== undefined && !isRecord(dependencies))
+			throw new Error(`Invalid dependencies for ${name}`)
+		const target = scratch.ensure(join('node_modules', name))
+		cpSync(join(source, 'package.json'), join(target, 'package.json'))
+		cpSync(join(source, 'dist'), join(target, 'dist'), { recursive: true, dereference: true })
+		if (lstatSync(target).isSymbolicLink()) throw new Error(`Linked fixture package ${name}`)
+		packages.push(Object.freeze({ name, source, target }))
+		const require = createRequire(join(source, 'package.json'))
+		for (const dependency of Object.keys(dependencies ?? {}))
+			if (!sources.has(dependency))
+				sources.set(dependency, dirname(require.resolve(`${dependency}/package.json`)))
+	}
+	return Object.freeze(packages)
+}
+
+/** Captures the actual Agent, installed Study and Ollama bytes with authored CPU workloads.
+ * @param scratch - Exclusive workspace owner, cleaned by the caller in finally.
+ * @param url - Ephemeral native Ollama protocol fixture origin.
+ * @returns The installed command and complete copied runtime closure.
+ */
+export function createStudyServiceFixture(
+	scratch: ScratchInterface,
+	url: string,
+): StudyServiceFixture {
+	const packages = captureServicePackages(
+		scratch,
+		new Map([
+			['@orkestrel/agent', resolve('.')],
+			['@orkestrel/study', resolve('node_modules/@orkestrel/study')],
+			['@orkestrel/ollama', resolve('node_modules/@orkestrel/ollama')],
+		]),
+	)
+	for (const target of ['memory', 'capacity'])
+		cpSync(resolve('studies', target), scratch.ensure(join('studies', target)), { recursive: true })
+	const raw = parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')
+	if (!isRecord(raw) || !isRecord(raw.bounds)) throw new Error('Missing authored memory profile')
+	const bounds: Record<string, unknown> = {}
+	for (const [scope, duration] of Object.entries({
+		request: 3000,
+		goal: 30000,
+		trial: 90000,
+		series: 240000,
+	})) {
+		const limit = raw.bounds[scope]
+		if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
+		bounds[scope] = { ...limit, duration }
+	}
+	scratch.write(
+		'studies/memory/profiles/local.json',
+		JSON.stringify({
+			...raw,
+			name: 'local',
+			subject: join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js'),
+			roots: packages.map((entry) => entry.target),
+			bounds,
+			provider: {
+				entry: join(scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
+				url,
+				model: 'model',
+				judge: 'judge',
+				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+			},
+			qualification: 'tmp/studies/memory-capacity',
+		}),
+	)
+	return Object.freeze({
+		scratch,
+		packages,
+		entry: join(scratch.path, 'node_modules/@orkestrel/study/dist/bin/main.js'),
+	})
+}
+
+/** Drives the actual installed Study executable through its public native command boundary.
+ * @param fixture - Captured installed command and working directory.
+ * @param arguments_ - Exact public command arguments, including emitted next hints.
+ * @param duration - Outer bound; execution retains its own request, trial and series limits.
+ * @returns Native exit and separate stdout/stderr bytes.
+ */
+export function executeStudyService(
+	fixture: StudyServiceFixture,
+	arguments_: readonly string[],
+	duration = 60000,
+): Promise<StudyServiceResult> {
+	return new Promise((done) =>
+		execFile(
+			process.execPath,
+			[fixture.entry, ...arguments_],
+			{
+				cwd: fixture.scratch.path,
+				windowsHide: true,
+				timeout: duration,
+				maxBuffer: 16 * 1024 * 1024,
+			},
+			(error, stdout, stderr) =>
+				done({
+					code: error === null ? 0 : typeof error.code === 'number' ? error.code : 1,
+					stdout,
+					stderr,
+				}),
+		),
+	)
+}
 
 /** Starts a native loopback Ollama protocol fixture on an ephemeral port. */
 export async function createMemoryServer(
