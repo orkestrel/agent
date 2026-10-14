@@ -51,6 +51,12 @@ The model and records research is distilled in experiments.md with adjacent sour
 
 The user's fixture correction on 2026-10-14 requires one setup per layer or surface. Use tests/setupStudy.ts and its mirrored test for shared study fixtures. Keep genuinely host-dependent resource orchestration in the existing server setup when environment isolation requires it. Do not create setup files per engine, store, tool, process, or command. Root has assigned the consolidation before successor consumers; parallel units return shared fixture changes for serial integration.
 
+The consolidation is committed at cdb9444: study and existing server setup own the fixtures; the engine/store-specific files are removed. Core/server checks, 36 touched study tests and 135 setup tests passed. The temporary ignore is instruments/results/* under this campaign, as requested; tracked custody remains tracked.
+
+U5 found a rubric path/version mismatch in U2. Definition.rubric names the input artifact; its string does not constrain rubric.version. Compatible regrading binds changed rubric bytes in a separate grading identity while preserving the execution horizon. U6 owns the narrow shared-helper correction. U8b also owns the packet custody successor: a grading binds exact public packet and private mapping bytes, imported labels bind the public hash, and translation is verified against the sealed observations and rubric. U8a owns the fresh child and asynchronous admission bridge; domain consumers await ticket admission before dispatch.
+
+Cleanup follows the user's request to prune while working. The read-only sweep ran on 2026-10-14. Initial naming-round positions are archived in cdb94447248fc0b135dc62dd3a81ae244d8bb2a9; the round receipt, accepted findings and final synthesis remain. Active implementation inputs, capacity acceptance reports bound by hash, frozen instruments, manifests and raw runs remain in place. Do not run a broad tmp sweep beside live journals.
+
 | Unit | Owner and files | Acceptance |
 | --- | --- | --- |
 | U1 contract | Root: app/core/studies/types.ts, constants.ts, errors.ts, environment barrel | Typed public inputs, nested finite allowances, outcomes distinct from judgments; strict compiler proof passed |

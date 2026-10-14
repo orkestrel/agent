@@ -2,7 +2,7 @@
 
 Adopt **study** as the optional comparison surface, owned by the agent checkout as unpublished development tooling under **studies/**. This is the design recommendation from the user-requested Opus5.5 adversarial round and Fable5.1 synthesis on 2026-10-14. No command, folder move, or published API has been implemented.
 
-See [Fable's final synthesis](study-synthesis.md) for the complete design and reconciliation. The inputs are the [original proposal](study-original.md), [blind Opus proposal](study-independent.md), and [Opus adversarial review](study-review.md). The [round receipt](study-round.json) records actual models, sessions, input/report hashes, allowed reads, duration, and usage accounting. The [acceptance record](study-round.md) distinguishes accepted design decisions from implementation proof.
+See [Fable's final synthesis](study-synthesis.md) for the complete design and reconciliation. The original proposal, blind Opus proposal, and Opus adversarial review are archived at commit cdb94447248fc0b135dc62dd3a81ae244d8bb2a9 under their original study-original.md, study-independent.md, and study-review.md paths in .orkestrel/agent. The [round receipt](study-round.json) retains their historical paths and byte hashes. The [acceptance record](study-round.md) retains the resolved findings. Active implementation uses [the implementation plan](study-implementation.md) and its adjacent final design.
 
 ## Proposed surface
 

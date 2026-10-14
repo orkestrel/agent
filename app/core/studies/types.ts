@@ -263,6 +263,8 @@ export interface StudyGrading {
 	readonly instrument: string
 	readonly attempts: readonly string[]
 	readonly labels: string | undefined
+	/** Binds the retained public packet and private mapping when semantic criteria exist. */
+	readonly packet?: string
 	readonly judgments: readonly StudyJudgment[]
 }
 

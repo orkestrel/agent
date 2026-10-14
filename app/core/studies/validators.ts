@@ -541,7 +541,7 @@ export function isStudyGrading(value: unknown): value is StudyGrading {
 			matchesStudyKeys(
 				value,
 				['version', 'result', 'rubric', 'grader', 'instrument', 'attempts', 'judgments'],
-				['labels'],
+				['labels', 'packet'],
 			) &&
 			value.version === 1 &&
 			isStudyDigest(value.result) &&
@@ -550,6 +550,7 @@ export function isStudyGrading(value: unknown): value is StudyGrading {
 			typeof value.grader === 'string' &&
 			value.grader.trim().length > 0 &&
 			(value.labels === undefined || isStudyDigest(value.labels)) &&
+			(value.packet === undefined || isStudyDigest(value.packet)) &&
 			isArray(value.attempts) &&
 			isJSONValue(value.attempts) &&
 			value.attempts.every(isStudyName) &&
