@@ -7,6 +7,7 @@ import type {
 	MemoryWireFixture,
 } from './service/studies/memory/types.js'
 import type { StudyEvidence, StudyProfile } from '@orkestrel/study'
+import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyToolsFixture } from './service/studies/tools/types.js'
 import { parseJSON } from '@orkestrel/contract'
 import {
@@ -111,10 +112,18 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 
 /** Builds a finite CPU-only profile with explicit fixture digests. */
 export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile {
+	const room = {
+		context: 32768,
+		output: 512,
+		safety: 128,
+		recap: 256,
+		think: false,
+		...options.room,
+	}
 	return {
 		name: 'cpu-fixture',
 		subject: 'dist/src/core/index.js',
-		roots: [],
+		roots: ['.'],
 		qualification: 'tmp/unused-capacity',
 		provider: {
 			entry: 'unchanged-staged-ollama',
@@ -123,14 +132,33 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 			judge: 'judge',
 			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
 		},
-		room: { context: 32768, output: 512, safety: 128, recap: 256, think: false, ...options.room },
+		room,
 		bounds: {
-			request: { duration: 2000, calls: 1, tokens: 32768, bytes: 1048576 },
+			request: { duration: 2000, calls: 1, tokens: room.context - room.safety, bytes: 1048576 },
 			goal: { duration: 15000, calls: 256, tokens: 8388608, bytes: 268435456 },
 			trial: { duration: 30000, calls: 512, tokens: 16777216, bytes: 536870912 },
 			series: { duration: 60000, calls: 1024, tokens: 33554432, bytes: 1073741824 },
 		},
 	}
+}
+
+/** Loads the actual capacity declaration and shared memory scenario for generic admission proofs.
+ * @param profile - The execution profile to compose with authored inputs.
+ * @returns Parsed capacity inputs with the caller's profile.
+ */
+export async function loadMemoryInputs(profile: StudyProfile): Promise<StudyValidation> {
+	const definition = parseStudyDefinition(
+		parseJSON(await readFile('studies/capacity/study.json', 'utf8')),
+	)
+	const rubric = parseStudyRubric(parseJSON(await readFile('studies/capacity/rubric.json', 'utf8')))
+	const scenarios = await Promise.all(
+		definition.scenarios.map(async (name) =>
+			parseStudyScenario(
+				parseJSON(await readFile(`studies/memory/scenarios/${name}.json`, 'utf8')),
+			),
+		),
+	)
+	return { definition, rubric, scenarios, profile }
 }
 
 /** Creates actual hierarchical request accounting and an evidence recorder. */

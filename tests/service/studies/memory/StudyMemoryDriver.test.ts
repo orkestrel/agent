@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { isRecord } from '@orkestrel/contract'
+import { validateStudyInputs } from '@orkestrel/study'
 import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
 import {
 	buildMemoryProfile,
@@ -7,6 +8,7 @@ import {
 	createMemoryContext,
 	createMemoryModules,
 	createMemoryServer,
+	loadMemoryInputs,
 } from '../../../setupService.js'
 import type { MemoryModuleFixture } from './types.js'
 
@@ -17,6 +19,235 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 	afterAll(async () => {
 		await modules.close()
+	})
+
+	it('dispatches actual memory work after generic validation and rejects invalid room controls', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		try {
+			const input = await loadMemoryInputs(profile)
+			expect(() =>
+				validateStudyInputs(input.definition, input.scenarios, input.rubric, profile),
+			).not.toThrow()
+			expect(() =>
+				validateStudyInputs(input.definition, input.scenarios, input.rubric, {
+					...profile,
+					roots: [],
+				}),
+			).toThrow('profile')
+			expect(() =>
+				validateStudyInputs(input.definition, input.scenarios, input.rubric, {
+					...profile,
+					bounds: {
+						...profile.bounds,
+						request: { ...profile.bounds.request, tokens: profile.room.context },
+					},
+				}),
+			).toThrow('room')
+			const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+				{ id: 'generic', scenario: 'handoff', arm: 'full', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				const goal = input.scenarios[0]?.goals[0]
+				if (goal === undefined) throw new Error('Missing authored memory goal')
+				await expect(session.execute(goal, fixture.context)).resolves.toEqual({
+					value: { content: 'Receipt retained.' },
+					partial: false,
+				})
+				expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+				expect(fixture.context.meter.usage.find((row) => row.role === 'agent')).toMatchObject({
+					calls: 1,
+					tokens: 12,
+				})
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('refuses lookup before record access or evidence when the goal call allowance is exhausted', async () => {
+		const server = await createMemoryServer([
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
+				}),
+			},
+		])
+		const base = buildMemoryProfile({ url: server.url })
+		const profile = { ...base, bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 4 } } }
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			{ id: 'refusal', scenario: 'handoff', arm: 'full', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			await expect(
+				session.execute(
+					{
+						id: 'first',
+						input: {
+							prompt: 'Read record',
+							arrivals: [],
+							records: [{ id: 'record', name: 'Owner', content: 'Never returned' }],
+						},
+					},
+					fixture.context,
+				),
+			).rejects.toBeDefined()
+			expect(
+				fixture.evidence.filter((row) => row.event === 'lookup' || row.event === 'result'),
+			).toEqual([])
+			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([])
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('retains actual lookup bytes once when the result exceeds its reservation', async () => {
+		const server = await createMemoryServer([
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
+				}),
+			},
+		])
+		const base = buildMemoryProfile({ url: server.url })
+		const profile = {
+			...base,
+			bounds: { ...base.bounds, request: { ...base.bounds.request, bytes: 8192 } },
+		}
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			{ id: 'bytes', scenario: 'handoff', arm: 'full', repetition: 0 },
+			fixture.context.signal,
+		)
+		const content = 'a'.repeat(profile.bounds.request.bytes)
+		try {
+			await expect(
+				session.execute(
+					{
+						id: 'first',
+						input: {
+							prompt: 'Read record',
+							arrivals: [],
+							records: [{ id: 'record', name: 'Owner', content }],
+						},
+					},
+					fixture.context,
+				),
+			).rejects.toBeDefined()
+			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([
+				expect.objectContaining({
+					calls: 1,
+					tokens: 0,
+					bytes: new TextEncoder().encode(
+						JSON.stringify({ id: 'record' }) + JSON.stringify(`record: Owner\n${content}`),
+					).byteLength,
+				}),
+			])
+			expect(fixture.evidence.filter((row) => row.event === 'result')).toEqual([])
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('settles malformed lookup arguments with their known cost and stops subsequent work', async () => {
+		const server = await createMemoryServer([
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [{ function: { name: 'lookup', arguments: { id: 42 } } }],
+				}),
+			},
+		])
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			{ id: 'arguments', scenario: 'handoff', arm: 'full', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			await expect(
+				session.execute(
+					{ id: 'first', input: { prompt: 'Read record', arrivals: [], records: [] } },
+					fixture.context,
+				),
+			).rejects.toThrow('id')
+			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([
+				expect.objectContaining({
+					calls: 1,
+					tokens: 0,
+					bytes: new TextEncoder().encode(JSON.stringify({ id: 42 })).byteLength,
+				}),
+			])
+			expect(
+				fixture.evidence.filter((row) => row.event === 'lookup' || row.event === 'result'),
+			).toEqual([])
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('admits and settles absent record lookups with the encoded response cost', async () => {
+		const server = await createMemoryServer([
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [{ function: { name: 'lookup', arguments: { id: 'absent' } } }],
+				}),
+			},
+		])
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			{ id: 'absent', scenario: 'handoff', arm: 'full', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			await session.execute(
+				{ id: 'first', input: { prompt: 'Read record', arrivals: [], records: [] } },
+				fixture.context,
+			)
+			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([
+				expect.objectContaining({
+					calls: 1,
+					tokens: 0,
+					bytes: new TextEncoder().encode(
+						JSON.stringify({ id: 'absent' }) + JSON.stringify('No record'),
+					).byteLength,
+				}),
+			])
+			expect(fixture.evidence).toContainEqual({
+				event: 'lookup',
+				goal: 'first',
+				value: { id: 'absent', found: false },
+			})
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
 	})
 
 	it('preserves corrections and lookup traces across goals and starts repetitions fresh', async () => {
@@ -76,7 +307,17 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(
 				server.requests.filter((request) => request.path === '/api/chat').at(-1)?.body,
 			).toContain('Correction: count is two.')
-			expect(fixture.context.meter.usage).toHaveLength(server.requests.length)
+			expect(fixture.context.meter.usage).toHaveLength(server.requests.length + 1)
+			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([
+				expect.objectContaining({
+					calls: 1,
+					tokens: 0,
+					bytes: new TextEncoder().encode(
+						JSON.stringify({ id: 'order-1' }) +
+							JSON.stringify('order-1: Owner\nConfirmed reference'),
+					).byteLength,
+				}),
+			])
 			await session.close()
 			const repeat = await driver.open(
 				{ id: 'full-2', scenario: 'public', arm: 'full', repetition: 1 },

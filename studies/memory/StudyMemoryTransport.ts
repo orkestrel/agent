@@ -97,7 +97,10 @@ export class StudyMemoryTransport {
 				throw new StudyError('CAPACITY', 'Encoded request consumes the response byte allowance')
 			const ticket = await activity.context.meter.admit({
 				role,
-				tokens: role === 'metadata' ? 0 : this.#options.profile.room.context,
+				tokens:
+					role === 'metadata'
+						? 0
+						: this.#options.profile.room.context - this.#options.profile.room.safety,
 				bytes: bound.bytes,
 			})
 			const started = performance.now()

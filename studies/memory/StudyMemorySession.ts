@@ -6,6 +6,7 @@ import type {
 	ProviderInterface,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
+import type { ToolContext } from '@orkestrel/tool'
 import type {
 	StudyContext,
 	StudyEvidence,
@@ -76,7 +77,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				required: ['id'],
 				additionalProperties: false,
 			},
-			execute: (args) => this.#lookup(args),
+			execute: (args, context) => this.#lookup(args, context),
 		})
 		this.#tools.add(lookup)
 		if (options.arm === 'records') {
@@ -209,6 +210,8 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#ledger === undefined
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
+			this.#transport.check()
+			signal.throwIfAborted()
 			if (
 				!isObject(result) ||
 				!('content' in result) ||
@@ -243,18 +246,57 @@ export class StudyMemorySession implements StudySessionInterface {
 		}
 	}
 
-	#lookup(args: Readonly<Record<string, unknown>>): JSONValue {
+	async #lookup(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {
 		this.#transport.check()
 		const active = this.#active
 		if (active === undefined) throw new StudyError('FAULT', 'Lookup outside an active goal')
-		if (typeof args.id !== 'string') throw new StudyError('CONFIG', 'Lookup requires an id')
-		const record = this.#records.get(args.id)
-		this.#trace.push({
-			event: 'lookup',
-			goal: active.goal,
-			value: { id: args.id, found: record !== undefined },
-		})
-		return record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
+		try {
+			const encoder = new TextEncoder()
+			let bytes = encoder.encode(JSON.stringify(args)).byteLength
+			const bound = this.#options.profile.bounds.request
+			if (bytes > bound.bytes)
+				throw new StudyError('CAPACITY', 'Lookup arguments exceed the byte allowance')
+			const ticket = await active.context.meter.admit({
+				role: 'tool',
+				tokens: 0,
+				bytes: bound.bytes,
+			})
+			const started = performance.now()
+			try {
+				const signal = AbortSignal.any([
+					this.#options.signal,
+					context.signal,
+					active.context.signal,
+					active.context.meter.signal,
+					ticket.signal,
+				])
+				signal.throwIfAborted()
+				if (typeof args.id !== 'string') throw new StudyError('CONFIG', 'Lookup requires an id')
+				const record = this.#records.get(args.id)
+				const value =
+					record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
+				bytes += encoder.encode(JSON.stringify(value)).byteLength
+				this.#trace.push({
+					event: 'lookup',
+					goal: active.goal,
+					value: { id: args.id, found: record !== undefined },
+				})
+				signal.throwIfAborted()
+				return value
+			} finally {
+				if (!ticket.signal.aborted)
+					ticket.finish({
+						role: 'tool',
+						calls: 1,
+						tokens: 0,
+						bytes,
+						duration: Math.ceil(performance.now() - started),
+					})
+			}
+		} catch (error) {
+			this.#transport.fail(error)
+			throw error
+		}
 	}
 
 	async #summarize(messages: readonly Message[], signal?: AbortSignal): Promise<string> {
