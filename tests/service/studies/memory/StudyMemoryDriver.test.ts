@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { isRecord } from '@orkestrel/contract'
 import { validateStudyInputs } from '@orkestrel/study'
 import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
@@ -6,21 +6,12 @@ import {
 	buildMemoryProfile,
 	buildMemoryReply,
 	createMemoryContext,
-	createMemoryModules,
 	createMemoryServer,
 	loadMemoryInputs,
+	STUDY_MEMORY_MODULES,
 } from '../../../setupService.js'
-import type { MemoryModuleFixture } from './types.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
-	let modules: MemoryModuleFixture
-	beforeAll(async () => {
-		modules = await createMemoryModules()
-	})
-	afterAll(async () => {
-		await modules.close()
-	})
-
 	it('dispatches actual memory work after generic validation and rejects invalid room controls', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url })
@@ -45,7 +36,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 					},
 				}),
 			).toThrow('room')
-			const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 				{ id: 'generic', scenario: 'handoff', arm: 'full', repetition: 0 },
 				fixture.context.signal,
 			)
@@ -83,7 +74,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const base = buildMemoryProfile({ url: server.url })
 		const profile = { ...base, bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 4 } } }
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'refusal', scenario: 'handoff', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -129,7 +120,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			bounds: { ...base.bounds, request: { ...base.bounds.request, bytes: 8192 } },
 		}
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'bytes', scenario: 'handoff', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -178,7 +169,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'arguments', scenario: 'handoff', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -219,7 +210,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'absent', scenario: 'handoff', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -264,7 +255,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const driver = new StudyMemoryDriver({ ...modules, profile })
+		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
 		const session = await driver.open(
 			{ id: 'full-1', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
@@ -345,7 +336,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'records-1', scenario: 'public', arm: 'records', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -387,7 +378,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			room: { context: 1024, output: 128, safety: 128, recap: 64 },
 		})
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'compact-1', scenario: 'public', arm: 'compaction', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -436,7 +427,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			])
 			const profile = buildMemoryProfile({ url: server.url })
 			const fixture = createMemoryContext(profile)
-			const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 				{ id: 'failed', scenario: 'public', arm: 'full', repetition: 0 },
 				fixture.context.signal,
 			)
@@ -472,7 +463,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'unknown', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -496,7 +487,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const server = await createMemoryServer([{ path: '/api/show', body: '{}' }])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'metadata', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -530,7 +521,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'changed', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -578,7 +569,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'judge-fault', scenario: 'public', arm: 'records', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -620,7 +611,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			bounds: { ...base.bounds, request: { ...base.bounds.request, tokens: 1 } },
 		}
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'budget', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)
@@ -657,7 +648,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			bounds: { ...base.bounds, request: { ...base.bounds.request, duration: 100 } },
 		}
 		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...modules, profile }).open(
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'abort', scenario: 'public', arm: 'full', repetition: 0 },
 			fixture.context.signal,
 		)

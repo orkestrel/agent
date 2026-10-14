@@ -21,12 +21,6 @@ export interface MemoryContextFixture {
 	readonly evidence: StudyEvidence[]
 	close(): void
 }
-/** Holds unchanged public built namespaces in a disposable ordinary-resolution layout. */
-export interface MemoryModuleFixture {
-	readonly subject: unknown
-	readonly provider: unknown
-	close(): Promise<void>
-}
 /** Holds pure profile fixture overrides. */
 export interface MemoryProfileFixture {
 	readonly url: string

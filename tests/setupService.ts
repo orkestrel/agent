@@ -1,6 +1,5 @@
 import type {
 	MemoryContextFixture,
-	MemoryModuleFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryServerFixture,
@@ -19,11 +18,15 @@ import {
 	validateStudyInputs,
 } from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
+import * as subject from '../dist/src/core/index.js'
+import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
-import { cp, mkdir, mkdtemp, rm, symlink, readFile } from 'node:fs/promises'
-import { resolve, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { StudyControl, StudyMeter, StudyScope } from '@orkestrel/study'
+
+/** Composes the selected built Agent with the installed public Ollama provider. */
+export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
 
 /** Starts a native loopback Ollama protocol fixture on an ephemeral port. */
 export async function createMemoryServer(
@@ -126,7 +129,7 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 		roots: ['.'],
 		qualification: 'tmp/unused-capacity',
 		provider: {
-			entry: 'unchanged-staged-ollama',
+			entry: '@orkestrel/ollama',
 			url: options.url,
 			model: 'model',
 			judge: 'judge',
@@ -194,36 +197,6 @@ export function createMemoryContext(
 			series.close()
 			control.close()
 		},
-	}
-}
-
-/** Stages unchanged public provider bytes with ordinary resolution to the selected Agent. */
-export async function createMemoryModules(): Promise<MemoryModuleFixture> {
-	const directory = await mkdtemp(resolve('tmp/memory-modules-'))
-	try {
-		const packages = join(directory, 'node_modules', '@orkestrel')
-		await mkdir(packages, { recursive: true })
-		await mkdir(join(packages, 'ollama'))
-		await cp(resolve('../ollama/package.json'), join(packages, 'ollama/package.json'))
-		await cp(resolve('../ollama/dist'), join(packages, 'ollama/dist'), { recursive: true })
-		await symlink(resolve('.'), join(packages, 'agent'), 'junction')
-		await symlink(
-			resolve('../ollama/node_modules/@orkestrel/ndjson'),
-			join(packages, 'ndjson'),
-			'junction',
-		)
-		const subject: unknown = await import(pathToFileURL(resolve('dist/src/core/index.js')).href)
-		const provider: unknown = await import(
-			pathToFileURL(join(packages, 'ollama/dist/src/core/index.js')).href
-		)
-		return {
-			subject,
-			provider,
-			close: () => rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 }),
-		}
-	} catch (error) {
-		await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 })
-		throw error
 	}
 }
 
