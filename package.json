@@ -74,7 +74,9 @@
 		"test:distribution": "vitest run --config vite.config.ts --no-cache --reporter=dot --project distribution",
 		"test:probe": "vitest run --config vite.config.ts --no-cache --reporter=verbose --project probe",
 		"test:bench": "vitest bench --config vite.config.ts --no-cache --project probe",
-		"test:setup": "vitest run --config vite.config.ts --no-cache --reporter=dot --project setup"
+		"test:setup": "vitest run --config vite.config.ts --no-cache --reporter=dot --project setup",
+		"test:app:core": "vitest run --config vite.config.ts --no-cache --reporter=dot --project app:core",
+		"test:app:server": "vitest run --config vite.config.ts --no-cache --reporter=dot --project app:server"
 	},
 	"dependencies": {
 		"@orkestrel/abort": "^0.0.13",

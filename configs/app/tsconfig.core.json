@@ -1,0 +1,18 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "WebWorker"],
+		"types": []
+	},
+	"include": [
+		"../../app/core/**/*.cts",
+		"../../app/core/**/*.mts",
+		"../../app/core/**/*.ts",
+		"../../app/core/**/*.tsx",
+		"../../tests/app/core/**/*.cts",
+		"../../tests/app/core/**/*.mts",
+		"../../tests/app/core/**/*.ts",
+		"../../tests/app/core/**/*.tsx",
+		"../../tests/setup.ts"
+	]
+}
