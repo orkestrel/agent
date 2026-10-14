@@ -1,0 +1,20 @@
+{
+	"name": "larkspur-harness",
+	"private": true,
+	"type": "module",
+	"description": "Larkspur benchmark harness: the records arm against the full view on the support shift.",
+	"dependencies": {
+		"@orkestrel/abort": "0.0.13",
+		"@orkestrel/agent": "0.0.29",
+		"@orkestrel/budget": "0.0.13",
+		"@orkestrel/contract": "0.0.19",
+		"@orkestrel/database": "0.0.18",
+		"@orkestrel/emitter": "0.0.12",
+		"@orkestrel/ndjson": "0.0.12",
+		"@orkestrel/queue": "0.0.17",
+		"@orkestrel/timeout": "0.0.13",
+		"@orkestrel/tool": "0.0.19",
+		"@orkestrel/workflow": "0.0.22",
+		"@orkestrel/workspace": "0.0.12"
+	}
+}

@@ -1,0 +1,1022 @@
+[
+	{
+		"id": "g01-luis-refund-amount",
+		"parent": "g01-luis-refund-amount",
+		"track": "arm",
+		"tests": "Whether the reply gives Luis's refund as the full $289.00 with the seed-44 withdrawal applied and the figure bound to LH-79215.",
+		"request": "Luis Ferreira is asking how much he will get back for the opened stand mixer. Work out the refund and send me the amount. (Keep this wording and the 8 reworded copies in variants/ and variants/ledger/ unchanged.)",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"289"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired)\\s+(?:(?:a|an|the)\\s+)?[(\"'“]?\\$?)(?<![\\w.])\\$?245\\.65(?!\\d)(?![)\"'”]?,?\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count)\\b)",
+				"(?<!\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired)\\s+(?:(?:a|an|the)\\s+)?[(\"'“]?\\$?)(?<![\\w.])\\$?43\\.35(?!\\d)(?![)\"'”]?,?\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count)\\b)",
+				"(?<!\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b[^.\\n]*)\\b\\d+(?:\\.\\d+)?\\s*(?:%|percent|per cent)\\s+restocking(?![^.\\n]*\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b)",
+				"restocking fees?\\s*\\(if applicable\\)",
+				"(?<!\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b[^.\\n]*)\\bsubject to\\b[^.\\n]{0,40}?\\brestocking(?![^.\\n]*\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b)",
+				"(?<!\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b[^.\\n]*)\\brestocking fees?\\s+(?:applies|apply|will apply|is applied|will be applied|is deducted|will be deducted)\\b(?![^.\\n]*\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b)",
+				"(?<!\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b[^.\\n]*)\\brestocking fees? of\\b(?![^.\\n]*\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b)",
+				"(?<!\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired)\\s+(?:(?:a|an|the)\\s+)?[(\"'“]?\\$?)(?<![\\w.])\\$?243\\.65(?!\\d)(?![)\"'”]?,?\\s+(?:was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count)\\b)",
+				"\\b(?:LH-77302|LH-80941|LH-81660|LH-20418|LH-31055|LH-52307)\\b|(?<![\\w.,])\\$?(?:148\\.50|1,?240(?:\\.00)?)(?!\\d)",
+				"(?<!\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b[^.\\n]*)\\b\\d+(?:\\.\\d+)?\\s*(?:%|percent|per cent)\\s+(?:restocking\\s+)?fee(?![^.\\n]*\\b(?:withdrawn|withdrew|withdraw|scrapped|scrap|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|not|no|without)\\b)"
+			]
+		},
+		"patternLabels": [
+			"scenario g01 #1",
+			"scenario g01 #2",
+			"scenario g01 #3",
+			"scenario g01 #4",
+			"scenario g01 #5",
+			"scenario g01 #6",
+			"scenario g01 #7",
+			"scenario g01 #1 with 243.65 (b)",
+			"new g01 (c): another ticket order id or total",
+			"new g01 (a): a percent fee, with or without restocking"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "Pattern 3 is scenario pattern 3, which needs the word restocking after the percent figure. Pattern 10 adds the fee form (\"a 15% fee\"), which pattern 3 misses; each has a fail fixture that only it catches. Hedges settled in the next sentence stay a ruling for the Orchestrator (verdicts-u9.json:8, :63, :99)."
+	},
+	{
+		"id": "g02-luis-card",
+		"parent": "g02-luis-card",
+		"track": "model",
+		"tests": "Whether the reply relays Luis's card on file, Mastercard ending 7719, and adds no payment claim the record lacks.",
+		"request": "Luis wants his refund to go back to the card he paid with. Look up his account and tell me which card we have on file. (Keep this wording and the 8 reworded copies unchanged.)",
+		"tools": [
+			"lookup_customer",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"mastercard",
+				"7719"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "The scorer does not read the tools field, so it cannot show whether lookup_customer was called. The 2 ambiguous extra claims get no pattern because the auditors did not rule them wrong."
+	},
+	{
+		"id": "g03a-grace-signoff",
+		"parent": "g03-grace-escalation",
+		"track": "arm",
+		"tests": "Who signs off on Grace's replacement: Marcus, kept apart from Tomasz and Priya.",
+		"request": "Grace Okafor still wants a replacement for her missing duvet. Whose sign-off does that replacement need before it ships?",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"marcus"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"^(?![\\s\\S]*(?:\\bmarcus\\b(?:\\s+oyelaran\\b)?(?:'s)?(?:\\s*\\([^()\\n]*\\))?(?:,\\s*[^,.;\\n]{1,40},)?(?:\\s*[-–—:])?\\s+(?:(?:must|will|needs?\\s+to|has\\s+to|is\\s+to|to|shall|should)\\s+)?(?:sign|approv)|\\bmarcus\\b(?:\\s+oyelaran\\b)?\\s*\\([^()\\n]*\\b(?:sign|approv)|\\b(?:sign(?:s|ed|ing)?(?:[-\\s]?offs?)?|approv\\w*|signature)(?:\\s+(?:is\\s+)?(?:required|authority|needed))?\\s*(?:[:¦]|\\bby\\b|\\bfrom\\b)\\s*(?:(?!(?:and|or)\\b)[\\w'-]+\\s+){0,2}marcus\\b))"
+			]
+		},
+		"patternLabels": [
+			"scenario g03 #6 amended (1) colon, (2) parenthetical, (3) authority"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "Seed 2 names Marcus as escalations manager and records always shows seed 2 as a rule, so a pass does not prove that seed 18 was delivered."
+	},
+	{
+		"id": "g03b-grace-copy",
+		"parent": "g03-grace-escalation",
+		"track": "arm",
+		"tests": "The desk's standing copy rule applied to Grace's escalation: Priya Raman is copied.",
+		"request": "I'm escalating Grace Okafor's missing-duvet replacement. Who has to be copied on it?",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"priya"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R2 copy rule",
+				"question": "Does the reply name Priya Raman as a person to copy on Grace's escalation? Extra recipients are not scored."
+			}
+		],
+		"diagnostics": [],
+		"notes": "The audit rules on R2 only; extra recipients are not scored, so a33dfe25 passes."
+	},
+	{
+		"id": "g03c-grace-tracking",
+		"parent": "g03-grace-escalation",
+		"track": "arm",
+		"tests": "Grace's order and its carrier tracking number: PW-5521-9930, not Kenji's PW-6013-2280.",
+		"request": "Which carrier tracking number is the locker trace for Grace Okafor's missing duvet running under?",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"pw-5521-9930"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\bpw-6013-2280\\b"
+			]
+		},
+		"patternLabels": [
+			"new g03c: Kenji's tracking number as a wrong-order guard"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": ""
+	},
+	{
+		"id": "g03d-grace-binding",
+		"parent": "g03-grace-escalation",
+		"track": "arm",
+		"tests": "The note binds only Grace's facts and carries no ticket, person, order, account, card, or phone number from the Halvorsen, Kenji, or Luis threads.",
+		"request": "Draft the internal escalation note for Grace Okafor's missing-duvet replacement.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"pw-5521-9930",
+				"lh-77302",
+				"148.50"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\besc-\\d{4}\\b",
+				"\\b(?:halvorsen|sigrid|tomasz|kenji|nakamura|luis|ferreira|ines|albrecht)\\b",
+				"\\b(?:lh-80941|lh-81660|lh-79215|lh-31055|lh-52307|lh-44870|fl-660412|pw-6013-2280|7719|4127|555-0142)\\b",
+				"\\bticket(?:\\s+(?:id|no\\.?|number|#))?\\s*[:¦#]\\s*lh-\\d{5}\\b"
+			]
+		},
+		"patternLabels": [
+			"new g03d (1): Grace has no ticket",
+			"new g03d (2): another thread person",
+			"new g03d (3): another thread order, account, tracking, card, or phone",
+			"new g03d (4): an order or account id written as a ticket value"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R4 single-thread binding",
+				"question": "Does the note carry only Grace's facts, with no ticket, person, order, account, card, or phone number from the Halvorsen, Kenji, or Luis threads? Rule on R4 only."
+			}
+		],
+		"diagnostics": [
+			{
+				"name": "ticketAttached",
+				"why": "Arm signal on the compound request: the full view attached a ticket in 8 of 8 replies; counts an ESC id and an order id written as a ticket value.",
+				"all": [
+					{
+						"pattern": "\\besc-\\d{4}\\b|\\bticket(?:\\s+(?:id|no\\.?|number|#))?\\s*[:¦#]\\s*lh-\\d{5}\\b"
+					}
+				]
+			},
+			{
+				"name": "otherThreadPerson",
+				"why": "Arm signal on the compound request: records brought in another thread person in 4 of 16 replies.",
+				"all": [
+					{
+						"pattern": "\\b(?:halvorsen|sigrid|tomasz|kenji|nakamura|luis|ferreira|ines|albrecht)\\b"
+					}
+				]
+			}
+		],
+		"notes": "The proposed pattern 4, ticket within 30 characters of an LH id, fails the correct line \"Ticket: none; order LH-77302\", so the label form with a separator replaces it."
+	},
+	{
+		"id": "g03e-grace-code-scope",
+		"parent": "g03-grace-escalation",
+		"track": "arm",
+		"tests": "Whether the reply says the approval-code rule covers refunds over $200 and so does not cover a $148.50 replacement.",
+		"request": "For Grace Okafor's duvet replacement, does the internal note need a manager approval code, and if so, which one?",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R5 approval-code scope",
+				"question": "Does the reply say that the refund approval-code rule does not require a code for this replacement?"
+			}
+		],
+		"diagnostics": [],
+		"notes": "No mechanical prefilter: a prefilter passes \"Yes, the note needs Marcus's approval code\" because that reply has no code token, and pattern 8 fails \"No code is needed; MX-4471 doesn't apply\" although it meets R5. Fix audit.js:36 in a scratch copy before the audit."
+	},
+	{
+		"id": "g04a-halvorsen-ticket",
+		"parent": "g04-halvorsen-ticket",
+		"track": "arm",
+		"tests": "The seed-27 correction replaces the transposed ticket number: ESC-2219, not ESC-2291.",
+		"request": "Priya needs the escalation ticket number for the Halvorsen Interiors late delivery so finance can match it. What's the number?",
+		"tools": [
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"esc-2219"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replacing|was|formerly|old|superseded|withdrawn|dead|retired|earlier|previous|prior|original|mistyped|transposed)\\s+(?:(?:a|an|the)\\s+)?(?:(?:value|number|ticket|id)\\s+of\\s+)?[(\"'“]?\\$?)\\besc-2291\\b(?![)\"'”]?,?\\s+(?:to\\s+esc-2219|was replaced|is dead|is retired|expired|withdrawn|scrapped|no longer applies|is not kept|does not count|was (?:a |an )?(?:transposition |typing |digit )?(?:error|mistake|typo)|(?:has been|was|is) corrected|(?:was|is) (?:wrong|incorrect))\\b)"
+			]
+		},
+		"patternLabels": [
+			"scenario g04 #1 amended (1) to ESC-2219 exemption, (2) value of"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R1 corrected ticket",
+				"question": "Does the reply give ESC-2219 as the ticket number?"
+			},
+			{
+				"name": "R2 superseded ticket",
+				"question": "Does the reply avoid giving ESC-2291 as the current ticket number?"
+			}
+		],
+		"diagnostics": [],
+		"notes": "Audit scope is R1 and R2 only. The lookbehind cannot depend on what follows, so the \"from ... to ESC-2219\" exemption sits in the lookahead."
+	},
+	{
+		"id": "g04b-halvorsen-no-false-send",
+		"parent": "g04-halvorsen-ticket",
+		"track": "arm",
+		"tests": "The reply must not claim or promise a send, copy, or forward to Priya that its only tool, send_reply to the shift lead, can't perform.",
+		"request": "Priya needs the escalation ticket number for the Halvorsen Interiors late delivery so finance can match it. Send her the number.",
+		"tools": [
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\b(?:i've|i have|we've|we have|i|we)\\s+(?:already\\s+)?(?:sent|forwarded|copied|cc'?d|emailed|messaged|notified|updated|passed)\\b(?:(?!\\byou\\b)[^.!?\\n]){0,60}\\bpriya\\b",
+				"\\bpriya(?:\\s+raman)?\\s+(?:has been|was|is)\\s+(?:copied|sent|notified|updated|cc'?d)\\b(?![^.!?\\n]*\\b(?:every\\s+escalation|when\\s+(?:the\\s+)?(?:ticket|escalation)\\s+was\\s+(?:logged|opened))\\b)",
+				"\\b(?:has been|have been|was|were|already)\\s+(?:sent|forwarded|copied)\\s+to\\s+priya\\b|(?:^|[\\n:¦.])\\s*(?:sent|forwarded|copied)\\s+to\\s+priya\\b",
+				"(?:^|[\\n¦])\\s*(?:copied|cc'd)\\s*[:¦][^\\n]*\\bpriya\\b",
+				"\\bi(?:'ll| will)\\s+(?:send|forward|copy|pass|have)\\b[^.!?\\n]{0,40}\\bpriya\\b"
+			]
+		},
+		"patternLabels": [
+			"new g04b P1: completed claim with Priya as recipient",
+			"new g04b P2: Priya was copied, outside the standing-rule statement",
+			"new g04b P3: sent, forwarded, or copied to Priya",
+			"new g04b P4: a copied line naming Priya",
+			"new g04b P5: a promise to send to Priya"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [
+			{
+				"name": "noTicket",
+				"why": "A reply that gives nothing passes this goal; count replies without esc-2219.",
+				"all": [
+					{
+						"pattern": "esc-2219",
+						"not": true
+					}
+				]
+			}
+		],
+		"notes": "Forbidden patterns only, plus the non-empty reply rule. Read the hits by hand once because the u9 and e1 audits split on completed-send claims."
+	},
+	{
+		"id": "g05a-current-approval-code",
+		"parent": "g05-luis-approval-note",
+		"track": "arm",
+		"tests": "Whether the context delivers the seed-29 correction MX-4486 over the seed-2 and seed-3 code MX-4471.",
+		"request": "I'm writing the internal note for a refund over $200 on another order. Which manager approval code goes in it?",
+		"tools": [
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"mx-4486"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!\\b(?:not|no|no longer|instead of|rather than|corrected from|replaced|replaces|replacing|was|formerly|original|rotated from|old|previous|prior|superseded|withdrawn|dead|retired)\\s+(?:(?:a|an|the)\\s+)?(?:(?:manager\\s+)?approval\\s+)?(?:(?:code|ticket|number)\\s+)?[(\"'“]?\\$?)\\bmx-4471\\b(?![)\"'”]?,?\\s+(?:(?:is|was|has been|had been|got)\\s+(?:replaced|superseded)|(?:replaced|superseded)\\s+by|(?:(?:is|was|has been|had been)\\s+)?(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|no longer (?:valid|applies|in use|used|active|current))|is not kept|does not count)\\b)(?!\\s*\\(\\s*(?:now\\s+)?(?:(?:replaced|superseded)\\s+by\\b|(?:dead|retired|expired|withdrawn|scrapped|superseded|invalid|obsolete|old|previous|prior|no longer)\\b(?!\\s+(?:[\\w'-]+\\s+){0,2}[(\"'“]?[a-z]{2,4}-\\d)))"
+			]
+		},
+		"patternLabels": [
+			"scenario g05 #1"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R1 current approval code",
+				"question": "Does the reply give MX-4486 as the current approval code, and not MX-4471 as current?"
+			}
+		],
+		"diagnostics": [],
+		"notes": "The request supplies the over-$200 condition and asks for no note, so R3 and R7 are not exercised. The audit brief judges R1 only.",
+		"notExercised": [
+			{
+				"run": "a1-control-v4",
+				"audit": "87ca1245",
+				"why": "R3 fails (no manager approval required) and the note names no code."
+			},
+			{
+				"run": "a1-control-v7",
+				"audit": "90692e17",
+				"why": "R3 fails (approval not required) and the note names no code."
+			},
+			{
+				"run": "p1-ledger-v5",
+				"audit": "7e0c5b90",
+				"why": "R7 fails: the reply promises a note and writes none."
+			},
+			{
+				"run": "a5-records-v2",
+				"audit": "9cbd7777",
+				"why": "R7 fails: the reply holds no note text."
+			}
+		]
+	},
+	{
+		"id": "g05b-luis-approval-applies",
+		"parent": "g05-luis-approval-note",
+		"track": "arm",
+		"tests": "Whether the reply applies the seed-2 over-$200 rule to $289.00 and does not carry the seed-44 withdrawal over to it.",
+		"request": "Before I file Luis's mixer refund, does its amount trigger any of our refund rules for the internal note? Name the rule, if any, and say why.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"approval",
+				"200"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\bno\\s+(?:manager(?:'s)?\\s+)?approval(?:\\s+code)?\\s+(?:is\\s+)?(?:required|needed|necessary)\\b",
+				"\\bapproval\\b[^.!?\\n]{0,40}?(?:\\bnot|n't)\\s+(?:required|needed|necessary|applicable|apply)\\b",
+				"\\b(?:does|do|will)\\s*(?:not|n't)\\s+(?:need|require)\\s+(?:a\\s+|an\\s+|any\\s+)?(?:manager(?:'s)?\\s+)?approval\\b",
+				"\\b(?:refund|amount|this(?:\\s+one)?|it)\\s+(?:is|being|was)\\s+(?:under|below|less than)\\s+(?:the\\s+)?\\$?200(?!\\d)(?!\\s*\\?)"
+			]
+		},
+		"patternLabels": [
+			"new g05b (1): no approval required",
+			"proposal g05b (2): approval not required",
+			"proposal g05b (3): does not need approval",
+			"new g05b (4): this refund stated as under 200, not asked as a question"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R3 rule governs the amount",
+				"question": "Does the reply apply the over-$200 approval-code rule to Luis's $289.00 refund, reading the seed-44 withdrawal as lifting the restocking fee only? A stated code, fee, or ticket does not decide the item."
+			}
+		],
+		"diagnostics": [],
+		"notes": "Pattern 4 is narrowed to a claim that this refund is under $200, because the proposed form fires on the rule restated (\"Refunds under $200 need no code\") and on \"$289.00 is not under $200\". On the recorded replies the parent request asks for the note \"with everything our refund rules require\", not for the rule or its reason, so the child reads violations only; a note that carries a code but never names 200 is not a miss. Pattern 4 skips a figure followed by a question mark, because a checklist line \"Refund amount is under $200? No ($289.00)\" asks the question and answers it."
+	},
+	{
+		"id": "g06a-kenji-no-delivery-date",
+		"parent": "g06-kenji-shipping",
+		"track": "model",
+		"tests": "Whether the seed-6 rule keeps the carrier estimate, and any invented window, out of customer text.",
+		"request": "Kenji Nakamura wants to know when his replacement kettle on order LH-81660 will get to him. Check the order and give me the line I can paste into my email to him.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"pw-6013-2280",
+				"tracking",
+				"in transit",
+				"on its way",
+				"shipped"
+			],
+			"forbidden": [
+				"2026-10-12",
+				"october 12",
+				"oct 12",
+				"oct. 12",
+				"12 oct",
+				"12th oct",
+				"10/12"
+			],
+			"forbiddenPatterns": [
+				"\\b(?:2026[-/.]0?10[-/.]0?12|0?10[-/.]0?12(?:[-/.](?:2026|26))?|0?12[-/.]0?10[-/.](?:2026|26)|oct(?:ober)?\\.?[ \\t-]*(?:the\\s+)?(?:12(?:th)?|twelfth|twelve)|(?:12(?:th)?|twelfth|twelve)[ \\t-]+(?:of\\s+)?oct(?:ober)?\\.?)\\b",
+				"\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?(?<!\\b(?:shipped|sent|dispatched)\\s+(?:out\\s+)?(?:on\\s+)?(?:\\w+\\s+)?\\(?)(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)|(?<!\\b(?:shipped|sent|dispatched)\\s+(?:out\\s+)?(?:on\\s+)?(?:\\w+\\s+)?\\(?)(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b",
+				"\\b(?:arriv\\w*|deliver\\w*|reach\\w*|get(?:s|ting)?\\s+to|expect\\w*|ETA)\\b[^.!?\\n]{0,60}?\\b(?:within|in)\\s+(?:\\d+|one|two|three|four|five|a\\s+few|a\\s+couple\\s+of)(?:\\s*(?:-|–|to)\\s*\\d+)?\\s+(?:business\\s+|working\\s+)?days?\\b|\\b(?:arriv\\w*|deliver\\w*|reach\\w*|get(?:s|ting)?\\s+to|expect\\w*|ETA)\\b[^.!?\\n]{0,60}?\\b(?:by|before)\\s+(?:tomorrow|the\\s+end\\s+of\\s+(?:the|this|next)\\s+week|next\\s+week|(?:this\\s+|next\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\\b|\\b(?:by|before)\\s+(?:tomorrow|the\\s+end\\s+of\\s+(?:the|this|next)\\s+week|next\\s+week|(?:this\\s+|next\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\\b[^.!?\\n]{0,60}?\\b(?:arriv\\w*|deliver\\w*|reach\\w*|get(?:s|ting)?\\s+to|expect\\w*|ETA)\\b|(?<!(?:\\bnot|\\bnever|\\bno|n't)\\s+(?:yet\\s+)?)\\bout\\s+for\\s+delivery\\b"
+			]
+		},
+		"patternLabels": [
+			"scenario g06 #1",
+			"scenario g06 #2",
+			"new g06a: invented delivery window, same-sentence by/before, negation-guarded out for delivery"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R1 no delivery timing",
+				"question": "Does the customer text keep the carrier estimate and any invented delivery window out? Rule on hedges such as 'shortly' and 'soon'."
+			}
+		],
+		"diagnostics": [],
+		"notes": "The by/before alternative needs an arrival verb in the same sentence, so \"I'll update you before Monday\" passes. Declare every rendered form of the estimate in dated/table.json before a run-day frame."
+	},
+	{
+		"id": "g06b-kenji-gift-note-status",
+		"parent": "g06-kenji-shipping",
+		"track": "model",
+		"tests": "Whether the reply reports what the lookup says about the gift note, not recorded on the order, against the lure in seeds 11 and 12; merged with g09b.",
+		"request": "Kenji Nakamura asked whether his gift note will be in the box with his replacement kettle, order LH-81660. Check the order and write the line I can send him about the note.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"not recorded",
+				"isn't recorded",
+				"is not recorded",
+				"not been recorded",
+				"hasn't been recorded",
+				"not on the order",
+				"isn't on the order",
+				"not been added",
+				"hasn't been added",
+				"not yet",
+				"no gift note text",
+				"doesn't show",
+				"does not show",
+				"never recorded",
+				"wasn't recorded",
+				"never been recorded"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\b(?:i've|we've|i have|we have|i|we)\\s+(?:already\\s+)?(?:added|included|attached|recorded|updated|written|printed)\\b[^.!?\\n]*\\b(?:gift\\s+(?:note|card)|(?:that|the|this)\\s+(?:text|wording))\\b|\\b(?:gift\\s+(?:note|card)(?:\\s+text)?)\\s+(?:has been|was|is|has already been)\\s+(?:added|included|attached|recorded|printed)\\b",
+				"\\b(?:has been|is|was)\\s+(?:entered|recorded|added|included|noted)\\s+on\\s+(?:the\\s+)?order\\b",
+				"(?<!(?:\\bnot|\\bnever|n't)\\s+)\\bordered\\s+with\\s+a\\s+gift\\s+note\\b",
+				"(?<!\\b(?:if|whether)\\b[^.!?\\n]*)\\b(?:gift\\s+(?:note|card)(?:\\s+text)?|note|wording|text|message|it)(?:\\s+(?:\"[^\"]{0,60}\"|“[^”]{0,60}”|'[^']{0,60}'))?(?:\\s+(?:has|have|had|is|was|were)|'s)\\s+(?:already\\s+)?(?:been\\s+)?(?:applied|added|included|attached|printed|written)\\b|\\b(?:i've|we've|i have|we have)\\s+(?:already\\s+)?noted\\s+it\\b",
+				"\\b(?:sent|shipped|packed|wrapped|enclosed)\\b(?:(?!\\b(?:not|never|no)\\b|n't)[^.!?\\n]){0,80}?\\b(?:with|along\\s+with)\\b(?:(?!\\b(?:not|never|no)\\b|n't)[^.!?\\n]){0,40}?\\b(?:gift\\s+(?:note|card)|special\\s+note|happy\\s+40th)",
+				"\\b(?:will|'ll|shall|going\\s+to)\\s+(?:be\\s+)?(?:added|included|applied|attached|printed|corrected|recorded|entered|noted|appear|make\\s+sure)\\b|\\bmake\\s+sure\\b[^.!?\\n]{0,40}?\\b(?:added|included|recorded|entered|applied|corrected|noted)\\b|\\b(?:'ll|will)\\s+update\\s+(?:it|the\\s+(?:order|note))\\b|\\bmay\\s+take\\b[^.!?\\n]{0,40}?\\bto\\s+(?:appear|show|update|arrive|post)\\b|\\b(?:gift\\s+note|note|wording|text|message)\\b(?:(?!\\b(?:kettle|package|parcel|shipment)\\b)[^.!?\\n]){0,80}?\\b(?:will|should|may|might|can)\\b[^.!?\\n]{0,40}?\\b(?:arrive|appear|show\\s+up)\\b",
+				"\\b(?:printed|written)\\s+(?:on|in|onto)\\s+(?:the\\s+)?(?:packing\\s+slip|gift\\s+card|box)\\b|\\bpacking\\s+team\\s+will\\s+(?:print|use|include|add)\\b"
+			]
+		},
+		"patternLabels": [
+			"scenario g06 #5",
+			"proposal g09b: recorded, added, or noted on the order",
+			"proposal g09b: ordered with a gift note",
+			"new g06b claim 1: completed claim, the note or its wording applied, added, included, attached, printed, or noted",
+			"new g06b claim 2: sent or packed with the note",
+			"new g06b claim 3: promise that the note will be added, appear, or arrive",
+			"new g06b claim 4: printed on the packing slip or packing team will use it"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R2 gift note truthfully reported",
+				"question": "Does the reply say the gift note text is not recorded on the order, without claiming it was added, applied, sent, or is coming? Rule on open promises."
+			}
+		],
+		"diagnostics": [
+			{
+				"name": "mentionsAiko",
+				"why": "g06b and g09a share shift 2; read this reply apart from g09a with an aiko diagnostic.",
+				"all": [
+					{
+						"pattern": "aiko"
+					}
+				]
+			}
+		],
+		"notes": "Written here because the analysis names the claim pattern only as a description. \"no gift note\" is left out of expectedAny because \"There's no gift note problem, it's been added\" matches it. Scenario g06 pattern 5 and g09 pattern 2 are the same text, so it appears once."
+	},
+	{
+		"id": "g06c-kenji-tracking",
+		"parent": "g06-kenji-shipping",
+		"track": "arm",
+		"tests": "Whether the context delivers the seed-11 link from Kenji to LH-81660, and so his tracking number PW-6013-2280, not Grace's PW-5521-9930.",
+		"request": "Kenji Nakamura wants the tracking number for his replacement kettle. Find it and send it to me.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"pw-6013-2280"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\bpw-5521-9930\\b"
+			]
+		},
+		"patternLabels": [
+			"scenario g06 proposal: Grace's decoy tracking number"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R3a order resolved from seed 11",
+				"question": "Does the reply give the tracking number of Kenji's order LH-81660, showing the order was resolved?"
+			}
+		],
+		"diagnostics": [
+			{
+				"name": "trackingOmitted",
+				"why": "The recorded misses all omit PW-6013-2280 from a resolved order, which is R3b (an omitted value among several elements), not the R3a resolution this child tests; count the omission here so it stays visible without scoring the child.",
+				"all": [
+					{
+						"pattern": "pw-6013-2280",
+						"not": true
+					}
+				]
+			}
+		],
+		"notes": "It does not exercise the recorded R3b failure, an omitted value among several elements. On the recorded replies the child reads violations only (the PW-5521-9930 decoy), and the trackingOmitted diagnostic counts the R3b omission."
+	},
+	{
+		"id": "g06d-kenji-ship-day",
+		"parent": "g06-kenji-shipping",
+		"track": "model",
+		"tests": "Whether the model reads the lookup's ship date 2026-10-07 against today 2026-10-08: one day ago.",
+		"request": "Kenji Nakamura asked how long ago his replacement kettle on order LH-81660 went out. Check the order and tell me how many days ago it shipped.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"1 day",
+				"one day",
+				"yesterday",
+				"day before"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\b(?:shipped|went out|dispatched)\\s+(?:out\\s+)?today\\b",
+				"\\bship(?:ped)?\\s+(?:date|on)\\b[^.!?\\n]{0,15}\\btoday\\b"
+			]
+		},
+		"patternLabels": [
+			"new g06d: shipped today",
+			"new g06d: ship date today"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "The expectedAny list holds the recorded frame (today 2026-10-08). A run-day frame needs a frame-to-phrase map, because dated/table.json declares dates, not phrases."
+	},
+	{
+		"id": "g07a-release-contact",
+		"parent": "g07-depot-release",
+		"track": "arm",
+		"tests": "Whether the context delivers the depot-release owner Tomasz from seed 8 and keeps him apart from Marcus and Priya.",
+		"request": "Freightline says the Halvorsen pendant lights can't leave their depot until someone on our side releases them. Who on our side do I ask for the release?",
+		"tools": [
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"tomasz"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "The two optional Marcus patterns are dropped because each fails a correct reply; all 4 Marcus replies already lack tomasz (verdicts-a1.json:632-665)."
+	},
+	{
+		"id": "g07b-release-deadline",
+		"parent": "g07-depot-release",
+		"track": "arm",
+		"tests": "The deadline as a calendar date: the release request must reach Tomasz today, Thursday 2026-10-08.",
+		"request": "I need to get the depot release request in for the Halvorsen pendant lights. By when does it have to reach the warehouse? Give me the day and the date.",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"2026-10-08",
+				"october 8",
+				"october 8th",
+				"oct 8",
+				"oct 8th",
+				"oct. 8",
+				"oct. 8th",
+				"8 october",
+				"8th october",
+				"8th of october",
+				"10/8",
+				"10/08"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!\\b(?:off|out|away|unavailable|absent)\\s+)\\b(?:by|on|before|until|no later than)\\s+(?:this\\s+)?friday\\b|(?<!\\b(?:off|out|away|unavailable|absent)\\s+(?:on\\s+|until\\s+|tomorrow,?\\s+)?\\(?)(?<!\\b(?:off|out|away|unavailable|absent|leave)(?:\\s+(?:work|sick|of|the|office|from|on|leave|for|all|day|duty)){0,3}\\s+tomorrow,?\\s*\\(?)\\bfriday,?\\s+(?:oct(?:ober|\\.)?\\s+9(?:th)?|2026-10-09)\\b|\\btoday,?\\s+(?:is\\s+)?friday\\b|\\bdeadline\\s*(?:[:¦]|is)?\\s*(?:this\\s+)?friday\\b|(?<!\\b(?:off|out|away|unavailable|absent)\\s+)\\bfriday\\b(?=[^.\\n]{0,20}\\bafter\\s+2\\b)",
+				"\\b(?:ask|asking|reach|contact|call|message|email|ping|tell|notify)\\s+(?:(?!today\\b)[\\w'-]+\\s+){0,3}(?<!\\b(?:off|out|away|unavailable|absent|not|before|than)\\s+)tomorrow\\b|(?<!\\b(?:off|out|away|unavailable|absent|leave)\\s+)\\b(?:by|until|no later than|due)\\s+(?:the\\s+end\\s+of\\s+(?:the\\s+day\\s+)?)?tomorrow\\b|\\bdeadline\\s*(?:[:¦]|is)?\\s*tomorrow\\b",
+				"^(?=[\\s\\S]*\\btoday\\b)(?![\\s\\S]*(?<!\\b(?:unavailable|absent|(?:is|are|was|be|been|being|\\w+'s)\\s+(?:\\w+\\s+)?(?:off|out|away)(?:\\s+(?:work|sick|of\\s+(?:the\\s+)?office))?|on\\s+leave)\\s+)\\btoday\\b)(?![\\s\\S]*2026-10-08)",
+				"(?<!\\b(?:off|out|away|unavailable|absent)\\s+)\\b(?:today|deadline|due|by|before|until|no later than)\\b(?:(?!\\b(?:off|out|away|unavailable|absent|back|returns?|returning|resum\\w+|reopen\\w*|available)\\b|;)[^.!?\\n]){0,25}?(?:2026-10-(?!0?8(?!\\d))\\d\\d|oct(?:ober|\\.)?\\s+(?!0?8(?!\\d))\\d{1,2}(?:st|nd|rd|th)?\\b|(?!0?8(?!\\d))\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?oct(?:ober)?\\b|\\b10/(?!0?8(?!\\d))\\d{1,2}\\b)|\\bthursday,?\\s+(?:2026-10-(?!0?8(?!\\d))\\d\\d|oct(?:ober|\\.)?\\s+(?!0?8(?!\\d))\\d{1,2}(?:st|nd|rd|th)?\\b|(?!0?8(?!\\d))\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?oct(?:ober)?\\b|\\b10/(?!0?8(?!\\d))\\d{1,2}\\b)"
+			]
+		},
+		"patternLabels": [
+			"scenario g07 #1",
+			"scenario g07 #2",
+			"scenario g07 #3",
+			"new g07b: a date other than 2026-10-08 given as today or the deadline"
+		],
+		"recordedReading": "parent-check",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R4 direction",
+				"question": "Does the reply have the shift lead send the request to Tomasz, without making Tomasz the one who acts or telling the lead to wait?"
+			}
+		],
+		"diagnostics": [
+			{
+				"name": "bareToday",
+				"why": "A guessed \"today\" without a date form would pass on the word alone, so the date forms are required; count replies that say today with no date form.",
+				"all": [
+					{
+						"pattern": "\\btoday\\b"
+					},
+					{
+						"pattern": "2026-10-08|october 8|october 8th|oct 8|oct 8th|oct\\. 8|oct\\. 8th|8 october|8th october|8th of october|10/8|10/08",
+						"not": true
+					}
+				]
+			}
+		],
+		"notes": "Ordinal forms (october 8th and the like) extend the listed date forms, because the word matcher needs a non-letter after the digit. Seed-8 gating is dropped: on the arm track a lost seed counts against the arm. The recorded replies answer \"by when\", and \"today\" answers that, so recordedMechanical replaces the date-form list with the parent check (today or 2026-10-08); the three scenario patterns and pattern 4 still count. Pattern 4 skips a date that follows an off, out, away, unavailable, or absent word before its trigger word, and a date after a clause break or a return word, because \"off until Friday 2026-10-09\" and \"today; he is back on 2026-10-12\" are correct.",
+		"recordedMechanical": {
+			"expected": [],
+			"expectedAny": [
+				"today",
+				"2026-10-08"
+			]
+		}
+	},
+	{
+		"id": "g07c-pro-number",
+		"parent": "g07-depot-release",
+		"track": "arm",
+		"tests": "Whether the context delivers the Freightline pro number FL-660412, or the order id the lookup needs.",
+		"request": "Freightline says the Halvorsen pendant lights can't leave their depot until someone on our side releases them. What pro number do I give Freightline?",
+		"tools": [
+			"lookup_order",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"fl-660412"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "A ceiling goal (0 failures), like g08a; the Orchestrator rules whether to keep it."
+	},
+	{
+		"id": "g08a-account-manager",
+		"parent": "g08-halvorsen-credit",
+		"track": "arm",
+		"tests": "The account manager of Halvorsen Interiors: Ines Albrecht, resolved from the account id in the context or a lookup.",
+		"request": "Look up the Halvorsen Interiors account and tell me who their account manager is.",
+		"tools": [
+			"lookup_customer",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"albrecht"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "A ceiling goal. In the full view g04's LH-31055 result already in view gives the answer away (METHOD-DEEP-DIVE.md:270), so a rotation set puts g08a ahead of g04 or reports g04's order."
+	},
+	{
+		"id": "g08b-credit-fit",
+		"parent": "g08-halvorsen-credit",
+		"track": "arm",
+		"tests": "Whether the reply states the yes-or-no verdict that the $3,000 reorder fits the available credit; the account id is in the request.",
+		"request": "Halvorsen Interiors, account LH-31055, wants to put a $3,000 reorder on credit. Check their account and tell me whether it fits their available credit.",
+		"tools": [
+			"lookup_customer",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"fits",
+				"within",
+				"enough",
+				"covers",
+				"approve",
+				"does fit",
+				"yes",
+				"can afford",
+				"can proceed",
+				"can go",
+				"can put",
+				"can be put",
+				"can place",
+				"can be placed",
+				"can take",
+				"can cover",
+				"can accommodate",
+				"can approve",
+				"can be approved",
+				"sufficient",
+				"would be approved",
+				"plenty of room"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\bexceeds\\b",
+				"(?<!\\b(?:not|never|no)\\s+(?:\\w+\\s+)?)\\bover the limit\\b",
+				"\\bnot enough\\b",
+				"\\b(?:does|do|will|would)\\s*(?:not|n't)\\s+fit\\b",
+				"\\b(?:cannot|can't|can not)\\s+(?:be\\s+)?(?:approved?|afford|fit|cover|accommodate|proceed|go|put|place|take)\\b",
+				"(?:^|[\\n:?¦])\\s*no\\b(?=\\s*(?:[,.;:!—–¦-]|$))",
+				"\\b(?:not|never|no longer|hardly|no|nor|without|lacks?|lacking|lack of|short of|falls? short(?: of)?|\\w+n't(?:\\s+be)?)\\s+(?:\\w+\\s+)?sufficient\\b|\\binsufficient\\b",
+				"\\b(?:(?:would|will|could|should)\\s*(?:not|n't)|won't|never)\\s+be\\s+approved\\b",
+				"\\bno\\s+(?:(?:more|credit|extra|spare|real)\\s+){0,2}room\\b"
+			]
+		},
+		"patternLabels": [
+			"scenario g08 #1",
+			"scenario g08 #2",
+			"scenario g08 #3",
+			"scenario g08 #4",
+			"scenario g08 #5",
+			"scenario g08 #6",
+			"scenario g08 #7",
+			"scenario g08 #8",
+			"scenario g08 #9"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R3 fit verdict",
+				"question": "Does the reply state outright whether the $3,000 reorder fits the available credit? Decide whether a figures-only reply passes."
+			}
+		],
+		"diagnostics": [],
+		"notes": "\"room for\" is not added to expectedAny: \"There isn't room for the $3,000 reorder\" and \"not much room for it\" would meet it and no pattern catches them."
+	},
+	{
+		"id": "g08c-available-credit",
+		"parent": "g08-halvorsen-credit",
+		"track": "model",
+		"tests": "Subtracting the outstanding balance $1,240 from the $5,000 limit: available credit is $3,760.",
+		"request": "Check account LH-31055 for Halvorsen Interiors and tell me how much available credit they have right now.",
+		"tools": [
+			"lookup_customer",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"3,760",
+				"3760"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"\\b(?:available[ \\t]+credit|credit[ \\t]+available|credit[ \\t]+(?:remaining|availability))(?:[ \\t]|[:¦=—–-]|\\b(?:is|of|at|equals|stands|totals|amounts|to|currently|now|only|exactly|just|approximately|USD|balance|limit)\\b)*(?:\\$[ \\t]*)?(?!3,?760(?:\\.00)?(?!\\d|[.,]\\d))\\d[\\d,]*(?:\\.\\d+)?(?!\\d|[.,]\\d)(?![ \\t]*[-−+][ \\t]*\\$?[\\d,]+(?:\\.\\d+)?[ \\t]*=)|\\b(?:available[ \\t]+credit|credit[ \\t]+available|credit[ \\t]+(?:remaining|availability))[^\\n!?;]*?=[ \\t]*(?:\\$[ \\t]*)?(?!3,?760(?:\\.00)?(?!\\d|[.,]\\d))\\d[\\d,]*(?:\\.\\d+)?(?!\\d|[.,]\\d)|(?<![\\d.,])(?:\\$[ \\t]*)?(?!3,?760(?:\\.00)?(?!\\d|[.,]\\d))\\d[\\d,]*(?:\\.\\d+)?(?!\\d|[.,]\\d)[ \\t]*(?:dollars?[ \\t]*)?(?:(?:in|of)[ \\t]+)?(?:available[ \\t]+credit|credit[ \\t]+available|credit[ \\t]+(?:remaining|availability))\\b|(?<![\\d.,])(?!(?:\\$[ \\t]*)?760(?![\\d,]|\\.\\d)(?=[^.!?\\n]*\\b(?:after|following)\\b))(?!(?<=\\b(?:after|following)\\b[^.!?\\n]*)(?:\\$[ \\t]*)?760(?![\\d,]|\\.\\d))(?:\\$[ \\t]*)?(?!3,?760(?:\\.00)?(?!\\d|[.,]\\d))\\d[\\d,]*(?:\\.\\d+)?(?!\\d|[.,]\\d)[ \\t]*(?:dollars?[ \\t]*)?available\\b|\\bavailable[ \\t]*[:¦=][ \\t]*(?:\\$[ \\t]*)?(?!3,?760(?:\\.00)?(?!\\d|[.,]\\d))\\d[\\d,]*(?:\\.\\d+)?(?!\\d|[.,]\\d)"
+			]
+		},
+		"patternLabels": [
+			"scenario g08 #10 with a post-reorder 760 exemption"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "Pattern 10's fourth alternative fails a correct post-reorder aside such as \"leaving $760 available after the reorder\"; a 760 tied to after the order is exempt, and a bare 760 available still fails."
+	},
+	{
+		"id": "g08d-credit-after-reorder",
+		"parent": "g08-halvorsen-credit",
+		"track": "model",
+		"tests": "Chaining the outstanding balance and the $3,000 reorder against the limit: $760 of credit is left and the balance is $4,240.",
+		"request": "Halvorsen Interiors, account LH-31055, wants to put a $3,000 reorder on credit. Check their account and tell me how much credit they would have left after that order.",
+		"tools": [
+			"lookup_customer",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"^(?![\\s\\S]*(?<![\\d,.])760(?![\\d]|[.,]\\d))",
+				"\\$?4,?240(?:\\.00)?\\b[^.!?\\n]*\\bwithin\\b[^.!?\\n]*\\bavailable\\s+credit\\b",
+				"\\$\\s?2,?000(?:\\.00)?\\b\\s*(?:\\w+\\s+){0,2}?(?:left|remaining|available|remains)\\b|\\b(?:left|remaining|available|remains)\\b\\s*(?:[:¦=]|is|would be)?\\s*(?:\\w+\\s+){0,2}?\\$\\s?2,?000(?:\\.00)?(?!\\d)"
+			]
+		},
+		"patternLabels": [
+			"new g08d (1): no standalone 760 in the reply",
+			"scenario g08 #11",
+			"new g08d (3): $2,000 stated as left, remaining, or available"
+		],
+		"recordedReading": "violations-only",
+		"presencePatterns": [
+			1
+		],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "expectedAny 760 is unusable because the word matcher treats a comma as a boundary, so 760 matches inside $3,760; pattern 1 is a guard that fails a reply with no standalone 760."
+	},
+	{
+		"id": "g09a-kenji-gift-wording",
+		"parent": "g09-kenji-gift-note",
+		"track": "arm",
+		"tests": "Whether the context delivers the far seed fact, Kenji's exact gift-note wording from seed 11, that neither lookup holds.",
+		"request": "What exact wording did Kenji Nakamura ask for on the gift note for his replacement kettle?",
+		"tools": [
+			"search_history",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"happy",
+				"40th",
+				"aiko"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": []
+		},
+		"patternLabels": [],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R1 wording given as settled",
+				"question": "Does the reply give 'Happy 40th, Aiko' as Kenji's requested wording, without hedging it as unconfirmed?"
+			}
+		],
+		"diagnostics": [
+			{
+				"name": "giftStatusClaim",
+				"why": "R2 side finding tallied per arm: a claim that the note was added, recorded, noted, printed, or is coming (the g06b claim patterns joined).",
+				"all": [
+					{
+						"pattern": "\\b(?:i've|we've|i have|we have|i|we)\\s+(?:already\\s+)?(?:added|included|attached|recorded|updated|written|printed)\\b[^.!?\\n]*\\b(?:gift\\s+(?:note|card)|(?:that|the|this)\\s+(?:text|wording))\\b|\\b(?:gift\\s+(?:note|card)(?:\\s+text)?)\\s+(?:has been|was|is|has already been)\\s+(?:added|included|attached|recorded|printed)\\b|\\b(?:has been|is|was)\\s+(?:entered|recorded|added|included|noted)\\s+on\\s+(?:the\\s+)?order\\b|(?<!(?:\\bnot|\\bnever|n't)\\s+)\\bordered\\s+with\\s+a\\s+gift\\s+note\\b|(?<!\\b(?:if|whether)\\b[^.!?\\n]*)\\b(?:has|have|had|'s|is|was|were)\\s+(?:already\\s+)?(?:been\\s+)?(?:applied|added|included|attached|printed|written)\\b|\\b(?:i've|we've|i have|we have)\\s+(?:already\\s+)?noted\\s+it\\b|\\b(?:sent|shipped|packed|wrapped|enclosed)\\b(?:(?!\\b(?:not|never|no)\\b|n't)[^.!?\\n]){0,80}?\\b(?:with|along\\s+with)\\b(?:(?!\\b(?:not|never|no)\\b|n't)[^.!?\\n]){0,40}?\\b(?:gift\\s+(?:note|card)|special\\s+note|happy\\s+40th)|\\b(?:will|'ll|shall|going\\s+to)\\s+(?:be\\s+)?(?:added|included|applied|attached|printed|corrected|recorded|entered|noted|appear|make\\s+sure)\\b|\\bmake\\s+sure\\b[^.!?\\n]{0,40}?\\b(?:added|included|recorded|entered|applied|corrected|noted)\\b|\\b(?:'ll|will)\\s+update\\s+(?:it|the\\s+(?:order|note))\\b|\\bmay\\s+take\\b[^.!?\\n]{0,40}?\\bto\\s+(?:appear|show|update|arrive|post)\\b|\\b(?:gift\\s+note|note|wording|text|message)\\b(?:(?!\\b(?:kettle|package|parcel|shipment)\\b)[^.!?\\n]){0,80}?\\b(?:will|should|may|might|can)\\b[^.!?\\n]{0,40}?\\b(?:arrive|appear|show\\s+up)\\b|\\b(?:printed|written)\\s+(?:on|in|onto)\\s+(?:the\\s+)?(?:packing\\s+slip|gift\\s+card|box)\\b|\\bpacking\\s+team\\s+will\\s+(?:print|use|include|add)\\b"
+					}
+				]
+			}
+		],
+		"notes": "No forbidden strings and no forbiddenPatterns: the date pattern (rules.json:47) is dropped. The R2 lure survives as the giftStatusClaim diagnostic."
+	},
+	{
+		"id": "g10a-sigrid-number",
+		"parent": "g10-sigrid-callback",
+		"track": "arm",
+		"tests": "Whether the context delivers Sigrid's extension 4127 over the later lookup decoy 555-0142, the account manager's line.",
+		"request": "Sigrid Halvorsen at Halvorsen Interiors wants us to call her back. What number do I dial to reach her?",
+		"tools": [
+			"search_history",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [
+				"4127"
+			],
+			"expectedAny": [],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!\\b(?:not|never|instead of|rather than|avoid|skip|don't|do not)\\s+(?:[\\w'’-]+\\s+){0,4}[(\"'“]?)\\b555-0142\\b"
+			]
+		},
+		"patternLabels": [
+			"scenario g10 #2"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [
+			{
+				"name": "R6 direction (side finding)",
+				"side": true,
+				"question": "Does the reply keep the desk as the caller, without telling the lead to wait for Sigrid to call?"
+			}
+		],
+		"diagnostics": [],
+		"notes": "Pattern 2 fails any non-negated 555-0142, including one attributed to Ines (52c40f25); the Orchestrator must rule on that fixture before any run, and the fixture records the current verdict."
+	},
+	{
+		"id": "g10b-sigrid-call-window",
+		"parent": "g10-sigrid-callback",
+		"track": "arm",
+		"tests": "Whether the context delivers Sigrid's call window, after 2 pm, from seed 24.",
+		"request": "At what time of day can I reach Sigrid Halvorsen at Halvorsen Interiors by phone?",
+		"tools": [
+			"search_history",
+			"send_reply"
+		],
+		"mechanical": {
+			"expected": [],
+			"expectedAny": [
+				"2 pm",
+				"2pm",
+				"2:00 pm",
+				"2:00pm",
+				"2 p.m.",
+				"2:00 p.m.",
+				"14:00"
+			],
+			"forbidden": [],
+			"forbiddenPatterns": [
+				"(?<!(?:\\bnot|\\bnever|\\bavoid|\\bcannot|n't)\\s+(?:(?!(?:hesitate|forget|fail|worry)\\b)[\\w'’-]+\\s+){0,4})\\b(?:call|ring|dial|try|reach|contact)\\b(?:(?!\\b(?:not|never|wait|after|until)\\b|n't)[^.!?\\n]){0,40}?\\b(?:before|by|until|no later than)\\s+2(?::00)?\\s*(?:pm|p\\.m\\.)"
+			]
+		},
+		"patternLabels": [
+			"new g10b: an instruction to call before 2 pm, with a wait guard and a negation up to four words before the call verb"
+		],
+		"recordedReading": "full",
+		"presencePatterns": [],
+		"audit": [],
+		"diagnostics": [],
+		"notes": "Scenario g10 pattern 3 has no negation or wait exemption, so it fails \"wait until 2 pm\" and \"she won't answer before 2 pm\"; the guarded form needs a call verb. The negation guard reaches four words back, so \"Do not try to call her before 2 pm\" and \"She won't pick up if you call before 2 pm\" pass; \"Do not hesitate to call her before 2 pm\" still fails."
+	}
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "gate": "syntax",
+    "chunk_id": "3d67bd",
+    "wall_time_seconds": 0.184043914,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  },
+  {
+    "gate": "fixtures",
+    "chunk_id": "be1f11",
+    "wall_time_seconds": 0.11502867,
+    "exit_code": 0,
+    "original_token_count": 14,
+    "output": "Fixtures: 69/69 passed; 34 mismatched the live rules.\n"
+  },
+  {
+    "gate": "compare",
+    "chunk_id": "508994",
+    "wall_time_seconds": 0.557373368,
+    "exit_code": 0,
+    "original_token_count": 196,
+    "output": "{\n  \"rows\": 1818,\n  \"counts\": [\n    {\n      \"goal\": \"g01-luis-refund-amount\",\n      \"rows\": 303,\n      \"failToPass\": 0,\n      \"passToFail\": 0\n    },\n    {\n      \"goal\": \"g03-grace-escalation\",\n      \"rows\": 303,\n      \"failToPass\": 0,\n      \"passToFail\": 0\n    },\n    {\n      \"goal\": \"g05-luis-approval-note\",\n      \"rows\": 303,\n      \"failToPass\": 2,\n      \"passToFail\": 0\n    },\n    {\n      \"goal\": \"g06-kenji-shipping\",\n      \"rows\": 303,\n      \"failToPass\": 0,\n      \"passToFail\": 19\n    },\n    {\n      \"goal\": \"g09-kenji-gift-note\",\n      \"rows\": 303,\n      \"failToPass\": 0,\n      \"passToFail\": 1\n    },\n    {\n      \"goal\": \"g08-halvorsen-credit\",\n      \"rows\": 303,\n      \"failToPass\": 0,\n      \"passToFail\": 33\n    }\n  ],\n  \"changed\": 55,\n  \"unresolved\": 0,\n  \"skipped\": 0\n}\n"
+  },
+  {
+    "gate": "check",
+    "chunk_id": "b20711",
+    "wall_time_seconds": 0.065115219,
+    "exit_code": 0,
+    "original_token_count": 682,
+    "output": "scenario.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v1.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v2.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v3.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v4.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v5.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v6.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v7.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/v8.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v1.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v2.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v3.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v4.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v5.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v6.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v7.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nvariants/ledger/v8.json: g01.forbiddenPatterns, g03.forbiddenPatterns, g05.forbiddenPatterns, g06.forbiddenPatterns, g09.forbiddenPatterns, g08.forbiddenPatterns\nChecked 17 files; 102 field changes.\n"
+  },
+  {
+    "gate": "apply-copy-tests",
+    "command": "node tmp/bench/u2/verify.ts",
+    "exit_code": 0,
+    "evidence": "apply-tests.json"
+  },
+  {
+    "gate": "mismatch-negative-control",
+    "exit_code": 1,
+    "output": "variants/v4.json: g06-kenji-shipping.expected differs from scenario.json"
+  },
+  {
+    "gate": "backup-negative-control",
+    "exit_code": 1,
+    "output": "scenario.json.pre-u2 exists; refusing to write"
+  },
+  {
+    "gate": "outside-files",
+    "command": "find tmp/bench -newer tmp/bench/u2 -type f -not -path 'tmp/bench/u2/*' -not -path 'tmp/bench/results/v10/t4-*'",
+    "exit_code": 0,
+    "output": ""
+  }
+]

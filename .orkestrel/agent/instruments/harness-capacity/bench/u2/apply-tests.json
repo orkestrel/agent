@@ -1,0 +1,13 @@
+{
+  "files": 17,
+  "changes": 102,
+  "sandbox": "/home/user/agent/tmp/bench/u2/apply-test-Mvy4HZ",
+  "check": "passed",
+  "mismatch": [
+    "variants/v4.json: g06-kenji-shipping.expected differs from scenario.json"
+  ],
+  "write": "passed",
+  "repeat": "refused existing backup",
+  "unrelatedBytes": "equal",
+  "backups": "exact originals"
+}

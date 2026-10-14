@@ -1,0 +1,37 @@
+[
+  {
+    "check": "identity: all 17 scenarios and staged rules preserve bytes",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "date table: inventory closure, derivations, business days, intervals, and event ordering",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "agreement: all files at every weekday, month/year ends, leap day, and requested day",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "scoring: handwritten estimate forms fail and ship-only replies pass staged g06",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "refusal: undeclared dates name the input file and offending text, including identity run",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "CLI: goal filtering, before parity, staged rules, today, and invalid arguments",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  },
+  {
+    "check": "negative controls: the agreement checker detects stale dates, weekdays, relative words, clock, and scoring",
+    "exit": 1,
+    "error": "ERR_MODULE_NOT_FOUND before implementation"
+  }
+]

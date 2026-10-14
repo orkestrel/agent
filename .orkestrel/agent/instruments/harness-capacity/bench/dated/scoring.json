@@ -1,0 +1,173 @@
+{
+  "scenarios": [
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v1.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v2.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v3.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v4.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v5.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v6.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v7.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    },
+    {
+      "file": "tmp/bench/variants/g06/after-2026-10-09/v8.json",
+      "fields": {
+        "expected": [
+          "pw-6013-2280"
+        ],
+        "forbidden": [
+          "2026-10-13",
+          "october 13",
+          "oct 13",
+          "oct. 13",
+          "13 oct",
+          "13th oct",
+          "10/13"
+        ],
+        "forbiddenPatterns": [
+          "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b"
+        ]
+      }
+    }
+  ],
+  "staged": {
+    "forbiddenPatterns": [
+      "\\b(?:2026[-/.]0?10[-/.]0?13|0?10[-/.]0?13(?:[-/.](?:2026|26))?|0?13[-/.]0?10[-/.](?:2026|26)|oct(?:ober)?\\.?[ \\t-]*(?:the\\s+)?(?:13(?:th)?|thirteenth|thirteen)|(?:13(?:th)?|thirteenth|thirteen)[ \\t-]+(?:of\\s+)?oct(?:ober)?\\.?)\\b",
+      "\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)|(?:\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b\\d{1,2}[-/.]\\d{1,2}(?:[-/.]\\d{2,4})?\\b)(?:[^.!?\\n]|(?<=\\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\\.|(?<=\\d)\\.(?=\\d))*?\\b(?:arriv\\w*|deliver\\w*|estimat\\w*|expected(?:\\s+date)?|ETA)\\b",
+      "(?<!\\b(?:not|never|hasn't|haven't|hadn't)\\s+(?:yet\\s+)?)\\barrived\\b|\\b(?:(?:was|were|is|has been|have been|had been|s been|ve been|got)\\s+(?:(?:already|successfully)\\s+)?delivered|(?:we|they|parcelway|the carrier)\\s+(?:have\\s+|has\\s+)?delivered)\\b|(?:^|[\\n:¦])\\s*delivered\\b",
+      "^(?![\\s\\S]*(?:\\b(?:hi|hello|dear)\\s+kenji\\b|(?:^|[\\n\"“])\\s*kenji(?:\\s+nakamura)?\\s*[,!:]|\\byour\\s+(?:replacement|electric|kettle|order|tracking|package|parcel|shipment)\\b))",
+      "\\b(?:i've|we've|i have|we have|i|we)\\s+(?:already\\s+)?(?:added|included|attached|recorded|updated|written|printed)\\b[^.!?\\n]*\\b(?:gift\\s+(?:note|card)|(?:that|the|this)\\s+(?:text|wording))\\b|\\b(?:gift\\s+(?:note|card)(?:\\s+text)?)\\s+(?:has been|was|is|has already been)\\s+(?:added|included|attached|recorded|printed)\\b"
+    ]
+  }
+}

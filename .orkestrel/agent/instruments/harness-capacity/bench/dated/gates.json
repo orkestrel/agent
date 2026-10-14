@@ -1,0 +1,100 @@
+[
+  {
+    "gate": "Pre-implementation: node tmp/bench/dated/check.mjs",
+    "exit": 1,
+    "detail": "All seven groups failed with ERR_MODULE_NOT_FOUND."
+  },
+  {
+    "gate": "Contract typecheck without --ignoreConfig",
+    "exit": 1,
+    "detail": "TS5112: explicit files require --ignoreConfig when tsconfig.json is present."
+  },
+  {
+    "gate": "node --check tmp/bench/dated/Renderer.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "node --check tmp/bench/dated/check.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "node --check tmp/bench/dated/constants.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "node --check tmp/bench/dated/dates.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "node --check tmp/bench/dated/helpers.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "node --check tmp/bench/dated/render.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "Contract typecheck with --ignoreConfig",
+    "exit": 0
+  },
+  {
+    "gate": "node tmp/bench/dated/check.mjs",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v1 and staged rules",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v2",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v3",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v4",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v5",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v6",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v7",
+    "exit": 0
+  },
+  {
+    "gate": "Render after v8",
+    "exit": 0
+  },
+  {
+    "gate": "After-file presence, parsing, clock, and goal selection",
+    "exit": 0
+  },
+  {
+    "gate": "Protected input, backup, rules, and harness hashes",
+    "exit": 0,
+    "files": 278
+  },
+  {
+    "gate": "Tracked workspace unchanged",
+    "exit": 0
+  },
+  {
+    "gate": "All pre-existing bench files unchanged",
+    "exit": 1,
+    "files": 23380,
+    "changed": [
+      "tmp/bench/results/g06/f2-before-v1/memory.log",
+      "tmp/bench/results/g06/f2-before-v1.log",
+      "tmp/bench/results/g06/run.log"
+    ],
+    "detail": "Three benchmark result logs changed during a separate run. This unit issued no writes to those paths."
+  }
+]

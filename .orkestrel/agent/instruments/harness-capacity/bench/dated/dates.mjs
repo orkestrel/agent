@@ -1,0 +1,16 @@
+/** @type {readonly import('./types.ts').DateEntry[]} */
+export const DATES = Object.freeze([
+  { date: '2021-04-12', name: 'Grace membership', basis: 'fixed', reason: 'Historical customer-since date.' },
+  { date: '2022-07-19', name: 'Kenji membership', basis: 'fixed', reason: 'Historical customer-since date.' },
+  { date: '2023-02-08', name: 'Luis membership', basis: 'fixed', reason: 'Historical customer-since date.' },
+  { date: '2026-10-08', name: 'Today', basis: 'run', reason: 'R, including Saturday and Sunday.' },
+  { date: '2026-09-21', name: 'Luis delivery and return-window anchor', basis: 'business', offset: -13, reason: 'R minus 13 business days. The source calls this delivery, and supplies no separate order date.' },
+  { date: '2026-09-30', name: 'Grace shipment', basis: 'business', offset: -6, reason: 'R minus 6 business days.' },
+  { date: '2026-10-02', name: 'Halvorsen depot hold', basis: 'business', offset: -4, reason: 'R minus 4 business days.' },
+  { date: '2026-10-03', name: 'Grace locker delivery', basis: 'calendar', anchor: '2026-10-02', offset: 1, reason: 'One calendar day after the depot hold; preserves event order and the original Saturday locker delivery.' },
+  { date: '2026-10-07', name: 'Kenji shipment', basis: 'business', offset: -1, reason: 'R minus 1 business day.' },
+  { date: '2026-10-09', name: 'Tomasz day off', basis: 'business', offset: 1, reason: 'R plus 1 business day.' },
+  { date: '2026-10-12', name: 'Kenji carrier estimate', basis: 'business', offset: 2, reason: 'R plus 2 business days.' },
+  { date: '2026-10-17', name: 'Unselected Frankfurt example', basis: 'calendar', anchor: '2026-10-08', offset: 9, reason: 'R plus 9 calendar days; the date and its weekday occur together in notes.' },
+  { date: '2026-10-21', name: 'Luis return deadline', basis: 'calendar', anchor: '2026-09-21', offset: 30, reason: '30 calendar days after the recorded return-window anchor.' },
+].map(row => Object.freeze(row)));

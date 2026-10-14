@@ -1,0 +1,963 @@
+{
+	"goals": {
+		"g11-grace-signoff-today": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						18,
+						54,
+						78,
+						88
+					],
+					"reason": "Ruth Adeyemi covers Marcus's approvals on the goal's date, 2026-10-09."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						18,
+						54,
+						78
+					],
+					"reason": "Keep the empty literal list because a correct explanation can name Marcus. Add a contextual guard in forbiddenPatterns."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\bmarcus(?:\\s+oyelaran)?\\s+(?:(?:must|will|can|may|should|also|still)\\s+)*(?:sign(?:s|ing)?\\s*off|approve[sd]?|authori[sz]e[sd]?)\\b(?!\\s+(?:normally|usually|ordinarily)\\b)",
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b(?:sign[- ]?off|approval|authorization|authorisation)\\s+(?:from|by|through)\\s+marcus\\b"
+					],
+					"evidence": [
+						18,
+						54,
+						78
+					],
+					"reason": "The missing guard admits a reply naming Adeyemi while assigning approval to Marcus. The existing hedged SAMPLES reply omits Adeyemi and therefore tests only expected. Add guards for affirmative Marcus approval clauses while retaining explanatory mentions."
+				}
+			},
+			"replies": [
+				{
+					"text": "For today's approval, contact Ruth Adeyemi.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Marcus must approve today's replacement.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Ruth Adeyemi or Marcus can approve today's replacement.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Ruth Adeyemi or Marcus can approve today's replacement.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Ruth Adeyemi handles today's approval because Marcus is away.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g12-copperline-gesture": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						94
+					],
+					"reason": "Free freight is Marcus's replacement preference for late wholesale orders."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						50,
+						51,
+						94
+					],
+					"reason": "Keep the empty literal list so a reply can explicitly reject the former store credit."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?<![\\w$])(?:\\$?50(?:\\.00)?\\s+(?:in\\s+)?store credit|(?<!\\$?50(?:\\.00)?\\s+(?:in\\s+)?)\\bstore credit)(?!\\s*(?:of\\s+\\$?50(?:\\.00)?\\s*)?(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						50,
+						51,
+						94
+					],
+					"reason": "The sentence-wide exemption treats 'old account number' as retiring an actively offered credit. It also rejects 'Free freight replaces the store credit of $50.' Scope retirement language to the credit phrase and preserve explicit negation of the amount."
+				}
+			},
+			"replies": [
+				{
+					"text": "The next Copperline order gets free freight.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "The next Copperline order gets a $50 store credit.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Offer free freight plus a $50 store credit, using the old account number.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Offer free freight plus a $50 store credit, using the old account number.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Free freight replaces the store credit of $50.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Free freight replaces the store credit of $50.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "Free freight applies, not a $50 store credit.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g13-farah-address": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						99,
+						103
+					],
+					"reason": "The correction changes the house number to 91 and retains Quarry Lane."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						99,
+						102,
+						103
+					],
+					"reason": "Keep the empty literal list because a correct correction can name the rejected address."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b19\\s+quarry(?!(?:\\s+lane)?\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						99,
+						102,
+						103
+					],
+					"reason": "The word 'old' describing a form exempts an actively suggested stale address. Restrict the ending exemption to the address and its immediate predicate."
+				}
+			},
+			"replies": [
+				{
+					"text": "Use this destination: 91 Quarry Lane, Ashby.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Use this destination: 19 Quarry Lane, Ashby.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Use 91 Quarry Lane or 19 Quarry Lane if the old form rejects it.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Use 91 Quarry Lane or 19 Quarry Lane if the old form rejects it.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "The form needs 91 Quarry Lane; 19 Quarry Lane was replaced.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g14-beatriz-remedy": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						71,
+						108,
+						110
+					],
+					"reason": "Beatriz chooses a sage exchange, and the warehouse supplies tracking PW-7042-1185."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						74,
+						75,
+						108
+					],
+					"reason": "Keep the empty literal list to permit an explicit rejection of the refund."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\brefund(?:ed|ing|s)?\\b[^.\\n]{0,25}?\\$?412(?:\\.00)?(?![\\d.])|(?<![\\w$])\\$?412(?:\\.00)?\\s+refund\\b|\\bfull refund\\b)(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						74,
+						75,
+						108,
+						110
+					],
+					"reason": "An unrelated 'old payment record' exempts a full refund. Conversely, the decimal point prevents the refund-before-amount pattern from recognizing '$412.00 was scrapped.' Consume the complete amount and bind the exemption to the refund."
+				}
+			},
+			"replies": [
+				{
+					"text": "Arrange Beatriz's exchange for the sage rug; Parcelway reference PW-7042-1185.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Refund $412.00 for the wrong rug.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Arrange the sage exchange on PW-7042-1185 plus a full refund, using the old payment record.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Arrange the sage exchange on PW-7042-1185 plus a full refund, using the old payment record.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Arrange the sage exchange, PW-7042-1185; the refund of $412.00 was scrapped.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Arrange the sage exchange, PW-7042-1185; the refund of $412.00 was scrapped.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "Arrange the sage exchange, PW-7042-1185, not a full refund.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g15-luis-returns": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						40,
+						42,
+						44
+					],
+					"reason": "The refund is the full $289 and the return deadline is 2026-10-21. Seed 40 supplies account LH-44870; its lookup_customer source supplies Mastercard ending 7719."
+				},
+				"forbidden": {
+					"ruling": "change",
+					"value": [],
+					"evidence": [
+						4,
+						5,
+						42,
+						44
+					],
+					"reason": "The literal amounts reject correct explanations that explicitly deny the reduced refund or identify the waived deduction. Move the amounts into contextual forbiddenPatterns."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?<![\\w$])\\$?(?:245\\.65|43\\.35)(?!\\d)(?!(?:\\s+(?:deduction|fee))?\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)",
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\b\\d+(?:\\.\\d+)?\\s*(?:%|percent|per cent)\\s+restocking fees?\\b|(?<!\\d+(?:\\.\\d+)?\\s*(?:%|percent|per cent)\\s+)\\brestocking fees?\\b)(?!\\s+(?:of\\s+\\d+(?:\\.\\d+)?\\s*(?:%|percent|per cent)\\s+)?(?:(?:is|are|was|were|has been|have been)\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|eliminated|cancell?ed|rescinded|retired|lifted|no longer|does not|do not|will not)\\b)"
+					],
+					"evidence": [
+						4,
+						5,
+						42,
+						44
+					],
+					"reason": "The sentence-wide negation exemption admits an applicable restocking fee followed by 'no further delay.' Bind negation and withdrawal to the fee or amount. The notes' inherited-pattern exemption does not resolve this reproduced false pass; this replacement is confined to g15."
+				}
+			},
+			"replies": [
+				{
+					"text": "Luis, the $289.00 refund went to Mastercard 7719; the return deadline was 2026-10-21.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Luis, $245.65 went to Mastercard 7719 after a $43.35 fee; deadline 2026-10-21.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Luis, $289.00 goes to Mastercard 7719 by the return deadline 2026-10-21, subject to a restocking fee, with no further delay.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Luis, $289.00 goes to Mastercard 7719 by the return deadline 2026-10-21, subject to a restocking fee, with no further delay.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Luis, we refunded $289.00, not $245.65, to Mastercard 7719; the return deadline was 2026-10-21.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Luis, we refunded $289.00, not $245.65, to Mastercard 7719; the return deadline was 2026-10-21.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "Luis, $289.00 went to Mastercard 7719; deadline 2026-10-21. The $43.35 deduction was waived.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Luis, $289.00 went to Mastercard 7719; deadline 2026-10-21. The $43.35 deduction was waived.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "Luis, $289.00 went to Mastercard 7719; deadline 2026-10-21. No 15 percent restocking fee applies.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g16-walk-in-return": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						122
+					],
+					"reason": "The replacement instruction defers walk-in returns until Monday."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						112,
+						113,
+						122
+					],
+					"reason": "Keep the empty literal list so a reply can identify the cancelled hours."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b(?:1\\s*(?::00\\s*)?p\\.?m|9\\s*(?::00\\s*)?a\\.?m)\\b(?!(?:\\s+(?:opening|hours?))?\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						112,
+						113,
+						122
+					],
+					"reason": "An unrelated 'old entrance' exempts both stale opening hours. Restrict the exemption to the time or its opening-hours predicate."
+				}
+			},
+			"replies": [
+				{
+					"text": "Walk-in returns resume Monday; today's counter is shut for floor work.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "The counter accepts returns this afternoon.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Come between 9 am and 1 pm today or on Monday, using the old entrance.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Come between 9 am and 1 pm today or on Monday, using the old entrance.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Use Monday; the 9 am opening was cancelled.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g17-phone-list": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						124
+					],
+					"reason": "Dalia's outstanding callback supplies 555-0175."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						58,
+						59,
+						84,
+						85
+					],
+					"reason": "Keep the empty literal list because a correct reply can explain that the Freightline call ended."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b555-0188\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						58,
+						59,
+						84,
+						85,
+						124
+					],
+					"reason": "The scorer accepts an instruction to call Freightline 'even though ESC-2219 closed.' The closing word describes the ticket while the reply still instructs the stale call. Bind the exemption to the phone reference."
+				}
+			},
+			"replies": [
+				{
+					"text": "Dalia Moreno needs a call at 555-0175 about her sofa delivery slot.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Phone Freightline Riverside at 555-0188 for the daily status.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Call Dalia Moreno at 555-0175 and Freightline Riverside at 555-0188 even though ESC-2219 closed.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Call Dalia Moreno at 555-0175 and Freightline Riverside at 555-0188 even though ESC-2219 closed.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Dalia Moreno: 555-0175. The call to 555-0188 is no longer needed.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g18-chase-list": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						101,
+						105
+					],
+					"reason": "Farah's outstanding redirect remains subject to an afternoon chase on PW-7120-4466."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						64,
+						67,
+						96,
+						110,
+						111,
+						130
+					],
+					"reason": "Keep the empty literal list to permit explanations that the other shipments arrived."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b(?:pw-7042-1185|fl-661978)\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						64,
+						67,
+						96,
+						110,
+						111,
+						130
+					],
+					"reason": "An unrelated 'old carrier portal' exempts both completed shipments while the reply actively requests their chases. Require retirement language to describe the shipment reference."
+				}
+			},
+			"replies": [
+				{
+					"text": "Farah's curtains remain outstanding: chase Parcelway with PW-7120-4466.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Chase Freightline for FL-661978.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Chase PW-7120-4466, PW-7042-1185 and FL-661978 using the old carrier portal.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Chase PW-7120-4466, PW-7042-1185 and FL-661978 using the old carrier portal.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Chase PW-7120-4466; FL-661978 already arrived.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "Chase PW-7120-4466; PW-7042-1185 arrived.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g19-farah-code": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						114,
+						120,
+						133
+					],
+					"reason": "WKND15 is valid on 2026-10-10 and applies to Farah's delayed order."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						48,
+						49,
+						114,
+						120
+					],
+					"reason": "Keep the empty literal list because a correct explanation can identify the expired code."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\blate10\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						48,
+						49,
+						114,
+						120
+					],
+					"reason": "The phrase 'old checkout' exempts an offered LATE10 fallback. Limit the expiry exemption to a predicate attached to LATE10."
+				}
+			},
+			"replies": [
+				{
+					"text": "Farah can use WKND15 on her next purchase for fifteen percent off.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Farah can use LATE10 on her next purchase.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Use WKND15 or LATE10 if the old checkout rejects WKND15.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Use WKND15 or LATE10 if the old checkout rejects WKND15.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "WKND15 is valid; LATE10 has expired.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g20-copperline-manager": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						136
+					],
+					"reason": "The replacement customer lookup names Tobias Lindqvist as account manager."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						65,
+						136
+					],
+					"reason": "Keep the empty literal list to permit an explanation of the manager replacement."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\bines\\s+albrecht|(?<!\\bines\\s+)\\balbrecht)\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						65,
+						136
+					],
+					"reason": "An 'old reorder' exempts Ines Albrecht while she is offered as an alternative manager. Bind the exemption to the name and preserve the full-name boundary used for direct negation."
+				}
+			},
+			"replies": [
+				{
+					"text": "Put Copperline's accounts team in touch with Tobias Lindqvist.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Put Copperline's accounts team in touch with Ines Albrecht.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Use Tobias Lindqvist or Ines Albrecht for the old reorder.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Use Tobias Lindqvist or Ines Albrecht for the old reorder.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Tobias Lindqvist replaced Ines Albrecht.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g21-copperline-buyer": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						138
+					],
+					"reason": "Hana Ikeda and her email address replace the former buyer's contact details."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						68,
+						92,
+						93,
+						138
+					],
+					"reason": "Keep the empty literal list because a correct explanation can name Owen and his former extensions."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\b(?:extension|ext\\.?)\\s*43(?:01|10)|(?<!\\b(?:extension|ext\\.?)\\s*)\\b43(?:01|10))\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)",
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\bowen\\s+pritchard|(?<!\\bowen\\s+)\\bpritchard)\\b(?!(?:\\s+on\\s+(?:extension|ext\\.?)\\s*43(?:01|10))?\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						68,
+						92,
+						93,
+						138
+					],
+					"reason": "The scorer admits an obsolete extension followed by 'old reorder.' It also admits Owen as an alternative contact when no extension is written. Guard the superseded buyer as well as both extensions, retaining statements that Owen has left."
+				}
+			},
+			"replies": [
+				{
+					"text": "Reach buyer Hana Ikeda by email: hana.ikeda@copperline.example.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Reach buyer Owen Pritchard by phone on extension 4301.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Reach Hana Ikeda at hana.ikeda@copperline.example or extension 4310 for the old reorder.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Reach Hana Ikeda at hana.ikeda@copperline.example or extension 4310 for the old reorder.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Reach Hana Ikeda at hana.ikeda@copperline.example or Owen Pritchard before noon.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Reach Hana Ikeda at hana.ikeda@copperline.example or Owen Pritchard before noon.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Hana Ikeda is at hana.ikeda@copperline.example. Owen Pritchard on extension 4310 has left.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g22-kenji-returns": {
+			"fields": {
+				"expected": {
+					"ruling": "change",
+					"value": [
+						"happy",
+						"40th",
+						"aiko"
+					],
+					"evidence": [
+						11
+					],
+					"reason": "The required card reads 'Happy 40th, Aiko.' The existing anchors accept 'Sad 40th, Aiko.' Require the missing greeting word."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						6,
+						11,
+						142
+					],
+					"reason": "Retain the benchmark's explicit written-date convention. The LH-81660 lookup contains the earlier kettle's 2026-10-12 estimate; seed 142 concerns another replacement and supplies no arrival date."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\b|\\b(?:3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:1[0-2]|0?[1-9])/(?:3[01]|[12][0-9]|0?[1-9])(?:/\\d{2,4})?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b",
+						"(?<!\\b(?:not|never|cannot|can't|won't|don't|do not)\\s+)\\b(?:arriv(?:e|es|ing|al)|deliver(?:ed|y))\\s+(?:(?:on|by|before|this|next)\\s+)?(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b"
+					],
+					"evidence": [
+						6,
+						142
+					],
+					"reason": "The calendar-date pattern admits 'will arrive tomorrow' despite the no-delivery-date rule and absence of an arrival estimate for the second replacement. Preserve the existing calendar pattern and add relative-day delivery assertions. Dispatching today remains admissible."
+				}
+			},
+			"replies": [
+				{
+					"text": "Gift message: Happy 40th, Aiko. Kenji, another kettle is being sent today; I cannot give an arrival date.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Gift message: Happy 40th, Aiko. Kenji, delivery is set for 2026-10-12.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Gift message: Happy 40th, Aiko. Kenji, it will arrive tomorrow, or possibly Monday.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Gift message: Happy 40th, Aiko. Kenji, it will arrive tomorrow, or possibly Monday.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Gift message: Sad 40th, Aiko. Kenji, another kettle is being sent today; arrival is unconfirmed.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Gift message: Sad 40th, Aiko. Kenji, another kettle is being sent today; arrival is unconfirmed.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Card: Happy 40th, Aiko. The warehouse is dispatching the kettle today; delivery timing remains unconfirmed.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g23-grace-reopened": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						15,
+						18,
+						56,
+						120,
+						144
+					],
+					"reason": "The reopened trace concerns the twin set received instead of Grace's queen set. Marcus's standing approval rule applies after Ruth's cover expires; the trace and tracking references remain supported."
+				},
+				"forbidden": {
+					"ruling": "keep",
+					"evidence": [
+						54,
+						55,
+						120
+					],
+					"reason": "Keep the empty literal list because a correct explanation can name Ruth's expired cover."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)(?:\\bruth\\s+adeyemi|(?<!\\bruth\\s+)\\badeyemi)\\b(?!(?:'s\\s+cover)?\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						18,
+						54,
+						55,
+						120,
+						144
+					],
+					"reason": "The phrase 'old form' exempts Ruth while the reply assigns her approval authority after her cover expires. Restrict the exemption to Ruth or her cover's immediate predicate."
+				}
+			},
+			"replies": [
+				{
+					"text": "Authorize Grace's replacement through Marcus: she received someone else's twin set. Trace TR-3307; tracking PW-5521-9930.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Ruth Adeyemi approves the replacement for the twin set; trace TR-3307; tracking PW-5521-9930.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "Marcus or Ruth Adeyemi can approve the replacement for the twin set, using the old form; trace TR-3307; tracking PW-5521-9930.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "Marcus or Ruth Adeyemi can approve the replacement for the twin set, using the old form; trace TR-3307; tracking PW-5521-9930.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "Marcus approves the twin replacement; TR-3307, PW-5521-9930. Ruth Adeyemi's cover expired.",
+					"label": "pass",
+					"under": "changed"
+				}
+			]
+		},
+		"g24-halvorsen-claim": {
+			"fields": {
+				"expected": {
+					"ruling": "keep",
+					"evidence": [
+						82,
+						148
+					],
+					"reason": "The replacement lookup supplies FL-660412 and the claim deadline 2026-10-16; the reopened escalation supplies cracked glass."
+				},
+				"forbidden": {
+					"ruling": "change",
+					"value": [],
+					"evidence": [
+						36,
+						82,
+						148
+					],
+					"reason": "The literal phrase rejects the correct statement 'no longer awaiting a release.' Move the obsolete state into contextual patterns."
+				},
+				"forbiddenPatterns": {
+					"ruling": "change",
+					"value": [
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\bawaiting\\s+(?:a\\s+)?release\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)",
+						"(?<!\\b(?:no|not|no longer|instead of|rather than|took over from|replaced|replacing|replaces|withdrawn|scrapped|removed|waived|dropped|cancelled|canceled|former|previous|old)\\s+(?:(?:a|an|the)\\s+)?)\\b(?:still\\s+)?held\\s+at\\s+(?:the\\s+)?riverside(?:\\s+depot)?\\b(?!\\s*(?:[,;:]\\s*)?(?:(?:is|are|was|were|has|have|had)\\s+)?(?:already\\s+)?(?:withdrawn|scrapped|removed|waived|dropped|replaced|no longer|superseded|expired|ended|left|closed|cancell?ed|took over|moved|disregarded|covered|arrived)\\b)"
+					],
+					"evidence": [
+						36,
+						82,
+						148
+					],
+					"reason": "The scorer admits the superseded depot hold when the reply omits the exact forbidden phrase. Guard both release-waiting and Riverside-hold assertions while allowing explicit rejection of the old state."
+				}
+			},
+			"replies": [
+				{
+					"text": "The delivered pendants include cracked glass; file against FL-660412 by 2026-10-16.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "FL-660412 is still awaiting a release at Riverside.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "The pendants have cracked glass; claim on FL-660412 by 2026-10-16, but they might still be awaiting a release.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "The pendants have cracked glass; claim on FL-660412 by 2026-10-16, but they might still be awaiting a release.",
+					"label": "fail",
+					"under": "changed"
+				},
+				{
+					"text": "The pendants are delivered with cracked glass, no longer awaiting a release; claim on FL-660412 by 2026-10-16.",
+					"label": "fail",
+					"under": "current"
+				},
+				{
+					"text": "The pendants are delivered with cracked glass, no longer awaiting a release; claim on FL-660412 by 2026-10-16.",
+					"label": "pass",
+					"under": "changed"
+				},
+				{
+					"text": "The pendants have cracked glass; claim on FL-660412 by 2026-10-16, but they are still held at the Riverside depot.",
+					"label": "pass",
+					"under": "current"
+				},
+				{
+					"text": "The pendants have cracked glass; claim on FL-660412 by 2026-10-16, but they are still held at the Riverside depot.",
+					"label": "fail",
+					"under": "changed"
+				}
+			]
+		}
+	},
+	"deviation": {
+		"expected": "git status --porcelain must be identical before and after the audit.",
+		"found": "The final status adds a modified harness/README.md and an untracked harness/bench5/ directory. This audit made no writes, installations, network calls, or agent spawns.",
+		"evidence": {
+			"before": "?? .orkestrel/agent/instruments/harness/vendor/agent-0.0.30/\n",
+			"after": " M .orkestrel/agent/instruments/harness/README.md\n?? .orkestrel/agent/instruments/harness/bench5/\n?? .orkestrel/agent/instruments/harness/vendor/agent-0.0.30/\n"
+		},
+		"done": "The scoring audit completed. Actual current labels were computed through compileRules and scoreText. Inline verification of the replacement rules against the existing samples, adversarial replies, and correction controls ran 132 checks with no failures. The unchanged-workspace acceptance criterion was not met. Work stopped upon observing the status difference.",
+		"hypothesis": "Another process or workspace participant changed the reported paths during this read-only audit."
+	}
+}
