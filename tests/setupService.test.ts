@@ -13,9 +13,28 @@ import {
 	captureServicePackages,
 	createStudyServiceFixture,
 	executeStudyService,
+	readMemoryToolResults,
 } from './setupService.js'
 
 describe('study service fixtures', () => {
+	it('reads tool receipts from actual wire shapes and refuses malformed messages', () => {
+		expect(
+			readMemoryToolResults(
+				JSON.stringify({
+					messages: [
+						{ role: 'user', content: 'Read' },
+						{ role: 'tool', content: 'No record' },
+						{ role: 'tool', content: 'order: Owner\nReleased' },
+					],
+				}),
+			),
+		).toEqual(['No record', 'order: Owner\nReleased'])
+		expect(() => readMemoryToolResults('{}')).toThrow('Invalid chat request')
+		expect(() => readMemoryToolResults('{"messages":[7]}')).toThrow('Invalid chat message')
+		expect(() => readMemoryToolResults('{"messages":[{"role":"tool","content":7}]}')).toThrow(
+			'Invalid tool receipt',
+		)
+	})
 	it('copies actual package closure with one selected Agent and retains exact native command diagnostics', async () => {
 		const scratch = createScratch()
 		try {

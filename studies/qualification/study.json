@@ -1,0 +1,12 @@
+{
+	"name": "qualification",
+	"version": "1",
+	"question": "Can the pinned thinking-off Q4 profile complete the entire prospective public endurance workload for records and compaction within the declared finite bounds?",
+	"purpose": "capacity",
+	"driver": "memory",
+	"arms": ["records", "compaction"],
+	"scenarios": ["endurance"],
+	"order": [["records", "compaction"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

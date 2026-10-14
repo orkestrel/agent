@@ -13,10 +13,11 @@ import type {
 } from '@orkestrel/agent'
 import type { StudyContext, StudyProfile, StudyRole, StudyTicket } from '@orkestrel/study'
 
-/** Holds the public messages and immutable reference records available to a goal. */
+/** Holds public arrivals and reference snapshots released before a goal. */
 export interface StudyMemoryInput {
 	readonly prompt: string
 	readonly arrivals: ReadonlyArray<{ readonly id: string; readonly content: string }>
+	/** Adds or replaces the current snapshot by id; omitted ids retain their last release, and unreleased ids remain absent. */
 	readonly records: ReadonlyArray<{
 		readonly id: string
 		readonly name: string

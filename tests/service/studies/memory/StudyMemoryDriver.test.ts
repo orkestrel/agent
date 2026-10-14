@@ -8,10 +8,128 @@ import {
 	createMemoryContext,
 	createMemoryServer,
 	loadMemoryInputs,
+	readMemoryToolResults,
 	STUDY_MEMORY_MODULES,
 } from '../../../setupService.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('releases and replaces snapshots while preserving earlier wire receipts and fresh trial isolation', async () => {
+		const server = await createMemoryServer(
+			Array.from({ length: 5 }, () => [
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } }],
+					}),
+				},
+				{ path: '/api/chat', body: buildMemoryReply() },
+			]).flat(),
+		)
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
+		try {
+			const session = await driver.open(
+				{ id: 'release', scenario: 'public', arm: 'full', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				for (const [index, goal] of [
+					{ id: 'before', records: [] },
+					{
+						id: 'initial',
+						records: [{ id: 'order:BC-7301', name: 'Mara Ellison', content: 'Original $265.86' }],
+					},
+					{
+						id: 'replacement',
+						records: [
+							{ id: 'order:BC-7301', name: 'Mara Ellison revised', content: 'Corrected $260.35' },
+						],
+					},
+					{ id: 'retained', records: [] },
+				].entries()) {
+					await session.execute(
+						{
+							id: goal.id,
+							input: {
+								prompt: 'Read lookup id order:BC-7301',
+								arrivals: [],
+								records: goal.records,
+							},
+						},
+						fixture.context,
+					)
+					const request = server.requests.filter((entry) => entry.path === '/api/chat').at(-1)
+					if (request === undefined) throw new Error('Missing actual chat request')
+					const expected =
+						goal.id === 'before'
+							? 'No record'
+							: goal.id === 'initial'
+								? 'order:BC-7301: Mara Ellison\nOriginal $265.86'
+								: 'order:BC-7301: Mara Ellison revised\nCorrected $260.35'
+					expect(readMemoryToolResults(request.body).at(-1)).toBe(expected)
+					expect(readMemoryToolResults(request.body)).toEqual(
+						[
+							'No record',
+							'order:BC-7301: Mara Ellison\nOriginal $265.86',
+							'order:BC-7301: Mara Ellison revised\nCorrected $260.35',
+							'order:BC-7301: Mara Ellison revised\nCorrected $260.35',
+						].slice(0, index + 1),
+					)
+				}
+				expect(
+					fixture.evidence.filter((row) => row.event === 'lookup').map((row) => row.value),
+				).toEqual([
+					{ id: 'order:BC-7301', found: false },
+					{ id: 'order:BC-7301', found: true },
+					{ id: 'order:BC-7301', found: true },
+					{ id: 'order:BC-7301', found: true },
+				])
+				expect(
+					fixture.context.meter.usage.filter((row) => row.role === 'tool').map((row) => row.bytes),
+				).toEqual(
+					[
+						'No record',
+						'order:BC-7301: Mara Ellison\nOriginal $265.86',
+						'order:BC-7301: Mara Ellison revised\nCorrected $260.35',
+						'order:BC-7301: Mara Ellison revised\nCorrected $260.35',
+					].map(
+						(receipt) =>
+							new TextEncoder().encode(
+								JSON.stringify({ id: 'order:BC-7301' }) + JSON.stringify(receipt),
+							).byteLength,
+					),
+				)
+			} finally {
+				await session.close()
+				fixture.close()
+			}
+			const fresh = createMemoryContext(profile)
+			const trial = await driver.open(
+				{ id: 'fresh', scenario: 'public', arm: 'full', repetition: 1 },
+				fresh.context.signal,
+			)
+			try {
+				await trial.execute(
+					{
+						id: 'before',
+						input: { prompt: 'Read lookup id order:BC-7301', arrivals: [], records: [] },
+					},
+					fresh.context,
+				)
+				const request = server.requests.filter((entry) => entry.path === '/api/chat').at(-1)
+				if (request === undefined) throw new Error('Missing fresh trial request')
+				expect(readMemoryToolResults(request.body)).toEqual(['No record'])
+			} finally {
+				await trial.close()
+				fresh.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
 	it('dispatches actual memory work after generic validation and rejects invalid room controls', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url })

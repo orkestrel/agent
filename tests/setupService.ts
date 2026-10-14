@@ -286,23 +286,44 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 	}
 }
 
-/** Loads the actual capacity declaration and shared memory scenario for generic admission proofs.
+/** Loads an authored declaration and its shared memory scenario for generic admission proofs.
  * @param profile - The execution profile to compose with authored inputs.
- * @returns Parsed capacity inputs with the caller's profile.
+ * @param name - The selected declaration. Default: capacity.
+ * @returns Parsed authored inputs with the caller's profile.
  */
-export async function loadMemoryInputs(profile: StudyProfile): Promise<StudyValidation> {
+export async function loadMemoryInputs(
+	profile: StudyProfile,
+	name = 'capacity',
+): Promise<StudyValidation> {
 	const definition = parseStudyDefinition(
-		parseJSON(await readFile('studies/capacity/study.json', 'utf8')),
+		parseJSON(await readFile(`studies/${name}/study.json`, 'utf8')),
 	)
-	const rubric = parseStudyRubric(parseJSON(await readFile('studies/capacity/rubric.json', 'utf8')))
+	const rubric = parseStudyRubric(parseJSON(await readFile(`studies/${name}/rubric.json`, 'utf8')))
 	const scenarios = await Promise.all(
-		definition.scenarios.map(async (name) =>
+		definition.scenarios.map(async (scenario) =>
 			parseStudyScenario(
-				parseJSON(await readFile(`studies/memory/scenarios/${name}.json`, 'utf8')),
+				parseJSON(await readFile(`studies/memory/scenarios/${scenario}.json`, 'utf8')),
 			),
 		),
 	)
 	return { definition, rubric, scenarios, profile }
+}
+
+/** Reads actual tool-result strings from recorded Ollama chat request bytes.
+ * @param body - The captured HTTP request body.
+ * @returns Tool receipts in conversation order.
+ */
+export function readMemoryToolResults(body: string): readonly string[] {
+	const value = parseJSON(body)
+	if (!isRecord(value) || !Array.isArray(value.messages)) throw new Error('Invalid chat request')
+	const receipts: string[] = []
+	for (const message of value.messages) {
+		if (!isRecord(message)) throw new Error('Invalid chat message')
+		if (message.role !== 'tool') continue
+		if (typeof message.content !== 'string') throw new Error('Invalid tool receipt')
+		receipts.push(message.content)
+	}
+	return receipts
 }
 
 /** Creates actual hierarchical request accounting and an evidence recorder. */

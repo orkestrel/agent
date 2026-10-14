@@ -70,7 +70,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		})
 		const lookup = createTool({
 			name: 'lookup',
-			description: 'Reads an immutable public reference record by id',
+			description: 'Reads the latest released public reference snapshot by id',
 			parameters: {
 				type: 'object',
 				properties: { id: { type: 'string' } },
@@ -184,9 +184,6 @@ export class StudyMemorySession implements StudySessionInterface {
 		try {
 			await this.#transport.verify()
 			for (const record of input.records) {
-				const prior = this.#records.get(record.id)
-				if (prior !== undefined && (prior.name !== record.name || prior.content !== record.content))
-					throw new StudyError('CONFIG', 'Reference record changed within a trial')
 				this.#records.set(record.id, Object.freeze({ ...record }))
 			}
 			for (const arrival of input.arrivals) {

@@ -1,6 +1,6 @@
 # c1 thinking results and retained harness
 
-The user has since requested a capacity repair and a new bounded comparison. The active successor is tracked in [capacity.md](capacity.md). The closed baseline below remains unchanged evidence.
+The user requested a capacity repair and a bounded comparison. The failed thinking-enabled attempts are tracked in [capacity.md](capacity.md); the selected prospective successor is tracked in [endurance.md](endurance.md). The closed baseline below remains unchanged evidence.
 
 The dedicated [Study package integration](../study.md) is implemented and accepted after independent review and gates. The user superseded app placement and a new scaffold root axis with @orkestrel/study, using canonical src/core, src/server and src/bin, with results in the consuming package's tmp/studies. Agent owns its consumer adapters under studies/. Duplicated app code was removed at 8a14ac9. The abandoned scaffold axis was restored exactly; do not integrate it or run the old migration. Opus's macro and per-file reviews, Sol's mutation proofs, the final Astra review, Study and Agent tree gates, and the actual installed CPU integration all passed. These proofs do not assert model quality. The user's final Fable allowance is consumed; do not invoke it again. Use latest published Orkestrel versions for working builds and preserve frozen runs. Consolidate fixtures by surface, never per item. The temporary harness/.build ignore stays until dependent generation, grading, reporting and custody work no longer need it.
 

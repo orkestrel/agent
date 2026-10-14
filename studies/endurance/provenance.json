@@ -1,0 +1,1197 @@
+{
+	"version": "1",
+	"adaptation": "Prospective public workload adaptation, not exact historical replay or a thinking-only ablation.",
+	"source": {
+		"path": ".orkestrel/agent/instruments/units/aggregates/endurance/runtime/evaluation.json",
+		"id": "endurance-evaluation-v 1",
+		"size": 149851,
+		"sha256": "e8b4143efbbc9251166852c2d993f6b1f0b3f44eaa181f0973c27878109a47f5"
+	},
+	"population": {
+		"goals": 96,
+		"seed": 103,
+		"days": 24,
+		"lookups": 49,
+		"snapshots": 39,
+		"unchanged": 10
+	},
+	"boundary": "after and from are inclusive zero-based source indices. Desk rules arrive before the first goal. Day markers arrive before the seed at their from index. Each seed arrives once at the first goal with after >= its index. Each lookup version becomes eligible at from <= after; the latest eligible snapshot replaces the current id only when name or content changes.",
+	"boundaries": [
+		{
+			"goal": "ev-01-1",
+			"after": 5,
+			"seed": [0, 1, 2, 3, 4, 5],
+			"days": [0],
+			"records": ["order:BC-7301", "customer:BC-4101"]
+		},
+		{
+			"goal": "ev-01-2",
+			"after": 5,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-01-3",
+			"after": 5,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-01-4",
+			"after": 5,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-02-1",
+			"after": 9,
+			"seed": [6, 7, 8, 9],
+			"days": [1],
+			"records": ["order:BC-7302", "customer:BC-4102"]
+		},
+		{
+			"goal": "ev-02-2",
+			"after": 9,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-02-3",
+			"after": 9,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-02-4",
+			"after": 9,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-03-1",
+			"after": 13,
+			"seed": [10, 11, 12, 13],
+			"days": [2],
+			"records": ["order:BC-7303", "customer:BC-4103"]
+		},
+		{
+			"goal": "ev-03-2",
+			"after": 13,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-03-3",
+			"after": 13,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-03-4",
+			"after": 13,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-04-1",
+			"after": 17,
+			"seed": [14, 15, 16, 17],
+			"days": [3],
+			"records": ["order:BC-7304", "customer:BC-4104"]
+		},
+		{
+			"goal": "ev-04-2",
+			"after": 17,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-04-3",
+			"after": 17,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-04-4",
+			"after": 17,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-05-1",
+			"after": 22,
+			"seed": [18, 19, 20, 21, 22],
+			"days": [4],
+			"records": ["order:BC-7305", "customer:BC-4105"]
+		},
+		{
+			"goal": "ev-05-2",
+			"after": 22,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-05-3",
+			"after": 22,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-05-4",
+			"after": 22,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-06-1",
+			"after": 26,
+			"seed": [23, 24, 25, 26],
+			"days": [5],
+			"records": ["order:BC-7306", "customer:BC-4106"]
+		},
+		{
+			"goal": "ev-06-2",
+			"after": 26,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-06-3",
+			"after": 26,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-06-4",
+			"after": 26,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-07-1",
+			"after": 31,
+			"seed": [27, 28, 29, 30, 31],
+			"days": [6],
+			"records": ["order:BC-7307", "customer:BC-4107"]
+		},
+		{
+			"goal": "ev-07-2",
+			"after": 31,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-07-3",
+			"after": 31,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-07-4",
+			"after": 31,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-08-1",
+			"after": 36,
+			"seed": [32, 33, 34, 35, 36],
+			"days": [7],
+			"records": ["order:BC-7308", "customer:BC-4108"]
+		},
+		{
+			"goal": "ev-08-2",
+			"after": 36,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-08-3",
+			"after": 36,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-08-4",
+			"after": 36,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-09-1",
+			"after": 41,
+			"seed": [37, 38, 39, 40, 41],
+			"days": [8],
+			"records": ["customer:BC-4105", "order:BC-7309", "customer:BC-4109"]
+		},
+		{
+			"goal": "ev-09-2",
+			"after": 41,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-09-3",
+			"after": 41,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-09-4",
+			"after": 41,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-10-1",
+			"after": 46,
+			"seed": [42, 43, 44, 45, 46],
+			"days": [9],
+			"records": ["order:BC-7310", "customer:BC-4110"]
+		},
+		{
+			"goal": "ev-10-2",
+			"after": 46,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-10-3",
+			"after": 46,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-10-4",
+			"after": 46,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-11-1",
+			"after": 50,
+			"seed": [47, 48, 49, 50],
+			"days": [10],
+			"records": ["order:BC-7311", "customer:BC-4111"]
+		},
+		{
+			"goal": "ev-11-2",
+			"after": 50,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-11-3",
+			"after": 50,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-11-4",
+			"after": 50,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-12-1",
+			"after": 54,
+			"seed": [51, 52, 53, 54],
+			"days": [11],
+			"records": ["order:BC-7312", "customer:BC-4112"]
+		},
+		{
+			"goal": "ev-12-2",
+			"after": 54,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-12-3",
+			"after": 54,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-12-4",
+			"after": 54,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-13-1",
+			"after": 58,
+			"seed": [55, 56, 57, 58],
+			"days": [12],
+			"records": ["order:BC-7301", "customer:BC-4101"]
+		},
+		{
+			"goal": "ev-13-2",
+			"after": 58,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-13-3",
+			"after": 58,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-13-4",
+			"after": 58,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-14-1",
+			"after": 62,
+			"seed": [59, 60, 61, 62],
+			"days": [13],
+			"records": ["order:BC-7302"]
+		},
+		{
+			"goal": "ev-14-2",
+			"after": 62,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-14-3",
+			"after": 62,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-14-4",
+			"after": 62,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-15-1",
+			"after": 66,
+			"seed": [63, 64, 65, 66],
+			"days": [14],
+			"records": ["order:BC-7303"]
+		},
+		{
+			"goal": "ev-15-2",
+			"after": 66,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-15-3",
+			"after": 66,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-15-4",
+			"after": 66,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-16-1",
+			"after": 70,
+			"seed": [67, 68, 69, 70],
+			"days": [15],
+			"records": ["order:BC-7304"]
+		},
+		{
+			"goal": "ev-16-2",
+			"after": 70,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-16-3",
+			"after": 70,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-16-4",
+			"after": 70,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-17-1",
+			"after": 74,
+			"seed": [71, 72, 73, 74],
+			"days": [16],
+			"records": ["order:BC-7305"]
+		},
+		{
+			"goal": "ev-17-2",
+			"after": 74,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-17-3",
+			"after": 74,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-17-4",
+			"after": 74,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-18-1",
+			"after": 78,
+			"seed": [75, 76, 77, 78],
+			"days": [17],
+			"records": ["order:BC-7306"]
+		},
+		{
+			"goal": "ev-18-2",
+			"after": 78,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-18-3",
+			"after": 78,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-18-4",
+			"after": 78,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-19-1",
+			"after": 82,
+			"seed": [79, 80, 81, 82],
+			"days": [18],
+			"records": ["order:BC-7307", "customer:BC-4107"]
+		},
+		{
+			"goal": "ev-19-2",
+			"after": 82,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-19-3",
+			"after": 82,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-19-4",
+			"after": 82,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-20-1",
+			"after": 86,
+			"seed": [83, 84, 85, 86],
+			"days": [19],
+			"records": ["order:BC-7308"]
+		},
+		{
+			"goal": "ev-20-2",
+			"after": 86,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-20-3",
+			"after": 86,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-20-4",
+			"after": 86,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-21-1",
+			"after": 90,
+			"seed": [87, 88, 89, 90],
+			"days": [20],
+			"records": ["order:BC-7309"]
+		},
+		{
+			"goal": "ev-21-2",
+			"after": 90,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-21-3",
+			"after": 90,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-21-4",
+			"after": 90,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-22-1",
+			"after": 94,
+			"seed": [91, 92, 93, 94],
+			"days": [21],
+			"records": ["order:BC-7310"]
+		},
+		{
+			"goal": "ev-22-2",
+			"after": 94,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-22-3",
+			"after": 94,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-22-4",
+			"after": 94,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-23-1",
+			"after": 98,
+			"seed": [95, 96, 97, 98],
+			"days": [22],
+			"records": ["order:BC-7311"]
+		},
+		{
+			"goal": "ev-23-2",
+			"after": 98,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-23-3",
+			"after": 98,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-23-4",
+			"after": 98,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-24-1",
+			"after": 102,
+			"seed": [99, 100, 101, 102],
+			"days": [23],
+			"records": ["order:BC-7312"]
+		},
+		{
+			"goal": "ev-24-2",
+			"after": 102,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-24-3",
+			"after": 102,
+			"seed": [],
+			"days": [],
+			"records": []
+		},
+		{
+			"goal": "ev-24-4",
+			"after": 102,
+			"seed": [],
+			"days": [],
+			"records": []
+		}
+	],
+	"releases": [
+		{
+			"source": 0,
+			"id": "order:BC-7301",
+			"from": 5,
+			"goal": "ev-01-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 1,
+			"id": "customer:BC-4101",
+			"from": 5,
+			"goal": "ev-01-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 2,
+			"id": "order:BC-7302",
+			"from": 9,
+			"goal": "ev-02-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 3,
+			"id": "customer:BC-4102",
+			"from": 9,
+			"goal": "ev-02-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 4,
+			"id": "order:BC-7303",
+			"from": 13,
+			"goal": "ev-03-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 5,
+			"id": "customer:BC-4103",
+			"from": 13,
+			"goal": "ev-03-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 6,
+			"id": "order:BC-7304",
+			"from": 17,
+			"goal": "ev-04-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 7,
+			"id": "customer:BC-4104",
+			"from": 17,
+			"goal": "ev-04-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 8,
+			"id": "order:BC-7305",
+			"from": 22,
+			"goal": "ev-05-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 9,
+			"id": "customer:BC-4105",
+			"from": 22,
+			"goal": "ev-05-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 10,
+			"id": "order:BC-7306",
+			"from": 26,
+			"goal": "ev-06-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 11,
+			"id": "customer:BC-4106",
+			"from": 26,
+			"goal": "ev-06-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 12,
+			"id": "order:BC-7307",
+			"from": 31,
+			"goal": "ev-07-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 13,
+			"id": "customer:BC-4107",
+			"from": 31,
+			"goal": "ev-07-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 14,
+			"id": "order:BC-7308",
+			"from": 36,
+			"goal": "ev-08-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 15,
+			"id": "customer:BC-4108",
+			"from": 36,
+			"goal": "ev-08-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 18,
+			"id": "customer:BC-4105",
+			"from": 41,
+			"goal": "ev-09-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 16,
+			"id": "order:BC-7309",
+			"from": 41,
+			"goal": "ev-09-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 17,
+			"id": "customer:BC-4109",
+			"from": 41,
+			"goal": "ev-09-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 19,
+			"id": "order:BC-7310",
+			"from": 46,
+			"goal": "ev-10-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 20,
+			"id": "customer:BC-4110",
+			"from": 46,
+			"goal": "ev-10-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 21,
+			"id": "order:BC-7311",
+			"from": 50,
+			"goal": "ev-11-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 22,
+			"id": "customer:BC-4111",
+			"from": 50,
+			"goal": "ev-11-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 23,
+			"id": "order:BC-7312",
+			"from": 54,
+			"goal": "ev-12-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 24,
+			"id": "customer:BC-4112",
+			"from": 54,
+			"goal": "ev-12-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 25,
+			"id": "order:BC-7301",
+			"from": 58,
+			"goal": "ev-13-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 26,
+			"id": "customer:BC-4101",
+			"from": 58,
+			"goal": "ev-13-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 27,
+			"id": "order:BC-7302",
+			"from": 62,
+			"goal": "ev-14-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 28,
+			"id": "customer:BC-4102",
+			"from": 62,
+			"goal": "ev-14-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 29,
+			"id": "order:BC-7303",
+			"from": 66,
+			"goal": "ev-15-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 30,
+			"id": "customer:BC-4103",
+			"from": 66,
+			"goal": "ev-15-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 31,
+			"id": "order:BC-7304",
+			"from": 70,
+			"goal": "ev-16-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 32,
+			"id": "customer:BC-4104",
+			"from": 70,
+			"goal": "ev-16-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 33,
+			"id": "order:BC-7305",
+			"from": 74,
+			"goal": "ev-17-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 34,
+			"id": "customer:BC-4105",
+			"from": 74,
+			"goal": "ev-17-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 35,
+			"id": "order:BC-7306",
+			"from": 78,
+			"goal": "ev-18-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 36,
+			"id": "customer:BC-4106",
+			"from": 78,
+			"goal": "ev-18-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 37,
+			"id": "order:BC-7307",
+			"from": 82,
+			"goal": "ev-19-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 38,
+			"id": "customer:BC-4107",
+			"from": 82,
+			"goal": "ev-19-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 39,
+			"id": "order:BC-7308",
+			"from": 86,
+			"goal": "ev-20-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 40,
+			"id": "customer:BC-4108",
+			"from": 86,
+			"goal": "ev-20-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 41,
+			"id": "order:BC-7309",
+			"from": 90,
+			"goal": "ev-21-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 42,
+			"id": "customer:BC-4109",
+			"from": 90,
+			"goal": "ev-21-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 43,
+			"id": "order:BC-7310",
+			"from": 94,
+			"goal": "ev-22-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 44,
+			"id": "customer:BC-4110",
+			"from": 94,
+			"goal": "ev-22-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 45,
+			"id": "order:BC-7311",
+			"from": 98,
+			"goal": "ev-23-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 46,
+			"id": "customer:BC-4111",
+			"from": 98,
+			"goal": "ev-23-1",
+			"disposition": "unchanged"
+		},
+		{
+			"source": 47,
+			"id": "order:BC-7312",
+			"from": 102,
+			"goal": "ev-24-1",
+			"disposition": "snapshot"
+		},
+		{
+			"source": 48,
+			"id": "customer:BC-4112",
+			"from": 102,
+			"goal": "ev-24-1",
+			"disposition": "unchanged"
+		}
+	],
+	"substitutions": [
+		{
+			"field": "system",
+			"before": "You are the support operator for Beacon Cooperative. Maintain one continuous work history and answer the current desk request. Treat external source messages and actual lookup receipts as evidence. Distinguish approval, draft preparation, initiation, and completion. Preserve unfinished obligations and revise your earlier work when facts change. Do not invent tool receipts, sent messages, completed refunds, shipments, deliveries, or closed cases. Available read-only lookup tools are lookup_order with an id and lookup_customer with an account. They reveal the version released by the current source boundary. Your written packet is a draft unless an external source confirms the action.",
+			"after": "You are the support operator for Beacon Cooperative. Maintain one continuous work history and answer the current desk request. Treat external source messages and actual lookup receipts as evidence. Distinguish approval, draft preparation, initiation, and completion. Preserve unfinished obligations and revise your earlier work when facts change. Do not invent tool receipts, sent messages, completed refunds, shipments, deliveries, or closed cases. Available read-only lookup tools are lookup with an id of order:<order id> and lookup with an id of customer:<account id>. They reveal the version released by the current source boundary. Your written packet is a draft unless an external source confirms the action."
+		},
+		{
+			"field": "goals[1].request",
+			"before": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-01-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-01-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[5].request",
+			"before": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-02-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-02-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "seed[11].content",
+			"before": "[2031-02-04; Nadia Solano; BC-7303; document 3.2] Payments review PY-7303: The gateway shows a settled $318.00 capture CAP-7303 and a separate $318.00 authorization AUTH-7303. The authorization is pending, not captured. The bank feed labels both as card activity. The invoice is $300.00 merchandise plus 6% tax and no freight. A capture refund would reduce the legitimate paid order; an authorization release is the correct request if the second entry is still pending. Obtain the status from lookup_order before drafting a remedy, because settlement can change after a screenshot is taken.",
+			"after": "[2031-02-04; Nadia Solano; BC-7303; document 3.2] Payments review PY-7303: The gateway shows a settled $318.00 capture CAP-7303 and a separate $318.00 authorization AUTH-7303. The authorization is pending, not captured. The bank feed labels both as card activity. The invoice is $300.00 merchandise plus 6% tax and no freight. A capture refund would reduce the legitimate paid order; an authorization release is the correct request if the second entry is still pending. Obtain the status from lookup (id order:<order id>) before drafting a remedy, because settlement can change after a screenshot is taken."
+		},
+		{
+			"field": "goals[9].request",
+			"before": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-03-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-03-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[13].request",
+			"before": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-04-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-04-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[17].request",
+			"before": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-05-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-05-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[21].request",
+			"before": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-06-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-06-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[25].request",
+			"before": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-07-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-07-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[29].request",
+			"before": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-08-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-08-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[33].request",
+			"before": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-09-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-09-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[37].request",
+			"before": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-10-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-10-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[41].request",
+			"before": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-11-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-11-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[45].request",
+			"before": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-12-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-12-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "seed[57].content",
+			"before": "[2031-02-14; Mara Ellison; BC-7301; document 13.3] Account administrator, contact notice CT-7301: Mara moved workshops. The prior address mara@alderbrook.example is no longer authorized for customer correspondence. Use mara.ellison@repairguild.example. The old address remains on an archived invoice and may be mentioned only as a retired route. The phone number has not changed, but the customer still requests email. The effective contact is visible in lookup_customer for BC-4101 from this shift. A message sent to the retired address would need correction even if its monetary calculation were accurate.",
+			"after": "[2031-02-14; Mara Ellison; BC-7301; document 13.3] Account administrator, contact notice CT-7301: Mara moved workshops. The prior address mara@alderbrook.example is no longer authorized for customer correspondence. Use mara.ellison@repairguild.example. The old address remains on an archived invoice and may be mentioned only as a retired route. The phone number has not changed, but the customer still requests email. The effective contact is visible in lookup (id customer:<account id>) for BC-4101 from this shift. A message sent to the retired address would need correction even if its monetary calculation were accurate."
+		},
+		{
+			"field": "goals[49].request",
+			"before": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-13-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-01-1 through ev-01-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7301, following your actual queue decision ev-13-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-01-1 through ev-01-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[53].request",
+			"before": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-14-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-02-1 through ev-02-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-14-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-02-1 through ev-02-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[57].request",
+			"before": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-15-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-03-1 through ev-03-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7303, following your actual queue decision ev-15-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-03-1 through ev-03-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[61].request",
+			"before": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-16-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-04-1 through ev-04-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7304, following your actual queue decision ev-16-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-04-1 through ev-04-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[65].request",
+			"before": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-17-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-05-1 through ev-05-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7305, following your actual queue decision ev-17-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-05-1 through ev-05-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[69].request",
+			"before": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-18-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-06-1 through ev-06-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7306, following your actual queue decision ev-18-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-06-1 through ev-06-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[73].request",
+			"before": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-19-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-07-1 through ev-07-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7307, following your actual queue decision ev-19-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-07-1 through ev-07-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[77].request",
+			"before": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-20-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-08-1 through ev-08-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7308, following your actual queue decision ev-20-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-08-1 through ev-08-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "seed[87].content",
+			"before": "[2031-02-22; Esme Rowan; BC-7309; document 21.1] Technical acceptance TA-7309: Esme supplied the HZ-4 label. Sales confirms it recommended the incompatible ST-5 despite the logger detail. Approve exchange to ST-4 with no return fee. The ST-5 remains unused. A replacement record in lookup_order contains the compatible model and the original range requirement. Do not state that the original sensor was defective; the evidence supports a compatibility error. Carry the technical acceptance into the revised authorization note.",
+			"after": "[2031-02-22; Esme Rowan; BC-7309; document 21.1] Technical acceptance TA-7309: Esme supplied the HZ-4 label. Sales confirms it recommended the incompatible ST-5 despite the logger detail. Approve exchange to ST-4 with no return fee. The ST-5 remains unused. A replacement record in lookup (id order:<order id>) contains the compatible model and the original range requirement. Do not state that the original sensor was defective; the evidence supports a compatibility error. Carry the technical acceptance into the revised authorization note."
+		},
+		{
+			"field": "goals[81].request",
+			"before": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-21-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-09-1 through ev-09-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7309, following your actual queue decision ev-21-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-09-1 through ev-09-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[85].request",
+			"before": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-22-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-10-1 through ev-10-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7310, following your actual queue decision ev-22-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-10-1 through ev-10-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[89].request",
+			"before": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-23-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-11-1 through ev-11-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7311, following your actual queue decision ev-23-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-11-1 through ev-11-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		},
+		{
+			"field": "goals[93].request",
+			"before": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-24-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup_order and lookup_customer before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-12-1 through ev-12-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+			"after": "Prepare the resolution packet for BC-7312, following your actual queue decision ev-24-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Retrieve your actual earlier queue, packet, reconciliation, and handoff ev-12-1 through ev-12-4. Compare their claims and commitments with the arrived evidence. Correct an earlier mistake rather than preserving it for consistency. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission."
+		}
+	],
+	"limits": [
+		"The generic consumer system and single orders topic replace historical system/topic configuration; original desk rules are preserved as a first public source.",
+		"Read-only historical tool names become lookup with disjoint order:<id> and customer:<id> ids. Historical tool parameter shapes and implementation differ.",
+		"Day metadata is rendered as Current workday: <date>. Source dates, ids and public text are preserved.",
+		"Sampling is fixed by the existing consumer at temperature zero and seed zero with thinking disabled; this changes the historical harness and is not a controlled thinking-only comparison.",
+		"Lookup snapshot names use the public owner text; immutable prior tool receipts remain in the conversation.",
+		"Identical released snapshots retain their earlier bytes and have explicit unchanged release mappings; no public source, goal or changed update is dropped.",
+		"No private oracle, labels, mapping keys or expected answers were read or added to execution input.",
+		"Semantic criteria are frozen prospectively using public evidence only and remain independent unknowns until accountable labeling.",
+		"The durable fixture proof depends on the original public evaluation.json path. Root explicitly accepted retaining these frozen public bytes; campaign cleanup must preserve this test dependency."
+	],
+	"criteria": {
+		"suffixes": ["facts", "work", "obligations", "completion"],
+		"critical": "completion",
+		"horizon": 384,
+		"policy": "Root narrowed the prospective rubric into separate comparative outcomes; ordinary factual, work or obligation omissions are not automatically critical. No holistic criterion is included."
+	}
+}

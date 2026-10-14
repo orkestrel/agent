@@ -1,0 +1,12 @@
+{
+	"name": "endurance",
+	"version": "1",
+	"question": "How do records and compaction compare in source-supported work, corrections, calculations and surviving obligations over the complete prospective public endurance workload?",
+	"purpose": "quality",
+	"driver": "memory",
+	"arms": ["records", "compaction"],
+	"scenarios": ["endurance"],
+	"order": [["records", "compaction"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

@@ -1,0 +1,66 @@
+{
+	"name": "q4",
+	"subject": "dist/src/core/index.js",
+	"roots": [
+		".",
+		"node_modules/@orkestrel/ollama",
+		"node_modules/@orkestrel/study",
+		"node_modules/@orkestrel/abort",
+		"node_modules/@orkestrel/budget",
+		"node_modules/@orkestrel/contract",
+		"node_modules/@orkestrel/database",
+		"node_modules/@orkestrel/emitter",
+		"node_modules/@orkestrel/queue",
+		"node_modules/@orkestrel/timeout",
+		"node_modules/@orkestrel/tool",
+		"node_modules/@orkestrel/workflow",
+		"node_modules/@orkestrel/workspace",
+		"node_modules/@orkestrel/ndjson",
+		"node_modules/@orkestrel/indexeddb",
+		"node_modules/@orkestrel/sqlite"
+	],
+	"provider": {
+		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
+		"url": "http://127.0.0.1:11435",
+		"model": "qwen3.5:4b-q4_K_M",
+		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+		"digest": {
+			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
+			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+		}
+	},
+	"qualification": "tmp/studies/endurance-capacity",
+	"room": {
+		"context": 20480,
+		"output": 8192,
+		"safety": 512,
+		"recap": 2048,
+		"think": false
+	},
+	"bounds": {
+		"request": {
+			"duration": 360000,
+			"calls": 1,
+			"tokens": 19968,
+			"bytes": 1048576
+		},
+		"goal": {
+			"duration": 900000,
+			"calls": 128,
+			"tokens": 2555904,
+			"bytes": 134217728
+		},
+		"trial": {
+			"duration": 14400000,
+			"calls": 4096,
+			"tokens": 8000000,
+			"bytes": 1073741824
+		},
+		"series": {
+			"duration": 21600000,
+			"calls": 8192,
+			"tokens": 16000000,
+			"bytes": 2147483648
+		}
+	}
+}
