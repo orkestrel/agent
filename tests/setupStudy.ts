@@ -1,4 +1,6 @@
 import type {
+	StudyAttempt,
+	StudyBounds,
 	StudyCriterion,
 	StudyDefinition,
 	StudyGrading,
@@ -9,6 +11,8 @@ import type {
 	StudyScenario,
 	StudyTrial,
 } from '../app/core/studies/types.js'
+import type { StudyMeterFixture } from './app/core/studies/engines/types.js'
+import { StudyControl, StudyMeter, StudyScope } from '../app/core/studies/engines/index.js'
 import { buildStudySchedule } from '../app/core/studies/helpers.js'
 
 /** Returns a declared two-arm, two-scenario, two-repetition population. */
@@ -144,3 +148,88 @@ export function buildStudyJudgment(
 		references: ['attempts/trace.ndjson#1'],
 	}
 }
+
+/** Creates real scopes and request admission with one lifecycle owner.
+ * @param bounds - Per-scope limit overrides.
+ * @param signal - Optional parent cancellation.
+ * @returns Owned control, scopes, and meter with cleanup.
+ */
+export function createStudyMeterFixture(
+	bounds: Partial<StudyBounds> = {},
+	signal?: AbortSignal,
+): StudyMeterFixture {
+	const limit = { duration: 1000, calls: 4, tokens: 100, bytes: 100 }
+	const control = new StudyControl(signal)
+	const scopes = [
+		new StudyScope({ limit: bounds.goal ?? limit, control, label: 'Goal' }),
+		new StudyScope({ limit: bounds.trial ?? limit, control, label: 'Trial' }),
+		new StudyScope({ limit: bounds.series ?? limit, control, label: 'Series' }),
+	]
+	const meter = new StudyMeter({
+		request: bounds.request ?? { ...limit, calls: 1 },
+		scopes,
+		control,
+	})
+	return Object.freeze({
+		control,
+		scopes: Object.freeze(scopes),
+		meter,
+		close(): void {
+			meter.close()
+			for (const scope of scopes) scope.close()
+			control.close()
+		},
+	})
+}
+
+/**
+ * Builds a fresh execution declaration with enough encoded custody room.
+ * @param changes - The scenario-specific declaration changes
+ * @returns The independently owned manifest
+ */
+export function buildCustodyManifest(changes: Partial<StudyManifest> = {}): StudyManifest {
+	const manifest = buildStudyManifest()
+	return {
+		...manifest,
+		bounds: {
+			request: { duration: 1000, calls: 1, tokens: 1000, bytes: 1024 },
+			goal: { duration: 2000, calls: 2, tokens: 2000, bytes: 4096 },
+			trial: { duration: 4000, calls: 4, tokens: 4000, bytes: 8192 },
+			series: { duration: 32000, calls: 32, tokens: 32000, bytes: 65536 },
+		},
+		...changes,
+	}
+}
+
+/**
+ * Builds a complete terminal horizon from the supplied scheduled trial.
+ * @param manifest - The authoritative goal horizon
+ * @param trial - The scheduled trial
+ * @returns The inert terminal record
+ */
+export function buildCustodyAttempt(manifest: StudyManifest, trial: StudyTrial): StudyAttempt {
+	const scenario = manifest.scenarios.find((entry) => entry.id === trial.scenario)
+	if (scenario === undefined) throw new Error('Fixture trial has no scenario')
+	return {
+		trial,
+		observations: scenario.goals.map((goal) => ({
+			goal: goal.id,
+			product: { value: 'remember', partial: false },
+			failure: undefined,
+			usage: [],
+			duration: 0,
+		})),
+		failure: undefined,
+		duration: 0,
+	}
+}
+
+/** Supplies hostile seal mutations that the offline reader must refuse. */
+export const STUDY_CUSTODY_MUTATIONS = Object.freeze([
+	'tampered',
+	'missing',
+	'extra',
+	'extra-directory',
+	'wrong-horizon',
+	'partial-evidence',
+])

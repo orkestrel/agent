@@ -147,7 +147,8 @@ export interface StudyTicket {
 export interface StudyMeterInterface {
 	readonly signal: AbortSignal
 	readonly usage: readonly StudyUsage[]
-	admit(charge: StudyCharge): StudyTicket
+	/** Resolves admission before dispatch; local meters may return the ticket synchronously. */
+	admit(charge: StudyCharge): StudyTicket | Promise<StudyTicket>
 }
 
 /** Holds append-only domain evidence in a JSON-compatible form. */

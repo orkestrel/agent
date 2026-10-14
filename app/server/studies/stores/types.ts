@@ -1,0 +1,82 @@
+import type {
+	StudyAttempt,
+	StudyManifest,
+	StudySinkInterface,
+} from '../../../core/studies/types.js'
+import type { FileHandle } from 'node:fs/promises'
+
+/** Holds the inert execution store configuration. */
+export interface StudyResultOptions {
+	readonly directory: string
+	readonly manifest: StudyManifest
+}
+
+/** Holds the exact byte identity of one execution file. */
+export interface StudyFile {
+	readonly path: string
+	readonly bytes: number
+	readonly digest: string
+}
+
+/** Holds a complete execution inventory and its deterministic identity. */
+export interface StudySeal {
+	readonly version: 1
+	readonly result: string
+	readonly id: string
+	readonly files: readonly StudyFile[]
+}
+
+/** Holds inspected execution metadata that is never gradeable before sealing. */
+export interface StudyInterruptedResult {
+	readonly status: 'interrupted'
+	readonly directory: string
+	readonly manifest: StudyManifest | undefined
+	readonly attempts: readonly StudyAttempt[]
+}
+
+/** Holds independently verified sealed execution bytes. */
+export interface StudySealedResult {
+	readonly status: 'sealed'
+	readonly directory: string
+	readonly manifest: StudyManifest
+	readonly attempts: readonly StudyAttempt[]
+	readonly seal: StudySeal
+}
+
+/** Holds an offline execution reading discriminated by custody completeness. */
+export type StudyResultReading = StudyInterruptedResult | StudySealedResult
+
+/** Holds imported grading artifacts independently of execution. */
+export interface StudyGradingOptions {
+	readonly result: StudySealedResult
+	readonly rubric: Uint8Array
+	readonly labels?: Uint8Array
+}
+
+/** Holds the evidence sink's shared admission budget. */
+export interface StudyCustodyBudget {
+	readonly reserve: (bytes: number) => void
+}
+
+/** Holds the trial sink's admitted writes and terminal lifecycle. */
+export interface StudyTrialCustody {
+	readonly sink: StudyCustodySinkInterface
+	readonly terminal: Promise<void> | undefined
+}
+
+/** Closes evidence admission and drains already admitted appends. */
+export interface StudyCustodySinkInterface extends StudySinkInterface {
+	close(): Promise<void>
+}
+
+/** Holds the owned evidence descriptor and byte admission constraints. */
+export interface StudyEvidenceOptions {
+	readonly file: FileHandle
+	readonly goals: readonly string[]
+	readonly goal: number
+	readonly trial: number
+	readonly budget: StudyCustodyBudget
+}
+
+/** Names the execution custody lifecycle without inferring seal completeness. */
+export type StudyCustodyPhase = 'new' | 'creating' | 'ready' | 'sealing' | 'sealed' | 'failed'

@@ -1,3 +1,7 @@
+import { createScratch } from '@orkestrel/test/server'
+import { join } from 'node:path'
+import { buildStudyRubric } from './setupStudy.js'
+import { buildCustodyGrading, buildCustodyLabels, retainStudyFixture } from './setupServer.js'
 import { createRecorder } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { createFixtureServer } from './setupServer.js'
@@ -61,5 +65,30 @@ describe('createFixtureServer', () => {
 		}).rejects.toBe(failure)
 		expect(server.status).toBe('stopped')
 		expect(server.address).toBeUndefined()
+	})
+})
+
+describe('study server fixtures', () => {
+	it('returns a sealed real-files fixture with complete grades and explicit supplied label provenance', async () => {
+		const scratch = createScratch()
+		try {
+			const result = await retainStudyFixture(join(scratch.path, 'result'))
+			const rubric = buildStudyRubric()
+			const grading = buildCustodyGrading(result, rubric)
+			expect(grading.attempts).toEqual(result.manifest.schedule.map((trial) => trial.id))
+			expect(
+				grading.judgments
+					.filter((judgment) => judgment.method === 'human')
+					.every((judgment) => judgment.verdict === 'unknown'),
+			).toBe(true)
+			const labels = buildCustodyLabels(result, 'supplied-human')
+			expect(labels.labeler).toBe('supplied-human')
+			expect(labels.created).toBe('2026-10-14T12:00:00.000Z')
+			expect(buildCustodyGrading(result, rubric, labels).judgments).toEqual(
+				expect.arrayContaining(labels.judgments),
+			)
+		} finally {
+			scratch.destroy()
+		}
 	})
 })
