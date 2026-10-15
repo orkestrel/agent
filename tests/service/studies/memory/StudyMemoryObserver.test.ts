@@ -12,9 +12,11 @@ import {
 	readMemoryStream,
 	STUDY_MEMORY_FIXED_PROJECTION,
 	STUDY_MEMORY_FIXED_SETTINGS,
+	STUDY_MEMORY_HUNG_STREAM,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVER_REQUEST,
-	STUDY_MEMORY_PROJECTION_CASES,
+	STUDY_MEMORY_PROJECTION_PASS,
+	STUDY_MEMORY_PROJECTION_REFUSALS,
 } from '../../../setupService.js'
 
 const { messages, tools, options } = STUDY_MEMORY_OBSERVER_REQUEST
@@ -129,9 +131,33 @@ describe('exact-request observation over the real provider', () => {
 	})
 
 	it.each(['generate', 'stream'] as const)(
-		'%s enforces the projection only after a successful return',
+		'%s passes a prompt equal to the projection after a successful return',
 		async (mode) => {
-			for (const entry of STUDY_MEMORY_PROJECTION_CASES) {
+			const { name, reply } = STUDY_MEMORY_PROJECTION_PASS
+			const body =
+				mode === 'generate' ? buildMemoryReply(reply) : buildMemoryStream(['Re', 'ceipt'], reply)
+			const server = await createMemoryServer([{ path: '/api/chat', body }])
+			try {
+				const { observer, readings } = createMemoryObserver(server.url, gauge)
+				const signal = new AbortController().signal
+				const returned = await (mode === 'generate'
+					? observer.generate(messages, signal, tools, options)
+					: readMemoryStream(observer.stream(messages, signal, tools, options)))
+				expect([name, returned]).toEqual([name, expect.anything()])
+				expect(server.requests.filter((entry) => entry.path === '/api/chat')).toHaveLength(1)
+				expect(readings.map((reading) => reading.projected)).toEqual([
+					STUDY_MEMORY_FIXED_PROJECTION,
+				])
+			} finally {
+				await server.close()
+			}
+		},
+	)
+
+	it.each(['generate', 'stream'] as const)(
+		'%s refuses every unusable or over-projection return with the exact attributable error',
+		async (mode) => {
+			for (const entry of STUDY_MEMORY_PROJECTION_REFUSALS) {
 				const body =
 					mode === 'generate'
 						? buildMemoryReply(entry.reply)
@@ -148,24 +174,13 @@ describe('exact-request observation over the real provider', () => {
 					} catch (error) {
 						outcome = error
 					}
-					expect([entry.name, server.requests.filter((r) => r.path === '/api/chat').length]).toEqual([
-						entry.name,
-						1,
+					expect([entry.name, outcome]).toEqual([entry.name, expect.any(StudyError)])
+					expect([entry.name, outcome]).toMatchObject([entry.name, { code: entry.code }])
+					expect([entry.name, readStudyFailure(outcome)]).toEqual([entry.name, entry.failure])
+					expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+					expect(readings.map((reading) => reading.projected)).toEqual([
+						STUDY_MEMORY_FIXED_PROJECTION,
 					])
-					expect(readings.map((reading) => reading.projected)).toEqual([STUDY_MEMORY_FIXED_PROJECTION])
-					if (entry.code === undefined) {
-						expect([entry.name, outcome]).toEqual([entry.name, undefined])
-						continue
-					}
-					expect(outcome).toBeInstanceOf(StudyError)
-					expect(outcome).toMatchObject({ code: entry.code })
-					expect(readStudyFailure(outcome).cause).toBe(entry.cause)
-					if (entry.code === 'CAPACITY')
-						expect(readStudyFailure(outcome)).toEqual({
-							cause: 'capacity',
-							message: 'Actual prompt exceeded the gauged projection',
-							role: 'agent',
-						})
 				} finally {
 					await server.close()
 				}
@@ -178,9 +193,7 @@ describe('exact-request observation over the real provider', () => {
 		async (mode) => {
 			for (const reply of [{ prompt: 5000 }, { unknown: true }, { prompt: 0 }]) {
 				const body =
-					mode === 'generate'
-						? buildMemoryReply(reply)
-						: buildMemoryStream(['Re', 'ceipt'], reply)
+					mode === 'generate' ? buildMemoryReply(reply) : buildMemoryStream(['Re', 'ceipt'], reply)
 				const server = await createMemoryServer([{ path: '/api/chat', body }])
 				try {
 					const { observer, readings } = createMemoryObserver(server.url, undefined)
@@ -196,37 +209,59 @@ describe('exact-request observation over the real provider', () => {
 		},
 	)
 
-	it('preserves the real provider abort and takes no projection decision for it', async () => {
-		const hung = {
-			path: '/api/chat',
-			body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'par' } })}\n`,
-			open: true,
-		}
-		const servers = [await createMemoryServer([hung]), await createMemoryServer([hung])]
+	it.each([
+		['an ungauged', undefined],
+		['a gauged', gauge],
+	])(
+		'preserves the real provider abort through %s observer and takes no projection decision',
+		async (_name, limit) => {
+			const server = await createMemoryServer([STUDY_MEMORY_HUNG_STREAM, STUDY_MEMORY_HUNG_STREAM])
+			try {
+				const outcomes: unknown[] = []
+				const watched = createMemoryObserver(server.url, limit)
+				const targets = [watched.inner, watched.observer]
+				for (const target of targets) {
+					const controller = new AbortController()
+					const stream = target.stream(messages, controller.signal, tools, options)
+					const first = await stream.next()
+					expect(first).toEqual({ done: false, value: { channel: 'content', text: 'par' } })
+					controller.abort()
+					outcomes.push(
+						await stream.next().then(
+							() => undefined,
+							(error: unknown) => error,
+						),
+					)
+				}
+				// Only the observer's call produces a reading: it was taken at entry, once, before any delta.
+				expect(watched.readings).toHaveLength(1)
+				expect(outcomes).toHaveLength(2)
+				for (const outcome of outcomes) {
+					expect(outcome).toMatchObject({ code: 'ABORT', partial: { content: 'par' } })
+					expect(outcome).not.toBeInstanceOf(StudyError)
+				}
+			} finally {
+				await server.close()
+			}
+		},
+	)
+
+	it('records the single reading when the observed stream is created, before any delta is read', async () => {
+		const server = await createMemoryServer([STUDY_MEMORY_HUNG_STREAM])
 		try {
-			const outcomes: unknown[] = []
-			for (const [index, server] of servers.entries()) {
-				const fixture = createMemoryObserver(server.url, index === 0 ? undefined : gauge)
-				const target = index === 0 ? fixture.inner : fixture.observer
-				const controller = new AbortController()
-				const stream = target.stream(messages, controller.signal, tools, options)
-				const first = await stream.next()
-				expect(first).toEqual({ done: false, value: { channel: 'content', text: 'par' } })
-				controller.abort()
-				outcomes.push(
-					await stream.next().then(
-						() => undefined,
-						(error: unknown) => error,
-					),
-				)
-				expect(fixture.readings).toHaveLength(1)
-			}
-			for (const outcome of outcomes) {
-				expect(outcome).toMatchObject({ code: 'ABORT', partial: { content: 'par' } })
-				expect(outcome).not.toBeInstanceOf(StudyError)
-			}
+			const { observer, readings } = createMemoryObserver(server.url, gauge)
+			const controller = new AbortController()
+			const stream = observer.stream(messages, controller.signal, tools, options)
+			expect(readings).toHaveLength(1)
+			await stream.next()
+			controller.abort()
+			await stream.next().then(
+				() => undefined,
+				() => undefined,
+			)
+			expect(readings).toHaveLength(1)
 		} finally {
-			for (const server of servers) await server.close()
+			await server.close()
 		}
 	})
 
@@ -326,7 +361,9 @@ describe('exact-request observation over the real provider', () => {
 			})
 			conversation.add({ role: 'user', content: 'Look up order-1' })
 			try {
-				await expect(agent.generate({ signal: new AbortController().signal })).rejects.toMatchObject({
+				await expect(
+					agent.generate({ signal: new AbortController().signal }),
+				).rejects.toMatchObject({
 					code: 'CAPACITY',
 					failure: { cause: 'capacity', role: 'agent' },
 				})

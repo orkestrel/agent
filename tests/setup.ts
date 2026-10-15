@@ -59,7 +59,9 @@ import type {
 	ConversationSummaryHandler,
 	Message,
 	MessageInput,
+	MessageMeasure,
 	MessageRole,
+	RequestMeasure,
 	RelayFrame,
 	ProviderDelta,
 	ProviderInterface,
@@ -260,6 +262,335 @@ export const REQUEST_ESTIMATE_CASES: ReadonlyArray<{
 			options: { think: false, schema: { type: 'object' } },
 		},
 		expected: 29,
+	},
+])
+
+const MEASURE_CIRCULAR: Record<string, unknown> = { type: 'object' }
+MEASURE_CIRCULAR.self = MEASURE_CIRCULAR
+const MEASURE_CALLS: readonly ToolCall[] = [{ id: 'c1', name: 'add', arguments: {} }]
+
+/**
+ * Supplies message measures counted by hand: content is `ceil(length / 4)` over UTF-16 length, framing
+ * is 4, an image is 512, and calls cost the ceiling of their JSON length over 4 — the `add` call below
+ * renders to 41 characters, so 11 — or the framing 4 when JSON cannot carry them. `total` is the
+ * legacy `estimateMessages` reading of the message alone.
+ */
+export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
+	readonly label: string
+	readonly message: Message
+	readonly expected: MessageMeasure
+	readonly total: number
+}> = Object.freeze([
+	{
+		label: 'an empty message',
+		message: { id: 'e', role: 'user', content: '' },
+		expected: { id: 'e', role: 'user', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 4,
+	},
+	{
+		label: 'content on a four-character boundary',
+		message: { id: 'b4', role: 'user', content: 'a'.repeat(4) },
+		expected: { id: 'b4', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 5,
+	},
+	{
+		label: 'content rounded up from five characters',
+		message: { id: 'b5', role: 'user', content: 'hello' },
+		expected: { id: 'b5', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 6,
+	},
+	{
+		label: 'content on an eight-character boundary',
+		message: { id: 'b8', role: 'user', content: 'a'.repeat(8) },
+		expected: { id: 'b8', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 6,
+	},
+	{
+		label: 'content rounded up from nine characters',
+		message: { id: 'b9', role: 'user', content: 'a'.repeat(9) },
+		expected: { id: 'b9', role: 'user', content: 3, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 7,
+	},
+	{
+		label: 'accented text counted by UTF-16 length',
+		message: { id: 'ac', role: 'user', content: 'naïve café' },
+		expected: { id: 'ac', role: 'user', content: 3, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 7,
+	},
+	{
+		label: 'surrogate pairs counted as two units each',
+		message: { id: 'sp', role: 'user', content: '\u{1F600}\u{1F600}' },
+		expected: { id: 'sp', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 5,
+	},
+	{
+		label: 'thinking beside content',
+		message: {
+			id: 'th',
+			role: 'assistant',
+			content: 'Booked',
+			thinking: 'Compare the fares before booking',
+		},
+		expected: {
+			id: 'th',
+			role: 'assistant',
+			content: 2,
+			framing: 4,
+			calls: 0,
+			thinking: 8,
+			images: 0,
+		},
+		total: 14,
+	},
+	{
+		label: 'an empty thinking string',
+		message: { id: 'et', role: 'assistant', content: '', thinking: '' },
+		expected: {
+			id: 'et',
+			role: 'assistant',
+			content: 0,
+			framing: 4,
+			calls: 0,
+			thinking: 0,
+			images: 0,
+		},
+		total: 4,
+	},
+	{
+		label: 'rendered calls',
+		message: { id: 'ca', role: 'assistant', content: '', calls: MEASURE_CALLS },
+		expected: {
+			id: 'ca',
+			role: 'assistant',
+			content: 0,
+			framing: 4,
+			calls: 11,
+			thinking: 0,
+			images: 0,
+		},
+		total: 15,
+	},
+	{
+		label: 'an empty calls list',
+		message: { id: 'ec', role: 'assistant', content: '', calls: [] },
+		expected: {
+			id: 'ec',
+			role: 'assistant',
+			content: 0,
+			framing: 4,
+			calls: 0,
+			thinking: 0,
+			images: 0,
+		},
+		total: 4,
+	},
+	{
+		label: 'calls JSON cannot carry',
+		message: {
+			id: 'uc',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'c1', name: 'search', arguments: MEASURE_CIRCULAR }],
+		},
+		expected: {
+			id: 'uc',
+			role: 'assistant',
+			content: 0,
+			framing: 4,
+			calls: 4,
+			thinking: 0,
+			images: 0,
+		},
+		total: 8,
+	},
+	{
+		label: 'three images',
+		message: { id: 'im', role: 'user', content: '', images: ['aaaa', 'bbbb', 'cccc'] },
+		expected: {
+			id: 'im',
+			role: 'user',
+			content: 0,
+			framing: 4,
+			calls: 0,
+			thinking: 0,
+			images: 1536,
+		},
+		total: 1540,
+	},
+	{
+		label: 'an empty images list',
+		message: { id: 'ei', role: 'user', content: '', images: [] },
+		expected: { id: 'ei', role: 'user', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
+		total: 4,
+	},
+	{
+		label: 'every component at once',
+		message: {
+			id: 'all',
+			role: 'assistant',
+			content: 'aaaaa',
+			thinking: 'bbbbbbbbb',
+			calls: MEASURE_CALLS,
+			images: ['x', 'y'],
+		},
+		expected: {
+			id: 'all',
+			role: 'assistant',
+			content: 2,
+			framing: 4,
+			calls: 11,
+			thinking: 3,
+			images: 1024,
+		},
+		total: 1044,
+	},
+])
+
+/**
+ * Supplies request measures counted by hand from the same character counts as
+ * {@link REQUEST_ESTIMATE_CASES}: `hello` is content 2 and `a` repeated 40 is content 10, each with
+ * framing 4; `[{"name":"lookup"}]` is 5, the `add` definition 18, `{"type":"object"}` 5 and the schema with
+ * a required list 9. A tool list or schema JSON cannot carry costs the framing 4. `total` is the legacy
+ * `estimateRequest` reading of the request.
+ */
+export const REQUEST_MEASURE_CASES: ReadonlyArray<{
+	readonly label: string
+	readonly request: ProviderRequest
+	readonly expected: RequestMeasure
+	readonly total: number
+}> = Object.freeze([
+	{
+		label: 'an empty request',
+		request: { messages: [] },
+		expected: { messages: [], tools: 0, schema: 0 },
+		total: 0,
+	},
+	{
+		label: 'one message',
+		request: { messages: [REQUEST_HELLO] },
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 0,
+		},
+		total: 6,
+	},
+	{
+		label: 'two messages in request order',
+		request: { messages: [REQUEST_HELLO, REQUEST_LONG] },
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'n', role: 'user', content: 10, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 0,
+		},
+		total: 20,
+	},
+	{
+		label: 'an empty tool list, an empty schema and think',
+		request: { messages: [REQUEST_HELLO], tools: [], options: { think: true, schema: {} } },
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 0,
+		},
+		total: 6,
+	},
+	{
+		label: 'a named tool',
+		request: { messages: [REQUEST_HELLO], tools: [{ name: 'lookup' }] },
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 5,
+			schema: 0,
+		},
+		total: 11,
+	},
+	{
+		label: 'a schema with a required list',
+		request: {
+			messages: [REQUEST_HELLO],
+			options: { schema: { type: 'object', required: ['a'] } },
+		},
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 9,
+		},
+		total: 15,
+	},
+	{
+		label: 'messages, tools and schema together',
+		request: {
+			messages: [REQUEST_HELLO],
+			tools: [REQUEST_ADD],
+			options: { think: false, schema: { type: 'object' } },
+		},
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 18,
+			schema: 5,
+		},
+		total: 29,
+	},
+	{
+		label: 'a tool list JSON cannot carry',
+		request: {
+			messages: [REQUEST_HELLO],
+			tools: [{ name: 'lookup', parameters: MEASURE_CIRCULAR }],
+		},
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 4,
+			schema: 0,
+		},
+		total: 10,
+	},
+	{
+		label: 'a schema JSON cannot carry',
+		request: { messages: [REQUEST_HELLO], options: { schema: MEASURE_CIRCULAR } },
+		expected: {
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 4,
+		},
+		total: 10,
+	},
+	{
+		label: 'duplicate ids kept in occurrence order',
+		request: {
+			messages: [
+				{ id: 'd', role: 'user', content: 'aaaa' },
+				{ id: 'x', role: 'assistant', content: '' },
+				{ id: 'd', role: 'tool', content: 'bbbbbbbb' },
+			],
+		},
+		expected: {
+			messages: [
+				{ id: 'd', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'x', role: 'assistant', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'd', role: 'tool', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 0,
+		},
+		total: 15,
 	},
 ])
 

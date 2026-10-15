@@ -97,7 +97,7 @@ export interface MemoryTrialFixture {
 }
 /** Holds what a real trial sent, admitted, retained and returned. */
 export interface MemoryTrialResult {
-	readonly requests: readonly { readonly path: string; readonly body: string }[]
+	readonly requests: ReadonlyArray<{ readonly path: string; readonly body: string }>
 	readonly products: readonly StudyProduct[]
 	readonly failure: string | undefined
 	readonly usage: readonly MemoryUsageFixture[]

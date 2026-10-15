@@ -1167,7 +1167,7 @@ describe('passive observation of actual memory requests', () => {
 				...base,
 				...(settings === undefined ? {} : { settings }),
 			})
-			const events: readonly ('dispatch' | 'wire')[] = ['dispatch', 'wire']
+			const events: ReadonlyArray<'dispatch' | 'wire'> = ['dispatch', 'wire']
 			for (const event of events) {
 				const keys = readMemoryEvents(result.evidence, event).map((value) =>
 					Object.keys(value).sort(),
@@ -1199,7 +1199,9 @@ describe('passive observation of actual memory requests', () => {
 						arm: 'full',
 						signal: new AbortController().signal,
 					}),
-			).toThrow(expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }))
+			).toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
+			)
 		},
 	)
 
@@ -1372,9 +1374,9 @@ describe('passive observation of actual memory requests', () => {
 			...base,
 			settings: { observe: true, checkpoints: ['correction', 'closure'] },
 		})
-		expect(JSON.stringify(readMemorySnapshot(later.evidence, 'correction').conversation)).not.toContain(
-			'Correction: count is two.',
-		)
+		expect(
+			JSON.stringify(readMemorySnapshot(later.evidence, 'correction').conversation),
+		).not.toContain('Correction: count is two.')
 		const closing = readMemorySnapshot(later.evidence, 'closure')
 		expect(JSON.stringify(closing.conversation)).toContain('Correction: count is two.')
 		expect(closing.arrivals).toEqual(['source-1', 'source-2'])
@@ -1621,7 +1623,7 @@ describe('passive observation of actual memory requests', () => {
 	})
 
 	it('enforces the projection on Compaction returns and leaves Full and Records unbounded', async () => {
-		const goal: readonly MemoryTrialFixture['goals'][number][] = [
+		const goal: ReadonlyArray<MemoryTrialFixture['goals'][number]> = [
 			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
 		]
 		const over = {
@@ -1672,7 +1674,7 @@ describe('passive observation of actual memory requests', () => {
 		['unknown counts', { unknown: true }],
 		['a zero prompt count', { prompt: 0 }],
 	])('refuses %s only for a gauged request', async (_name, reply) => {
-		const goal: readonly MemoryTrialFixture['goals'][number][] = [
+		const goal: ReadonlyArray<MemoryTrialFixture['goals'][number]> = [
 			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
 		]
 		const responses = [{ path: '/api/chat', body: buildMemoryReply(reply) }]

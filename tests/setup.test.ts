@@ -1,4 +1,4 @@
-import { buildLedgerTailScenario } from './setup.js'
+import { buildLedgerTailScenario, MESSAGE_MEASURE_CASES, REQUEST_MEASURE_CASES } from './setup.js'
 import {
 	createPhraseJudge,
 	LEDGER_REFUNDS_TOPIC,
@@ -334,6 +334,56 @@ describe('agent scenario infrastructure', () => {
 			'turn 2 boom',
 		)
 		await expect(createFailingScheduler().yield()).rejects.toThrow('scheduler fault')
+	})
+})
+
+describe('hand-counted measure fixtures', () => {
+	it('keep each expected measure joined to its message with components that sum to the stated total', () => {
+		expect(new Set(MESSAGE_MEASURE_CASES.map((entry) => entry.label)).size).toBe(
+			MESSAGE_MEASURE_CASES.length,
+		)
+		for (const entry of MESSAGE_MEASURE_CASES) {
+			const { expected, message, total } = entry
+			expect([entry.label, expected.id, expected.role]).toEqual([
+				entry.label,
+				message.id,
+				message.role,
+			])
+			expect([
+				entry.label,
+				expected.content + expected.framing + expected.calls + expected.thinking + expected.images,
+			]).toEqual([entry.label, total])
+		}
+		// Every component the estimator prices appears in at least one fixture, so no weight goes unpinned.
+		for (const key of ['content', 'calls', 'thinking', 'images'] as const)
+			expect(MESSAGE_MEASURE_CASES.some((entry) => entry.expected[key] > 0)).toBe(true)
+	})
+
+	it('keep each expected request measure joined to its messages in order with the stated total', () => {
+		expect(new Set(REQUEST_MEASURE_CASES.map((entry) => entry.label)).size).toBe(
+			REQUEST_MEASURE_CASES.length,
+		)
+		for (const entry of REQUEST_MEASURE_CASES) {
+			const { expected, request, total } = entry
+			expect([entry.label, expected.messages.map((measure) => [measure.id, measure.role])]).toEqual(
+				[entry.label, request.messages.map((message) => [message.id, message.role])],
+			)
+			expect([
+				entry.label,
+				expected.messages.reduce(
+					(sum, measure) =>
+						sum +
+						measure.content +
+						measure.framing +
+						measure.calls +
+						measure.thinking +
+						measure.images,
+					expected.tools + expected.schema,
+				),
+			]).toEqual([entry.label, total])
+		}
+		expect(REQUEST_MEASURE_CASES.some((entry) => entry.expected.tools > 0)).toBe(true)
+		expect(REQUEST_MEASURE_CASES.some((entry) => entry.expected.schema > 0)).toBe(true)
 	})
 })
 

@@ -251,18 +251,24 @@ describe('memory declaration and mechanical evidence', () => {
 			[0.25, 0, 7, 2],
 		]
 		for (const [scale, overhead, estimate, expected] of cases)
-			expect([scale, overhead, estimate, projectStudyMemoryRequest({ scale, overhead }, estimate)]).toEqual([
+			expect([
 				scale,
 				overhead,
 				estimate,
-				expected,
-			])
+				projectStudyMemoryRequest({ scale, overhead }, estimate),
+			]).toEqual([scale, overhead, estimate, expected])
 	})
 
 	it('accepts a finite positive prompt not above its projection and refuses the rest with attributable errors', () => {
-		const [one, ten, eleven, zero, negative, nan, infinite] = [1, 10, 11, 0, -1, Number.NaN, Infinity].map(
-			(prompt) => ({ prompt, completion: 2, total: prompt + 2 }),
-		)
+		const [one, ten, eleven, zero, negative, nan, infinite] = [
+			1,
+			10,
+			11,
+			0,
+			-1,
+			Number.NaN,
+			Infinity,
+		].map((prompt) => ({ prompt, completion: 2, total: prompt + 2 }))
 		if (
 			one === undefined ||
 			ten === undefined ||
@@ -291,7 +297,10 @@ describe('memory declaration and mechanical evidence', () => {
 		})
 		for (const unusable of [undefined, zero, negative, nan, infinite])
 			expect(() => validateStudyMemoryProjection(unusable, 10)).toThrow(
-				expect.objectContaining({ code: 'FAULT', message: expect.stringContaining('prompt count') }),
+				expect.objectContaining({
+					code: 'FAULT',
+					message: expect.stringContaining('prompt count'),
+				}),
 			)
 	})
 

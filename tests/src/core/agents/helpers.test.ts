@@ -1,4 +1,4 @@
-import type { AgentResult, Message } from '@src/core'
+import type { AgentResult, Message, ProviderRequest } from '@src/core'
 import type { TokenUsage } from '@orkestrel/budget'
 import {
 	createMessage,
@@ -7,7 +7,9 @@ import {
 	createRecordedBudget,
 	createTurnRegistry,
 	AGENT_USAGE,
+	MESSAGE_MEASURE_CASES,
 	REQUEST_ESTIMATE_CASES,
+	REQUEST_MEASURE_CASES,
 } from '../../../setup.js'
 import {
 	agentResultToJSON,
@@ -19,6 +21,8 @@ import {
 	estimateTokens,
 	IMAGE_TOKEN_ESTIMATE,
 	isAgentJobError,
+	measureMessage,
+	measureRequest,
 	MESSAGE_TOKEN_OVERHEAD,
 	renderToolValue,
 	settleAgentJob,
@@ -351,6 +355,113 @@ describe('estimateRequest', () => {
 		expect(estimateRequest({ messages, tools: [{ name: 'lookup', parameters: circular }] })).toBe(
 			6 + MESSAGE_TOKEN_OVERHEAD,
 		)
+	})
+})
+
+describe('measureMessage', () => {
+	it.each(MESSAGE_MEASURE_CASES)(
+		'measures $label into its hand-counted components',
+		({ message, expected, total }) => {
+			const measure = measureMessage(message)
+			expect(measure).toEqual(expected)
+			// The components sum to the legacy estimator's known reading, never to a mirrored call.
+			expect(
+				measure.content + measure.framing + measure.calls + measure.thinking + measure.images,
+			).toBe(total)
+			expect(estimateMessages([message])).toBe(total)
+		},
+	)
+
+	it('keeps exactly the identity joins and the five components, with no stored total', () => {
+		const [first] = MESSAGE_MEASURE_CASES
+		if (first === undefined) throw new Error('Missing message measure case')
+		expect(Object.keys(measureMessage(first.message)).sort()).toEqual([
+			'calls',
+			'content',
+			'framing',
+			'id',
+			'images',
+			'role',
+			'thinking',
+		])
+	})
+
+	it('sums across a batch to the known legacy reading', () => {
+		expect(estimateMessages(MESSAGE_MEASURE_CASES.map((entry) => entry.message))).toBe(2673)
+	})
+
+	it('neither mutates nor retains the measured message', () => {
+		const message: Message = Object.freeze({
+			id: 'm',
+			role: 'assistant',
+			content: 'hello',
+			thinking: 'plan',
+			images: Object.freeze(['a']),
+			calls: Object.freeze([createToolCall({ id: 'c1', name: 'search', arguments: { q: 'x' } })]),
+		})
+		const before = JSON.stringify(message)
+		const first = measureMessage(message)
+		const second = measureMessage(message)
+		expect(JSON.stringify(message)).toBe(before)
+		expect(second).toEqual(first)
+		expect(second).not.toBe(first)
+	})
+})
+
+describe('measureRequest', () => {
+	it.each(REQUEST_MEASURE_CASES)(
+		'measures $label into its hand-counted components',
+		({ request, expected, total }) => {
+			const measure = measureRequest(request)
+			expect(measure).toEqual(expected)
+			expect(
+				measure.messages.reduce(
+					(sum, message) =>
+						sum +
+						message.content +
+						message.framing +
+						message.calls +
+						message.thinking +
+						message.images,
+					measure.tools + measure.schema,
+				),
+			).toBe(total)
+			expect(estimateRequest(request)).toBe(total)
+		},
+	)
+
+	it('keeps exactly the messages, tools and schema members, with no stored total', () => {
+		expect(Object.keys(measureRequest({ messages: [] })).sort()).toEqual([
+			'messages',
+			'schema',
+			'tools',
+		])
+	})
+
+	it('keeps message order and duplicate ids as separate occurrences', () => {
+		const duplicates = REQUEST_MEASURE_CASES.find((entry) => entry.label.startsWith('duplicate'))
+		if (duplicates === undefined) throw new Error('Missing duplicate-id case')
+		const measure = measureRequest(duplicates.request)
+		expect(measure.messages.map((message) => [message.id, message.role])).toEqual([
+			['d', 'user'],
+			['x', 'assistant'],
+			['d', 'tool'],
+		])
+	})
+
+	it('neither mutates nor retains the measured request', () => {
+		const request: ProviderRequest = Object.freeze({
+			messages: Object.freeze([createMessage('hello')]),
+			tools: Object.freeze([Object.freeze({ name: 'lookup' })]),
+			options: Object.freeze({ think: true, schema: Object.freeze({ type: 'object' }) }),
+		})
+		const before = JSON.stringify(request)
+		const first = measureRequest(request)
+		const second = measureRequest(request)
+		expect(JSON.stringify(request)).toBe(before)
+		expect(second).toEqual(first)
+		expect(second).not.toBe(first)
+		expect(second.messages).not.toBe(first.messages)
 	})
 })
 

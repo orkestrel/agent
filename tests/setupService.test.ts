@@ -37,7 +37,9 @@ import {
 	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_OBSERVER_REQUEST,
-	STUDY_MEMORY_PROJECTION_CASES,
+	STUDY_MEMORY_HUNG_STREAM,
+	STUDY_MEMORY_PROJECTION_PASS,
+	STUDY_MEMORY_PROJECTION_REFUSALS,
 	STUDY_MEMORY_SETTINGS,
 	STUDY_MEMORY_TIMING,
 } from './setupService.js'
@@ -194,20 +196,26 @@ describe('study service fixtures', () => {
 						STUDY_MEMORY_FIXED_SETTINGS.gauge.scale * estimate,
 				),
 			).toBe(STUDY_MEMORY_FIXED_PROJECTION)
-		const [equal, over, unknown, zero] = STUDY_MEMORY_PROJECTION_CASES
-		expect(equal?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION })
+		const [over, unknown, zero] = STUDY_MEMORY_PROJECTION_REFUSALS
+		expect(STUDY_MEMORY_PROJECTION_PASS.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION })
 		expect(over?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 })
-		expect([equal?.code, over?.code, unknown?.code, zero?.code]).toEqual([
+		expect(STUDY_MEMORY_PROJECTION_REFUSALS).toHaveLength(3)
+		expect([over?.code, unknown?.code, zero?.code]).toEqual(['CAPACITY', 'FAULT', 'FAULT'])
+		expect([over?.failure.role, unknown?.failure.role, zero?.failure.role]).toEqual([
+			'agent',
 			undefined,
-			'CAPACITY',
-			'FAULT',
-			'FAULT',
+			undefined,
 		])
+		const hung = parseJSON(STUDY_MEMORY_HUNG_STREAM.body)
+		expect(hung).toMatchObject({ done: false, message: { content: 'par' } })
+		expect(STUDY_MEMORY_HUNG_STREAM).toMatchObject({ path: '/api/chat', open: true })
 		const { messages, tools, options } = STUDY_MEMORY_OBSERVER_REQUEST
 		expect(messages.map((message) => message.role)).toEqual(['user'])
 		expect(tools.map((tool) => tool.name)).toEqual(['lookup'])
 		expect(options).toEqual({ think: false })
-		expect(Object.isFrozen(messages) && Object.isFrozen(tools) && Object.isFrozen(options)).toBe(true)
+		expect(Object.isFrozen(messages) && Object.isFrozen(tools) && Object.isFrozen(options)).toBe(
+			true,
+		)
 	})
 
 	it('builds the observation trajectory and its queued replies with one-byte prompt control', () => {
@@ -241,7 +249,9 @@ describe('study service fixtures', () => {
 		const body = buildMemoryStream(['A', 'B'], { prompt: 9, completion: 4 })
 		const lines = body.split('\n').filter((line) => line !== '')
 		expect(lines).toHaveLength(3)
-		expect(lines.map((line) => (isRecord(parseJSON(line)) ? parseJSON(line) : undefined))).toMatchObject([
+		expect(
+			lines.map((line) => (isRecord(parseJSON(line)) ? parseJSON(line) : undefined)),
+		).toMatchObject([
 			{ done: false, message: { content: 'A' } },
 			{ done: false, message: { content: 'B' } },
 			{ done: true, prompt_eval_count: 9, eval_count: 4 },
@@ -275,7 +285,9 @@ describe('study service fixtures', () => {
 			expect(plain.readings).toHaveLength(1)
 			expect(plain.readings[0]?.projected).toBeUndefined()
 			expect(gauged.readings[0]?.estimate).toBe(plain.readings[0]?.estimate)
-			expect(gauged.readings[0]?.projected).toBe(Math.ceil((gauged.readings[0]?.estimate ?? 0) + 100))
+			expect(gauged.readings[0]?.projected).toBe(
+				Math.ceil((gauged.readings[0]?.estimate ?? 0) + 100),
+			)
 			expect(plain.observer.id).toBe(plain.inner.id)
 		} finally {
 			await server.close()

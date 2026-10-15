@@ -9,7 +9,7 @@ import type {
 	ConversationManagerInterface,
 	ConversationStoreInterface,
 } from '../conversations/index.js'
-import type { MessageInput } from '../types.js'
+import type { MessageInput, MessageRole } from '../types.js'
 import type { ProviderInterface, ProviderRequest } from '../providers/index.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
@@ -820,3 +820,42 @@ export interface AgentRunnerOptions {
 
 /** Names the machine-readable agent concurrency, limit, registry, and window failures. */
 export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'
+
+/**
+ * Holds the disjoint estimate components of one message, in heuristic estimate units.
+ *
+ * @remarks
+ * The structural estimate is not a tokenizer allocation. `id` and `role` are joins back to the
+ * message, not token components. A message's estimate is the sum of `content`, `framing`, `calls`,
+ * `thinking`, and `images`; no total is stored. A provider's template effects and the estimation
+ * error are not individually attributed.
+ */
+export interface MessageMeasure {
+	readonly id: string
+	readonly role: MessageRole
+	/** Holds the `ceil(length / 4)` estimate of the message `content`. */
+	readonly content: number
+	/** Holds the fixed per-message framing overhead. */
+	readonly framing: number
+	/** Holds the estimate of the JSON-rendered `calls`, or the framing overhead when they cannot be rendered; `0` when the message carries none. */
+	readonly calls: number
+	/** Holds the estimate of the message `thinking`; `0` when absent. */
+	readonly thinking: number
+	/** Holds the per-image estimate times the attached image count; `0` when none. */
+	readonly images: number
+}
+
+/**
+ * Holds the disjoint estimate components of one provider request, in heuristic estimate units.
+ *
+ * @remarks
+ * `messages` keeps the request's message order, duplicate ids included. `tools` and `schema` are the
+ * estimates of the rendered advertised tools and `options.schema`, each `0` when absent or empty and
+ * the framing overhead when unrenderable. A request's estimate is the sum of every message component
+ * plus `tools` and `schema`; no total is stored.
+ */
+export interface RequestMeasure {
+	readonly messages: readonly MessageMeasure[]
+	readonly tools: number
+	readonly schema: number
+}

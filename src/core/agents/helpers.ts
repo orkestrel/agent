@@ -6,6 +6,8 @@ import type {
 	AgentRegistryInterface,
 	AgentResult,
 	AgentRunResult,
+	MessageMeasure,
+	RequestMeasure,
 } from './types.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
@@ -143,16 +145,50 @@ export function estimateTokens(text: string): number {
  */
 export function estimateMessages(messages: readonly Message[]): number {
 	return messages.reduce((sum, message) => {
-		const content = estimateTokens(message.content) + MESSAGE_TOKEN_OVERHEAD
-		let calls = 0
-		if (hasCalls(message)) {
-			const rendered = renderJSON(message.calls)
-			calls = rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
-		}
-		const images = (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE
-		const thinking = message.thinking === undefined ? 0 : estimateTokens(message.thinking)
-		return sum + content + calls + images + thinking
+		const measure = measureMessage(message)
+		return (
+			sum + measure.content + measure.framing + measure.calls + measure.thinking + measure.images
+		)
 	}, 0)
+}
+
+/**
+ * Measures the disjoint estimate components of one message — its content, framing, rendered calls,
+ * thinking, and attached images — as the same heuristic units {@link estimateMessages} sums.
+ *
+ * @remarks
+ * The result is a structural estimate, not a tokenizer allocation. `id` and `role` are joins back to
+ * the message, not token components, and a provider's template effects and the estimation error are
+ * not individually attributed. `content` is `ceil(length / 4)`, `framing` is
+ * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, `calls` is the estimate of the JSON-rendered
+ * calls (`0` when the message carries none, the framing overhead when they cannot be rendered),
+ * `thinking` is the estimate of the thinking (`0` when absent), and `images` is the attached image
+ * count times {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE}. The message is not mutated.
+ *
+ * @param message - The message to measure
+ * @returns The message's identity and its estimate components
+ *
+ * @example
+ * ```ts
+ * measureMessage({ id: '1', role: 'user', content: 'hello' })
+ * // { id: '1', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 }
+ * ```
+ */
+export function measureMessage(message: Message): MessageMeasure {
+	let calls = 0
+	if (hasCalls(message)) {
+		const rendered = renderJSON(message.calls)
+		calls = rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
+	}
+	return {
+		id: message.id,
+		role: message.role,
+		content: estimateTokens(message.content),
+		framing: MESSAGE_TOKEN_OVERHEAD,
+		calls,
+		thinking: message.thinking === undefined ? 0 : estimateTokens(message.thinking),
+		images: (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE,
+	}
 }
 
 /**
@@ -180,16 +216,52 @@ export function estimateMessages(messages: readonly Message[]): number {
  * ```
  */
 export function estimateRequest(request: ProviderRequest): number {
+	const measure = measureRequest(request)
+	return measure.messages.reduce(
+		(sum, message) =>
+			sum + message.content + message.framing + message.calls + message.thinking + message.images,
+		measure.tools + measure.schema,
+	)
+}
+
+/**
+ * Measures the disjoint estimate components of a complete provider request — each message through
+ * {@link measureMessage}, plus the rendered advertised `tools` and `options.schema` — as the same
+ * heuristic units {@link estimateRequest} sums.
+ *
+ * @remarks
+ * The result is a structural estimate, not a tokenizer allocation; a provider's template effects, how
+ * it encodes tool definitions, the `think` flag, and the estimation error are not individually
+ * attributed. `messages` keeps the request's message order, duplicate ids included. `tools` and
+ * `schema` are each `0` when absent or empty and the estimate of their JSON rendering otherwise, or
+ * the {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} when JSON cannot carry them. The request
+ * is not mutated.
+ *
+ * @param request - The {@link ProviderRequest} to measure: messages, advertised tools, call options
+ * @returns The per-message components and the tools and schema estimates
+ *
+ * @example
+ * ```ts
+ * measureRequest({ messages: [{ id: '1', role: 'user', content: 'hello' }] })
+ * // { messages: [{ id: '1', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 }], tools: 0, schema: 0 }
+ * ```
+ */
+export function measureRequest(request: ProviderRequest): RequestMeasure {
 	const tools = request.tools !== undefined && request.tools.length > 0 ? request.tools : undefined
 	const schema = request.options?.schema
-	const parts = [tools, schema !== undefined && Object.keys(schema).length > 0 ? schema : undefined]
-	let extra = 0
-	for (const part of parts) {
-		if (part === undefined) continue
+	const [toolsEstimate = 0, schemaEstimate = 0] = [
+		tools,
+		schema !== undefined && Object.keys(schema).length > 0 ? schema : undefined,
+	].map((part) => {
+		if (part === undefined) return 0
 		const rendered = renderJSON(part)
-		extra += rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
+		return rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
+	})
+	return {
+		messages: request.messages.map((message) => measureMessage(message)),
+		tools: toolsEstimate,
+		schema: schemaEstimate,
 	}
-	return estimateMessages(request.messages) + extra
 }
 
 /**

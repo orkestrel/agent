@@ -451,7 +451,10 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
  * @param options - Terminal row overrides; its content is ignored.
  * @returns Newline-delimited protocol rows.
  */
-export function buildMemoryStream(parts: readonly string[], options: MemoryReplyFixture = {}): string {
+export function buildMemoryStream(
+	parts: readonly string[],
+	options: MemoryReplyFixture = {},
+): string {
 	const rows = parts.map(
 		(content) =>
 			`${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content } })}\n`,
@@ -488,33 +491,52 @@ export const STUDY_MEMORY_OBSERVER_REQUEST = Object.freeze({
 	options: Object.freeze({ think: false }),
 })
 
-/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must pass or refuse, with the error each refusal carries. */
-export const STUDY_MEMORY_PROJECTION_CASES = Object.freeze([
-	Object.freeze({
-		name: 'a prompt equal to the projection',
-		reply: Object.freeze({ prompt: 101 }),
-		code: undefined,
-		cause: undefined,
-	}),
+/** Pins the reply an observer with STUDY_MEMORY_FIXED_PROJECTION must pass: a prompt equal to the projection. */
+export const STUDY_MEMORY_PROJECTION_PASS = Object.freeze({
+	name: 'a prompt equal to the projection',
+	reply: Object.freeze({ prompt: 101 }),
+})
+
+/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must refuse, with the exact error each carries. */
+export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
 	Object.freeze({
 		name: 'a prompt one over the projection',
 		reply: Object.freeze({ prompt: 102 }),
 		code: 'CAPACITY',
-		cause: 'capacity',
+		failure: Object.freeze({
+			cause: 'capacity',
+			message: 'Actual prompt exceeded the gauged projection',
+			role: 'agent',
+		}),
 	}),
 	Object.freeze({
 		name: 'unknown counts',
 		reply: Object.freeze({ unknown: true }),
 		code: 'FAULT',
-		cause: 'infrastructure',
+		failure: Object.freeze({
+			cause: 'infrastructure',
+			message: 'Gauged request returned no usable prompt count',
+			role: undefined,
+		}),
 	}),
 	Object.freeze({
 		name: 'a zero prompt count',
 		reply: Object.freeze({ prompt: 0 }),
 		code: 'FAULT',
-		cause: 'infrastructure',
+		failure: Object.freeze({
+			cause: 'infrastructure',
+			message: 'Gauged request returned no usable prompt count',
+			role: undefined,
+		}),
 	}),
 ])
+
+/** Pins a protocol reply that streams one content row and then holds the response open without a terminal row. */
+export const STUDY_MEMORY_HUNG_STREAM = Object.freeze({
+	path: '/api/chat',
+	body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'par' } })}\n`,
+	open: true,
+})
 
 /** Wraps a real installed Ollama provider in the observer, recording every reading it takes.
  * @param url - Protocol fixture origin.
@@ -685,7 +707,7 @@ export const STUDY_MEMORY_PASSIVE_SETTINGS = Object.freeze({ observe: true })
  * @param groups - Key groups to merge.
  * @returns The sorted union of every group's keys.
  */
-export function listMemoryKeys(...groups: readonly (readonly string[])[]): readonly string[] {
+export function listMemoryKeys(...groups: ReadonlyArray<readonly string[]>): readonly string[] {
 	return [...new Set(groups.flat())].sort()
 }
 
@@ -799,7 +821,7 @@ export function readMemoryEvents(
 	evidence: readonly StudyEvidence[],
 	event: string,
 	goal?: string,
-): readonly Readonly<Record<string, unknown>>[] {
+): ReadonlyArray<Readonly<Record<string, unknown>>> {
 	return evidence
 		.filter((row) => row.event === event && (goal === undefined || row.goal === goal))
 		.map((row) => {
@@ -833,8 +855,8 @@ export function readMemorySnapshot(
  * @returns Admission, send and elapsed readings in row order.
  */
 export function readMemoryTimeline(
-	wires: readonly Readonly<Record<string, unknown>>[],
-): readonly { readonly started: number; readonly sent: number; readonly elapsed: number }[] {
+	wires: ReadonlyArray<Readonly<Record<string, unknown>>>,
+): ReadonlyArray<{ readonly started: number; readonly sent: number; readonly elapsed: number }> {
 	return wires.map((wire) => {
 		const { started, sent, elapsed } = wire
 		if (typeof started !== 'number' || typeof sent !== 'number' || typeof elapsed !== 'number')
@@ -849,7 +871,7 @@ export function readMemoryTimeline(
  */
 export function readMemoryShapes(
 	requests: MemoryTrialResult['requests'],
-): readonly { readonly body: readonly string[]; readonly options: readonly string[] }[] {
+): ReadonlyArray<{ readonly body: readonly string[]; readonly options: readonly string[] }> {
 	return requests
 		.filter((request) => request.path === '/api/chat' || request.path === '/api/generate')
 		.map((request) => {
