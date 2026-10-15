@@ -1,9 +1,11 @@
 import type {
 	MemoryAdmissionFixture,
 	MemoryContextFixture,
+	MemoryObserverFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryServerFixture,
+	MemoryStreamFixture,
 	MemoryTrialFixture,
 	MemoryTrialResult,
 	MemoryUsageFixture,
@@ -12,8 +14,15 @@ import type {
 	StudyServicePackage,
 	StudyServiceResult,
 } from './service/studies/memory/types.js'
+import type { LedgerGauge, ProviderDelta, ProviderResult, ThinkingReplay } from '@orkestrel/agent'
 import type { ScratchInterface } from '@orkestrel/test/server'
-import type { StudyEvidence, StudyGoal, StudyProduct, StudyProfile } from '@orkestrel/study'
+import type {
+	StudyEvidence,
+	StudyGoal,
+	StudyProduct,
+	StudyProfile,
+	StudySessionInterface,
+} from '@orkestrel/study'
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyToolsFixture } from './service/studies/tools/types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
@@ -29,7 +38,11 @@ import {
 	StudyScope,
 } from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
-import { StudyMemoryDriver } from '../studies/memory/index.js'
+import {
+	isStudyMemorySubject,
+	StudyMemoryDriver,
+	StudyMemoryObserver,
+} from '../studies/memory/index.js'
 import * as subject from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
@@ -47,6 +60,14 @@ export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
 export const STUDY_MEMORY_SETTINGS = Object.freeze({
 	gauge: Object.freeze({ scale: 1, overhead: 0 }),
 })
+
+/** Pins a gauge whose projection is the same for every estimate between 0 and 1e9: ceil(100 + 1e-9 * estimate). */
+export const STUDY_MEMORY_FIXED_SETTINGS = Object.freeze({
+	gauge: Object.freeze({ scale: 1e-9, overhead: 100 }),
+})
+
+/** Pins the projection STUDY_MEMORY_FIXED_SETTINGS gives any realistic request, written as arithmetic rather than derived from the helper. */
+export const STUDY_MEMORY_FIXED_PROJECTION = 101
 
 /** Pins a short request whose admission depends on the declared gauge. */
 export const WINDOW_GOAL = Object.freeze({
@@ -425,6 +446,108 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
 }
 
+/** Builds a streamed protocol reply: one nonterminal row per content part, then a terminal row with the reply's counts.
+ * @param parts - Content chunks in delta order.
+ * @param options - Terminal row overrides; its content is ignored.
+ * @returns Newline-delimited protocol rows.
+ */
+export function buildMemoryStream(parts: readonly string[], options: MemoryReplyFixture = {}): string {
+	const rows = parts.map(
+		(content) =>
+			`${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content } })}\n`,
+	)
+	return rows.join('') + buildMemoryReply({ ...options, content: '' })
+}
+
+/** Drains a provider stream, keeping both the yielded deltas and the returned result.
+ * @param stream - The generator to drain.
+ * @returns Deltas in yield order and the assembled result.
+ */
+export async function readMemoryStream(
+	stream: AsyncGenerator<ProviderDelta, ProviderResult>,
+): Promise<MemoryStreamFixture> {
+	const deltas: ProviderDelta[] = []
+	let next = await stream.next()
+	while (!next.done) {
+		deltas.push(next.value)
+		next = await stream.next()
+	}
+	return { deltas, result: next.value }
+}
+
+/** Pins one complete provider request: a user message, an advertised tool and a per-call option. */
+export const STUDY_MEMORY_OBSERVER_REQUEST = Object.freeze({
+	messages: Object.freeze([{ id: 'm1', role: 'user' as const, content: 'Count the orders' }]),
+	tools: Object.freeze([
+		Object.freeze({
+			name: 'lookup',
+			description: 'Reads a record',
+			parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+		}),
+	]),
+	options: Object.freeze({ think: false }),
+})
+
+/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must pass or refuse, with the error each refusal carries. */
+export const STUDY_MEMORY_PROJECTION_CASES = Object.freeze([
+	Object.freeze({
+		name: 'a prompt equal to the projection',
+		reply: Object.freeze({ prompt: 101 }),
+		code: undefined,
+		cause: undefined,
+	}),
+	Object.freeze({
+		name: 'a prompt one over the projection',
+		reply: Object.freeze({ prompt: 102 }),
+		code: 'CAPACITY',
+		cause: 'capacity',
+	}),
+	Object.freeze({
+		name: 'unknown counts',
+		reply: Object.freeze({ unknown: true }),
+		code: 'FAULT',
+		cause: 'infrastructure',
+	}),
+	Object.freeze({
+		name: 'a zero prompt count',
+		reply: Object.freeze({ prompt: 0 }),
+		code: 'FAULT',
+		cause: 'infrastructure',
+	}),
+])
+
+/** Wraps a real installed Ollama provider in the observer, recording every reading it takes.
+ * @param url - Protocol fixture origin.
+ * @param gauge - Gauge to enforce; undefined enforces nothing.
+ * @param replay - Replay policy the real provider is constructed with; omitted keeps its default.
+ * @returns The observer, its delegate and the recorded readings.
+ */
+export function createMemoryObserver(
+	url: string,
+	gauge: LedgerGauge | undefined,
+	replay?: ThinkingReplay,
+): MemoryObserverFixture {
+	const { subject: admitted } = STUDY_MEMORY_MODULES
+	if (!isStudyMemorySubject(admitted)) throw new Error('Missing admitted Agent subject')
+	const inner = provider.createOllama({
+		model: 'model',
+		url,
+		think: false,
+		...(replay === undefined ? {} : { replay }),
+		options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
+	})
+	const readings: MemoryObserverFixture['readings'] = []
+	const observer = new StudyMemoryObserver({
+		provider: inner,
+		subject: admitted,
+		gauge,
+		record: (reading) => {
+			readings.push(reading)
+		},
+	})
+	return { observer, inner, readings }
+}
+
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
 export const STUDY_MEMORY_TIMING = Object.freeze({
 	total_duration: 1234567890,
@@ -500,19 +623,24 @@ export const STUDY_MEMORY_TIMING_CASES = Object.freeze([
 	Object.freeze({ name: 'absent', timing: undefined, expected: STUDY_MEMORY_TIMING_ABSENT }),
 ])
 
-/** Pins generic settings that must leave observation disabled. */
-export const STUDY_MEMORY_DISABLED_SETTINGS = Object.freeze([
-	Object.freeze({ name: 'absent', settings: undefined }),
-	Object.freeze({ name: 'false', settings: Object.freeze({ observe: false }) }),
+/** Pins settings the driver must refuse with CONFIG: checkpoints without observation, a text switch, an unrelated key and an unknown key. */
+export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 	Object.freeze({
-		name: 'checkpoints without observe',
+		name: 'checkpoints with observe false',
 		settings: Object.freeze({ observe: false, checkpoints: Object.freeze(['opening']) }),
 	}),
 	Object.freeze({ name: 'string', settings: Object.freeze({ observe: 'true' }) }),
 	Object.freeze({
-		name: 'unrelated',
+		name: 'checkpoints without observe',
 		settings: Object.freeze({ checkpoints: Object.freeze(['opening']) }),
 	}),
+	Object.freeze({ name: 'unknown key', settings: Object.freeze({ observe: true, extra: 1 }) }),
+])
+
+/** Pins well-formed generic settings that leave observation disabled. */
+export const STUDY_MEMORY_DISABLED_SETTINGS = Object.freeze([
+	Object.freeze({ name: 'absent', settings: undefined }),
+	Object.freeze({ name: 'false', settings: Object.freeze({ observe: false }) }),
 ])
 
 /** Builds a three-goal trajectory with a lookup, a correction and a closing request.
@@ -596,13 +724,15 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		...(options.duration === undefined ? {} : { duration: options.duration }),
 	})
 	const fixture = createMemoryContext(profile)
-	const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-		{ id: 'observation', scenario: 'public', arm: options.arm, repetition: 0 },
-		fixture.context.signal,
-	)
 	const products: StudyProduct[] = []
 	let failure: string | undefined
+	let session: StudySessionInterface | undefined
+	// Construction and open sit inside the cleanup boundary so a refused treatment still releases the server and accounting.
 	try {
+		session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'observation', scenario: 'public', arm: options.arm, repetition: 0 },
+			fixture.context.signal,
+		)
 		for (const goal of options.goals) {
 			try {
 				products.push(await session.execute(goal, fixture.context))
@@ -625,7 +755,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 			evidence: [...fixture.evidence],
 		}
 	} finally {
-		await session.close()
+		await session?.close()
 		fixture.close()
 		await server.close()
 	}

@@ -1,7 +1,11 @@
+import type { StudyMemoryRequest } from '../../../../studies/memory/index.js'
+import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, readStudyFailure, StudyError } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import { AgentError } from '../../../../src/core/index.js'
 import {
+	buildStudyMemoryReadings,
+	buildStudyMemoryTiming,
 	createStudyAdapter,
 	gradeStudyMemory,
 	isStudyMemoryArm,
@@ -10,20 +14,29 @@ import {
 	isStudyMemoryProvider,
 	isStudyMemorySettings,
 	isStudyMemorySubject,
+	projectStudyMemoryRequest,
+	readStudyMemoryDigest,
 	readStudyMemoryError,
 	readStudyMemoryGauge,
 	readStudyMemoryRequest,
+	readStudyMemorySettings,
 	readStudyMemorySupport,
 	readStudyMemoryTerminal,
+	readStudyMemoryTiming,
 	validateStudyMemoryInventory,
 	validateStudyMemoryCompletion,
 	validateStudyMemoryProfile,
+	validateStudyMemoryProjection,
 } from '../../../../studies/memory/index.js'
 import {
 	buildMemoryProfile,
+	buildMemoryReply,
 	loadMemoryInputs,
+	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_SETTINGS,
+	STUDY_MEMORY_TIMING,
+	STUDY_MEMORY_TIMING_EXPECTED,
 } from '../../../setupService.js'
 
 describe('memory declaration and mechanical evidence', () => {
@@ -225,6 +238,175 @@ describe('memory declaration and mechanical evidence', () => {
 		]
 		for (const [label, value] of identities)
 			expect([label, Object.is(readStudyMemoryError(value, subject), value)]).toEqual([label, true])
+	})
+
+	it('projects an estimate through the gauge with Math.ceil(overhead + scale * estimate)', () => {
+		const cases: ReadonlyArray<readonly [number, number, number, number]> = [
+			[1, 0, 10, 10],
+			[1.5, 2, 10, 17],
+			[0.5, 0.2, 3, 2],
+			[2, 5, 0, 5],
+			[2, 0, 2.25, 5],
+			[1e-9, 100, 7, 101],
+			[0.25, 0, 7, 2],
+		]
+		for (const [scale, overhead, estimate, expected] of cases)
+			expect([scale, overhead, estimate, projectStudyMemoryRequest({ scale, overhead }, estimate)]).toEqual([
+				scale,
+				overhead,
+				estimate,
+				expected,
+			])
+	})
+
+	it('accepts a finite positive prompt not above its projection and refuses the rest with attributable errors', () => {
+		const [one, ten, eleven, zero, negative, nan, infinite] = [1, 10, 11, 0, -1, Number.NaN, Infinity].map(
+			(prompt) => ({ prompt, completion: 2, total: prompt + 2 }),
+		)
+		if (
+			one === undefined ||
+			ten === undefined ||
+			eleven === undefined ||
+			zero === undefined ||
+			negative === undefined ||
+			nan === undefined ||
+			infinite === undefined
+		)
+			throw new Error('Missing usage fixture')
+		expect(() => validateStudyMemoryProjection(ten, 10)).not.toThrow()
+		expect(() => validateStudyMemoryProjection(ten, 11)).not.toThrow()
+		expect(() => validateStudyMemoryProjection(one, 1)).not.toThrow()
+		let capacity: unknown
+		try {
+			validateStudyMemoryProjection(eleven, 10)
+		} catch (error) {
+			capacity = error
+		}
+		expect(capacity).toBeInstanceOf(StudyError)
+		expect(capacity).toMatchObject({ code: 'CAPACITY' })
+		expect(readStudyFailure(capacity)).toEqual({
+			cause: 'capacity',
+			message: 'Actual prompt exceeded the gauged projection',
+			role: 'agent',
+		})
+		for (const unusable of [undefined, zero, negative, nan, infinite])
+			expect(() => validateStudyMemoryProjection(unusable, 10)).toThrow(
+				expect.objectContaining({ code: 'FAULT', message: expect.stringContaining('prompt count') }),
+			)
+	})
+
+	it('reads observation switches only from well-formed settings and refuses malformed ones', () => {
+		expect(readStudyMemorySettings(undefined)).toEqual({ observe: false, checkpoints: new Set() })
+		for (const settings of [{}, { observe: false }, STUDY_MEMORY_SETTINGS])
+			expect(readStudyMemorySettings(settings)).toEqual({ observe: false, checkpoints: new Set() })
+		expect(readStudyMemorySettings({ observe: true })).toEqual({
+			observe: true,
+			checkpoints: new Set(),
+		})
+		expect(
+			readStudyMemorySettings({ ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['a', 'b'] }),
+		).toEqual({ observe: true, checkpoints: new Set(['a', 'b']) })
+		for (const settings of [
+			...STUDY_MEMORY_MALFORMED_SETTINGS.map((entry) => entry.settings),
+			null,
+			[],
+			'observe',
+		])
+			expect(() => readStudyMemorySettings(settings)).toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
+			)
+	})
+
+	it('reads the pinned serving digest each request role and model is answered by', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const request = {
+			role: 'agent',
+			path: '/api/chat',
+			model: 'model',
+			output: 512,
+			bytes: 1,
+			options: {},
+		} as const
+		const cases: ReadonlyArray<readonly [string, StudyMemoryRequest, string | null]> = [
+			['agent', request, 'a'.repeat(64)],
+			['summary', { ...request, role: 'summary' }, 'a'.repeat(64)],
+			['judge', { ...request, role: 'judge', model: 'judge' }, 'b'.repeat(64)],
+			['model metadata', { ...request, role: 'metadata', model: 'model' }, 'a'.repeat(64)],
+			['judge metadata', { ...request, role: 'metadata', model: 'judge' }, 'b'.repeat(64)],
+			['inventory', { ...request, role: 'metadata', model: undefined }, null],
+			['foreign metadata', { ...request, role: 'metadata', model: 'other' }, null],
+		]
+		for (const [label, entry, expected] of cases)
+			expect([label, readStudyMemoryDigest(profile, entry)]).toEqual([label, expected])
+		expect(readStudyMemoryDigest({ ...profile, provider: undefined }, request)).toBeNull()
+	})
+
+	it('extracts terminal timing without letting a refusing extractor fail the request', () => {
+		const row = parseJSON(buildMemoryReply({ timing: STUDY_MEMORY_TIMING }))
+		if (!isRecord(row)) throw new Error('Invalid reply row')
+		const { extractTiming } = STUDY_MEMORY_MODULES.provider
+		expect(readStudyMemoryTiming(extractTiming, row)).toEqual(STUDY_MEMORY_TIMING_EXPECTED)
+		expect(
+			readStudyMemoryTiming(() => {
+				throw new Error('Extractor refused the row')
+			}, row),
+		).toBeUndefined()
+		expect(readStudyMemoryTiming(() => undefined, row)).toBeUndefined()
+	})
+
+	it('builds JSON timing evidence that keeps unknown values null and copies invalid names', () => {
+		expect(buildStudyMemoryTiming(undefined)).toBeNull()
+		const invalid = ['load_duration']
+		const built = buildStudyMemoryTiming({
+			durations: { total: 9, load: undefined, prompt: 0, decode: 4 },
+			counts: { prompt: 6, decode: undefined, cached: undefined },
+			invalid,
+		})
+		expect(built).toEqual({
+			durations: { total: 9, load: null, prompt: 0, decode: 4 },
+			counts: { prompt: 6, decode: null, cached: null },
+			invalid: ['load_duration'],
+		})
+		invalid.push('late')
+		expect(built).toMatchObject({ invalid: ['load_duration'] })
+		expect(
+			buildStudyMemoryTiming({
+				durations: { total: undefined, load: undefined, prompt: undefined, decode: undefined },
+				counts: { prompt: undefined, decode: undefined, cached: undefined },
+				invalid: [],
+			}),
+		).toEqual({
+			durations: { total: null, load: null, prompt: null, decode: null },
+			counts: { prompt: null, decode: null, cached: null },
+			invalid: [],
+		})
+	})
+
+	it('builds classifier readings in asking order, skipping malformed entries and keeping unknown durations null', () => {
+		expect(buildStudyMemoryReadings(undefined)).toBeNull()
+		expect(buildStudyMemoryReadings('readings')).toBeNull()
+		expect(buildStudyMemoryReadings({})).toBeNull()
+		expect(buildStudyMemoryReadings({ readings: 'none' })).toBeNull()
+		expect(buildStudyMemoryReadings({ readings: [] })).toEqual([])
+		expect(
+			buildStudyMemoryReadings({
+				readings: [
+					{ key: 'first', phase: 'ask', outcome: 'cached', duration: 12, extra: 'dropped' },
+					{ key: 'second', phase: 'ask', outcome: 'asked' },
+					{ key: 7, phase: 'ask', outcome: 'asked' },
+					{ phase: 'ask', outcome: 'asked' },
+					{ key: 'third', phase: 1, outcome: 'asked' },
+					{ key: 'fourth', phase: 'ask' },
+					'text',
+					null,
+					{ key: 'fifth', phase: 'ask', outcome: 'asked', duration: 'long' },
+				],
+			}),
+		).toEqual([
+			{ key: 'first', phase: 'ask', outcome: 'cached', duration: 12 },
+			{ key: 'second', phase: 'ask', outcome: 'asked', duration: null },
+			{ key: 'fifth', phase: 'ask', outcome: 'asked', duration: null },
+		])
 	})
 
 	it('accepts bounded inputs and rejects repeated source ids and malformed foreign namespaces', () => {

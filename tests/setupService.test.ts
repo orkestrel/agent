@@ -1,15 +1,28 @@
-import { parseJSON } from '@orkestrel/contract'
+import { isRecord, parseJSON } from '@orkestrel/contract'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { isStudyMemorySettings } from '../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemoryObservationGoals,
+	buildMemoryObservationResponses,
 	buildMemoryProfile,
 	buildMemoryReply,
+	buildMemoryStream,
 	createMemoryContext,
+	createMemoryObserver,
 	createMemoryServer,
+	listMemoryKeys,
 	loadStudyToolsFixture,
+	readMemoryAdmission,
+	readMemoryEvents,
+	readMemoryModels,
+	readMemoryShapes,
+	readMemorySnapshot,
+	readMemoryStream,
+	readMemoryTimeline,
 	readStudyToolsEvidence,
 	captureServicePackages,
 	createStudyServiceFixture,
@@ -17,7 +30,16 @@ import {
 	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
+	runMemoryTrial,
+	totalMemoryUsage,
+	STUDY_MEMORY_DISABLED_SETTINGS,
+	STUDY_MEMORY_FIXED_PROJECTION,
+	STUDY_MEMORY_FIXED_SETTINGS,
+	STUDY_MEMORY_MALFORMED_SETTINGS,
+	STUDY_MEMORY_OBSERVER_REQUEST,
+	STUDY_MEMORY_PROJECTION_CASES,
 	STUDY_MEMORY_SETTINGS,
+	STUDY_MEMORY_TIMING,
 } from './setupService.js'
 
 describe('study service fixtures', () => {
@@ -156,6 +178,195 @@ describe('study service fixtures', () => {
 			room: { context: 1024, output: 128, safety: 128 },
 		})
 		expect(buildMemoryEdge(narrow, -2)).toEqual({ gauge: { scale: 1e-9, overhead: 766 } })
+	})
+
+	it('pins observation fixtures that are consistent with the settings guard and the fixed projection', () => {
+		for (const entry of STUDY_MEMORY_DISABLED_SETTINGS)
+			expect([entry.name, isStudyMemorySettings(entry.settings ?? {})]).toEqual([entry.name, true])
+		expect(STUDY_MEMORY_DISABLED_SETTINGS.map((entry) => entry.name)).toEqual(['absent', 'false'])
+		for (const entry of STUDY_MEMORY_MALFORMED_SETTINGS)
+			expect([entry.name, isStudyMemorySettings(entry.settings)]).toEqual([entry.name, false])
+		expect(STUDY_MEMORY_MALFORMED_SETTINGS).toHaveLength(4)
+		for (const estimate of [1, 1000, 1e6])
+			expect(
+				Math.ceil(
+					STUDY_MEMORY_FIXED_SETTINGS.gauge.overhead +
+						STUDY_MEMORY_FIXED_SETTINGS.gauge.scale * estimate,
+				),
+			).toBe(STUDY_MEMORY_FIXED_PROJECTION)
+		const [equal, over, unknown, zero] = STUDY_MEMORY_PROJECTION_CASES
+		expect(equal?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION })
+		expect(over?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 })
+		expect([equal?.code, over?.code, unknown?.code, zero?.code]).toEqual([
+			undefined,
+			'CAPACITY',
+			'FAULT',
+			'FAULT',
+		])
+		const { messages, tools, options } = STUDY_MEMORY_OBSERVER_REQUEST
+		expect(messages.map((message) => message.role)).toEqual(['user'])
+		expect(tools.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(options).toEqual({ think: false })
+		expect(Object.isFrozen(messages) && Object.isFrozen(tools) && Object.isFrozen(options)).toBe(true)
+	})
+
+	it('builds the observation trajectory and its queued replies with one-byte prompt control', () => {
+		const goals = buildMemoryObservationGoals()
+		expect(goals.map((goal) => goal.id)).toEqual(['opening', 'correction', 'closure'])
+		expect(Object.isFrozen(goals)).toBe(true)
+		const changed = buildMemoryObservationGoals('Look up order-2')
+		expect(changed.map((goal) => goal.id)).toEqual(goals.map((goal) => goal.id))
+		expect(changed[0]?.input).toMatchObject({ prompt: 'Look up order-2' })
+		expect(goals[0]?.input).toMatchObject({ prompt: 'Look up order-1' })
+		expect(changed.slice(1)).toEqual(goals.slice(1))
+		const replies = buildMemoryObservationResponses()
+		expect(replies.map((reply) => reply.path)).toEqual(Array(4).fill('/api/chat'))
+		const rows = replies.map((reply) => parseJSON(reply.body))
+		expect(rows[0]).toMatchObject({ message: { tool_calls: [{ function: { name: 'lookup' } }] } })
+		expect(rows.slice(1).map((row) => (isRecord(row) ? row.message : undefined))).toEqual([
+			{ role: 'assistant', content: 'Initial handoff' },
+			{ role: 'assistant', content: 'Corrected handoff' },
+			{ role: 'assistant', content: 'Closed handoff' },
+		])
+		expect(rows.every((row) => isRecord(row) && !('total_duration' in row))).toBe(true)
+		const timed = buildMemoryObservationResponses(STUDY_MEMORY_TIMING).map((reply) =>
+			parseJSON(reply.body),
+		)
+		expect(timed.every((row) => isRecord(row) && row.total_duration === 1234567890)).toBe(true)
+		expect(listMemoryKeys(['b', 'a'], ['c', 'a'], [])).toEqual(['a', 'b', 'c'])
+		expect(listMemoryKeys()).toEqual([])
+	})
+
+	it('builds streamed rows and drains a real stream keeping deltas and result', async () => {
+		const body = buildMemoryStream(['A', 'B'], { prompt: 9, completion: 4 })
+		const lines = body.split('\n').filter((line) => line !== '')
+		expect(lines).toHaveLength(3)
+		expect(lines.map((line) => (isRecord(parseJSON(line)) ? parseJSON(line) : undefined))).toMatchObject([
+			{ done: false, message: { content: 'A' } },
+			{ done: false, message: { content: 'B' } },
+			{ done: true, prompt_eval_count: 9, eval_count: 4 },
+		])
+		const server = await createMemoryServer([{ path: '/api/chat', body }])
+		try {
+			const { inner } = createMemoryObserver(server.url, undefined)
+			const { messages } = STUDY_MEMORY_OBSERVER_REQUEST
+			const { deltas, result } = await readMemoryStream(
+				inner.stream(messages, new AbortController().signal),
+			)
+			expect(deltas).toEqual([
+				{ channel: 'content', text: 'A' },
+				{ channel: 'content', text: 'B' },
+			])
+			expect(result).toMatchObject({ content: 'AB', usage: { prompt: 9, completion: 4 } })
+		} finally {
+			await server.close()
+		}
+	})
+
+	it('creates an observer over the real provider that records readings and carries the gauge', async () => {
+		const server = await createMemoryServer()
+		try {
+			const plain = createMemoryObserver(server.url, undefined)
+			const gauged = createMemoryObserver(server.url, { scale: 1, overhead: 100 })
+			const { messages } = STUDY_MEMORY_OBSERVER_REQUEST
+			expect(plain.readings).toEqual([])
+			await plain.observer.generate(messages, new AbortController().signal)
+			await gauged.observer.generate(messages, new AbortController().signal)
+			expect(plain.readings).toHaveLength(1)
+			expect(plain.readings[0]?.projected).toBeUndefined()
+			expect(gauged.readings[0]?.estimate).toBe(plain.readings[0]?.estimate)
+			expect(gauged.readings[0]?.projected).toBe(Math.ceil((gauged.readings[0]?.estimate ?? 0) + 100))
+			expect(plain.observer.id).toBe(plain.inner.id)
+		} finally {
+			await server.close()
+		}
+	})
+
+	it('runs a real trial, reads its retained shapes and releases resources when the treatment is refused', async () => {
+		const goal = { id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }
+		const result = await runMemoryTrial({ arm: 'full', responses: [], goals: [goal] })
+		expect(result.failure).toBeUndefined()
+		expect(result.products).toEqual([{ value: { content: 'Receipt retained.' }, partial: false }])
+		expect(result.requests.map((request) => request.path)).toContain('/api/chat')
+		expect(readMemoryAdmission(result)).toEqual({
+			requests: result.requests,
+			products: result.products,
+			failure: undefined,
+			usage: result.usage,
+		})
+		expect(Object.keys(readMemoryAdmission(result)).sort()).toEqual([
+			'failure',
+			'products',
+			'requests',
+			'usage',
+		])
+		expect(totalMemoryUsage(result.usage).agent).toEqual({ calls: 1, tokens: 12 })
+		expect(readMemoryModels(result.requests)).toEqual(['model'])
+		const shapes = readMemoryShapes(result.requests)
+		expect(shapes.map((shape) => shape.options)).toEqual([
+			['num_ctx', 'num_predict', 'seed', 'temperature'],
+		])
+		expect(shapes[0]?.body).toEqual(expect.arrayContaining(['messages', 'model', 'options']))
+		expect(readMemoryEvents(result.evidence, 'result')).toEqual([
+			expect.objectContaining({ content: 'Receipt retained.', partial: false }),
+		])
+		expect(readMemoryEvents(result.evidence, 'result', 'absent')).toEqual([])
+		await expect(
+			runMemoryTrial({ arm: 'compaction', responses: [], goals: [goal] }),
+		).rejects.toThrow(expect.objectContaining({ code: 'CONFIG' }))
+		await expect(
+			runMemoryTrial({
+				arm: 'full',
+				responses: [],
+				goals: [goal],
+				settings: { observe: true, extra: 1 },
+			}),
+		).rejects.toThrow(expect.objectContaining({ code: 'CONFIG' }))
+	})
+
+	it('totals usage, selects retained rows and refuses malformed ones', () => {
+		expect(
+			totalMemoryUsage([
+				{ role: 'agent', calls: 1, tokens: 12, bytes: 5 },
+				{ role: 'agent', calls: 2, tokens: undefined, bytes: undefined },
+				{ role: 'judge', calls: 1, tokens: 3, bytes: 1 },
+			]),
+		).toEqual({ agent: { calls: 3, tokens: 12 }, judge: { calls: 1, tokens: 3 } })
+		expect(totalMemoryUsage([])).toEqual({})
+		const evidence = [
+			{ event: 'dispatch', goal: 'a', value: { id: 1, snapshot: { arrivals: ['x'] } } },
+			{ event: 'wire', goal: 'a', value: { id: 1, started: 1, sent: 2, elapsed: 3 } },
+			{ event: 'wire', goal: 'b', value: { id: 2, started: 4, sent: 5, elapsed: 6 } },
+		]
+		expect(readMemoryEvents(evidence, 'wire').map((value) => value.id)).toEqual([1, 2])
+		expect(readMemoryEvents(evidence, 'wire', 'b').map((value) => value.id)).toEqual([2])
+		expect(() => readMemoryEvents([{ event: 'wire', goal: 'a', value: 7 }], 'wire')).toThrow(
+			'not an object',
+		)
+		expect(readMemorySnapshot(evidence, 'a')).toEqual({ arrivals: ['x'] })
+		expect(() => readMemorySnapshot(evidence, 'b')).toThrow('Missing b checkpoint')
+		expect(() => readMemorySnapshot(evidence, 'absent')).toThrow('Missing absent checkpoint')
+		expect(readMemoryTimeline(readMemoryEvents(evidence, 'wire'))).toEqual([
+			{ started: 1, sent: 2, elapsed: 3 },
+			{ started: 4, sent: 5, elapsed: 6 },
+		])
+		expect(() => readMemoryTimeline([{ started: 1, sent: 2 }])).toThrow('Missing wire timeline')
+		const requests = [
+			{ path: '/api/tags', body: '' },
+			{ path: '/api/chat', body: '{"model":"model","options":{"seed":0,"num_ctx":1}}' },
+			{ path: '/api/generate', body: '{"model":"judge","options":{"temperature":1},"raw":true}' },
+		]
+		expect(readMemoryModels(requests)).toEqual(['model', 'judge'])
+		expect(readMemoryShapes(requests)).toEqual([
+			{ body: ['model', 'options'], options: ['num_ctx', 'seed'] },
+			{ body: ['model', 'options', 'raw'], options: ['temperature'] },
+		])
+		expect(() => readMemoryModels([{ path: '/api/chat', body: '{}' }])).toThrow(
+			'Invalid generation request',
+		)
+		expect(() => readMemoryShapes([{ path: '/api/chat', body: '{"model":"m"}' }])).toThrow(
+			'Invalid generation request',
+		)
 	})
 
 	it('loads actual tools declarations and refuses malformed retained evidence', async () => {

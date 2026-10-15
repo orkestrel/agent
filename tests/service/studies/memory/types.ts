@@ -1,3 +1,4 @@
+import type { ProviderDelta, ProviderInterface, ProviderResult } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type {
 	StudyContext,
@@ -8,6 +9,7 @@ import type {
 	StudyRole,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
+import type { StudyMemoryEstimate, StudyMemoryObserver } from '../../../../studies/memory/index.js'
 
 /** Holds one copied package selection in the installed fixture closure. */
 export interface StudyServicePackage {
@@ -66,6 +68,17 @@ export interface MemoryReplyFixture {
 	readonly unknown?: boolean
 	readonly calls?: readonly JSONValue[]
 	readonly timing?: Readonly<Record<string, JSONValue>>
+}
+/** Holds a real observing provider, the real provider it delegates to and every reading it recorded. */
+export interface MemoryObserverFixture {
+	readonly observer: StudyMemoryObserver
+	readonly inner: ProviderInterface
+	readonly readings: StudyMemoryEstimate[]
+}
+/** Holds the deltas a drained stream yielded in order and the result it returned. */
+export interface MemoryStreamFixture {
+	readonly deltas: readonly ProviderDelta[]
+	readonly result: ProviderResult
 }
 /** Holds one finished request's comparable measurements without its real elapsed clock. */
 export interface MemoryUsageFixture {

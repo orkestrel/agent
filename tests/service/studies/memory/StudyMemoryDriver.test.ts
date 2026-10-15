@@ -2,7 +2,12 @@ import type { MemoryTrialFixture } from './types.js'
 import { describe, expect, it, vi } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { readStudyFailure, StudyError, validateStudyInputs } from '@orkestrel/study'
-import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
+import {
+	isStudyMemoryProvider,
+	isStudyMemorySubject,
+	StudyMemoryDriver,
+	StudyMemorySession,
+} from '../../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
 	buildMemoryObservationGoals,
@@ -24,6 +29,9 @@ import {
 	totalMemoryUsage,
 	STUDY_MEMORY_DISABLED_SETTINGS,
 	STUDY_MEMORY_EVENT_KEYS,
+	STUDY_MEMORY_FIXED_PROJECTION,
+	STUDY_MEMORY_FIXED_SETTINGS,
+	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
 	STUDY_MEMORY_OBSERVED_KEYS,
@@ -1116,9 +1124,10 @@ describe('passive observation of actual memory requests', () => {
 		expect(off.usage.filter((row) => row.role === 'tool')).toHaveLength(1)
 		expect(readMemoryAdmission(control)).toEqual(readMemoryAdmission(off))
 		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
-		expect(on.evidence.map((row) => [row.event, row.goal])).toEqual(
-			off.evidence.map((row) => [row.event, row.goal]),
-		)
+		expect(
+			on.evidence.filter((row) => row.event !== 'estimate').map((row) => [row.event, row.goal]),
+		).toEqual(off.evidence.map((row) => [row.event, row.goal]))
+		expect(off.evidence.some((row) => row.event === 'estimate')).toBe(false)
 		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
 		expect(changed.requests.map((request) => request.body)).not.toEqual(
 			off.requests.map((request) => request.body),
@@ -1169,6 +1178,28 @@ describe('passive observation of actual memory requests', () => {
 			expect(
 				readMemoryEvents(result.evidence, 'result').map((value) => Object.keys(value).sort()),
 			).toEqual(goals.map(() => ['content', 'conversation', 'partial']))
+		},
+	)
+
+	it.each(STUDY_MEMORY_MALFORMED_SETTINGS)(
+		'refuses $name settings with a CONFIG error through the driver and the session',
+		async ({ settings }) => {
+			await expect(runMemoryTrial({ ...base, settings })).rejects.toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
+			)
+			const { subject: admitted, provider: ollama } = STUDY_MEMORY_MODULES
+			if (!isStudyMemorySubject(admitted) || !isStudyMemoryProvider(ollama))
+				throw new Error('Missing admitted modules')
+			expect(
+				() =>
+					new StudyMemorySession({
+						subject: admitted,
+						provider: ollama,
+						profile: buildMemoryProfile({ url: 'http://127.0.0.1:1', settings }),
+						arm: 'full',
+						signal: new AbortController().signal,
+					}),
+			).toThrow(expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }))
 		},
 	)
 
@@ -1332,8 +1363,21 @@ describe('passive observation of actual memory requests', () => {
 		expect(result.requests.filter((request) => request.path === '/api/chat').at(2)?.body).toContain(
 			'Correction: count is two.',
 		)
-		expect(JSON.stringify(snapshot)).not.toContain('Correction: count is two.')
+		// The snapshot retains the goal's own input by design; its pre-arrival state must not hold it.
+		expect(JSON.stringify(snapshot.input)).toContain('Correction: count is two.')
+		expect(JSON.stringify(snapshot.records)).not.toContain('Correction: count is two.')
+		expect(JSON.stringify(snapshot.arrivals)).not.toContain('source-2')
 		expect(parseJSON(JSON.stringify(snapshot))).toEqual(snapshot)
+		const later = await runMemoryTrial({
+			...base,
+			settings: { observe: true, checkpoints: ['correction', 'closure'] },
+		})
+		expect(JSON.stringify(readMemorySnapshot(later.evidence, 'correction').conversation)).not.toContain(
+			'Correction: count is two.',
+		)
+		const closing = readMemorySnapshot(later.evidence, 'closure')
+		expect(JSON.stringify(closing.conversation)).toContain('Correction: count is two.')
+		expect(closing.arrivals).toEqual(['source-1', 'source-2'])
 	})
 
 	it('retains the snapshot of a selected goal whose model later fails', async () => {
@@ -1503,5 +1547,143 @@ describe('passive observation of actual memory requests', () => {
 			scale: expect.any(Number),
 			overhead: expect.any(Number),
 		})
+	})
+
+	it('retains one ordered estimate row per agent dispatch and a projection only for Compaction', async () => {
+		const full = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		const compaction = await runMemoryTrial({
+			...base,
+			arm: 'compaction',
+			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
+		})
+		const silent = await runMemoryTrial({
+			...base,
+			arm: 'compaction',
+			settings: STUDY_MEMORY_FIXED_SETTINGS,
+		})
+		expect(silent.evidence.some((row) => row.event === 'estimate')).toBe(false)
+		for (const result of [full, compaction]) {
+			expect(result.failure).toBeUndefined()
+			const rows = readMemoryEvents(result.evidence, 'estimate')
+			const dispatched = readMemoryEvents(result.evidence, 'dispatch').filter(
+				(value) => value.role === 'agent',
+			)
+			expect(rows).toHaveLength(dispatched.length)
+			expect(rows).toHaveLength(4)
+			for (const goal of goals)
+				expect(readMemoryEvents(result.evidence, 'estimate', goal.id)).toHaveLength(
+					readMemoryEvents(result.evidence, 'dispatch', goal.id).filter(
+						(value) => value.role === 'agent',
+					).length,
+				)
+			expect(rows.map((row) => Object.keys(row).sort())).toEqual(
+				rows.map(() => ['estimate', 'projected']),
+			)
+			const estimates = rows.map((row) => row.estimate)
+			expect(estimates.every((value) => typeof value === 'number' && value > 0)).toBe(true)
+			// Each request appends the previous reply and any tool receipt, so the complete request only grows.
+			expect(estimates).toEqual(estimates.toSorted((a, b) => Number(a) - Number(b)))
+			expect(new Set(estimates).size).toBe(estimates.length)
+		}
+		expect(readMemoryEvents(full.evidence, 'estimate').map((row) => row.projected)).toEqual([
+			null,
+			null,
+			null,
+			null,
+		])
+		expect(readMemoryEvents(compaction.evidence, 'estimate').map((row) => row.projected)).toEqual([
+			STUDY_MEMORY_FIXED_PROJECTION,
+			STUDY_MEMORY_FIXED_PROJECTION,
+			STUDY_MEMORY_FIXED_PROJECTION,
+			STUDY_MEMORY_FIXED_PROJECTION,
+		])
+		expect(readMemoryEvents(compaction.evidence, 'estimate').map((row) => row.estimate)).toEqual(
+			readMemoryEvents(full.evidence, 'estimate').map((row) => row.estimate),
+		)
+	})
+
+	it('keeps Compaction requests, products and admission identical with observation off and on, and fails on a changed byte', async () => {
+		const gauged: MemoryTrialFixture = { ...base, arm: 'compaction' }
+		const off = await runMemoryTrial({ ...gauged, settings: STUDY_MEMORY_FIXED_SETTINGS })
+		const on = await runMemoryTrial({
+			...gauged,
+			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
+		})
+		const changed = await runMemoryTrial({
+			...gauged,
+			goals: buildMemoryObservationGoals('Look up order-2'),
+			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
+		})
+		expect(off.failure).toBeUndefined()
+		expect(off.products).toHaveLength(3)
+		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
+	})
+
+	it('enforces the projection on Compaction returns and leaves Full and Records unbounded', async () => {
+		const goal: readonly MemoryTrialFixture['goals'][number][] = [
+			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
+		]
+		const over = {
+			path: '/api/chat',
+			body: buildMemoryReply({ prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 }),
+		}
+		for (const arm of ['full', 'records'] as const) {
+			const result = await runMemoryTrial({
+				arm,
+				responses: [over],
+				goals: goal,
+				settings: STUDY_MEMORY_FIXED_SETTINGS,
+			})
+			expect(result.failure).toBeUndefined()
+		}
+		const equal = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [
+				{ path: '/api/chat', body: buildMemoryReply({ prompt: STUDY_MEMORY_FIXED_PROJECTION }) },
+			],
+			goals: goal,
+			settings: STUDY_MEMORY_FIXED_SETTINGS,
+		})
+		expect(equal.failure).toBeUndefined()
+		const rejected = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+						prompt: STUDY_MEMORY_FIXED_PROJECTION + 1,
+					}),
+				},
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+			],
+			goals: goal,
+			settings: STUDY_MEMORY_FIXED_SETTINGS,
+		})
+		expect(rejected.failure).toContain('gauged projection')
+		expect(rejected.products).toEqual([])
+		// The tool turn's follow-up request is never sent once the projection is exceeded.
+		expect(rejected.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+	})
+
+	it.each([
+		['unknown counts', { unknown: true }],
+		['a zero prompt count', { prompt: 0 }],
+	])('refuses %s only for a gauged request', async (_name, reply) => {
+		const goal: readonly MemoryTrialFixture['goals'][number][] = [
+			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
+		]
+		const responses = [{ path: '/api/chat', body: buildMemoryReply(reply) }]
+		const ungauged = await runMemoryTrial({ arm: 'full', responses, goals: goal })
+		expect(ungauged.failure).toBeUndefined()
+		const gauged = await runMemoryTrial({
+			arm: 'compaction',
+			responses,
+			goals: goal,
+			settings: STUDY_MEMORY_FIXED_SETTINGS,
+		})
+		expect(gauged.failure).toContain('usable prompt count')
 	})
 })

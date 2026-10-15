@@ -75,6 +75,26 @@ export interface StudyMemoryObservation {
 	readonly checkpoints: ReadonlySet<string>
 }
 
+/** Holds one dispatched agent request's explicit size reading. */
+export interface StudyMemoryEstimate {
+	/** Holds the subject's estimate of the complete pre-encoding request. */
+	readonly estimate: number
+	/** Holds the gauge projection of that estimate; undefined when no gauge applies. */
+	readonly projected: number | undefined
+}
+
+/** Holds the observing provider's real delegate and measurement seams. */
+export interface StudyMemoryObserverOptions {
+	/** Holds the real provider every call is delegated to unchanged. */
+	readonly provider: ProviderInterface
+	/** Holds the admitted Agent namespace measuring requests. */
+	readonly subject: StudyMemorySubject
+	/** Holds the validated gauge enforced after a successful return; undefined enforces nothing. */
+	readonly gauge: LedgerGauge | undefined
+	/** Receives exactly one reading, synchronously, before each delegated call. */
+	readonly record: (reading: StudyMemoryEstimate) => void
+}
+
 /** Holds validated runtime dependencies for a fresh trial. */
 export interface StudyMemoryOptions {
 	readonly subject: unknown

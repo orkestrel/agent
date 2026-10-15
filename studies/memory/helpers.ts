@@ -2,7 +2,7 @@ import type { StudyAdjudication } from '@orkestrel/study/server'
 import type { JSONValue } from '@orkestrel/contract'
 import type { OllamaTiming } from '@orkestrel/ollama'
 import type { StudyJudgment, StudyProfile, StudyRole } from '@orkestrel/study'
-import type { LedgerGauge } from '@orkestrel/agent'
+import type { LedgerGauge, ProviderResult } from '@orkestrel/agent'
 import type {
 	StudyMemoryProvider,
 	StudyMemoryRequest,
@@ -31,20 +31,32 @@ export function readStudyMemoryError(error: unknown, subject: StudyMemorySubject
 	})
 }
 
-/** Reads the passive observation switches from generic driver settings without asserting their shape. @param settings - Optional profile settings. @returns Disabled observation unless `observe` is exactly true; selected goal ids only while enabled. */
-export function readStudyMemorySettings(
-	settings: StudyProfile['settings'],
-): StudyMemoryObservation {
-	const observe = settings?.observe === true
-	const selected: unknown = settings?.checkpoints
-	return {
-		observe,
-		checkpoints: new Set(
-			observe && isArray(selected)
-				? selected.filter((entry): entry is string => typeof entry === 'string')
-				: [],
-		),
+/** Prices an estimate through a gauge. @param gauge - Explicit scale and overhead. @param estimate - Subject estimate of one complete request. @returns The projected prompt tokens, rounded up. */
+export function projectStudyMemoryRequest(gauge: LedgerGauge, estimate: number): number {
+	return Math.ceil(gauge.overhead + gauge.scale * estimate)
+}
+
+/** Checks an actual prompt count against a request's projection. @param usage - Usage a successful provider call reported. @param projected - Gauge projection of the dispatched request. @returns Nothing when a finite positive count does not exceed the projection. @throws StudyError - FAULT when the count is missing or not finite and positive; CAPACITY when it exceeds the projection. */
+export function validateStudyMemoryProjection(
+	usage: ProviderResult['usage'],
+	projected: number,
+): void {
+	const prompt = usage?.prompt
+	if (typeof prompt !== 'number' || !Number.isFinite(prompt) || prompt <= 0)
+		throw new StudyError('FAULT', 'Gauged request returned no usable prompt count')
+	if (prompt > projected) {
+		const message = 'Actual prompt exceeded the gauged projection'
+		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role: 'agent' })
 	}
+}
+
+/** Reads the passive observation switches from generic driver settings. @param settings - Optional profile settings. @returns Disabled observation unless `observe` is true; selected goal ids only while enabled. @throws StudyError - CONFIG when present settings are malformed. */
+export function readStudyMemorySettings(settings: unknown): StudyMemoryObservation {
+	if (settings === undefined) return { observe: false, checkpoints: new Set() }
+	if (!isStudyMemorySettings(settings))
+		throw new StudyError('CONFIG', 'Memory settings are malformed')
+	const observe = settings.observe === true
+	return { observe, checkpoints: new Set(observe ? (settings.checkpoints ?? []) : []) }
 }
 
 /** Reads the pinned serving digest of an admitted request. @param profile - Runtime profile with the required digests. @param request - Admitted dispatch. @returns The pinned digest, or null for an inventory request. */

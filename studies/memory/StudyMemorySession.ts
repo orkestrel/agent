@@ -17,6 +17,7 @@ import type {
 } from '@orkestrel/study'
 import type {
 	StudyMemoryActivity,
+	StudyMemoryEstimate,
 	StudyMemoryInput,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
@@ -32,11 +33,13 @@ import {
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
 import {
+	projectStudyMemoryRequest,
 	readStudyMemoryError,
 	readStudyMemoryGauge,
 	buildStudyMemoryReadings,
 	readStudyMemorySettings,
 } from './helpers.js'
+import { StudyMemoryObserver } from './StudyMemoryObserver.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
 import { StudyMemoryJudge } from './StudyMemoryJudge.js'
 import { isStudyMemoryInput } from './validators.js'
@@ -74,13 +77,19 @@ export class StudyMemorySession implements StudySessionInterface {
 		const settings = options.profile.provider
 		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 		const room = options.profile.room
-		const provider = options.provider.createOllama({
-			model: settings.model,
-			url: settings.url,
-			think: room.think,
-			timeout: options.profile.bounds.request.duration,
-			options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
-			fetch: (input, init) => this.#transport.fetch('agent', input, init),
+		// Every arm wraps the agent provider, so toggling passive capture keeps the same wrapper overhead.
+		const provider = new StudyMemoryObserver({
+			provider: options.provider.createOllama({
+				model: settings.model,
+				url: settings.url,
+				think: room.think,
+				timeout: options.profile.bounds.request.duration,
+				options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
+				fetch: (input, init) => this.#transport.fetch('agent', input, init),
+			}),
+			subject: options.subject,
+			gauge,
+			record: (reading) => this.#record(reading),
 		})
 		this.#summary = options.provider.createOllama({
 			model: settings.model,
@@ -165,9 +174,7 @@ export class StudyMemorySession implements StudySessionInterface {
 							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
 								consumer: (request) =>
-									Math.ceil(
-										gauge.overhead + gauge.scale * options.subject.estimateRequest(request),
-									),
+									projectStudyMemoryRequest(gauge, options.subject.estimateRequest(request)),
 							}),
 						}),
 				on: { fault: (error) => this.#translate(error) },
@@ -276,6 +283,17 @@ export class StudyMemorySession implements StudySessionInterface {
 		const translated = readStudyMemoryError(error, this.#options.subject)
 		this.#transport.fail(translated)
 		return translated
+	}
+
+	// Retains the reading without an awaited write; the goal's finally flush appends it, failure included.
+	#record(reading: StudyMemoryEstimate): void {
+		const active = this.#active
+		if (!this.#settings.observe || active === undefined) return
+		this.#trace.push({
+			event: 'estimate',
+			goal: active.goal,
+			value: { estimate: reading.estimate, projected: reading.projected ?? null },
+		})
 	}
 
 	#checkpoint(goal: string, input: StudyMemoryInput): JSONValue | undefined {
