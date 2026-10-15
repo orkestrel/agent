@@ -47,6 +47,7 @@ import {
 	readStudyMemoryGauge,
 	buildStudyMemoryReadings,
 	readStudyMemorySettings,
+	validateStudyMemoryProjection,
 } from './helpers.js'
 import { StudyMemoryObserver } from './StudyMemoryObserver.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
@@ -179,9 +180,9 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#ledger = undefined
 			const conversations = options.subject.createConversationManager()
 			this.#conversation = conversations.add(
-				options.arm === 'compaction'
-					? { keep: 2, summarize: (messages, signal) => this.#summarize(messages, signal) }
-					: {},
+				gauge === undefined
+					? {}
+					: { keep: 2, summarize: (messages, signal) => this.#summarize(messages, signal, gauge) },
 			)
 			this.#agent = new options.subject.Agent(provider, {
 				conversations,
@@ -484,9 +485,15 @@ export class StudyMemorySession implements StudySessionInterface {
 		}
 	}
 
-	async #summarize(messages: readonly Message[], signal?: AbortSignal): Promise<string> {
+	async #summarize(
+		messages: readonly Message[],
+		signal: AbortSignal | undefined,
+		gauge: LedgerGauge,
+	): Promise<string> {
+		const bound = signal ?? this.#options.signal
+		bound.throwIfAborted()
 		this.#transport.check()
-		// One canonical array: measured and recorded here, then sent as the very same array.
+		// One canonical array: measured once, admitted or refused, then sent as the very same array.
 		const canonical: readonly Message[] = [
 			{
 				id: 'summary-instruction',
@@ -496,19 +503,46 @@ export class StudyMemorySession implements StudySessionInterface {
 			},
 			...messages,
 		]
-		if (this.#settings.observe && this.#active !== undefined) {
-			const request: ProviderRequest = { messages: canonical }
+		const request: ProviderRequest = { messages: canonical }
+		const estimate = this.#options.subject.estimateRequest(request)
+		const projected = projectStudyMemoryRequest(gauge, estimate)
+		const room = this.#options.profile.room
+		const limit = room.context - room.recap - room.safety
+		const current = this.#active
+		const observing = this.#settings.observe && current !== undefined
+		if (projected >= limit) {
+			const message = 'Summary request projection reaches the summary room'
+			// The refusal keeps its own admission, so the Agent's admission stays the one a later window refusal names.
+			if (observing) {
+				const { ordinal, revision } = this.#stamp(
+					'admission',
+					'summary',
+					request,
+					{ estimate, projected },
+					undefined,
+				)
+				this.#trace.push({
+					event: 'refusal',
+					goal: current.goal,
+					value: {
+						cause: 'capacity',
+						role: 'summary',
+						ordinal,
+						revision,
+						consumed: projected,
+						max: limit,
+					},
+				})
+			}
+			throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role: 'summary' })
+		}
+		if (observing) {
 			const id = ++this.#dispatches
-			const { revision } = this.#stamp(
-				'dispatch',
-				'summary',
-				request,
-				{ estimate: this.#options.subject.estimateRequest(request), projected: undefined },
-				id,
-			)
+			const { revision } = this.#stamp('dispatch', 'summary', request, { estimate, projected }, id)
 			this.#summaryDispatch = Object.freeze({ id, revision: revision ?? undefined })
 		}
-		const result = await this.#summary.generate(canonical, signal ?? this.#options.signal)
+		const result = await this.#summary.generate(canonical, bound)
+		if (!bound.aborted) validateStudyMemoryProjection(result.usage, projected, 'summary')
 		this.#transport.check()
 		const active = this.#active
 		if (active === undefined || typeof result.content !== 'string')

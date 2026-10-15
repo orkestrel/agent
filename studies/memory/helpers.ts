@@ -51,17 +51,20 @@ export function projectStudyMemoryRequest(gauge: LedgerGauge, estimate: number):
 	return Math.ceil(gauge.overhead + gauge.scale * estimate)
 }
 
-/** Checks an actual prompt count against a request's projection. @param usage - Usage a successful provider call reported. @param projected - Gauge projection of the dispatched request. @returns Nothing when a finite positive count does not exceed the projection. @throws StudyError - FAULT when the count is missing or not finite and positive; CAPACITY when it exceeds the projection. */
+/** Checks an actual prompt count against a request's projection. @param usage - Usage a successful provider call reported. @param projected - Gauge projection of the dispatched request. @param role - The responsibility whose request was dispatched; every failure retains it. @returns Nothing when a finite positive count does not exceed the projection. @throws StudyError - FAULT when the count is missing or not finite and positive; CAPACITY when it exceeds the projection. */
 export function validateStudyMemoryProjection(
 	usage: ProviderResult['usage'],
 	projected: number,
+	role: StudyRole,
 ): void {
 	const prompt = usage?.prompt
-	if (typeof prompt !== 'number' || !Number.isFinite(prompt) || prompt <= 0)
-		throw new StudyError('FAULT', 'Gauged request returned no usable prompt count')
+	if (typeof prompt !== 'number' || !Number.isFinite(prompt) || prompt <= 0) {
+		const message = 'Gauged request returned no usable prompt count'
+		throw new StudyError('FAULT', message, { cause: 'infrastructure', message, role })
+	}
 	if (prompt > projected) {
 		const message = 'Actual prompt exceeded the gauged projection'
-		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role: 'agent' })
+		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role })
 	}
 }
 

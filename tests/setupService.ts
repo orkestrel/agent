@@ -516,7 +516,7 @@ export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
 		failure: Object.freeze({
 			cause: 'infrastructure',
 			message: 'Gauged request returned no usable prompt count',
-			role: undefined,
+			role: 'agent',
 		}),
 	}),
 	Object.freeze({
@@ -526,7 +526,7 @@ export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
 		failure: Object.freeze({
 			cause: 'infrastructure',
 			message: 'Gauged request returned no usable prompt count',
-			role: undefined,
+			role: 'agent',
 		}),
 	}),
 ])
@@ -977,6 +977,89 @@ export function buildMemoryFoldGoals(
 			}),
 		}),
 	])
+}
+
+/** Pins a room whose summary admission room, context less recap less safety (4096 - 64 - 128 = 3904), is wider than the Agent window, context less output less safety (4096 - 2048 - 128 = 1920). */
+export const STUDY_MEMORY_SUMMARY_ROOM = Object.freeze({
+	context: 4096,
+	output: 2048,
+	safety: 128,
+	recap: 64,
+})
+
+/** Pins the summary admission room of STUDY_MEMORY_SUMMARY_ROOM. */
+export const STUDY_MEMORY_SUMMARY_LIMIT = 3904
+
+/**
+ * Pins hand-counted summary request lengths, each the content length of one folded arrival message,
+ * `[Source aN] ` (12 characters) plus its body. A message costs `length / 4 + 4` and the summary
+ * instruction (113 characters) costs `ceil(113 / 4) + 4 = 33`, so a seven-message fold projects
+ * `33 + 7 * (2196 / 4 + 4) = 3904` for EQUAL, `33 + 6 * 553 + (2192 / 4 + 4) = 3903` for BELOW and
+ * `33 + 7 * (2400 / 4 + 4) = 4261` for OVER, under the identity gauge.
+ */
+export const STUDY_MEMORY_SUMMARY_FOLDS = Object.freeze({
+	equal: Object.freeze([2196, 2196, 2196, 2196, 2196, 2196, 2196]),
+	below: Object.freeze([2196, 2196, 2196, 2196, 2196, 2196, 2192]),
+	over: Object.freeze([2400, 2400, 2400, 2400, 2400, 2400, 2400]),
+	small: Object.freeze([1200, 1200, 1200, 1200, 1200, 1200, 1200]),
+})
+
+/** Pins the identity-gauge projections the folds above are counted to: equal 3904, below 3903, over 4261, small 33 + 7 * (1200 / 4 + 4) = 2161. */
+export const STUDY_MEMORY_SUMMARY_PROJECTIONS = Object.freeze({
+	equal: 3904,
+	below: 3903,
+	over: 4261,
+	small: 2161,
+})
+
+/**
+ * Builds one goal of exactly counted arrivals: the folded ones, then one live one, then the prompt.
+ * @param folded - Message content lengths of the arrivals a Compaction fold summarizes; each is at least 12.
+ * @param live - Message content length of the last arrival, which stays live beside the prompt.
+ * @returns A single public goal whose arrival `aN` has `[Source aN] ` plus `x` repeated to that length.
+ */
+export function buildMemorySummaryGoals(
+	folded: readonly number[],
+	live: number,
+): readonly StudyGoal[] {
+	return Object.freeze([
+		Object.freeze({
+			id: 'opening',
+			input: Object.freeze({
+				prompt: 'Retain obligations',
+				arrivals: Object.freeze(
+					[...folded, live].map((length, index) => {
+						if (length < 12 || index > 9) throw new Error('Invalid summary arrival length')
+						return { id: `a${index}`, content: 'x'.repeat(length - 12) }
+					}),
+				),
+				records: Object.freeze([]),
+			}),
+		}),
+	])
+}
+
+/**
+ * Runs one Compaction goal over counted arrivals in STUDY_MEMORY_SUMMARY_ROOM under the identity gauge.
+ * @param folded - Message content lengths a fold summarizes.
+ * @param live - Message content length of the live arrival.
+ * @param responses - Queued protocol replies; the first chat reply answers the summary.
+ * @param observe - Whether passive evidence is captured; it must change evidence only.
+ * @returns The trial result.
+ */
+export function runMemorySummary(
+	folded: readonly number[],
+	live: number,
+	responses: readonly MemoryWireFixture[],
+	observe: boolean,
+): Promise<MemoryTrialResult> {
+	return runMemoryTrial({
+		arm: 'compaction',
+		responses,
+		goals: buildMemorySummaryGoals(folded, live),
+		settings: observe ? { ...STUDY_MEMORY_SETTINGS, observe: true } : STUDY_MEMORY_SETTINGS,
+		room: STUDY_MEMORY_SUMMARY_ROOM,
+	})
 }
 
 /** Reads the top-level and option key sets of each recorded generation request from its exact wire bytes.

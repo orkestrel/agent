@@ -15,6 +15,7 @@ import {
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
 	buildMemoryReply,
+	buildMemorySummaryGoals,
 	createMemoryContext,
 	createMemoryServer,
 	listMemoryKeys,
@@ -28,6 +29,7 @@ import {
 	readMemorySnapshot,
 	readMemoryTimeline,
 	readMemoryToolResults,
+	runMemorySummary,
 	runMemoryTrial,
 	totalMemoryUsage,
 	STUDY_MEMORY_DISABLED_SETTINGS,
@@ -38,7 +40,10 @@ import {
 	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_FIXED_PROJECTION,
 	STUDY_MEMORY_FIXED_SETTINGS,
-	STUDY_MEMORY_FOLD_ROOM,
+	STUDY_MEMORY_SUMMARY_FOLDS,
+	STUDY_MEMORY_SUMMARY_LIMIT,
+	STUDY_MEMORY_SUMMARY_PROJECTIONS,
+	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
@@ -520,7 +525,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({
 			url: server.url,
-			room: { context: 1024, output: 128, safety: 128, recap: 64 },
+			room: STUDY_MEMORY_SUMMARY_ROOM,
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		const fixture = createMemoryContext(profile)
@@ -983,7 +988,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		])
 		const profile = buildMemoryProfile({
 			url: server.url,
-			room: { context: 1024, output: 128, safety: 128, recap: 64 },
+			room: STUDY_MEMORY_SUMMARY_ROOM,
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		const fixture = createMemoryContext(profile)
@@ -1102,6 +1107,305 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			fixture.close()
 			await server.close()
 		}
+	})
+})
+
+describe('summary admission under the Compaction gauge', () => {
+	it('pins the hand-counted summary fixtures to their arithmetic', () => {
+		const { context, output, safety, recap } = STUDY_MEMORY_SUMMARY_ROOM
+		expect(context - recap - safety).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
+		expect(context - output - safety).toBe(1920)
+		// The instruction is 113 characters: ceil(113 / 4) = 29 plus 4 of framing.
+		const instruction = 29 + 4
+		const counted = Object.fromEntries(
+			Object.entries(STUDY_MEMORY_SUMMARY_FOLDS).map(([name, lengths]) => [
+				name,
+				instruction + lengths.reduce((sum, length) => sum + length / 4 + 4, 0),
+			]),
+		)
+		expect(counted).toEqual(STUDY_MEMORY_SUMMARY_PROJECTIONS)
+		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.equal).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
+		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.below).toBe(STUDY_MEMORY_SUMMARY_LIMIT - 1)
+		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.over).toBeGreaterThan(STUDY_MEMORY_SUMMARY_LIMIT)
+		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.small).toBeLessThan(STUDY_MEMORY_SUMMARY_LIMIT)
+		const input = buildMemorySummaryGoals([2196, 2192], 400)[0]?.input
+		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid summary goal')
+		expect(
+			input.arrivals.map((arrival) =>
+				isRecord(arrival) ? `[Source ${String(arrival.id)}] ${String(arrival.content)}`.length : 0,
+			),
+		).toEqual([2196, 2192, 400])
+	})
+
+	it.each([
+		['equal to', STUDY_MEMORY_SUMMARY_FOLDS.equal, STUDY_MEMORY_SUMMARY_PROJECTIONS.equal],
+		['over', STUDY_MEMORY_SUMMARY_FOLDS.over, STUDY_MEMORY_SUMMARY_PROJECTIONS.over],
+	])(
+		'refuses a summary request %s the summary room before the provider and retains its admission and refusal',
+		async (_name, folded, projected) => {
+			const result = await runMemorySummary(folded, 400, [], true)
+			expect(result.failure).toContain('Summary request')
+			// Neither the summary nor any agent request reached the model.
+			expect(result.requests.filter((request) => request.path === '/api/chat')).toEqual([])
+			const contexts = readMemoryEvents(result.evidence, 'context')
+			const admissions = contexts.filter((value) => value.role === 'summary')
+			expect(admissions).toHaveLength(1)
+			const [admission] = admissions
+			expect(admission).toMatchObject({ stage: 'admission', estimate: projected, projected })
+			expect(Object.keys(admission ?? {}).sort()).toEqual(listMemoryKeys(STUDY_MEMORY_CONTEXT_KEYS))
+			expect(typeof admission?.revision).toBe('string')
+			expect(readMemoryParts(admission?.parts)).toEqual({
+				count: 8,
+				tools: 0,
+				schema: 0,
+				total: projected,
+			})
+			expect(readMemoryOrigins(admission?.origins)[0]).toEqual({
+				origin: 'instructions',
+				source: 'summary',
+			})
+			const refusals = readMemoryEvents(result.evidence, 'refusal')
+			expect(refusals).toHaveLength(1)
+			expect(Object.keys(refusals[0] ?? {}).sort()).toEqual(STUDY_MEMORY_REFUSAL_KEYS)
+			expect(refusals[0]).toMatchObject({
+				cause: 'capacity',
+				role: 'summary',
+				ordinal: admission?.ordinal,
+				revision: admission?.revision,
+				consumed: projected,
+				max: STUDY_MEMORY_SUMMARY_LIMIT,
+			})
+			for (const event of ['dispatch', 'wire', 'wire-failure'])
+				expect(
+					readMemoryEvents(result.evidence, event).filter(
+						(value) => value.role === 'summary' || value.role === 'agent',
+					),
+				).toEqual([])
+			expect(result.usage.filter((row) => row.role === 'summary' || row.role === 'agent')).toEqual(
+				[],
+			)
+			const agent = contexts.filter((value) => value.role === 'agent')
+			expect(agent.length).toBeGreaterThan(0)
+			expect(
+				agent.every(
+					(value) =>
+						value.stage === 'admission' && Number(value.ordinal) < Number(admission?.ordinal),
+				),
+			).toBe(true)
+		},
+	)
+
+	it('applies the declared scale and overhead to summary admission', async () => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
+			settings: { gauge: { scale: 2, overhead: 7 }, observe: true },
+			room: STUDY_MEMORY_SUMMARY_ROOM,
+		})
+		expect(result.failure).toContain('Summary request')
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toEqual([])
+		expect(
+			readMemoryEvents(result.evidence, 'context').find((value) => value.role === 'summary'),
+		).toMatchObject({ stage: 'admission', estimate: 3903, projected: 7813 })
+		expect(readMemoryEvents(result.evidence, 'refusal')).toMatchObject([
+			{ role: 'summary', consumed: 7813, max: 3904 },
+		])
+	})
+
+	it('admits a summary request one below the room and stamps its dispatch with the admitted projection', async () => {
+		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
+		expect(result.failure).toBeUndefined()
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
+		const rows = readMemoryEvents(result.evidence, 'context').filter(
+			(value) => value.role === 'summary',
+		)
+		expect(rows).toHaveLength(1)
+		const [row] = rows
+		expect(row).toMatchObject({
+			stage: 'dispatch',
+			estimate: STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
+			projected: STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
+		})
+		expect(readMemoryParts(row?.parts)).toEqual({
+			count: 8,
+			tools: 0,
+			schema: 0,
+			total: STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
+		})
+		expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
+		for (const event of ['dispatch', 'wire']) {
+			const joined = readMemoryEvents(result.evidence, event).filter(
+				(value) => value.role === 'summary',
+			)
+			expect(joined).toHaveLength(1)
+			expect(joined[0]).toMatchObject({ canonical: row?.dispatch, revision: row?.revision })
+		}
+		expect(
+			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
+		).toMatchObject({ prompt: 10 })
+		expect(result.evidence.some((entry) => entry.event === 'summary')).toBe(true)
+	})
+
+	it('accepts a post-call prompt equal to the admitted projection and keeps its wire usage', async () => {
+		const prompt = STUDY_MEMORY_SUMMARY_PROJECTIONS.below
+		const result = await runMemorySummary(
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			400,
+			[{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap', prompt }) }],
+			true,
+		)
+		expect(result.failure).toBeUndefined()
+		expect(
+			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
+		).toMatchObject({ prompt })
+	})
+
+	it('terminates on a post-call prompt above the admitted projection while keeping the wire usage', async () => {
+		const prompt = STUDY_MEMORY_SUMMARY_PROJECTIONS.below + 1
+		const result = await runMemorySummary(
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			400,
+			[{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap', prompt }) }],
+			true,
+		)
+		// The transport admits this prompt (it equals the room); only the gauge projection is exceeded.
+		expect(prompt).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
+		expect(result.failure).toContain('gauged projection')
+		expect(result.failure).not.toContain('reserved context capacity')
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		expect(
+			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
+		).toMatchObject({ prompt })
+		expect(result.usage.find((row) => row.role === 'summary')?.tokens).toBe(prompt + 2)
+	})
+
+	it.each([
+		['unknown counts', { unknown: true }],
+		['a zero prompt count', { prompt: 0 }],
+	])('terminates on %s after a summary call', async (_name, reply) => {
+		const result = await runMemorySummary(
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			400,
+			[{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap', ...reply }) }],
+			true,
+		)
+		expect(result.failure).toContain('usable prompt count')
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+	})
+
+	it.each([
+		['admitted', STUDY_MEMORY_SUMMARY_FOLDS.below],
+		['refused', STUDY_MEMORY_SUMMARY_FOLDS.over],
+	])(
+		'keeps wire bytes, products, usage and outcome identical with observation off and on for a %s summary',
+		async (_name, folded) => {
+			const off = await runMemorySummary(folded, 400, [], false)
+			const on = await runMemorySummary(folded, 400, [], true)
+			expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+			expect(off.evidence.some((row) => STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))).toBe(
+				false,
+			)
+			expect(on.evidence.some((row) => row.event === 'context')).toBe(true)
+		},
+	)
+
+	it.each([
+		['an over-room summary request', STUDY_MEMORY_SUMMARY_FOLDS.over, {}, 'CAPACITY', 'capacity'],
+		['an equal-room summary request', STUDY_MEMORY_SUMMARY_FOLDS.equal, {}, 'CAPACITY', 'capacity'],
+		[
+			'a prompt above the projection',
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			{ prompt: 3904 },
+			'CAPACITY',
+			'capacity',
+		],
+		[
+			'unknown counts',
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			{ unknown: true },
+			'FAULT',
+			'infrastructure',
+		],
+		[
+			'a zero prompt count',
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			{ prompt: 0 },
+			'FAULT',
+			'infrastructure',
+		],
+	])(
+		'retains the summary role in the study failure of %s',
+		async (_name, folded, reply, code, cause) => {
+			const server = await createMemoryServer([
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap', ...reply }) },
+			])
+			const profile = buildMemoryProfile({
+				url: server.url,
+				room: STUDY_MEMORY_SUMMARY_ROOM,
+				settings: STUDY_MEMORY_SETTINGS,
+			})
+			const fixture = createMemoryContext(profile)
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'role', scenario: 'public', arm: 'compaction', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				const goal = buildMemorySummaryGoals(folded, 400)[0]
+				if (goal === undefined) throw new Error('Missing summary goal')
+				await expect(session.execute(goal, fixture.context)).rejects.toBeDefined()
+				// The first failure is latched, so the next goal rethrows the very error the summary raised.
+				const latched = await session
+					.execute(
+						{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
+						fixture.context,
+					)
+					.then(
+						() => undefined,
+						(error: unknown) => error,
+					)
+				expect(latched).toBeInstanceOf(StudyError)
+				expect(latched).toMatchObject({ code })
+				expect(readStudyFailure(latched)).toMatchObject({ cause, role: 'summary' })
+			} finally {
+				await session.close()
+				fixture.close()
+				await server.close()
+			}
+		},
+	)
+
+	it('refuses a summary request with observation off exactly as with it on', async () => {
+		const off = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.over, 400, [], false)
+		expect(off.failure).toContain('Summary request')
+		expect(off.requests.filter((request) => request.path === '/api/chat')).toEqual([])
+	})
+
+	it('links an Agent window refusal to its own admission after an admitted summary', async () => {
+		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.small, 8000, [], true)
+		expect(result.failure).toBeDefined()
+		// Only the admitted summary reached the model; the post-fold agent request was refused by the window.
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		const contexts = readMemoryEvents(result.evidence, 'context')
+		const summary = contexts.find((value) => value.role === 'summary')
+		expect(summary).toMatchObject({
+			stage: 'dispatch',
+			projected: STUDY_MEMORY_SUMMARY_PROJECTIONS.small,
+		})
+		const last = contexts
+			.filter((value) => value.role === 'agent' && value.stage === 'admission')
+			.at(-1)
+		expect(Number(last?.ordinal)).toBeGreaterThan(Number(summary?.ordinal))
+		const refusals = readMemoryEvents(result.evidence, 'refusal')
+		expect(refusals).toHaveLength(1)
+		expect(refusals[0]).toMatchObject({
+			cause: 'capacity',
+			role: 'agent',
+			ordinal: last?.ordinal,
+			revision: last?.revision,
+			max: 1920,
+		})
+		expect(refusals[0]?.ordinal).not.toBe(summary?.ordinal)
 	})
 })
 
@@ -1761,11 +2065,13 @@ describe('passive observation of actual memory requests', () => {
 			responses: [],
 			goals: buildMemoryFoldGoals(),
 			settings,
-			room: STUDY_MEMORY_FOLD_ROOM,
+			room: STUDY_MEMORY_SUMMARY_ROOM,
 		})
 		expect(result.failure).toBeUndefined()
 		const max =
-			STUDY_MEMORY_FOLD_ROOM.context - STUDY_MEMORY_FOLD_ROOM.output - STUDY_MEMORY_FOLD_ROOM.safety
+			STUDY_MEMORY_SUMMARY_ROOM.context -
+			STUDY_MEMORY_SUMMARY_ROOM.output -
+			STUDY_MEMORY_SUMMARY_ROOM.safety
 		const contexts = readMemoryEvents(result.evidence, 'context')
 		const sequence = contexts.map((value) => `${String(value.stage)}:${String(value.role)}`)
 		const summaryAt = sequence.indexOf('dispatch:summary')
@@ -1816,7 +2122,9 @@ describe('passive observation of actual memory requests', () => {
 			origin: 'instructions',
 			source: 'summary',
 		})
-		expect(summary?.projected).toBeNull()
+		// An admitted summary is stamped with the very estimate and gauge projection it was admitted on.
+		expect(summary?.projected).toBe(summary?.estimate)
+		expect(Number(summary?.projected)).toBeLessThan(STUDY_MEMORY_SUMMARY_LIMIT)
 		expect(Number(readMemoryParts(summary?.parts).count)).toBeGreaterThan(2)
 	})
 
@@ -1825,7 +2133,7 @@ describe('passive observation of actual memory requests', () => {
 			arm: 'compaction',
 			responses: [],
 			goals: buildMemoryFoldGoals(),
-			room: STUDY_MEMORY_FOLD_ROOM,
+			room: STUDY_MEMORY_SUMMARY_ROOM,
 		}
 		const off = await runMemoryTrial({ ...trial, settings: STUDY_MEMORY_SETTINGS })
 		const on = await runMemoryTrial({

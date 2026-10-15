@@ -45,7 +45,7 @@ export class StudyMemoryObserver implements ProviderInterface {
 		const projected = this.#measure(messages, tools, options)
 		const result = await this.#options.provider.generate(messages, signal, tools, options)
 		if (projected !== undefined && !signal.aborted)
-			validateStudyMemoryProjection(result.usage, projected)
+			validateStudyMemoryProjection(result.usage, projected, 'agent')
 		return result
 	}
 
@@ -89,7 +89,7 @@ export class StudyMemoryObserver implements ProviderInterface {
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
 		const result = yield* source
 		if (projected !== undefined && !signal.aborted)
-			validateStudyMemoryProjection(result.usage, projected)
+			validateStudyMemoryProjection(result.usage, projected, 'agent')
 		return result
 	}
 }

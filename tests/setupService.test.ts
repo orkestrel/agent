@@ -210,10 +210,11 @@ describe('study service fixtures', () => {
 		expect(over?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 })
 		expect(STUDY_MEMORY_PROJECTION_REFUSALS).toHaveLength(3)
 		expect([over?.code, unknown?.code, zero?.code]).toEqual(['CAPACITY', 'FAULT', 'FAULT'])
+		// Every refusal an agent observer raises retains the agent role, including unusable usage.
 		expect([over?.failure.role, unknown?.failure.role, zero?.failure.role]).toEqual([
 			'agent',
-			undefined,
-			undefined,
+			'agent',
+			'agent',
 		])
 		const hung = parseJSON(STUDY_MEMORY_HUNG_STREAM.body)
 		expect(hung).toMatchObject({ done: false, message: { content: 'par' } })

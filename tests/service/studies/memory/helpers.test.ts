@@ -300,29 +300,42 @@ describe('memory declaration and mechanical evidence', () => {
 			infinite === undefined
 		)
 			throw new Error('Missing usage fixture')
-		expect(() => validateStudyMemoryProjection(ten, 10)).not.toThrow()
-		expect(() => validateStudyMemoryProjection(ten, 11)).not.toThrow()
-		expect(() => validateStudyMemoryProjection(one, 1)).not.toThrow()
-		let capacity: unknown
-		try {
-			validateStudyMemoryProjection(eleven, 10)
-		} catch (error) {
-			capacity = error
-		}
-		expect(capacity).toBeInstanceOf(StudyError)
-		expect(capacity).toMatchObject({ code: 'CAPACITY' })
-		expect(readStudyFailure(capacity)).toEqual({
-			cause: 'capacity',
-			message: 'Actual prompt exceeded the gauged projection',
-			role: 'agent',
-		})
-		for (const unusable of [undefined, zero, negative, nan, infinite])
-			expect(() => validateStudyMemoryProjection(unusable, 10)).toThrow(
-				expect.objectContaining({
+		for (const role of ['agent', 'summary'] as const) {
+			expect(() => validateStudyMemoryProjection(ten, 10, role)).not.toThrow()
+			expect(() => validateStudyMemoryProjection(ten, 11, role)).not.toThrow()
+			expect(() => validateStudyMemoryProjection(one, 1, role)).not.toThrow()
+			let capacity: unknown
+			try {
+				validateStudyMemoryProjection(eleven, 10, role)
+			} catch (error) {
+				capacity = error
+			}
+			expect(capacity).toBeInstanceOf(StudyError)
+			expect(capacity).toMatchObject({ code: 'CAPACITY' })
+			expect(readStudyFailure(capacity)).toEqual({
+				cause: 'capacity',
+				message: 'Actual prompt exceeded the gauged projection',
+				role,
+			})
+			for (const unusable of [undefined, zero, negative, nan, infinite]) {
+				let fault: unknown
+				try {
+					validateStudyMemoryProjection(unusable, 10, role)
+				} catch (error) {
+					fault = error
+				}
+				expect(fault).toBeInstanceOf(StudyError)
+				expect(fault).toMatchObject({
 					code: 'FAULT',
 					message: expect.stringContaining('prompt count'),
-				}),
-			)
+				})
+				expect(readStudyFailure(fault)).toEqual({
+					cause: 'infrastructure',
+					message: 'Gauged request returned no usable prompt count',
+					role,
+				})
+			}
+		}
 	})
 
 	it('reads observation switches only from well-formed settings and refuses malformed ones', () => {

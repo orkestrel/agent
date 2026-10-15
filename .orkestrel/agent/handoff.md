@@ -1,4 +1,36 @@
-# Series state at 2026-10-15 03:59 UTC
+# Series repair accepted on 2026-10-15
+
+Reuse candidate-3 Records; execute Compaction only. Actual Sonnet implemented summary admission
+and role-preserving projection errors; actual Opus implemented cross-copy StudyError recognition.
+Independent Astra review passed; Luna's final Agent and Study gates passed, including the real
+packed ESM/CommonJS proof. Root accepted the repaired claims in `series-repair-verdict.md`.
+The original CPU reproduction passed against the refreshed installed runtime: the over-room
+response retains capacity attribution. No Fable was used.
+
+Root observed summary red8failed/4passed become17passed; all memory files129passed; fixture17
+passed; root TypeScript passed. A further nonidentity summary-gauge proof passed with the
+existing Agent gauge proof (2tests): estimate3903, scale2/overhead7 projects7813 and refuses
+before dispatch. Study final focused core/setup30passed, captured CLI3passed, processes31passed,
+root TypeScript passed. The CLI regression separately preserves abandoned-ticket cleanup
+failures rather than mistaking them for attribution loss. Final receipts are under Agent/tmp/units
+with prefix series-repair-final; independent review is series-repair-review-report.md there.
+
+The accepted prospective protocol is at the top of ../study/.orkestrel/series.md. Full calibration
+stays inconclusive and unchanged. One Compaction-only qualification tests its provisional frozen
+gauge prospectively, with160-minute trial/series and60-second launcher cleanup allowance.
+Per-request underprediction or missing usage stops it; summary prompt room17920 and Agent
+prompt room11776 are admitted separately. No automatic rerun, recovery, refit, or extension.
+
+Installed Study was preserved under tmp/studies/runtime-before-error-identity and refreshed after
+gates. The create-only tmp/studies/compaction-provisional-project holds the repaired memory source,
+runtime transitions, and frozen protocol. Root's compaction-provisional-freeze.ts requires accepted
+review, final gates, clean commits, unchanged staged bytes, and daemon coverage. Its launch.json
+records the absolute deadline and command; it never launches inference. Execution journal/errors
+are tmp/units/compaction-provisional.{jsonl,err}; output is tmp/studies/compaction-provisional.
+Check those receipts for execution state. The event observer is compaction-provisional-watch.ts.
+
+The following paragraphs retain the diagnostic's custody and older context; their active-unit
+statements are superseded by this dated state.
 
 Reuse completed candidate-3 Records; rerun Compaction only. Candidate 3 is terminal:
 Records completed96/96 without partials or failures; Compaction produced63 products, failed
