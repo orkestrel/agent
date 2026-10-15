@@ -1,12 +1,17 @@
-import { isStudyJudgment } from '@orkestrel/study'
+import { isStudyJudgment, readStudyFailure, StudyError } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
+import { AgentError } from '../../../../src/core/index.js'
 import {
+	createStudyAdapter,
 	gradeStudyMemory,
 	isStudyMemoryArm,
 	isStudyMemoryAssertion,
 	isStudyMemoryInput,
 	isStudyMemoryProvider,
+	isStudyMemorySettings,
 	isStudyMemorySubject,
+	readStudyMemoryError,
+	readStudyMemoryGauge,
 	readStudyMemoryRequest,
 	readStudyMemorySupport,
 	readStudyMemoryTerminal,
@@ -14,7 +19,12 @@ import {
 	validateStudyMemoryCompletion,
 	validateStudyMemoryProfile,
 } from '../../../../studies/memory/index.js'
-import { buildMemoryProfile } from '../../../setupService.js'
+import {
+	buildMemoryProfile,
+	loadMemoryInputs,
+	STUDY_MEMORY_MODULES,
+	STUDY_MEMORY_SETTINGS,
+} from '../../../setupService.js'
 
 describe('memory declaration and mechanical evidence', () => {
 	it('validates finite room, actual digest syntax and exact uncredentialed origin', () => {
@@ -41,6 +51,180 @@ describe('memory declaration and mechanical evidence', () => {
 				provider: { ...provider, url: 'http://user:password@127.0.0.1:7' },
 			}),
 		).toThrow('uncredentialed')
+	})
+
+	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
+		const gauge = { scale: 1.5, overhead: 0 }
+		const names = Array.from({ length: 13 }, (_, index) => `checkpoint-${index}`)
+		const accepted: ReadonlyArray<readonly [string, unknown]> = [
+			['empty', {}],
+			['gauge', { gauge }],
+			['smallest scale', { gauge: { scale: Number.MIN_VALUE, overhead: 7 } }],
+			['observe false', { observe: false }],
+			['observe true', { observe: true }],
+			['no checkpoints', { observe: true, checkpoints: [] }],
+			['longest checkpoint', { observe: true, checkpoints: ['x'.repeat(128)] }],
+			['all members', { gauge, observe: true, checkpoints: names.slice(0, 12) }],
+			['undefined members', { gauge: undefined, observe: undefined, checkpoints: undefined }],
+		]
+		const refused: ReadonlyArray<readonly [string, unknown]> = [
+			['undefined', undefined],
+			['null', null],
+			['array', []],
+			['string', 'gauge'],
+			['number', 7],
+			['unknown key', { extra: 1 }],
+			['unknown key beside gauge', { gauge, extra: true }],
+			['cased key', { Gauge: gauge }],
+			['zero scale', { gauge: { scale: 0, overhead: 0 } }],
+			['negative scale', { gauge: { scale: -1, overhead: 0 } }],
+			['NaN scale', { gauge: { scale: Number.NaN, overhead: 0 } }],
+			['infinite scale', { gauge: { scale: Number.POSITIVE_INFINITY, overhead: 0 } }],
+			['negative overhead', { gauge: { scale: 1, overhead: -1 } }],
+			['NaN overhead', { gauge: { scale: 1, overhead: Number.NaN } }],
+			['infinite overhead', { gauge: { scale: 1, overhead: Number.POSITIVE_INFINITY } }],
+			['text scale', { gauge: { scale: '1', overhead: 0 } }],
+			['missing overhead', { gauge: { scale: 1 } }],
+			['missing scale', { gauge: { overhead: 0 } }],
+			['unknown gauge key', { gauge: { scale: 1, overhead: 0, extra: 0 } }],
+			['array gauge', { gauge: [] }],
+			['null gauge', { gauge: null }],
+			['number gauge', { gauge: 1 }],
+			['text observe', { observe: 'true' }],
+			['null observe', { observe: null }],
+			['checkpoints without observe', { checkpoints: ['a'] }],
+			['checkpoints with observe false', { observe: false, checkpoints: ['a'] }],
+			['text checkpoints', { observe: true, checkpoints: 'a' }],
+			['null checkpoints', { observe: true, checkpoints: null }],
+			['empty checkpoint', { observe: true, checkpoints: [''] }],
+			['duplicate checkpoint', { observe: true, checkpoints: ['a', 'a'] }],
+			['long checkpoint', { observe: true, checkpoints: ['x'.repeat(129)] }],
+			['non-text checkpoint', { observe: true, checkpoints: [1] }],
+			['too many checkpoints', { observe: true, checkpoints: names }],
+		]
+		for (const [label, value] of accepted)
+			expect([label, isStudyMemorySettings(value)]).toEqual([label, true])
+		for (const [label, value] of refused)
+			expect([label, isStudyMemorySettings(value)]).toEqual([label, false])
+	})
+
+	it('admits absent or valid profile settings, refuses malformed ones and reads the gauge only when explicit', () => {
+		const url = 'http://127.0.0.1:7'
+		for (const settings of [undefined, {}, { observe: true }, STUDY_MEMORY_SETTINGS])
+			expect(() => validateStudyMemoryProfile(buildMemoryProfile({ url, settings }))).not.toThrow()
+		for (const settings of [
+			{ extra: 1 },
+			{ gauge: { scale: 0, overhead: 0 } },
+			{ checkpoints: ['a'] },
+		])
+			expect(() => validateStudyMemoryProfile(buildMemoryProfile({ url, settings }))).toThrow(
+				'settings',
+			)
+		const declared = { scale: 2, overhead: 5 }
+		const gauge = readStudyMemoryGauge({ gauge: declared, observe: false })
+		expect(gauge).toEqual(declared)
+		expect(gauge).not.toBe(declared)
+		for (const settings of [
+			undefined,
+			null,
+			{},
+			{ observe: true },
+			{ gauge: { scale: 1 } },
+			{ gauge: { scale: 0, overhead: 0 } },
+			{ gauge: { scale: 1, overhead: 0 }, extra: 1 },
+		])
+			expect(() => readStudyMemoryGauge(settings)).toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('gauge') }),
+			)
+	})
+
+	it('requires an explicit valid gauge for any compaction arm at declaration only', async () => {
+		const url = 'http://127.0.0.1:7'
+		const adapter = createStudyAdapter()
+		const input = await loadMemoryInputs(
+			buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS }),
+		)
+		expect(input.definition.arms).toContain('compaction')
+		expect(() => adapter.validate(input)).not.toThrow()
+		for (const settings of [undefined, {}, { observe: true }])
+			expect(() =>
+				adapter.validate({ ...input, profile: buildMemoryProfile({ url, settings }) }),
+			).toThrow('gauge')
+		expect(() =>
+			adapter.validate({
+				...input,
+				profile: buildMemoryProfile({ url, settings: { gauge: { scale: 0, overhead: 0 } } }),
+			}),
+		).toThrow('settings')
+		for (const arms of [['records'], ['full'], ['records', 'full']])
+			expect(() =>
+				adapter.validate({
+					...input,
+					definition: { ...input.definition, arms, order: [arms] },
+					profile: buildMemoryProfile({ url }),
+				}),
+			).not.toThrow()
+	})
+
+	it('translates only a nominal Agent window refusal into attributable capacity', () => {
+		const { subject } = STUDY_MEMORY_MODULES
+		if (!isStudyMemorySubject(subject)) throw new Error('Missing admitted Agent subject')
+		const surface = {
+			Agent: subject.Agent,
+			createLedger: subject.createLedger,
+			createConversationManager: subject.createConversationManager,
+			estimateRequest: subject.estimateRequest,
+			LEDGER_QUESTIONS: subject.LEDGER_QUESTIONS,
+		}
+		expect(isStudyMemorySubject(surface)).toBe(false)
+		expect(isStudyMemorySubject({ ...surface, isAgentError: 'guard' })).toBe(false)
+		expect(isStudyMemorySubject({ ...surface, isAgentError: subject.isAgentError })).toBe(true)
+		const refusal = new STUDY_MEMORY_MODULES.subject.AgentError('WINDOW', 'Request fills window', {
+			context: { consumed: 9, max: 8 },
+		})
+		const translated = readStudyMemoryError(refusal, subject)
+		expect(translated).toBeInstanceOf(StudyError)
+		expect(translated).toMatchObject({
+			code: 'CAPACITY',
+			message: 'Request fills window',
+			failure: { cause: 'capacity', message: 'Request fills window', role: 'agent' },
+		})
+		expect(readStudyFailure(translated)).toEqual({
+			cause: 'capacity',
+			message: 'Request fills window',
+			role: 'agent',
+		})
+		const aborted = AbortSignal.abort(new Error('Cancelled by caller'))
+		const identities: ReadonlyArray<readonly [string, unknown]> = [
+			...(['CONCURRENCY', 'LIMIT', 'REGISTRY'] as const).map(
+				(code) =>
+					[
+						`nominal ${code}`,
+						new STUDY_MEMORY_MODULES.subject.AgentError(code, 'Not a window refusal'),
+					] as const,
+			),
+			['foreign Agent copy', new AgentError('WINDOW', 'Separately loaded Agent')],
+			['plain code object', { code: 'WINDOW', message: 'Request fills window' }],
+			[
+				'named code object',
+				{ name: 'AgentError', code: 'WINDOW', message: 'Request fills window' },
+			],
+			['coded Error', Object.assign(new Error('Request fills window'), { code: 'WINDOW' })],
+			[
+				'named coded Error',
+				Object.assign(new Error('Request fills window'), { name: 'AgentError', code: 'WINDOW' }),
+			],
+			['study capacity', new StudyError('CAPACITY', 'Already attributed')],
+			['summarizer failure', new Error('Summary provider failed')],
+			['abort reason', aborted.reason],
+			['abort error', new DOMException('The operation was aborted', 'AbortError')],
+			['timeout error', new DOMException('The operation timed out', 'TimeoutError')],
+			['text', 'WINDOW'],
+			['null', null],
+			['undefined', undefined],
+		]
+		for (const [label, value] of identities)
+			expect([label, Object.is(readStudyMemoryError(value, subject), value)]).toEqual([label, true])
 	})
 
 	it('accepts bounded inputs and rejects repeated source ids and malformed foreign namespaces', () => {

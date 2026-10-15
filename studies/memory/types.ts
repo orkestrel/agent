@@ -1,8 +1,10 @@
 import type {
+	AgentError,
 	AgentOptions,
 	AgentInterface,
 	ConversationManagerInterface,
 	ConversationManagerOptions,
+	LedgerGauge,
 	LedgerInterface,
 	LedgerOptions,
 	LedgerQuestion,
@@ -12,6 +14,16 @@ import type {
 	JudgeInterface,
 } from '@orkestrel/agent'
 import type { StudyContext, StudyProfile, StudyRole, StudyTicket } from '@orkestrel/study'
+
+/** Holds the memory driver's interpretation of `StudyProfile.settings`. */
+export interface StudyMemorySettings {
+	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
+	readonly gauge?: LedgerGauge | undefined
+	/** Reserved for passive observation by a separate consumer; this driver does not read it. */
+	readonly observe?: boolean | undefined
+	/** Names observation checkpoints and requires `observe: true`; this driver does not read it. */
+	readonly checkpoints?: readonly string[] | undefined
+}
 
 /** Holds public arrivals and reference snapshots released before a goal. */
 export interface StudyMemoryInput {
@@ -33,6 +45,7 @@ export interface StudyMemorySubject {
 		options?: ConversationManagerOptions,
 	) => ConversationManagerInterface
 	readonly estimateRequest: (request: ProviderRequest) => number
+	readonly isAgentError: (value: unknown) => value is AgentError
 	readonly LEDGER_QUESTIONS: LedgerQuestion
 }
 

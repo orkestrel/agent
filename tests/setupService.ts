@@ -38,6 +38,17 @@ import { pathToFileURL } from 'node:url'
 /** Composes the selected built Agent with the installed public Ollama provider. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
 
+/** Pins the identity gauge compaction fixtures declare explicitly; it prices a request at its raw estimate. */
+export const STUDY_MEMORY_SETTINGS = Object.freeze({
+	gauge: Object.freeze({ scale: 1, overhead: 0 }),
+})
+
+/** Pins a short request whose admission depends on the declared gauge. */
+export const WINDOW_GOAL = Object.freeze({
+	id: 'first',
+	input: { prompt: 'State the order count', arrivals: [], records: [] },
+})
+
 /** Pins the authored trial order independently of native execution output. */
 export const STUDY_MEMORY_SCHEDULE = Object.freeze([
 	Object.freeze(['records', 0]),
@@ -195,6 +206,7 @@ export function createStudyServiceFixture(
 		JSON.stringify({
 			...raw,
 			name: 'local',
+			settings: STUDY_MEMORY_SETTINGS,
 			subject: join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js'),
 			roots: packages.map((entry) => entry.target),
 			bounds,
@@ -408,7 +420,7 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }) })}\n`
 }
 
-/** Builds a finite CPU-only profile with explicit fixture digests. */
+/** Builds a finite CPU-only profile with explicit fixture digests; `settings` is emitted exactly as supplied. */
 export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile {
 	const room = {
 		context: 32768,
@@ -437,7 +449,21 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 			trial: { duration: 30000, calls: 512, tokens: 16777216, bytes: 536870912 },
 			series: { duration: 60000, calls: 1024, tokens: 33554432, bytes: 1073741824 },
 		},
+		settings: options.settings,
 	}
+}
+
+/** Builds a gauge that prices any request at `offset` units from the profile's window max.
+ * @param profile - The profile whose room defines the window max: context less output and safety.
+ * @param offset - Distance from the max; a request prices at the max plus this offset rounded up.
+ * @returns Settings with an overhead at that distance and a scale small enough that any estimate adds less than one unit.
+ */
+export function buildMemoryEdge(
+	profile: StudyProfile,
+	offset: number,
+): NonNullable<StudyProfile['settings']> {
+	const { context, output, safety } = profile.room
+	return { gauge: { scale: 1e-9, overhead: context - output - safety + offset } }
 }
 
 /** Loads an authored declaration and its shared memory scenario for generic admission proofs.

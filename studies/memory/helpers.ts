@@ -1,13 +1,33 @@
 import type { StudyAdjudication } from '@orkestrel/study/server'
 import type { StudyJudgment, StudyProfile, StudyRole } from '@orkestrel/study'
-import type { StudyMemoryRequest, StudyMemoryTerminal } from './types.js'
+import type { LedgerGauge } from '@orkestrel/agent'
+import type { StudyMemoryRequest, StudyMemorySubject, StudyMemoryTerminal } from './types.js'
 import { canonicalStringify, isObject, isRecord } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
-import { isStudyMemoryAssertion } from './validators.js'
+import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
 
-/** Checks finite room and required immutable serving identities. @param profile - Runtime profile. @returns Nothing when admitted. */
+/** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
+export function readStudyMemoryGauge(settings: unknown): LedgerGauge {
+	if (!isStudyMemorySettings(settings) || settings.gauge === undefined)
+		throw new StudyError('CONFIG', 'Memory compaction requires an explicit settings gauge')
+	return { scale: settings.gauge.scale, overhead: settings.gauge.overhead }
+}
+
+/** Translates only a nominal window refusal into the attributable capacity failure. @param error - Caught or reported value. @param subject - Admitted Agent namespace owning the nominal guard. @returns A capacity StudyError for an Agent WINDOW error; every other value with its identity. */
+export function readStudyMemoryError(error: unknown, subject: StudyMemorySubject): unknown {
+	if (!subject.isAgentError(error) || error.code !== 'WINDOW') return error
+	return new StudyError('CAPACITY', error.message, {
+		cause: 'capacity',
+		message: error.message,
+		role: 'agent',
+	})
+}
+
+/** Checks finite room, required immutable serving identities and well-formed driver settings. @param profile - Runtime profile. @returns Nothing when admitted. */
 export function validateStudyMemoryProfile(profile: StudyProfile): void {
 	const { room, provider } = profile
+	if (profile.settings !== undefined && !isStudyMemorySettings(profile.settings))
+		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	if (
 		provider === undefined ||
 		!/^(?:sha256:)?[a-f0-9]{64}$/.test(provider.digest.model) ||

@@ -7,7 +7,7 @@ import type {
 	ProviderRequest,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
-import type { ToolContext } from '@orkestrel/tool'
+import type { ToolContext, ToolManagerInterface } from '@orkestrel/tool'
 import type {
 	StudyContext,
 	StudyEvidence,
@@ -26,6 +26,7 @@ import {
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
+import { readStudyMemoryError, readStudyMemoryGauge } from './helpers.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
 import { StudyMemoryJudge } from './StudyMemoryJudge.js'
 import { isStudyMemoryInput } from './validators.js'
@@ -34,7 +35,7 @@ import { isStudyMemoryInput } from './validators.js'
 export class StudyMemorySession implements StudySessionInterface {
 	readonly #options: StudyMemorySessionOptions
 	readonly #transport: StudyMemoryTransport
-	readonly #tools = createToolManager()
+	readonly #tools: ToolManagerInterface
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
@@ -48,7 +49,10 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
+		const gauge =
+			options.arm === 'compaction' ? readStudyMemoryGauge(options.profile.settings) : undefined
 		this.#options = options
+		this.#tools = createToolManager()
 		this.#transport = new StudyMemoryTransport({ profile: options.profile, signal: options.signal })
 		const settings = options.profile.provider
 		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
@@ -118,7 +122,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				agent: {
 					limit: 8,
 					timeout: options.profile.bounds.goal.duration,
-					on: { fault: (error) => this.#transport.fail(error) },
+					on: { fault: (error) => this.#translate(error) },
 				},
 			})
 			this.#agent = this.#ledger.agent
@@ -138,16 +142,19 @@ export class StudyMemorySession implements StudySessionInterface {
 				limit: 8,
 				timeout: options.profile.bounds.goal.duration,
 				signal: options.signal,
-				...(options.arm === 'compaction'
-					? {
+				...(gauge === undefined
+					? {}
+					: {
 							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
-								consumer: options.subject.estimateRequest,
+								consumer: (request) =>
+									Math.ceil(
+										gauge.overhead + gauge.scale * options.subject.estimateRequest(request),
+									),
 							}),
-						}
-					: {}),
-				on: { fault: (error) => this.#transport.fail(error) },
-				error: (error) => this.#transport.fail(error),
+						}),
+				on: { fault: (error) => this.#translate(error) },
+				error: (error) => this.#translate(error),
 			})
 			this.#agent.context.instructions.add({ name: 'desk', content: STUDY_MEMORY_SYSTEM })
 		}
@@ -233,8 +240,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			await this.#transport.verify()
 			return product
 		} catch (error) {
-			this.#transport.fail(error)
-			throw error
+			throw this.#translate(error)
 		} finally {
 			try {
 				for (const row of this.#trace) await context.evidence.append(row)
@@ -242,6 +248,13 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#active = undefined
 			}
 		}
+	}
+
+	// Latch the study-level reading before any enclosing runtime can swallow the failure.
+	#translate(error: unknown): unknown {
+		const translated = readStudyMemoryError(error, this.#options.subject)
+		this.#transport.fail(translated)
+		return translated
 	}
 
 	async #lookup(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {

@@ -45,6 +45,8 @@ export interface MemoryContextFixture {
 export interface MemoryProfileFixture {
 	readonly url: string
 	readonly room?: Partial<StudyProfile['room']>
+	/** Supplies driver-owned settings verbatim; omission and `undefined` both emit an absent profile setting. */
+	readonly settings?: StudyProfile['settings']
 }
 /** Holds an inert model reply fixture. */
 export interface MemoryReplyFixture {

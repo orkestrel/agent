@@ -3,9 +3,10 @@ import type {
 	StudyMemoryAssertion,
 	StudyMemoryInput,
 	StudyMemoryProvider,
+	StudyMemorySettings,
 	StudyMemorySubject,
 } from './types.js'
-import { holds, isArray, isObject, isRecord } from '@orkestrel/contract'
+import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
 /** Checks the admitted Agent factory surface. @param value - Admitted namespace. @returns Whether the required exports exist. */
@@ -21,9 +22,44 @@ export function isStudyMemorySubject(value: unknown): value is StudyMemorySubjec
 			typeof value.createConversationManager === 'function' &&
 			'estimateRequest' in value &&
 			typeof value.estimateRequest === 'function' &&
+			'isAgentError' in value &&
+			typeof value.isAgentError === 'function' &&
 			'LEDGER_QUESTIONS' in value &&
 			isObject(value.LEDGER_QUESTIONS),
 	)
+}
+
+/** Checks the driver-owned settings exactly. @param value - Profile settings. @returns Whether every present member is valid and no member is unknown. */
+export function isStudyMemorySettings(value: unknown): value is StudyMemorySettings {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		if (Object.keys(value).some((key) => !['gauge', 'observe', 'checkpoints'].includes(key)))
+			return false
+		const { gauge, observe, checkpoints } = value
+		if (gauge !== undefined) {
+			if (
+				!isRecord(gauge) ||
+				Object.keys(gauge).length !== 2 ||
+				!isFiniteNumber(gauge.scale) ||
+				gauge.scale <= 0 ||
+				!isFiniteNumber(gauge.overhead) ||
+				gauge.overhead < 0
+			)
+				return false
+		}
+		if (observe !== undefined && !isBoolean(observe)) return false
+		if (checkpoints === undefined) return true
+		return (
+			observe === true &&
+			isArray(checkpoints) &&
+			checkpoints.length <= 12 &&
+			new Set(checkpoints).size === checkpoints.length &&
+			checkpoints.every(
+				(checkpoint) =>
+					typeof checkpoint === 'string' && checkpoint.length > 0 && checkpoint.length <= 128,
+			)
+		)
+	})
 }
 
 /** Checks the admitted Ollama factory surface. @param value - Admitted namespace. @returns Whether both public factories exist. */

@@ -4,6 +4,7 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+	buildMemoryEdge,
 	buildMemoryProfile,
 	buildMemoryReply,
 	createMemoryContext,
@@ -16,6 +17,7 @@ import {
 	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
+	STUDY_MEMORY_SETTINGS,
 } from './setupService.js'
 
 describe('study service fixtures', () => {
@@ -76,6 +78,7 @@ describe('study service fixtures', () => {
 			}
 			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toMatchObject({
 				qualification: 'tmp/studies/memory-capacity',
+				settings: { gauge: { scale: 1, overhead: 0 } },
 				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
 				roots: fixture.packages.map((entry) => entry.target),
 			})
@@ -121,6 +124,38 @@ describe('study service fixtures', () => {
 			fixture.close()
 			await server.close()
 		}
+	})
+
+	it('leaves the authored local profile without settings', () => {
+		const authored = parseJSON(readFileSync('studies/memory/profiles/local.json', 'utf8'))
+		expect(authored).not.toHaveProperty('settings')
+	})
+
+	it('emits supplied profile settings verbatim, including an explicit absence', () => {
+		const url = 'http://127.0.0.1:7'
+		const settings = { gauge: { scale: 2, overhead: 3 }, observe: true, checkpoints: ['a'] }
+		expect(buildMemoryProfile({ url, settings }).settings).toEqual(settings)
+		expect(buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS }).settings).toEqual({
+			gauge: { scale: 1, overhead: 0 },
+		})
+		for (const profile of [
+			buildMemoryProfile({ url }),
+			buildMemoryProfile({ url, settings: undefined }),
+		]) {
+			expect(Object.keys(profile)).toContain('settings')
+			expect(profile.settings).toBeUndefined()
+		}
+	})
+
+	it('places a gauge at a signed distance from the window max of the profile room', () => {
+		const base = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		expect(buildMemoryEdge(base, -1)).toEqual({ gauge: { scale: 1e-9, overhead: 32127 } })
+		expect(buildMemoryEdge(base, 0)).toEqual({ gauge: { scale: 1e-9, overhead: 32128 } })
+		const narrow = buildMemoryProfile({
+			url: 'http://127.0.0.1:7',
+			room: { context: 1024, output: 128, safety: 128 },
+		})
+		expect(buildMemoryEdge(narrow, -2)).toEqual({ gauge: { scale: 1e-9, overhead: 766 } })
 	})
 
 	it('loads actual tools declarations and refuses malformed retained evidence', async () => {

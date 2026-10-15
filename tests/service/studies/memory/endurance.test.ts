@@ -8,6 +8,7 @@ import {
 	buildMemoryProfile,
 	loadMemoryInputs,
 	STUDY_ENDURANCE_BOUNDARIES,
+	STUDY_MEMORY_SETTINGS,
 } from '../../../setupService.js'
 
 describe('prospective public endurance declarations', () => {
@@ -241,7 +242,10 @@ describe('prospective public endurance declarations', () => {
 	})
 
 	it('admits identical schedules and the pinned finite q4 profile while keeping semantics independently unknown', async () => {
-		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:1' })
+		const profile = buildMemoryProfile({
+			url: 'http://127.0.0.1:1',
+			settings: STUDY_MEMORY_SETTINGS,
+		})
 		const capacity = await loadMemoryInputs(profile, 'qualification')
 		const quality = await loadMemoryInputs(profile, 'endurance')
 		const q4 = parseStudyProfile(
