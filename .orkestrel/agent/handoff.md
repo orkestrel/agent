@@ -1,3 +1,44 @@
+# Final-user summary qualification started on 2026-10-15
+
+The Compaction-only `compaction-task` attempt started at 19:37 UTC from accepted Agent
+`7bd2a44` and Study `019f5ce`. It moves the same summary instruction from first/system to
+final/user, preserving folded messages and all model, gauge, workload, rubric and budget
+controls. This separate treatment leaves every earlier result intact. Records remains
+sealed and labeled at 96/96; never rerun or replay it.
+
+The physical runtime is `tmp/studies/compaction-task-runtime`, the project is its `project`
+directory, and results go to `tmp/studies/compaction-task`. Custody SHA-256 is
+`aa11d92f2be674ff3367af2efa53881538c6ff6f07771a9cfe7d7da39f818980`; fingerprint is
+`03077ac9a4198b5f3eb05c5af116646bcc1d4aa711d977bef5af7253802a285f`. Offline check passed in
+2093 ms and the launch check in 2200 ms. Wrong custody, extra project/runtime files and stale
+deadline controls reject, with exact restoration. The source, runtime and consumed launcher
+files must remain unchanged while execution or evidence reading depends on them.
+
+The trial limit is 9600000 ms, one attempt and zero retries. The absolute execute deadline is
+`2026-10-15T22:25:00.000Z`; the dedicated daemon expires at `2026-10-15T22:35:00.000Z`.
+The execute wrapper received a 10041-second cap; the supervisor has a 10080-second cap.
+No deadline extension, silent truncate/shift, model retry or prediction-miss refusal is added.
+Blank recap content still fails immediately after retaining its evidence and cost.
+
+The owned process and journal identities are:
+
+- Supervisor PID 101076, `tmp/codex/compaction-task-supervisor.jsonl` and `.err`.
+- Execute PID 57252, wrapper PID 45788, `tmp/codex/compaction-task-series.jsonl` and `.err`.
+- Daemon PID 20432, script PID 76008, `tmp/codex/compaction-task-daemon.jsonl` and `.err`;
+  only port 11435. Daemon start is `2026-10-15T19:37:25.746Z`.
+- Observer PID 60208, `tmp/units/compaction-task-watch.jsonl` and `.err`.
+- Root launch receipt is `tmp/units/compaction-task-launch.json`; read progress metadata with
+  `node tmp/units/compaction-task-progress.ts`.
+
+Sonnet is adapting `tmp/units/compaction-task-reader.ts` to require the instruction last as
+user, with source ids and provenance preceding it. Its prior full-horizon, correlation,
+nonempty/reducing/repeated-fold and deadline predicates remain binding. Run its selftest and
+pins before using it; never use the old instruction-first reader on this treatment. Public
+Study custody/grade/report remain separate terminal checks. No quality or speedup is accepted
+from progress metadata. Study's promotion and MCP repair are accepted; their records live in
+Study's `.orkestrel/promotion.md`. MCP's root install was aligned to its accepted lockfile
+(Scaffold 0.0.101, npm ci exit 0, 8727 ms); no source changed or package was published.
+
 # Compaction content qualification failed on 2026-10-15
 
 The Compaction-only successor started at 19:05 UTC and stopped at goal 11, `ev-03-3`, after
