@@ -1,5 +1,18 @@
 # Rolling Compaction closed on 2026-10-15
 
+Parallel performance reading is verified in `tmp/units/rolling-performance-read-v5-report.md`.
+All fixed checkpoint inputs are present; the rejected qualification does not admit a speed or
+quality comparison. Agent prefill accounts for 19.92% of attempt wall, summary prefill 17.71%,
+and combined model loading under 1%. No new speedup or Records replay is claimed. Study's
+`.orkestrel/performance.md` carries the accepted protocol and current implementation state.
+
+Actual Opus session `8032cd0f-5c26-4b7d-9025-174c18c9c96f` recommended a consumer-only
+blank recap refusal and a distinct Study `content` cause (108670 ms, exit 0, uncapped).
+Root verified strict Agent compaction rethrows and the existing rolling no-commit-on-throw
+test; a duplicate core proof is unnecessary. Sonnet implementation runs in Agent
+`tmp/worktrees/empty-recap` and Study `tmp/worktrees/study-content`. Preserve exact failed
+summary bytes and usage before refusal. No retry, prompt rewrite or successor run is launched.
+
 The rolling successor completed all 96 goals, with no operational failure, in 3402443 ms
 of launcher wall time. The process exited 0, uncapped. Its qualification reader rejected
 the result: 8 of 12 summary completions were empty. The remaining 4 were nonempty and
