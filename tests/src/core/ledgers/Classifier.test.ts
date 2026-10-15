@@ -1,3 +1,4 @@
+import type { ClassifierReading } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { requireValue } from '@orkestrel/test'
@@ -16,11 +17,14 @@ import {
 	buildLedgerPairJudgment,
 	buildLedgerResponse,
 	buildLedgerTopicJudgment,
+	buildReadingSummaries,
+	CLASSIFIER_PINNED_ASKS,
 	createLedgerJudge,
 	RecordedTransport,
 	RecordingJudge,
 	ScriptedJudge,
 	SequentialSystemOneJudge,
+	summarizeReadings,
 } from '../../../setup.js'
 
 describe('Classifier', () => {
@@ -134,13 +138,17 @@ describe('Classifier', () => {
 				topics: [],
 			}),
 		)
-		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
-			judgments: [],
-		})
+		const first = await classifier.classify(new Set(), new AbortController().signal)
+		expect(first.judgments).toEqual([])
+		expect(summarizeReadings(first.readings)).toEqual([
+			{ key, phase: 'category', outcome: 'failed', duration: 'valid' },
+		])
 		expect(judge.bodies).toHaveLength(1)
-		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
-			judgments: [],
-		})
+		const second = await classifier.classify(new Set(), new AbortController().signal)
+		expect(second.judgments).toEqual([])
+		expect(summarizeReadings(second.readings)).toEqual([
+			{ key, phase: 'category', outcome: 'skipped', duration: 'absent' },
+		])
 		expect(judge.bodies).toHaveLength(1)
 		expect(classifier.category(message.id)).toBeUndefined()
 	})
@@ -199,7 +207,8 @@ describe('Classifier', () => {
 			}),
 		)
 		const result = await classifier.classify(new Set(['m4']), new AbortController().signal)
-		expect(result).toEqual({
+		const { readings, ...filed } = result
+		expect(filed).toEqual({
 			judgments: [
 				'["category","m1"]',
 				'["category","m2"]',
@@ -214,6 +223,13 @@ describe('Classifier', () => {
 			],
 			usage: { prompt: 20, completion: 10, total: 30 },
 		})
+		expect(summarizeReadings(readings)).toEqual(
+			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
+		)
+		expect(readings.map((reading) => reading.key)).toEqual(result.judgments)
+		expect(transport.requests).toHaveLength(
+			readings.filter((reading) => reading.outcome === 'resolved').length,
+		)
 		const category = requireValue(conversation.judgments.judgment('["category","m1"]'))
 		expect(category.id).toBe('["category","m1"]')
 		expect(category.state).toBe('user: Refund AB-12 is 20.')
@@ -268,9 +284,16 @@ describe('Classifier', () => {
 			amendments: new Map([['m1', ['m2']]]),
 			supersessions: new Map(),
 		})
-		expect(await classifier.classify(new Set(['m4']), new AbortController().signal)).toEqual({
-			judgments: result.judgments,
-		})
+		const repeat = await classifier.classify(new Set(['m4']), new AbortController().signal)
+		expect(repeat.judgments).toEqual(result.judgments)
+		expect(repeat.usage).toBeUndefined()
+		expect(summarizeReadings(repeat.readings)).toEqual(
+			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'cached'),
+		)
+		expect(repeat.readings).not.toBe(readings)
+		expect(summarizeReadings(readings)).toEqual(
+			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
+		)
 		expect(transport.requests).toHaveLength(10)
 	})
 
@@ -443,13 +466,22 @@ describe('Classifier', () => {
 				topics: [],
 			}),
 		)
-		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
-			judgments: [],
-		})
+		const keys = [first, second].map((message) => JSON.stringify(['category', message.id]))
+		const initial = await classifier.classify(new Set(), new AbortController().signal)
+		expect(initial.judgments).toEqual([])
+		expect(summarizeReadings(initial.readings)).toEqual(
+			buildReadingSummaries(
+				keys.map((key) => ['category', key] as const),
+				'failed',
+			),
+		)
 		expect(transport.requests).toHaveLength(2)
-		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
-			judgments: [],
-		})
+		const retried = await classifier.classify(new Set(), new AbortController().signal)
+		expect(retried.judgments).toEqual([])
+		expect(summarizeReadings(retried.readings)).toEqual([
+			{ key: keys[0], phase: 'category', outcome: 'skipped', duration: 'absent' },
+			{ key: keys[1], phase: 'category', outcome: 'failed', duration: 'valid' },
+		])
 		expect(transport.requests).toHaveLength(3)
 		expect(await requireValue(transport.requests[2]).json()).toMatchObject({
 			state: `user: ${second.content}`,
@@ -494,14 +526,105 @@ describe('Classifier', () => {
 		expect(result.fault).toBeInstanceOf(JudgeAbortError)
 		expect(result.judgments).toEqual([JSON.stringify(['category', conversation.messages()[0]?.id])])
 		expect(result.usage).toEqual({ prompt: 50, completion: 1, total: 51 })
+		expect(summarizeReadings(result.readings)).toEqual([
+			{
+				key: JSON.stringify(['category', conversation.messages()[0]?.id]),
+				phase: 'category',
+				outcome: 'resolved',
+				duration: 'valid',
+			},
+			{
+				key: JSON.stringify(['category', conversation.messages()[1]?.id]),
+				phase: 'category',
+				outcome: 'aborted',
+				duration: 'valid',
+			},
+		])
 		expect(conversation.judgments.count).toBeGreaterThanOrEqual(1)
 		expect(classifier.category(requireValue(conversation.messages()[0]).id)).toBe('fact')
 		conversation.judgments.clear()
-		expect(await classifier.classify(new Set(), AbortSignal.abort())).toMatchObject({
+		const refused = await classifier.classify(new Set(), AbortSignal.abort())
+		expect(refused).toMatchObject({
 			judgments: [],
 			fault: expect.objectContaining({ name: 'AbortError' }),
 		})
+		expect(refused.readings).toEqual([])
 		expect(transport.requests).toHaveLength(2)
+	})
+
+	it('records no reading for a question the abort preceded and keeps the completed one', async () => {
+		const conversation = createConversation()
+		const messages = conversation.add([
+			{ role: 'user', content: 'First statement.' },
+			{ role: 'user', content: 'Second statement.' },
+		])
+		const controller = new AbortController()
+		const asked: string[] = []
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge: createLedgerJudge(asked, (request) => {
+					controller.abort()
+					const key = requireValue(Object.keys(request.questions)[0])
+					return Promise.resolve({
+						model: 'partial',
+						answers: { [key]: { form: 'choice', probabilities: { fact: 1 } } },
+						usage: { prompt: 4, completion: 1, total: 5 },
+					})
+				}),
+				topics: [],
+			}),
+		)
+		const result = await classifier.classify(new Set(), controller.signal)
+		expect(result.fault).toEqual(expect.objectContaining({ name: 'AbortError' }))
+		expect(result.judgments).toEqual([JSON.stringify(['category', requireValue(messages[0]).id])])
+		expect(result.usage).toEqual({ prompt: 4, completion: 1, total: 5 })
+		expect(asked).toEqual(result.judgments)
+		expect(summarizeReadings(result.readings)).toEqual([
+			{
+				key: JSON.stringify(['category', requireValue(messages[0]).id]),
+				phase: 'category',
+				outcome: 'resolved',
+				duration: 'valid',
+			},
+		])
+	})
+
+	it('counts resolver requests as the resolve outcomes of a closed serial fixture', async () => {
+		const conversation = createConversation()
+		const messages = conversation.add([
+			{ role: 'user', content: 'First statement.' },
+			{ role: 'user', content: 'Second statement.' },
+		])
+		const judge = new RecordingJudge()
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
+			}),
+		)
+		const [one, two] = messages.map((message) => message.id)
+		const asks = [
+			['category', JSON.stringify(['category', one])],
+			['category', JSON.stringify(['category', two])],
+			['topic', JSON.stringify(['topic', one, 'refunds'])],
+			['topic', JSON.stringify(['topic', two, 'refunds'])],
+		] as const
+		const readings: ClassifierReading[] = []
+		for (const round of [1, 2]) {
+			const result = await classifier.classify(new Set(), new AbortController().signal)
+			expect(result.judgments).toEqual([])
+			expect(summarizeReadings(result.readings)).toEqual(buildReadingSummaries(asks, 'resolved'))
+			readings.push(...result.readings)
+			expect(judge.requests).toHaveLength(round * asks.length)
+		}
+		expect(
+			readings.filter((reading) => ['resolved', 'failed', 'aborted'].includes(reading.outcome)),
+		).toHaveLength(judge.requests.length)
+		expect(judge.requests.map((request) => Object.keys(request.questions))).toEqual(
+			[...asks, ...asks].map(([, key]) => [key]),
+		)
 	})
 	it('returns a partial fault when a classification handler throws', async () => {
 		const conversation = createConversation()
@@ -519,6 +642,7 @@ describe('Classifier', () => {
 		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
+			readings: [],
 			fault,
 		})
 	})
@@ -550,6 +674,7 @@ describe('Classifier', () => {
 		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
+			readings: [],
 		})
 		expect(judge.requests).toEqual([])
 		expect(classifier.classification()).toEqual({
@@ -602,6 +727,20 @@ describe('Classifier', () => {
 				messages.slice(0, 2).map((message) => JSON.stringify(['category', message.id])),
 			)
 			expect(result.usage).toEqual({ prompt: 44, completion: 2, total: 46 })
+			expect(summarizeReadings(result.readings)).toEqual([
+				{
+					key: requireValue(result.judgments[0]),
+					phase: 'category',
+					outcome: 'resolved',
+					duration: 'valid',
+				},
+				{
+					key: requireValue(result.judgments[1]),
+					phase: 'category',
+					outcome: 'aborted',
+					duration: 'valid',
+				},
+			])
 			expect(asked).toEqual(result.judgments)
 			expect(conversation.judgments.count).toBe(2)
 		}
@@ -624,9 +763,17 @@ describe('Classifier', () => {
 				topics: [],
 			}),
 		)
-		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
-			judgments: [],
-		})
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(result.judgments).toEqual([])
+		expect(result.fault).toBeUndefined()
+		expect(summarizeReadings(result.readings)).toEqual(
+			conversation.messages().map((message) => ({
+				key: JSON.stringify(['category', message.id]),
+				phase: 'category',
+				outcome: 'aborted',
+				duration: 'valid',
+			})),
+		)
 		expect(asked).toHaveLength(2)
 	})
 

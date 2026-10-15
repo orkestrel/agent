@@ -2253,6 +2253,7 @@ await new GuideCommand({
 			const filed = await classifier.classify(new Set(), signal)
 
 			expect(filed.judgments).toHaveLength(2)
+			expect(filed.readings.map((reading) => reading.outcome)).toEqual(['resolved', 'resolved'])
 			expect(classifier.category(rule.id)).toBe('rule')
 			expect(classifier.decisive(rule.id)).toBe(true)
 			expect(classifier.quiet(rule.id)).toBe(false)

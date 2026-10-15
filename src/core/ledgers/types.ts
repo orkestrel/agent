@@ -275,10 +275,13 @@ export interface LedgerOptions {
  * @remarks
  * `passes` holds the first pass and, when the ledger ran one, the answer pass. `content` and
  * `partial` are the last pass's, `usage` sums the passes' usage, and `thinking` joins the passes'
- * reasoning; each optional member is present when any pass reported it.
+ * reasoning; each optional member is present when any pass reported it. `readings` lists every
+ * {@link ClassifierReading} the request's selections recorded, in asking order. A request's reading
+ * count is its logical questions, never its physical wire calls.
  */
 export interface LedgerResult extends AgentResult {
 	readonly passes: readonly AgentResult[]
+	readonly readings: readonly ClassifierReading[]
 }
 
 /**
@@ -314,7 +317,7 @@ export interface LedgerInterface {
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
-	 * @returns The reply and the passes the request took
+	 * @returns The reply, the passes the request took, and the filing readings of this request alone
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
@@ -483,10 +486,49 @@ export interface ClassifierOptions {
 	readonly entities: LedgerEntityHandler
 }
 
-/** Carries the judgment keys one classification rests on and the judge usage it spent. */
+/** Names the filing question a classifier asked: a message's category, a message's topic, or an earlier and later message's amendment or supersession. */
+export type ClassifierPhase = 'category' | 'topic' | 'amends' | 'supersedes'
+
+/**
+ * Names what became of one filing question.
+ *
+ * @remarks
+ * `cached` means the conversation already held a matching judgment, so the classifier did not call the judgment manager.
+ * `skipped` means the classifier held the question after a deterministic failure and did not call the judgment manager.
+ * `resolved` means the judgment manager's resolve call fulfilled. `failed` means it rejected while the caller's signal was live.
+ * `aborted` means it rejected with a `JudgeAbortError` or after the caller's signal aborted.
+ */
+export type ClassifierOutcome = 'cached' | 'skipped' | 'resolved' | 'failed' | 'aborted'
+
+/**
+ * Carries what became of one filing question: its judgment key, its phase, its outcome, and the time spent resolving it.
+ *
+ * @remarks
+ * `key` is the judgment key the classifier asked or reused. `duration` is the monotonic milliseconds
+ * the classifier waited on the judgment manager's resolve call, present for `resolved`, `failed`, and `aborted`
+ * and absent for `cached` and `skipped`, which make no resolve call. A reading counts one logical
+ * question attempt. It counts neither the physical wire calls a judge made nor a request that joined
+ * another pending request, and a question the caller's signal aborted before its resolve call began
+ * has no reading.
+ */
+export interface ClassifierReading {
+	readonly key: string
+	readonly phase: ClassifierPhase
+	readonly outcome: ClassifierOutcome
+	readonly duration?: number
+}
+
+/**
+ * Carries the judgment keys one classification rests on and the judge usage it spent.
+ *
+ * @remarks
+ * `readings` lists one {@link ClassifierReading} per logical question attempt, in asking order, including
+ * the attempt a caller abort interrupted. Each result owns its array.
+ */
 export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
+	readonly readings: readonly ClassifierReading[]
 	/** Holds the error when an assign or entities handler throw, or a caller abort, interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
 }
@@ -504,7 +546,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys and usage spent; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, usage spent, and one reading per logical question attempt; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**

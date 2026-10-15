@@ -15,6 +15,9 @@ import type {
 } from '@src/core'
 import type {
 	ClassifierOptions,
+	ClassifierOutcome,
+	ClassifierPhase,
+	ClassifierReading,
 	GaugeCall,
 	GaugeOptions,
 	LedgerCategory,
@@ -3798,6 +3801,67 @@ export function createLedgerJudge(
 	}
 }
 
+/** Supplies the phase and judgment key of each question the measured `m1` to `m5` filing asks, in asking order. */
+export const CLASSIFIER_PINNED_ASKS: ReadonlyArray<readonly [ClassifierPhase, string]> = [
+	['category', '["category","m1"]'],
+	['category', '["category","m2"]'],
+	['category', '["category","m3"]'],
+	['topic', '["topic","m1","refunds"]'],
+	['topic', '["topic","m1","warehouse"]'],
+	['topic', '["topic","m2","refunds"]'],
+	['topic', '["topic","m2","warehouse"]'],
+	['topic', '["topic","m4","refunds"]'],
+	['amends', '["amends","m1","m2"]'],
+	['supersedes', '["supersedes","m1","m2"]'],
+]
+
+/** Carries a classifier reading with its elapsed time reduced to whether it is absent, a finite nonnegative number, or anything else. */
+export interface ReadingSummary {
+	readonly key: string
+	readonly phase: ClassifierPhase
+	readonly outcome: ClassifierOutcome
+	readonly duration: 'absent' | 'valid' | 'invalid'
+}
+
+/**
+ * Reduces classifier readings to values an exact comparison can hold without a timing threshold.
+ * @param readings - The readings a classifier or ledger returned
+ * @returns Each reading's key, phase, and outcome, with its duration classed as absent, valid, or invalid
+ */
+export function summarizeReadings(
+	readings: readonly ClassifierReading[],
+): readonly ReadingSummary[] {
+	return readings.map((reading) => ({
+		key: reading.key,
+		phase: reading.phase,
+		outcome: reading.outcome,
+		duration:
+			reading.duration === undefined
+				? 'absent'
+				: Number.isFinite(reading.duration) && reading.duration >= 0
+					? 'valid'
+					: 'invalid',
+	}))
+}
+
+/**
+ * Builds the summaries for a run of questions with one outcome.
+ * @param asks - The phase and judgment key of each question, in asking order
+ * @param outcome - The outcome every question shares
+ * @returns The expected summaries; a cached or skipped question has no duration and any other has a valid one
+ */
+export function buildReadingSummaries(
+	asks: ReadonlyArray<readonly [ClassifierPhase, string]>,
+	outcome: ClassifierOutcome,
+): readonly ReadingSummary[] {
+	return asks.map(([phase, key]) => ({
+		key,
+		phase,
+		outcome,
+		duration: outcome === 'cached' || outcome === 'skipped' ? 'absent' : 'valid',
+	}))
+}
+
 /**
  * Builds a category judgment whose identity and state match a source message.
  * @param message - The source message
@@ -4389,6 +4453,7 @@ export const RELAY_REPLAY_CASES: readonly ThinkingReplay[] = Object.freeze(['all
 /** Supplies the guide classifier readings scenario inputs. */
 export const GUIDE_CLASSIFIER_READINGS = Object.freeze([
 	'filed.judgments.length // 2 — the category question and the refunds topic question',
+	"filed.readings.map((reading) => reading.outcome) // ['resolved', 'resolved'] — the judge answered both",
 	"classifier.category(rule.id) // 'rule'",
 	'classifier.decisive(rule.id) // true',
 	'classifier.quiet(rule.id) // false',

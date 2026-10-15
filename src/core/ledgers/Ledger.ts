@@ -4,6 +4,7 @@ import type { ConversationInterface } from '../conversations/types.js'
 import type { ProviderInterface } from '../providers/types.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type {
+	ClassifierReading,
 	ClassifierResult,
 	GaugeCall,
 	LedgerCategory,
@@ -110,6 +111,7 @@ export class Ledger implements LedgerInterface {
 	#boundary = 0
 	#gauge: Gauge | undefined
 	#calls: GaugeCall[] = []
+	#readings: readonly ClassifierReading[] = []
 	#position: number | undefined
 	#active = false
 	#recalls = 0
@@ -293,7 +295,7 @@ export class Ledger implements LedgerInterface {
 	 * When the answer pass rejects, `respond` rejects with that error. Every rejection leaves the ledger free for a later call.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
-	 * @returns The final pass and the usage of every pass
+	 * @returns The final pass, the usage of every pass, and the filing readings of this request alone
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
@@ -310,6 +312,7 @@ export class Ledger implements LedgerInterface {
 			this.#entered = undefined
 			this.#selected = undefined
 			this.#calls = []
+			this.#readings = []
 			this.#position = undefined
 			this.#recalls = 0
 			this.#closed = false
@@ -370,6 +373,7 @@ export class Ledger implements LedgerInterface {
 				content: last.content,
 				partial: last.partial,
 				passes,
+				readings: [...this.#readings],
 				...(usage === undefined ? {} : { usage }),
 				...(thinking === undefined ? {} : { thinking }),
 			}
@@ -560,7 +564,7 @@ export class Ledger implements LedgerInterface {
 	}
 
 	async #select(request: Message, signal: AbortSignal): Promise<Selection> {
-		let filing: ClassifierResult = { judgments: [] }
+		let filing: Omit<ClassifierResult, 'readings'> = { judgments: [] }
 		try {
 			if (
 				!this.#active ||
@@ -578,7 +582,9 @@ export class Ledger implements LedgerInterface {
 					...(this.#entered.briefing === undefined ? {} : { briefing: this.#entered.briefing }),
 				}
 			const selected = this.#request
-			filing = await this.#classifier.classify(this.#requests, signal)
+			const { readings, ...filed } = await this.#classifier.classify(this.#requests, signal)
+			this.#readings = [...this.#readings, ...readings]
+			filing = filed
 			if (filing.fault !== undefined) throw filing.fault
 			const plan = this.#plan(selected)
 			this.#entered = { ...plan, ...filing }

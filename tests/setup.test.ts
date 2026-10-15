@@ -139,6 +139,9 @@ import {
 	measureRoom,
 	buildLedgerOptions,
 	buildClassifierOptions,
+	buildReadingSummaries,
+	CLASSIFIER_PINNED_ASKS,
+	summarizeReadings,
 	LEDGER_DESK_THRESHOLDS,
 	buildLedgerJudgment,
 	buildLedgerExchange,
@@ -1947,6 +1950,26 @@ describe('shared ledger builders', () => {
 		expect(filed).not.toContain(JSON.stringify(['topic', 'second', 'refunds']))
 		expect(filed).not.toContain(JSON.stringify(['amends', 'first', 'second']))
 		expect(filed).toContain(JSON.stringify(['supersedes', 'first', 'second']))
+	})
+
+	it('summarizes reading durations as absent, valid, or invalid and builds matching expectations', () => {
+		const key = '["category","m1"]'
+		expect(
+			summarizeReadings([
+				{ key, phase: 'category', outcome: 'cached' },
+				{ key, phase: 'category', outcome: 'resolved', duration: 0 },
+				{ key, phase: 'category', outcome: 'failed', duration: 2.5 },
+				{ key, phase: 'category', outcome: 'aborted', duration: -1 },
+				{ key, phase: 'category', outcome: 'aborted', duration: Number.NaN },
+				{ key, phase: 'category', outcome: 'aborted', duration: Number.POSITIVE_INFINITY },
+			]).map((summary) => summary.duration),
+		).toEqual(['absent', 'valid', 'valid', 'invalid', 'invalid', 'invalid'])
+		expect(buildReadingSummaries([['topic', key]], 'skipped')).toEqual([
+			{ key, phase: 'topic', outcome: 'skipped', duration: 'absent' },
+		])
+		const resolved = buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved')
+		expect(resolved).toHaveLength(CLASSIFIER_PINNED_ASKS.length)
+		expect(resolved.every((summary) => summary.duration === 'valid')).toBe(true)
 	})
 
 	it('buildUncalibratedOptions drops only the gauge and leaves its input whole', () => {

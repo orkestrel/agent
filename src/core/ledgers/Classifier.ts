@@ -2,6 +2,8 @@ import type { ChoiceAnswer, Judgment, JudgmentInput, Message } from '../types.js
 import type {
 	ClassifierInterface,
 	ClassifierOptions,
+	ClassifierPhase,
+	ClassifierReading,
 	ClassifierResult,
 	LedgerCategory,
 	LedgerClassification,
@@ -47,7 +49,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The judgment keys and summed usage; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, summed usage, and one reading per logical question attempt, in asking order; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -57,13 +59,17 @@ export class Classifier implements ClassifierInterface {
 			const asked = messages.filter((message) => this.#options.assign(message) === undefined)
 			for (const message of asked) {
 				if (!requests.has(message.id))
-					results.push(await this.#ask(this.#buildCategory(message.id), signal, results))
+					results.push(
+						await this.#ask(this.#buildCategory(message.id), 'category', signal, results),
+					)
 			}
 			for (const message of asked) {
 				if (!requests.has(message.id) && this.quiet(message.id)) continue
 				for (const topic of this.#options.topics) {
 					if (requests.has(message.id) && topic.requested === false) continue
-					results.push(await this.#ask(this.#buildTopic(message.id, topic), signal, results))
+					results.push(
+						await this.#ask(this.#buildTopic(message.id, topic), 'topic', signal, results),
+					)
 				}
 			}
 			for (const later of asked) {
@@ -83,10 +89,15 @@ export class Classifier implements ClassifierInterface {
 					)
 						continue
 					const spec = this.#buildPair('amends', earlier.id, later.id)
-					results.push(await this.#ask(spec, signal, results))
+					results.push(await this.#ask(spec, 'amends', signal, results))
 					if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
 						results.push(
-							await this.#ask(this.#buildPair('supersedes', earlier.id, later.id), signal, results),
+							await this.#ask(
+								this.#buildPair('supersedes', earlier.id, later.id),
+								'supersedes',
+								signal,
+								results,
+							),
 						)
 				}
 			}
@@ -98,6 +109,7 @@ export class Classifier implements ClassifierInterface {
 			if (result.usage !== undefined) usage = sumUsage(usage, result.usage)
 		return {
 			judgments: results.flatMap((result) => result.judgments),
+			readings: results.flatMap((result) => result.readings),
 			...(fault === undefined ? {} : { fault }),
 			...(usage === undefined ? {} : { usage }),
 		}
@@ -315,13 +327,17 @@ export class Classifier implements ClassifierInterface {
 
 	async #ask(
 		spec: JudgmentInput,
+		phase: ClassifierPhase,
 		signal: AbortSignal,
 		results: ClassifierResult[],
 	): Promise<ClassifierResult> {
-		if (this.#read(spec) !== undefined) return { judgments: [spec.id] }
+		if (this.#read(spec) !== undefined)
+			return { judgments: [spec.id], readings: [{ key: spec.id, phase, outcome: 'cached' }] }
 		const fingerprint = JSON.stringify(spec)
-		if (this.#failed.has(fingerprint)) return { judgments: [] }
+		if (this.#failed.has(fingerprint))
+			return { judgments: [], readings: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		signal.throwIfAborted()
+		const started = performance.now()
 		try {
 			const [judgment] = await this.#options.conversation.judgments.resolve(
 				this.#options.judge,
@@ -329,13 +345,26 @@ export class Classifier implements ClassifierInterface {
 				spec.sources,
 				signal,
 			)
+			const readings: readonly ClassifierReading[] = [
+				{ key: spec.id, phase, outcome: 'resolved', duration: performance.now() - started },
+			]
 			return judgment === undefined
-				? { judgments: [] }
+				? { judgments: [], readings }
 				: {
 						judgments: [spec.id],
 						...(judgment.usage === undefined ? {} : { usage: judgment.usage }),
+						readings,
 					}
 		} catch (error) {
+			// A rejection records its reading in the pushed result alone, so the empty result returned under a live signal repeats none.
+			const readings: readonly ClassifierReading[] = [
+				{
+					key: spec.id,
+					phase,
+					outcome: isJudgeAbortError(error) || signal.aborted ? 'aborted' : 'failed',
+					duration: performance.now() - started,
+				},
+			]
 			if (isJudgeAbortError(error))
 				results.push({
 					judgments:
@@ -344,14 +373,16 @@ export class Classifier implements ClassifierInterface {
 							? [spec.id]
 							: [],
 					...(error.partial.usage === undefined ? {} : { usage: error.partial.usage }),
+					readings,
 				})
+			else results.push({ judgments: [], readings })
 			if (
 				(isJudgeError(error) && error.code === 'QUESTION') ||
 				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
 			)
 				this.#failed.add(fingerprint)
 			if (signal.aborted) throw error
-			return { judgments: [] }
+			return { judgments: [], readings: [] }
 		}
 	}
 }

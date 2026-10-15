@@ -26,6 +26,7 @@ import {
 	SequentialSystemOneJudge,
 	createForeignSignal,
 	createScriptedProvider,
+	summarizeReadings,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -1592,7 +1593,7 @@ describe('Ledger', () => {
 		failed = true
 		const selections: Selection[] = []
 		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
-		await ledger.respond('Inspect the statement.')
+		const result = await ledger.respond('Inspect the statement.')
 		const selection = selections[0]
 		expect(selection).toEqual({
 			messages: ledger.conversation.view().slice(0, -1),
@@ -1600,6 +1601,15 @@ describe('Ledger', () => {
 			usage: { prompt: 50, completion: 1, total: 51 },
 			fault,
 		})
+		expect(selection).not.toHaveProperty('readings')
+		expect(summarizeReadings(result.readings)).toEqual([
+			{
+				key: JSON.stringify(['category', request.id]),
+				phase: 'category',
+				outcome: 'resolved',
+				duration: 'valid',
+			},
+		])
 	})
 
 	it('retains judge usage when the caller aborts classification', async () => {
@@ -1619,7 +1629,7 @@ describe('Ledger', () => {
 				fetch: transport.fetch,
 			}),
 		})
-		ledger.conversation.add([
+		const seeded = ledger.conversation.add([
 			{ role: 'user', content: 'First.' },
 			{ role: 'user', content: 'Second.' },
 		])
@@ -1628,6 +1638,69 @@ describe('Ledger', () => {
 		expect(result.partial).toBe(true)
 		expect(result.passes).toHaveLength(1)
 		expect(provider.calls).toEqual([])
+		expect(summarizeReadings(result.readings)).toEqual([
+			{
+				key: JSON.stringify(['category', requireValue(seeded[0]).id]),
+				phase: 'category',
+				outcome: 'resolved',
+				duration: 'valid',
+			},
+			{
+				key: JSON.stringify(['category', requireValue(seeded[1]).id]),
+				phase: 'category',
+				outcome: 'aborted',
+				duration: 'valid',
+			},
+		])
+	})
+
+	it('returns the readings of its own request only and keeps direct agent selections out of them', async () => {
+		const transport: RecordedTransport = new RecordedTransport(async () => {
+			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
+		})
+		const provider = createScriptedProvider(
+			[{ content: 'Earlier done.' }, { content: 'Direct done.' }, { content: 'Later done.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, {
+			...options,
+			topics: [],
+			judge: new SequentialSystemOneJudge({
+				url: 'http://judge.test',
+				model: 'filing',
+				batch: false,
+				fetch: transport.fetch,
+			}),
+		})
+		const statement = ledger.conversation.add({ role: 'user', content: 'First.' })
+		const key = JSON.stringify(['category', statement.id])
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const earlier = await ledger.respond('Earlier request.')
+		expect(summarizeReadings(earlier.readings)).toEqual([
+			{ key, phase: 'category', outcome: 'resolved', duration: 'valid' },
+		])
+		const direct = ledger.conversation.add({ role: 'user', content: 'Direct statement.' })
+		await ledger.agent.generate()
+		expect(selections).toHaveLength(2)
+		expect(isLedgerError(selections[1]?.fault)).toBe(true)
+		expect(transport.requests).toHaveLength(1)
+		const later = await ledger.respond('Later request.')
+		expect(summarizeReadings(later.readings)).toEqual([
+			{ key, phase: 'category', outcome: 'cached', duration: 'absent' },
+			{
+				key: JSON.stringify(['category', direct.id]),
+				phase: 'category',
+				outcome: 'resolved',
+				duration: 'valid',
+			},
+		])
+		expect(later.readings).not.toBe(earlier.readings)
+		expect(summarizeReadings(earlier.readings)).toHaveLength(1)
+		expect(transport.requests).toHaveLength(2)
+		for (const selection of selections) expect(selection).not.toHaveProperty('readings')
+		expect(selections[0]?.judgments).toEqual([key])
+		expect(selections[2]?.judgments).toEqual([key, JSON.stringify(['category', direct.id])])
 	})
 
 	it('resets selection and message boundaries before a pass whose selection throws', async () => {
