@@ -1,3 +1,57 @@
+# Compaction content qualification started on 2026-10-15
+
+The Compaction-only successor started at 19:05 UTC. At 19:06 UTC its retained evidence had
+3 completed products and was serving `ev-01-4`. Completion and quality remain pending.
+Records stays sealed and labeled at 96/96; never rerun or replay it for this campaign.
+
+The accepted promotion is Study `019f5ce` with Agent `8a9087b`; the MCP owner repair is
+`b0e9d7f`. Study's default gates passed after isolated timing rechecks, and its authored
+packed-consumer gate passed 10 tests without skips. MCP's full gates passed 2239 tests with
+5 conditional skips. See Study's `.orkestrel/promotion.md` acceptance record. No bump or
+publication occurred; promoted Agent/Ollama APIs still need their owning releases.
+
+The running candidate uses physical captured files under
+`tmp/studies/compaction-content-3-runtime`, with its authored project in that directory's
+`project` folder. Its result destination is `tmp/studies/compaction-content-3`.
+Keep the entire runtime, source, build receipt, launcher scripts, and their journals unchanged.
+The captured Study source is the accepted `tmp/worktrees/promotion-final` build; later
+working-tree changes do not change this physical copy. The original installed Study remains
+unchanged for historical evidence readers.
+
+The fixed execution deadline is `2026-10-15T21:51:00.000Z`; the dedicated daemon stops at
+`2026-10-15T22:02:00.000Z`. Trial and series each permit 9600000 ms, zero retries, one
+96-goal Compaction trajectory. Context 20480, output 8192, recap 2048, safety 512, thinking
+off, calibrated gauge, model digests, strict overflow options, workload, and rubric remain
+frozen. A blank recap retains its exact attempted text and settled usage, then fails with
+`content` before history replacement. No automatic retry or deadline extension is admitted.
+
+The process and journal identities are:
+
+- Supervisor PID 71256, `tmp/codex/compaction-content-3-supervisor.jsonl` and `.err`.
+- Study execute PID 32512, `tmp/codex/compaction-content-3-series.jsonl` and `.err`.
+- Dedicated daemon PID 97780, script PID 50724, `tmp/codex/compaction-content-3-daemon.jsonl`
+  and `.err`; port 11435 only. The user's daemon on 11434 is untouched.
+- Event observer PID 27112, `tmp/units/compaction-content-3-watch.jsonl` and `.err`.
+- Read live metadata with `node tmp/units/compaction-content-3-progress.ts`. The observer
+  reports milestones and terminal exit; it never declares qualification or stops execution.
+
+Custody SHA-256 is `09748251a8b6392be3564ef0bd3cf5260d405693137ae99c74397204e0bc30cd`.
+The checked declaration fingerprint is
+`973ea3b82212ca8fc2dbd61f544b894573508265e066042fd9389f350fde60aa`.
+The build receipt is `tmp/units/compaction-content-build.json`, SHA-256
+`4e0503c9ca6fa8acd41873e260d8b642d4b9a206fdb8f02d5664ce3229cd37b2`.
+Root's controls reject the wrong receipt, extra project/runtime files, reused destinations,
+and insufficient deadlines; restored custody passes. The real offline check passed in
+1631 ms without model calls. Earlier content and content-2 candidates failed offline on a
+missing required Agent selection and an invalid built-root layout; both are retained and
+were never executed. The content-3 source resolves native imports from its captured runtime.
+
+On termination, read the exit and seal, then apply the existing full-horizon, usage, pressure,
+nonempty recap, reducing fold, and repeated-fold predicates. A clean CLI exit is insufficient.
+Grade retained products separately under the frozen semantic rubric; never regenerate products
+to grade them. Performance screens remain gated on accepted qualification. No speedup is
+claimed from the rejected historical run's context or timing shares.
+
 # Rolling Compaction closed on 2026-10-15
 
 Parallel performance reading is verified in `tmp/units/rolling-performance-read-v5-report.md`.
