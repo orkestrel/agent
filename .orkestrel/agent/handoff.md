@@ -1,3 +1,12 @@
+# Compaction recap-cap successor authorized on 2026-10-15
+
+The user authorized repairing the recap-growth policy and launching a separate Compaction-only
+treatment. The analyst unit compaction-cap-design selects a bounded use of the existing section
+cap before implementation and freeze. No successor has launched at this entry. Keep Records
+and every historical failed run unchanged; their deadlines and stop rules are not extended.
+Study acceptance proceeds independently at sibling commit 065f2aa without refreshing Agent's
+installed Study runtime. The following terminal record describes the prior room treatment.
+
 # Terminal Compaction and parallel quality work on 2026-10-15
 
 The user selected unchanged estimation with prediction misses recorded as diagnostics. Root
@@ -55,23 +64,51 @@ not established ground truth. Actual transport input/output was 6777291/127585 t
 cached input was reported. Original execution and historical gradings remain unchanged.
 See tmp/units/retained-label-import-report.md for immutable label and report custody.
 
+Compaction labeling also completed: the remaining 36 batches ended exit 0, uncapped, after
+723219 ms, alongside the preserved 037 pilot. All 37 product-bearing batches passed the
+148-assignment audit, including omitted, duplicate and foreign controls. Imported grading
+467587cc891b026a8c5d81eb36ade8b8ffa7ed6a98b92f03ffcf06e27b67a8d1 records 24 achieved, 124
+unsuccessful and 236 unknown over the declared 384 semantic criteria. The 59 absent-product
+goals include the failed attempted goal and 58 genuinely unexecuted goals. The frozen report
+incorrectly calls all absent products unexecuted; preserve its bytes and use the terminal
+reading for execution counts. Actual labeling input/output was 1645758/45953 tokens over 37
+calls; summed duration was 1337131 ms. Public label/report commands both exited 0 uncapped.
+See tmp/units/compaction-label-import-report.md and its canonical command receipts. Labeling
+creates a grading on the existing execution result; it does not create another execution.
+
 The refusal's dominant component is eleven accumulated recaps: 9943 of 12315 heuristic units.
 The driver omitted the existing sections cap; the library's documented default is uncapped.
 The final fold expanded one arrival by 67 units while retaining all prior recaps. This is a
 treatment-policy limitation, not a proven Conversation mechanism defect. Selecting a cap would
 change model context and requires a separate frozen treatment. Do not silently change this run.
 
-Performance work continues with exact-byte preparation of the available four checkpoints.
+Performance preparation retained exact bytes for the available four checkpoints in
+tmp/studies/performance-terminal-inputs. The successor verifier
+tmp/units/performance-terminal-inputs-2.ts passed strict TypeScript and its positive/negative
+controls; the original extraction script is preserved but was not accepted for conformance.
 Agent prefill accounts for 27.575% of Agent fetch time and 20.389% of this partial attempt's
 wall time; model loading is 0.372% of Agent fetch time. The required twelve-checkpoint screen
 is incomplete. No speedup or optimization is accepted. See ../study/.orkestrel/performance.md.
-Study execution accounting is being implemented in the Study checkout by actual Sonnet after
-a bounded Opus design opinion. It records execution facts and keeps historical facts unknown.
-The installed Study copy and frozen runtimes remain unchanged while grading proceeds.
+Study execution accounting is accepted at sibling commit 065f2aa. Actual Sonnet implemented
+the change and independent Opus reviewed the production claims and proof adequacy. Study-owned
+format counters and historical compatibility branches are removed. Explicit boolean execution
+facts separate attempted failures from unexecuted cascades. Structural validation, integrity
+hashes, npm identities and caller-authored content versions remain. There is no decoder,
+migration or npm-version branch. Historical runs retain their captured runtime unchanged.
+Prescribed close-failure tests killed both review mutations; restored focused tests passed 59.
+Final format, lint, types, build and npm test passed, with 604 tests passing and 2 explained
+applicability skips. Discovery found no ungated, empty or undiscovered files. The commit carries
+the review ruling and gate measurements. No version bump or publication occurred.
 
-The requested one-hour metadata check is armed for 2026-10-15T13:15:20Z (09:15 EDT), child
-PID 54664, under a 3700-second cap. It writes tmp/studies/progress-check-20261015T1315.json
-and never launches inference. The following sections are historical; this terminal state
+The CPU-only compaction-sections-fixture passed against the real frozen Conversation. It
+reproduced recap expansion and verified merge triggering, preserved source identities and the
+protected exchange, plus initial/merge throw and abort behavior. No model executed. Its cap-2
+fixture was not a treatment recommendation or model-quality reading; the authorized successor
+requires its own frozen policy and bound.
+
+The requested one-hour metadata check completed at 2026-10-15T13:15:20.018Z (09:15 EDT),
+exit 0 uncapped, without inference. It wrote tmp/studies/progress-check-20261015T1315.json.
+The following sections are historical; this terminal state
 supersedes their active-process and pending-label statements.
 
 # Compaction terminal state on 2026-10-15

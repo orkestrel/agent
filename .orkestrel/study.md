@@ -1,5 +1,12 @@
 # Study package integration
 
+Study commit 065f2aa accepts explicit execution facts and removes Study-owned format counters
+and historical compatibility branches. Actual Sonnet implementation, independent Opus review,
+prescribed mutation proofs, and final gates closed that change: 604 tests passed with 2 explained
+applicability skips. Agent's installed Study copy remains unchanged for retained and successor
+series custody. No package version or dependency changed. Earlier installed-copy readings in
+this file remain historical; they do not describe the sibling checkout's revised contract.
+
 The portable @orkestrel/study package is implemented in the sibling Study checkout. Its public runtime uses src/core, src/server and src/bin/main.ts. Agent owns the authored adapters and scenarios under studies/; results and scratch belong in the consuming checkout's tmp/studies/. The superseded private app code was removed at 8a14ac9. The abandoned scaffold root-axis proposal was restored and its verified historical files moved to Study. Do not resume either layout.
 
 The contract is [Study's guide](../../study/guides/study.md). Research, design rounds and the per-file refinement record are retained in Study's git history through `3b7d6f3`; earlier private-app and scaffold-root proposals are superseded. No publication or version bump has occurred. Agent's file:../study development dependency is a real copied installation made with --install-links and --ignore-scripts. After the native package-root repair at Study `f977e68`, independent comparison found all 14 installed Study dist files byte-identical to the verified sibling build, totaling 2159504 bytes. The package manifest is identical too. The receipt is `tmp/units/study-native-final-installed.json`.
