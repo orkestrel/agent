@@ -1,8 +1,45 @@
-# Compaction content qualification started on 2026-10-15
+# Compaction content qualification failed on 2026-10-15
 
-The Compaction-only successor started at 19:05 UTC. At 19:06 UTC its retained evidence had
-3 completed products and was serving `ev-01-4`. Completion and quality remain pending.
+The Compaction-only successor started at 19:05 UTC and stopped at goal 11, `ev-03-3`, after
+10 complete products. Its summary returned an empty string. The content guard retained the
+attempted text, source ids and settled cost, then failed without retry. The remaining 85 goals
+are unexecuted, not independent model failures. Trial duration is 257249 ms; execute exited 1,
+uncapped, after 261007 ms. No generation is running.
 Records stays sealed and labeled at 96/96; never rerun or replay it for this campaign.
+
+Result `6ae6b4cc-833b-4227-9d27-ff57546ff54e` is sealed as
+`89604d36913afad1c9e8687c310e9056fcef95a04b123313c6a6e984d6dacc41`.
+The captured public Study grade and report commands passed in 1242 ms and 246 ms. Their
+operational rubric rejects the whole trial; its 96 unsuccessful rows are not 96 semantic
+critical violations. Semantic labeling remains separate.
+
+The independent reader `tmp/units/compaction-content-reader.ts` passed strict typechecking,
+53 controls and 16 rolling controls, and exact custody verification. Its terminal read exited
+2 in 341 ms, with status rejected and the real failure/cascade/cost retained in
+`tmp/units/compaction-content-reader-result.json`. Actual Opus session
+`349e8a34-65af-47f2-a84c-2a81edad6b52` reviewed the adapted seal/custody/terminal seams and
+returned PASS in 225253 ms. Root checked the diff and owning algorithms; abbreviated
+unresolved citations were not accepted as evidence. This reader does not replace the public
+Study custody check. Preserve it for this frozen request shape.
+
+The summary wire reports prompt 10604, completion 1 and finish `stop`, under context 20480
+and output 2048. This is a content failure, not an observed overflow or output cap. The request
+ends with an old assistant answer. A render-only check against pinned Ollama v0.40.3 confirms
+that this shape continues that answer; a final user task opens a fresh assistant turn. No
+generated tokens were used. This mechanism does not prove the cause of every historical blank
+recap, and the exact failed request body was not retained.
+
+Actual Opus session `2d6214a1-ec73-4a07-9e2e-c5947d8e8aa3` prescribed moving the unchanged
+`summary-instruction` message from first/system to final/user in the Agent study adapter.
+Scaffold's Agent guide already specifies this pattern. The final-user-only renderer checks
+passed for assistant-tail and rolling-recap transcripts in 5823 ms. Root accepted Sonnet's
+consumer repair after the regression failed against the old adapter (1 failure, 3861 ms),
+passed after repair (1 passed, 3806 ms), and the touched file passed 91 tests. The full service
+project passed 159 tests across 11 files in 94908 ms; typecheck, scoped lint and format passed.
+The old first/system, missing instruction and first/user mutations each failed the named
+regression; restoration passed. No models were called by these protocol-fixture proofs.
+The unchanged instruction, folded source bytes, explicit provenance, blank refusal and budgets
+remain covered. Freeze the successor separately, preserving all failed results.
 
 The accepted promotion is Study `019f5ce` with Agent `8a9087b`; the MCP owner repair is
 `b0e9d7f`. Study's default gates passed after isolated timing rechecks, and its authored
@@ -10,7 +47,7 @@ packed-consumer gate passed 10 tests without skips. MCP's full gates passed 2239
 5 conditional skips. See Study's `.orkestrel/promotion.md` acceptance record. No bump or
 publication occurred; promoted Agent/Ollama APIs still need their owning releases.
 
-The running candidate uses physical captured files under
+The terminal candidate uses physical captured files under
 `tmp/studies/compaction-content-3-runtime`, with its authored project in that directory's
 `project` folder. Its result destination is `tmp/studies/compaction-content-3`.
 Keep the entire runtime, source, build receipt, launcher scripts, and their journals unchanged.
@@ -30,7 +67,8 @@ The process and journal identities are:
 - Supervisor PID 71256, `tmp/codex/compaction-content-3-supervisor.jsonl` and `.err`.
 - Study execute PID 32512, `tmp/codex/compaction-content-3-series.jsonl` and `.err`.
 - Dedicated daemon PID 97780, script PID 50724, `tmp/codex/compaction-content-3-daemon.jsonl`
-  and `.err`; port 11435 only. The user's daemon on 11434 is untouched.
+  and `.err`, were stopped after the render diagnostics. Root enumerated and confirmed the
+  owned tree gone before preparing another daemon. The user's daemon on 11434 is untouched.
 - Event observer PID 27112, `tmp/units/compaction-content-3-watch.jsonl` and `.err`.
 - Read live metadata with `node tmp/units/compaction-content-3-progress.ts`. The observer
   reports milestones and terminal exit; it never declares qualification or stops execution.
@@ -46,7 +84,7 @@ and insufficient deadlines; restored custody passes. The real offline check pass
 missing required Agent selection and an invalid built-root layout; both are retained and
 were never executed. The content-3 source resolves native imports from its captured runtime.
 
-On termination, read the exit and seal, then apply the existing full-horizon, usage, pressure,
+For a successor, apply the existing full-horizon, usage, pressure,
 nonempty recap, reducing fold, and repeated-fold predicates. A clean CLI exit is insufficient.
 Grade retained products separately under the frozen semantic rubric; never regenerate products
 to grade them. Performance screens remain gated on accepted qualification. No speedup is

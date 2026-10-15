@@ -530,15 +530,17 @@ export class StudyMemorySession implements StudySessionInterface {
 		bound.throwIfAborted()
 		this.#transport.check()
 		const { gauge, recap } = compaction
-		// One canonical array: measured once, admitted or refused, then sent as the very same array.
+		// One canonical array: measured once, admitted or refused, then sent as the very same array. The
+		// instruction is the final user turn, so the chat template opens a fresh reply instead of
+		// continuing the last folded assistant message.
 		const canonical: readonly Message[] = [
+			...messages,
 			{
 				id: 'summary-instruction',
-				role: 'system',
+				role: 'user',
 				content:
 					'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.',
 			},
-			...messages,
 		]
 		const request: ProviderRequest = { messages: canonical }
 		const estimate = this.#options.agent.estimateRequest(request)

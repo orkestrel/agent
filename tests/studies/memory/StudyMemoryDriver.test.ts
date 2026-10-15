@@ -728,8 +728,8 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const agentDispatches = dispatched.filter((row) => row.role === 'agent')
 		expect([summaryDispatches.length, agentDispatches.length]).toEqual([2, 2])
 		const secondOrigins = readMemoryOrigins(summaryDispatches[1]?.origins)
-		expect(secondOrigins[0]).toEqual({ origin: 'instructions', source: 'summary' })
-		const recap = secondOrigins[1]
+		expect(secondOrigins.at(-1)).toEqual({ origin: 'instructions', source: 'summary' })
+		const recap = secondOrigins[0]
 		expect(recap?.origin).toBe('summary')
 		expect(recap?.source).toBeDefined()
 		const [, secondSummary] = readMemoryEvents(rolling.evidence, 'summary')
@@ -1396,7 +1396,7 @@ describe('summary admission under the Compaction gauge', () => {
 				schema: 0,
 				total: projected,
 			})
-			expect(readMemoryOrigins(admission?.origins)[0]).toEqual({
+			expect(readMemoryOrigins(admission?.origins).at(-1)).toEqual({
 				origin: 'instructions',
 				source: 'summary',
 			})
@@ -1481,6 +1481,49 @@ describe('summary admission under the Compaction gauge', () => {
 			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
 		).toMatchObject({ prompt: 10 })
 		expect(result.evidence.some((entry) => entry.event === 'summary')).toBe(true)
+	})
+
+	it('sends the summary instruction once as the final user message after the folded originals', async () => {
+		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
+		expect(result.failure).toBeUndefined()
+		const [chat] = result.requests.filter((request) => request.path === '/api/chat')
+		if (chat === undefined) throw new Error('Missing summary chat request')
+		const body = parseJSON(chat.body)
+		if (!isRecord(body) || !Array.isArray(body.messages)) throw new Error('Invalid chat request')
+		const sent = body.messages.map((message) => {
+			if (!isRecord(message)) throw new Error('Invalid chat message')
+			return { role: message.role, content: message.content }
+		})
+		const instruction =
+			'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.'
+		// The folded originals are the declared arrivals before the live one, in arrival order, untouched.
+		const input = buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0]?.input
+		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid summary goal')
+		const folded = input.arrivals.slice(0, -1).map((arrival) => {
+			if (!isRecord(arrival)) throw new Error('Invalid summary arrival')
+			return { role: 'user', content: `[Source ${String(arrival.id)}] ${String(arrival.content)}` }
+		})
+		expect(folded).toHaveLength(STUDY_MEMORY_SUMMARY_FOLDS.below.length)
+		expect(sent.filter((message) => message.content === instruction)).toHaveLength(1)
+		expect(sent.at(-1)).toEqual({ role: 'user', content: instruction })
+		expect(sent.slice(0, -1)).toEqual(folded)
+		// The retained context row and summary event agree with the sent order.
+		const row = readMemoryEvents(result.evidence, 'context').find(
+			(value) => value.role === 'summary' && value.stage === 'dispatch',
+		)
+		const origins = readMemoryOrigins(row?.origins)
+		expect(origins).toHaveLength(sent.length)
+		expect(origins.at(-1)).toEqual({ origin: 'instructions', source: 'summary' })
+		expect(origins.slice(0, -1)).toEqual(
+			folded.map((_message, index) => ({ origin: 'arrival', source: `a${index}` })),
+		)
+		const [summary] = readMemoryEvents(result.evidence, 'summary')
+		// The summary names exactly the folded messages, never its own instruction.
+		const sources = summary?.sources
+		if (!Array.isArray(sources)) throw new Error('Invalid summary sources')
+		expect(sources).toHaveLength(folded.length)
+		expect(new Set(sources).size).toBe(folded.length)
+		expect(sources).not.toContain('summary-instruction')
 	})
 
 	it('accepts a post-call prompt equal to the admitted projection and keeps its wire usage', async () => {
@@ -2467,7 +2510,7 @@ describe('passive observation of actual memory requests', () => {
 		}
 		// The summary request is exactly its instruction plus the folded messages: no tools, no schema.
 		expect(readMemoryParts(summary?.parts)).toMatchObject({ tools: 0, schema: 0 })
-		expect(readMemoryOrigins(summary?.origins)[0]).toEqual({
+		expect(readMemoryOrigins(summary?.origins).at(-1)).toEqual({
 			origin: 'instructions',
 			source: 'summary',
 		})
