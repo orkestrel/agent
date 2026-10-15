@@ -1376,6 +1376,31 @@ export function buildMemorySummaryGoals(
 }
 
 /**
+ * Builds two goals that each fold once under STUDY_MEMORY_SUMMARY_ROOM and the identity gauge: the
+ * small counted goal, then seven more 1200-character arrivals and a prompt. Each goal's agent window
+ * overflows, so a Compaction trial sends summary, agent, summary, agent in that order.
+ * @returns Two public goals whose arrival ids are distinct.
+ */
+export function buildMemoryRollingGoals(): readonly StudyGoal[] {
+	return Object.freeze([
+		...buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.small, 400),
+		Object.freeze({
+			id: 'second',
+			input: Object.freeze({
+				prompt: 'Retain later obligations',
+				arrivals: Object.freeze(
+					Array.from({ length: 7 }, (_, index) => ({
+						id: `b${index}`,
+						content: 'x'.repeat(1188),
+					})),
+				),
+				records: Object.freeze([]),
+			}),
+		}),
+	])
+}
+
+/**
  * Runs one Compaction goal over counted arrivals in STUDY_MEMORY_SUMMARY_ROOM under the identity gauge.
  * @param folded - Message content lengths a fold summarizes.
  * @param live - Message content length of the live arrival.

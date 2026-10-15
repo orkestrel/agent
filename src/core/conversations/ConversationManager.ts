@@ -98,6 +98,7 @@ export class ConversationManager implements ConversationManagerInterface {
 			...(summarize === undefined ? {} : { summarize }),
 			keep: input?.keep ?? this.#keep,
 			...(sections === undefined ? {} : { sections }),
+			...(input?.rolling === undefined ? {} : { rolling: input.rolling }),
 			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
 		})
 		this.#conversations.set(conversation.id, conversation)

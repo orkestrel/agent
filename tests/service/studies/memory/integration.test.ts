@@ -85,11 +85,14 @@ it('loads the actual q4 native topology with two distinct captured Agent occurre
 		expect(
 			inventory.packages.filter((entry) => isRecord(entry) && entry.name === '@orkestrel/agent'),
 		).toEqual(
-			[resolve('.'), resolve('node_modules/@orkestrel/agent')].map((root) => {
-				const manifest = parseJSON(readFileSync(join(root, 'package.json'), 'utf8'))
-				if (!isRecord(manifest)) throw new Error('Invalid actual Agent manifest')
-				return { root: realpathSync(root), name: '@orkestrel/agent', version: manifest.version }
-			}),
+			[resolve('.'), resolve('node_modules/@orkestrel/agent')]
+				.map((root) => realpathSync(root))
+				.sort()
+				.map((root) => {
+					const manifest = parseJSON(readFileSync(join(root, 'package.json'), 'utf8'))
+					if (!isRecord(manifest)) throw new Error('Invalid actual Agent manifest')
+					return { root: realpathSync(root), name: '@orkestrel/agent', version: manifest.version }
+				}),
 		)
 		for (const identity of selection.identities) {
 			if (!isRecord(identity) || typeof identity.path !== 'string')

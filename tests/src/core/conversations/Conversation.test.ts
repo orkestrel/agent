@@ -4,11 +4,13 @@ import {
 	Conversation,
 	ConversationError,
 	createConversation,
+	createConversationManager,
 	estimateMessages,
 	isConversationError,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	createRecapSummarizer,
 	createStubSummarizer,
 	createToolCall,
 	renderRecap,
@@ -1530,5 +1532,322 @@ describe('Conversation — keep must be a nonnegative safe integer', () => {
 
 		expect(await conversation.compact({ keep: 1 })).toBeDefined()
 		expect(conversation.messages().map(({ content }) => content)).toEqual(['b'])
+	})
+})
+
+describe('Conversation — rolling folds', () => {
+	it('folds each round in one call over the prior recap then the new slice, leaving one section', async () => {
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const first = requireValue(await conversation.compact())
+		expect(first.summary).toBe('recap(u1|a1)')
+		expect(stub.calls).toHaveLength(1)
+
+		conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+		const second = requireValue(await conversation.compact())
+
+		// One further call: the framed prior recap comes before the new slice, never the originals.
+		expect(stub.calls).toHaveLength(2)
+		expect(stub.calls[1]?.map(({ role, content }) => ({ role, content }))).toEqual([
+			{ role: 'assistant', content: renderRecap('recap(u1|a1)') },
+			{ role: 'user', content: 'u2' },
+			{ role: 'assistant', content: 'a2' },
+		])
+		expect(second.summary).toBe(`recap(${renderRecap('recap(u1|a1)')}|u2|a2)`)
+		expect(conversation.sections).toEqual([second])
+		expect(second.id).not.toBe(first.id)
+		expect(second.messages.map(({ content }) => content)).toEqual(['u1', 'a1', 'u2', 'a2'])
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u3'])
+		expect(conversation.view().map(({ content }) => content)).toEqual([
+			renderRecap(second.summary),
+			'u3',
+		])
+		expect(conversation.rehydrate(second.id)).toEqual(second.messages)
+		expect(conversation.rehydrate(first.id)).toBeUndefined()
+		expect(events.compact.calls).toEqual([[first], [second]])
+		expect(events.collapse.count).toBe(0)
+	})
+
+	it('keeps the newest user exchange and its tool turns live', async () => {
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'a2' })
+		const protectedExchange = conversation.add([
+			{ role: 'user', content: 'u3' },
+			{ role: 'assistant', content: 'checking', calls: [createToolCall({ id: 'order' })] },
+			{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
+			{ role: 'assistant', content: 'a3' },
+		])
+		await conversation.compact()
+
+		// The whole newest exchange — request, call, matching result and continuation — stays live verbatim.
+		expect(conversation.messages()).toEqual(protectedExchange)
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.sections[0]?.messages.map(({ content }) => content)).toEqual([
+			'u1',
+			'a1',
+			'u2',
+			'a2',
+		])
+		expect(stub.calls[1]?.map(({ content }) => content)).toEqual([
+			renderRecap('recap(u1|a1)'),
+			'u2',
+			'a2',
+		])
+	})
+
+	it('omitting rolling keeps appending sections with no prior recap in the request', async () => {
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize })
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		await conversation.compact()
+		conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+		await conversation.compact()
+
+		expect(conversation.sections.map(({ summary }) => summary)).toEqual([
+			'recap(u1|a1)',
+			'recap(u2|a2)',
+		])
+		expect(stub.calls[1]?.map(({ content }) => content)).toEqual(['u2', 'a2'])
+	})
+
+	it('makes no call and keeps the sections when no slice is eligible', async () => {
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const section = requireValue(await conversation.compact())
+		conversation.add({ role: 'assistant', content: 'a2' })
+
+		expect(await conversation.compact()).toBeUndefined()
+		expect(stub.calls).toHaveLength(1)
+		expect(conversation.sections).toEqual([section])
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u2', 'a2'])
+	})
+
+	it('commits nothing and emits nothing when the summarizer throws, then folds on retry', async () => {
+		const boom = new Error('rolling summarizer boom')
+		let calls = 0
+		const conversation = new Conversation({
+			rolling: true,
+			async summarize(messages) {
+				calls += 1
+				if (calls === 2) throw boom
+				return `recap of ${messages.length}`
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const first = requireValue(await conversation.compact())
+		conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+		const live = conversation.messages()
+
+		await expect(conversation.compact()).rejects.toBe(boom)
+		expect(conversation.sections).toEqual([first])
+		expect(conversation.sections[0]).toBe(first)
+		expect(conversation.messages()).toEqual(live)
+		expect(events.compact.count).toBe(1)
+		expect(events.collapse.count).toBe(0)
+
+		const retried = requireValue(await conversation.compact())
+		expect(retried.messages.map(({ content }) => content)).toEqual(['u1', 'a1', 'u2', 'a2'])
+		expect(conversation.sections).toEqual([retried])
+	})
+
+	it('commits nothing when aborted mid-fold, even if the summarizer ignores the signal', async () => {
+		const gate = Promise.withResolvers<string>()
+		let calls = 0
+		const conversation = new Conversation({
+			rolling: true,
+			async summarize() {
+				calls += 1
+				return calls === 1 ? 'recap' : gate.promise
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const first = requireValue(await conversation.compact())
+		conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+		const live = conversation.messages()
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+
+		const pending = conversation.compact({ signal: controller.signal })
+		await waitForCondition('the rolling summarizer call', () => calls === 2)
+		controller.abort(reason)
+		await expect(pending).rejects.toBe(reason)
+		gate.resolve('late recap')
+		await waitForDelay()
+
+		expect(conversation.sections[0]).toBe(first)
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.messages()).toEqual(live)
+		expect(events.compact.count).toBe(1)
+	})
+
+	it('commits nothing when a slice message is removed while the summarizer runs', async () => {
+		const gate = Promise.withResolvers<string>()
+		let calls = 0
+		const conversation = new Conversation({
+			rolling: true,
+			async summarize() {
+				calls += 1
+				return calls === 1 ? 'recap' : gate.promise
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
+			'compact',
+		])
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const first = requireValue(await conversation.compact())
+		const [dropped] = conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+
+		const pending = conversation.compact()
+		await waitForCondition('the rolling summarizer call', () => calls === 2)
+		expect(conversation.remove(requireValue(dropped).id)).toBe(true)
+		gate.resolve('late recap')
+
+		expect(await pending).toBeUndefined()
+		expect(conversation.sections[0]).toBe(first)
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u2', 'u3'])
+		expect(events.compact.count).toBe(1)
+	})
+
+	it('refuses a sections cap at construction, per call, and from a manager default', async () => {
+		expect(() => new Conversation({ rolling: true, sections: 2 })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
+		expect(() => createConversationManager({ sections: 2 }).add({ rolling: true })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
+
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		await expect(conversation.compact({ sections: 2 })).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SECTIONS',
+		)
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.sections).toEqual([])
+		expect(conversation.count).toBe(3)
+	})
+
+	it('folds every section of a hydrated snapshot into one, originals in order', async () => {
+		const stub = createRecapSummarizer()
+		const conversation = new Conversation({
+			summarize: stub.summarize,
+			rolling: true,
+			snapshot: {
+				id: 'hydrated',
+				sections: [
+					{
+						id: 'section-1',
+						summary: 'one',
+						messages: [
+							{ id: 'm1', role: 'user', content: 'u1' },
+							{ id: 'm2', role: 'assistant', content: 'a1' },
+						],
+					},
+					{
+						id: 'section-2',
+						summary: 'two',
+						messages: [
+							{ id: 'm3', role: 'user', content: 'u2' },
+							{ id: 'm4', role: 'assistant', content: 'a2' },
+						],
+					},
+				],
+				messages: [
+					{ id: 'm5', role: 'user', content: 'u3' },
+					{ id: 'm6', role: 'assistant', content: 'a3' },
+					{ id: 'm7', role: 'user', content: 'u4' },
+				],
+			},
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+
+		const section = requireValue(await conversation.compact())
+
+		expect(stub.calls).toHaveLength(1)
+		expect(stub.calls[0]?.map(({ content }) => content)).toEqual([
+			renderRecap('one'),
+			renderRecap('two'),
+			'u3',
+			'a3',
+		])
+		expect(conversation.sections).toEqual([section])
+		expect(section.messages.map(({ content }) => content)).toEqual([
+			'u1',
+			'a1',
+			'u2',
+			'a2',
+			'u3',
+			'a3',
+		])
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u4'])
+		expect(events.compact.count).toBe(1)
+		expect(events.collapse.count).toBe(0)
 	})
 })

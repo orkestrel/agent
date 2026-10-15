@@ -1940,6 +1940,28 @@ export function createStubSummarizer(): {
 	}
 }
 
+/**
+ * Creates an inert summarizer that records each request and digests it as `recap(<contents>)`,
+ * so a rolling fold's input and output are both readable from the section summary.
+ *
+ * @returns The summarizer and the requests it received, oldest first
+ */
+export function createRecapSummarizer(): {
+	readonly summarize: ConversationSummaryHandler
+	readonly calls: ReadonlyArray<readonly Message[]>
+} {
+	const recorder = createRecorder<readonly [readonly Message[]]>()
+	return {
+		get calls() {
+			return recorder.calls.map(([messages]) => messages)
+		},
+		async summarize(messages) {
+			recorder.handler(messages)
+			return `recap(${messages.map((message) => message.content).join('|')})`
+		},
+	}
+}
+
 /** Supplies the judge usage a selection fixture reports, distinct from every provider usage. */
 export const SELECTION_USAGE: TokenUsage = Object.freeze({ prompt: 30, completion: 2, total: 32 })
 

@@ -7,6 +7,7 @@ import {
 	raceSignal,
 	requireJudgment,
 	requireKeep,
+	requireRolling,
 	requireSectionsCap,
 } from '@src/core'
 import { waitForDelay } from '@orkestrel/test'
@@ -224,6 +225,24 @@ describe('requireJudgment', () => {
 			expect.objectContaining({ code: 'JUDGMENT' }),
 		)
 	})
+})
+
+describe('requireRolling', () => {
+	it('returns the switch unchanged when rolling has no cap, and when rolling is off with or without a cap', () => {
+		expect(requireRolling(true, undefined)).toBe(true)
+		expect(requireRolling(false, undefined)).toBe(false)
+		expect(requireRolling(false, 2)).toBe(false)
+	})
+
+	it.each([1, 2, 1.5, Number.POSITIVE_INFINITY, 0, Number.NaN])(
+		'throws the SECTIONS ConversationError for rolling beside the cap %s',
+		(cap) => {
+			expect(() => requireRolling(true, cap)).toThrow(ConversationError)
+			expect(() => requireRolling(true, cap)).toThrow(
+				expect.objectContaining({ code: 'SECTIONS', context: { sections: cap } }),
+			)
+		},
+	)
 })
 
 describe('requireSectionsCap', () => {

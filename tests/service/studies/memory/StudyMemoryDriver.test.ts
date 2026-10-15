@@ -15,6 +15,7 @@ import {
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
 	buildMemoryReply,
+	buildMemoryRollingGoals,
 	buildMemorySummaryGoals,
 	createMemoryContext,
 	createMemoryServer,
@@ -556,6 +557,127 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			fixture.close()
 			await server.close()
 		}
+	})
+
+	it('rolls repeated Compaction summaries into one recap that covers the prior recap and the new live slice', async () => {
+		const responses = ['Recap one', 'Answer one', 'Recap two', 'Answer two'].map((content) => ({
+			path: '/api/chat',
+			body: buildMemoryReply({ content }),
+		}))
+		const trial: MemoryTrialFixture = {
+			arm: 'compaction',
+			responses,
+			goals: buildMemoryRollingGoals(),
+			room: STUDY_MEMORY_SUMMARY_ROOM,
+			settings: { ...STUDY_MEMORY_SETTINGS, observe: true },
+		}
+		const rolling = await runMemoryTrial({
+			...trial,
+			settings: { ...STUDY_MEMORY_SETTINGS, observe: true, rolling: true },
+		})
+		const control = await runMemoryTrial(trial)
+
+		for (const result of [rolling, control]) {
+			expect(result.failure).toBeUndefined()
+			const chats = result.requests.filter((request) => request.path === '/api/chat')
+			expect(chats.map((request) => request.body.includes('Summarize the conversation'))).toEqual([
+				true,
+				false,
+				true,
+				false,
+			])
+		}
+		const rollingChats = rolling.requests.filter((request) => request.path === '/api/chat')
+		const controlChats = control.requests.filter((request) => request.path === '/api/chat')
+		const framed = '[Summary of earlier messages] '
+
+		// The second summary digests the framed first recap and the new slice, never the folded originals.
+		expect(rollingChats[2]?.body).toContain(`${framed}Recap one`)
+		expect(rollingChats[2]?.body).toContain('[Source a7]')
+		expect(rollingChats[2]?.body).toContain('[Source b5]')
+		expect(rollingChats[2]?.body).not.toContain('[Source a0]')
+		expect(rollingChats[2]?.body).not.toContain('[Source b6]')
+		// The next agent request carries the single newest recap and the live arrival.
+		expect(rollingChats[3]?.body).toContain(`${framed}Recap two`)
+		expect(rollingChats[3]?.body).not.toContain('Recap one')
+		expect(rollingChats[3]?.body).toContain('[Source b6]')
+		// The second summary names the prior recap among its sources beside the slice.
+		const [, rolled] = readMemoryEvents(rolling.evidence, 'summary').map((row) =>
+			Array.isArray(row.sources) ? row.sources.length : -1,
+		)
+		const [, appended] = readMemoryEvents(control.evidence, 'summary').map((row) =>
+			Array.isArray(row.sources) ? row.sources.length : -1,
+		)
+		expect(appended).toBeGreaterThan(0)
+		expect(rolled).toBe(Number(appended) + 1)
+
+		// The captured second summary dispatch names its first history member as the first section's recap.
+		const dispatched = readMemoryEvents(rolling.evidence, 'context').filter(
+			(row) => row.stage === 'dispatch',
+		)
+		const summaryDispatches = dispatched.filter((row) => row.role === 'summary')
+		const agentDispatches = dispatched.filter((row) => row.role === 'agent')
+		expect([summaryDispatches.length, agentDispatches.length]).toEqual([2, 2])
+		const secondOrigins = readMemoryOrigins(summaryDispatches[1]?.origins)
+		expect(secondOrigins[0]).toEqual({ origin: 'instructions', source: 'summary' })
+		const recap = secondOrigins[1]
+		expect(recap?.origin).toBe('summary')
+		expect(recap?.source).toBeDefined()
+		const [, secondSummary] = readMemoryEvents(rolling.evidence, 'summary')
+		const covered = Array.isArray(secondSummary?.sources) ? secondSummary.sources : []
+		expect(covered[0]).toBe(recap?.source)
+		expect(covered).toContain(recap?.source)
+		// The slice the second summary covers keeps its arrival provenance.
+		expect(secondOrigins).toContainEqual({ origin: 'arrival', source: 'a7' })
+		expect(secondOrigins).toContainEqual({ origin: 'arrival', source: 'b5' })
+		// The first agent request already named that recap; the last names the single new one and the live input.
+		expect(readMemoryOrigins(agentDispatches[0]?.origins)).toContainEqual(recap)
+		const lastOrigins = readMemoryOrigins(agentDispatches[1]?.origins)
+		expect(lastOrigins).toContainEqual({ origin: 'arrival', source: 'b6' })
+		expect(lastOrigins).toContainEqual({ origin: 'input', source: 'second' })
+		expect(lastOrigins.filter((entry) => entry.origin === 'summary')).toHaveLength(1)
+		expect(lastOrigins).not.toContainEqual(recap)
+
+		// The default stays append-only: the second summary sees no recap and the agent sees both.
+		expect(controlChats[2]?.body).not.toContain('Recap one')
+		expect(controlChats[3]?.body).toContain(`${framed}Recap one`)
+		expect(controlChats[3]?.body).toContain(`${framed}Recap two`)
+	})
+
+	it('keeps wire bytes identical for rolling false or omitted, and for a non-Compaction arm given rolling', async () => {
+		const goals = buildMemoryRollingGoals()
+		const room = STUDY_MEMORY_SUMMARY_ROOM
+		const omitted = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals,
+			room,
+			settings: STUDY_MEMORY_SETTINGS,
+		})
+		const disabled = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals,
+			room,
+			settings: { ...STUDY_MEMORY_SETTINGS, rolling: false },
+		})
+		const full = await runMemoryTrial({ arm: 'full', responses: [], goals: [WINDOW_GOAL] })
+		const ignored = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: [WINDOW_GOAL],
+			settings: { rolling: true },
+		})
+
+		expect([omitted.failure, disabled.failure, full.failure, ignored.failure]).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		])
+		expect(omitted.requests.length).toBeGreaterThan(2)
+		expect(disabled.requests).toEqual(omitted.requests)
+		expect(ignored.requests).toEqual(full.requests)
 	})
 
 	it.each(['length', 'overflow', 'malformed', 'missing', 'duplicate', 'http'])(

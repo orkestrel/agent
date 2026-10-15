@@ -1,3 +1,24 @@
+# Rolling implementation accepted on 2026-10-15
+
+Read `rolling.md` for vendor research, the selected one-pass replacement mechanism and
+verification. The implementation is accepted after actual Sonnet work, independent actual
+Opus review and proof closure. Full isolated service: 180 passed. Root project tests and
+guide parity pass; historical runtimes retain their bytes.
+
+The final root receipt is `tmp/units/rolling-compaction-acceptance-2.json`, SHA-256
+`1bd2c0df6ede7c2d94c461b881cbc6ef91f2422dc16478d2a3966a5169e44aed`.
+Use `rolling-series-stage-2.ts`: the original stage's dry validation incorrectly treated
+the prior generated Compaction profile as a removed source file. The successor exempts that
+generated profile alongside the already-preserved generated scenario; exact source-delta
+validation now passes. The original stage and receipt remain unlaunched evidence.
+
+Stage validation passed with exactly the expected memory source delta: StudyMemorySession,
+types and validators. Freeze/launch remain pending at this entry. The next steps use
+`rolling-series-freeze.ts`, `rolling-series-launch.ts` and `rolling-reader.ts`. Never build
+root dist, refresh dependencies, or alter captured runtime inputs. The isolated mirror is
+`tmp/studies/compaction-rolling-runtime`; preserve its build receipts and all acceptance-bound
+artifacts. The final launch entry will supersede this pending status.
+
 # Production-compaction research changes the successor on 2026-10-15
 
 The user's comparability check withdrew the unlaunched sections:2 proposal. Read

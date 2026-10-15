@@ -35,9 +35,14 @@ export function isStudyMemorySubject(value: unknown): value is StudyMemorySubjec
 export function isStudyMemorySettings(value: unknown): value is StudyMemorySettings {
 	return holds(() => {
 		if (!isRecord(value)) return false
-		if (Object.keys(value).some((key) => !['gauge', 'observe', 'checkpoints'].includes(key)))
+		if (
+			Object.keys(value).some(
+				(key) => !['gauge', 'observe', 'checkpoints', 'rolling'].includes(key),
+			)
+		)
 			return false
-		const { gauge, observe, checkpoints } = value
+		const { gauge, observe, checkpoints, rolling } = value
+		if (rolling !== undefined && !isBoolean(rolling)) return false
 		if (gauge !== undefined) {
 			if (
 				!isRecord(gauge) ||

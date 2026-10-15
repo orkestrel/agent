@@ -98,6 +98,11 @@ describe('memory declaration and mechanical evidence', () => {
 			['longest checkpoint', { observe: true, checkpoints: ['x'.repeat(128)] }],
 			['all members', { gauge, observe: true, checkpoints: names.slice(0, 12) }],
 			['undefined members', { gauge: undefined, observe: undefined, checkpoints: undefined }],
+			['rolling true', { gauge, rolling: true }],
+			['rolling false', { gauge, rolling: false }],
+			['rolling alone', { rolling: true }],
+			['rolling beside observation', { gauge, rolling: true, observe: true, checkpoints: ['a'] }],
+			['undefined rolling', { gauge, rolling: undefined }],
 		]
 		const refused: ReadonlyArray<readonly [string, unknown]> = [
 			['undefined', undefined],
@@ -133,6 +138,12 @@ describe('memory declaration and mechanical evidence', () => {
 			['long checkpoint', { observe: true, checkpoints: ['x'.repeat(129)] }],
 			['non-text checkpoint', { observe: true, checkpoints: [1] }],
 			['too many checkpoints', { observe: true, checkpoints: names }],
+			['text rolling', { gauge, rolling: 'true' }],
+			['numeric rolling', { gauge, rolling: 1 }],
+			['null rolling', { gauge, rolling: null }],
+			['array rolling', { gauge, rolling: [true] }],
+			['cased rolling key', { gauge, Rolling: true }],
+			['sections beside rolling', { gauge, rolling: true, sections: 2 }],
 		]
 		for (const [label, value] of accepted)
 			expect([label, isStudyMemorySettings(value)]).toEqual([label, true])

@@ -54,8 +54,8 @@ export function buildJudgments(
  *
  * @remarks
  * Pure and total. This is the unframed form a `sections` cap merge digests when it folds the
- * oldest sections into one (a summary over their section summaries); the recap label is a
- * `view()` presentation concern kept out of what the summarizer re-reads — see
+ * oldest sections into one (a summary over their section summaries); the recap label is absent
+ * from that merge input. A rolling fold instead re-reads the framed recap — see
  * {@link buildRecapMessage}.
  *
  * @param section - The compacted section to render
@@ -146,6 +146,36 @@ export function requireSectionsCap(cap: number | undefined): number | undefined 
 		throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
 	}
 	return cap
+}
+
+/**
+ * Returns the rolling switch after checking it does not combine with a `sections` cap, or throws a
+ * coded error.
+ *
+ * @remarks
+ * A rolling conversation keeps one section, so a cap has nothing to bound. The cap checked is the
+ * effective one: inherited from a manager, configured on the conversation, or supplied to one
+ * `compact()` call.
+ *
+ * @param rolling - Whether folds roll every prior section into one
+ * @param cap - The effective `sections` cap, or `undefined` for none
+ * @returns The rolling switch unchanged
+ * @throws ConversationError Thrown when `rolling` is true and a cap is present (code `'SECTIONS'`)
+ *
+ * @example
+ * ```ts
+ * requireRolling(true, undefined) // true
+ * requireRolling(false, 2) // false
+ * requireRolling(true, 2) // throws ConversationError ('SECTIONS')
+ * ```
+ */
+export function requireRolling(rolling: boolean, cap: number | undefined): boolean {
+	if (rolling && cap !== undefined) {
+		throw new ConversationError('SECTIONS', 'rolling cannot combine with a sections cap', {
+			context: { sections: cap },
+		})
+	}
+	return rolling
 }
 
 /**

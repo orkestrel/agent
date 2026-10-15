@@ -53,7 +53,7 @@ import {
 import { StudyMemoryObserver } from './StudyMemoryObserver.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
 import { StudyMemoryJudge } from './StudyMemoryJudge.js'
-import { isStudyMemoryInput } from './validators.js'
+import { isStudyMemoryInput, isStudyMemorySettings } from './validators.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
@@ -190,7 +190,14 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#conversation = conversations.add(
 				gauge === undefined
 					? {}
-					: { keep: 2, summarize: (messages, signal) => this.#summarize(messages, signal, gauge) },
+					: {
+							keep: 2,
+							summarize: (messages, signal) => this.#summarize(messages, signal, gauge),
+							...(isStudyMemorySettings(options.profile.settings) &&
+							options.profile.settings.rolling === true
+								? { rolling: true }
+								: {}),
+						},
 			)
 			this.#agent = new options.subject.Agent(provider, {
 				conversations,

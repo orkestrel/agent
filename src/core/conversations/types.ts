@@ -12,7 +12,8 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
  * Names the machine-readable condition a {@link import('./errors.js').ConversationError} reports.
  *
  * @remarks
- * `'SUMMARIZER'`: a `compact()` with no summarizer. `'SECTIONS'`: a `sections` cap below `1`.
+ * `'SUMMARIZER'`: a `compact()` with no summarizer. `'SECTIONS'`: a `sections` cap below `1`, or
+ * any `sections` cap combined with `rolling`.
  * `'JUDGMENT'`: a judgment or judge request that JSON cannot carry, or whose copy fails its guard.
  * `'KEEP'`: a `keep` that is not a nonnegative safe integer.
  */
@@ -210,7 +211,11 @@ export type ConversationEventMap = {
  * optional cap on the compacted `sections` list — when set (`>= 1`), a `compact()` that would
  * leave more than `sections` entries folds the oldest overflow into one merged section,
  * emitting `collapse`. A successful capped merge retains at most `Math.ceil(sections)` entries;
- * fractions and positive infinity are accepted. Default: no cap.
+ * fractions and positive infinity are accepted. Default: no cap. `rolling` makes each `compact()`
+ * one summarizer call over the framed recaps of every prior section then the slice, replacing all
+ * prior sections with one that retains their originals then the slice, with one `compact` event
+ * and no `collapse`; it cannot combine with `sections`, which throws a `ConversationError` with
+ * code `'SECTIONS'`. Default: `false`.
  * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, compacted
  * `sections`, and live tail are restored into the conversation, with the live `summarize` /
  * `keep` / `on` supplied alongside it (a summarizer is a function, not serialized data).
@@ -229,6 +234,13 @@ export interface ConversationOptions {
 	readonly keep?: number
 	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Default: no cap. */
 	readonly sections?: number
+	/**
+	 * Rolls every fold into one section: the summarizer digests the framed recaps of all prior
+	 * sections followed by the slice, and one section retaining their originals then the slice
+	 * replaces them. Combining it with a `sections` cap throws a `ConversationError` (`'SECTIONS'`).
+	 * Default: `false`.
+	 */
+	readonly rolling?: boolean
 	/** Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent. */
 	readonly snapshot?: ConversationSnapshot
 }
@@ -246,7 +258,8 @@ export interface ConversationOptions {
  * conversation for this compaction only — after the folded section is appended, an overflow past
  * `sections` folds the oldest sections into one merged section. Default: the cap of the
  * conversation (or no cap). `keep` must be a nonnegative safe integer; any other value throws a
- * {@link import('./errors.js').ConversationError} with code `'KEEP'`. `signal` cancels this
+ * {@link import('./errors.js').ConversationError} with code `'KEEP'`. A `sections` cap on a
+ * rolling conversation throws code `'SECTIONS'`. `signal` cancels this
  * compaction: an already-aborted signal rejects with its reason before the summarizer is called,
  * the signal is passed to the {@link ConversationSummaryHandler}, and an abort while the
  * summarizer runs rejects with the reason at once and commits nothing after the abort. A fold
@@ -412,6 +425,14 @@ export interface ConversationInterface {
 	 * a group moves before its assistant message, then back to whole exchanges again. Only a group
 	 * that spans two exchanges reaches that rule.
 	 *
+	 * A rolling conversation makes one summarizer call per fold, over the framed recaps of every
+	 * prior section followed by the slice with thinking stripped; the originals behind the recaps
+	 * are not sent. After the call settles, the slice and the prior sections must be unchanged; the
+	 * prior sections are then replaced atomically by one section retaining their originals in order
+	 * and then the slice, and the slice leaves the live tail. It emits `compact` once and never
+	 * `collapse`. A throw, an abort, or a changed input commits nothing. A fold with no eligible
+	 * slice makes no call. A `sections` cap, configured or supplied here, throws `'SECTIONS'`.
+	 *
 	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
 	 * merge step folds the oldest sections into one. If the `summarize` call of that merge throws,
 	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss), no `compact` is
@@ -434,7 +455,8 @@ export interface ConversationInterface {
 	 * @returns The folded {@link Section}, or `undefined` when nothing folded or the folded
 	 * messages or sections changed while the summarizer ran
 	 * @throws ConversationError Thrown when no summarizer was supplied (code `'SUMMARIZER'`), when the
-	 * effective sections cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`), or when
+	 * effective sections cap does not satisfy `>= 1` or combines with `rolling` (code `'SECTIONS'`,
+	 * including `NaN`), or when
 	 * the effective `keep` is not a nonnegative safe integer (code `'KEEP'`)
 	 */
 	compact(options?: CompactOptions): Promise<Section | undefined>
@@ -605,14 +627,15 @@ export interface ConversationSnapshotRow {
 /**
  * Carries the data to author a {@link ConversationInterface} through a {@link
  * ConversationManagerInterface} — the optional `id`, a `summarize` override, a `keep` override, a
- * `sections` cap override, the reserved `on` hooks, and a {@link ConversationSnapshot} to hydrate
- * from.
+ * `sections` cap override, the `rolling` switch, the reserved `on` hooks, and a
+ * {@link ConversationSnapshot} to hydrate from.
  *
  * @remarks
  * `id` is the identity of the conversation. Default: a minted id. `summarize` overrides the
  * default {@link ConversationSummaryHandler} of the manager for this conversation. Default: the
  * manager default. `keep` overrides the default retained-tail size of the manager. `sections`
- * overrides the default `sections` cap of the manager. `on` is the reserved listener key
+ * overrides the default `sections` cap of the manager. `rolling` switches on rolling folds; a
+ * manager `sections` default it would inherit throws `'SECTIONS'`. `on` is the reserved listener key
  * (initial {@link ConversationEventMap} listeners). `error` is the listener-error handler of the
  * conversation's emitter, so a throwing `on` listener reports there. Default: the emitter's own
  * handler. `snapshot` is the construction-time hydration
@@ -632,6 +655,8 @@ export interface ConversationInput {
 	readonly keep?: number
 	/** Overrides the default `sections` cap of the manager for this conversation. */
 	readonly sections?: number
+	/** Rolls every fold of this conversation into one section, passed on as {@link ConversationOptions.rolling}. Default: `false`; the manager holds no default. */
+	readonly rolling?: boolean
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** Holds the listener-error handler of the conversation's emitter — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler

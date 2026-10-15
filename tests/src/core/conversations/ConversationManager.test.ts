@@ -368,6 +368,47 @@ describe('ConversationManager — the default sections cap flows in, and per-add
 	})
 })
 
+describe('ConversationManager — rolling is a per-add option with no manager default', () => {
+	it('forwards a per-add rolling switch, so folds roll into one section', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize })
+		const conversation = manager.add({ rolling: true })
+
+		conversation.add({ role: 'assistant', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'b' })
+		const section = requireValue(await conversation.compact())
+
+		expect(conversation.sections).toEqual([section])
+		expect(section.messages.map(({ content }) => content)).toEqual(['a', 'b'])
+		expect(stub.calls[1]?.map(({ content }) => content)).toEqual([renderRecap('recap of 1'), 'b'])
+	})
+
+	it('leaves a conversation added without rolling appending sections', async () => {
+		const stub = createStubSummarizer()
+		const manager = new ConversationManager({ summarize: stub.summarize })
+		const conversation = manager.add({ rolling: false })
+
+		conversation.add({ role: 'assistant', content: 'a' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'b' })
+		await conversation.compact()
+
+		expect(conversation.sections).toHaveLength(2)
+	})
+
+	it('refuses rolling beside an inherited manager cap or a per-add cap', () => {
+		const capped = new ConversationManager({ sections: 2 })
+		expect(() => capped.add({ rolling: true })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
+		expect(() => new ConversationManager().add({ rolling: true, sections: 2 })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
+		expect(capped.count).toBe(0)
+	})
+})
+
 describe('ConversationManager — created conversations are independent', () => {
 	it('each conversation has its own live tail + sections', async () => {
 		const stub = createStubSummarizer()

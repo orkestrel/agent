@@ -21,6 +21,7 @@ import {
 	buildSummaryMessage,
 	raceSignal,
 	requireKeep,
+	requireRolling,
 	requireSectionsCap,
 } from './helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
@@ -53,6 +54,11 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   `#summarize` was supplied. Calls run one at a time, a fold commits only when its messages are
  *   still the live entries after the summarizer settles, and `options.signal` rejects the call
  *   with its reason at once and commits nothing after the abort.
+ * - **Rolling.** With `rolling`, a fold makes one summarizer call over the framed recaps of all
+ *   prior sections then the slice, and replaces those sections with one that retains their
+ *   originals then the slice. It emits `compact` once and never `collapse`, commits nothing when
+ *   the call throws, aborts, or the slice or prior sections changed, and cannot combine with a
+ *   `sections` cap (`'SECTIONS'`).
  * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns the full original messages of a
  *   known section and emits its `id` through `rehydrate`, even when the list is empty. An unknown
  *   id returns `undefined` without an event. The read never reinserts messages. `search` is a case-insensitive
@@ -88,6 +94,9 @@ export class Conversation implements ConversationInterface {
 	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
 	// after appending a fresh `compact()` fold: an overflow folds the oldest sections into one.
 	readonly #cap: number | undefined
+	// Whether a fold replaces every prior section with one that digests their recaps and the slice.
+	// Never combined with a cap.
+	readonly #rolling: boolean
 	// The compacted history, oldest → newest — each summarized slice retains its originals.
 	// Replaced on every change rather than mutated in place.
 	#sections: readonly Section[]
@@ -109,6 +118,8 @@ export class Conversation implements ConversationInterface {
 		this.#summarize = options?.summarize
 		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
 		this.#cap = requireSectionsCap(options?.sections)
+		this.#rolling = options?.rolling ?? false
+		requireRolling(this.#rolling, this.#cap)
 		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
 		if (snapshot !== undefined) {
 			for (const message of snapshot.messages) this.#messages.set(message.id, message)
@@ -189,6 +200,7 @@ export class Conversation implements ConversationInterface {
 			)
 		}
 		const cap = requireSectionsCap(options?.sections ?? this.#cap)
+		requireRolling(this.#rolling, cap)
 		const keep = requireKeep(options?.keep ?? this.#keep)
 		const signal = options?.signal
 		signal?.throwIfAborted()
@@ -278,18 +290,31 @@ export class Conversation implements ConversationInterface {
 		if (first >= 0 && fold <= first) fold = 0
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
-		const summary = await raceSignal(summarize(stripThinking(slice, 'none'), signal), signal)
+		// A rolling fold digests every prior recap (framed, oldest first) ahead of the slice in one
+		// call; the originals behind those recaps are never sent.
+		const prior = this.#rolling ? this.#sections : []
+		const request = [...prior.map((one) => buildRecapMessage(one)), ...stripThinking(slice, 'none')]
+		const summary = await raceSignal(summarize(request, signal), signal)
 		signal?.throwIfAborted()
 		// A `remove` or `clear` while the summarizer ran changed what this fold covers, so commit
 		// nothing rather than fold messages the caller dropped back into a section.
 		if (!slice.every((message) => this.#messages.get(message.id) === message)) return undefined
+		// The recaps the digest covers must still be the sections held, or the replacement would drop
+		// a section it never summarized.
+		if (
+			this.#rolling &&
+			(this.#sections.length !== prior.length ||
+				!prior.every((one, index) => this.#sections[index] === one))
+		) {
+			return undefined
+		}
 		const section: Section = {
 			id: crypto.randomUUID(),
 			summary,
-			messages: slice,
+			messages: this.#rolling ? [...prior.flatMap((one) => one.messages), ...slice] : slice,
 		}
 		for (const message of slice) this.#messages.delete(message.id)
-		this.#sections = [...this.#sections, section]
+		this.#sections = this.#rolling ? [section] : [...this.#sections, section]
 		// Preserve the original sections if the merge fails by replacing them only after summarizing.
 		if (cap !== undefined && this.#sections.length > cap) {
 			const overflow = this.#sections.length - cap + 1

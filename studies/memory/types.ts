@@ -26,6 +26,8 @@ export interface StudyMemorySettings {
 	readonly observe?: boolean | undefined
 	/** Names observation checkpoints and requires `observe: true`. */
 	readonly checkpoints?: readonly string[] | undefined
+	/** Rolls each compaction into one section covering the prior recaps; forwarded only in the compaction arm. */
+	readonly rolling?: boolean | undefined
 }
 
 /** Holds public arrivals and reference snapshots released before a goal. */

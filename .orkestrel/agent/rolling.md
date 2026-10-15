@@ -68,5 +68,36 @@ implementation. Its shortened Agent citation was checked against the actual core
 
 The optional cap draft passed 112 focused fixture tests and a typecheck but was never accepted,
 frozen or executed. Root withdrew its source edits and retained the patch under temporary custody.
-Its draft stage, freeze, launch and reader scripts must never be executed. No successor is running
-at this entry. Implementation, independent seam review, proofs and an isolated runtime freeze remain.
+Its draft stage, freeze, launch and reader scripts must never be executed.
+
+## Implementation accepted on 2026-10-15
+
+Actual Sonnet session `c6c2bbba-5e76-415a-9b93-4b17ff68eaed` implemented the selected shape
+and the prescribed proof additions. Actual Opus reviewer session
+`25cb5cf7-fa18-4982-bf04-7b88b9bca2ba` confirmed the contract and risky seams; its remaining
+claim concerned unexecuted consumer proofs. Root closed that claim with the isolated build,
+111 focused consumer tests and the full service project: 180 passed. Core mutations omitting
+prior recaps and retaining old sections each failed three assertions. Disabling session
+forwarding failed the intended consumer assertion. All mutations were restored.
+
+Verification retained 1474 core, 119 policy, 229 config and 161 setup passes, with two existing
+skips. Guide parity failed before its documentation correction and then passed 137 tests.
+The isolated full-service proof initially lacked checkout fixtures; after supplying and
+removing those temporary inputs, its remaining failure was an order-dependent topology
+expectation. Canonical-path ordering fixed that assertion without changing runtime behavior.
+Format, lint, TypeScript and isolated build passed. The full-service wrapper restored its
+temporary test copy and removed its dependency junction and workload fixture.
+
+Root dist and installed runtimes retain their historical bytes. The successor uses separately
+built Agent and copied Ollama siblings under `tmp/studies/compaction-rolling-runtime`. Native
+Astra reviewed the launch bindings; the daemon wrapper now permits dispatcher-owned logs
+and runs only under the canonical four-hour cap. The independent reader passed 52 offline
+controls and discloses that replacement recap IDs are observed in the next Agent context,
+not emitted by the summary-completion event.
+
+Accept the implementation and the qualification protocol, not a future successful result.
+The prospective Compaction-only attempt retains 96 goals, zero retries, strict failures,
+the existing room/gauge, and a 9662835-ms trial/series budget. Its immutable outer deadline
+adds 60000 ms cleanup and 120000 ms launch margin. Repeated nonempty reducing folds are
+required to qualify; completed operations alone do not establish quality or vendor equivalence.
+`handoff.md` carries the subsequent frozen identity and actual launch state.
