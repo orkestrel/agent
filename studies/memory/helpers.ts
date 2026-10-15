@@ -23,8 +23,10 @@ import {
 	attempt as attemptValue,
 	canonicalStringify,
 	isArray,
+	isInteger,
 	isObject,
 	isRecord,
+	parseJSON,
 } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
 import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
@@ -51,20 +53,12 @@ export function projectStudyMemoryRequest(gauge: LedgerGauge, estimate: number):
 	return Math.ceil(gauge.overhead + gauge.scale * estimate)
 }
 
-/** Checks an actual prompt count against a request's projection. @param usage - Usage a successful provider call reported. @param projected - Gauge projection of the dispatched request. @param role - The responsibility whose request was dispatched; every failure retains it. @returns Nothing when a finite positive count does not exceed the projection. @throws StudyError - FAULT when the count is missing or not finite and positive; CAPACITY when it exceeds the projection. */
-export function validateStudyMemoryProjection(
-	usage: ProviderResult['usage'],
-	projected: number,
-	role: StudyRole,
-): void {
+/** Checks that a successful provider call reported a usable actual prompt count; room enforcement stays with the transport. @param usage - Usage a successful provider call reported. @param role - The responsibility whose request was dispatched; the failure retains it. @returns Nothing when the count is finite and positive, however it compares with any forecast. @throws StudyError - FAULT when the count is missing or not finite and positive. */
+export function validateStudyMemoryUsage(usage: ProviderResult['usage'], role: StudyRole): void {
 	const prompt = usage?.prompt
 	if (typeof prompt !== 'number' || !Number.isFinite(prompt) || prompt <= 0) {
 		const message = 'Gauged request returned no usable prompt count'
 		throw new StudyError('FAULT', message, { cause: 'infrastructure', message, role })
-	}
-	if (prompt > projected) {
-		const message = 'Actual prompt exceeded the gauged projection'
-		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role })
 	}
 }
 
@@ -238,12 +232,13 @@ export function validateStudyMemoryProfile(profile: StudyProfile): void {
 		throw new StudyError('CONFIG', 'Memory requires an uncredentialed exact origin')
 }
 
-/** Validates exact outbound Ollama policy before admission. @param profile - Runtime settings. @param role - Responsible model role. @param input - Requested URL. @param init - Native fetch settings. @returns Safe dispatch facts. */
+/** Validates exact outbound Ollama policy before admission. @param profile - Runtime settings. @param role - Responsible model role. @param input - Requested URL. @param init - Native fetch settings. @param strict - If `true`, a chat request must carry `truncate: false` and `shift: false`; if `false`, those fields are not read. Default: false. @returns Safe dispatch facts. @throws StudyError - CONFIG when the request differs from the admitted policy or a strict chat request omits or enables either field. */
 export function readStudyMemoryRequest(
 	profile: StudyProfile,
 	role: StudyRole,
 	input: string | URL | Request,
 	init?: RequestInit,
+	strict = false,
 ): StudyMemoryRequest {
 	const provider = profile.provider
 	if (provider === undefined || input instanceof Request)
@@ -325,6 +320,10 @@ export function readStudyMemoryRequest(
 				(body.think === true && !profile.room.think)
 	)
 		throw new StudyError('CONFIG', 'Memory transport flags differ from the declared treatment')
+	// The strict treatment governs chat requests only; the judge's raw generate wire is outside it.
+	const verified = strict && role !== 'judge'
+	if (verified && (body.truncate !== false || body.shift !== false))
+		throw new StudyError('CONFIG', 'Memory transport must disable native truncation and shifting')
 	return {
 		role,
 		path,
@@ -332,6 +331,7 @@ export function readStudyMemoryRequest(
 		output,
 		bytes: new TextEncoder().encode(init.body).byteLength,
 		options,
+		...(verified ? { strict: true } : {}),
 	}
 }
 
@@ -359,12 +359,61 @@ export function readStudyMemorySupport(value: unknown, profile: StudyProfile): n
 	return ceiling
 }
 
-/** Reads one Ollama terminal without inventing absent usage. @param value - Parsed wire row. @param request - Admitted dispatch. @returns Terminal facts or undefined for a nonterminal row. */
+/** Reads a native Ollama error member into the attributable failure it names, without reading any token usage from it. @param value - Parsed HTTP error body or wire row. @param role - The responsibility whose request was dispatched; the failure retains it. @param status - HTTP status of the carrying response; undefined for a row of a stream that answered 200. @returns Undefined when the value carries no `error` member. CAPACITY when the member, a string or an object, names the exact structured type `exceed_context_size_error` with finite positive integer `n_prompt_tokens` above `n_ctx`, a `code` of 400 if supplied and a status of 400 if supplied. FAULT with the readable reason otherwise, a malformed member included. */
+export function readStudyMemoryFailure(
+	value: unknown,
+	role: StudyRole,
+	status?: number,
+): StudyError | undefined {
+	if (!isRecord(value) || !('error' in value)) return undefined
+	const field = value.error
+	// The live daemon sends structured JSON inside a string; decode it once and unwrap one error object.
+	const decoded = typeof field === 'string' ? parseJSON(field) : field
+	const structured = isRecord(decoded)
+		? isRecord(decoded.error)
+			? decoded.error
+			: decoded
+		: undefined
+	const native = structured?.message
+	const text =
+		typeof native === 'string' && native.trim() !== ''
+			? native
+			: typeof field === 'string'
+				? field
+				: ''
+	const label = structured?.type
+	const type = typeof label === 'string' && label !== '' ? label : undefined
+	const origin = status === undefined ? 'Ollama error' : `Ollama HTTP ${status} error`
+	const prompt = structured?.n_prompt_tokens
+	const limit = structured?.n_ctx
+	const capacity =
+		type === 'exceed_context_size_error' &&
+		isInteger(prompt) &&
+		prompt > 0 &&
+		isInteger(limit) &&
+		limit > 0 &&
+		prompt > limit &&
+		(structured?.code === undefined || structured?.code === 400) &&
+		(status === undefined || status === 400)
+	const reason =
+		text.trim() === '' && type === undefined
+			? `Malformed ${origin}`
+			: `${origin}${type === undefined ? '' : ` (${type})`}${text.trim() === '' ? '' : `: ${text}`}`
+	return new StudyError(capacity ? 'CAPACITY' : 'FAULT', reason, {
+		cause: capacity ? 'capacity' : 'infrastructure',
+		message: reason,
+		role,
+	})
+}
+
+/** Reads one Ollama terminal without inventing absent usage. @param value - Parsed wire row. @param request - Admitted dispatch. @returns Terminal facts or undefined for a nonterminal row. @throws StudyError - The recognized provider failure when the row carries an `error` member, before any other row check. */
 export function readStudyMemoryTerminal(
 	value: unknown,
 	request: StudyMemoryRequest,
 ): StudyMemoryTerminal | undefined {
-	if (!isRecord(value) || typeof value.done !== 'boolean' || 'error' in value)
+	const failure = readStudyMemoryFailure(value, request.role)
+	if (failure !== undefined) throw failure
+	if (!isRecord(value) || typeof value.done !== 'boolean')
 		throw new StudyError('FAULT', 'Malformed Ollama response row')
 	if (value.model !== request.model)
 		throw new StudyError('FAULT', 'Ollama response model differs from the dispatched model')
@@ -396,30 +445,46 @@ export function readStudyMemoryTerminal(
 			value[key] !== undefined &&
 			(typeof value[key] !== 'number' || !Number.isSafeInteger(value[key]) || value[key] < 0)
 		)
-			throw new StudyError('FAULT', 'Malformed Ollama usage')
+			throw new StudyError('FAULT', 'Malformed Ollama usage', {
+				cause: 'infrastructure',
+				message: 'Malformed Ollama usage',
+				role: request.role,
+			})
 	const prompt = typeof value.prompt_eval_count === 'number' ? value.prompt_eval_count : undefined
 	const completion = typeof value.eval_count === 'number' ? value.eval_count : undefined
 	return { prompt, completion, reason: value.done_reason }
 }
 
-/** Checks terminal policy after actual wire cost has been retained. @param terminal - Valid terminal facts. @param profile - Reserved context and output. @param request - Admitted responsibility. */
+/** Checks terminal policy after actual wire cost has been retained. @param terminal - Valid terminal facts. @param profile - Reserved context and output. @param request - Admitted responsibility; every refusal retains its role. @throws StudyError - CAPACITY when the actual prompt exceeds its room or generation exhausts its allowance; FAULT for an unsupported finish reason. */
 export function validateStudyMemoryCompletion(
 	terminal: StudyMemoryTerminal,
 	profile: StudyProfile,
 	request: StudyMemoryRequest,
 ): void {
 	const { prompt, completion, reason } = terminal
-	if (prompt !== undefined && prompt > profile.room.context - request.output - profile.room.safety)
-		throw new StudyError('CAPACITY', 'Actual prompt exceeded reserved context capacity')
-	if (completion !== undefined && completion > request.output)
-		throw new StudyError('CAPACITY', 'Actual generation exceeded the output allowance')
+	const { role } = request
 	if (
-		request.role !== 'judge' &&
+		prompt !== undefined &&
+		prompt > profile.room.context - request.output - profile.room.safety
+	) {
+		const message = 'Actual prompt exceeded reserved context capacity'
+		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role })
+	}
+	if (completion !== undefined && completion > request.output) {
+		const message = 'Actual generation exceeded the output allowance'
+		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role })
+	}
+	if (
+		role !== 'judge' &&
 		(reason === 'length' || (completion !== undefined && completion >= request.output))
-	)
-		throw new StudyError('CAPACITY', 'Substantive generation reached its output cap')
-	if (reason !== 'stop' && !(request.role === 'judge' && reason === 'length'))
-		throw new StudyError('FAULT', 'Unsupported Ollama finish reason')
+	) {
+		const message = 'Substantive generation reached its output cap'
+		throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role })
+	}
+	if (reason !== 'stop' && !(role === 'judge' && reason === 'length')) {
+		const message = 'Unsupported Ollama finish reason'
+		throw new StudyError('FAULT', message, { cause: 'infrastructure', message, role })
+	}
 }
 
 /** Verifies both names resolve to the required inventory digests. @param value - Inventory response. @param profile - Required serving identities. @returns Nothing for a matching inventory. */

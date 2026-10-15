@@ -862,7 +862,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				think: false,
 				options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
 			})
-			expect(Object.keys(windowed).toSorted()).toEqual(Object.keys(plain).toSorted())
+			// Compaction adds only the two explicit native controls; every other member matches the plain request.
+			expect(Object.keys(windowed).toSorted()).toEqual(
+				[...Object.keys(plain), 'shift', 'truncate'].toSorted(),
+			)
+			expect([windowed.truncate, windowed.shift]).toEqual([false, false])
+			expect('truncate' in plain || 'shift' in plain).toBe(false)
 			expect(windowed.options).toEqual(plain.options)
 			expect(windowed.tools).toEqual(plain.tools)
 			expect(chats[0]?.body).not.toContain('overhead')
@@ -1261,7 +1266,7 @@ describe('summary admission under the Compaction gauge', () => {
 		).toMatchObject({ prompt })
 	})
 
-	it('terminates on a post-call prompt above the admitted projection while keeping the wire usage', async () => {
+	it('returns a post-call prompt above the admitted projection with its wire usage and retains the miss beside the forecast', async () => {
 		const prompt = STUDY_MEMORY_SUMMARY_PROJECTIONS.below + 1
 		const result = await runMemorySummary(
 			STUDY_MEMORY_SUMMARY_FOLDS.below,
@@ -1271,13 +1276,22 @@ describe('summary admission under the Compaction gauge', () => {
 		)
 		// The transport admits this prompt (it equals the room); only the gauge projection is exceeded.
 		expect(prompt).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
-		expect(result.failure).toContain('gauged projection')
-		expect(result.failure).not.toContain('reserved context capacity')
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		expect(result.failure).toBeUndefined()
+		expect(result.products).toHaveLength(1)
+		// The summary completes and the goal continues into the agent request that carries the recap.
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
 		expect(
 			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
 		).toMatchObject({ prompt })
 		expect(result.usage.find((row) => row.role === 'summary')?.tokens).toBe(prompt + 2)
+		const forecast = readMemoryEvents(result.evidence, 'context').find(
+			(value) => value.role === 'summary',
+		)
+		expect(forecast).toMatchObject({
+			stage: 'dispatch',
+			projected: STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
+		})
+		expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
 	})
 
 	it.each([
@@ -1314,9 +1328,16 @@ describe('summary admission under the Compaction gauge', () => {
 		['an over-room summary request', STUDY_MEMORY_SUMMARY_FOLDS.over, {}, 'CAPACITY', 'capacity'],
 		['an equal-room summary request', STUDY_MEMORY_SUMMARY_FOLDS.equal, {}, 'CAPACITY', 'capacity'],
 		[
-			'a prompt above the projection',
+			'a prompt one over the summary room',
 			STUDY_MEMORY_SUMMARY_FOLDS.below,
-			{ prompt: 3904 },
+			{ prompt: STUDY_MEMORY_SUMMARY_LIMIT + 1 },
+			'CAPACITY',
+			'capacity',
+		],
+		[
+			'a summary that exhausts its recap allowance',
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			{ completion: STUDY_MEMORY_SUMMARY_ROOM.recap },
 			'CAPACITY',
 			'capacity',
 		],
@@ -1792,7 +1813,16 @@ describe('passive observation of actual memory requests', () => {
 		expect(readMemoryEvents(refused.evidence, 'wire').map((value) => value.id)).not.toContain(
 			sent?.id,
 		)
-		expect(readMemoryEvents(refused.evidence, 'wire-failure')).toEqual([])
+		// A refused response is accounted once as a failure that keeps its status, never as a successful wire row.
+		const [refusal] = readMemoryEvents(refused.evidence, 'wire-failure')
+		expect(readMemoryEvents(refused.evidence, 'wire-failure')).toHaveLength(1)
+		expect(refusal).toMatchObject({ role: 'agent', status: 503, id: sent?.id })
+		expect(Object.keys(refusal ?? {}).sort()).toEqual(
+			listMemoryKeys(
+				STUDY_MEMORY_EVENT_KEYS['wire-failure'],
+				STUDY_MEMORY_OBSERVED_KEYS['wire-failure'],
+			),
+		)
 	})
 
 	it('attaches logical classifier readings and the calibrated gauge without leaking into requests or products', async () => {
@@ -2216,7 +2246,7 @@ describe('passive observation of actual memory requests', () => {
 		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
 	})
 
-	it('enforces the projection on Compaction returns and leaves Full and Records unbounded', async () => {
+	it('returns a Compaction reply above the projection with its usage and leaves Full and Records unbounded', async () => {
 		const goal: ReadonlyArray<MemoryTrialFixture['goals'][number]> = [
 			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
 		]
@@ -2242,7 +2272,7 @@ describe('passive observation of actual memory requests', () => {
 			settings: STUDY_MEMORY_FIXED_SETTINGS,
 		})
 		expect(equal.failure).toBeUndefined()
-		const rejected = await runMemoryTrial({
+		const missed = await runMemoryTrial({
 			arm: 'compaction',
 			responses: [
 				{
@@ -2253,15 +2283,27 @@ describe('passive observation of actual memory requests', () => {
 						prompt: STUDY_MEMORY_FIXED_PROJECTION + 1,
 					}),
 				},
-				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Follow-up received' }) },
 			],
 			goals: goal,
-			settings: STUDY_MEMORY_FIXED_SETTINGS,
+			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
 		})
-		expect(rejected.failure).toContain('gauged projection')
-		expect(rejected.products).toEqual([])
-		// The tool turn's follow-up request is never sent once the projection is exceeded.
-		expect(rejected.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		// The miss is not a refusal: the tool turn continues into its follow-up request and the goal completes.
+		expect(missed.failure).toBeUndefined()
+		expect(missed.products).toEqual([{ value: { content: 'Follow-up received' }, partial: false }])
+		expect(missed.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
+		expect(readMemoryEvents(missed.evidence, 'lookup')).toHaveLength(1)
+		// The pre-dispatch forecast stays retained beside the actual count that exceeded it.
+		expect(readMemoryEvents(missed.evidence, 'estimate').map((value) => value.projected)).toEqual([
+			STUDY_MEMORY_FIXED_PROJECTION,
+			STUDY_MEMORY_FIXED_PROJECTION,
+		])
+		expect(
+			readMemoryEvents(missed.evidence, 'wire')
+				.filter((value) => value.role === 'agent')
+				.map((value) => value.prompt),
+		).toEqual([STUDY_MEMORY_FIXED_PROJECTION + 1, 10])
+		expect(readMemoryEvents(missed.evidence, 'refusal')).toEqual([])
 	})
 
 	it.each([

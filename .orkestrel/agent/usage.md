@@ -52,24 +52,33 @@ different measurements. Larger allocated context also consumes memory.
 
 ## Implementation decision
 
-Separate prediction diagnostics from capacity enforcement before changing the estimator.
-Keep the published Agent calculator contract. Implement the following as a separately declared
-consumer treatment, with no change to old seals, readers, or outcomes:
+The user selected the correction on 2026-10-15: keep the estimator and completed Records run,
+record prediction misses, and stop on the first actual capacity failure. No estimator replacement,
+anchor, coefficient refit, cushion increase, or Records replay is selected. Keep the published Agent
+calculator contract. The prospective Compaction treatment changes no old seal, reader, or outcome:
 
 | Layer | Change | Required proof |
 | --- | --- | --- |
-| Agent memory study | Record actual-minus-projected error separately from actual prompt room; keep the historical projection qualification explicit. | A prediction miss within room remains observable; an actual room breach refuses the next turn; missing usage remains a fault. Pin the equality boundary. |
+| Agent memory study | Retain the estimate and actual usage; remove the post-return forecast comparison as a failure condition. | A prediction miss within room continues; actual prompt room plus one fails before another dispatch; equality remains accepted; missing usage remains a fault. |
 | Ollama provider | Add opt-in top-level truncation and shift controls, preserving the omitted/default wire. | Public contracts and encoded fields agree; the pinned daemon refuses excess context without silent truncation or shifting; terminal failures survive HTTP 200. |
 | Study reporting | Report projection misses, reserved-room breaches, provider refusals, output exhaustion, and the first failure separately. | Preserve attempt counts and unexecuted cascades; do not count one failure as many independent events. |
-| Estimator candidate | Evaluate a prior-actual-count anchor through the existing custom consumer after the preceding repairs. | Match rendered input, model, options, tools, schema, and replay policy; invalidate on rewrites; compare on declared held-out requests. No measured gain or bound is established yet. |
+| Estimator | Retain the existing heuristic, affine coefficients, and fixed cushion. | The estimator and pre-dispatch compaction admission stay unchanged. |
 
-Anchor identity must use provider-relevant content, not generated message IDs: the wire does
-not send those IDs. Replacing a summary, changing tools, or changing templates can invalidate
-an anchor. An actual count from an earlier request is not an exact count of the next request.
 Keep all measurements outside the model prompt unless a separate treatment explicitly adds them.
 No hidden retry, automatic margin increase, or Records rerun follows this decision. The failed
-qualification's fixed deadline has elapsed; another Compaction execution requires a separate
-freeze and its finite acceptance criteria.
+qualification's fixed deadline has elapsed. The user authorized the repair and Compaction-only
+successor; it needs a new freeze with finite bounds and explicit disclosure of the changed failure
+policy. Preserve the earlier rejected attempts. Their stop rule is not changed retrospectively.
+
+The bounded native chat proof completed in 5888 ms, exit 0, uncapped. On daemon 0.40.3 and the
+pinned Qwen 4B digest, the short control reported prompt 16, completion 2, and `stop`. The second
+request was refused with HTTP 400: 8204 prompt tokens exceeded the allocated 2048-token context.
+The process-list reading confirmed that allocation. Both requests sent `truncate:false` and
+`shift:false`; no successful terminal row appeared for the oversized request. This establishes
+the input refusal for this runtime, not an independent proof of generation shifting behavior.
+The native body wraps an `exceed_context_size_error` object in a JSON string under `error`.
+The consumer must preserve that failure reason and unknown terminal usage through the bounded
+HTTP reader. Source and fixture proof must cover streamed errors after HTTP 200 as well.
 
 Opus supplied a bounded opinion in session `f78db5f6-b6cd-43fd-a377-93f358483aba`
 (129260 ms, exit 0, uncapped). Root accepts classification and strict-wire work first, but rejects
@@ -77,6 +86,19 @@ the report's premise that request 33 was the first request after compaction. Ret
 shows summary 28 followed by agent requests 29, 30, 31, 32, and 33; the failed request shares those summary IDs.
 Consequently the claim that anchoring could not have affected that request is unproved.
 No adaptive-estimator performance claim is accepted.
+
+The implementation passed independent Astra correctness review after its prescribed attribution
+and fixture-placement fixes. Removing the malformed-usage attribution made both agent and summary
+regressions fail; restoring it made both pass. Opus session `7bf23d9e-6566-42f6-88c1-5e86996966c0`
+held the provider and consumer design by inspection. Its initial launch exhausted its turn limit;
+the bounded continuation returned the verdict without another investigation. Astra's concrete
+negative-usage and inline-table findings take precedence over that lane's broader confirmation.
+
+Final Agent verification passed 178 service tests and 2101 default-chain tests, with 2 applicability
+skips. Ollama passed 835 default-chain tests, with 3 applicability skips. Both packages passed
+format, lint, typecheck and build. The live proof remains limited to the observed input refusal.
+No estimator, gauge, reserve, compaction trigger, historical seal or Records execution changed.
+The new freeze binds the accepted source, runtime, proof and gate bytes before Compaction starts.
 
 ## API coverage
 

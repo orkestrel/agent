@@ -1,6 +1,10 @@
 import type { Message, ProviderRequest } from '@orkestrel/agent'
-import type { StudyMemoryProvenance, StudyMemoryRequest } from '../../../../studies/memory/index.js'
-import { isRecord, parseJSON } from '@orkestrel/contract'
+import type {
+	StudyMemoryProvenance,
+	StudyMemoryRequest,
+	StudyMemoryTerminal,
+} from '../../../../studies/memory/index.js'
+import { attempt, isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, readStudyFailure, StudyError } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import { AgentError } from '../../../../src/core/index.js'
@@ -22,6 +26,7 @@ import {
 	projectStudyMemoryRequest,
 	readStudyMemoryDigest,
 	readStudyMemoryError,
+	readStudyMemoryFailure,
 	readStudyMemoryGauge,
 	readStudyMemoryProvenance,
 	readStudyMemoryRequest,
@@ -32,7 +37,7 @@ import {
 	validateStudyMemoryInventory,
 	validateStudyMemoryCompletion,
 	validateStudyMemoryProfile,
-	validateStudyMemoryProjection,
+	validateStudyMemoryUsage,
 } from '../../../../studies/memory/index.js'
 import {
 	buildMemoryProfile,
@@ -40,9 +45,15 @@ import {
 	loadMemoryInputs,
 	readMemoryOrigins,
 	readMemoryParts,
+	STUDY_MEMORY_CHAT_BODY,
+	STUDY_MEMORY_FAILURE_CASES,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
+	STUDY_MEMORY_NATIVE_BODY,
+	STUDY_MEMORY_NATIVE_MESSAGE,
+	STUDY_MEMORY_NO_FAILURES,
 	STUDY_MEMORY_SETTINGS,
+	STUDY_MEMORY_STRICT_REFUSALS,
 	STUDY_MEMORY_TIMING,
 	STUDY_MEMORY_TIMING_EXPECTED,
 } from '../../../setupService.js'
@@ -280,11 +291,11 @@ describe('memory declaration and mechanical evidence', () => {
 			]).toEqual([scale, overhead, estimate, expected])
 	})
 
-	it('accepts a finite positive prompt not above its projection and refuses the rest with attributable errors', () => {
-		const [one, ten, eleven, zero, negative, nan, infinite] = [
+	it('accepts any finite positive prompt count and refuses the rest with attributable errors', () => {
+		const [one, ten, large, zero, negative, nan, infinite] = [
 			1,
 			10,
-			11,
+			1_000_000,
 			0,
 			-1,
 			Number.NaN,
@@ -293,7 +304,7 @@ describe('memory declaration and mechanical evidence', () => {
 		if (
 			one === undefined ||
 			ten === undefined ||
-			eleven === undefined ||
+			large === undefined ||
 			zero === undefined ||
 			negative === undefined ||
 			nan === undefined ||
@@ -301,26 +312,13 @@ describe('memory declaration and mechanical evidence', () => {
 		)
 			throw new Error('Missing usage fixture')
 		for (const role of ['agent', 'summary'] as const) {
-			expect(() => validateStudyMemoryProjection(ten, 10, role)).not.toThrow()
-			expect(() => validateStudyMemoryProjection(ten, 11, role)).not.toThrow()
-			expect(() => validateStudyMemoryProjection(one, 1, role)).not.toThrow()
-			let capacity: unknown
-			try {
-				validateStudyMemoryProjection(eleven, 10, role)
-			} catch (error) {
-				capacity = error
-			}
-			expect(capacity).toBeInstanceOf(StudyError)
-			expect(capacity).toMatchObject({ code: 'CAPACITY' })
-			expect(readStudyFailure(capacity)).toEqual({
-				cause: 'capacity',
-				message: 'Actual prompt exceeded the gauged projection',
-				role,
-			})
+			// The count is never compared with a forecast, so a count of any size is usable.
+			for (const usable of [one, ten, large])
+				expect(() => validateStudyMemoryUsage(usable, role)).not.toThrow()
 			for (const unusable of [undefined, zero, negative, nan, infinite]) {
 				let fault: unknown
 				try {
-					validateStudyMemoryProjection(unusable, 10, role)
+					validateStudyMemoryUsage(unusable, role)
 				} catch (error) {
 					fault = error
 				}
@@ -746,6 +744,219 @@ describe('memory declaration and mechanical evidence', () => {
 				request,
 			),
 		).toThrow('message')
+	})
+
+	it('reads native errors into attributable failures and recognizes capacity only by its exact structured type', () => {
+		for (const entry of STUDY_MEMORY_FAILURE_CASES)
+			for (const role of ['agent', 'summary'] as const) {
+				const failure = readStudyMemoryFailure(entry.value, role, entry.status)
+				expect(failure).toBeInstanceOf(StudyError)
+				expect(failure?.code).toBe(entry.code)
+				expect(failure?.failure).toEqual({
+					cause: entry.code === 'CAPACITY' ? 'capacity' : 'infrastructure',
+					message: failure?.message,
+					role,
+				})
+				for (const text of entry.reason) expect(failure?.message).toContain(text)
+			}
+		for (const value of STUDY_MEMORY_NO_FAILURES)
+			expect(readStudyMemoryFailure(value, 'agent')).toBeUndefined()
+		// The reason keeps the daemon's own words and type, and the failure names no token usage.
+		const live = readStudyMemoryFailure(parseJSON(STUDY_MEMORY_NATIVE_BODY), 'agent', 400)
+		expect(live?.message).toBe(
+			`Ollama HTTP 400 error (exceed_context_size_error): ${STUDY_MEMORY_NATIVE_MESSAGE}`,
+		)
+		expect(Object.keys(live?.failure ?? {}).sort()).toEqual(['cause', 'message', 'role'])
+	})
+
+	it('throws a recognized provider failure from an error row before any other row check', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const chat = 'http://127.0.0.1:7/api/chat'
+		const agent = readStudyMemoryRequest(profile, 'agent', chat, {
+			method: 'POST',
+			body: JSON.stringify(STUDY_MEMORY_CHAT_BODY),
+		})
+		const summary = readStudyMemoryRequest(profile, 'summary', chat, {
+			method: 'POST',
+			body: JSON.stringify({
+				...STUDY_MEMORY_CHAT_BODY,
+				options: { ...STUDY_MEMORY_CHAT_BODY.options, num_predict: profile.room.recap },
+			}),
+		})
+		const live = parseJSON(STUDY_MEMORY_NATIVE_BODY)
+		for (const [request, role] of [
+			[agent, 'agent'],
+			[summary, 'summary'],
+		] as const) {
+			const refused = attempt(() => readStudyMemoryTerminal(live, request))
+			expect(refused.success).toBe(false)
+			expect(refused.success ? undefined : refused.error).toMatchObject({
+				code: 'CAPACITY',
+				failure: { cause: 'capacity', role },
+				message: expect.stringContaining(STUDY_MEMORY_NATIVE_MESSAGE),
+			})
+		}
+		// An error row wins over a row that would otherwise be a valid partial or terminal.
+		for (const row of [
+			{ model: 'model', done: false, message: { role: 'assistant', content: 'par' } },
+			{ model: 'model', done: true, done_reason: 'stop', message: { content: 'ok' } },
+			{ model: 'other', done: 'maybe' },
+		])
+			expect(() => readStudyMemoryTerminal({ ...row, error: 'model failed' }, agent)).toThrow(
+				expect.objectContaining({
+					code: 'FAULT',
+					message: 'Ollama error: model failed',
+				}),
+			)
+		expect(() => readStudyMemoryTerminal({ error: 7 }, agent)).toThrow(
+			expect.objectContaining({ code: 'FAULT', message: 'Malformed Ollama error' }),
+		)
+		// A row without an error member keeps the existing strictness.
+		for (const row of [null, 'text', [], { done: 'maybe' }, { model: 'model' }])
+			expect(() => readStudyMemoryTerminal(row, agent)).toThrow('Malformed Ollama response row')
+	})
+
+	it('refuses a returned prompt one above its room with the role retained and accepts equality', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const chat = 'http://127.0.0.1:7/api/chat'
+		const { context, output, safety, recap } = profile.room
+		for (const [role, allowance] of [
+			['agent', output],
+			['summary', recap],
+		] as const) {
+			const request = readStudyMemoryRequest(profile, role, chat, {
+				method: 'POST',
+				body: JSON.stringify({
+					...STUDY_MEMORY_CHAT_BODY,
+					options: { ...STUDY_MEMORY_CHAT_BODY.options, num_predict: allowance },
+				}),
+			})
+			const room = context - allowance - safety
+			expect(() =>
+				validateStudyMemoryCompletion(
+					{ prompt: room, completion: 2, reason: 'stop' },
+					profile,
+					request,
+				),
+			).not.toThrow()
+			const refusals: ReadonlyArray<readonly [StudyMemoryTerminal, string, 'CAPACITY' | 'FAULT']> =
+				[
+					[
+						{ prompt: room + 1, completion: 2, reason: 'stop' },
+						'reserved context capacity',
+						'CAPACITY',
+					],
+					[
+						{ prompt: 10, completion: allowance + 1, reason: 'stop' },
+						'output allowance',
+						'CAPACITY',
+					],
+					[{ prompt: 10, completion: allowance, reason: 'stop' }, 'output cap', 'CAPACITY'],
+					[{ prompt: 10, completion: 2, reason: 'length' }, 'output cap', 'CAPACITY'],
+					[{ prompt: 10, completion: 2, reason: 'load' }, 'finish reason', 'FAULT'],
+				]
+			for (const [terminal, message, code] of refusals) {
+				const refused = attempt(() => validateStudyMemoryCompletion(terminal, profile, request))
+				expect(refused.success, `${role} ${message}`).toBe(false)
+				expect(refused.success ? undefined : refused.error, `${role} ${message}`).toMatchObject({
+					code,
+					message: expect.stringContaining(message),
+					failure: { cause: code === 'CAPACITY' ? 'capacity' : 'infrastructure', role },
+				})
+			}
+			// Unknown usage is never refused as capacity.
+			expect(() =>
+				validateStudyMemoryCompletion(
+					{ prompt: undefined, completion: undefined, reason: 'stop' },
+					profile,
+					request,
+				),
+			).not.toThrow()
+		}
+	})
+
+	it('verifies native truncate and shift controls only for strict chat requests', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const chat = 'http://127.0.0.1:7/api/chat'
+		const omitted = { method: 'POST', body: JSON.stringify(STUDY_MEMORY_CHAT_BODY) }
+		const disabled = {
+			method: 'POST',
+			body: JSON.stringify({ ...STUDY_MEMORY_CHAT_BODY, truncate: false, shift: false }),
+		}
+		// Omitted controls stay admitted for every caller that does not ask for strictness.
+		for (const request of [
+			readStudyMemoryRequest(profile, 'agent', chat, omitted),
+			readStudyMemoryRequest(profile, 'agent', chat, omitted, false),
+		])
+			expect('strict' in request).toBe(false)
+		const agent = readStudyMemoryRequest(profile, 'agent', chat, disabled, true)
+		expect(agent).toMatchObject({ role: 'agent', path: '/api/chat', output: 512, strict: true })
+		expect(Object.keys(agent.options).sort()).toEqual([
+			'num_ctx',
+			'num_predict',
+			'seed',
+			'temperature',
+		])
+		const summary = readStudyMemoryRequest(
+			profile,
+			'summary',
+			chat,
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					...STUDY_MEMORY_CHAT_BODY,
+					options: { ...STUDY_MEMORY_CHAT_BODY.options, num_predict: profile.room.recap },
+					truncate: false,
+					shift: false,
+				}),
+			},
+			true,
+		)
+		expect(summary).toMatchObject({ role: 'summary', output: profile.room.recap, strict: true })
+		for (const entry of STUDY_MEMORY_STRICT_REFUSALS) {
+			const init = {
+				method: 'POST',
+				body: JSON.stringify({ ...STUDY_MEMORY_CHAT_BODY, ...entry.fields }),
+			}
+			expect(() => readStudyMemoryRequest(profile, 'agent', chat, init, true)).toThrow(
+				expect.objectContaining({
+					code: 'CONFIG',
+					message: 'Memory transport must disable native truncation and shifting',
+				}),
+			)
+			expect(() => readStudyMemoryRequest(profile, 'agent', chat, init)).not.toThrow()
+		}
+		const judge = readStudyMemoryRequest(
+			profile,
+			'judge',
+			'http://127.0.0.1:7/api/generate',
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					model: 'judge',
+					stream: false,
+					raw: true,
+					logprobs: true,
+					options: { num_ctx: 32768, num_predict: 1, temperature: 1, seed: 0 },
+				}),
+			},
+			true,
+		)
+		const tags = readStudyMemoryRequest(
+			profile,
+			'metadata',
+			'http://127.0.0.1:7/api/tags',
+			{ method: 'GET' },
+			true,
+		)
+		const show = readStudyMemoryRequest(
+			profile,
+			'metadata',
+			'http://127.0.0.1:7/api/show',
+			{ method: 'POST', body: JSON.stringify({ model: 'model' }) },
+			true,
+		)
+		expect([judge, tags, show].map((request) => 'strict' in request)).toEqual([false, false, false])
 	})
 
 	it('requires unambiguous declared model context support', () => {

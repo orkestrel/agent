@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { isStudyMemorySettings } from '../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemoryCall,
 	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
@@ -18,6 +19,7 @@ import {
 	listMemoryKeys,
 	loadStudyToolsFixture,
 	readMemoryAdmission,
+	readMemoryControls,
 	readMemoryEvents,
 	readMemoryModels,
 	readMemoryOrigins,
@@ -33,8 +35,11 @@ import {
 	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
+	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
+	STUDY_MEMORY_AGENT_LIMIT,
+	STUDY_MEMORY_CHAT_BODY,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_DISABLED_SETTINGS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
@@ -46,10 +51,26 @@ import {
 	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_OBSERVER_REQUEST,
+	STUDY_MEMORY_FAILURE_CASES,
 	STUDY_MEMORY_HUNG_STREAM,
+	STUDY_MEMORY_NATIVE_BODY,
+	STUDY_MEMORY_NATIVE_CAPACITY,
+	STUDY_MEMORY_NATIVE_ERROR,
+	STUDY_MEMORY_NATIVE_GENERIC,
+	STUDY_MEMORY_NATIVE_MESSAGE,
+	STUDY_MEMORY_NATIVE_PARTIAL,
+	STUDY_MEMORY_NATIVE_TRIALS,
+	STUDY_MEMORY_NO_FAILURES,
+	STUDY_MEMORY_PROJECTION_MISSES,
 	STUDY_MEMORY_PROJECTION_PASS,
 	STUDY_MEMORY_PROJECTION_REFUSALS,
 	STUDY_MEMORY_SETTINGS,
+	STUDY_MEMORY_STRICT_REFUSALS,
+	STUDY_MEMORY_SUMMARY_FOLDS,
+	STUDY_MEMORY_SUMMARY_LIMIT,
+	STUDY_MEMORY_SUMMARY_MISSES,
+	STUDY_MEMORY_SUMMARY_PROJECTIONS,
+	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_TIMING,
 } from './setupService.js'
 
@@ -205,17 +226,14 @@ describe('study service fixtures', () => {
 						STUDY_MEMORY_FIXED_SETTINGS.gauge.scale * estimate,
 				),
 			).toBe(STUDY_MEMORY_FIXED_PROJECTION)
-		const [over, unknown, zero] = STUDY_MEMORY_PROJECTION_REFUSALS
+		const [unknown, zero] = STUDY_MEMORY_PROJECTION_REFUSALS
 		expect(STUDY_MEMORY_PROJECTION_PASS.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION })
-		expect(over?.reply).toEqual({ prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 })
-		expect(STUDY_MEMORY_PROJECTION_REFUSALS).toHaveLength(3)
-		expect([over?.code, unknown?.code, zero?.code]).toEqual(['CAPACITY', 'FAULT', 'FAULT'])
-		// Every refusal an agent observer raises retains the agent role, including unusable usage.
-		expect([over?.failure.role, unknown?.failure.role, zero?.failure.role]).toEqual([
-			'agent',
-			'agent',
-			'agent',
-		])
+		expect(STUDY_MEMORY_PROJECTION_REFUSALS).toHaveLength(2)
+		expect(unknown?.reply).toEqual({ unknown: true })
+		expect(zero?.reply).toEqual({ prompt: 0 })
+		expect([unknown?.code, zero?.code]).toEqual(['FAULT', 'FAULT'])
+		// Only unusable usage is refused now, and it retains the agent role; a forecast miss is never a refusal.
+		expect([unknown?.failure.role, zero?.failure.role]).toEqual(['agent', 'agent'])
 		const hung = parseJSON(STUDY_MEMORY_HUNG_STREAM.body)
 		expect(hung).toMatchObject({ done: false, message: { content: 'par' } })
 		expect(STUDY_MEMORY_HUNG_STREAM).toMatchObject({ path: '/api/chat', open: true })
@@ -226,6 +244,164 @@ describe('study service fixtures', () => {
 		expect(Object.isFrozen(messages) && Object.isFrozen(tools) && Object.isFrozen(options)).toBe(
 			true,
 		)
+	})
+
+	it('pins forecast-miss replies that stay inside every room and carry no refusal', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const { context, output, safety } = profile.room
+		expect(STUDY_MEMORY_AGENT_LIMIT).toBe(context - output - safety)
+		expect(STUDY_MEMORY_PROJECTION_MISSES.map((entry) => entry.reply.prompt)).toEqual([
+			STUDY_MEMORY_FIXED_PROJECTION + 1,
+			STUDY_MEMORY_FIXED_PROJECTION + 35,
+		])
+		for (const entry of STUDY_MEMORY_PROJECTION_MISSES)
+			expect(entry.reply.prompt).toBeLessThan(STUDY_MEMORY_AGENT_LIMIT)
+		const { context: span, safety: margin, recap } = STUDY_MEMORY_SUMMARY_ROOM
+		expect(STUDY_MEMORY_SUMMARY_LIMIT).toBe(span - recap - margin)
+		const projections = [
+			STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
+			STUDY_MEMORY_SUMMARY_PROJECTIONS.small,
+		]
+		expect(STUDY_MEMORY_SUMMARY_MISSES.map((entry) => entry.folded)).toEqual([
+			STUDY_MEMORY_SUMMARY_FOLDS.below,
+			STUDY_MEMORY_SUMMARY_FOLDS.small,
+		])
+		expect(
+			STUDY_MEMORY_SUMMARY_MISSES.map((entry, index) => entry.prompt - (projections[index] ?? 0)),
+		).toEqual([1, 35])
+		for (const entry of STUDY_MEMORY_SUMMARY_MISSES)
+			expect(entry.prompt).toBeLessThanOrEqual(STUDY_MEMORY_SUMMARY_LIMIT)
+	})
+
+	it('pins the strict chat body and the native controls a strict request must refuse', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		expect(STUDY_MEMORY_CHAT_BODY).toEqual({
+			model: 'model',
+			stream: true,
+			think: false,
+			options: {
+				num_ctx: profile.room.context,
+				num_predict: profile.room.output,
+				temperature: 0,
+				seed: 0,
+			},
+		})
+		expect('truncate' in STUDY_MEMORY_CHAT_BODY || 'shift' in STUDY_MEMORY_CHAT_BODY).toBe(false)
+		const names = STUDY_MEMORY_STRICT_REFUSALS.map((entry) => entry.name)
+		expect(new Set(names).size).toBe(names.length)
+		// Every refusal differs from the one admitted body, truncate false with shift false.
+		const admitted = { ...STUDY_MEMORY_CHAT_BODY, truncate: false, shift: false }
+		for (const entry of STUDY_MEMORY_STRICT_REFUSALS)
+			expect({ ...STUDY_MEMORY_CHAT_BODY, ...entry.fields }).not.toEqual(admitted)
+	})
+
+	it('builds a lookup call reply and reads native controls from exact chat bytes', () => {
+		const call = parseJSON(buildMemoryCall({ content: 'ignored', calls: [], prompt: 77 }))
+		expect(call).toMatchObject({
+			done: true,
+			prompt_eval_count: 77,
+			message: {
+				role: 'assistant',
+				content: '',
+				tool_calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+			},
+		})
+		const requests = [
+			{ path: '/api/chat', body: JSON.stringify({ truncate: false, shift: false }) },
+			{ path: '/api/chat', body: JSON.stringify({ truncate: true }) },
+			{ path: '/api/chat', body: '{}' },
+			{ path: '/api/generate', body: JSON.stringify({ truncate: false, shift: false }) },
+			{ path: '/api/tags', body: '' },
+		]
+		expect(readMemoryControls(requests)).toEqual([
+			{ truncate: false, shift: false },
+			{ truncate: true, shift: undefined },
+			{ truncate: undefined, shift: undefined },
+		])
+		expect(() => readMemoryControls([{ path: '/api/chat', body: '[]' }])).toThrow(
+			'Invalid chat request',
+		)
+	})
+
+	it('pins the live native refusal byte for byte and keeps every failure case distinguishable', () => {
+		const outer = parseJSON(STUDY_MEMORY_NATIVE_BODY)
+		if (!isRecord(outer) || typeof outer.error !== 'string') throw new Error('Invalid live body')
+		// The live wire carries a string holding structured JSON, never a nested object.
+		expect(parseJSON(outer.error)).toEqual({ error: STUDY_MEMORY_NATIVE_ERROR })
+		expect(STUDY_MEMORY_NATIVE_BODY).toBe(
+			JSON.stringify({ error: JSON.stringify({ error: STUDY_MEMORY_NATIVE_ERROR }) }),
+		)
+		expect(STUDY_MEMORY_NATIVE_ERROR.message).toBe(STUDY_MEMORY_NATIVE_MESSAGE)
+		const names = STUDY_MEMORY_FAILURE_CASES.map((entry) => entry.name)
+		expect(new Set(names).size).toBe(names.length)
+		expect(names).toEqual(
+			expect.arrayContaining([
+				'a structured error object',
+				'the exact live string-wrapped body',
+				'plain text that mentions the context',
+				'a prompt count equal to the context',
+				'a numeric error member',
+			]),
+		)
+		expect(new Set(STUDY_MEMORY_FAILURE_CASES.map((entry) => entry.code))).toEqual(
+			new Set(['CAPACITY', 'FAULT']),
+		)
+		for (const entry of STUDY_MEMORY_FAILURE_CASES) expect(entry.reason.length).toBeGreaterThan(0)
+		for (const value of STUDY_MEMORY_NO_FAILURES)
+			expect([value, isRecord(value) && 'error' in value]).toEqual([value, false])
+	})
+
+	it('pins end-to-end native replies for each role with the live refusal as the only capacity source', () => {
+		expect(STUDY_MEMORY_NATIVE_TRIALS.agent).toMatchObject({ arm: 'full' })
+		expect(STUDY_MEMORY_NATIVE_TRIALS.summary).toMatchObject({
+			arm: 'compaction',
+			room: STUDY_MEMORY_SUMMARY_ROOM,
+			goals: [{ id: 'opening' }],
+		})
+		expect(parseJSON(STUDY_MEMORY_NATIVE_PARTIAL)).toMatchObject({
+			done: false,
+			message: { content: 'par' },
+		})
+		expect(STUDY_MEMORY_NATIVE_PARTIAL.endsWith('\n')).toBe(true)
+		expect(STUDY_MEMORY_NATIVE_CAPACITY.map((entry) => [entry.role, entry.status])).toEqual([
+			['agent', 400],
+			['agent', 200],
+			['summary', 400],
+			['summary', 200],
+		])
+		for (const entry of STUDY_MEMORY_NATIVE_CAPACITY) {
+			expect([entry.code, entry.message]).toEqual(['CAPACITY', STUDY_MEMORY_NATIVE_MESSAGE])
+			expect(entry.body.trimEnd().endsWith(STUDY_MEMORY_NATIVE_BODY)).toBe(true)
+			// A 200 reply streams a content row first; a 400 reply is the bare body.
+			expect(entry.body.startsWith(STUDY_MEMORY_NATIVE_PARTIAL)).toBe(entry.status === 200)
+		}
+		const names = STUDY_MEMORY_NATIVE_GENERIC.map((entry) => entry.name)
+		expect(new Set(names).size).toBe(names.length)
+		expect(STUDY_MEMORY_NATIVE_GENERIC.every((entry) => entry.code === 'FAULT')).toBe(true)
+		expect(STUDY_MEMORY_NATIVE_GENERIC.some((entry) => entry.status === 200)).toBe(true)
+		expect(STUDY_MEMORY_NATIVE_GENERIC.some((entry) => entry.status >= 400)).toBe(true)
+	})
+
+	it('runs a real session to its first failure and then reads the latched fault', async () => {
+		const result = await runMemoryFailure({
+			arm: 'full',
+			responses: [
+				{ path: '/api/chat', body: 'Unavailable', status: 503 },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+			],
+			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+		})
+		expect(result.first).toBeDefined()
+		expect(result.latched).toMatchObject({ code: 'FAULT' })
+		expect(result.products).toEqual([])
+		expect(result.requests).toHaveLength(result.sent)
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		expect(result.queued).toBe(1)
+		expect(result.usage.filter((row) => row.role === 'agent')).toEqual([
+			{ role: 'agent', calls: 1, tokens: undefined, bytes: undefined },
+		])
+		const [failure] = readMemoryEvents(result.evidence, 'wire-failure')
+		expect(failure).toMatchObject({ role: 'agent', path: '/api/chat', status: 503 })
 	})
 
 	it('builds the observation trajectory and its queued replies with one-byte prompt control', () => {

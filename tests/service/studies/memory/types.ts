@@ -112,6 +112,48 @@ export interface MemoryTrialResult {
 	readonly usage: readonly MemoryUsageFixture[]
 	readonly evidence: readonly StudyEvidence[]
 }
+/** Holds what a real trial raised at its first failing goal and at the goal after it, with the wire state at both points. */
+export interface MemoryFailureResult {
+	/** Holds the value the first failing goal rejected with; undefined when every goal completed. */
+	readonly first: unknown
+	/** Holds the value the goal after the failure rejected with, which is the latched transport fault. */
+	readonly latched: unknown
+	readonly products: readonly StudyProduct[]
+	/** Holds every request the fixture received, in arrival order. */
+	readonly requests: ReadonlyArray<{ readonly path: string; readonly body: string }>
+	/** Holds the count of requests received before the goal after the failure ran. */
+	readonly sent: number
+	/** Holds the count of queued replies the fixture never served. */
+	readonly queued: number
+	readonly usage: readonly MemoryUsageFixture[]
+	readonly evidence: readonly StudyEvidence[]
+}
+
+/** Holds one native error value, the status it arrived with and the failure it must read as. */
+export interface MemoryFailureFixture {
+	readonly name: string
+	readonly value: unknown
+	readonly status?: number
+	readonly code: 'CAPACITY' | 'FAULT'
+	/** Holds substrings the readable reason must contain, such as the native message and type. */
+	readonly reason: readonly string[]
+}
+
+/** Holds one reply the daemon could send to a role's first chat request and the failure it must become. */
+export interface MemoryNativeFixture {
+	readonly name: string
+	/** Holds the responsibility whose first chat request the reply answers. */
+	readonly role: 'agent' | 'summary'
+	/** Holds the treatment that makes that role's chat request the first one sent; replies are supplied separately. */
+	readonly trial: Omit<MemoryTrialFixture, 'responses'>
+	/** Holds the HTTP status the fixture answers with. */
+	readonly status: number
+	readonly body: string
+	readonly code: 'CAPACITY' | 'FAULT'
+	/** Holds a substring of the readable failure message. */
+	readonly message: string
+}
+
 /** Holds the observation-independent subset two trials must agree on. */
 export type MemoryAdmissionFixture = Pick<
 	MemoryTrialResult,

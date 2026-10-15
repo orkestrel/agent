@@ -4,6 +4,8 @@ import {
 	parseStudyGrading,
 	parseStudyProfile,
 	parseStudyRubric,
+	readStudyFailure,
+	StudyError,
 } from '@orkestrel/study'
 import { readStudyResult } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
@@ -12,14 +14,37 @@ import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
+import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
 import {
+	buildMemoryCall,
+	buildMemoryProfile,
+	buildMemoryReply,
+	createMemoryContext,
 	createMemoryServer,
 	createStudyServiceFixture,
 	executeStudyService,
 	executeStudyTopology,
+	readMemoryControls,
+	readMemoryEvents,
 	readStudyToolsEvidence,
+	runMemoryFailure,
+	runMemorySummary,
+	runMemoryTrial,
+	STUDY_MEMORY_ACTUAL_REFUSALS,
+	STUDY_MEMORY_CONTINUATION_MISSES,
+	STUDY_MEMORY_FIXED_PROJECTION,
+	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_GOALS,
+	STUDY_MEMORY_MODULES,
+	STUDY_MEMORY_NATIVE_CAPACITY,
+	STUDY_MEMORY_NATIVE_GENERIC,
+	STUDY_MEMORY_NATIVE_MALFORMED,
+	STUDY_MEMORY_NATIVE_TRIALS,
+	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_SCHEDULE,
+	STUDY_MEMORY_SUMMARY_FOLDS,
+	STUDY_MEMORY_SUMMARY_MISSES,
+	WINDOW_GOAL,
 } from '../../../setupService.js'
 
 it('loads the actual q4 native topology with two distinct captured Agent occurrences', async () => {
@@ -364,3 +389,227 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 		}
 	}
 }, 540000)
+
+it.each(STUDY_MEMORY_SUMMARY_MISSES)(
+	'completes a summary whose actual prompt is $name and feeds the recap to the next agent request',
+	async ({ folded, prompt }) => {
+		const result = await runMemorySummary(
+			folded,
+			400,
+			[{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap kept', prompt }) }],
+			true,
+		)
+		expect(result.failure).toBeUndefined()
+		expect(result.products).toHaveLength(1)
+		const chats = result.requests.filter((request) => request.path === '/api/chat')
+		expect(chats).toHaveLength(2)
+		expect(chats[0]?.body).not.toContain('Recap kept')
+		expect(chats[1]?.body).toContain('Recap kept')
+		const forecast = readMemoryEvents(result.evidence, 'context').find(
+			(value) => value.role === 'summary',
+		)
+		// The actual count is above the forecast it is retained beside, and the goal still completes.
+		expect(Number(forecast?.projected)).toBeLessThan(prompt)
+		expect(
+			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
+		).toMatchObject({ prompt })
+		expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
+	},
+)
+
+it.each(STUDY_MEMORY_CONTINUATION_MISSES)(
+	'continues the tool turn for $name and retains the forecast beside the actual count',
+	async ({ prompt }) => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [
+				{ path: '/api/chat', body: buildMemoryCall({ prompt }) },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Follow-up received' }) },
+			],
+			goals: [WINDOW_GOAL],
+			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
+		})
+		expect(result.failure).toBeUndefined()
+		expect(result.products).toEqual([{ value: { content: 'Follow-up received' }, partial: false }])
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
+		expect(readMemoryEvents(result.evidence, 'lookup')).toHaveLength(1)
+		expect(readMemoryEvents(result.evidence, 'estimate').map((value) => value.projected)).toEqual([
+			STUDY_MEMORY_FIXED_PROJECTION,
+			STUDY_MEMORY_FIXED_PROJECTION,
+		])
+		expect(
+			readMemoryEvents(result.evidence, 'wire')
+				.filter((value) => value.role === 'agent')
+				.map((value) => value.prompt),
+		).toEqual([prompt, 10])
+	},
+)
+
+it.each(STUDY_MEMORY_ACTUAL_REFUSALS)(
+	'stops before the next request, tool and goal on $name',
+	async ({ settings, room, goal, body, message, role }) => {
+		const server = await createMemoryServer([
+			{ path: '/api/chat', body },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+		])
+		const profile = buildMemoryProfile({ url: server.url, room, settings })
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'stop', scenario: 'public', arm: 'compaction', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			if (goal === undefined) throw new Error('Missing goal fixture')
+			await expect(session.execute(goal, fixture.context)).rejects.toBeDefined()
+			const sent = server.requests.length
+			// The first failure is latched, so the next goal rethrows the very error the wire raised.
+			const latched = await session
+				.execute(
+					{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
+					fixture.context,
+				)
+				.then(
+					() => undefined,
+					(error: unknown) => error,
+				)
+			expect(latched).toMatchObject({ code: 'CAPACITY', message: expect.stringContaining(message) })
+			// A returned actual-capacity failure stays attributable to the role that sent the request.
+			expect(readStudyFailure(latched)).toMatchObject({ cause: 'capacity', role })
+			expect(server.requests).toHaveLength(sent)
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+			expect(server.responses).toHaveLength(1)
+			expect(readMemoryEvents(fixture.evidence, 'lookup')).toEqual([])
+			expect(
+				readMemoryEvents(fixture.evidence, 'wire').filter(
+					(value) => value.role === 'agent' || value.role === 'summary',
+				),
+			).toHaveLength(1)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
+	},
+)
+
+it('sends false truncate and shift controls only for Compaction chat requests and marks only their dispatch evidence', async () => {
+	const compaction = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
+	expect(compaction.failure).toBeUndefined()
+	expect(readMemoryControls(compaction.requests)).toEqual([
+		{ truncate: false, shift: false },
+		{ truncate: false, shift: false },
+	])
+	const dispatches = readMemoryEvents(compaction.evidence, 'dispatch')
+	const models = dispatches.filter((value) => value.role === 'agent' || value.role === 'summary')
+	expect(models.map((value) => value.role)).toEqual(['summary', 'agent'])
+	expect(models.map((value) => value.strict)).toEqual([true, true])
+	const metadata = dispatches.filter((value) => value.role === 'metadata')
+	expect(metadata.length).toBeGreaterThan(0)
+	expect(metadata.some((value) => 'strict' in value)).toBe(false)
+	for (const arm of ['full', 'records'] as const) {
+		const result = await runMemoryTrial({
+			arm,
+			responses: [],
+			goals: [WINDOW_GOAL],
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const controls = readMemoryControls(result.requests)
+		expect(controls.length).toBeGreaterThan(0)
+		expect(controls).toEqual(controls.map(() => ({ truncate: undefined, shift: undefined })))
+		expect(readMemoryEvents(result.evidence, 'dispatch').some((value) => 'strict' in value)).toBe(
+			false,
+		)
+	}
+})
+
+it.each([...STUDY_MEMORY_NATIVE_CAPACITY, ...STUDY_MEMORY_NATIVE_GENERIC])(
+	'fails $name once as $code with the role, status and bytes retained and sends no later request',
+	async ({ role, trial, status, body, code, message }) => {
+		const result = await runMemoryFailure({
+			...trial,
+			responses: [
+				{ path: '/api/chat', status, body },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+			],
+		})
+		// The failure surfaces: no goal completes, and the latched fault carries the daemon's own words.
+		expect(result.first).toBeDefined()
+		expect(result.products).toEqual([])
+		expect(result.latched).toBeInstanceOf(StudyError)
+		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
+		expect(readStudyFailure(result.latched)).toMatchObject({
+			cause: code === 'CAPACITY' ? 'capacity' : 'infrastructure',
+			role,
+		})
+		// Exactly one chat request was sent, none after the failure, and the second queued reply was never served.
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		expect(result.requests).toHaveLength(result.sent)
+		expect(result.queued).toBe(1)
+		// One failed ticket with unknown usage, never a successful wire row.
+		expect(result.usage.filter((row) => row.role === role)).toEqual([
+			{ role, calls: 1, tokens: undefined, bytes: undefined },
+		])
+		expect(
+			readMemoryEvents(result.evidence, 'wire').filter((value) => value.role === role),
+		).toEqual([])
+		// One failure row keeps the status, a bounded reason and every byte read, request included.
+		const failures = readMemoryEvents(result.evidence, 'wire-failure')
+		expect(failures).toHaveLength(1)
+		const dispatch = readMemoryEvents(result.evidence, 'dispatch').find(
+			(value) => value.role === role,
+		)
+		expect(failures[0]).toMatchObject({ role, path: '/api/chat', status })
+		expect(String(failures[0]?.reason)).toContain(message)
+		expect(String(failures[0]?.reason).length).toBeLessThanOrEqual(256)
+		expect(failures[0]?.bytes).toBe(
+			Number(dispatch?.bytes) + new TextEncoder().encode(body).byteLength,
+		)
+	},
+)
+
+it.each(STUDY_MEMORY_NATIVE_MALFORMED)(
+	'fails $name once as $code with the role retained, usage unknown and no later request',
+	async ({ role, trial, status, body, code, message }) => {
+		const result = await runMemoryFailure({
+			...trial,
+			responses: [
+				{ path: '/api/chat', status, body },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+			],
+		})
+		expect(result.first).toBeDefined()
+		expect(result.products).toEqual([])
+		expect(result.latched).toBeInstanceOf(StudyError)
+		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
+		expect(readStudyFailure(result.latched)).toMatchObject({ cause: 'infrastructure', role })
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		expect(result.requests).toHaveLength(result.sent)
+		expect(result.queued).toBe(1)
+		expect(result.usage.filter((row) => row.role === role)).toMatchObject([
+			{ role, calls: 1, tokens: undefined },
+		])
+	},
+)
+
+it('stops buffering a non-2xx body at the response byte allowance and fails capacity without a later request', async () => {
+	const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+	const allowance = profile.bounds.request.bytes
+	const result = await runMemoryFailure({
+		...STUDY_MEMORY_NATIVE_TRIALS.agent,
+		responses: [
+			{ path: '/api/chat', status: 500, body: 'x'.repeat(allowance + 1) },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+		],
+	})
+	expect(result.latched).toMatchObject({
+		code: 'CAPACITY',
+		message: expect.stringContaining('byte allowance'),
+	})
+	expect(readStudyFailure(result.latched)).toMatchObject({ cause: 'capacity', role: 'agent' })
+	expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+	expect(result.queued).toBe(1)
+	const [failure] = readMemoryEvents(result.evidence, 'wire-failure')
+	expect(failure).toMatchObject({ role: 'agent', status: 500 })
+	expect(Number(failure?.bytes)).toBeGreaterThan(allowance)
+})

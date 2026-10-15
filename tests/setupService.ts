@@ -1,6 +1,9 @@
 import type {
 	MemoryAdmissionFixture,
 	MemoryContextFixture,
+	MemoryFailureFixture,
+	MemoryFailureResult,
+	MemoryNativeFixture,
 	MemoryObserverFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
@@ -68,6 +71,9 @@ export const STUDY_MEMORY_FIXED_SETTINGS = Object.freeze({
 
 /** Pins the projection STUDY_MEMORY_FIXED_SETTINGS gives any realistic request, written as arithmetic rather than derived from the helper. */
 export const STUDY_MEMORY_FIXED_PROJECTION = 101
+
+/** Pins the agent prompt room of the default fixture profile, written as arithmetic: context 32768 less output 512 less safety 128. */
+export const STUDY_MEMORY_AGENT_LIMIT = 32128
 
 /** Pins a short request whose admission depends on the declared gauge. */
 export const WINDOW_GOAL = Object.freeze({
@@ -446,6 +452,18 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
 }
 
+/** Builds a protocol reply that has the model call the lookup tool for `order-1` instead of answering.
+ * @param options - Terminal row overrides; its content and calls are ignored.
+ * @returns A newline-delimited terminal row.
+ */
+export function buildMemoryCall(options: MemoryReplyFixture = {}): string {
+	return buildMemoryReply({
+		...options,
+		content: '',
+		calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+	})
+}
+
 /** Builds a streamed protocol reply: one nonterminal row per content part, then a terminal row with the reply's counts.
  * @param parts - Content chunks in delta order.
  * @param options - Terminal row overrides; its content is ignored.
@@ -497,18 +515,20 @@ export const STUDY_MEMORY_PROJECTION_PASS = Object.freeze({
 	reply: Object.freeze({ prompt: 101 }),
 })
 
-/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must refuse, with the exact error each carries. */
-export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
+/** Pins the replies that miss STUDY_MEMORY_FIXED_PROJECTION (101) upward by 1 and by 35 and stay far inside the reserved room, so a gauged observer must return them unchanged. */
+export const STUDY_MEMORY_PROJECTION_MISSES = Object.freeze([
 	Object.freeze({
 		name: 'a prompt one over the projection',
 		reply: Object.freeze({ prompt: 102 }),
-		code: 'CAPACITY',
-		failure: Object.freeze({
-			cause: 'capacity',
-			message: 'Actual prompt exceeded the gauged projection',
-			role: 'agent',
-		}),
 	}),
+	Object.freeze({
+		name: 'a prompt thirty-five over the projection',
+		reply: Object.freeze({ prompt: 136 }),
+	}),
+])
+
+/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must refuse for carrying no usable prompt count, with the exact error each carries. */
+export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
 	Object.freeze({
 		name: 'unknown counts',
 		reply: Object.freeze({ unknown: true }),
@@ -529,6 +549,247 @@ export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
 			role: 'agent',
 		}),
 	}),
+])
+
+/** Pins the exact agent chat body the default fixture profile admits, before any native control is added. */
+export const STUDY_MEMORY_CHAT_BODY = Object.freeze({
+	model: 'model',
+	stream: true,
+	think: false,
+	options: Object.freeze({ num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 }),
+})
+
+/** Pins the native control members a strict chat request must refuse, each as the fields it adds to STUDY_MEMORY_CHAT_BODY. */
+export const STUDY_MEMORY_STRICT_REFUSALS = Object.freeze([
+	Object.freeze({ name: 'both omitted', fields: Object.freeze({}) }),
+	Object.freeze({ name: 'shift omitted', fields: Object.freeze({ truncate: false }) }),
+	Object.freeze({ name: 'truncate omitted', fields: Object.freeze({ shift: false }) }),
+	Object.freeze({
+		name: 'truncate enabled',
+		fields: Object.freeze({ truncate: true, shift: false }),
+	}),
+	Object.freeze({ name: 'shift enabled', fields: Object.freeze({ truncate: false, shift: true }) }),
+	Object.freeze({
+		name: 'a non-boolean truncate',
+		fields: Object.freeze({ truncate: null, shift: false }),
+	}),
+])
+
+/** Pins the human message of the live Ollama 0.40.3 context refusal. */
+export const STUDY_MEMORY_NATIVE_MESSAGE =
+	'request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it'
+
+/** Pins the structured error that live refusal carried. */
+export const STUDY_MEMORY_NATIVE_ERROR = Object.freeze({
+	code: 400,
+	message: STUDY_MEMORY_NATIVE_MESSAGE,
+	type: 'exceed_context_size_error',
+	n_prompt_tokens: 8204,
+	n_ctx: 2048,
+})
+
+/** Pins the exact outer body recorded from that live refusal: `error` is a string that holds the structured JSON, not a nested object. */
+export const STUDY_MEMORY_NATIVE_BODY =
+	'{"error":"{\\"error\\":{\\"code\\":400,\\"message\\":\\"request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it\\",\\"type\\":\\"exceed_context_size_error\\",\\"n_prompt_tokens\\":8204,\\"n_ctx\\":2048}}"}'
+
+/** Pins the native error values and the failure each must read as, with the substrings its readable reason must keep. */
+export const STUDY_MEMORY_FAILURE_CASES: readonly MemoryFailureFixture[] = Object.freeze([
+	{
+		name: 'a structured error object',
+		value: { error: STUDY_MEMORY_NATIVE_ERROR },
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
+	},
+	{
+		name: 'the exact live string-wrapped body',
+		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
+	},
+	{
+		name: 'the exact live string-wrapped body on HTTP 400',
+		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
+		status: 400,
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error', 'HTTP 400'],
+	},
+	{
+		name: 'a string holding the bare error object',
+		value: { error: JSON.stringify(STUDY_MEMORY_NATIVE_ERROR) },
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
+	},
+	{
+		name: 'an object that wraps the error object once',
+		value: { error: { error: STUDY_MEMORY_NATIVE_ERROR } },
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'an error object without a code',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, code: undefined } },
+		code: 'CAPACITY',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'plain text that mentions the context',
+		value: { error: 'the prompt exceeds the available context size' },
+		code: 'FAULT',
+		reason: ['the prompt exceeds the available context size'],
+	},
+	{
+		name: 'context text under another native type',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'invalid_request_error' } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'invalid_request_error'],
+	},
+	{
+		name: 'a type that only resembles the capacity type',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'exceed_context_size_errors' } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_errors'],
+	},
+	{
+		name: 'the capacity type in another case',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'Exceed_Context_Size_Error' } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'an error object without a type',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: undefined } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a prompt count equal to the context',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 2048 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a prompt count below the context',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 100 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a zero context count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: 0 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a negative prompt count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: -8204, n_ctx: -9000 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a fractional prompt count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 8204.5 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a prompt count written as text',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: '8204' } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a NaN context count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: Number.NaN } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'an infinite prompt count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: Number.POSITIVE_INFINITY } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a missing prompt count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: undefined } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'a missing context count',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: undefined } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'an error code other than 400',
+		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, code: 500 } },
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
+	},
+	{
+		name: 'the live body on another HTTP status',
+		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
+		status: 500,
+		code: 'FAULT',
+		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'HTTP 500'],
+	},
+	{
+		name: 'a string that wraps a string that wraps the error',
+		value: {
+			error: JSON.stringify({ error: JSON.stringify({ error: STUDY_MEMORY_NATIVE_ERROR }) }),
+		},
+		code: 'FAULT',
+		reason: ['Ollama error'],
+	},
+	{
+		name: 'a string that decodes to a JSON string',
+		value: { error: '"model not found"' },
+		code: 'FAULT',
+		reason: ['"model not found"'],
+	},
+	{
+		name: 'a numeric error member',
+		value: { error: 7 },
+		code: 'FAULT',
+		reason: ['Malformed Ollama error'],
+	},
+	{
+		name: 'a null error member',
+		value: { error: null },
+		code: 'FAULT',
+		reason: ['Malformed Ollama error'],
+	},
+	{
+		name: 'a blank error string',
+		value: { error: '  ' },
+		code: 'FAULT',
+		reason: ['Malformed Ollama error'],
+	},
+	{
+		name: 'an array error member',
+		value: { error: [STUDY_MEMORY_NATIVE_ERROR] },
+		code: 'FAULT',
+		reason: ['Malformed Ollama error'],
+	},
+	{
+		name: 'an empty error object on HTTP 500',
+		value: { error: {} },
+		status: 500,
+		code: 'FAULT',
+		reason: ['Malformed Ollama HTTP 500 error'],
+	},
+])
+
+/** Pins values that carry no `error` member and so must read as no failure at all. */
+export const STUDY_MEMORY_NO_FAILURES: readonly unknown[] = Object.freeze([
+	undefined,
+	null,
+	'error',
+	['error'],
+	{},
+	{ done: true },
+	{ model: 'model', done: false, message: { role: 'assistant', content: 'error' } },
 ])
 
 /** Pins a protocol reply that streams one content row and then holds the response open without a terminal row. */
@@ -615,7 +876,7 @@ export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
 		'prompt',
 		'role',
 	]),
-	'wire-failure': Object.freeze(['bytes', 'path', 'role']),
+	'wire-failure': Object.freeze(['bytes', 'path', 'reason', 'role', 'status']),
 })
 
 /** Pins the keys observation adds to each existing event, excluding selected-goal body and snapshot. */
@@ -804,6 +1065,67 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 			requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
 			products,
 			failure,
+			usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
+				role: row.role,
+				calls: row.calls,
+				tokens: row.tokens,
+				bytes: row.bytes,
+			})),
+			evidence: [...fixture.evidence],
+		}
+	} finally {
+		await session?.close()
+		fixture.close()
+		await server.close()
+	}
+}
+
+/** Runs a real driver session against a fresh protocol fixture until a goal fails, then runs one more goal to read the latched fault.
+ * @param options - Treatment, queued replies, ordered goals and optional driver settings.
+ * @returns What the failing and the following goal rejected with, plus the wire state before the following goal and after the run.
+ */
+export async function runMemoryFailure(options: MemoryTrialFixture): Promise<MemoryFailureResult> {
+	const server = await createMemoryServer(options.responses)
+	const profile = buildMemoryProfile({
+		url: server.url,
+		...(options.settings === undefined ? {} : { settings: options.settings }),
+		...(options.duration === undefined ? {} : { duration: options.duration }),
+		...(options.room === undefined ? {} : { room: options.room }),
+	})
+	const fixture = createMemoryContext(profile)
+	const products: StudyProduct[] = []
+	let session: StudySessionInterface | undefined
+	try {
+		session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'failure', scenario: 'public', arm: options.arm, repetition: 0 },
+			fixture.context.signal,
+		)
+		let first: unknown
+		for (const goal of options.goals) {
+			try {
+				products.push(await session.execute(goal, fixture.context))
+			} catch (error) {
+				first = error
+				break
+			}
+		}
+		const sent = server.requests.length
+		const latched = await session
+			.execute(
+				{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
+				fixture.context,
+			)
+			.then(
+				() => undefined,
+				(error: unknown) => error,
+			)
+		return {
+			first,
+			latched,
+			products,
+			requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+			sent,
+			queued: server.responses.length,
 			usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
 				role: row.role,
 				calls: row.calls,
@@ -1012,6 +1334,20 @@ export const STUDY_MEMORY_SUMMARY_PROJECTIONS = Object.freeze({
 	small: 2161,
 })
 
+/** Pins summary replies whose prompt misses the identity-gauge projection of their fold upward and still fits the summary room: the below fold projects 3903 and replies 3904, equal to the room; the small fold projects 2161 and replies 2196, 35 over. */
+export const STUDY_MEMORY_SUMMARY_MISSES = Object.freeze([
+	Object.freeze({
+		name: '1 over the projection and equal to the room',
+		folded: STUDY_MEMORY_SUMMARY_FOLDS.below,
+		prompt: 3904,
+	}),
+	Object.freeze({
+		name: '35 over the projection and inside the room',
+		folded: STUDY_MEMORY_SUMMARY_FOLDS.small,
+		prompt: 2196,
+	}),
+])
+
 /**
  * Builds one goal of exactly counted arrivals: the folded ones, then one live one, then the prompt.
  * @param folded - Message content lengths of the arrivals a Compaction fold summarizes; each is at least 12.
@@ -1062,6 +1398,185 @@ export function runMemorySummary(
 	})
 }
 
+/** Pins the treatments that make an agent request and a summary request the first chat request of a trial. */
+export const STUDY_MEMORY_NATIVE_TRIALS = Object.freeze({
+	agent: Object.freeze({ arm: 'full' as const, goals: Object.freeze([WINDOW_GOAL]) }),
+	summary: Object.freeze({
+		arm: 'compaction' as const,
+		goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
+		settings: STUDY_MEMORY_SETTINGS,
+		room: STUDY_MEMORY_SUMMARY_ROOM,
+	}),
+})
+
+/** Pins the content row a stream sends before it fails. */
+export const STUDY_MEMORY_NATIVE_PARTIAL = `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'par' } })}\n`
+
+/** Pins the live context refusal as an HTTP 400 body and as an error row after a content row, for each role that sends chat requests; every one must become attributed capacity. */
+export const STUDY_MEMORY_NATIVE_CAPACITY: readonly MemoryNativeFixture[] = Object.freeze(
+	(['agent', 'summary'] as const).flatMap((role) => [
+		{
+			name: `an HTTP 400 refusal of a ${role} request`,
+			role,
+			trial: STUDY_MEMORY_NATIVE_TRIALS[role],
+			status: 400,
+			body: STUDY_MEMORY_NATIVE_BODY,
+			code: 'CAPACITY' as const,
+			message: STUDY_MEMORY_NATIVE_MESSAGE,
+		},
+		{
+			name: `an HTTP 200 error row after a content row of a ${role} request`,
+			role,
+			trial: STUDY_MEMORY_NATIVE_TRIALS[role],
+			status: 200,
+			body: `${STUDY_MEMORY_NATIVE_PARTIAL}${STUDY_MEMORY_NATIVE_BODY}\n`,
+			code: 'CAPACITY' as const,
+			message: STUDY_MEMORY_NATIVE_MESSAGE,
+		},
+	]),
+)
+
+/** Pins agent replies that carry a provider error or an invalid body but are not the live context refusal; every one must stay a generic fault. */
+export const STUDY_MEMORY_NATIVE_GENERIC: readonly MemoryNativeFixture[] = Object.freeze([
+	{
+		name: 'a pretty-printed error on a non-2xx response',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 500,
+		body: JSON.stringify({ error: 'model runner crashed' }, null, 2),
+		code: 'FAULT',
+		message: 'Ollama HTTP 500 error: model runner crashed',
+	},
+	{
+		name: 'context text on a non-2xx response',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 400,
+		body: JSON.stringify({ error: 'the prompt exceeds the available context size' }),
+		code: 'FAULT',
+		message: 'Ollama HTTP 400 error: the prompt exceeds the available context size',
+	},
+	{
+		name: 'the structured capacity type on a non-400 response',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 500,
+		body: STUDY_MEMORY_NATIVE_BODY,
+		code: 'FAULT',
+		message: 'Ollama HTTP 500 error (exceed_context_size_error)',
+	},
+	{
+		name: 'a non-2xx JSON body without an error member',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 500,
+		body: '{"detail":"x"}',
+		code: 'FAULT',
+		message: 'Ollama HTTP response refused: 500',
+	},
+	{
+		name: 'a non-2xx plain text body',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 503,
+		body: 'Unavailable',
+		code: 'FAULT',
+		message: 'Ollama HTTP response refused: 503',
+	},
+	{
+		name: 'a non-2xx empty body',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 502,
+		body: '',
+		code: 'FAULT',
+		message: 'Ollama HTTP response refused: 502',
+	},
+	{
+		name: 'context text in an HTTP 200 error row',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 200,
+		body: `${JSON.stringify({ error: 'the prompt exceeds the context window' })}\n`,
+		code: 'FAULT',
+		message: 'Ollama error: the prompt exceeds the context window',
+	},
+	{
+		name: 'a malformed member in an HTTP 200 error row',
+		role: 'agent',
+		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
+		status: 200,
+		body: '{"error":7}\n',
+		code: 'FAULT',
+		message: 'Malformed Ollama error',
+	},
+])
+
+/** Pins a negative prompt count in a terminal row of each role that sends chat requests; every one must stay a generic fault that keeps its role and its unknown usage. */
+export const STUDY_MEMORY_NATIVE_MALFORMED: readonly MemoryNativeFixture[] = Object.freeze(
+	(['agent', 'summary'] as const).map((role) => ({
+		name: `a negative prompt count in an HTTP 200 terminal row of a ${role} request`,
+		role,
+		trial: STUDY_MEMORY_NATIVE_TRIALS[role],
+		status: 200,
+		body: buildMemoryReply({ prompt: -1 }),
+		code: 'FAULT' as const,
+		message: 'Malformed Ollama usage',
+	})),
+)
+
+/** Pins the tool-turn prompts that miss the fixed projection upward or equal the reserved room and must still continue to the follow-up request. */
+export const STUDY_MEMORY_CONTINUATION_MISSES = Object.freeze([
+	Object.freeze({
+		name: 'a forecast miss of 35',
+		prompt: STUDY_MEMORY_FIXED_PROJECTION + 35,
+	}),
+	Object.freeze({
+		name: 'a prompt equal to the reserved room',
+		prompt: STUDY_MEMORY_AGENT_LIMIT,
+	}),
+])
+
+/** Pins the actual summary and agent replies that exceed their reserved room or output allowance and must stop before the next request, tool and goal. */
+export const STUDY_MEMORY_ACTUAL_REFUSALS = Object.freeze([
+	Object.freeze({
+		name: 'a summary prompt one over the summary room',
+		settings: STUDY_MEMORY_SETTINGS,
+		room: STUDY_MEMORY_SUMMARY_ROOM,
+		goal: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0],
+		body: buildMemoryReply({ content: 'Recap kept', prompt: STUDY_MEMORY_SUMMARY_LIMIT + 1 }),
+		message: 'reserved context capacity',
+		role: 'summary',
+	}),
+	Object.freeze({
+		name: 'a summary that exhausts its recap allowance',
+		settings: STUDY_MEMORY_SETTINGS,
+		room: STUDY_MEMORY_SUMMARY_ROOM,
+		goal: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0],
+		body: buildMemoryReply({ content: 'Recap kept', completion: STUDY_MEMORY_SUMMARY_ROOM.recap }),
+		message: 'output cap',
+		role: 'summary',
+	}),
+	Object.freeze({
+		name: 'an agent prompt one over the reserved room',
+		settings: STUDY_MEMORY_FIXED_SETTINGS,
+		room: Object.freeze({}),
+		goal: WINDOW_GOAL,
+		body: buildMemoryCall({ prompt: STUDY_MEMORY_AGENT_LIMIT + 1 }),
+		message: 'reserved context capacity',
+		role: 'agent',
+	}),
+	Object.freeze({
+		name: 'an agent turn that exhausts its output allowance',
+		settings: STUDY_MEMORY_FIXED_SETTINGS,
+		room: Object.freeze({}),
+		goal: WINDOW_GOAL,
+		body: buildMemoryCall({ completion: 512 }),
+		message: 'output cap',
+		role: 'agent',
+	}),
+])
+
 /** Reads the top-level and option key sets of each recorded generation request from its exact wire bytes.
  * @param requests - Recorded HTTP requests.
  * @returns Sorted body and option keys for chat and generate requests in arrival order.
@@ -1090,6 +1605,22 @@ export function readMemoryModels(requests: MemoryTrialResult['requests']): reado
 			if (!isRecord(body) || typeof body.model !== 'string')
 				throw new Error('Invalid generation request')
 			return body.model
+		})
+}
+
+/** Reads the native truncate and shift members of each recorded chat request from its exact wire bytes.
+ * @param requests - Recorded HTTP requests.
+ * @returns One entry per chat request in arrival order; a member the body omits is undefined.
+ */
+export function readMemoryControls(
+	requests: MemoryTrialResult['requests'],
+): ReadonlyArray<{ readonly truncate: unknown; readonly shift: unknown }> {
+	return requests
+		.filter((request) => request.path === '/api/chat')
+		.map((request) => {
+			const body = parseJSON(request.body)
+			if (!isRecord(body)) throw new Error('Invalid chat request')
+			return { truncate: body.truncate, shift: body.shift }
 		})
 }
 

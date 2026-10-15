@@ -5,16 +5,19 @@ import { parseJSON, isRecord } from '@orkestrel/contract'
 import { readStudyFailure, StudyError } from '@orkestrel/study'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
+	buildMemoryCall,
 	buildMemoryReply,
 	buildMemoryStream,
 	createMemoryObserver,
 	createMemoryServer,
 	readMemoryStream,
+	readMemoryToolResults,
 	STUDY_MEMORY_FIXED_PROJECTION,
 	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_HUNG_STREAM,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVER_REQUEST,
+	STUDY_MEMORY_PROJECTION_MISSES,
 	STUDY_MEMORY_PROJECTION_PASS,
 	STUDY_MEMORY_PROJECTION_REFUSALS,
 } from '../../../setupService.js'
@@ -186,7 +189,55 @@ describe('exact-request observation over the real provider', () => {
 	)
 
 	it.each(['generate', 'stream'] as const)(
-		'%s refuses every unusable or over-projection return with the exact attributable error',
+		'%s returns a prompt that misses the projection upward exactly as the real provider does, keeping the pre-dispatch reading',
+		async (mode) => {
+			const estimate = STUDY_MEMORY_MODULES.subject.estimateRequest({ messages, tools, options })
+			for (const entry of STUDY_MEMORY_PROJECTION_MISSES) {
+				const body =
+					mode === 'generate'
+						? buildMemoryReply(entry.reply)
+						: buildMemoryStream(['Re', 'ceipt'], entry.reply)
+				const plainServer = await createMemoryServer([{ path: '/api/chat', body }])
+				const watchedServer = await createMemoryServer([{ path: '/api/chat', body }])
+				try {
+					const plain = createMemoryObserver(plainServer.url, undefined)
+					const watched = createMemoryObserver(watchedServer.url, gauge)
+					const signal = new AbortController().signal
+					const expected =
+						mode === 'generate'
+							? await plain.inner.generate(messages, signal, tools, options)
+							: await readMemoryStream(plain.inner.stream(messages, signal, tools, options))
+					const pending =
+						mode === 'generate'
+							? watched.observer.generate(messages, signal, tools, options)
+							: readMemoryStream(watched.observer.stream(messages, signal, tools, options))
+					// The forecast is taken before the delegated request can have reached the wire.
+					expect(watched.readings).toEqual([{ estimate, projected: STUDY_MEMORY_FIXED_PROJECTION }])
+					expect(watchedServer.requests.filter((request) => request.path === '/api/chat')).toEqual(
+						[],
+					)
+					const returned = await pending
+					expect([entry.name, returned]).toEqual([entry.name, expected])
+					const usage = { usage: { prompt: entry.reply.prompt } }
+					expect([entry.name, returned]).toMatchObject([
+						entry.name,
+						mode === 'generate' ? usage : { result: usage },
+					])
+					expect(entry.reply.prompt).toBeGreaterThan(STUDY_MEMORY_FIXED_PROJECTION)
+					expect(
+						watchedServer.requests.filter((request) => request.path === '/api/chat'),
+					).toHaveLength(1)
+					expect(watched.readings).toHaveLength(1)
+				} finally {
+					await plainServer.close()
+					await watchedServer.close()
+				}
+			}
+		},
+	)
+
+	it.each(['generate', 'stream'] as const)(
+		'%s refuses every unusable return with the exact attributable error',
 		async (mode) => {
 			for (const entry of STUDY_MEMORY_PROJECTION_REFUSALS) {
 				const body =
@@ -353,61 +404,81 @@ describe('exact-request observation over the real provider', () => {
 		}
 	})
 
-	it('stops the Agent before another request when a tool turn exceeds the projection', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
-					prompt: STUDY_MEMORY_FIXED_PROJECTION + 1,
-				}),
-			},
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
-		])
-		const { subject } = STUDY_MEMORY_MODULES
-		const manager = subject.createConversationManager()
-		const conversation = manager.add({})
-		const toolbox = createToolManager()
-		toolbox.add(
-			createTool({
-				name: 'lookup',
-				description: 'Reads a record',
-				parameters: {
-					type: 'object',
-					properties: { id: { type: 'string' } },
-					required: ['id'],
-					additionalProperties: false,
-				},
-				execute: () => 'No record',
+	it.each([
+		{
+			name: 'a projection miss',
+			reply: { prompt: STUDY_MEMORY_FIXED_PROJECTION + 1 },
+			outcome: expect.objectContaining({ content: 'Follow-up received' }),
+			chats: 2,
+			unsent: 0,
+		},
+		{
+			name: 'unknown counts',
+			reply: { unknown: true },
+			outcome: expect.objectContaining({
+				code: 'FAULT',
+				failure: expect.objectContaining({ cause: 'infrastructure', role: 'agent' }),
 			}),
-		)
-		try {
-			const { observer, readings } = createMemoryObserver(server.url, gauge)
-			const agent = new subject.Agent(observer, {
-				conversations: manager,
-				tools: toolbox,
-				strict: true,
-				limit: 8,
-			})
-			conversation.add({ role: 'user', content: 'Look up order-1' })
+			chats: 1,
+			unsent: 1,
+		},
+	])(
+		'continues or stops the Agent tool turn by the usable prompt count alone for $name',
+		async ({ reply, outcome, chats, unsent }) => {
+			const server = await createMemoryServer([
+				{ path: '/api/chat', body: buildMemoryCall(reply) },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Follow-up received' }) },
+			])
+			const { subject } = STUDY_MEMORY_MODULES
+			const manager = subject.createConversationManager()
+			const conversation = manager.add({})
+			const toolbox = createToolManager()
+			toolbox.add(
+				createTool({
+					name: 'lookup',
+					description: 'Reads a record',
+					parameters: {
+						type: 'object',
+						properties: { id: { type: 'string' } },
+						required: ['id'],
+						additionalProperties: false,
+					},
+					execute: () => 'No record',
+				}),
+			)
 			try {
-				await expect(
-					agent.generate({ signal: new AbortController().signal }),
-				).rejects.toMatchObject({
-					code: 'CAPACITY',
-					failure: { cause: 'capacity', role: 'agent' },
+				const { observer, readings } = createMemoryObserver(server.url, gauge)
+				const agent = new subject.Agent(observer, {
+					conversations: manager,
+					tools: toolbox,
+					strict: true,
+					limit: 8,
 				})
-				expect(server.requests.filter((entry) => entry.path === '/api/chat')).toHaveLength(1)
-				expect(server.responses).toHaveLength(1)
-				expect(readings).toHaveLength(1)
+				conversation.add({ role: 'user', content: 'Look up order-1' })
+				try {
+					const returned = await agent.generate({ signal: new AbortController().signal }).then(
+						(result) => result,
+						(error: unknown) => error,
+					)
+					expect(returned).toEqual(outcome)
+					const sent = server.requests.filter((entry) => entry.path === '/api/chat')
+					expect(sent).toHaveLength(chats)
+					expect(server.responses).toHaveLength(unsent)
+					expect(readings.map((reading) => reading.projected)).toEqual(
+						sent.map(() => STUDY_MEMORY_FIXED_PROJECTION),
+					)
+					// A completed tool turn feeds its receipt to the follow-up request; a stopped one never runs the tool.
+					expect(sent.slice(1).map((entry) => readMemoryToolResults(entry.body))).toEqual(
+						sent.slice(1).map(() => ['No record']),
+					)
+				} finally {
+					agent.emitter.destroy()
+				}
 			} finally {
-				agent.emitter.destroy()
+				toolbox.destroy()
+				conversation.emitter.destroy()
+				await server.close()
 			}
-		} finally {
-			toolbox.destroy()
-			conversation.emitter.destroy()
-			await server.close()
-		}
-	})
+		},
+	)
 })

@@ -21,6 +21,7 @@ import type {
 	StudyMemoryDispatch,
 	StudyMemoryEstimate,
 	StudyMemoryInput,
+	StudyMemoryOllamaOptions,
 	StudyMemoryProvenance,
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
@@ -47,7 +48,7 @@ import {
 	readStudyMemoryGauge,
 	buildStudyMemoryReadings,
 	readStudyMemorySettings,
-	validateStudyMemoryProjection,
+	validateStudyMemoryUsage,
 } from './helpers.js'
 import { StudyMemoryObserver } from './StudyMemoryObserver.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
@@ -86,8 +87,12 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
-		const gauge =
-			options.arm === 'compaction' ? readStudyMemoryGauge(options.profile.settings) : undefined
+		const compaction = options.arm === 'compaction'
+		const gauge = compaction ? readStudyMemoryGauge(options.profile.settings) : undefined
+		// Compaction refuses an overflowing prompt instead of letting the daemon truncate or shift it; other arms keep the omitted controls.
+		const strict: Pick<StudyMemoryOllamaOptions, 'truncate' | 'shift'> = compaction
+			? { truncate: false, shift: false }
+			: {}
 		this.#options = options
 		this.#tools = createToolManager()
 		this.#settings = readStudyMemorySettings(options.profile.settings)
@@ -96,6 +101,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			signal: options.signal,
 			observe: this.#settings.observe,
 			timing: options.provider.extractTiming,
+			...(compaction ? { strict: true } : {}),
 		})
 		const settings = options.profile.provider
 		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
@@ -106,6 +112,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				model: settings.model,
 				url: settings.url,
 				think: room.think,
+				...strict,
 				timeout: options.profile.bounds.request.duration,
 				options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
 				fetch: (input, init) => this.#transport.fetch('agent', input, init, this.#agentDispatch),
@@ -118,6 +125,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			model: settings.model,
 			url: settings.url,
 			think: false,
+			...strict,
 			timeout: options.profile.bounds.request.duration,
 			options: { num_ctx: room.context, num_predict: room.recap, temperature: 0, seed: 0 },
 			fetch: (input, init) => this.#transport.fetch('summary', input, init, this.#summaryDispatch),
@@ -542,7 +550,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#summaryDispatch = Object.freeze({ id, revision: revision ?? undefined })
 		}
 		const result = await this.#summary.generate(canonical, bound)
-		if (!bound.aborted) validateStudyMemoryProjection(result.usage, projected, 'summary')
+		if (!bound.aborted) validateStudyMemoryUsage(result.usage, 'summary')
 		this.#transport.check()
 		const active = this.#active
 		if (active === undefined || typeof result.content !== 'string')

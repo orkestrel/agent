@@ -7,12 +7,13 @@ import type {
 	StudyMemoryTransportOptions,
 	StudyMemoryWire,
 } from './types.js'
-import { isRecord } from '@orkestrel/contract'
+import { isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, readStudyFailure } from '@orkestrel/study'
 import {
 	buildStudyMemoryRaw,
 	buildStudyMemoryTiming,
 	readStudyMemoryDigest,
+	readStudyMemoryFailure,
 	readStudyMemoryRequest,
 	readStudyMemorySupport,
 	readStudyMemoryTerminal,
@@ -95,7 +96,7 @@ export class StudyMemoryTransport {
 		}
 	}
 
-	/** Dispatches exactly one admitted request with bounded streaming reads. @param role - Accountable responsibility. @param input - Exact configured URL. @param init - Native fetch settings. @param dispatch - The immutable canonical dispatch the caller measured for this request; it joins the observation rows and never changes the request. @returns A validated streaming response. */
+	/** Dispatches exactly one admitted request with bounded streaming reads. @param role - Accountable responsibility. @param input - Exact configured URL. @param init - Native fetch settings. @param dispatch - The immutable canonical dispatch the caller measured for this request; it joins the observation rows and never changes the request. @returns A validated streaming response. @throws StudyError - The recognized provider failure or a role-attributed FAULT for a non-2xx response, after its bounded body was read and its request accounted once. */
 	async fetch(
 		role: StudyRole,
 		input: string | URL | Request,
@@ -108,7 +109,13 @@ export class StudyMemoryTransport {
 			throw new StudyError('FAULT', 'Model dispatch outside an active goal')
 		let wire: StudyMemoryWire | undefined
 		try {
-			const request = readStudyMemoryRequest(this.#options.profile, role, input, init)
+			const request = readStudyMemoryRequest(
+				this.#options.profile,
+				role,
+				input,
+				init,
+				this.#options.strict,
+			)
 			const bound = this.#options.profile.bounds.request
 			if (request.bytes >= bound.bytes)
 				throw new StudyError('CAPACITY', 'Encoded request consumes the response byte allowance')
@@ -148,10 +155,8 @@ export class StudyMemoryTransport {
 				signal.throwIfAborted()
 				const sent = performance.now()
 				const response = await globalThis.fetch(input, { ...init, signal, redirect: 'error' })
-				if (!response.ok || response.body === null) {
-					await response.body?.cancel()
+				if (response.body === null)
 					throw new StudyError('FAULT', `Ollama HTTP response refused: ${response.status}`)
-				}
 				wire = {
 					activity,
 					request,
@@ -159,6 +164,7 @@ export class StudyMemoryTransport {
 					signal,
 					reader: response.body.getReader(),
 					decoder: new TextDecoder('utf-8', { fatal: true }),
+					status: response.status,
 					started,
 					id,
 					sent,
@@ -170,6 +176,7 @@ export class StudyMemoryTransport {
 					settled: false,
 				}
 				this.#wires.add(wire)
+				if (!response.ok) return await this.#refuse(wire)
 				return new Response(
 					new ReadableStream<Uint8Array>({
 						pull: (controller) => this.#pull(wire, controller),
@@ -203,6 +210,45 @@ export class StudyMemoryTransport {
 		this.#activity = undefined
 	}
 
+	// Buffers a non-2xx body under the wire bounds and parses it once at EOF, because an error body is one JSON document, not rows.
+	async #refuse(wire: StudyMemoryWire): Promise<never> {
+		// A lenient decoder: undecodable bytes make the body invalid JSON, which is a generic refusal rather than a decode crash.
+		const decoder = new TextDecoder()
+		let text = ''
+		let failure: unknown
+		try {
+			for (;;) {
+				wire.signal.throwIfAborted()
+				const chunk = await wire.reader.read()
+				wire.signal.throwIfAborted()
+				if (chunk.done) break
+				wire.bytes += chunk.value.byteLength
+				if (wire.bytes > this.#options.profile.bounds.request.bytes) {
+					const message = 'Ollama wire byte allowance exceeded'
+					throw new StudyError('CAPACITY', message, {
+						cause: 'capacity',
+						message,
+						role: wire.request.role,
+					})
+				}
+				text += decoder.decode(chunk.value, { stream: true })
+			}
+			const body: unknown = parseJSON(text + decoder.decode())
+			const message = `Ollama HTTP response refused: ${wire.status}`
+			failure =
+				readStudyMemoryFailure(body, wire.request.role, wire.status) ??
+				new StudyError('FAULT', message, {
+					cause: 'infrastructure',
+					message,
+					role: wire.request.role,
+				})
+		} catch (error) {
+			failure = error
+		}
+		await this.#cancel(wire, failure)
+		throw failure
+	}
+
 	async #pull(
 		wire: StudyMemoryWire | undefined,
 		controller: ReadableStreamDefaultController<Uint8Array>,
@@ -217,8 +263,14 @@ export class StudyMemoryTransport {
 			wire.signal.throwIfAborted()
 			if (!chunk.done) {
 				wire.bytes += chunk.value.byteLength
-				if (wire.bytes > this.#options.profile.bounds.request.bytes)
-					throw new StudyError('CAPACITY', 'Ollama wire byte allowance exceeded')
+				if (wire.bytes > this.#options.profile.bounds.request.bytes) {
+					const message = 'Ollama wire byte allowance exceeded'
+					throw new StudyError('CAPACITY', message, {
+						cause: 'capacity',
+						message,
+						role: wire.request.role,
+					})
+				}
 				wire.text += wire.decoder.decode(chunk.value, { stream: true })
 				if (wire.request.role !== 'metadata' && wire.request.role !== 'judge')
 					this.#rows(wire, false)
@@ -286,6 +338,7 @@ export class StudyMemoryTransport {
 			digest: readStudyMemoryDigest(this.#options.profile, request),
 			previous: previous ?? null,
 			changed: model && previous !== undefined && previous !== request.model,
+			...(request.strict === true ? { strict: true } : {}),
 			...(activity.checkpoint === undefined
 				? {}
 				: { body: typeof init?.body === 'string' ? init.body : null }),
@@ -353,9 +406,9 @@ export class StudyMemoryTransport {
 		this.fail(error ?? new StudyError('FAULT', 'Ollama response cancelled before EOF'))
 		wire.settled = true
 		const observation = this.#options.observe ? this.#timeline(wire) : {}
+		const failure = readStudyFailure(this.#fault)
 		try {
-			if (!wire.ticket.signal.aborted)
-				wire.ticket.fail({ ...readStudyFailure(this.#fault), role: wire.request.role })
+			if (!wire.ticket.signal.aborted) wire.ticket.fail({ ...failure, role: wire.request.role })
 			await wire.activity.context.evidence.append({
 				event: 'wire-failure',
 				goal: wire.activity.goal,
@@ -363,6 +416,9 @@ export class StudyMemoryTransport {
 					role: wire.request.role,
 					path: wire.request.path,
 					bytes: wire.bytes,
+					status: wire.status,
+					// Bounded so a daemon-supplied message cannot grow the retained row.
+					reason: failure.message.slice(0, 256),
 					...observation,
 				},
 			})

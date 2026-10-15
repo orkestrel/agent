@@ -9,9 +9,9 @@ import type {
 } from '@orkestrel/agent'
 import type { ToolDefinition } from '@orkestrel/tool'
 import type { StudyMemoryObserverOptions } from './types.js'
-import { projectStudyMemoryRequest, validateStudyMemoryProjection } from './helpers.js'
+import { projectStudyMemoryRequest, validateStudyMemoryUsage } from './helpers.js'
 
-/** Reads each agent request's size and enforces the gauge projection on the real provider's successful returns. */
+/** Reads each agent request's size and requires a usable actual prompt count on the real provider's gauged successful returns. */
 export class StudyMemoryObserver implements ProviderInterface {
 	readonly #options: StudyMemoryObserverOptions
 
@@ -42,10 +42,10 @@ export class StudyMemoryObserver implements ProviderInterface {
 		tools?: readonly ToolDefinition[],
 		options?: ProviderStreamOptions,
 	): Promise<ProviderResult> {
-		const projected = this.#measure(messages, tools, options)
+		this.#measure(messages, tools, options)
 		const result = await this.#options.provider.generate(messages, signal, tools, options)
-		if (projected !== undefined && !signal.aborted)
-			validateStudyMemoryProjection(result.usage, projected, 'agent')
+		if (this.#options.gauge !== undefined && !signal.aborted)
+			validateStudyMemoryUsage(result.usage, 'agent')
 		return result
 	}
 
@@ -56,12 +56,8 @@ export class StudyMemoryObserver implements ProviderInterface {
 		tools?: readonly ToolDefinition[],
 		options?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
-		const projected = this.#measure(messages, tools, options)
-		return this.#relay(
-			this.#options.provider.stream(messages, signal, tools, options),
-			signal,
-			projected,
-		)
+		this.#measure(messages, tools, options)
+		return this.#relay(this.#options.provider.stream(messages, signal, tools, options), signal)
 	}
 
 	// Forms the pre-encoding request exactly as the Agent's window measures it: omitted members stay omitted.
@@ -69,7 +65,7 @@ export class StudyMemoryObserver implements ProviderInterface {
 		messages: readonly Message[],
 		tools: readonly ToolDefinition[] | undefined,
 		options: ProviderStreamOptions | undefined,
-	): number | undefined {
+	): void {
 		const request: ProviderRequest = {
 			messages,
 			...(tools === undefined ? {} : { tools }),
@@ -79,17 +75,15 @@ export class StudyMemoryObserver implements ProviderInterface {
 		const gauge = this.#options.gauge
 		const projected = gauge === undefined ? undefined : projectStudyMemoryRequest(gauge, estimate)
 		this.#options.record({ estimate, projected }, request)
-		return projected
 	}
 
 	async *#relay(
 		source: AsyncGenerator<ProviderDelta, ProviderResult>,
 		signal: AbortSignal,
-		projected: number | undefined,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
 		const result = yield* source
-		if (projected !== undefined && !signal.aborted)
-			validateStudyMemoryProjection(result.usage, projected, 'agent')
+		if (this.#options.gauge !== undefined && !signal.aborted)
+			validateStudyMemoryUsage(result.usage, 'agent')
 		return result
 	}
 }

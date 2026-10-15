@@ -58,6 +58,10 @@ export interface StudyMemoryOllamaOptions extends ProviderOptions {
 	readonly model: string
 	readonly url: string
 	readonly think?: boolean
+	/** Mirrors the Ollama `truncate` field; false refuses an oversized prompt, and omission keeps the daemon default. */
+	readonly truncate?: boolean
+	/** Mirrors the Ollama `shift` field; false refuses a context overflow, and omission keeps the daemon default. */
+	readonly shift?: boolean
 	readonly options: Readonly<Record<string, unknown>>
 }
 
@@ -91,7 +95,7 @@ export interface StudyMemoryObserverOptions {
 	readonly provider: ProviderInterface
 	/** Holds the admitted Agent namespace measuring requests. */
 	readonly subject: StudyMemorySubject
-	/** Holds the validated gauge enforced after a successful return; undefined enforces nothing. */
+	/** Holds the validated gauge that prices each reading and requires a usable actual prompt count after a successful return; undefined requires nothing. */
 	readonly gauge: LedgerGauge | undefined
 	/** Receives exactly one reading and the exact pre-encoding request it measured, synchronously, before each delegated call. */
 	readonly record: (reading: StudyMemoryEstimate, request: ProviderRequest) => void
@@ -175,6 +179,8 @@ export interface StudyMemoryTransportOptions {
 	readonly signal: AbortSignal
 	/** Adds passive timing and correlation fields to existing evidence when true. */
 	readonly observe: boolean
+	/** Requires every model chat request to carry `truncate: false` and `shift: false` when true; omission verifies nothing. */
+	readonly strict?: boolean
 	/** Extracts the daemon timing of a validated terminal record. */
 	readonly timing: StudyMemoryProvider['extractTiming']
 }
@@ -194,6 +200,8 @@ export interface StudyMemoryRequest {
 	readonly output: number
 	readonly bytes: number
 	readonly options: Readonly<Record<string, number>>
+	/** Reports that the request's native `truncate` and `shift` fields were verified false; omitted when nothing was verified. */
+	readonly strict?: boolean
 }
 
 /** Tracks one owned HTTP response until EOF or cancellation. */
@@ -204,6 +212,8 @@ export interface StudyMemoryWire {
 	readonly signal: AbortSignal
 	readonly reader: ReadableStreamDefaultReader<Uint8Array>
 	readonly decoder: TextDecoder
+	/** Holds the HTTP status the daemon answered with. */
+	readonly status: number
 	readonly started: number
 	/** Holds the trial-local request id. */
 	readonly id: number
