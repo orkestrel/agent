@@ -101,3 +101,17 @@ the existing room/gauge, and a 9662835-ms trial/series budget. Its immutable out
 adds 60000 ms cleanup and 120000 ms launch margin. Repeated nonempty reducing folds are
 required to qualify; completed operations alone do not establish quality or vendor equivalence.
 `handoff.md` carries the subsequent frozen identity and actual launch state.
+
+## Execution closed on 2026-10-15
+
+The successor served 96/96 goals with no operational failure. Its launcher exited 0,
+uncapped, after 3402443 ms. Qualification rejected the run because 8 of its 12 completed
+recaps were empty; 4 were nonempty and reduced the subsequent request projection. The
+11 repeated folds structurally included their prior recap, so rolling replacement ran,
+but those empty summaries do not establish preserved context. No quality conclusion or
+speed comparison follows from the completed operations.
+
+The result seal is `3bf2316f53f28af8a49d2894b93d24e2e35804176091892ab80ea485c5719426`.
+The terminal reader retained this rejection without a retry or policy change. The source
+allows an empty summarizer return to become a section; that boundary needs investigation
+before proposing a successor. Frozen inputs and retained results remain immutable.

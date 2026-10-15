@@ -1,3 +1,27 @@
+# Rolling Compaction closed on 2026-10-15
+
+The rolling successor completed all 96 goals, with no operational failure, in 3402443 ms
+of launcher wall time. The process exited 0, uncapped. Its qualification reader rejected
+the result: 8 of 12 summary completions were empty. The remaining 4 were nonempty and
+reduced the subsequent projected request. All 11 repeated folds carried the prior recap
+forward structurally. Completion does not override the predeclared nonempty-fold criterion.
+
+Result ID: `883013ed-ae9a-4af4-a1ff-153490d73d95`.
+Seal: `3bf2316f53f28af8a49d2894b93d24e2e35804176091892ab80ea485c5719426`.
+Reader output: `tmp/units/rolling-reader-result.json` (400555 bytes); read a projection,
+never dump the report. Its SHA-256 is
+`43d7301bfc5cb2725dda3693993dff97f582b9010428170d584440acbcef5d4e`.
+The compact projection and predicate review are `tmp/units/rolling-terminal-review-projection.json`
+and `tmp/units/rolling-terminal-review-report.md`. No replay or follow-on run was launched.
+Frozen runtime/project/results and the accepted-source archive remain unchanged. Records
+remains sealed and labeled, 96/96, and must not be rerun. Investigate the empty recap finding
+without changing this result or silently loosening its qualification rule.
+
+Study promotion is authorized and underway in the sibling Study checkout. Its accepted
+plan is `.orkestrel/promotion.md` there. Actual Sonnet owns runtime selection and grading/
+settlement units; actual Opus owns shared Agent/Ollama instrumentation in isolated worktrees.
+Keep Agent's installed Study copy unchanged until retained evidence no longer depends on it.
+
 # Authored study test layout accepted on 2026-10-15
 
 The user placed Agent's authored study proofs under `tests/studies`, mirroring `studies`.
