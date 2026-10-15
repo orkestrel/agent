@@ -87,6 +87,7 @@ await new GuideCommand({
 		createSystemOneJudge,
 		DEFAULT_LEDGER_SHARE,
 		estimateMessages,
+		estimateRequest,
 		Gauge,
 		isJudgeAbortError,
 		isJudgeEntry,
@@ -501,7 +502,12 @@ await new GuideCommand({
 			const agent = createAgent(provider, {
 				tools,
 				conversations,
-				window: createBudget({ max: 60, consumer: estimateMessages }),
+				// This case pins the between-turns rebuild by message arithmetic, so the window explicitly
+				// projects the request's messages and leaves the tool definitions out of the measure.
+				window: createBudget({
+					max: 60,
+					consumer: (request: ProviderRequest) => estimateMessages(request.messages),
+				}),
 				scope: createScope({ name: 'research', instructions: ['safety'], tools: ['search'] }),
 			})
 			agent.context.instructions.add([
@@ -963,7 +969,8 @@ await new GuideCommand({
 					tools,
 					window: createBudget({
 						max: estimateMessages(conversation.view()) + 1,
-						consumer: estimateMessages,
+						// Message arithmetic is the claim, so the window projects the request's messages.
+						consumer: (request: ProviderRequest) => estimateMessages(request.messages),
 					}),
 				},
 			)
@@ -2339,8 +2346,8 @@ await new GuideCommand({
 			)
 		})
 
-		it('measures the working message array alone against the window (the automatic-compaction clause)', async () => {
-			const measured: Array<readonly Message[]> = []
+		it('measures the dispatched request against the window (the automatic-compaction clause)', async () => {
+			const measured: ProviderRequest[] = []
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
 			const conversations = createConversationManager({
@@ -2360,18 +2367,25 @@ await new GuideCommand({
 				conversations,
 				window: createBudget({
 					max: 1_000_000,
-					consumer: (messages: readonly Message[]) => {
-						measured.push([...messages])
-						return estimateMessages(messages)
+					consumer: (request: ProviderRequest) => {
+						measured.push(request)
+						return estimateRequest(request)
 					},
 				}),
 			})
 			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
 			await agent.generate({ schema: { type: 'object' } })
 
-			// Each check reads the exact message array the next provider request carries, while the
-			// advertised definitions and the schema travel beside it, unmeasured.
-			expect(measured).toEqual(provider.calls.map((call) => call.messages))
+			// Each check reads the exact request the next provider call carries: the messages, the
+			// advertised definitions, and the per-call options.
+			expect(measured).toHaveLength(2)
+			expect(measured).toEqual(
+				provider.calls.map((call) => ({
+					messages: call.messages,
+					...(call.tools === undefined ? {} : { tools: call.tools }),
+					...(call.options === undefined ? {} : { options: call.options }),
+				})),
+			)
 			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['lookup'])
 			expect(provider.calls[0]?.options).toEqual({ schema: { type: 'object' } })
 		})
@@ -2418,12 +2432,14 @@ await new GuideCommand({
 					'Report the amount.',
 				])
 				expect(outcome.result.thinking).toBe('Refund through the order tool.\n\nReport the amount.')
-				// The window estimate reads the exact messages each provider call carries.
+				// The window estimate reads the exact request each provider call carries.
 				expect(outcome.measured).toEqual(outcome.wire)
 				// A stripped message drops the member rather than holding it as undefined.
-				expect(outcome.wire.flat().filter((message) => 'thinking' in message).length).toBe(
-					outcome.sent.flat().length,
-				)
+				expect(
+					outcome.wire
+						.flatMap(({ messages }) => messages)
+						.filter((message) => 'thinking' in message).length,
+				).toBe(outcome.sent.flat().length)
 				expect(outcome.sent).toEqual(
 					replay === 'turn'
 						? [[], ['Refund through the order tool.']]

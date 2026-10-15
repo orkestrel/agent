@@ -6,9 +6,9 @@ import type {
 	LedgerInterface,
 	LedgerOptions,
 	LedgerQuestion,
-	Message,
 	ProviderInterface,
 	ProviderOptions,
+	ProviderRequest,
 	JudgeInterface,
 } from '@orkestrel/agent'
 import type { StudyContext, StudyProfile, StudyRole, StudyTicket } from '@orkestrel/study'
@@ -32,7 +32,7 @@ export interface StudyMemorySubject {
 	readonly createConversationManager: (
 		options?: ConversationManagerOptions,
 	) => ConversationManagerInterface
-	readonly estimateMessages: (messages: readonly Message[]) => number
+	readonly estimateRequest: (request: ProviderRequest) => number
 	readonly LEDGER_QUESTIONS: LedgerQuestion
 }
 

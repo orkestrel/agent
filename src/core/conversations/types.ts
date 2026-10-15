@@ -316,10 +316,11 @@ export interface ConversationReferenceOptions {
  *   thrown when no `summarize` was supplied.
  * - **`summarizable` — whether a `compact()` can fold.** `true` when a
  *   {@link ConversationSummaryHandler} was supplied, `false` otherwise. The automatic compaction
- *   of the agent loop (`AgentOptions.window`) gates on it so a conversation that has no
+ *   of the agent loop (`AgentOptions.window`) gates its fold on it so a conversation that has no
  *   summarizer is never auto-compacted (and the loop never throws the `compact()` `SUMMARIZER`
- *   error from the auto path). A manual `compact()` still throws without a summarizer — only the
- *   auto path is guarded.
+ *   error from the auto path); the loop still measures its requests against the window, and a
+ *   strict agent refuses one that is over. A manual `compact()` still throws without a summarizer
+ *   — only the auto path is guarded.
  * - **`rehydrate(id)` / `search(query)` — read the retained originals.** `rehydrate` returns
  *   the full original messages of a known section and emits its `id` through `rehydrate`, even
  *   when the list is empty. An unknown id returns `undefined` without an event. The read never
@@ -344,9 +345,10 @@ export interface ConversationInterface {
 	readonly sections: readonly Section[]
 	/**
 	 * Reports whether a `compact()` can fold — `true` when a {@link ConversationSummaryHandler} was supplied.
-	 * The automatic compaction of the agent loop (`AgentOptions.window`) gates on it (a
+	 * The automatic compaction of the agent loop (`AgentOptions.window`) gates its fold on it (a
 	 * non-summarizable conversation is never auto-compacted, so the auto path never throws the
-	 * `SUMMARIZER` error); a manual `compact()` still throws without a summarizer.
+	 * `SUMMARIZER` error, though its requests are still measured); a manual `compact()` still throws
+	 * without a summarizer.
 	 */
 	readonly summarizable: boolean
 	/** Counts the live (uncompacted) messages stored in the tail. */

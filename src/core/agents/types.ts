@@ -9,8 +9,8 @@ import type {
 	ConversationManagerInterface,
 	ConversationStoreInterface,
 } from '../conversations/index.js'
-import type { Message, MessageInput } from '../types.js'
-import type { ProviderInterface } from '../providers/index.js'
+import type { MessageInput } from '../types.js'
+import type { ProviderInterface, ProviderRequest } from '../providers/index.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { QueueStoreInterface } from '@orkestrel/queue'
@@ -172,7 +172,7 @@ export type AgentEventMap = {
 	readonly exhaust: readonly [turns: number]
 	/**
 	 * Reports automatic compaction's summarizer throwing — a non-fatal warn channel (the run continues; see
-	 * {@link AgentOptions.window}). When the loop's between-turns / pre-first-turn auto-compaction
+	 * {@link AgentOptions.window}). When the loop's pre-dispatch auto-compaction
 	 * (`conversation.compact()`) rejects, the run does not crash: the loop skips compaction that
 	 * turn and surfaces the caught error here so the failure is observable, never silently lost.
 	 * The run still settles through the other events — `finish` for the lenient default, and
@@ -298,17 +298,20 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   context as the message source (so `context.messages` is its active conversation's live tail);
  *   omitted ⇒ a fresh registry holding one default conversation. Auto-compaction (`window`) folds
  *   the active conversation when it is summarizable.
- * - `window` — an optional context {@link BudgetInterface} for automatic conversation
- *   compaction: when set, the loop measures the current full prompt against this budget each turn
- *   (its `consumer` is a token estimator, its `max` the context window) and, when the prompt
- *   reaches the window and the active conversation is summarizable, compacts the active
- *   conversation + continues on the rebuilt smaller view — compact-and-continue, distinct from
+ * - `window` — an optional context {@link BudgetInterface} over the complete
+ *   {@link ProviderRequest} for automatic conversation compaction: when set, the loop measures the
+ *   exact request, messages after replay, advertised tools, and per-call options, before every
+ *   provider dispatch (its `consumer` is a token estimator, its `max` the context window) and, when
+ *   the request reaches the window and the active conversation is summarizable, compacts the active
+ *   conversation once + dispatches the rebuilt smaller request — compact-and-continue, distinct from
  *   hard abort of the `budget` object. Omitted ⇒ no auto-compaction.
  * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
  *   (rethrown after the `fault` event, propagating through `#execute` to a genuine `error`
  *   settle) instead of skipping compaction and continuing over-window. The selection faults (a
  *   thrown handler, a returned `fault`, a conversation changed under the handler) settle the same
- *   way. Default: `false`. The run continues over-window, or on `view()` after a selection fault.
+ *   way, and a request still over the `window` after the permitted fold, or one that cannot fold,
+ *   settles `error` with an `AgentError` coded `'WINDOW'` before the provider is called.
+ *   Default: `false`. The run continues over-window, or on `view()` after a selection fault.
  * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
  *   active scope's `select` overrides it. The loop runs it at run entry and after each automatic
  *   compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
@@ -378,22 +381,34 @@ export interface AgentOptions {
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
-	 * Holds an optional context {@link BudgetInterface} for automatic compaction. Its `consumer` is a
-	 * token estimator (for example the exported {@link import('./helpers.js').estimateMessages}) and
-	 * its `max` is the context window. When set, the loop measures the current full prompt (the
-	 * next provider request) against this budget each turn; when that prompt reaches the window and
-	 * the active conversation is summarizable, it **compacts the active conversation + continues on
-	 * the rebuilt smaller view** (compact-and-continue) — the same consume-to-a-ceiling primitive
-	 * as the cost `budget`, but compaction is the ceiling action instead of abort. Omit to disable.
+	 * Holds an optional context {@link BudgetInterface} that admits each provider request. Its
+	 * `consumer` is a token estimator over the complete {@link ProviderRequest} (for example the
+	 * exported {@link import('./helpers.js').estimateRequest}) and its `max` is the context window.
+	 * Before every provider dispatch the loop measures the exact request it will send: the messages
+	 * after the provider's `replay` policy, the tools the turn advertises after the scope's
+	 * allow-list, and the per-call `options` (`think`, `schema`). The budget is cleared, consumes that
+	 * request, and the request is over the window when the budget is `exhausted`, which includes a
+	 * request equal to `max`. When it is over and the active conversation is summarizable, the loop
+	 * **compacts the active conversation once, rebuilds with the same tools and options, measures the
+	 * rebuilt request, and dispatches it** (compact-and-continue) — the same consume-to-a-ceiling
+	 * primitive as the cost `budget`, but compaction is the ceiling action instead of abort. A
+	 * non-summarizable conversation is still measured, but cannot fold. After a run `consumed` holds
+	 * the last measured request. With {@link AgentOptions.strict}, a request still over the window
+	 * after the one permitted fold, or one that cannot fold, is refused before dispatch with an
+	 * `AgentError` coded `'WINDOW'`. Omit to disable.
 	 */
-	readonly window?: BudgetInterface<readonly Message[]>
+	readonly window?: BudgetInterface<ProviderRequest>
 	/**
 	 * If `true`, a summarizer failure during automatic compaction emits `fault` and settles the
 	 * run `error`; a thrown selection handler, a returned selection `fault`, and a conversation
-	 * changed during selection follow the same rule. If `false`, the run continues — over-window
-	 * after a summarizer failure, and on the active conversation's `view()` after a selection
-	 * fault. A cancel at a selection site, a `fault` listener's included, settles partial instead
-	 * of `error`. Default: `false`.
+	 * changed during selection follow the same rule. A request that the {@link AgentOptions.window}
+	 * still finds over the window, equal to `max` included, after the one permitted fold, or that
+	 * cannot fold, is refused before the provider is called: the run settles `error` with an
+	 * `AgentError` coded `'WINDOW'` whose `context` holds the `agent`, the measured `consumed`, and
+	 * the window `max`, and no `fault` fires for it. If `false`, the run continues — over-window
+	 * after a summarizer failure or a futile fold, and on the active conversation's `view()` after a
+	 * selection fault. A cancel at a selection site or a fold, a `fault` listener's included, settles
+	 * partial instead of `error`. Default: `false`.
 	 */
 	readonly strict?: boolean
 	/**
@@ -803,5 +818,5 @@ export interface AgentRunnerOptions {
 	readonly timeout?: number
 }
 
-/** Names the machine-readable agent concurrency, limit, and registry failures. */
-export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY'
+/** Names the machine-readable agent concurrency, limit, registry, and window failures. */
+export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'

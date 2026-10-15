@@ -65,7 +65,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // `catch` branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports a run sharing accounting with a live run, a `limit` that is not a nonnegative safe integer, or a name absent from a registry pool. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise. Await the call inside `try`/`catch` to catch it.
+ * Reports a run sharing accounting with a live run, a `limit` that is not a nonnegative safe integer, a name absent from a registry pool, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
  * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
@@ -76,11 +76,14 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `'LIMIT'` reports a construction or per-run `limit` that is not a nonnegative safe integer,
  * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
  * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`;
- * its `context` names the `category` and the `name`. Narrow a caught value with
- * {@link isAgentError} and branch on `error.code`.
+ * its `context` names the `category` and the `name`. `'WINDOW'` reports a `strict` run whose
+ * complete provider request is still over the `window` budget, equal to its `max` included, after
+ * the one permitted fold or with no fold possible; it settles the run `error` before the provider
+ * is called, and its `context` holds the `agent` id, the measured `consumed`, and the window `max`.
+ * Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'CONCURRENCY'`: a run sharing accounting with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool. */
+	/** Names the machine-readable condition — `'CONCURRENCY'`: a run sharing accounting with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
 	readonly code: AgentErrorCode
 	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined

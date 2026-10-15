@@ -89,6 +89,7 @@ import {
 	linkOwners,
 	splitSentences,
 	estimateMessages,
+	estimateRequest,
 	isLedgerError,
 	LEDGER_QUESTIONS,
 	AgentContext,
@@ -180,9 +181,103 @@ export const COMPACT_SCRIPT: readonly ScriptedTurn[] = Object.freeze([
 	{ result: { content: 'the answer is 42' } },
 ])
 
+/**
+ * Measures only the messages of a request, a custom window policy that ignores the advertised
+ * tools and the per-call options. Tests that pin message-only arithmetic select it explicitly,
+ * while the default window consumer is `estimateRequest`.
+ *
+ * @param request - The complete provider request a window measures
+ * @returns The `estimateMessages` estimate of its messages
+ */
+export function measureMessages(request: ProviderRequest): number {
+	return estimateMessages(request.messages)
+}
+
+const REQUEST_HELLO: Message = { id: 'm', role: 'user', content: 'hello' }
+const REQUEST_LONG: Message = { id: 'n', role: 'user', content: 'a'.repeat(40) }
+const REQUEST_ADD: ToolDefinition = {
+	name: 'add',
+	description: 'Adds.',
+	parameters: { type: 'object' },
+}
+
+/**
+ * Supplies request estimates counted by hand. The message term is `hello` at 2 tokens plus 4 of
+ * framing, so 6, and 40 characters at 10 plus 4, so 14. A tool list renders as JSON and costs the
+ * ceiling of its character count over 4: `[{"name":"lookup"}]` is 19 characters, so 5, and the
+ * `add` definition renders to 69 characters, so 18. A schema renders the same way:
+ * `{"type":"object"}` is 17 characters, so 5, and `{"type":"object","required":["a"]}` is 34, so 9.
+ * An empty tool list, an empty schema, and `think` add nothing.
+ */
+export const REQUEST_ESTIMATE_CASES: ReadonlyArray<{
+	readonly label: string
+	readonly request: ProviderRequest
+	readonly expected: number
+}> = Object.freeze([
+	{ label: 'messages alone', request: { messages: [REQUEST_HELLO] }, expected: 6 },
+	{
+		label: 'several messages unchanged',
+		request: { messages: [REQUEST_HELLO, REQUEST_LONG] },
+		expected: 20,
+	},
+	{ label: 'an empty tool list', request: { messages: [REQUEST_HELLO], tools: [] }, expected: 6 },
+	{
+		label: 'an empty schema and think',
+		request: { messages: [REQUEST_HELLO], options: { think: true, schema: {} } },
+		expected: 6,
+	},
+	{
+		label: 'a named tool',
+		request: { messages: [REQUEST_HELLO], tools: [{ name: 'lookup' }] },
+		expected: 11,
+	},
+	{
+		label: 'a tool with a description and parameters',
+		request: { messages: [REQUEST_HELLO], tools: [REQUEST_ADD] },
+		expected: 24,
+	},
+	{
+		label: 'a structured output schema',
+		request: { messages: [REQUEST_HELLO], options: { schema: { type: 'object' } } },
+		expected: 11,
+	},
+	{
+		label: 'a schema with a required list',
+		request: {
+			messages: [REQUEST_HELLO],
+			options: { schema: { type: 'object', required: ['a'] } },
+		},
+		expected: 15,
+	},
+	{
+		label: 'messages, tools, and schema together',
+		request: {
+			messages: [REQUEST_HELLO],
+			tools: [REQUEST_ADD],
+			options: { think: false, schema: { type: 'object' } },
+		},
+		expected: 29,
+	},
+])
+
+/**
+ * Reads the request a scripted provider call received, omitting an absent tool list or options so
+ * it compares to a measured {@link ProviderRequest}.
+ *
+ * @param call - One recorded scripted provider call
+ * @returns The messages, tools, and options the call carried
+ */
+export function readCallRequest(call: ScriptedCall): ProviderRequest {
+	return {
+		messages: call.messages,
+		...(call.tools === undefined ? {} : { tools: call.tools }),
+		...(call.options === undefined ? {} : { options: call.options }),
+	}
+}
+
 /** Seeds an agent and conversation for automatic compaction. */
 export function seedCompactionAgent(
-	window: ReturnType<typeof createBudget<readonly Message[]>> | undefined,
+	window: ReturnType<typeof createBudget<ProviderRequest>> | undefined,
 ): {
 	readonly agent: ReturnType<typeof createAgent>
 	readonly conversation: ReturnType<typeof createConversation>
@@ -4105,10 +4200,10 @@ export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined)
 	readonly result: AgentResult
 	readonly recorded: readonly string[]
 	readonly sent: ReadonlyArray<readonly string[]>
-	readonly measured: ReadonlyArray<readonly Message[]>
-	readonly wire: ReadonlyArray<readonly Message[]>
+	readonly measured: readonly ProviderRequest[]
+	readonly wire: readonly ProviderRequest[]
 }> {
-	const measured = createRecorder<readonly [readonly Message[]]>()
+	const measured = createRecorder<readonly [ProviderRequest]>()
 	const replies: ProviderResult[] = [
 		{
 			content: '',
@@ -4133,9 +4228,9 @@ export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined)
 		conversations,
 		window: createBudget({
 			max: 1_000_000,
-			consumer: (messages: readonly Message[]) => {
-				measured.handler([...messages])
-				return estimateMessages(messages)
+			consumer: (request: ProviderRequest) => {
+				measured.handler({ ...request, messages: [...request.messages] })
+				return estimateRequest(request)
 			},
 		}),
 	})
@@ -4153,8 +4248,8 @@ export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined)
 		result,
 		recorded: collectMessageThinking(agent.context.messages.messages()),
 		sent: provider.calls.map(({ messages }) => collectMessageThinking(messages)),
-		measured: measured.calls.map(([messages]) => messages),
-		wire: provider.calls.map(({ messages }) => messages),
+		measured: measured.calls.map(([request]) => request),
+		wire: provider.calls.map(readCallRequest),
 	}
 }
 /**
@@ -4319,7 +4414,7 @@ export const GUIDE_REPLAY_READINGS = Object.freeze([
 /** Supplies the guide replay claims scenario inputs. */
 export const GUIDE_REPLAY_CLAIMS = Object.freeze([
 	"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
-	"`estimateMessages` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
+	"`estimateRequest` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
 	'It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.',
 ])
 

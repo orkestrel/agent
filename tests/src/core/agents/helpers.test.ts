@@ -7,6 +7,7 @@ import {
 	createRecordedBudget,
 	createTurnRegistry,
 	AGENT_USAGE,
+	REQUEST_ESTIMATE_CASES,
 } from '../../../setup.js'
 import {
 	agentResultToJSON,
@@ -14,6 +15,7 @@ import {
 	chargeUsage,
 	denyCall,
 	estimateMessages,
+	estimateRequest,
 	estimateTokens,
 	IMAGE_TOKEN_ESTIMATE,
 	isAgentJobError,
@@ -320,6 +322,35 @@ describe('estimateMessages', () => {
 
 	it('is 0 for an empty array (no messages)', () => {
 		expect(estimateMessages([])).toBe(0)
+	})
+})
+
+describe('estimateRequest', () => {
+	it.each(REQUEST_ESTIMATE_CASES)('counts $label as $expected tokens', ({ request, expected }) => {
+		expect(estimateRequest(request)).toBe(expected)
+	})
+
+	it('equals estimateMessages when no tool list or schema is carried', () => {
+		const messages = [createMessage('hello'), createMessage('a'.repeat(40))]
+		expect(estimateRequest({ messages })).toBe(estimateMessages(messages))
+		expect(estimateRequest({ messages, tools: [], options: { think: true } })).toBe(20)
+	})
+
+	it('is 0 for an empty request', () => {
+		expect(estimateRequest({ messages: [] })).toBe(0)
+	})
+
+	it('charges a fixed overhead for a schema or tool list JSON cannot carry, and never throws', () => {
+		const circular: Record<string, unknown> = { type: 'object' }
+		circular.self = circular
+		const messages = [createMessage('hello')]
+		// 6 for the message plus the documented fixed MESSAGE_TOKEN_OVERHEAD for the unrenderable part.
+		expect(estimateRequest({ messages, options: { schema: circular } })).toBe(
+			6 + MESSAGE_TOKEN_OVERHEAD,
+		)
+		expect(estimateRequest({ messages, tools: [{ name: 'lookup', parameters: circular }] })).toBe(
+			6 + MESSAGE_TOKEN_OVERHEAD,
+		)
 	})
 })
 

@@ -1,6 +1,6 @@
 import type { AgentEventName } from '../../../setup.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import type { ProviderResult } from '@src/core'
+import type { ProviderRequest, ProviderResult } from '@src/core'
 import type { ToolCall } from '@orkestrel/tool'
 import type {
 	AgentEventMap,
@@ -22,6 +22,8 @@ import {
 	computeUsageTotal,
 	createEchoProvider,
 	COMPACT_SCRIPT,
+	measureMessages,
+	readCallRequest,
 	seedCompactionAgent,
 	createAnswerProvider,
 	requestConversation,
@@ -50,6 +52,7 @@ import {
 	createConversationManager,
 	createScope,
 	estimateMessages,
+	estimateRequest,
 	isAgentError,
 	isProviderAbortError,
 	ProviderAbortError,
@@ -117,7 +120,7 @@ describe('Agent — thinking replay', () => {
 			],
 			{ recorded: true },
 		)
-		const estimated = createRecorder<[readonly Message[]]>()
+		const estimated = createRecorder<[ProviderRequest]>()
 		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
 		conversations.add()
 		const tools = createToolManager()
@@ -135,11 +138,11 @@ describe('Agent — thinking replay', () => {
 			{
 				tools,
 				conversations,
-				window: createBudget<readonly Message[]>({
+				window: createBudget<ProviderRequest>({
 					max: 10000,
-					consumer: (messages) => {
-						estimated.handler(messages)
-						return estimateMessages(messages)
+					consumer: (request) => {
+						estimated.handler(request)
+						return estimateRequest(request)
 					},
 				}),
 			},
@@ -150,7 +153,7 @@ describe('Agent — thinking replay', () => {
 		const sent = requireValue(provider.calls[1]).messages
 		expect(sent.map((message) => message.thinking)).toContain('first')
 		const [measured] = requireValue(estimated.calls.at(-1))
-		expect(measured.map((message) => message.thinking)).toContain('first')
+		expect(measured.messages.map((message) => message.thinking)).toContain('first')
 	})
 
 	it('defaults an absent provider policy to none and omits empty thinking on both assistant paths', async () => {
@@ -313,7 +316,8 @@ describe('Agent — thinking replay', () => {
 				{ role: 'assistant', content: 'reply', thinking: 'h'.repeat(8000) },
 				{ role: 'user', content: 'go' },
 			])
-			const window = createBudget<readonly Message[]>({ max: 100, consumer: estimateMessages })
+			// This case pins message arithmetic, so the window explicitly measures request messages alone.
+			const window = createBudget<ProviderRequest>({ max: 100, consumer: measureMessages })
 			expect(estimateMessages(conversation.view())).toBeGreaterThan(window.max)
 			const responses = ['tool', 'answer']
 			const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
@@ -3295,13 +3299,14 @@ describe('Agent — emitter (push observation surface)', () => {
 describe('Agent — automatic compaction (context window budget)', () => {
 	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
 		// An earlier exchange sits before the run's request 'go', and the window sits one token preceding
-		// the opening prompt, so the pre-first-turn check holds and turn 1's appends cross it:
-		//  • Turn 1 sees `[earlier, reply, go]` (3 messages) and appends asst(40x) + tool("5") → EXHAUSTED
-		//    → compact() (keep 0) folds the 2 messages before the request into `recap of 2`; the
-		//    working array rebuilds to `[<recap of 2>, go, 40x, "5"]` (4 messages).
-		//  • Turn 2 appends asst(40y) + tool("5") → still over the window → compact() has nothing
-		//    before the request to fold, so it returns `undefined` and the run latches futile.
-		//  • Turn 3 (no tools) answers 'the answer is 42'.
+		// the opening prompt, so the first admission passes and the second turn's appends cross it:
+		//  • Turn 1 dispatches `[earlier, reply, go]` (3 messages) and appends asst(40x) + tool("5").
+		//  • Turn 2's admission finds the request EXHAUSTED → compact() (keep 0) folds the 2
+		//    messages before the request into `recap of 2`; the working array rebuilds to
+		//    `[<recap of 2>, go, 40x, "5"]` (4 messages), which is dispatched.
+		//  • Turn 3's admission, after asst(40y) + tool("5"), is still over the window → compact() has
+		//    nothing before the request to fold, so it returns `undefined` and the run latches futile;
+		//    the turn (no tools) answers 'the answer is 42'.
 		// So compaction fires EXACTLY once; without it turn 2 would see 5 messages. Record the
 		// conversation's own `compact` event (the observability surface — NO added Agent event).
 		const conversations = createConversationManager({
@@ -3320,9 +3325,10 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			// Message arithmetic is the claim here, so the window measures request messages alone.
 			window: createBudget({
 				max: estimateMessages(conversation.view()) + 1,
-				consumer: estimateMessages,
+				consumer: measureMessages,
 			}),
 			limit: 5,
 		})
@@ -3359,7 +3365,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		// produces the same answer. With NO compaction the working array only grows, so the LAST
 		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x(+calls), "5",
 		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
-		const window = createBudget({ max: 10_000, consumer: estimateMessages })
+		const window = createBudget({ max: 10_000, consumer: measureMessages })
 		const { agent, conversation } = seedCompactionAgent(window)
 		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
 			'compact',
@@ -3408,13 +3414,12 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		expect(result.partial).toBe(false)
 	})
 
-	it('is a no-op with a NON-SUMMARIZABLE conversation even when a window budget is set (regression)', async () => {
+	it('measures but never folds a NON-SUMMARIZABLE conversation when a window budget is set (regression)', async () => {
 		// A LOW-max window budget but the DEFAULT conversation (no summarizer ⇒ `summarizable` is
-		// false). The trigger's `active.summarizable === true` guard fails, so the whole block is
-		// skipped: the multi-turn loop runs exactly as the no-window path and ends correctly — and the
-		// budget is never consumed. This preserves the shipped behavior (a conversation that can't fold
-		// is never auto-compacted, and the loop never throws the SUMMARIZER error).
-		const window = createBudget({ max: 1, consumer: estimateMessages })
+		// false). The fold guard fails, so the multi-turn loop runs exactly as the no-window path and
+		// ends correctly in the lenient default — the loop never throws the SUMMARIZER error — but
+		// every request is still measured, so the budget holds the last request's estimate.
+		const window = createBudget({ max: 1, consumer: measureMessages })
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
@@ -3428,8 +3433,9 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		expect(result.partial).toBe(false)
 		// Three scripted turns ran (two tool turns + the final), none over-running the script.
 		expect(provider.calls).toHaveLength(3)
-		// The window budget was never charged (non-summarizable conversation ⇒ the trigger is skipped).
-		expect(window.consumed).toBe(0)
+		// The final dispatch carried `[go, 40x(+calls), "5", 40y(+calls), "5"]`, counted at 65 above.
+		expect(window.consumed).toBe(65)
+		expect(window.exhausted).toBe(true)
 	})
 })
 
@@ -3449,10 +3455,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		// Seed the conversation's live tail with ONE big earlier user message (200 chars ⇒
 		// ceil(200/4) = 50 tokens) and the short request BEFORE the run. With a window max of 20 and NO
 		// system prompt, the build()'d initial prompt already exceeds the window — so the loop's
-		// PRE-FIRST-TURN `#trim` fires `compact()` (keep 0 folds the message before the request into
-		// `recap of 1`) and rebuilds BEFORE turn 0. The single provider call must therefore see the
-		// COMPACTED view (the framed `recap of 1`, then the request), not the 200-char seed — the
-		// proof the pre-first-turn check ran ahead of the provider.
+		// first turn's admission fires `compact()` (keep 0 folds the message before the request into
+		// `recap of 1`) and rebuilds BEFORE the dispatch. The single provider call must therefore see
+		// the COMPACTED view (the framed `recap of 1`, then the request), not the 200-char seed — the
+		// proof the admission ran ahead of the provider.
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
 			keep: 0,
@@ -3464,7 +3470,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const provider = createAnswerProvider()
 		const agent = createAgent(provider, {
 			conversations,
-			window: createBudget({ max: 20, consumer: estimateMessages }),
+			window: createBudget({ max: 20, consumer: estimateRequest }),
 			limit: 5,
 		})
 
@@ -3498,7 +3504,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const provider = createAnswerProvider()
 		const agent = createAgent(provider, {
 			conversations,
-			window: createBudget({ max: 10_000, consumer: estimateMessages }),
+			window: createBudget({ max: 10_000, consumer: estimateRequest }),
 			limit: 5,
 		})
 
@@ -3511,7 +3517,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 
 	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run — it fires fault and continues', async () => {
 		// A summarizer that ALWAYS throws, a conversation with keep 0 (so there IS a tail to fold), and
-		// a low window crossed by the post-tool-turn prompt. The between-turns `#trim` calls
+		// a low window crossed by every request. Each turn's admission calls
 		// `compact()`, which rejects — the loop CATCHES it (the run does not reject), surfaces a
 		// `fault` event, skips compaction that turn, and continues to the final answer. No
 		// section is ever created (every fold attempt threw). A MANUAL compact() still throws (asserted
@@ -3535,7 +3541,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: createBudget({ max: 12, consumer: estimateMessages }),
+			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 		})
 		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
@@ -3564,10 +3570,10 @@ describe('Agent — automatic compaction (production hardening)', () => {
 
 	it('FUTILE guard: a compact() that folds NOTHING while over the window stops auto-compacting for the rest of the run (no churn)', async () => {
 		// `keep` is huge (50), so `compact()` ALWAYS folds nothing (count <= keep) and resolves
-		// `undefined` — yet the prompt is over the window. The pre-first-turn check measures once
-		// without latching; the FIRST between-turns `#trim` measures, folds nothing, and latches the
-		// per-run futile flag, so the second tool turn measures nothing. The window consumer records
-		// each measurement: two with the latch, three without it.
+		// `undefined` — yet the request is over the window. The first turn's admission folds nothing
+		// without latching; the second turn's admission folds nothing and latches the per-run futile
+		// flag. Every request is still measured, so the window consumer records one measurement per
+		// dispatch, and the lenient default sends each over-window request.
 		const stub = createStubSummarizer()
 		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
 		const conversation = conversations.add() // auto-activates — the agent's message source
@@ -3581,15 +3587,15 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			{ result: { content: 'done' } },
 		]
 		const provider = createScriptedProvider(script, AGENT_SCRIPT_OPTIONS)
-		const measured = createRecorder<[readonly Message[]]>()
+		const measured = createRecorder<[ProviderRequest]>()
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: createBudget<readonly Message[]>({
+			window: createBudget<ProviderRequest>({
 				max: 12,
-				consumer: (messages) => {
-					measured.handler(messages)
-					return estimateMessages(messages)
+				consumer: (request) => {
+					measured.handler(request)
+					return estimateRequest(request)
 				},
 			}),
 			limit: 5,
@@ -3607,14 +3613,69 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(result.content).toBe('done')
 		expect(result.partial).toBe(false)
 		expect(events.finish.count).toBe(1)
-		// No churn: the latch short-circuited the second between-turns check, so the window measured
-		// the prompt exactly twice; nothing folded, so the summarizer never ran and no `fault` fired.
-		expect(measured.count).toBe(2)
+		// One measurement per dispatch, latched or not; nothing folded, so the summarizer never ran
+		// and no `fault` fired.
+		expect(measured.count).toBe(3)
 		expect(stub.calls).toHaveLength(0)
 		expect(events.fault.count).toBe(0)
-		// The over-window run still ran all three scripted turns (the futile prompt proceeded to the
-		// provider rather than looping on compaction).
+		// The over-window run still ran all three scripted turns (the futile request proceeded to the
+		// provider rather than looping on compaction), and each measured request is the dispatched one.
 		expect(provider.calls).toHaveLength(3)
+		expect(measured.calls.map(([request]) => request)).toEqual(provider.calls.map(readCallRequest))
+	})
+
+	// A `turn` listener adds a user message as the numbered turn begins, which makes the conversation
+	// foldable at that turn's admission (the earlier exchange sits before the newest user message).
+	// Whether that fold runs shows whether the earlier undefined fold latched: the first turn's does
+	// not, a later turn's does. The user message arrives between exchanges, never inside a tool group.
+	it.each([
+		{ added: 1, folds: 1, label: 'an undefined fold on the first turn does not latch' },
+		{ added: 2, folds: 0, label: 'an undefined fold on a later turn latches the run' },
+	])('FUTILE guard: $label', async ({ added, folds }) => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'a', tools: [createToolCall({ name: 'note' })] } },
+				{ result: { content: 'b', tools: [createToolCall({ name: 'note', id: 'c2' })] } },
+				{ result: { content: 'c', tools: [createToolCall({ name: 'note', id: 'c3' })] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		const executed = createRecorder<[]>()
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			// Every request is over the window, and the opening request is the lone user message. The
+			// original message-only policy is explicit: the latch, not the tools, is the subject.
+			window: createBudget({ max: 3, consumer: measureMessages }),
+			limit: 6,
+			on: {
+				turn: (index) => {
+					if (index === added) agent.context.messages.add({ role: 'user', content: 'later' })
+				},
+			},
+		})
+		tools.add(
+			createTool({
+				name: 'note',
+				execute: () => {
+					executed.handler()
+					return 'noted'
+				},
+			}),
+		)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		const result = await agent.generate()
+
+		expect(result.content).toBe('done')
+		expect(executed.count).toBe(3)
+		expect(stub.calls).toHaveLength(folds)
+		expect(conversation.sections).toHaveLength(folds)
 	})
 
 	it('folds nothing after a tool aborts the run, and the next run folds the whole exchange first', async () => {
@@ -3626,10 +3687,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			{ role: 'assistant', content: 'Nice.' },
 			{ role: 'user', content: 'go' },
 		])
-		// The opening prompt fits the window, so only the post-dispatch check can reach it.
+		// The opening prompt fits the window, so only a later admission can reach it, and the abort
+		// stops the loop before that admission.
 		const window = createBudget({
 			max: estimateMessages(conversation.view()) + 1,
-			consumer: estimateMessages,
+			consumer: measureMessages,
 		})
 		const provider = createScriptedProvider(
 			[
@@ -3733,9 +3795,9 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 
 	it('compacts each conversation INDEPENDENTLY — one thread’s sections never leak into another', async () => {
 		// One agent WITH a small window + a ConversationManager (keep 0). A no-tools provider that
-		// always finishes, so each request is a single turn whose PRE-FIRST-TURN `#trim` compacts the
+		// always finishes, so each request is a single turn whose admission compacts the
 		// conversation after its accumulated history exceeds the window. Two requests per thread: the
-		// 2nd request's pre-first-turn check folds that thread's own accumulated tail into ITS OWN
+		// 2nd request's admission folds that thread's own accumulated tail into ITS OWN
 		// section (retaining ITS OWN originals). The window resets per run (run-entry `clear()`), so the
 		// two threads compact on their own schedules with no shared state.
 		const { summarize } = createStubSummarizer()
@@ -3752,7 +3814,7 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		// is the agent's OWN registry, so each thread is summarizable.
 		const agent = createAgent(provider, {
 			conversations: manager,
-			window: createBudget({ max: 10, consumer: estimateMessages }),
+			window: createBudget({ max: 10, consumer: estimateRequest }),
 			limit: 5,
 		})
 
@@ -3763,7 +3825,7 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		expect(manager.conversation('B')?.sections.length).toBe(0)
 
 		// Round 2 — each thread now has [user, 'ok'] accumulated; the new user turn (added before
-		// generate) pushes the prompt over the window, so the pre-first-turn `#trim` folds THAT thread's
+		// generate) pushes the prompt over the window, so the admission folds THAT thread's
 		// earlier exchange into one section and keeps the second request live.
 		await requestConversation(agent, manager, 'A', 'alpha-2')
 		await requestConversation(agent, manager, 'B', 'bravo-2')
@@ -4117,7 +4179,7 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 	it('a construction `window` -- starting a 2nd run while the 1st is in flight throws AgentError(CONCURRENCY); the 1st still completes', async () => {
 		const gate = Promise.withResolvers<void>()
 		const agent = createAgent(createGatedProvider(gate), {
-			window: createBudget({ max: 1_000_000, consumer: estimateMessages }),
+			window: createBudget({ max: 1_000_000, consumer: estimateRequest }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -4271,7 +4333,7 @@ describe('Agent — strict compaction', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
-			window: createBudget({ max: 12, consumer: estimateMessages }),
+			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 			strict: true,
 		})
@@ -4291,6 +4353,322 @@ describe('Agent — strict compaction', () => {
 		expect(events.error.count).toBe(1)
 		expect(events.error.calls[0]?.[0]).toBe(boom)
 		expect(events.finish.count).toBe(0)
+	})
+})
+
+// ── Strict window admission — with `strict: true` a request that is still over the window after
+// the admission step (a fold that left it over, a futile fold, or a conversation that can't fold) is
+// refused with an AgentError coded WINDOW before any provider call. The window `max` is 10 and the
+// request 'hi' alone estimates 5 tokens, so every case is over by the real estimator, never at the
+// boundary. The non-strict counterparts stay in 'automatic compaction (production hardening)'.
+describe('Agent — strict window admission', () => {
+	it('strict window: refuses a request still over max after a successful fold, with zero provider calls', async () => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		const seed = 'q'.repeat(200)
+		conversation.add([
+			{ role: 'user', content: seed },
+			{ role: 'user', content: 'hi' },
+		])
+		const window = createBudget({ max: 10, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { conversations, window, limit: 5, strict: true })
+
+		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
+
+		// The run reached the fold: the summarizer folded the seed alone, yet the rebuilt view
+		// (framed recap + request) still estimates above the window max.
+		expect(stub.calls).toHaveLength(1)
+		expect(stub.calls[0]?.map((message) => message.content)).toEqual([seed])
+		expect(conversation.sections).toHaveLength(1)
+		expect(estimateMessages(conversation.view())).toBeGreaterThan(10)
+		expect(agent.status).toBe('error')
+		expect(provider.calls).toHaveLength(0)
+	})
+
+	it('strict window: refuses an over-max request when the fold returns undefined, with zero provider calls', async () => {
+		const stub = createStubSummarizer()
+		// `keep` 50 leaves nothing foldable, so `compact()` resolves undefined for this conversation.
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const window = createBudget({ max: 10, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { conversations, window, limit: 5, strict: true })
+		// The setup is over the window and the fold is futile before the run starts.
+		expect(estimateMessages(conversation.view())).toBeGreaterThan(10)
+		expect(await conversation.compact()).toBeUndefined()
+
+		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
+
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.sections).toHaveLength(0)
+		expect(agent.status).toBe('error')
+		expect(provider.calls).toHaveLength(0)
+	})
+
+	it('strict window: refuses an exhausted window on a non-summarizable conversation, with zero provider calls', async () => {
+		// The default conversation has no summarizer, so no fold can ever run for it.
+		const window = createBudget({ max: 1, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { window, limit: 5, strict: true })
+		expect(agent.context.conversations.active?.summarizable).toBe(false)
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		expect(estimateMessages(agent.context.build())).toBeGreaterThan(1)
+
+		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
+
+		expect(agent.status).toBe('error')
+		expect(provider.calls).toHaveLength(0)
+	})
+
+	it('strict window: refuses a request equal to max, naming the agent, the measure, and the max', async () => {
+		const window = createBudget({ max: 5, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { window, limit: 5, strict: true })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		// 'hi' is 1 token plus 4 of framing, and the request advertises no tools and no options.
+		expect(estimateRequest({ messages: agent.context.build() })).toBe(5)
+
+		await expect(agent.generate()).rejects.toMatchObject({
+			code: 'WINDOW',
+			context: { agent: agent.id, consumed: 5, max: 5 },
+		})
+
+		expect(provider.calls).toHaveLength(0)
+	})
+
+	it('strict window: sends a request one token under max', async () => {
+		const window = createBudget({ max: 6, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { window, limit: 5, strict: true })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+
+		const result = await agent.generate()
+
+		expect(result.content).toBe('final answer')
+		expect(provider.calls).toHaveLength(1)
+		expect(window.consumed).toBe(5)
+		expect(window.exhausted).toBe(false)
+	})
+
+	it('strict window: refuses a later turn whose request grows past max with nothing to fold, after the first dispatch', async () => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		// The lone request 'go' is 5 tokens, under max 6. The tool turn appends the 40-char answer
+		// (10 + 4, plus 11 for its 41-char call JSON) and the result '5' (1 + 4), so the next request
+		// measures 5 + 25 + 5 = 35 messages-only, and the newest user message is all there is to keep.
+		const window = createBudget({ max: 6, consumer: measureMessages })
+		const agent = createAgent(provider, { conversations, tools, window, limit: 5, strict: true })
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		await expect(agent.generate()).rejects.toMatchObject({
+			code: 'WINDOW',
+			context: { agent: agent.id, consumed: 35, max: 6 },
+		})
+
+		expect(provider.calls).toHaveLength(1)
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.sections).toHaveLength(0)
+		expect(agent.status).toBe('error')
+	})
+
+	it('strict window: a cancel during the fold settles partial, not WINDOW, with no fault and zero provider calls', async () => {
+		const controller = new AbortController()
+		const summarized = createRecorder<[readonly Message[]]>()
+		const conversations = createConversationManager({
+			summarize: async (messages) => {
+				summarized.handler(messages)
+				controller.abort('the operator closed the ticket')
+				return 'recap'
+			},
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const provider = createAnswerProvider()
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const errors = createRecorder<AgentEventMap['error']>()
+		const agent = createAgent(provider, {
+			conversations,
+			window: createBudget({ max: 10, consumer: estimateRequest }),
+			limit: 5,
+			strict: true,
+			signal: controller.signal,
+			on: { fault: faults.handler, error: errors.handler },
+		})
+
+		const result = await agent.generate()
+
+		expect(summarized.count).toBe(1)
+		expect(result.partial).toBe(true)
+		expect(faults.count).toBe(0)
+		expect(errors.count).toBe(0)
+		expect(conversation.sections).toHaveLength(0)
+		expect(provider.calls).toHaveLength(0)
+		expect(agent.status).toBe('done')
+	})
+})
+
+// ── Complete-request window admission — the window measures the exact request each dispatch sends
+// (messages after replay, advertised tools, per-call options), folds at most once per turn, and the
+// lenient default still sends an over-window request. Arithmetic is counted by hand beside each case.
+describe('Agent — complete-request window admission', () => {
+	it.each(['none', 'all'] as const)(
+		'measures the exact request each dispatch sends under replay %s, through tools, options, and a scope narrowed by a turn listener',
+		async (replay) => {
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+			})
+			conversations.add()
+			const tools = createToolManager()
+			tools.add(createAddTool())
+			tools.add(createTool({ name: 'other', execute: () => 'o' }))
+			const provider = createScriptedProvider(
+				[
+					{ result: { content: '', thinking: 'first', tools: [createToolCall()] } },
+					{ result: { content: 'done' } },
+				],
+				{ ...AGENT_SCRIPT_OPTIONS, replay },
+			)
+			const measured = createRecorder<[ProviderRequest]>()
+			const agent = createAgent(provider, {
+				conversations,
+				tools,
+				window: createBudget<ProviderRequest>({
+					max: 1_000_000,
+					consumer: (request) => {
+						measured.handler(request)
+						return estimateRequest(request)
+					},
+				}),
+				on: {
+					turn: (index) => {
+						if (index === 1) agent.context.apply(createScope({ name: 'add-only', tools: ['add'] }))
+					},
+				},
+			})
+			agent.context.messages.add({ role: 'user', content: 'go' })
+			const schema = { type: 'object' }
+
+			await agent.generate({ schema, think: true })
+
+			const requests = measured.calls.map(([request]) => request)
+			expect(provider.calls).toHaveLength(2)
+			expect(requests).toEqual(provider.calls.map(readCallRequest))
+			expect(requests.map((request) => request.tools?.map(({ name }) => name))).toEqual([
+				['add', 'other'],
+				['add'],
+			])
+			expect(requests.map((request) => request.options)).toEqual([
+				{ think: true, schema },
+				{ think: true, schema },
+			])
+			// The replayed thinking is part of what was measured exactly when it was sent.
+			expect(requests[1]?.messages.some((message) => message.thinking === 'first')).toBe(
+				replay === 'all',
+			)
+			for (const [index, call] of provider.calls.entries()) {
+				expect(call.tools).toBe(requests[index]?.tools)
+				expect(call.options).toBe(requests[index]?.options)
+			}
+		},
+	)
+
+	it.each([
+		{ advertise: true, folds: 1 },
+		{ advertise: false, folds: 0 },
+	])(
+		'counts advertised tools toward the window, so tools alone fold a request (advertised: $advertise)',
+		async ({ advertise, folds }) => {
+			const stub = createStubSummarizer()
+			const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+			const conversation = conversations.add()
+			conversation.add([
+				{ role: 'user', content: 'q'.repeat(40) },
+				{ role: 'assistant', content: 'Nice.' },
+				{ role: 'user', content: 'go' },
+			])
+			const tools = createToolManager()
+			if (advertise) {
+				tools.add(createTool({ name: 'lookup', description: 'd'.repeat(400), execute: () => 'ok' }))
+			}
+			// The messages alone sit one token under max, so only the 400-character description, at
+			// 100 tokens or more, can carry the request to max.
+			const window = createBudget({
+				max: estimateMessages(conversation.view()) + 1,
+				consumer: estimateRequest,
+			})
+			const provider = createAnswerProvider()
+			const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
+
+			await agent.generate()
+
+			expect(stub.calls).toHaveLength(folds)
+			expect(conversation.sections).toHaveLength(folds)
+			expect(provider.calls).toHaveLength(1)
+			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(
+				advertise ? ['lookup'] : undefined,
+			)
+		},
+	)
+
+	it('sends the rebuilt request in the lenient default when the fold leaves it over max', async () => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const window = createBudget({ max: 10, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { conversations, window, limit: 5 })
+
+		const result = await agent.generate()
+
+		expect(result.content).toBe('final answer')
+		expect(stub.calls).toHaveLength(1)
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
+			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
+			'hi',
+		])
+		// The window holds the rebuilt request: the 30-character recap prefix and the 10-character
+		// summary are 10 tokens plus 4 of framing, and 'hi' is 1 plus 4.
+		expect(window.consumed).toBe(19)
+		expect(window.exhausted).toBe(true)
+	})
+
+	it('neither measures nor folds a limit 0 run', async () => {
+		const stub = createStubSummarizer()
+		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const window = createBudget({ max: 10, consumer: estimateRequest })
+		const provider = createAnswerProvider()
+		const agent = createAgent(provider, { conversations, window, limit: 0, strict: true })
+
+		await agent.generate()
+
+		expect(stub.calls).toHaveLength(0)
+		expect(conversation.sections).toHaveLength(0)
+		expect(provider.calls).toHaveLength(0)
+		expect(window.consumed).toBe(0)
 	})
 })
 
@@ -4632,7 +5010,7 @@ describe('Agent — the select event follows each select-site build', () => {
 			tools,
 			window: createBudget({
 				max: estimateMessages(conversation.view()) + 1,
-				consumer: estimateMessages,
+				consumer: measureMessages,
 			}),
 			limit: 5,
 			select: selection.handler,
@@ -4652,7 +5030,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		)
 	})
 
-	it('fires twice before turn 0 when the pre-first-turn compaction folds', async () => {
+	it('fires after turn 0 begins when the first admission folds, before its provider call', async () => {
 		const selection = createRecordingSelection()
 		const order: string[] = []
 		const conversations = createConversationManager({
@@ -4666,7 +5044,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		const provider = createScriptedProvider([{ content: 'final answer' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			conversations,
-			window: createBudget({ max: 20, consumer: estimateMessages }),
+			window: createBudget({ max: 20, consumer: estimateRequest }),
 			limit: 5,
 			select: selection.handler,
 			on: {
@@ -4677,7 +5055,9 @@ describe('Agent — the select event follows each select-site build', () => {
 
 		await agent.generate()
 
-		expect(order).toEqual(['select', 'select', 'turn 0'])
+		// The entry select, then the turn begins, then the admission fold rebuilds through select
+		// before the single provider call.
+		expect(order).toEqual(['select', 'turn 0', 'select'])
 		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
 			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
 			'hi',
@@ -4990,7 +5370,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 			tools,
 			window: createBudget({
 				max: estimateMessages(history.view()) + 1,
-				consumer: estimateMessages,
+				consumer: measureMessages,
 			}),
 			limit: 5,
 			select: async (conversation, request, signal) => {
@@ -5140,7 +5520,7 @@ describe('Agent — run boundaries', () => {
 		const agent = createAgent(provider, {
 			tools,
 			conversations,
-			window: createBudget<readonly Message[]>({ max: 1_000_000, consumer: estimateMessages }),
+			window: createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'Ship order 42.' })
 
@@ -5220,7 +5600,7 @@ describe('Agent — run boundaries', () => {
 		const faults = createRecorder<AgentEventMap['fault']>()
 		const agent = createAgent(provider, {
 			conversations,
-			window: createBudget<readonly Message[]>({ max: 20, consumer: estimateMessages }),
+			window: createBudget<ProviderRequest>({ max: 20, consumer: estimateRequest }),
 			timeout: AGENT_DEADLINE,
 			on: { fault: faults.handler },
 		})

@@ -13,6 +13,8 @@ import {
 	collectMessageThinking,
 	createBoundedRelay,
 	buildGuideLedgerOptions,
+	measureMessages,
+	readCallRequest,
 } from './setup.js'
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
@@ -1747,6 +1749,24 @@ describe('guide scenario fixtures', () => {
 		expect(outcome.measured).toEqual(outcome.wire)
 		expect(outcome.result.content).toBe('Refunded $148.50.')
 		expect((await exerciseThinkingReplay(undefined)).sent).toEqual([[], []])
+	})
+	it('measures only request messages and reads a recorded call as its request', () => {
+		const hello = [createMessage('hello')]
+		// 'hello' is 2 tokens plus 4 of framing; the tool list and schema are not counted.
+		expect(
+			measureMessages({
+				messages: hello,
+				tools: [{ name: 'lookup', description: 'Finds a ticket.', parameters: { type: 'object' } }],
+				options: { schema: { type: 'object' } },
+			}),
+		).toBe(6)
+		const signal = new AbortController().signal
+		expect(
+			readCallRequest({ messages: hello, tools: undefined, options: undefined, signal }),
+		).toEqual({ messages: hello })
+		expect(
+			readCallRequest({ messages: hello, tools: [], options: { think: true }, signal }),
+		).toStrictEqual({ messages: hello, tools: [], options: { think: true } })
 	})
 	it('collects present reasoning strings in order without altering messages', () => {
 		const reasoning = [

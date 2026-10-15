@@ -19,8 +19,8 @@ export function isStudyMemorySubject(value: unknown): value is StudyMemorySubjec
 			typeof value.createLedger === 'function' &&
 			'createConversationManager' in value &&
 			typeof value.createConversationManager === 'function' &&
-			'estimateMessages' in value &&
-			typeof value.estimateMessages === 'function' &&
+			'estimateRequest' in value &&
+			typeof value.estimateRequest === 'function' &&
 			'LEDGER_QUESTIONS' in value &&
 			isObject(value.LEDGER_QUESTIONS),
 	)

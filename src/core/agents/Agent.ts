@@ -10,7 +10,7 @@ import type {
 	AuthorityInterface,
 	AgentRunResult,
 } from './types.js'
-import type { ProviderInterface, ProviderResult } from '../providers/index.js'
+import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
 import type { AgentContextInterface, Selection } from '../contexts/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
@@ -100,16 +100,17 @@ export class Agent implements AgentInterface {
 	readonly #scheduler: SchedulerInterface | undefined
 	readonly #signal: AbortSignal | undefined
 	readonly #authority: AuthorityInterface | undefined
-	// The context budget for automatic conversation compaction — its `consumer` is a token estimator,
-	// its `max` the context window. `#trim` re-measures the absolute current prompt against it
-	// after the provider's replay policy before the first request and between turns; `undefined`
-	// ⇒ disabled, and the loop never calls `#trim`. Reset (`clear()`) at run entry so no stale
-	// `consumed` carries across runs / a conversation switch. Not the hard cost `budget` ceiling —
-	// when the prompt reaches its `max` this compacts + continues (non-fatal on a summarizer throw,
-	// futile-guarded), never aborts.
-	readonly #window: BudgetInterface<readonly Message[]> | undefined
-	// When true, a summarizer failure during automatic compaction rethrows (after the
-	// `fault` event) instead of skipping compaction and continuing over-window.
+	// The context budget that admits each provider request — its `consumer` is a token estimator
+	// over the complete `ProviderRequest`, its `max` the context window. `#admit` re-measures the
+	// exact request (replay-filtered messages, advertised tools, per-call options) against it before
+	// every dispatch; `undefined` ⇒ disabled, and the loop never calls `#admit`. Reset (`clear()`)
+	// at run entry so no stale `consumed` carries across runs / a conversation switch. Not the hard
+	// cost `budget` ceiling — when the request reaches its `max` this compacts + continues
+	// (non-fatal on a summarizer throw, futile-guarded) and never aborts; only `strict` refuses.
+	readonly #window: BudgetInterface<ProviderRequest> | undefined
+	// When true, a summarizer failure during automatic compaction rethrows (after the `fault`
+	// event) instead of skipping compaction and continuing over-window, and a request still over
+	// the window after the permitted fold is refused with a WINDOW error before dispatch.
 	readonly #strict: boolean
 	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
@@ -374,6 +375,15 @@ export class Agent implements AgentInterface {
 		const selecting = this.#select(request, messages, abort, budget, spent)
 		if (selecting !== undefined) await selecting
 		const tools = this.#context.tools
+		// The per-call options are fixed for the run, so every request carries this one snapshot;
+		// absent when neither preference is set.
+		const options: ProviderRequest['options'] =
+			think === undefined && schema === undefined
+				? undefined
+				: {
+						...(think === undefined ? {} : { think }),
+						...(schema === undefined ? {} : { schema }),
+					}
 		let content = ''
 		let thinking: string | undefined
 		let usage: TokenUsage | undefined
@@ -387,31 +397,16 @@ export class Agent implements AgentInterface {
 		let exited = false
 		let partial = false
 		let exhausted = false
-		// Per-run auto-compaction state — a local, so it starts fresh each run (never carried
-		// across runs or a conversation switch). `futile` is the futile-compaction guard:
-		// after a `compact()` returns `undefined` while still over the window, the prompt can't
-		// shrink further, so auto-compaction stops for the rest of this run (no per-turn churn).
-		let futile = false
-		// Auto-compaction runs only when a `#window` budget is set and the active conversation is
-		// summarizable; the default conversation has no summarizer, so the auto path never throws the
-		// `compact()` SUMMARIZER error. Gating the run-entry `clear()` and the pre-first-turn `#trim`
-		// behind this flag adds no `await` from compaction when it is off; the select site before it
-		// adds one only when a handler is set.
-		// When enabled: reset `#window` at run entry so no stale `consumed` carries across runs / a
-		// conversation switch, then run a pre-first-turn `#trim` so a resumed / long conversation whose
-		// initial prompt already exceeds the window compacts at once (not only after a tool turn) —
-		// skipped when already aborted (a pre-aborted run commits its empty partial without compaction).
-		const compacting =
-			this.#window !== undefined && this.#context.conversations.active?.summarizable === true
-		if (compacting) {
-			this.#window?.clear()
-			// Pre-first-turn: `latch: false` — an `undefined` fold here means the tail is too short
-			// yet (this run's turns haven't accumulated), not permanently futile, so it must not disable
-			// auto-compaction for the run; the growing tail can still fold on the between-turns checks.
-			if (!abort.signal.aborted) {
-				futile = await this.#trim(messages, false, request, abort, budget, spent)
-			}
-		}
+		// Per-run admission state — a local, so it starts fresh each run (never carried across runs
+		// or a conversation switch). `futile` is the futile-compaction guard: after a `compact()`
+		// returns `undefined` on a later turn while the request is still over the window, the
+		// request can't shrink further, so the run stops folding (no per-turn churn) but still
+		// measures every request. The first turn's `undefined` fold does not latch: the tail is too
+		// short yet, and the growing tail can still fold on a later turn.
+		const admission = { futile: false }
+		// Reset `#window` at run entry so no stale `consumed` carries across runs / a conversation
+		// switch. A `limit: 0` run never measures or folds, and adds no `await` when `window` is unset.
+		this.#window?.clear()
 		// A cancel at the entry select site of a `limit: 0` run never reaches the loop's own abort checks.
 		if (abort.signal.aborted) partial = true
 		for (let turn = 0; turn < limit; turn += 1) {
@@ -449,6 +444,29 @@ export class Agent implements AgentInterface {
 				(definition) => definition.name,
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
+			// Admit the request: compose it once from the replay-filtered messages and this turn's
+			// tool and option snapshot, measure it against `#window`, and dispatch exactly the
+			// request the window last measured (the rebuilt one after a fold). With no `window` it
+			// is composed and dispatched with no extra `await`.
+			let dispatch = this.#compose(messages, definitions, options)
+			if (this.#window !== undefined) {
+				const admitted = await this.#admit(
+					dispatch,
+					messages,
+					request,
+					turn > 0,
+					admission,
+					abort,
+					budget,
+					spent,
+				)
+				if (admitted === undefined) {
+					partial = true
+					exited = true
+					break
+				}
+				dispatch = admitted
+			}
 			// Bounded mid-stream budget enforcement — a per-turn local accumulator (`turnContent`,
 			// distinct from the run-spanning `content`) so `charged` (the amount already consumed
 			// against `budget` this turn) never mixes with earlier turns' content. As each content delta
@@ -463,26 +481,19 @@ export class Agent implements AgentInterface {
 			let turnContent = ''
 			let result: ProviderResult
 			try {
-				result = yield* this.#provide(
-					messages,
-					abort.signal,
-					definitions,
-					think,
-					schema,
-					(delta) => {
-						content += delta
-						turnContent += delta
-						const estimate = estimateTokens(turnContent)
-						if (estimate > charged) {
-							budget?.consume({
-								prompt: 0,
-								completion: estimate - charged,
-								total: estimate - charged,
-							})
-							charged = estimate
-						}
-					},
-				)
+				result = yield* this.#provide(dispatch, abort.signal, (delta) => {
+					content += delta
+					turnContent += delta
+					const estimate = estimateTokens(turnContent)
+					if (estimate > charged) {
+						budget?.consume({
+							prompt: 0,
+							completion: estimate - charged,
+							total: estimate - charged,
+						})
+						charged = estimate
+					}
+				})
 			} catch (error) {
 				// A cancel mid-stream (the bound signal aborted): stop and mark partial. The
 				// deltas streamed before the cancel were already accumulated into `content`
@@ -576,13 +587,8 @@ export class Agent implements AgentInterface {
 					})
 					messages.push(toolMessage)
 				}
-				// Compact between turns on the `continue` path only; after the final answer a fold is
-				// wasted. `compacting` gates the call, so with auto-compaction off the loop awaits nothing
-				// here. `latch: true`: the tail holds this turn's appends, so an `undefined` fold is futile
-				// and the run stops calling `#trim`.
-				if (compacting && !futile) {
-					futile = await this.#trim(messages, true, request, abort, budget, spent)
-				}
+				// The next turn's admission measures and folds the grown prompt, so a final answer never
+				// pays for a fold.
 				pending = true
 				continue
 			}
@@ -617,63 +623,101 @@ export class Agent implements AgentInterface {
 		return { content, thinking, usage, partial, exhausted }
 	}
 
-	// Automatic compaction, called before the first provider request and between turns, always behind
-	// the `compacting` gate. A non-summarizable conversation is never auto-compacted, so the auto
-	// path never throws the `compact()` SUMMARIZER error. The trigger is the context `#window` budget
-	// — its `consumer` a token estimator (for example `estimateMessages`), its `max` the context
-	// window — the same consume-to-a-ceiling primitive as the cost `budget`, but the ceiling action
-	// is compaction, not abort. It measures the absolute current prompt: `clear()` then
-	// consuming the working messages after the provider's replay policy makes `#window.consumed`
-	// the estimated footprint of the next prompt (the system block + the conversation's `view()` +
-	// this turn's appended messages, with only the thinking that policy permits), and `exhausted`
-	// means that prompt has reached `max`.
-	// A summarizer throw is non-fatal unless strict mode requires it to fail the run.
-	// An undefined fold between turns latches structural overflow to stop repeated compaction;
-	// before the first turn, it means the tail has not grown yet.
-	async #trim(
+	// Composes the exact request one provider dispatch sends: the working messages after the
+	// provider's replay policy, the advertised tool definitions, and the per-call `think` / `schema`
+	// options. Keys are omitted when undefined, so the provider receives no tools and no options
+	// object when there are none. The request owns its messages array, a shallow copy after the
+	// replay filter, because that filter returns the growing working array for a policy that keeps
+	// every message. The admission step measures this object and `#provide` sends it, so the
+	// measured and the dispatched request can never diverge.
+	#compose(
+		messages: readonly Message[],
+		tools: ProviderRequest['tools'],
+		options: ProviderRequest['options'],
+	): ProviderRequest {
+		return {
+			messages: [...stripThinking(messages, this.#replay)],
+			...(tools === undefined ? {} : { tools }),
+			...(options === undefined ? {} : { options }),
+		}
+	}
+
+	// Admits one request against the context `#window` budget immediately before its provider
+	// dispatch, so only called when a window is set. The budget's `consumer` is a token estimator
+	// over the complete request (for example `estimateRequest`), its `max` the context window.
+	// `clear()` then consuming the request makes `#window.consumed` its estimated footprint, and
+	// `exhausted` means it has reached `max`. A request over the window folds the active
+	// conversation once when it is summarizable and not latched futile, then rebuilds through
+	// selection, recomposes with the same tool and option snapshot, and measures again; the request
+	// that measures last is the one returned for dispatch. A non-summarizable conversation is
+	// measured but never folded, so the auto path never throws the `compact()` SUMMARIZER error.
+	// A summarizer throw is non-fatal unless strict mode requires it to fail the run. An undefined
+	// fold on a later turn latches structural overflow to stop repeated compaction; on the first
+	// turn it means the tail has not grown yet. A cancel anywhere returns `undefined` so the run
+	// settles partial, and wins over `strict`; otherwise `strict` refuses a request still over the
+	// window with a WINDOW error before any dispatch, while the lenient default sends it.
+	async #admit(
+		composed: ProviderRequest,
 		messages: Message[],
-		latch: boolean,
 		request: Message | undefined,
+		latch: boolean,
+		admission: { futile: boolean },
 		abort: AbortInterface,
 		budget: BudgetInterface<TokenUsage> | undefined,
 		spent: TokenUsage[],
-	): Promise<boolean> {
+	): Promise<ProviderRequest | undefined> {
+		const window = this.#window
+		if (window === undefined) return composed
+		window.clear()
+		window.consume(composed)
+		if (!window.exhausted) return composed
+		// A cancelled run is about to settle, so a fold would spend summarizer time on a request no
+		// provider reads; the next run's first admission folds instead.
+		if (abort.signal.aborted) return undefined
 		const conversation = this.#context.conversations.active
-		// No window or a non-summarizable active conversation (the default one can't fold) ⇒ nothing
-		// to do. (Both call sites are gated by `compacting`, so here `conversation` is the
-		// active, summarizable one; this guard keeps `#trim` total.) A cancelled run is about to
-		// settle, so a fold would spend summarizer time on a prompt no provider reads; the next
-		// run's pre-first-turn check folds instead.
-		if (this.#window === undefined || conversation?.summarizable !== true || abort.signal.aborted)
-			return false
-		this.#window.clear()
-		this.#window.consume(stripThinking(messages, this.#replay))
-		if (!this.#window.exhausted) return false
-		let section: Awaited<ReturnType<typeof conversation.compact>>
-		try {
-			// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
-			// commits nothing, even when the summarizer ignores the signal.
-			section = await conversation.compact({ signal: abort.signal })
-		} catch (error) {
-			// A cancel wins over the failure it caused, as on the select path: the run settles
-			// partial without a `fault`, and strict mode does not turn the cancel into an error.
-			if (abort.signal.aborted) return false
-			// Surface the summarizer failure observably first (always). Lenient (default): skip
-			// compaction this turn and continue over-window. Strict: rethrow after the event so
-			// the caught error propagates through `#execute` and the run settles `error` instead.
-			this.#emitter.emit('fault', error)
-			if (this.#strict) throw error
-			return false
+		let current = composed
+		if (conversation?.summarizable === true && !admission.futile) {
+			let section: Awaited<ReturnType<typeof conversation.compact>>
+			try {
+				// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
+				// commits nothing, even when the summarizer ignores the signal.
+				section = await conversation.compact({ signal: abort.signal })
+			} catch (error) {
+				// A cancel wins over the failure it caused, as on the select path: the run settles
+				// partial without a `fault`, and strict mode does not turn the cancel into an error.
+				if (abort.signal.aborted) return undefined
+				// Surface the summarizer failure observably first (always). Lenient (default): skip
+				// compaction this turn and send the over-window request. Strict: rethrow after the
+				// event so the caught error propagates through `#execute` and the run settles `error`.
+				this.#emitter.emit('fault', error)
+				if (this.#strict) throw error
+				return composed
+			}
+			if (abort.signal.aborted) return undefined
+			if (section === undefined) {
+				// Nothing folded. On a later turn the tail had its chance to grow yet still won't fold
+				// ⇒ genuinely futile: latch so the run stops churning. On the first turn the tail is
+				// too short yet ⇒ no latch, leaving later turns free to fold as the tail grows.
+				admission.futile = latch
+			} else {
+				// Compaction changes the view the handler evaluates, so rebuild through selection, then
+				// measure the rebuilt request with the unchanged tools and options.
+				const selecting = this.#select(request, messages, abort, budget, spent)
+				if (selecting !== undefined) await selecting
+				if (abort.signal.aborted) return undefined
+				current = this.#compose(messages, composed.tools, composed.options)
+				window.clear()
+				window.consume(current)
+			}
 		}
-		// Nothing folded. On a between-turns check (`latch`) the tail had its chance to grow yet
-		// still won't fold ⇒ genuinely futile: report the latch so the run stops churning and the
-		// over-window prompt reaches the provider. On the pre-first-turn check the tail is
-		// too short yet ⇒ report no latch, leaving later turns free to fold as the tail grows.
-		if (section === undefined) return latch
-		// Compaction changes the view the handler evaluates, so rebuild through selection.
-		const selecting = this.#select(request, messages, abort, budget, spent)
-		if (selecting !== undefined) await selecting
-		return false
+		if (this.#strict && window.exhausted) {
+			throw new AgentError(
+				'WINDOW',
+				`the request measures ${window.consumed} against a window of ${window.max} and cannot shrink`,
+				{ context: { agent: this.#id, consumed: window.consumed, max: window.max } },
+			)
+		}
+		return current
 	}
 
 	// One select site: rebuild the working array from the handler's selection, or from `view()` when
@@ -809,27 +853,20 @@ export class Agent implements AgentInterface {
 	// Drive one provider stream turn: read the `channel` of each {@link ProviderDelta} — a `'content'`
 	// delta is the answer (fed back through `onDelta`, surfaced as a `token` chunk); a `'thinking'`
 	// delta is live reasoning (surfaced as a `think` chunk, never fed into `onDelta` — reasoning is
-	// not answer content) — returning the provider's assembled result. The per-run `think` / `schema`
-	// preferences ride into `provider.stream` as {@link ProviderStreamOptions}, composed together —
-	// keys are omitted when undefined, so the provider receives no options object at all when both
-	// are absent. The messages carry only the thinking the provider's replay policy permits (default
-	// `'none'`). Kept separate so the loop reads as one straight line.
+	// not answer content) — returning the provider's assembled result. It sends the composed
+	// {@link ProviderRequest} unchanged — the messages already carry only the thinking the provider's
+	// replay policy permits (default `'none'`), and the tools and options are the turn's snapshot,
+	// absent when there are none. Kept separate so the loop reads as one straight line.
 	async *#provide(
-		messages: readonly Message[],
+		request: ProviderRequest,
 		signal: AbortSignal,
-		definitions: ReturnType<ToolManagerInterface['definitions']> | undefined,
-		think: boolean | undefined,
-		schema: Readonly<Record<string, unknown>> | undefined,
 		onDelta: (delta: string) => void,
 	): AsyncGenerator<AgentChunk, ProviderResult> {
-		const options: { think?: boolean; schema?: Readonly<Record<string, unknown>> } = {}
-		if (think !== undefined) options.think = think
-		if (schema !== undefined) options.schema = schema
 		const generator = this.#provider.stream(
-			stripThinking(messages, this.#replay),
+			request.messages,
 			signal,
-			definitions,
-			Object.keys(options).length > 0 ? options : undefined,
+			request.tools,
+			request.options,
 		)
 		let next = await generator.next()
 		while (!next.done) {

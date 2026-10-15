@@ -1,4 +1,5 @@
 import type { Message } from '../types.js'
+import type { ProviderRequest } from '../providers/index.js'
 import type {
 	AgentInterface,
 	AgentJobInput,
@@ -113,8 +114,8 @@ export function estimateTokens(text: string): number {
 /**
  * Estimates the context-token footprint of a batch of messages — each message's content plus
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, a thinking estimate, and
- * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The default
- * `consumer` estimator for an agent's context budget (the
+ * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The {@link estimateRequest} message term
+ * for an agent's context budget (the
  * {@link import('./types.js').AgentOptions} `window`), a provider-independent approximation for conforming messages rather than an exact tokenizer count.
  *
  * @remarks
@@ -124,9 +125,9 @@ export function estimateTokens(text: string): number {
  * `calls` plus, when present, {@link estimateTokens} over its `thinking` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
  * deliberately-approximate per-image cost — a base64 length is not a token proxy). Deterministic
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
- * It is the fully-swappable default an agent's auto-compaction context budget charges each
- * turn's new messages through; a caller wanting a sharper count supplies its own `consumer` to
- * `createBudget` instead. A `calls` list JSON cannot carry (a circular or `BigInt`
+ * It is the message term of the request estimate an agent's auto-compaction context budget
+ * measures; a caller wanting a sharper count supplies its own `consumer` to `createBudget`
+ * instead. A `calls` list JSON cannot carry (a circular or `BigInt`
  * `ToolCall.arguments`) contributes a fixed
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
  * instead of an estimate of the (unreachable) serialized length.
@@ -152,6 +153,43 @@ export function estimateMessages(messages: readonly Message[]): number {
 		const thinking = message.thinking === undefined ? 0 : estimateTokens(message.thinking)
 		return sum + content + calls + images + thinking
 	}, 0)
+}
+
+/**
+ * Estimates the context-token footprint of a complete provider request — its messages through
+ * {@link estimateMessages}, plus the rendered advertised `tools`, plus the rendered
+ * `options.schema`. The `consumer` estimator an agent's `window` budget measures every request
+ * through, a provider-independent heuristic rather than an exact tokenizer count.
+ *
+ * @remarks
+ * Adds {@link estimateTokens} over the JSON rendering of `tools` and of `options.schema` to the
+ * message estimate. An absent or empty `tools` list and an absent or empty `schema` add `0`, so a
+ * request that advertises neither equals {@link estimateMessages} of its messages. A value JSON
+ * cannot carry contributes a fixed {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}. The
+ * estimate counts JSON characters, not a provider's template: the chat template's own tokens, how
+ * a provider encodes tool definitions, and the `think` flag are not counted, and no tokenizer
+ * runs. A model's real prompt count can exceed it, so choose the window `max` with headroom
+ * measured against the provider.
+ *
+ * @param request - The {@link ProviderRequest} to estimate: messages, advertised tools, call options
+ * @returns The estimated token count (`0` for an empty request)
+ *
+ * @example
+ * ```ts
+ * estimateRequest({ messages: [{ id: '1', role: 'user', content: 'hello' }] }) // 6, equal to estimateMessages
+ * ```
+ */
+export function estimateRequest(request: ProviderRequest): number {
+	const tools = request.tools !== undefined && request.tools.length > 0 ? request.tools : undefined
+	const schema = request.options?.schema
+	const parts = [tools, schema !== undefined && Object.keys(schema).length > 0 ? schema : undefined]
+	let extra = 0
+	for (const part of parts) {
+		if (part === undefined) continue
+		const rendered = renderJSON(part)
+		extra += rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
+	}
+	return estimateMessages(request.messages) + extra
 }
 
 /**

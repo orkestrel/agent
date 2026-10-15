@@ -4,6 +4,7 @@ import type {
 	LedgerInterface,
 	Message,
 	ProviderInterface,
+	ProviderRequest,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext } from '@orkestrel/tool'
@@ -139,9 +140,9 @@ export class StudyMemorySession implements StudySessionInterface {
 				signal: options.signal,
 				...(options.arm === 'compaction'
 					? {
-							window: createBudget<readonly Message[]>({
+							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
-								consumer: options.subject.estimateMessages,
+								consumer: options.subject.estimateRequest,
 							}),
 						}
 					: {}),
