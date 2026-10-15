@@ -2,11 +2,10 @@ import type { StudyEvidence } from '@orkestrel/study'
 import { createScratch } from '@orkestrel/test/server'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
+import { createStudyAdapter } from '../../../studies/tools/factories.js'
 import {
-	gradeStudyTools,
 	observeStudyToolsFile,
 	readStudyToolsGrade,
-	readStudyToolsMessages,
 	readStudyToolsPredicate,
 	resolveStudyToolsPath,
 	validateStudyToolsRubric,
@@ -43,34 +42,6 @@ it('refuses traversal, reserved names, symlinks and oversized files before obser
 		scratch.destroy()
 		outside.destroy()
 	}
-})
-
-it('projects only dereferenced foreign message fields and refuses malformed provider reads', () => {
-	const reads = { role: 0, content: 0, call: 0 }
-	expect(
-		readStudyToolsMessages([
-			{
-				get role() {
-					reads.role++
-					return 'tool'
-				},
-				get content() {
-					reads.content++
-					return 'alpha'
-				},
-				get call() {
-					reads.call++
-					return 'recalled'
-				},
-			},
-		]),
-	).toEqual([{ role: 'tool', content: 'alpha', call: 'recalled' }])
-	expect(reads).toEqual({ role: 1, content: 1, call: 1 })
-	expect(
-		readStudyToolsMessages([{ role: 'tool', content: 'alpha', call: 'recalled', extra: true }]),
-	).toEqual([{ role: 'tool', content: 'alpha', call: 'recalled' }])
-	expect(() => readStudyToolsMessages([{ role: 'tool', content: 1 }])).toThrow('invalid')
-	expect(() => readStudyToolsMessages({})).toThrow('array')
 })
 
 it('grades the latest actual file and trace, retaining unknown when no matching evidence exists', () => {
@@ -146,18 +117,19 @@ it('refuses unsupported assertions, foreign attempts/evidence and duplicate atte
 			criteria: fixture.rubric.criteria.map((criterion) => ({ ...criterion, method: 'semantic' })),
 		}),
 	).toThrow('Unsupported')
+	const adapter = createStudyAdapter()
 	const input = { manifest, rubric: fixture.rubric, attempts: [], evidence: {} }
-	expect(gradeStudyTools(input).every((judgment) => judgment.verdict === 'unknown')).toBe(true)
-	expect(() => gradeStudyTools({ ...input, attempts: [attempt, attempt] })).toThrow('duplicate')
+	expect(adapter.grade(input).every((judgment) => judgment.verdict === 'unknown')).toBe(true)
+	expect(() => adapter.grade({ ...input, attempts: [attempt, attempt] })).toThrow('duplicate')
 	expect(() =>
-		gradeStudyTools({
+		adapter.grade({
 			...input,
 			attempts: [{ ...attempt, trial: { ...trial, id: 'foreign' } }],
 		}),
 	).toThrow('Invalid')
-	expect(() => gradeStudyTools({ ...input, evidence: { foreign: [] } })).toThrow('foreign')
+	expect(() => adapter.grade({ ...input, evidence: { foreign: [] } })).toThrow('foreign')
 	expect(() =>
-		gradeStudyTools({
+		adapter.grade({
 			...input,
 			manifest: { ...manifest, definition: { ...manifest.definition, purpose: 'quality' } },
 		}),

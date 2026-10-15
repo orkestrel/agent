@@ -6,8 +6,8 @@ import type {
 	ProviderInterface,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
-import type { ToolCall } from '@orkestrel/tool'
 import type { StudyContext, StudyJudgment } from '@orkestrel/study'
+import type { StudyAgentResponse } from '@orkestrel/study/server'
 
 /**
  * Holds the admitted modules and exclusive parent scratch directory.
@@ -34,26 +34,16 @@ export interface StudyToolsAgentInterface {
 	abort(reason?: unknown): void
 }
 
-/** Holds one inert scripted provider response and its explicit workload controls. */
-export interface StudyToolsResponse {
-	readonly content: string
-	readonly calls: readonly ToolCall[]
-	readonly consume: string | undefined
-	readonly cancel: boolean | undefined
-	readonly tokens: number | undefined
-	readonly bytes: number | undefined
-}
-
 /** Holds public mechanism input without any criterion or expected outcome. */
 export interface StudyToolsInput {
 	readonly prompt: string
-	readonly responses: readonly StudyToolsResponse[]
+	readonly responses: readonly StudyAgentResponse[]
 	readonly files: readonly string[]
 	readonly admitted: boolean
 }
 
-/** Holds one provider workload with separate operational and workload signals. */
-export interface ScriptedStudyOptions {
+/** Holds one goal's parsed workload with its operational context and workload signal. */
+export interface StudyToolsActive {
 	readonly input: StudyToolsInput
 	readonly goal: string
 	readonly context: StudyContext

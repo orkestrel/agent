@@ -9,7 +9,7 @@ import type {
 	StudyTicket,
 } from '@orkestrel/study'
 import type {
-	ScriptedStudyOptions,
+	StudyToolsActive,
 	StudyToolsAgentInterface,
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
@@ -20,21 +20,20 @@ import { errorToMessage } from '@orkestrel/workflow'
 import { open, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { StudyError, failStudyTicket } from '@orkestrel/study'
-import { encodeStudyJSON } from '@orkestrel/study/server'
+import { StudyAgentScript, encodeStudyJSON } from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
 import { observeStudyToolsFile, resolveStudyToolsPath } from './helpers.js'
 import { parseStudyToolsInput } from './parsers.js'
-import { ScriptedStudyProvider } from './ScriptedStudyProvider.js'
 import { isStudyToolsAgent, isStudyToolsRead, isStudyToolsWrite } from './validators.js'
 
 /** Retains one actual Agent and scratch-file state across the declared trial goals. */
 export class StudyToolsSession implements StudySessionInterface {
 	readonly #options: StudyToolsSessionOptions
-	readonly #provider = new ScriptedStudyProvider()
+	readonly #provider = new StudyAgentScript({ bytes: STUDY_TOOLS_BYTES })
 	readonly #tools = createToolManager()
 	readonly #agent: StudyToolsAgentInterface
-	#active: ScriptedStudyOptions | undefined
+	#active: StudyToolsActive | undefined
 	#work: Promise<StudyProduct> | undefined
 	#closing: Promise<void> | undefined
 	#trace: StudyEvidence[] = []
@@ -122,7 +121,12 @@ export class StudyToolsSession implements StudySessionInterface {
 		this.#trace = []
 		this.#fault = undefined
 		try {
-			this.#provider.prepare(this.#active)
+			this.#provider.prepare({
+				responses: input.responses,
+				goal: goal.id,
+				context,
+				workload,
+			})
 			this.#agent.context.messages.add({ role: 'user', content: input.prompt })
 			const result: unknown = await this.#agent.generate({
 				signal: AbortSignal.any([context.signal, context.meter.signal, workload.signal]),

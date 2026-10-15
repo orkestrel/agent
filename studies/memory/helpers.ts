@@ -2,7 +2,6 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerGauge, Message } from '@orkestrel/agent'
 import type { StudyJudgment, StudyProfile, StudyProvider, StudyRoom } from '@orkestrel/study'
 import type {
-	StudyAdjudication,
 	StudyGradeReading,
 	StudyGradeTarget,
 	StudyOllamaTransportOptions,
@@ -15,10 +14,9 @@ import type {
 	StudyMemoryProvenance,
 	StudyMemoryProvenanceSource,
 } from './types.js'
-import { isArray, isObject, isRecord } from '@orkestrel/contract'
-import { StudyError } from '@orkestrel/study'
-import { gradeStudyEvidence } from '@orkestrel/study/server'
-import { isStudyMemoryAssertion, isStudyMemoryDigest, isStudyMemorySettings } from './validators.js'
+import { isRecord } from '@orkestrel/contract'
+import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
+import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
 export function readStudyMemoryGauge(settings: unknown): LedgerGauge {
@@ -83,32 +81,7 @@ export function buildStudyMemoryOrigins(
 	})
 }
 
-/** Builds the JSON evidence form of a Ledger result's logical classifier readings. @param result - Value returned by the Ledger. @returns Null when the result carries no readings array, else one entry per well-formed reading in asking order. */
-export function buildStudyMemoryReadings(result: unknown): JSONValue {
-	if (!isObject(result) || !('readings' in result) || !isArray(result.readings)) return null
-	const readings: JSONValue[] = []
-	for (const entry of result.readings) {
-		if (
-			!isObject(entry) ||
-			!('key' in entry) ||
-			typeof entry.key !== 'string' ||
-			!('phase' in entry) ||
-			typeof entry.phase !== 'string' ||
-			!('outcome' in entry) ||
-			typeof entry.outcome !== 'string'
-		)
-			continue
-		readings.push({
-			key: entry.key,
-			phase: entry.phase,
-			outcome: entry.outcome,
-			duration: 'duration' in entry && typeof entry.duration === 'number' ? entry.duration : null,
-		})
-	}
-	return readings
-}
-
-/** Checks well-formed driver settings, the pinned serving identities the selected arms use, and finite room. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. */
+/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, or an arm's requirement is not met. */
 export function validateStudyMemoryProfile(
 	profile: StudyProfile,
 	arms: readonly StudyMemoryArm[],
@@ -116,47 +89,16 @@ export function validateStudyMemoryProfile(
 	const { room, provider } = profile
 	if (profile.settings !== undefined && !isStudyMemorySettings(profile.settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
-	if (provider === undefined || !isStudyMemoryDigest(provider.digest.model))
-		throw new StudyError('CONFIG', 'Memory requires an exact model digest')
-	if (
-		(arms.includes('records') && provider.judge === undefined) ||
-		(provider.judge !== undefined && !isStudyMemoryDigest(provider.digest.judge))
-	)
+	if (provider === undefined || !isStudyProvider(provider))
+		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')
+	if (arms.includes('records') && provider.judge === undefined)
 		throw new StudyError(
 			'CONFIG',
 			'Memory requires an exact judge model and digest where one is used',
 		)
-	const allowances = [room.context, room.output, room.safety]
-	if (room.recap !== undefined) allowances.push(room.recap)
-	if (
-		(arms.includes('compaction') && room.recap === undefined) ||
-		allowances.some((number) => !Number.isSafeInteger(number) || number <= 0)
-	)
-		throw new StudyError('CONFIG', 'Memory room allowances must be positive finite integers')
-	if (room.context <= Math.max(room.output, room.recap ?? 0) + room.safety)
-		throw new StudyError('CONFIG', 'Memory room leaves no prompt capacity')
-	const url = new URL(provider.url)
-	if (
-		!['http:', 'https:'].includes(url.protocol) ||
-		url.username !== '' ||
-		url.password !== '' ||
-		url.search !== '' ||
-		url.hash !== '' ||
-		url.pathname !== '/'
-	)
-		throw new StudyError('CONFIG', 'Memory requires an uncredentialed exact origin')
-}
-
-/** Declares the pinned serving identities the Ollama transport verifies, keyed by the label their inventory evidence carries. @param provider - Declared serving identities. @returns The model pin, plus the judge pin when the profile declares one. */
-export function buildStudyMemoryModels(
-	provider: StudyProvider,
-): StudyOllamaTransportOptions['models'] {
-	return {
-		model: { name: provider.model, digest: provider.digest.model },
-		...(provider.judge === undefined || provider.digest.judge === undefined
-			? {}
-			: { judge: { name: provider.judge, digest: provider.digest.judge } }),
-	}
+	if (!isStudyRoom(room)) throw new StudyError('CONFIG', 'Memory room declaration is invalid')
+	if (arms.includes('compaction') && room.recap === undefined)
+		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
 }
 
 /** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
@@ -255,9 +197,4 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeReadin
 					: 'Retained observable mechanism evidence',
 		references,
 	}
-}
-
-/** Grades observable mechanisms while leaving meaning for blind labels. @param input - Sealed attempts, evidence and independent rubric. @returns One attributable mechanical reading for each declared trial and criterion pair, citing retained attempt files and one-based evidence rows. */
-export function gradeStudyMemory(input: StudyAdjudication): readonly StudyJudgment[] {
-	return gradeStudyEvidence(input, readStudyMemoryGrade)
 }

@@ -6,7 +6,8 @@ import type {
 	StudyValidation,
 } from '@orkestrel/study/server'
 import { StudyError } from '@orkestrel/study'
-import { gradeStudyTools, validateStudyToolsRubric } from './helpers.js'
+import { gradeStudyEvidence } from '@orkestrel/study/server'
+import { readStudyToolsGrade, validateStudyToolsRubric } from './helpers.js'
 import { isStudyToolsInput } from './validators.js'
 import { StudyToolsDriver } from './StudyToolsDriver.js'
 
@@ -49,6 +50,10 @@ export class StudyToolsAdapter implements StudyAdapterInterface {
 	 * @returns Readings with exact evidence references and honest unknowns.
 	 */
 	grade(input: StudyAdjudication): readonly StudyJudgment[] {
-		return gradeStudyTools(input)
+		validateStudyToolsRubric(input.rubric)
+		const { definition } = input.manifest
+		if (definition.purpose !== 'mechanism' || definition.driver !== 'tools')
+			throw new StudyError('CONFIG', 'Invalid tools study declaration')
+		return gradeStudyEvidence(input, readStudyToolsGrade)
 	}
 }

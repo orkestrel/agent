@@ -10,12 +10,7 @@ import type {
 } from './types.js'
 import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
 import { isStudyAgentRuntime } from '@orkestrel/study'
-import { STUDY_MEMORY_DIGEST, STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
-
-/** Checks a pinned serving digest. @param value - Declared digest. @returns Whether it is an exact SHA-256 hex digest, with or without its `sha256:` prefix. */
-export function isStudyMemoryDigest(value: unknown): value is string {
-	return typeof value === 'string' && STUDY_MEMORY_DIGEST.test(value)
-}
+import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
 /** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent and conversation factories exist. */
 export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {

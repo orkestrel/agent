@@ -68,9 +68,6 @@ export interface StudyMemoryCompaction {
 	readonly recap: number
 }
 
-/** Names the stage a measurement was taken at: the Agent window's admission or the provider dispatch. */
-export type StudyMemoryStage = 'admission' | 'dispatch'
-
 /** Names where a request message came from, or that the composer mixes sources (`mixed`) or the consumer cannot tell (`unknown`). */
 export type StudyMemoryOrigin =
 	| 'input'
@@ -98,12 +95,6 @@ export interface StudyMemoryProvenanceSource {
 	readonly members: ReadonlySet<string>
 	/** Reports that a composer builds the request from several sources, so its system messages are mixed. */
 	readonly composed: boolean
-}
-
-/** Holds the identity of one recorded measurement. */
-export interface StudyMemoryStamp {
-	readonly ordinal: number
-	readonly revision: string | null
 }
 
 /**

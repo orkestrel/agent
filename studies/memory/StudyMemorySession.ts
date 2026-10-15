@@ -1,61 +1,43 @@
 import type {
 	AgentInterface,
 	ConversationInterface,
-	LedgerGauge,
 	LedgerInterface,
-	Message,
-	ProviderInterface,
 	ProviderRequest,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
-import type { OllamaOptions } from '@orkestrel/ollama'
 import type { ToolContext, ToolManagerInterface } from '@orkestrel/tool'
-import type {
-	StudyAgentDispatch,
-	StudyAgentReading,
-	StudyContext,
-	StudyEvidence,
-	StudyGoal,
-	StudyProduct,
-	StudySessionInterface,
-} from '@orkestrel/study'
+import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
 import type { StudyOllamaActivity } from '@orkestrel/study/server'
 import type {
-	StudyMemoryCompaction,
 	StudyMemoryInput,
 	StudyMemoryProvenance,
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
-	StudyMemoryStage,
-	StudyMemoryStamp,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
+import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
-	StudyAgentJudge,
-	StudyAgentObserver,
-	StudyError,
-	buildStudyAgentParts,
-	projectStudyAgentRequest,
-	translateStudyAgentError,
-	validateStudyAgentUsage,
-} from '@orkestrel/study'
-import { StudyOllamaTransport, buildStudyAgentRevision } from '@orkestrel/study/server'
+	StudyAgentSummary,
+	StudyAgentTrace,
+	StudyOllamaTransport,
+	buildStudyAgentReadings,
+	buildStudyOllamaModels,
+	buildStudyOllamaSettings,
+} from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_JUDGE,
+	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
 import {
-	buildStudyMemoryModels,
 	buildStudyMemoryOrigins,
-	buildStudyMemoryReadings,
 	buildStudyMemoryRoles,
 	readStudyMemoryCompaction,
-	readStudyMemoryJudge,
 	readStudyMemorySettings,
 } from './helpers.js'
 import { isStudyMemoryInput, isStudyMemorySettings } from './validators.js'
@@ -64,6 +46,7 @@ import { isStudyMemoryInput, isStudyMemorySettings } from './validators.js'
 export class StudyMemorySession implements StudySessionInterface {
 	readonly #options: StudyMemorySessionOptions
 	readonly #transport: StudyOllamaTransport
+	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
 	readonly #settings: StudyMemoryObservation
 	readonly #agent: AgentInterface
@@ -75,17 +58,8 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #explicit = new Map<string, StudyMemoryProvenance>([
 		['summary-instruction', { origin: 'instructions', source: 'summary' }],
 	])
-	// The session executes goals serially and awaits each summary before the Agent's next request, so one
-	// current dispatch per role cannot be overtaken by another of the same role.
-	#agentDispatch: StudyAgentDispatch | undefined
-	#summaryDispatch: StudyAgentDispatch | undefined
-	#ordinal = 0
-	#dispatches = 0
 	#input: string | undefined
-	#admission: StudyMemoryStamp | undefined
-	#refused: unknown
 	#active: StudyOllamaActivity | undefined
-	#trace: StudyEvidence[] = []
 	#work: Promise<StudyProduct> | undefined
 	#closing: Promise<void> | undefined
 
@@ -94,58 +68,67 @@ export class StudyMemorySession implements StudySessionInterface {
 		const compaction =
 			options.arm === 'compaction' ? readStudyMemoryCompaction(options.profile) : undefined
 		const gauge = compaction?.gauge
-		// Compaction refuses an overflowing prompt instead of letting the daemon truncate or shift it; other arms keep the omitted controls.
-		const strict: Pick<OllamaOptions, 'truncate' | 'shift'> =
-			compaction === undefined ? {} : { truncate: false, shift: false }
 		this.#options = options
 		this.#tools = createToolManager()
 		this.#settings = readStudyMemorySettings(options.profile.settings)
 		const settings = options.profile.provider
 		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 		const room = options.profile.room
+		// One declaration of every role's wire policy feeds both the transport and the provider constructors.
+		const roles = buildStudyMemoryRoles(options.profile, options.arm)
+		const policy = roles.agent
+		if (policy === undefined) throw new StudyError('CONFIG', 'Memory agent role is required')
 		this.#transport = new StudyOllamaTransport({
 			url: settings.url,
 			room,
 			limit: options.profile.bounds.request,
-			models: buildStudyMemoryModels(settings),
-			roles: buildStudyMemoryRoles(options.profile, options.arm),
+			models: buildStudyOllamaModels(settings),
+			roles,
 			signal: options.signal,
 			observe: this.#settings.observe,
 			timing: options.provider.extractTiming,
 		})
+		this.#trace = new StudyAgentTrace({
+			runtime: options.agent,
+			latch: this.#transport,
+			observe: this.#settings.observe,
+			origins: (messages) => buildStudyMemoryOrigins(messages, this.#provenance()),
+		})
 		// Every arm wraps the agent provider, so toggling passive capture keeps the same wrapper overhead.
 		const provider = new StudyAgentObserver({
 			provider: options.provider.createOllama({
-				model: settings.model,
+				...buildStudyOllamaSettings(policy),
 				url: settings.url,
-				think: room.think,
-				...strict,
 				timeout: options.profile.bounds.request.duration,
-				options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
-				fetch: (input, init) => this.#transport.fetch('agent', input, init, this.#agentDispatch),
+				fetch: (input, init) =>
+					this.#transport.fetch('agent', input, init, this.#trace.canonical('agent')),
 			}),
 			runtime: options.agent,
 			gauge,
 			enforced: gauge !== undefined,
-			record: (reading, request) => this.#record(reading, request),
+			record: (reading, request) => this.#trace.record(reading, request),
 		})
+		const recap = compaction === undefined ? undefined : roles.summary
+		if (compaction !== undefined && recap === undefined)
+			throw new StudyError('CONFIG', 'Memory compaction requires a summary role')
 		const summary =
-			compaction === undefined
+			compaction === undefined || recap === undefined
 				? undefined
-				: options.provider.createOllama({
-						model: settings.model,
-						url: settings.url,
-						think: false,
-						...strict,
-						timeout: options.profile.bounds.request.duration,
-						options: {
-							num_ctx: room.context,
-							num_predict: compaction.recap,
-							temperature: 0,
-							seed: 0,
-						},
-						fetch: (input, init) =>
-							this.#transport.fetch('summary', input, init, this.#summaryDispatch),
+				: new StudyAgentSummary({
+						provider: options.provider.createOllama({
+							...buildStudyOllamaSettings(recap),
+							url: settings.url,
+							timeout: options.profile.bounds.request.duration,
+							fetch: (input, init) =>
+								this.#transport.fetch('summary', input, init, this.#trace.canonical('summary')),
+						}),
+						runtime: options.agent,
+						trace: this.#trace,
+						latch: this.#transport,
+						gauge: compaction.gauge,
+						limit: room.context - compaction.recap - room.safety,
+						instruction: { id: 'summary-instruction', role: 'user', content: STUDY_MEMORY_SUMMARY },
+						signal: options.signal,
 					})
 		const lookup = createTool({
 			name: 'lookup',
@@ -162,13 +145,15 @@ export class StudyMemorySession implements StudySessionInterface {
 		if (options.arm === 'records') {
 			if (options.ledger === undefined || options.classifier === undefined)
 				throw new StudyError('CONFIG', 'Memory records require the Ledger and judge factories')
+			const role = roles.judge
+			if (role === undefined) throw new StudyError('CONFIG', 'Memory records require a judge role')
 			const judge = new StudyAgentJudge(
 				options.classifier.createOllamaJudge({
-					model: readStudyMemoryJudge(settings),
+					model: role.model,
 					system: STUDY_MEMORY_JUDGE,
 					url: settings.url,
 					timeout: options.profile.bounds.request.duration,
-					options: { num_ctx: room.context, num_predict: 1, temperature: 1, seed: 0 },
+					options: role.options,
 					fetch: (input, init) => this.#transport.fetch('judge', input, init),
 				}),
 				this.#transport,
@@ -198,7 +183,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				agent: {
 					limit: 8,
 					timeout: options.profile.bounds.goal.duration,
-					on: { fault: (error) => this.#translate(error) },
+					on: { fault: (error) => this.#trace.translate(error) },
 				},
 			})
 			this.#agent = this.#ledger.agent
@@ -207,12 +192,11 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#ledger = undefined
 			const conversations = options.agent.createConversationManager()
 			this.#conversation = conversations.add(
-				compaction === undefined || summary === undefined
+				summary === undefined
 					? {}
 					: {
 							keep: 2,
-							summarize: (messages, signal) =>
-								this.#summarize(messages, signal, compaction, summary),
+							summarize: (messages, signal) => summary.summarize(messages, signal),
 							...(isStudyMemorySettings(options.profile.settings) &&
 							options.profile.settings.rolling === true
 								? { rolling: true }
@@ -231,11 +215,11 @@ export class StudyMemorySession implements StudySessionInterface {
 					: {
 							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
-								consumer: (request) => this.#admit(request, compaction.gauge),
+								consumer: (request) => this.#trace.admit(request, compaction.gauge),
 							}),
 						}),
-				on: { fault: (error) => this.#translate(error) },
-				error: (error) => this.#translate(error),
+				on: { fault: (error) => this.#trace.translate(error) },
+				error: (error) => this.#trace.translate(error),
 			})
 			this.#agent.context.instructions.add({ name: 'desk', content: STUDY_MEMORY_SYSTEM })
 		}
@@ -270,9 +254,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		const activity = { goal, context, checkpoint: this.#checkpoint(goal, input) }
 		this.#transport.prepare(activity)
 		this.#active = activity
-		this.#trace = []
-		this.#refused = undefined
-		this.#admission = undefined
+		this.#trace.start(goal)
 		// The previous goal's input is history now; membership or a section names it from here on.
 		if (this.#input !== undefined) this.#explicit.delete(this.#input)
 		this.#input = undefined
@@ -328,7 +310,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					partial: result.partial,
 					conversation: this.#conversation.id,
 					...(this.#settings.observe && this.#ledger !== undefined
-						? { readings: buildStudyMemoryReadings(result) }
+						? { readings: buildStudyAgentReadings(result) }
 						: {}),
 				},
 			})
@@ -337,78 +319,14 @@ export class StudyMemorySession implements StudySessionInterface {
 			await this.#transport.verify()
 			return product
 		} catch (error) {
-			throw this.#translate(error)
+			throw this.#trace.translate(error)
 		} finally {
 			try {
-				for (const row of this.#trace) await context.evidence.append(row)
+				await this.#trace.flush(context.evidence)
 			} finally {
 				this.#active = undefined
 			}
 		}
-	}
-
-	// Latch the study-level reading before any enclosing runtime can swallow the failure.
-	#translate(error: unknown): unknown {
-		const translated = translateStudyAgentError(error, this.#options.agent)
-		this.#refuse(error, translated)
-		this.#transport.fail(translated)
-		return translated
-	}
-
-	// Retains one refusal row per refused error identity in a goal, however many callbacks it traverses.
-	#refuse(error: unknown, translated: unknown): void {
-		const active = this.#active
-		if (
-			translated === error ||
-			!this.#settings.observe ||
-			active === undefined ||
-			this.#refused === error
-		)
-			return
-		this.#refused = error
-		const context = this.#options.agent.isAgentError(error) ? error.context : undefined
-		this.#trace.push({
-			event: 'refusal',
-			goal: active.goal,
-			value: {
-				cause: 'capacity',
-				role: 'agent',
-				ordinal: this.#admission?.ordinal ?? null,
-				revision: this.#admission?.revision ?? null,
-				consumed: typeof context?.consumed === 'number' ? context.consumed : null,
-				max: typeof context?.max === 'number' ? context.max : null,
-			},
-		})
-	}
-
-	// Takes one synchronous measurement row; the goal's finally flush appends it, failure included.
-	#stamp(
-		stage: StudyMemoryStage,
-		role: 'agent' | 'summary',
-		request: ProviderRequest,
-		reading: StudyAgentReading,
-		dispatch: number | undefined,
-	): StudyMemoryStamp {
-		const ordinal = ++this.#ordinal
-		const revision = buildStudyAgentRevision(request) ?? null
-		const active = this.#active
-		if (active !== undefined)
-			this.#trace.push({
-				event: 'context',
-				goal: active.goal,
-				value: {
-					stage,
-					role,
-					ordinal,
-					revision,
-					estimate: reading.estimate,
-					projected: reading.projected ?? null,
-					...(dispatch === undefined ? {} : { dispatch }),
-					parts: buildStudyAgentParts(this.#options.agent.measureRequest(request)),
-					origins: buildStudyMemoryOrigins(request.messages, this.#provenance()),
-				},
-			})
-		return { ordinal, revision }
 	}
 
 	#provenance(): StudyMemoryProvenanceSource {
@@ -418,40 +336,6 @@ export class StudyMemorySession implements StudySessionInterface {
 			members: new Set(this.#conversation.messages().map((message) => message.id)),
 			composed: this.#options.arm === 'records',
 		}
-	}
-
-	// Prices a window measurement exactly as before and, when observing, retains it as an admission row.
-	#admit(request: ProviderRequest, gauge: LedgerGauge): number {
-		const estimate = this.#options.agent.estimateRequest(request)
-		const projected = projectStudyAgentRequest(gauge, estimate)
-		if (this.#settings.observe && this.#active !== undefined)
-			this.#admission = this.#stamp(
-				'admission',
-				'agent',
-				request,
-				{ estimate, projected },
-				undefined,
-			)
-		return projected
-	}
-
-	// Retains the reading of a dispatching agent request and names it for the wire request that follows.
-	#record(reading: StudyAgentReading, request: ProviderRequest): void {
-		const active = this.#active
-		if (!this.#settings.observe || active === undefined) return
-		const id = ++this.#dispatches
-		const { revision } = this.#stamp('dispatch', 'agent', request, reading, id)
-		this.#agentDispatch = Object.freeze({ id, revision: revision ?? undefined })
-		this.#trace.push({
-			event: 'estimate',
-			goal: active.goal,
-			value: {
-				estimate: reading.estimate,
-				projected: reading.projected ?? null,
-				revision,
-				dispatch: id,
-			},
-		})
 	}
 
 	#checkpoint(goal: string, input: StudyMemoryInput): JSONValue | undefined {
@@ -497,11 +381,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				const value =
 					record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
 				bytes += encoder.encode(JSON.stringify(value)).byteLength
-				this.#trace.push({
-					event: 'lookup',
-					goal: active.goal,
-					value: { id: args.id, found: record !== undefined },
-				})
+				this.#trace.append('lookup', { id: args.id, found: record !== undefined })
 				signal.throwIfAborted()
 				return value
 			} finally {
@@ -518,85 +398,6 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#transport.fail(error)
 			throw error
 		}
-	}
-
-	async #summarize(
-		messages: readonly Message[],
-		signal: AbortSignal | undefined,
-		compaction: StudyMemoryCompaction,
-		summary: ProviderInterface,
-	): Promise<string> {
-		const bound = signal ?? this.#options.signal
-		bound.throwIfAborted()
-		this.#transport.check()
-		const { gauge, recap } = compaction
-		// One canonical array: measured once, admitted or refused, then sent as the very same array. The
-		// instruction is the final user turn, so the chat template opens a fresh reply instead of
-		// continuing the last folded assistant message.
-		const canonical: readonly Message[] = [
-			...messages,
-			{
-				id: 'summary-instruction',
-				role: 'user',
-				content:
-					'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.',
-			},
-		]
-		const request: ProviderRequest = { messages: canonical }
-		const estimate = this.#options.agent.estimateRequest(request)
-		const projected = projectStudyAgentRequest(gauge, estimate)
-		const room = this.#options.profile.room
-		const limit = room.context - recap - room.safety
-		const current = this.#active
-		const observing = this.#settings.observe && current !== undefined
-		if (projected >= limit) {
-			const message = 'Summary request projection reaches the summary room'
-			// The refusal keeps its own admission, so the Agent's admission stays the one a later window refusal names.
-			if (observing) {
-				const { ordinal, revision } = this.#stamp(
-					'admission',
-					'summary',
-					request,
-					{ estimate, projected },
-					undefined,
-				)
-				this.#trace.push({
-					event: 'refusal',
-					goal: current.goal,
-					value: {
-						cause: 'capacity',
-						role: 'summary',
-						ordinal,
-						revision,
-						consumed: projected,
-						max: limit,
-					},
-				})
-			}
-			throw new StudyError('CAPACITY', message, { cause: 'capacity', message, role: 'summary' })
-		}
-		if (observing) {
-			const id = ++this.#dispatches
-			const { revision } = this.#stamp('dispatch', 'summary', request, { estimate, projected }, id)
-			this.#summaryDispatch = Object.freeze({ id, revision: revision ?? undefined })
-		}
-		const result = await summary.generate(canonical, bound)
-		if (!bound.aborted) validateStudyAgentUsage(result.usage, 'summary')
-		this.#transport.check()
-		const active = this.#active
-		if (active === undefined || typeof result.content !== 'string')
-			throw new StudyError('FAULT', 'Summary outside an active goal or invalid content')
-		const value: unknown = {
-			sources: messages.map((message) => message.id),
-			content: result.content,
-		}
-		if (!isJSONValue(value)) throw new StudyError('FAULT', 'Summary evidence is not JSON')
-		this.#trace.push({ event: 'summary', goal: active.goal, value: cloneJSONValue(value) })
-		if (result.content.trim() === '') {
-			const message = 'Summary returned no usable content'
-			throw new StudyError('FAULT', message, { cause: 'content', message, role: 'summary' })
-		}
-		return result.content
 	}
 
 	async #dispose(): Promise<void> {

@@ -20,7 +20,7 @@ import {
 	readStudyResult,
 } from '@orkestrel/study/server'
 import {
-	gradeStudyTools,
+	createStudyAdapter,
 	parseStudyToolsInput,
 	StudyToolsDriver,
 } from '../../../studies/tools/index.js'
@@ -103,7 +103,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 		const evidence: Record<string, readonly StudyEvidence[]> = {}
 		for (const trial of fixture.manifest.schedule)
 			evidence[trial.id] = await readStudyToolsEvidence(directory, trial.id)
-		const judgments = gradeStudyTools({
+		const judgments = createStudyAdapter().grade({
 			manifest: result.manifest,
 			rubric: fixture.rubric,
 			attempts: result.attempts,
@@ -217,7 +217,7 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 			...fixture.rubric,
 			criteria: fixture.rubric.criteria.filter((criterion) => criterion.scenario === 'write'),
 		}
-		const judgments = gradeStudyTools({ manifest, rubric, attempts, evidence })
+		const judgments = createStudyAdapter().grade({ manifest, rubric, attempts, evidence })
 		expect(judgments).toHaveLength(6)
 		expect(
 			judgments.every(

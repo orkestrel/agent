@@ -91,6 +91,28 @@ it('validates actual admitted constructors and bounds every declared workload wi
 		isStudyToolsResponse({ content: 'x', calls: [], bytes: Number.MAX_SAFE_INTEGER + 1 }),
 	).toBe(false)
 	expect(isStudyToolsResponse({ content: 'x', calls: [], cancel: 'true' })).toBe(false)
+	const call = { id: 'c1', name: 'read', arguments: { path: 'note.txt' } }
+	expect(isStudyToolsResponse({ content: 'a'.repeat(1024), calls: [call, call, call, call] })).toBe(
+		true,
+	)
+	expect(isStudyToolsResponse({ content: 'a'.repeat(1025), calls: [] })).toBe(false)
+	expect(isStudyToolsResponse({ content: 'x', calls: [call, call, call, call, call] })).toBe(false)
+	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: 'a'.repeat(128) })).toBe(true)
+	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: 'a'.repeat(129) })).toBe(false)
+	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: '' })).toBe(false)
+	// A foreign proxy that passes the shared guard and then throws on a later read stays total.
+	let reads = 0
+	const hostile = new Proxy(
+		{ content: '', calls: [] },
+		{
+			get(target, key, receiver) {
+				if (key === 'content' && ++reads > 1) throw new Error('Later read refused')
+				return Reflect.get(target, key, receiver)
+			},
+		},
+	)
+	expect(isStudyToolsResponse(hostile)).toBe(false)
+	expect(reads).toBe(2)
 	expect(() => parseStudyToolsInput({})).toThrow('Invalid')
 })
 

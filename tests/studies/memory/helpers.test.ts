@@ -5,12 +5,9 @@ import { attempt } from '@orkestrel/contract'
 import { isStudyError, isStudyJudgment, parseStudyScenario } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import {
-	buildStudyMemoryModels,
 	buildStudyMemoryOrigins,
-	buildStudyMemoryReadings,
 	buildStudyMemoryRoles,
 	createStudyAdapter,
-	gradeStudyMemory,
 	isStudyMemoryArm,
 	isStudyMemoryAssertion,
 	isStudyMemoryClassifier,
@@ -50,9 +47,9 @@ describe('memory declaration and mechanical evidence', () => {
 				{ ...profile, room: { ...profile.room, safety: profile.room.context } },
 				every,
 			),
-		).toThrow('prompt capacity')
+		).toThrow('Memory room declaration is invalid')
 		expect(() => validateStudyMemoryProfile({ ...profile, provider: undefined }, every)).toThrow(
-			'model digest',
+			'Memory provider declaration is invalid',
 		)
 		const provider = profile.provider
 		if (provider === undefined) throw new Error('Missing fixture provider')
@@ -64,7 +61,7 @@ describe('memory declaration and mechanical evidence', () => {
 				},
 				every,
 			),
-		).toThrow('model digest')
+		).toThrow('Memory provider declaration is invalid')
 		expect(() =>
 			validateStudyMemoryProfile(
 				{
@@ -73,13 +70,13 @@ describe('memory declaration and mechanical evidence', () => {
 				},
 				every,
 			),
-		).toThrow('judge model and digest')
+		).toThrow('Memory provider declaration is invalid')
 		expect(() =>
 			validateStudyMemoryProfile(
 				{ ...profile, provider: { ...provider, url: 'http://user:password@127.0.0.1:7' } },
 				every,
 			),
-		).toThrow('uncredentialed')
+		).toThrow('Memory provider declaration is invalid')
 	})
 
 	it('requires a judge only for the records arm and a recap only for the compaction arm', () => {
@@ -90,7 +87,9 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(() => validateStudyMemoryProfile(bare, [])).not.toThrow()
 		expect(() => validateStudyMemoryProfile(bare, ['full'])).not.toThrow()
 		expect(() => validateStudyMemoryProfile(bare, ['records'])).toThrow('judge model and digest')
-		expect(() => validateStudyMemoryProfile(bare, ['compaction'])).toThrow('positive')
+		expect(() => validateStudyMemoryProfile(bare, ['compaction'])).toThrow(
+			'Memory compaction requires a declared recap allowance',
+		)
 		expect(() => validateStudyMemoryProfile(bare, ['records', 'compaction', 'full'])).toThrow(
 			'judge model and digest',
 		)
@@ -102,7 +101,7 @@ describe('memory declaration and mechanical evidence', () => {
 		// A declared auxiliary is validated whichever arm is selected.
 		expect(() =>
 			validateStudyMemoryProfile({ ...bare, room: { ...bare.room, recap: 0 } }, ['full']),
-		).toThrow('positive')
+		).toThrow('Memory room declaration is invalid')
 		expect(() =>
 			validateStudyMemoryProfile(
 				{
@@ -111,7 +110,7 @@ describe('memory declaration and mechanical evidence', () => {
 				},
 				['full'],
 			),
-		).toThrow('judge model and digest')
+		).toThrow('Memory provider declaration is invalid')
 	})
 
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
@@ -295,7 +294,7 @@ describe('memory declaration and mechanical evidence', () => {
 				...input,
 				definition: { ...input.definition, arms: compaction, order: [compaction] },
 			}),
-		).toThrow('positive')
+		).toThrow('Memory compaction requires a declared recap allowance')
 		expect(() =>
 			adapter.validate({
 				...input,
@@ -399,20 +398,6 @@ describe('memory declaration and mechanical evidence', () => {
 			)
 	})
 
-	it('declares the pinned serving identities under the labels their inventory evidence carries', () => {
-		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		const bare = omitMemoryAuxiliaries(profile)
-		if (profile.provider === undefined || bare.provider === undefined)
-			throw new Error('Missing fixture provider')
-		expect(buildStudyMemoryModels(profile.provider)).toEqual({
-			model: { name: 'model', digest: 'a'.repeat(64) },
-			judge: { name: 'judge', digest: 'b'.repeat(64) },
-		})
-		expect(buildStudyMemoryModels(bare.provider)).toEqual({
-			model: { name: 'model', digest: 'a'.repeat(64) },
-		})
-	})
-
 	it('declares the exact wire policy of each role an arm dispatches and no other role', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const agent = {
@@ -460,33 +445,6 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(() => buildStudyMemoryRoles({ ...profile, provider: undefined }, 'full')).toThrow(
 			expect.objectContaining({ code: 'CONFIG' }),
 		)
-	})
-
-	it('builds classifier readings in asking order, skipping malformed entries and keeping unknown durations null', () => {
-		expect(buildStudyMemoryReadings(undefined)).toBeNull()
-		expect(buildStudyMemoryReadings('readings')).toBeNull()
-		expect(buildStudyMemoryReadings({})).toBeNull()
-		expect(buildStudyMemoryReadings({ readings: 'none' })).toBeNull()
-		expect(buildStudyMemoryReadings({ readings: [] })).toEqual([])
-		expect(
-			buildStudyMemoryReadings({
-				readings: [
-					{ key: 'first', phase: 'ask', outcome: 'cached', duration: 12, extra: 'dropped' },
-					{ key: 'second', phase: 'ask', outcome: 'asked' },
-					{ key: 7, phase: 'ask', outcome: 'asked' },
-					{ phase: 'ask', outcome: 'asked' },
-					{ key: 'third', phase: 1, outcome: 'asked' },
-					{ key: 'fourth', phase: 'ask' },
-					'text',
-					null,
-					{ key: 'fifth', phase: 'ask', outcome: 'asked', duration: 'long' },
-				],
-			}),
-		).toEqual([
-			{ key: 'first', phase: 'ask', outcome: 'cached', duration: 12 },
-			{ key: 'second', phase: 'ask', outcome: 'asked', duration: null },
-			{ key: 'fifth', phase: 'ask', outcome: 'asked', duration: null },
-		])
 	})
 
 	it('joins message origins from session state only, in priority order, leaving the rest unknown', () => {
@@ -622,6 +580,7 @@ describe('memory declaration and mechanical evidence', () => {
 })
 
 describe('memory mechanical grading over the shared traversal', () => {
+	const adapter = createStudyAdapter()
 	const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 	const definition = {
 		name: 'test',
@@ -684,7 +643,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 	const evidence = { [complete.id]: completeEvidence, [faulted.id]: [] }
 
 	it('cites retained attempts and one-based rows, keeps unknowns empty and admits nonfault partial products', () => {
-		const judgments = gradeStudyMemory({ manifest, rubric, attempts, evidence })
+		const judgments = adapter.grade({ manifest, rubric, attempts, evidence })
 		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
 		expect(
 			judgments.map((judgment) => [
@@ -757,7 +716,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 		)
 		const [trial] = plan.schedule
 		if (trial === undefined) throw new Error('Missing fixture trial')
-		const judgments = gradeStudyMemory({
+		const judgments = adapter.grade({
 			manifest: plan,
 			rubric: {
 				version: '1',
@@ -796,7 +755,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 	})
 
 	it('grades every declared pair in schedule order, retained or not, and refuses invalid input', () => {
-		const sparse = gradeStudyMemory({ manifest, rubric, attempts: [faultedAttempt], evidence: {} })
+		const sparse = adapter.grade({ manifest, rubric, attempts: [faultedAttempt], evidence: {} })
 		expect(sparse.map((judgment) => judgment.trial)).toEqual([
 			...Array(5).fill(complete.id),
 			...Array(5).fill(faulted.id),
@@ -810,12 +769,12 @@ describe('memory mechanical grading over the shared traversal', () => {
 			criterion: 'operational',
 			verdict: 'unsuccessful',
 		})
-		expect(() =>
-			gradeStudyMemory({ manifest, rubric, attempts, evidence: { foreign: [] } }),
-		).toThrow(expect.objectContaining({ code: 'EVIDENCE' }))
+		expect(() => adapter.grade({ manifest, rubric, attempts, evidence: { foreign: [] } })).toThrow(
+			expect.objectContaining({ code: 'EVIDENCE' }),
+		)
 		// The shared traversal throws from another bundle instance, so recognition uses the public guard.
 		const duplicate = attempt(() =>
-			gradeStudyMemory({ manifest, rubric, attempts: [...attempts, completeAttempt], evidence }),
+			adapter.grade({ manifest, rubric, attempts: [...attempts, completeAttempt], evidence }),
 		)
 		expect(duplicate.success).toBe(false)
 		const duplicated = duplicate.success ? undefined : duplicate.error
@@ -825,7 +784,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 			message: 'Invalid or duplicate grading attempts',
 		})
 		expect(() =>
-			gradeStudyMemory({
+			adapter.grade({
 				manifest,
 				rubric: {
 					version: '1',

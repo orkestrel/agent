@@ -4,14 +4,13 @@ import type {
 	StudyToolsFile,
 	StudyToolsInput,
 	StudyToolsRead,
-	StudyToolsResponse,
 	StudyToolsRuntime,
 	StudyToolsWrite,
 } from './types.js'
+import type { StudyAgentResponse } from '@orkestrel/study/server'
 import { holds, isArray, isConstructor, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
-import { isToolCall } from '@orkestrel/tool'
 import { matchesStudyKeys } from '@orkestrel/study'
-import { isStudyCustodyName } from '@orkestrel/study/server'
+import { isStudyAgentResponse, isStudyCustodyName } from '@orkestrel/study/server'
 import {
 	STUDY_TOOLS_CALLS,
 	STUDY_TOOLS_FILE,
@@ -81,35 +80,24 @@ export function isStudyToolsFileName(value: unknown): value is string {
 }
 
 /**
- * Checks whether a scripted response has bounded JSON calls and workload controls.
+ * Checks whether a scripted response is a valid Study response within this workload's bounds.
+ * @remarks
+ * Study's guard owns the response shape; this guard adds only the scratch text, call and
+ * continuation-name limits.
  * @param value - The candidate response
- * @returns True if every declared response member is valid; false otherwise
+ * @returns True if the response is valid and within the workload bounds; false otherwise
  * @example
  * ```ts
  * isStudyToolsResponse({ content: 'done', calls: [] }) // true
  * ```
  */
-export function isStudyToolsResponse(value: unknown): value is StudyToolsResponse {
+export function isStudyToolsResponse(value: unknown): value is StudyAgentResponse {
 	return holds(
 		() =>
-			isRecord(value) &&
-			matchesStudyKeys(value, ['content', 'calls'], ['consume', 'cancel', 'tokens', 'bytes']) &&
-			typeof value.content === 'string' &&
+			isStudyAgentResponse(value) &&
 			new TextEncoder().encode(value.content).byteLength <= STUDY_TOOLS_TEXT &&
-			isArray(value.calls) &&
 			value.calls.length <= STUDY_TOOLS_CALLS &&
-			value.calls.every(isToolCall) &&
-			isJSONValue(value.calls) &&
-			(value.consume === undefined ||
-				(typeof value.consume === 'string' &&
-					value.consume.length > 0 &&
-					value.consume.length <= 128)) &&
-			(value.cancel === undefined || typeof value.cancel === 'boolean') &&
-			['tokens', 'bytes'].every(
-				(key) =>
-					value[key] === undefined ||
-					(typeof value[key] === 'number' && Number.isSafeInteger(value[key]) && value[key] >= 0),
-			),
+			(value.consume === undefined || value.consume.length <= 128),
 	)
 }
 

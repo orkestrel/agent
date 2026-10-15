@@ -6,9 +6,10 @@ import type {
 	StudyValidation,
 } from '@orkestrel/study/server'
 import { StudyError } from '@orkestrel/study'
+import { gradeStudyEvidence } from '@orkestrel/study/server'
 import {
-	gradeStudyMemory,
 	readStudyMemoryCompaction,
+	readStudyMemoryGrade,
 	validateStudyMemoryProfile,
 } from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
@@ -50,6 +51,6 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 	}
 	/** Reads retained mechanics separately from semantic labels. @param input - Independent grading inputs. @returns Mechanical judgments and semantic unknowns. */
 	grade(input: StudyAdjudication): readonly StudyJudgment[] {
-		return gradeStudyMemory(input)
+		return gradeStudyEvidence(input, readStudyMemoryGrade)
 	}
 }

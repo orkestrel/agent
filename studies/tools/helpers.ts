@@ -1,16 +1,10 @@
-import type { JSONValue } from '@orkestrel/contract'
-import type { StudyEvidence, StudyJudgment, StudyRubric } from '@orkestrel/study'
-import type {
-	StudyAdjudication,
-	StudyGradeReading,
-	StudyGradeTarget,
-} from '@orkestrel/study/server'
+import type { StudyEvidence, StudyRubric } from '@orkestrel/study'
+import type { StudyGradeReading, StudyGradeTarget } from '@orkestrel/study/server'
 import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
-import { isArray, isObject, isRecord } from '@orkestrel/contract'
+import { isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { StudyError, isStudyRubric } from '@orkestrel/study'
-import { gradeStudyEvidence } from '@orkestrel/study/server'
 import { STUDY_TOOLS_TEXT } from './constants.js'
 import { StudyToolsRefusal } from './errors.js'
 import { isStudyToolsAssertion, isStudyToolsFile, isStudyToolsFileName } from './validators.js'
@@ -76,39 +70,6 @@ export async function observeStudyToolsFile(
 			return Object.freeze({ path: name, exists: false })
 		throw error
 	}
-}
-
-/**
- * Projects foreign provider messages onto the exact fields the workload reads.
- * @param value - The foreign provider message collection
- * @returns Owned JSON message readings in original order
- * @throws StudyError - Thrown when a dereferenced foreign member is malformed
- * @example
- * ```ts
- * readStudyToolsMessages(messages)
- * ```
- */
-export function readStudyToolsMessages(value: unknown): readonly JSONValue[] {
-	if (!isArray(value)) throw new StudyError('FAULT', 'Provider messages are not an array')
-	return Object.freeze(
-		Array.from(value).map((message): JSONValue => {
-			if (!isObject(message)) throw new StudyError('FAULT', 'Provider message fields are invalid')
-			const role = 'role' in message ? message.role : undefined
-			const content = 'content' in message ? message.content : undefined
-			const call = 'call' in message ? message.call : undefined
-			if (
-				typeof role !== 'string' ||
-				typeof content !== 'string' ||
-				(call !== undefined && typeof call !== 'string')
-			)
-				throw new StudyError('FAULT', 'Provider message fields are invalid')
-			return Object.freeze({
-				role,
-				content,
-				...(call === undefined ? {} : { call }),
-			})
-		}),
-	)
 }
 
 /**
@@ -209,22 +170,4 @@ export function readStudyToolsGrade(target: StudyGradeTarget): StudyGradeReading
 					: 'Retained observation differs from the independent predicate',
 		references: reading.row === undefined ? [] : [{ file: 'evidence', row: reading.row }],
 	}
-}
-
-/**
- * Grades only retained observations against independently declared mechanism predicates.
- * @param input - The sealed declaration, retained attempts, retained evidence and independent rubric
- * @returns Whole-horizon judgments with exact retained row references
- * @throws StudyError - Thrown when declarations, attempts or evidence are incompatible
- * @example
- * ```ts
- * gradeStudyTools({ manifest, rubric, attempts, evidence })
- * ```
- */
-export function gradeStudyTools(input: StudyAdjudication): readonly StudyJudgment[] {
-	validateStudyToolsRubric(input.rubric)
-	const { definition } = input.manifest
-	if (definition.purpose !== 'mechanism' || definition.driver !== 'tools')
-		throw new StudyError('CONFIG', 'Invalid tools study declaration')
-	return gradeStudyEvidence(input, readStudyToolsGrade)
 }
