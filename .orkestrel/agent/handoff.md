@@ -1,3 +1,43 @@
+# Rolling Compaction running on 2026-10-15
+
+Agent implementation committed at `7a2e29a`. Only Compaction is running. Records remains
+96/96, sealed and labeled; never rerun or replay it. The rolling run is development evidence,
+not a replica or quality claim about Claude Code, Codex or Cursor. Read `rolling.md`.
+
+Project: `tmp/studies/compaction-rolling-project`. Output: `tmp/studies/compaction-rolling`.
+Fingerprint: `3916d7506358aca5d08ae3b33569b1005cae87c9eeba8b1614725ff6b17df90a`.
+External launch-pins SHA-256: `6d4c4b4bf1e7648f3576fa89525dc849dd6eec8c9bb266a2c5ecd6855869c346`.
+Absolute deadline: `2026-10-15T17:26:13.570Z` (13:26 EDT). Do not reset or extend it.
+One attempt, 96 goals, zero retries. Trial and series allowance: 9662835 ms.
+The reader's `pins` command verified the frozen identity before launch.
+
+Canonical series PID 21148; journal/errors `tmp/codex/compaction-rolling-series.jsonl` and
+`.err`. Evidence at `execution/trials/r1-s1-a1/evidence.jsonl` was advancing at 14:43 UTC.
+Read-only watcher PID 32260 writes `tmp/units/compaction-rolling-watch.jsonl`; it exits on
+terminal state or its bound and never controls execution.
+
+Dedicated daemon PID 95044, wrapper PID 71800, port 11435. The canonical dispatcher owns
+its four-hour cap, ending around `2026-10-15T18:41:49.780Z`; receipt is
+`tmp/units/compaction-rolling-daemon-start.json`. The old owned daemon 65196 and descendant
+84864 were stopped and confirmed gone before replacement. User daemon 11434 was untouched.
+
+Do not rebuild, install, sweep, or edit captured runtimes or frozen study inputs. Preserve
+acceptance-bound files under `tmp/units`, the isolated runtime and all prior result custody.
+Study's parallel implementation remains accepted at `065f2aa`; Agent's captured installed
+Study stays unchanged. No blanket cleanup is safe while this attempt and observers run.
+
+At termination, read canonical errors and run:
+
+```text
+node tmp/units/rolling-reader.ts read tmp/studies/compaction-rolling tmp/studies/compaction-rolling-project tmp/units/rolling-reader-result.json 6d4c4b4bf1e7648f3576fa89525dc849dd6eec8c9bb266a2c5ecd6855869c346
+```
+
+The reader uses create-only output and exits 2 when qualification is not established. Preserve
+the actual first failure and unexecuted remainder; do not auto-retry. If complete, require
+repeated nonempty reducing rolling folds before qualification. Grade retained products and
+update reports with the treatment/build differences. Compare performance only within the
+accepted protocol; rolling qualification is not a quality or speed result.
+
 # Rolling implementation accepted on 2026-10-15
 
 Read `rolling.md` for vendor research, the selected one-pass replacement mechanism and
