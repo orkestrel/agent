@@ -44,6 +44,31 @@ repair are accepted; their records live in
 Study's `.orkestrel/promotion.md`. MCP's root install was aligned to its accepted lockfile
 (Scaffold 0.0.101, npm ci exit 0, 8727 ms); no source changed or package was published.
 
+After the attempt seals, read it with the accepted reader into a fresh destination. Run public
+grading through `tmp/studies/compaction-task-runtime/node_modules/@orkestrel/study/dist/bin/main.js`,
+not the root installed Study. Its `--help` verified `grade <result> --rubric <path>`,
+`label <result> --grading <sha256> --labels <path>` and `report <result> --grading <sha256>`.
+Those commands have a 60-second internal allowance; retain the canonical 120-second outer cap.
+Use the captured `project/studies/qualification/rubric.json` for the operational reading and
+`project/studies/endurance/rubric.json` for the separate semantic grading. The latter still
+hashes to `1c192f973185dec7fba312dcb630a64416baf9a36a5d8c79752d25dc94320206`; captured
+`project/studies/memory/scenarios/endurance.json` still hashes to
+`e6d2396c71979f64e6147df3bd4a8bc7bf7bc3e2d1d0fa118dac2fae0e6e65ed`.
+
+The existing create-only preparer takes `PACKET SCENARIO TRIAL DESTINATION` at
+`tmp/units/study-label-prepare.ts`. The per-batch runner takes
+`BATCH_PATH EXPECTED_SHA256 CREATE_ONLY_DESTINATION` at `tmp/units/study-label-runner/main.ts`.
+Its frozen adjudicator remains GPT-6.1 Sol high; Claude implementation helpers do not change
+that experimental condition. The previous population/import wrappers bind compaction-room
+and cannot be reused unchanged. Prepare successor wrappers only after the actual packet,
+neutral trial and batch identities exist; preserve Records and all prior labels.
+
+Actual Haiku session `cceaf74f-c1e9-40e5-bada-14797a3a6fac` mapped these existing terminal
+entries. Root rejected the first report's omitted authority reads and abbreviated citations.
+The correction read the required authority files and resolved all 22 citations; its launcher
+exited 0 uncapped in 45363 ms. Root checked the captured CLI help, exact rubric/scenario bytes,
+and labeler constants directly. This is preparation, not a terminal grading result.
+
 # Compaction content qualification failed on 2026-10-15
 
 The Compaction-only successor started at 19:05 UTC and stopped at goal 11, `ev-03-3`, after
