@@ -1,5 +1,13 @@
 # Results
 
+**Cushioned Compaction qualification, 2026-10-15.** The Compaction-only successor completed
+24 of 96 goals, failed on attempted goal 25, and left 71 unexecuted. Actual prompt usage was
+10738 tokens against a cushioned projection of 10703 and reserved prompt room of 11776.
+The declared 512-token prediction cushion was insufficient; this was not an observed physical
+context overflow. The launcher exited 1, uncapped, after 971634 ms. No further GPU execution
+is selected. Records remains sealed at 96/96 and was not rerun. See
+[the qualification outcome](.orkestrel/agent/qualification.md).
+
 **Compaction gauge qualification, 2026-10-15.** The repaired Compaction-only execution completed
 21 of 96 goals, failed on attempted goal 22, and left 74 unexecuted. It stopped because the
 actual prompt was 10425 tokens against a frozen projection of 10423; the reserved prompt limit

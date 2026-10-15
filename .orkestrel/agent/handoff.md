@@ -1,3 +1,35 @@
+# Compaction terminal state on 2026-10-15
+
+Read `usage.md` for the completed Ollama API research and the next implementation decision:
+separate prediction diagnostics from reserved-room enforcement, prove opt-in truncation/shift
+controls, then evaluate an adaptive estimate through the existing custom consumer. This decision
+does not authorize a run under the elapsed frozen deadline. No runtime change has landed for it.
+
+The owned daemon on 11435 was stopped after terminal custody was collected. No GPU execution is
+active. The user daemon on 11434 was not changed. Retain the raw runs, frozen projects, readers,
+and runtime backups; `compaction.md` remains hash-bound.
+
+The temporary label runner repair is verified: 59 helper tests pass, and isolated mutations of
+the prompt boundary, judging policy, and publication order fail their regression tests. Live Sol
+controls returned 4 achieved, 4 unsuccessful, and 1 unknown against the frozen expectations. The
+largest Records batch 096 completed in 32900 ms uncapped, with 125458 input tokens and 1262 output
+tokens. Its full 462917-byte batch was sent; no summarization or Records execution occurred.
+Receipts are under `tmp/studies/study-label-control-{a,b,c}-1` and
+`tmp/studies/study-label-pilot-096-1`; verification reports use the corresponding prefixes under
+`tmp/units/`. No labels have been imported. Population labeling has not launched. Keep the
+pilot as the single completed attempt for 096; do not label it again.
+
+The cushioned successor is terminal and rejected: 24 completed goals, failure on attempted
+goal25 (`ev-07-1`), and71 unexecuted. Actual prompt10738 exceeded cushioned projection10703
+by35, while reserved room11776 still had1038 tokens. Launcher exit1, uncapped971634ms.
+The frozen reader passed custody checks and saved rejected status to
+`tmp/units/compaction-cushion-reading.json`. See `qualification.md` for the seal and evidence.
+No further GPU execution is selected. Records remains sealed at96/96, with no rerun or replay.
+
+The following launch decision is historical. Its original absolute deadline has elapsed.
+Continue only retained-product grading, cost analysis, and independent implementation checks.
+Keep `compaction.md` byte-identical because the frozen launch binds its hash.
+
 # Compaction successor decision on 2026-10-15
 
 Reuse sealed candidate-3 Records, 96/96 complete; execute no Records replay. The repaired
@@ -90,7 +122,7 @@ match the sibling build; independent Astra is reproducing the bundled nominal-er
 with a CPU-only fixture. Actual Opus is deciding a bounded successor validation protocol from
 the inconclusive diagnostic. Fable remains forbidden. Neither lane may rerun Records.
 
-No GPU series is running after that terminal result. Dedicated daemon11435 remains under its
+No GPU series is running after that terminal result. Dedicated daemon 11435 remains under its
 recorded cap ending2026-10-15T12:53:19.339Z; user11434 is untouched. Runtime refresh or build
 requires checking that no successor has started. The source worktrees and installed-runtime
 backups remain preserved. Temporary active-lane details belong in
@@ -119,7 +151,7 @@ Study's renewed actual Opus refinement is accepted at `d06b30c`: 101 authored pa
 
 The dedicated [Study package integration](../study.md) is implemented and accepted after independent review and gates. The user superseded app placement and a new scaffold root axis with @orkestrel/study, using canonical src/core, src/server and src/bin, with results in the consuming package's tmp/studies. Agent owns its consumer adapters under studies/. Duplicated app code was removed at 8a14ac9. The abandoned scaffold axis was restored exactly; do not integrate it or run the old migration. Opus's macro and per-file reviews, Sol's mutation proofs, the final Astra review, Study and Agent tree gates, and the actual installed CPU integration all passed. These proofs do not assert model quality. The user's final Fable allowance is consumed; do not invoke it again. Use latest published Orkestrel versions for working builds and preserve frozen runs. Consolidate fixtures by surface, never per item. The temporary harness/.build ignore stays until dependent generation, grading, reporting and custody work no longer need it.
 
-The extended capacity series stopped at2026-10-14T18:16:38Z, exit3 uncapped. Q4records completed48goals and exhausted8192output tokens on attempt49, ev-13-1, producing thinking text but no answer. Its fail-fast rule sent no further request; the remaining arms never started. The journal is tmp/codex/c1-capacity-extended-series.jsonl, and retained raw runs are instruments/harness-capacity/tmp/c1-capacity-extended/runs. See capacity.md for the terminal evidence. No restart or additional budget increase has been selected. Keep the frozen builds and evidence pending custody/reporting; daemon11435 remains separate from the user's11434.
+The extended capacity series stopped at2026-10-14T18:16:38Z, exit3 uncapped. Q4records completed48goals and exhausted8192output tokens on attempt49, ev-13-1, producing thinking text but no answer. Its fail-fast rule sent no further request; the remaining arms never started. The journal is tmp/codex/c1-capacity-extended-series.jsonl, and retained raw runs are instruments/harness-capacity/tmp/c1-capacity-extended/runs. See capacity.md for the terminal evidence. No restart or additional budget increase has been selected. Keep the frozen builds and evidence pending custody/reporting; daemon 11435 remains separate from the user's11434.
 
 The evaluation research and user-requested adversarial round closed on 2026-10-14. Study's git history through `3b7d6f3` retains the article research, independent Opus proposal and review, authorized Fable synthesis, model custody and reconciliation under the historical `.orkestrel/study/` paths. The implemented portable contract is described in [Study's guide](../../../study/guides/study.md). This supersedes the earlier scaffold ownership proposal and bench umbrella name. Local model execution remains serial.
 
