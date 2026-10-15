@@ -1,3 +1,17 @@
+# Study consumer cleanup accepted on 2026-10-15
+
+Study `422d549` and Agent `34862bc` close the requested extraction before another model run.
+The reusable execution mechanisms moved into Study; Agent's study source is 491 lines smaller.
+See [integration acceptance](../study.md) for ownership, review, gates and the retained physical
+development installation. The cleanup plan and verdict retire in the acceptance commit; their
+history remains at `f007a27`. Frozen run dependencies and results remain unchanged.
+
+Generation remains stopped. The next series work is a separately declared Compaction-only
+summary-output treatment for the failure recorded below; no successor has been frozen or
+launched. Retain first-failure accounting and finite request/goal/trial bounds. Records is
+sealed and labeled at 96/96; never rerun, replay or relabel it. Do not refresh Agent's historical
+root Study installation to run the promoted consumer; use a fresh physical captured runtime.
+
 # Final-user summary qualification failed on 2026-10-15
 
 The Compaction-only attempt sealed at 20:14 UTC after 78 complete products. Goal 79,

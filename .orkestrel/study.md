@@ -1,6 +1,31 @@
 # Study package integration
 
-Study's shared instrumentation promotion is accepted at `019f5ce`, with Agent's consumer
+The consumer cleanup is accepted at Study `422d549` and Agent `34862bc`. Study owns the
+request trace, gauged summary execution, scripted provider, response validation, message and
+reading projections, and Ollama model/settings projections. Agent keeps workload declarations,
+prompts, strategy choices, source joins, checkpoints, tool semantics, and grading. The measured
+`studies/` TypeScript source falls from 2595 lines / 97140 bytes to 2104 lines / 80231 bytes;
+workload assets remain 461437 bytes. This is source consolidation, not a speed measurement.
+
+Actual Sonnet implemented the extraction. Independent Opus design and correctness lanes
+closed ownership and treatment preservation, then a focused Opus review confirmed the repaired
+Trace, Script and Summary boundaries. Physical reproduction failed 10 tests before repair and
+passed the unchanged 10 afterward. Mutation controls distinguish the repaired invariants.
+Final physical-install verification passed Study's 509 source, 119 policy, 229 configuration,
+42 setup and 13 guide tests, with two applicability skips; the test chain resumed at policy
+after a guide-only correction. Agent passed 2118 main tests with two applicability skips and
+155 study integration tests. Both packages passed format, lint, types and build. Agent's
+discovery instrument flags its core project as ungated, but the direct Vitest list matches all
+44 census files and `npm test` executed those files with 1474 passes. No configuration changed.
+
+Accepted source matches the isolated proof trees. The development installation remains at
+`tmp/studies/study-slim-dependencies`; its Study server SHA-256 is
+`01bff1edf977435415d21bb572150ae6434fb900a65dd3c53c877720a6304ecd`. Agent's historical root
+Study installation remains unchanged and is not the installation that verified the promoted
+exports. Preserve the physical proof trees for the separate Compaction successor. No bump,
+publication, model execution, retry, scoring change or frozen-result edit occurred.
+
+The earlier shared instrumentation promotion is accepted at `019f5ce`, with Agent's consumer
 migration at `8a9087b` and MCP's owner repair at `b0e9d7f`. Actual Sonnet implementation,
 independent review including Opus, mutation controls and host gates closed the work. See
 [promotion acceptance](../../study/.orkestrel/promotion.md#acceptance) for the readings and
