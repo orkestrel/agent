@@ -2,9 +2,9 @@ import type { Message } from '@orkestrel/agent'
 import type { StudyEvidence } from '@orkestrel/study'
 import { createRecorder } from '@orkestrel/test'
 import { expect, it } from 'vitest'
-import { ScriptedStudyProvider } from '../../../../studies/tools/ScriptedStudyProvider.js'
-import { parseStudyToolsInput } from '../../../../studies/tools/parsers.js'
-import { createStudyMeterFixture } from '../../../setupStudy.js'
+import { ScriptedStudyProvider } from '../../../studies/tools/ScriptedStudyProvider.js'
+import { parseStudyToolsInput } from '../../../studies/tools/parsers.js'
+import { createStudyMeterFixture } from '../../setupStudy.js'
 
 it('serves an actual mechanism provider boundary with metered bytes and accountable unknown token usage', async () => {
 	const limit = { duration: 1000, calls: 4, tokens: 100, bytes: 1000 }

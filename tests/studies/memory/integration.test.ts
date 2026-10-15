@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
-import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
+import { StudyMemoryDriver } from '../../../studies/memory/index.js'
 import {
 	buildMemoryCall,
 	buildMemoryProfile,
@@ -45,7 +45,7 @@ import {
 	STUDY_MEMORY_SUMMARY_FOLDS,
 	STUDY_MEMORY_SUMMARY_MISSES,
 	WINDOW_GOAL,
-} from '../../../setupService.js'
+} from '../../setupStudy.js'
 
 it('loads the actual q4 native topology with two distinct captured Agent occurrences', async () => {
 	const scratch = createScratch({ prefix: 'study-memory-topology-' })

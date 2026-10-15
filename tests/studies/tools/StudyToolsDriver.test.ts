@@ -2,9 +2,9 @@ import type { StudyEvidence } from '@orkestrel/study'
 import { createRecorder } from '@orkestrel/test'
 import { createScratch } from '@orkestrel/test/server'
 import { expect, it } from 'vitest'
-import { StudyToolsDriver } from '../../../../studies/tools/StudyToolsDriver.js'
-import { loadStudyToolsFixture } from '../../../setupService.js'
-import { createStudyMeterFixture } from '../../../setupStudy.js'
+import { StudyToolsDriver } from '../../../studies/tools/StudyToolsDriver.js'
+import { loadStudyToolsFixture } from '../../setupStudy.js'
+import { createStudyMeterFixture } from '../../setupStudy.js'
 
 it('rejects malformed subjects and unsupported arms, serializes a real session and closes only its private child', async () => {
 	const fixture = await loadStudyToolsFixture()

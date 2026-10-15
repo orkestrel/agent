@@ -23,9 +23,9 @@ import {
 	gradeStudyTools,
 	parseStudyToolsInput,
 	StudyToolsDriver,
-} from '../../../../studies/tools/index.js'
-import { loadStudyToolsFixture, readStudyToolsEvidence } from '../../../setupService.js'
-import { buildStudyGrading } from '../../../setupStudy.js'
+} from '../../../studies/tools/index.js'
+import { loadStudyToolsFixture, readStudyToolsEvidence } from '../../setupStudy.js'
+import { buildStudyGrading } from '../../setupStudy.js'
 
 it('inspects the shipped package-root profile against the real offline artifact inventory', async () => {
 	const root = realpathSync(resolve('.'))

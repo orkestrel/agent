@@ -3,11 +3,11 @@ import type {
 	StudyMemoryProvenance,
 	StudyMemoryRequest,
 	StudyMemoryTerminal,
-} from '../../../../studies/memory/index.js'
+} from '../../../studies/memory/index.js'
 import { attempt, isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, readStudyFailure, StudyError } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
-import { AgentError } from '../../../../src/core/index.js'
+import { AgentError } from '../../../src/core/index.js'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryParts,
@@ -38,7 +38,7 @@ import {
 	validateStudyMemoryCompletion,
 	validateStudyMemoryProfile,
 	validateStudyMemoryUsage,
-} from '../../../../studies/memory/index.js'
+} from '../../../studies/memory/index.js'
 import {
 	buildMemoryProfile,
 	buildMemoryReply,
@@ -56,7 +56,7 @@ import {
 	STUDY_MEMORY_STRICT_REFUSALS,
 	STUDY_MEMORY_TIMING,
 	STUDY_MEMORY_TIMING_EXPECTED,
-} from '../../../setupService.js'
+} from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
 	it('validates finite room, actual digest syntax and exact uncredentialed origin', () => {

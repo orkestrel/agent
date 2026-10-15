@@ -1,3 +1,27 @@
+# Authored study test layout accepted on 2026-10-15
+
+The user placed Agent's authored study proofs under `tests/studies`, mirroring `studies`.
+All 14 files moved: 12 test modules and their two types files. Imports were adjusted; helper
+and assertion bodies were preserved. Shared helpers and their proofs now live only in
+`tests/setupStudy.ts` and `tests/setupStudy.test.ts`; the old setupService files are removed.
+The existing isolated `service` project selects the new paths and setup, retaining its bounded
+process settings and existing package scripts. No runtime code or manifest changed.
+
+Independent verification collected every moved test file exactly once and passed 180 tests
+against a separate copy of the accepted runtime. Root policy passed 119 with one applicability
+skip, config passed 229 with one applicability skip, and setup passed 161. Typecheck, scoped
+format and lint passed. The verification wrapper initially mistook 14 moved files for 14 test
+files after Vitest had passed; the separate census reconciled 12 tests plus two type modules.
+The passing service execution was not repeated for that receipt-only defect.
+
+Before moving source proofs, root archived every accepted source binding byte-for-byte under
+`tmp/studies/rolling-accepted-sources`; its `custody.json` SHA-256 is
+`d074519dc1d470f6400d4291a1ba80b3b2031e10525c5c7afcbc2c10e905c161`.
+The original acceptance receipt and frozen project/runtime remain unchanged. Its old absolute
+source paths describe commit `7a2e29a`; use the archive for their source evidence. The terminal
+reader verifies the original receipt bytes and frozen project/runtime, not today's source paths.
+Never relaunch the consumed prelaunch wrappers. The live series is unaffected by this relocation.
+
 # Rolling Compaction running on 2026-10-15
 
 Agent implementation committed at `7a2e29a`. Only Compaction is running. Records remains

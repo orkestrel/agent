@@ -20,7 +20,7 @@ import {
 	STUDY_MEMORY_PROJECTION_MISSES,
 	STUDY_MEMORY_PROJECTION_PASS,
 	STUDY_MEMORY_PROJECTION_REFUSALS,
-} from '../../../setupService.js'
+} from '../../setupStudy.js'
 
 const { messages, tools, options } = STUDY_MEMORY_OBSERVER_REQUEST
 const gauge = STUDY_MEMORY_FIXED_SETTINGS.gauge

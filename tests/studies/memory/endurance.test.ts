@@ -3,13 +3,13 @@ import { readFile, stat } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { buildStudySchedule, parseStudyProfile, validateStudyInputs } from '@orkestrel/study'
-import { createStudyAdapter, isStudyMemoryInput } from '../../../../studies/memory/index.js'
+import { createStudyAdapter, isStudyMemoryInput } from '../../../studies/memory/index.js'
 import {
 	buildMemoryProfile,
 	loadMemoryInputs,
 	STUDY_ENDURANCE_BOUNDARIES,
 	STUDY_MEMORY_SETTINGS,
-} from '../../../setupService.js'
+} from '../../setupStudy.js'
 
 describe('prospective public endurance declarations', () => {
 	it('preserves the complete pinned public goal and source population at their original boundaries', async () => {

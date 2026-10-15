@@ -201,16 +201,15 @@ export function guides(override?: UserConfig): UserConfig {
 	return mergeOverride(project, override)
 }
 
-// The caller prepares the live external services before this project.
-// `tests/setupService.ts` verifies readiness, and the project stays out of `npm test`
-// because a real service answers it.
+// Authored study proofs use bounded subprocesses and protocol fixtures,
+// so this project runs separately from `npm test`.
 export function service(override?: UserConfig): UserConfig {
 	const project: UserConfig = {
 		resolve,
 		test: {
 			name: { label: 'service', color: 'red' },
-			include: ['tests/service/**/*.test.ts'],
-			setupFiles: ['./tests/setup.ts', './tests/setupService.ts'],
+			include: ['tests/studies/**/*.test.ts'],
+			setupFiles: ['./tests/setup.ts', './tests/setupStudy.ts'],
 			environment: 'node',
 			browser: { enabled: false },
 			testTimeout: 120_000,

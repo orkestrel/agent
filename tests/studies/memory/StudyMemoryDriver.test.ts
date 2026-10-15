@@ -7,7 +7,7 @@ import {
 	isStudyMemorySubject,
 	StudyMemoryDriver,
 	StudyMemorySession,
-} from '../../../../studies/memory/index.js'
+} from '../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
 	buildMemoryFoldGoals,
@@ -56,7 +56,7 @@ import {
 	WINDOW_GOAL,
 	STUDY_MEMORY_TIMING,
 	STUDY_MEMORY_TIMING_CASES,
-} from '../../../setupService.js'
+} from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	it('releases and replaces snapshots while preserving earlier wire receipts and fresh trial isolation', async () => {

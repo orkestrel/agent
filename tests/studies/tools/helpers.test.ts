@@ -9,9 +9,9 @@ import {
 	readStudyToolsPredicate,
 	resolveStudyToolsPath,
 	validateStudyToolsRubric,
-} from '../../../../studies/tools/helpers.js'
-import { loadStudyToolsFixture } from '../../../setupService.js'
-import { buildCustodyAttempt } from '../../../setupStudy.js'
+} from '../../../studies/tools/helpers.js'
+import { loadStudyToolsFixture } from '../../setupStudy.js'
+import { buildCustodyAttempt } from '../../setupStudy.js'
 
 it('refuses traversal, reserved names, symlinks and oversized files before observing or writing outside scratch', async () => {
 	const scratch = createScratch()

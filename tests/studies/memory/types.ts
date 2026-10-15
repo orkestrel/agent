@@ -14,7 +14,7 @@ import type {
 	StudyRole,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
-import type { StudyMemoryEstimate, StudyMemoryObserver } from '../../../../studies/memory/index.js'
+import type { StudyMemoryEstimate, StudyMemoryObserver } from '../../../studies/memory/index.js'
 
 /** Holds one copied package selection in the installed fixture closure. */
 export interface StudyServicePackage {

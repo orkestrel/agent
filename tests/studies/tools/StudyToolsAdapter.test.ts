@@ -1,8 +1,8 @@
 import { createScratch } from '@orkestrel/test/server'
 import { expect, it } from 'vitest'
-import { createStudyAdapter } from '../../../../studies/tools/factories.js'
-import { StudyToolsDriver } from '../../../../studies/tools/StudyToolsDriver.js'
-import { loadStudyToolsFixture } from '../../../setupService.js'
+import { createStudyAdapter } from '../../../studies/tools/factories.js'
+import { StudyToolsDriver } from '../../../studies/tools/StudyToolsDriver.js'
+import { loadStudyToolsFixture } from '../../setupStudy.js'
 
 it('validates mechanism declarations and refuses incompatible execution before constructing a driver', async () => {
 	const fixture = await loadStudyToolsFixture()

@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { parseStudyDefinition, parseStudyProfile, validateStudyInputs } from '@orkestrel/study'
-import { createStudyAdapter } from '../../../../studies/memory/index.js'
-import { buildMemoryProfile, loadMemoryInputs } from '../../../setupService.js'
+import { createStudyAdapter } from '../../../studies/memory/index.js'
+import { buildMemoryProfile, loadMemoryInputs } from '../../setupStudy.js'
 
 describe('shared memory and capacity declarations', () => {
 	it('uses one driver and identical public scenario horizon and arm order', async () => {

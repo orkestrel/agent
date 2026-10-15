@@ -9,10 +9,10 @@ import {
 	isStudyToolsResponse,
 	isStudyToolsSubject,
 	isStudyToolsWrite,
-} from '../../../../studies/tools/validators.js'
-import { parseStudyToolsInput } from '../../../../studies/tools/parsers.js'
-import { isStudyToolsRefusal, StudyToolsRefusal } from '../../../../studies/tools/errors.js'
-import { loadStudyToolsFixture } from '../../../setupService.js'
+} from '../../../studies/tools/validators.js'
+import { parseStudyToolsInput } from '../../../studies/tools/parsers.js'
+import { isStudyToolsRefusal, StudyToolsRefusal } from '../../../studies/tools/errors.js'
+import { loadStudyToolsFixture } from '../../setupStudy.js'
 
 it('validates actual admitted constructors and bounds every declared workload without coercion', async () => {
 	const fixture = await loadStudyToolsFixture()
