@@ -1,8 +1,16 @@
 import type { StudyAdjudication } from '@orkestrel/study/server'
+import type { JSONValue } from '@orkestrel/contract'
+import type { OllamaTiming } from '@orkestrel/ollama'
 import type { StudyJudgment, StudyProfile, StudyRole } from '@orkestrel/study'
 import type { LedgerGauge } from '@orkestrel/agent'
-import type { StudyMemoryRequest, StudyMemorySubject, StudyMemoryTerminal } from './types.js'
-import { canonicalStringify, isObject, isRecord } from '@orkestrel/contract'
+import type {
+	StudyMemoryProvider,
+	StudyMemoryRequest,
+	StudyMemoryObservation,
+	StudyMemorySubject,
+	StudyMemoryTerminal,
+} from './types.js'
+import { canonicalStringify, isArray, isObject, isRecord } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
 import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
 
@@ -21,6 +29,91 @@ export function readStudyMemoryError(error: unknown, subject: StudyMemorySubject
 		message: error.message,
 		role: 'agent',
 	})
+}
+
+/** Reads the passive observation switches from generic driver settings without asserting their shape. @param settings - Optional profile settings. @returns Disabled observation unless `observe` is exactly true; selected goal ids only while enabled. */
+export function readStudyMemorySettings(
+	settings: StudyProfile['settings'],
+): StudyMemoryObservation {
+	const observe = settings?.observe === true
+	const selected: unknown = settings?.checkpoints
+	return {
+		observe,
+		checkpoints: new Set(
+			observe && isArray(selected)
+				? selected.filter((entry): entry is string => typeof entry === 'string')
+				: [],
+		),
+	}
+}
+
+/** Reads the pinned serving digest of an admitted request. @param profile - Runtime profile with the required digests. @param request - Admitted dispatch. @returns The pinned digest, or null for an inventory request. */
+export function readStudyMemoryDigest(
+	profile: StudyProfile,
+	request: StudyMemoryRequest,
+): string | null {
+	const provider = profile.provider
+	if (provider === undefined) return null
+	if (request.role === 'judge') return provider.digest.judge
+	if (request.role !== 'metadata') return provider.digest.model
+	if (request.model === provider.model) return provider.digest.model
+	return request.model === provider.judge ? provider.digest.judge : null
+}
+
+/** Extracts daemon timing from a validated terminal row without letting an observation fail the request. @param extract - Admitted extractor. @param record - Validated terminal row. @returns The raw timing, or undefined when absent or the extractor refuses. */
+export function readStudyMemoryTiming(
+	extract: StudyMemoryProvider['extractTiming'],
+	record: Readonly<Record<string, unknown>>,
+): OllamaTiming | undefined {
+	try {
+		return extract(record)
+	} catch {
+		return undefined
+	}
+}
+
+/** Builds the JSON evidence form of a timing observation, keeping raw nanoseconds and counts. @param timing - Extracted timing. @returns Null when no terminal timing was observed, else unknown fields as null. */
+export function buildStudyMemoryTiming(timing: OllamaTiming | undefined): JSONValue {
+	if (timing === undefined) return null
+	return {
+		durations: {
+			total: timing.durations.total ?? null,
+			load: timing.durations.load ?? null,
+			prompt: timing.durations.prompt ?? null,
+			decode: timing.durations.decode ?? null,
+		},
+		counts: {
+			prompt: timing.counts.prompt ?? null,
+			decode: timing.counts.decode ?? null,
+			cached: timing.counts.cached ?? null,
+		},
+		invalid: [...timing.invalid],
+	}
+}
+
+/** Builds the JSON evidence form of a Ledger result's logical classifier readings. @param result - Value returned by the Ledger. @returns Null when the result carries no readings array, else one entry per well-formed reading in asking order. */
+export function buildStudyMemoryReadings(result: unknown): JSONValue {
+	if (!isObject(result) || !('readings' in result) || !isArray(result.readings)) return null
+	const readings: JSONValue[] = []
+	for (const entry of result.readings) {
+		if (
+			!isObject(entry) ||
+			!('key' in entry) ||
+			typeof entry.key !== 'string' ||
+			!('phase' in entry) ||
+			typeof entry.phase !== 'string' ||
+			!('outcome' in entry) ||
+			typeof entry.outcome !== 'string'
+		)
+			continue
+		readings.push({
+			key: entry.key,
+			phase: entry.phase,
+			outcome: entry.outcome,
+			duration: 'duration' in entry && typeof entry.duration === 'number' ? entry.duration : null,
+		})
+	}
+	return readings
 }
 
 /** Checks finite room, required immutable serving identities and well-formed driver settings. @param profile - Runtime profile. @returns Nothing when admitted. */

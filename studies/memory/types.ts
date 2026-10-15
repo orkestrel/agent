@@ -13,15 +13,17 @@ import type {
 	ProviderRequest,
 	JudgeInterface,
 } from '@orkestrel/agent'
+import type { JSONValue } from '@orkestrel/contract'
+import type { OllamaTiming } from '@orkestrel/ollama'
 import type { StudyContext, StudyProfile, StudyRole, StudyTicket } from '@orkestrel/study'
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemorySettings {
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
-	/** Reserved for passive observation by a separate consumer; this driver does not read it. */
+	/** Enables passive request and classifier observations. */
 	readonly observe?: boolean | undefined
-	/** Names observation checkpoints and requires `observe: true`; this driver does not read it. */
+	/** Names observation checkpoints and requires `observe: true`. */
 	readonly checkpoints?: readonly string[] | undefined
 }
 
@@ -63,6 +65,14 @@ export interface StudyMemoryProvider {
 	readonly createOllamaJudge: (
 		options: StudyMemoryOllamaOptions & { readonly system: string },
 	) => JudgeInterface
+	readonly extractTiming: (record: Readonly<Record<string, unknown>>) => OllamaTiming | undefined
+}
+
+/** Holds the passive observation switches read from the generic profile settings. */
+export interface StudyMemoryObservation {
+	readonly observe: boolean
+	/** Holds the goal ids whose public view and exact request bodies are retained; empty unless observing. */
+	readonly checkpoints: ReadonlySet<string>
 }
 
 /** Holds validated runtime dependencies for a fresh trial. */
@@ -88,12 +98,18 @@ export interface StudyMemorySessionOptions {
 export interface StudyMemoryActivity {
 	readonly goal: string
 	readonly context: StudyContext
+	/** Holds the owned public view taken before a selected goal's arrivals; undefined retains neither it nor request bodies. */
+	readonly checkpoint: JSONValue | undefined
 }
 
 /** Holds the bounded transport's immutable configuration. */
 export interface StudyMemoryTransportOptions {
 	readonly profile: StudyProfile
 	readonly signal: AbortSignal
+	/** Adds passive timing and correlation fields to existing evidence when true. */
+	readonly observe: boolean
+	/** Extracts the daemon timing of a validated terminal record. */
+	readonly timing: StudyMemoryProvider['extractTiming']
 }
 
 /** Holds a validated response terminal's actual usage and finish reason. */
@@ -122,9 +138,15 @@ export interface StudyMemoryWire {
 	readonly reader: ReadableStreamDefaultReader<Uint8Array>
 	readonly decoder: TextDecoder
 	readonly started: number
+	/** Holds the trial-local request id. */
+	readonly id: number
+	/** Holds the monotonic millisecond reading taken immediately before native fetch. */
+	readonly sent: number
 	bytes: number
 	text: string
 	terminal: StudyMemoryTerminal | undefined
+	/** Holds the daemon timing of the terminal row once observed. */
+	timing: OllamaTiming | undefined
 	settled: boolean
 }
 

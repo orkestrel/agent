@@ -62,7 +62,7 @@ export function isStudyMemorySettings(value: unknown): value is StudyMemorySetti
 	})
 }
 
-/** Checks the admitted Ollama factory surface. @param value - Admitted namespace. @returns Whether both public factories exist. */
+/** Checks the admitted Ollama surface. @param value - Admitted namespace. @returns Whether both public factories and the timing extractor exist. */
 export function isStudyMemoryProvider(value: unknown): value is StudyMemoryProvider {
 	return holds(
 		() =>
@@ -70,7 +70,9 @@ export function isStudyMemoryProvider(value: unknown): value is StudyMemoryProvi
 			'createOllama' in value &&
 			typeof value.createOllama === 'function' &&
 			'createOllamaJudge' in value &&
-			typeof value.createOllamaJudge === 'function',
+			typeof value.createOllamaJudge === 'function' &&
+			'extractTiming' in value &&
+			typeof value.extractTiming === 'function',
 	)
 }
 

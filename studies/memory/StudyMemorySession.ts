@@ -15,7 +15,12 @@ import type {
 	StudyProduct,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyMemoryActivity, StudyMemoryInput, StudyMemorySessionOptions } from './types.js'
+import type {
+	StudyMemoryActivity,
+	StudyMemoryInput,
+	StudyMemorySessionOptions,
+	StudyMemoryObservation,
+} from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
@@ -26,7 +31,12 @@ import {
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
-import { readStudyMemoryError, readStudyMemoryGauge } from './helpers.js'
+import {
+	readStudyMemoryError,
+	readStudyMemoryGauge,
+	buildStudyMemoryReadings,
+	readStudyMemorySettings,
+} from './helpers.js'
 import { StudyMemoryTransport } from './StudyMemoryTransport.js'
 import { StudyMemoryJudge } from './StudyMemoryJudge.js'
 import { isStudyMemoryInput } from './validators.js'
@@ -36,6 +46,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #options: StudyMemorySessionOptions
 	readonly #transport: StudyMemoryTransport
 	readonly #tools: ToolManagerInterface
+	readonly #settings: StudyMemoryObservation
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
@@ -53,7 +64,13 @@ export class StudyMemorySession implements StudySessionInterface {
 			options.arm === 'compaction' ? readStudyMemoryGauge(options.profile.settings) : undefined
 		this.#options = options
 		this.#tools = createToolManager()
-		this.#transport = new StudyMemoryTransport({ profile: options.profile, signal: options.signal })
+		this.#settings = readStudyMemorySettings(options.profile.settings)
+		this.#transport = new StudyMemoryTransport({
+			profile: options.profile,
+			signal: options.signal,
+			observe: this.#settings.observe,
+			timing: options.provider.extractTiming,
+		})
 		const settings = options.profile.provider
 		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 		const room = options.profile.room
@@ -186,8 +203,9 @@ export class StudyMemorySession implements StudySessionInterface {
 		input: StudyMemoryInput,
 		context: StudyContext,
 	): Promise<StudyProduct> {
-		this.#transport.prepare({ goal, context })
-		this.#active = { goal, context }
+		const activity = { goal, context, checkpoint: this.#checkpoint(goal, input) }
+		this.#transport.prepare(activity)
+		this.#active = activity
 		this.#trace = []
 		try {
 			await this.#transport.verify()
@@ -233,6 +251,9 @@ export class StudyMemorySession implements StudySessionInterface {
 					content: result.content,
 					partial: result.partial,
 					conversation: this.#conversation.id,
+					...(this.#settings.observe && this.#ledger !== undefined
+						? { readings: buildStudyMemoryReadings(result) }
+						: {}),
 				},
 			})
 			this.#transport.check()
@@ -255,6 +276,19 @@ export class StudyMemorySession implements StudySessionInterface {
 		const translated = readStudyMemoryError(error, this.#options.subject)
 		this.#transport.fail(translated)
 		return translated
+	}
+
+	#checkpoint(goal: string, input: StudyMemoryInput): JSONValue | undefined {
+		if (!this.#settings.observe || !this.#settings.checkpoints.has(goal)) return undefined
+		const value: unknown = {
+			conversation: this.#conversation.snapshot(),
+			records: [...this.#records.values()],
+			arrivals: [...this.#arrivals],
+			gauge: this.#ledger?.gauge ?? null,
+			input,
+		}
+		if (!isJSONValue(value)) throw new StudyError('FAULT', 'Checkpoint is not JSON')
+		return cloneJSONValue(value)
 	}
 
 	async #lookup(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {

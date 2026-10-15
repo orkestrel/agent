@@ -1,5 +1,12 @@
 import type { JSONValue } from '@orkestrel/contract'
-import type { StudyContext, StudyEvidence, StudyProfile } from '@orkestrel/study'
+import type {
+	StudyContext,
+	StudyEvidence,
+	StudyGoal,
+	StudyProduct,
+	StudyProfile,
+	StudyRole,
+} from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
 
 /** Holds one copied package selection in the installed fixture closure. */
@@ -47,8 +54,10 @@ export interface MemoryProfileFixture {
 	readonly room?: Partial<StudyProfile['room']>
 	/** Supplies driver-owned settings verbatim; omission and `undefined` both emit an absent profile setting. */
 	readonly settings?: StudyProfile['settings']
+	/** Overrides the per-request deadline in milliseconds. */
+	readonly duration?: number
 }
-/** Holds an inert model reply fixture. */
+/** Holds an inert model reply fixture; `timing` adds raw daemon fields to the terminal row. */
 export interface MemoryReplyFixture {
 	readonly content?: string
 	readonly reason?: string
@@ -56,4 +65,33 @@ export interface MemoryReplyFixture {
 	readonly completion?: number
 	readonly unknown?: boolean
 	readonly calls?: readonly JSONValue[]
+	readonly timing?: Readonly<Record<string, JSONValue>>
 }
+/** Holds one finished request's comparable measurements without its real elapsed clock. */
+export interface MemoryUsageFixture {
+	readonly role: StudyRole
+	readonly calls: number
+	readonly tokens: number | undefined
+	readonly bytes: number | undefined
+}
+/** Holds a real trial's inputs: queued protocol replies, ordered goals and optional driver settings. */
+export interface MemoryTrialFixture {
+	readonly arm: 'records' | 'compaction' | 'full'
+	readonly responses: readonly MemoryWireFixture[]
+	readonly goals: readonly StudyGoal[]
+	readonly settings?: Readonly<Record<string, JSONValue>>
+	readonly duration?: number
+}
+/** Holds what a real trial sent, admitted, retained and returned. */
+export interface MemoryTrialResult {
+	readonly requests: readonly { readonly path: string; readonly body: string }[]
+	readonly products: readonly StudyProduct[]
+	readonly failure: string | undefined
+	readonly usage: readonly MemoryUsageFixture[]
+	readonly evidence: readonly StudyEvidence[]
+}
+/** Holds the observation-independent subset two trials must agree on. */
+export type MemoryAdmissionFixture = Pick<
+	MemoryTrialResult,
+	'requests' | 'products' | 'failure' | 'usage'
+>

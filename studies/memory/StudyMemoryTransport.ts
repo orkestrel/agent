@@ -1,10 +1,20 @@
+import type { JSONValue } from '@orkestrel/contract'
 import type { StudyRole } from '@orkestrel/study'
-import type { StudyMemoryActivity, StudyMemoryTransportOptions, StudyMemoryWire } from './types.js'
+import type {
+	StudyMemoryActivity,
+	StudyMemoryRequest,
+	StudyMemoryTransportOptions,
+	StudyMemoryWire,
+} from './types.js'
+import { isRecord } from '@orkestrel/contract'
 import { StudyError, readStudyFailure } from '@orkestrel/study'
 import {
+	buildStudyMemoryTiming,
+	readStudyMemoryDigest,
 	readStudyMemoryRequest,
 	readStudyMemorySupport,
 	readStudyMemoryTerminal,
+	readStudyMemoryTiming,
 	validateStudyMemoryInventory,
 	validateStudyMemoryCompletion,
 } from './helpers.js'
@@ -16,6 +26,9 @@ export class StudyMemoryTransport {
 	readonly #wires = new Set<StudyMemoryWire>()
 	#activity: StudyMemoryActivity | undefined
 	#fault: unknown
+	#count = 0
+	#previous: string | undefined
+	#attached = false
 
 	/** Records immutable transport bounds. @param options - Profile and trial signal. */
 	constructor(options: StudyMemoryTransportOptions) {
@@ -28,6 +41,7 @@ export class StudyMemoryTransport {
 		if (this.#wires.size !== 0)
 			throw new StudyError('FAULT', 'Previous model response is still open')
 		this.#activity = activity
+		this.#attached = false
 	}
 
 	/** Refuses work after any transport fault or trial cancellation. */
@@ -103,6 +117,7 @@ export class StudyMemoryTransport {
 						: this.#options.profile.room.context - this.#options.profile.room.safety,
 				bytes: bound.bytes,
 			})
+			const id = ++this.#count
 			const started = performance.now()
 			const signal = AbortSignal.any([
 				this.#options.signal,
@@ -124,9 +139,11 @@ export class StudyMemoryTransport {
 						model: request.model ?? null,
 						options: { ...request.options },
 						bytes: request.bytes,
+						...(this.#options.observe ? this.#dispatch(activity, request, id, init) : {}),
 					},
 				})
 				signal.throwIfAborted()
+				const sent = performance.now()
 				const response = await globalThis.fetch(input, { ...init, signal, redirect: 'error' })
 				if (!response.ok || response.body === null) {
 					await response.body?.cancel()
@@ -140,9 +157,12 @@ export class StudyMemoryTransport {
 					reader: response.body.getReader(),
 					decoder: new TextDecoder('utf-8', { fatal: true }),
 					started,
+					id,
+					sent,
 					bytes: request.bytes,
 					text: '',
 					terminal: undefined,
+					timing: undefined,
 					settled: false,
 				}
 				this.#wires.add(wire)
@@ -206,9 +226,11 @@ export class StudyMemoryTransport {
 				if (wire.request.path === '/api/tags')
 					validateStudyMemoryInventory(JSON.parse(wire.text), this.#options.profile)
 				else readStudyMemorySupport(JSON.parse(wire.text), this.#options.profile)
-			} else if (wire.request.role === 'judge')
-				wire.terminal = readStudyMemoryTerminal(JSON.parse(wire.text), wire.request)
-			else this.#rows(wire, true)
+			} else if (wire.request.role === 'judge') {
+				const row: unknown = JSON.parse(wire.text)
+				wire.terminal = readStudyMemoryTerminal(row, wire.request)
+				this.#time(wire, row)
+			} else this.#rows(wire, true)
 			if (wire.request.role !== 'metadata' && wire.terminal === undefined)
 				throw new StudyError('FAULT', 'Ollama response has no terminal row')
 			await this.#finish(wire)
@@ -229,13 +251,55 @@ export class StudyMemoryTransport {
 			if (line.trim() === '') continue
 			if (wire.terminal !== undefined)
 				throw new StudyError('FAULT', 'Ollama emitted a row after its terminal')
-			wire.terminal = readStudyMemoryTerminal(JSON.parse(line), wire.request)
+			const row: unknown = JSON.parse(line)
+			wire.terminal = readStudyMemoryTerminal(row, wire.request)
+			this.#time(wire, row)
+		}
+	}
+
+	#time(wire: StudyMemoryWire, row: unknown): void {
+		if (this.#options.observe && wire.terminal !== undefined && isRecord(row))
+			wire.timing = readStudyMemoryTiming(this.#options.timing, row)
+	}
+
+	#dispatch(
+		activity: StudyMemoryActivity,
+		request: StudyMemoryRequest,
+		id: number,
+		init: RequestInit | undefined,
+	): Readonly<Record<string, JSONValue>> {
+		const previous = this.#previous
+		const model = request.role !== 'metadata'
+		if (model) this.#previous = request.model
+		const snapshot = activity.checkpoint !== undefined && !this.#attached
+		if (snapshot) this.#attached = true
+		return {
+			id,
+			digest: readStudyMemoryDigest(this.#options.profile, request),
+			previous: previous ?? null,
+			changed: model && previous !== undefined && previous !== request.model,
+			...(activity.checkpoint === undefined
+				? {}
+				: { body: typeof init?.body === 'string' ? init.body : null }),
+			...(snapshot && activity.checkpoint !== undefined ? { snapshot: activity.checkpoint } : {}),
+		}
+	}
+
+	#timeline(wire: StudyMemoryWire): Readonly<Record<string, JSONValue>> {
+		return {
+			id: wire.id,
+			started: wire.started,
+			sent: wire.sent,
+			elapsed: performance.now() - wire.sent,
 		}
 	}
 
 	async #finish(wire: StudyMemoryWire): Promise<void> {
 		if (wire.settled) throw new StudyError('FAULT', 'Duplicate wire accounting')
 		const terminal = wire.terminal
+		const observation = this.#options.observe
+			? { ...this.#timeline(wire), timing: buildStudyMemoryTiming(wire.timing) }
+			: {}
 		await wire.activity.context.evidence.append({
 			event: 'wire',
 			goal: wire.activity.goal,
@@ -248,6 +312,7 @@ export class StudyMemoryTransport {
 				prompt: terminal?.prompt ?? null,
 				completion: terminal?.completion ?? null,
 				bytes: wire.bytes,
+				...observation,
 			},
 		})
 		wire.settled = true
@@ -274,13 +339,19 @@ export class StudyMemoryTransport {
 		if (wire === undefined || wire.settled) return
 		this.fail(error ?? new StudyError('FAULT', 'Ollama response cancelled before EOF'))
 		wire.settled = true
+		const observation = this.#options.observe ? this.#timeline(wire) : {}
 		try {
 			if (!wire.ticket.signal.aborted)
 				wire.ticket.fail({ ...readStudyFailure(this.#fault), role: wire.request.role })
 			await wire.activity.context.evidence.append({
 				event: 'wire-failure',
 				goal: wire.activity.goal,
-				value: { role: wire.request.role, path: wire.request.path, bytes: wire.bytes },
+				value: {
+					role: wire.request.role,
+					path: wire.request.path,
+					bytes: wire.bytes,
+					...observation,
+				},
 			})
 		} finally {
 			this.#wires.delete(wire)

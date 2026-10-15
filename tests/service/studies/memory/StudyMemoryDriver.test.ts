@@ -1,19 +1,39 @@
+import type { MemoryTrialFixture } from './types.js'
 import { describe, expect, it, vi } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { readStudyFailure, StudyError, validateStudyInputs } from '@orkestrel/study'
 import { StudyMemoryDriver } from '../../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemoryObservationGoals,
+	buildMemoryObservationResponses,
 	buildMemoryProfile,
 	buildMemoryReply,
 	createMemoryContext,
 	createMemoryServer,
+	listMemoryKeys,
 	loadMemoryInputs,
+	readMemoryAdmission,
+	readMemoryEvents,
+	readMemoryModels,
+	readMemoryShapes,
+	readMemorySnapshot,
+	readMemoryTimeline,
 	readMemoryToolResults,
+	runMemoryTrial,
+	totalMemoryUsage,
+	STUDY_MEMORY_DISABLED_SETTINGS,
+	STUDY_MEMORY_EVENT_KEYS,
 	STUDY_MEMORY_MODULES,
+	STUDY_MEMORY_OBSERVATION_GOALS,
+	STUDY_MEMORY_OBSERVED_KEYS,
+	STUDY_MEMORY_OBSERVED_SETTINGS,
+	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_RELEASE_GOALS,
 	STUDY_MEMORY_SETTINGS,
 	WINDOW_GOAL,
+	STUDY_MEMORY_TIMING,
+	STUDY_MEMORY_TIMING_CASES,
 } from '../../../setupService.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
@@ -1066,5 +1086,422 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			fixture.close()
 			await server.close()
 		}
+	})
+})
+
+describe('passive observation of actual memory requests', () => {
+	const goals = STUDY_MEMORY_OBSERVATION_GOALS
+	const base: MemoryTrialFixture = {
+		arm: 'full',
+		responses: buildMemoryObservationResponses(STUDY_MEMORY_TIMING),
+		goals,
+	}
+
+	it('keeps requests, products and admission identical with observation off and on, and fails on a changed byte', async () => {
+		const off = await runMemoryTrial(base)
+		const control = await runMemoryTrial(base)
+		const on = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_OBSERVED_SETTINGS })
+		const changed = await runMemoryTrial({
+			...base,
+			goals: buildMemoryObservationGoals('Look up order-2'),
+			settings: STUDY_MEMORY_OBSERVED_SETTINGS,
+		})
+		expect(off.failure).toBeUndefined()
+		expect(off.products.map((product) => product.value)).toEqual([
+			{ content: 'Initial handoff' },
+			{ content: 'Corrected handoff' },
+			{ content: 'Closed handoff' },
+		])
+		expect(off.requests.filter((request) => request.path === '/api/chat')).toHaveLength(4)
+		expect(off.usage.filter((row) => row.role === 'tool')).toHaveLength(1)
+		expect(readMemoryAdmission(control)).toEqual(readMemoryAdmission(off))
+		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+		expect(on.evidence.map((row) => [row.event, row.goal])).toEqual(
+			off.evidence.map((row) => [row.event, row.goal]),
+		)
+		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
+		expect(changed.requests.map((request) => request.body)).not.toEqual(
+			off.requests.map((request) => request.body),
+		)
+	})
+
+	it('keeps the failure outcome and admission identical when a malformed terminal fails the request', async () => {
+		const failing: MemoryTrialFixture = {
+			arm: 'full',
+			responses: [
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({ completion: -1, timing: STUDY_MEMORY_TIMING }),
+				},
+			],
+			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+		}
+		const off = await runMemoryTrial(failing)
+		const on = await runMemoryTrial({ ...failing, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		expect(off.failure).toBeDefined()
+		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+		const [disabled] = readMemoryEvents(off.evidence, 'wire-failure')
+		const [observed] = readMemoryEvents(on.evidence, 'wire-failure')
+		expect(Object.keys(disabled ?? {}).sort()).toEqual(STUDY_MEMORY_EVENT_KEYS['wire-failure'])
+		expect(Object.keys(observed ?? {}).sort()).toEqual(
+			listMemoryKeys(
+				STUDY_MEMORY_EVENT_KEYS['wire-failure'],
+				STUDY_MEMORY_OBSERVED_KEYS['wire-failure'],
+			),
+		)
+	})
+
+	it.each(STUDY_MEMORY_DISABLED_SETTINGS)(
+		'leaves existing events unchanged for $name settings',
+		async ({ settings }) => {
+			const result = await runMemoryTrial({
+				...base,
+				...(settings === undefined ? {} : { settings }),
+			})
+			const events: readonly ('dispatch' | 'wire')[] = ['dispatch', 'wire']
+			for (const event of events) {
+				const keys = readMemoryEvents(result.evidence, event).map((value) =>
+					Object.keys(value).sort(),
+				)
+				expect(keys.length).toBeGreaterThan(0)
+				expect(keys).toEqual(keys.map(() => STUDY_MEMORY_EVENT_KEYS[event]))
+			}
+			expect(
+				readMemoryEvents(result.evidence, 'result').map((value) => Object.keys(value).sort()),
+			).toEqual(goals.map(() => ['content', 'conversation', 'partial']))
+		},
+	)
+
+	it('adds only the declared keys to existing events and keeps bodies and the snapshot to selected goals', async () => {
+		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_OBSERVED_SETTINGS })
+		const rows = result.evidence.filter((row) => row.event === 'dispatch' || row.event === 'wire')
+		const selected = new Set(STUDY_MEMORY_OBSERVED_SETTINGS.checkpoints)
+		const carried = new Set<string>()
+		const expected = rows.map((row) => {
+			const extra: string[] = []
+			if (row.event === 'dispatch' && selected.has(row.goal)) {
+				extra.push('body')
+				if (!carried.has(row.goal)) {
+					carried.add(row.goal)
+					extra.push('snapshot')
+				}
+			}
+			return row.event === 'dispatch'
+				? listMemoryKeys(
+						STUDY_MEMORY_EVENT_KEYS.dispatch,
+						STUDY_MEMORY_OBSERVED_KEYS.dispatch,
+						extra,
+					)
+				: listMemoryKeys(STUDY_MEMORY_EVENT_KEYS.wire, STUDY_MEMORY_OBSERVED_KEYS.wire, extra)
+		})
+		expect(rows.map((row) => (isRecord(row.value) ? Object.keys(row.value).sort() : []))).toEqual(
+			expected,
+		)
+		expect([...carried]).toEqual(['opening', 'closure'])
+		expect(rows.some((row) => row.event === 'dispatch' && row.goal === 'correction')).toBe(true)
+	})
+
+	it('correlates trial-local ids, pinned digests and a monotonic timeline across dispatch and wire rows', async () => {
+		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		const dispatches = readMemoryEvents(result.evidence, 'dispatch')
+		const wires = readMemoryEvents(result.evidence, 'wire')
+		expect(dispatches).toHaveLength(result.requests.length)
+		expect(dispatches.map((value) => value.id)).toEqual(
+			Array.from({ length: dispatches.length }, (_, index) => index + 1),
+		)
+		expect(wires.map((value) => value.id)).toEqual(dispatches.map((value) => value.id))
+		expect(wires.map((value) => [value.role, value.path, value.model])).toEqual(
+			dispatches.map((value) => [value.role, value.path, value.model]),
+		)
+		expect(dispatches.map((value) => value.path)).toEqual(
+			result.requests.map((entry) => entry.path),
+		)
+		expect(dispatches.map((value) => value.digest)).toEqual(
+			result.requests.map((entry) => {
+				if (entry.path === '/api/tags') return null
+				if (entry.path === '/api/chat') return 'a'.repeat(64)
+				const body = parseJSON(entry.body)
+				return isRecord(body) && body.model === 'judge' ? 'b'.repeat(64) : 'a'.repeat(64)
+			}),
+		)
+		const timeline = readMemoryTimeline(wires)
+		expect(timeline.every((row) => row.sent >= row.started && row.elapsed >= 0)).toBe(true)
+		expect(
+			timeline.slice(1).every((row, index) => {
+				const prior = timeline[index]
+				return prior !== undefined && row.sent >= prior.sent + prior.elapsed - 1e-6
+			}),
+		).toBe(true)
+	})
+
+	it('records the previous model across metadata and a model switch, first request included', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: [],
+			goals: [
+				{
+					id: 'opening',
+					input: {
+						prompt: 'State the current order count',
+						arrivals: [{ id: 'source', content: 'The order count is two.' }],
+						records: [],
+					},
+				},
+			],
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const models = readMemoryModels(result.requests)
+		expect(new Set(models)).toEqual(new Set(['model', 'judge']))
+		const dispatches = readMemoryEvents(result.evidence, 'dispatch')
+		expect(
+			dispatches.filter((value) => value.role !== 'metadata').map((value) => value.model),
+		).toEqual(models)
+		const expected: unknown[] = []
+		let previous: string | null = null
+		let cursor = 0
+		for (const value of dispatches) {
+			const model = value.role === 'metadata' ? undefined : models[cursor]
+			expected.push([previous, model !== undefined && previous !== null && previous !== model])
+			if (model !== undefined) {
+				previous = model
+				cursor += 1
+			}
+		}
+		expect(dispatches.map((value) => [value.previous, value.changed])).toEqual(expected)
+		const generated = dispatches.filter((value) => value.role !== 'metadata')
+		expect(generated[0]).toMatchObject({ previous: null, changed: false })
+		expect(generated.some((value) => value.changed === true)).toBe(true)
+		expect(
+			dispatches
+				.filter((value) => value.role === 'metadata')
+				.every((value) => value.changed === false),
+		).toBe(true)
+		expect(dispatches[0]?.previous).toBeNull()
+	})
+
+	it('retains exact request bodies only for selected goals, in request order', async () => {
+		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_OBSERVED_SETTINGS })
+		const rows = result.evidence.filter((row) => row.event === 'dispatch')
+		expect(rows).toHaveLength(result.requests.length)
+		const selected = new Set(STUDY_MEMORY_OBSERVED_SETTINGS.checkpoints)
+		const captured = rows.map((row) =>
+			isRecord(row.value) && 'body' in row.value ? row.value.body : undefined,
+		)
+		expect(captured).toEqual(
+			rows.map((row, index) => {
+				const request = result.requests[index]
+				if (!selected.has(row.goal)) return undefined
+				return request?.path === '/api/tags' ? null : request?.body
+			}),
+		)
+		const chats = result.requests.filter((request) => request.path === '/api/chat')
+		const opening = rows
+			.filter(
+				(row) => row.goal === 'opening' && isRecord(row.value) && row.value.path === '/api/chat',
+			)
+			.map((row) => (isRecord(row.value) ? row.value.body : undefined))
+		expect(opening).toEqual(chats.slice(0, 2).map((request) => request.body))
+		expect(captured.some((body) => body === undefined)).toBe(true)
+		expect(captured.some((body) => typeof body === 'string')).toBe(true)
+	})
+
+	it('attaches an owned pre-arrival snapshot once to the first dispatch of a selected goal', async () => {
+		const result = await runMemoryTrial({
+			...base,
+			settings: { observe: true, checkpoints: ['correction'] },
+		})
+		const carriers = result.evidence.filter((row) => isRecord(row.value) && 'snapshot' in row.value)
+		expect(carriers).toHaveLength(1)
+		const first = result.evidence.find((row) => row.goal === 'correction')
+		expect(first).toBe(carriers[0])
+		expect(first?.event).toBe('dispatch')
+		const snapshot = readMemorySnapshot(result.evidence, 'correction')
+		expect(snapshot.arrivals).toEqual(['source-1'])
+		expect(snapshot.records).toEqual([
+			{ id: 'order-1', name: 'Owner', content: 'Confirmed reference' },
+		])
+		expect(snapshot.gauge).toBeNull()
+		expect(snapshot.input).toEqual(goals[1]?.input)
+		expect(snapshot.input).not.toBe(goals[1]?.input)
+		const view = JSON.stringify(snapshot.conversation)
+		expect(view).toContain('Count was three.')
+		expect(view).toContain('Confirmed reference')
+		expect(view).toContain('Initial handoff')
+		expect(view).not.toContain('Correction: count is two.')
+		expect(result.requests.filter((request) => request.path === '/api/chat').at(2)?.body).toContain(
+			'Correction: count is two.',
+		)
+		expect(JSON.stringify(snapshot)).not.toContain('Correction: count is two.')
+		expect(parseJSON(JSON.stringify(snapshot))).toEqual(snapshot)
+	})
+
+	it('retains the snapshot of a selected goal whose model later fails', async () => {
+		const result = await runMemoryTrial({
+			arm: 'full',
+			responses: [{ path: '/api/chat', body: buildMemoryReply({ reason: 'length' }) }],
+			goals,
+			settings: { observe: true, checkpoints: ['opening'] },
+		})
+		expect(result.failure).toBeDefined()
+		expect(readMemorySnapshot(result.evidence, 'opening').input).toEqual(goals[0]?.input)
+		expect(
+			result.evidence.filter((row) => isRecord(row.value) && 'snapshot' in row.value),
+		).toHaveLength(1)
+	})
+
+	it.each(STUDY_MEMORY_TIMING_CASES)(
+		'retains $name terminal timing for every response without changing the product',
+		async ({ timing, expected }) => {
+			const responses = buildMemoryObservationResponses(timing)
+			const off = await runMemoryTrial({ ...base, responses })
+			const on = await runMemoryTrial({
+				...base,
+				responses,
+				settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+			})
+			expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+			const wires = readMemoryEvents(on.evidence, 'wire')
+			const chats = wires.filter((value) => value.role === 'agent')
+			expect(chats).toHaveLength(4)
+			expect(chats.map((value) => value.timing)).toEqual(chats.map(() => expected))
+			const metadata = wires.filter((value) => value.role === 'metadata')
+			expect(metadata.length).toBeGreaterThan(0)
+			expect(metadata.map((value) => value.timing)).toEqual(metadata.map(() => null))
+		},
+	)
+
+	it('keeps unknown counts null instead of inventing zero', async () => {
+		const result = await runMemoryTrial({
+			arm: 'full',
+			responses: [{ path: '/api/chat', body: buildMemoryReply({ unknown: true }) }],
+			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		expect(
+			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'agent')?.timing,
+		).toEqual({
+			durations: { total: null, load: null, prompt: null, decode: null },
+			counts: { prompt: null, decode: null, cached: null },
+			invalid: [],
+		})
+	})
+
+	it('reports cancellation and a refused response truthfully without terminal timing', async () => {
+		const hung = await runMemoryTrial({
+			arm: 'full',
+			responses: [
+				{
+					path: '/api/chat',
+					body: `${JSON.stringify({ model: 'model', done: false, message: { content: 'partial' } })}\n`,
+					open: true,
+				},
+			],
+			goals,
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+			duration: 100,
+		})
+		expect(hung.failure).toBeDefined()
+		const [cancelled] = readMemoryEvents(hung.evidence, 'wire-failure')
+		expect(Object.keys(cancelled ?? {}).sort()).toEqual(
+			listMemoryKeys(
+				STUDY_MEMORY_EVENT_KEYS['wire-failure'],
+				STUDY_MEMORY_OBSERVED_KEYS['wire-failure'],
+			),
+		)
+		expect(cancelled?.elapsed).toBeGreaterThan(0)
+		const hungDispatch = readMemoryEvents(hung.evidence, 'dispatch').find(
+			(value) => value.role === 'agent',
+		)
+		expect(cancelled?.id).toBe(hungDispatch?.id)
+		expect(readMemoryEvents(hung.evidence, 'wire').map((value) => value.id)).not.toContain(
+			cancelled?.id,
+		)
+		const refused = await runMemoryTrial({
+			arm: 'full',
+			responses: [{ path: '/api/chat', body: 'Unavailable', status: 503 }],
+			goals,
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+		})
+		expect(refused.failure).toBeDefined()
+		const sent = readMemoryEvents(refused.evidence, 'dispatch').find(
+			(value) => value.role === 'agent',
+		)
+		expect(sent?.id).toBeDefined()
+		expect(readMemoryEvents(refused.evidence, 'wire').map((value) => value.id)).not.toContain(
+			sent?.id,
+		)
+		expect(readMemoryEvents(refused.evidence, 'wire-failure')).toEqual([])
+	})
+
+	it('attaches logical classifier readings and the calibrated gauge without leaking into requests or products', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: [],
+			goals: [
+				{
+					id: 'opening',
+					input: {
+						prompt: 'State the current order count',
+						arrivals: [{ id: 'source', content: 'The order count is two.' }],
+						records: [],
+					},
+				},
+				{
+					id: 'closure',
+					input: { prompt: 'Repeat the order count', arrivals: [], records: [] },
+				},
+			],
+		}
+		const off = await runMemoryTrial(trial)
+		const on = await runMemoryTrial({ ...trial, settings: STUDY_MEMORY_OBSERVED_SETTINGS })
+		expect(off.failure).toBeUndefined()
+		expect(on.failure).toBeUndefined()
+		expect(on.products).toEqual(off.products)
+		expect(on.requests.map((request) => request.path)).toEqual(
+			off.requests.map((request) => request.path),
+		)
+		expect(totalMemoryUsage(on.usage)).toEqual(totalMemoryUsage(off.usage))
+		expect(readMemoryEvents(off.evidence, 'result').map((value) => 'readings' in value)).toEqual([
+			false,
+			false,
+		])
+		const readings = readMemoryEvents(on.evidence, 'result').map((value) => value.readings)
+		expect(readings.every((entry) => Array.isArray(entry))).toBe(true)
+		const entries = readings.flatMap((entry) => (Array.isArray(entry) ? entry : []))
+		expect(entries.length).toBeGreaterThan(0)
+		expect(
+			entries.every(
+				(entry) =>
+					isRecord(entry) &&
+					typeof entry.key === 'string' &&
+					typeof entry.phase === 'string' &&
+					typeof entry.outcome === 'string' &&
+					(entry.duration === null || typeof entry.duration === 'number'),
+			),
+		).toBe(true)
+		expect(
+			on.products.map((product) => (isRecord(product.value) ? Object.keys(product.value) : [])),
+		).toEqual(on.products.map(() => ['content']))
+		const shapes = readMemoryShapes(on.requests)
+		expect(shapes).toEqual(readMemoryShapes(off.requests))
+		expect(shapes.map((shape) => shape.options)).toEqual(
+			shapes.map(() => ['num_ctx', 'num_predict', 'seed', 'temperature']),
+		)
+		const judges = readMemoryEvents(on.evidence, 'wire').filter((value) => value.role === 'judge')
+		expect(judges.length).toBeGreaterThan(0)
+		expect(judges.map((value) => value.timing)).toEqual(
+			judges.map(() => ({
+				durations: { total: null, load: null, prompt: null, decode: null },
+				counts: { prompt: 10, decode: 1, cached: null },
+				invalid: [],
+			})),
+		)
+		expect(readMemorySnapshot(on.evidence, 'opening').gauge).toBeNull()
+		expect(readMemorySnapshot(on.evidence, 'closure').gauge).toEqual({
+			scale: expect.any(Number),
+			overhead: expect.any(Number),
+		})
 	})
 })

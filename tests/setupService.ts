@@ -1,15 +1,19 @@
 import type {
+	MemoryAdmissionFixture,
 	MemoryContextFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryServerFixture,
+	MemoryTrialFixture,
+	MemoryTrialResult,
+	MemoryUsageFixture,
 	MemoryWireFixture,
 	StudyServiceFixture,
 	StudyServicePackage,
 	StudyServiceResult,
 } from './service/studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
-import type { StudyEvidence, StudyProfile } from '@orkestrel/study'
+import type { StudyEvidence, StudyGoal, StudyProduct, StudyProfile } from '@orkestrel/study'
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyToolsFixture } from './service/studies/tools/types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
@@ -25,6 +29,7 @@ import {
 	StudyScope,
 } from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
+import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as subject from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
@@ -417,7 +422,326 @@ export async function createMemoryServer(
 
 /** Builds inert protocol output consumed by the actual Ollama package. */
 export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
-	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }) })}\n`
+	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
+}
+
+/** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
+export const STUDY_MEMORY_TIMING = Object.freeze({
+	total_duration: 1234567890,
+	load_duration: 234567,
+	prompt_eval_duration: 345678,
+	eval_duration: 456789,
+	prompt_eval_cached_count: 3,
+})
+
+/** Pins the timing a default reply with STUDY_MEMORY_TIMING must yield, written independently of the extractor. */
+export const STUDY_MEMORY_TIMING_EXPECTED = Object.freeze({
+	durations: { total: 1234567890, load: 234567, prompt: 345678, decode: 456789 },
+	counts: { prompt: 10, decode: 2, cached: 3 },
+	invalid: [],
+})
+
+/** Pins timing fields that are present but not non-negative safe integers, valid as protocol rows. */
+export const STUDY_MEMORY_TIMING_INVALID = Object.freeze({
+	total_duration: -1,
+	load_duration: '5',
+	prompt_eval_duration: 1.5,
+})
+
+/** Pins the timing a default reply with STUDY_MEMORY_TIMING_INVALID must yield. */
+export const STUDY_MEMORY_TIMING_REFUSED = Object.freeze({
+	durations: { total: null, load: null, prompt: null, decode: null },
+	counts: { prompt: 10, decode: 2, cached: null },
+	invalid: ['total_duration', 'load_duration', 'prompt_eval_duration'],
+})
+
+/** Pins the event keys present with observation disabled. */
+export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
+	dispatch: Object.freeze(['bytes', 'model', 'options', 'path', 'role']),
+	wire: Object.freeze([
+		'bytes',
+		'completion',
+		'finish',
+		'model',
+		'options',
+		'path',
+		'prompt',
+		'role',
+	]),
+	'wire-failure': Object.freeze(['bytes', 'path', 'role']),
+})
+
+/** Pins the keys observation adds to each existing event, excluding selected-goal body and snapshot. */
+export const STUDY_MEMORY_OBSERVED_KEYS = Object.freeze({
+	dispatch: Object.freeze(['changed', 'digest', 'id', 'previous']),
+	wire: Object.freeze(['elapsed', 'id', 'sent', 'started', 'timing']),
+	'wire-failure': Object.freeze(['elapsed', 'id', 'sent', 'started']),
+})
+
+/** Pins the timing of a default reply whose terminal row carries no timing fields. */
+export const STUDY_MEMORY_TIMING_ABSENT = Object.freeze({
+	durations: { total: null, load: null, prompt: null, decode: null },
+	counts: { prompt: 10, decode: 2, cached: null },
+	invalid: [],
+})
+
+/** Pins the complete, invalid and absent timing replies with their independently written expectations. */
+export const STUDY_MEMORY_TIMING_CASES = Object.freeze([
+	Object.freeze({
+		name: 'complete',
+		timing: STUDY_MEMORY_TIMING,
+		expected: STUDY_MEMORY_TIMING_EXPECTED,
+	}),
+	Object.freeze({
+		name: 'invalid',
+		timing: STUDY_MEMORY_TIMING_INVALID,
+		expected: STUDY_MEMORY_TIMING_REFUSED,
+	}),
+	Object.freeze({ name: 'absent', timing: undefined, expected: STUDY_MEMORY_TIMING_ABSENT }),
+])
+
+/** Pins generic settings that must leave observation disabled. */
+export const STUDY_MEMORY_DISABLED_SETTINGS = Object.freeze([
+	Object.freeze({ name: 'absent', settings: undefined }),
+	Object.freeze({ name: 'false', settings: Object.freeze({ observe: false }) }),
+	Object.freeze({
+		name: 'checkpoints without observe',
+		settings: Object.freeze({ observe: false, checkpoints: Object.freeze(['opening']) }),
+	}),
+	Object.freeze({ name: 'string', settings: Object.freeze({ observe: 'true' }) }),
+	Object.freeze({
+		name: 'unrelated',
+		settings: Object.freeze({ checkpoints: Object.freeze(['opening']) }),
+	}),
+])
+
+/** Builds a three-goal trajectory with a lookup, a correction and a closing request.
+ * @param prompt - Opening request text; changing one byte must change every comparison that includes request bytes.
+ * @returns Ordered public goals.
+ */
+export function buildMemoryObservationGoals(prompt = 'Look up order-1'): readonly StudyGoal[] {
+	return Object.freeze([
+		Object.freeze({
+			id: 'opening',
+			input: Object.freeze({
+				prompt,
+				arrivals: Object.freeze([{ id: 'source-1', content: 'Count was three.' }]),
+				records: Object.freeze([{ id: 'order-1', name: 'Owner', content: 'Confirmed reference' }]),
+			}),
+		}),
+		Object.freeze({
+			id: 'correction',
+			input: Object.freeze({
+				prompt: 'Repair handoff',
+				arrivals: Object.freeze([{ id: 'source-2', content: 'Correction: count is two.' }]),
+				records: Object.freeze([]),
+			}),
+		}),
+		Object.freeze({
+			id: 'closure',
+			input: Object.freeze({ prompt: 'Close handoff', arrivals: [], records: [] }),
+		}),
+	])
+}
+
+/** Pins settings that observe every request and capture the opening and closing goals. */
+export const STUDY_MEMORY_OBSERVED_SETTINGS = Object.freeze({
+	observe: true,
+	checkpoints: Object.freeze(['opening', 'closure']),
+})
+
+/** Pins settings that observe without selecting a checkpoint goal. */
+export const STUDY_MEMORY_PASSIVE_SETTINGS = Object.freeze({ observe: true })
+
+/** Joins event key groups into one sorted list for exact key-set comparison.
+ * @param groups - Key groups to merge.
+ * @returns The sorted union of every group's keys.
+ */
+export function listMemoryKeys(...groups: readonly (readonly string[])[]): readonly string[] {
+	return [...new Set(groups.flat())].sort()
+}
+
+/** Pins the default observation trajectory. */
+export const STUDY_MEMORY_OBSERVATION_GOALS: readonly StudyGoal[] = buildMemoryObservationGoals()
+
+/** Builds the queued replies for the observation trajectory: one lookup call, then three final answers. */
+export function buildMemoryObservationResponses(
+	timing?: MemoryReplyFixture['timing'],
+): readonly MemoryWireFixture[] {
+	return [
+		{
+			path: '/api/chat',
+			body: buildMemoryReply({
+				content: '',
+				calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+				...(timing === undefined ? {} : { timing }),
+			}),
+		},
+		...['Initial handoff', 'Corrected handoff', 'Closed handoff'].map((content) => ({
+			path: '/api/chat',
+			body: buildMemoryReply({ content, ...(timing === undefined ? {} : { timing }) }),
+		})),
+	]
+}
+
+/** Runs a real driver session against a fresh protocol fixture and returns everything it sent, admitted and retained.
+ * @param options - Treatment, queued replies, ordered goals and optional driver settings.
+ * @returns Request bytes, products, the first failure, comparable usage and evidence rows.
+ */
+export async function runMemoryTrial(options: MemoryTrialFixture): Promise<MemoryTrialResult> {
+	const server = await createMemoryServer(options.responses)
+	const profile = buildMemoryProfile({
+		url: server.url,
+		...(options.settings === undefined ? {} : { settings: options.settings }),
+		...(options.duration === undefined ? {} : { duration: options.duration }),
+	})
+	const fixture = createMemoryContext(profile)
+	const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+		{ id: 'observation', scenario: 'public', arm: options.arm, repetition: 0 },
+		fixture.context.signal,
+	)
+	const products: StudyProduct[] = []
+	let failure: string | undefined
+	try {
+		for (const goal of options.goals) {
+			try {
+				products.push(await session.execute(goal, fixture.context))
+			} catch (error) {
+				failure = error instanceof Error ? error.message : String(error)
+				break
+			}
+		}
+		await session.close()
+		return {
+			requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+			products,
+			failure,
+			usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
+				role: row.role,
+				calls: row.calls,
+				tokens: row.tokens,
+				bytes: row.bytes,
+			})),
+			evidence: [...fixture.evidence],
+		}
+	} finally {
+		await session.close()
+		fixture.close()
+		await server.close()
+	}
+}
+
+/** Selects the subset of a trial two runs must share whether or not observation is enabled; real elapsed clocks are excluded.
+ * @param result - A finished trial.
+ * @returns Exact request bytes, products, failure outcome and per-request admission measurements.
+ */
+export function readMemoryAdmission(result: MemoryTrialResult): MemoryAdmissionFixture {
+	return {
+		requests: result.requests,
+		products: result.products,
+		failure: result.failure,
+		usage: result.usage,
+	}
+}
+
+/** Sums admitted calls and known tokens per role for comparisons that cannot assume request order.
+ * @param usage - Finished request measurements.
+ * @returns Calls and known tokens by role.
+ */
+export function totalMemoryUsage(
+	usage: readonly MemoryUsageFixture[],
+): Readonly<Record<string, { readonly calls: number; readonly tokens: number }>> {
+	const totals: Record<string, { readonly calls: number; readonly tokens: number }> = {}
+	for (const row of usage) {
+		const total = totals[row.role] ?? { calls: 0, tokens: 0 }
+		totals[row.role] = { calls: total.calls + row.calls, tokens: total.tokens + (row.tokens ?? 0) }
+	}
+	return totals
+}
+
+/** Reads the object values of one retained event kind in append order.
+ * @param evidence - Retained rows.
+ * @param event - Event name.
+ * @param goal - Optional goal restriction.
+ * @returns The event values.
+ */
+export function readMemoryEvents(
+	evidence: readonly StudyEvidence[],
+	event: string,
+	goal?: string,
+): readonly Readonly<Record<string, unknown>>[] {
+	return evidence
+		.filter((row) => row.event === event && (goal === undefined || row.goal === goal))
+		.map((row) => {
+			if (!isRecord(row.value)) throw new Error(`Evidence ${event} is not an object`)
+			return row.value
+		})
+}
+
+/** Reads the checkpoint snapshot carried by the first retained event of a goal.
+ * @param evidence - Retained rows.
+ * @param goal - Selected goal id.
+ * @returns The owned snapshot object.
+ */
+export function readMemorySnapshot(
+	evidence: readonly StudyEvidence[],
+	goal: string,
+): Readonly<Record<string, unknown>> {
+	const first = evidence.find((row) => row.goal === goal)
+	if (
+		first === undefined ||
+		first.event !== 'dispatch' ||
+		!isRecord(first.value) ||
+		!isRecord(first.value.snapshot)
+	)
+		throw new Error(`Missing ${goal} checkpoint snapshot`)
+	return first.value.snapshot
+}
+
+/** Reads the monotonic millisecond readings of wire rows, refusing a row without all three.
+ * @param wires - Retained wire event values.
+ * @returns Admission, send and elapsed readings in row order.
+ */
+export function readMemoryTimeline(
+	wires: readonly Readonly<Record<string, unknown>>[],
+): readonly { readonly started: number; readonly sent: number; readonly elapsed: number }[] {
+	return wires.map((wire) => {
+		const { started, sent, elapsed } = wire
+		if (typeof started !== 'number' || typeof sent !== 'number' || typeof elapsed !== 'number')
+			throw new Error('Missing wire timeline')
+		return { started, sent, elapsed }
+	})
+}
+
+/** Reads the top-level and option key sets of each recorded generation request from its exact wire bytes.
+ * @param requests - Recorded HTTP requests.
+ * @returns Sorted body and option keys for chat and generate requests in arrival order.
+ */
+export function readMemoryShapes(
+	requests: MemoryTrialResult['requests'],
+): readonly { readonly body: readonly string[]; readonly options: readonly string[] }[] {
+	return requests
+		.filter((request) => request.path === '/api/chat' || request.path === '/api/generate')
+		.map((request) => {
+			const body = parseJSON(request.body)
+			if (!isRecord(body) || !isRecord(body.options)) throw new Error('Invalid generation request')
+			return { body: Object.keys(body).sort(), options: Object.keys(body.options).sort() }
+		})
+}
+
+/** Reads the model name each recorded generation request carried, from its exact wire bytes.
+ * @param requests - Recorded HTTP requests.
+ * @returns Model names of chat and generate requests in arrival order.
+ */
+export function readMemoryModels(requests: MemoryTrialResult['requests']): readonly string[] {
+	return requests
+		.filter((request) => request.path === '/api/chat' || request.path === '/api/generate')
+		.map((request) => {
+			const body = parseJSON(request.body)
+			if (!isRecord(body) || typeof body.model !== 'string')
+				throw new Error('Invalid generation request')
+			return body.model
+		})
 }
 
 /** Builds a finite CPU-only profile with explicit fixture digests; `settings` is emitted exactly as supplied. */
@@ -444,7 +768,12 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 		},
 		room,
 		bounds: {
-			request: { duration: 2000, calls: 1, tokens: room.context - room.safety, bytes: 1048576 },
+			request: {
+				duration: options.duration ?? 2000,
+				calls: 1,
+				tokens: room.context - room.safety,
+				bytes: 1048576,
+			},
 			goal: { duration: 15000, calls: 256, tokens: 8388608, bytes: 268435456 },
 			trial: { duration: 30000, calls: 512, tokens: 16777216, bytes: 536870912 },
 			series: { duration: 60000, calls: 1024, tokens: 33554432, bytes: 1073741824 },
