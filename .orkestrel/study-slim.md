@@ -82,3 +82,59 @@ captures the existing offline consumer baseline before consumer edits. Preserve 
 request-byte, accounting, failure, cancellation, source-identity and evidence assertions; add
 focused owning proofs with negative controls. Run one integrated falsify round and the required
 gates. Do not turn this structural extraction into a new treatment or release.
+
+## Implementation and proof readings
+
+Study's extraction checkpoint is `b6b2fed`; Agent's isolated consumer checkpoint is
+`7018039`. These are implementation checkpoints, not acceptance. Agent root remains at
+`80b4016` pending review and final gates. All implementation used actual Sonnet through Claude
+CLI. Source units have closed. Shared helper, types and setup patches integrated serially.
+
+| Unit | Claude session | Uncapped duration |
+| --- | --- | ---: |
+| Trace and summary | `6d4efc77-910d-4888-ab47-515ec16f9c91` | 386789 ms |
+| Script | `dcf53844-caac-4deb-a78f-ff8d84092476` | 324633 ms |
+| Ollama projections | `25af8ca7-ede5-4a58-8e2b-d5e6819ad839` | 80744 ms |
+| Memory consumer | `8b06aab5-53f3-4a96-9573-2f982ddff45d` | 241350 ms |
+| Tools consumer | `826be7d4-d65f-4140-b893-c2b21b476ffa` | 120216 ms |
+| Guide and parity | `f556b284-f3bf-4427-940f-e6bf4b761bef` | 223719 ms |
+
+Successor units resumed Script for owned-call snapshots and workload-neutral bounds (60503 ms),
+then corrected enclosing test allowances while keeping request bounds and assertions (46085 ms).
+Trace resumed to integrate shared patches and remove an unused public getter (111325 ms).
+Tools resumed to restore the composed guard's totality and correct configuration diagnostics
+(53003 ms). Root's hostile Proxy probe failed before restoring Contract `holds` and passed after:
+one failed assertion at 1225 ms, one passed at 1483 ms. The assertion now lives in the consumer
+validator test. Root verified code directly; unresolved abbreviated report citations are not
+acceptance evidence.
+
+GPT-6 Luna executed mechanical host verification because Claude's allowed tools had no shell.
+The isolated Study installation uses accepted physical Agent, Ollama and MCP builds. An omitted
+MCP staging substitution initially produced `isMCPToolError is not a function`; root corrected
+only the development installation to accepted MCP `f9fffad`, preserving root installs. Isolated
+reruns of the failed integration and timeout files passed without changing tests or timeouts.
+The full server project then passed: 347 tests, exit 0, uncapped 66526 ms. Its deadline diagnostic
+comes from the existing launcher test that requires exit 124 at the public default duration.
+Build passed in 11179 ms; guide parity passed 13 tests in 4506 ms. TypeScript passed in 4249 ms;
+the owning suite passed 125 tests in 2595 ms, and setup passed 23 in 1056 ms.
+
+The resulting physical Study build was copied only to Agent's development proof installation.
+Agent's historical installed Study hash stayed unchanged. Consumer TypeScript passed in
+5375 ms; touched tests passed 26 tests in 6028 ms; the full service project passed 155
+tests in 62745 ms, against the pre-extraction 159-test baseline. Moved provider and helper
+assertions are now owned by Study. No workload assets changed.
+
+Root's offline negative controls reset the cross-goal ordinal, removed call cloning, moved the
+summary instruction to the front, and removed strict native fields. Each selected assertion
+failed under its mutation and passed after restoration. The control batch exited 0 uncapped in
+17066 ms. Controls establish those specific invariants, not all public lifecycle behavior.
+
+The measured Agent `studies/` source changed from 2595 lines / 97140 bytes to 2104 lines /
+80231 bytes. Non-TypeScript assets remained 461437 bytes. No performance claim follows from
+this source reduction.
+
+The final integrated falsify round is running read-only on actual Opus, with the same numbered
+claims and actual diffs in independent clean contexts. Design-fit session
+`2d254ccf-f4ba-4b64-a7e6-71bf93d5732c`; correctness session
+`95fa6ef9-7b2b-4e4c-be9c-e70fb8a054f6`. No further design round is authorized. Reproduce each
+substantiated finding, close its bounded repair, run final gates, then integrate the consumer.
