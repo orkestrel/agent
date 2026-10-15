@@ -1,11 +1,13 @@
 # Study package integration
 
-Study commit 065f2aa accepts explicit execution facts and removes Study-owned format counters
-and historical compatibility branches. Actual Sonnet implementation, independent Opus review,
-prescribed mutation proofs, and final gates closed that change: 604 tests passed with 2 explained
-applicability skips. Agent's installed Study copy remains unchanged for retained and successor
-series custody. No package version or dependency changed. Earlier installed-copy readings in
-this file remain historical; they do not describe the sibling checkout's revised contract.
+Study's shared instrumentation promotion is accepted at `019f5ce`, with Agent's consumer
+migration at `8a9087b` and MCP's owner repair at `b0e9d7f`. Actual Sonnet implementation,
+independent review including Opus, mutation controls and host gates closed the work. See
+[promotion acceptance](../../study/.orkestrel/promotion.md#acceptance) for the readings and
+the remaining unpublished Agent/Ollama API limitation. The separate Compaction qualification
+uses a physical captured runtime; [the series handoff](agent/handoff.md) owns its status.
+No version bump or publication occurred. Installed-copy readings below are historical;
+preserve the copies and captured builds that retained results still bind.
 
 The portable @orkestrel/study package is implemented in the sibling Study checkout. Its public runtime uses src/core, src/server and src/bin/main.ts. Agent owns the authored adapters and scenarios under studies/; results and scratch belong in the consuming checkout's tmp/studies/. The superseded private app code was removed at 8a14ac9. The abandoned scaffold root-axis proposal was restored and its verified historical files moved to Study. Do not resume either layout.
 
@@ -13,7 +15,7 @@ The contract is [Study's guide](../../study/guides/study.md). Research, design r
 
 Agent's `studies/memory/` and `studies/tools/` code drives the actual Agent package. Their scenarios, rubrics, declarations, and consumer proofs stay with Agent. The generic cross-package adapter proposal and migration record belong to Study's git history; they do not establish implemented adapters in sibling packages. Frozen historical benchmark custody stays in Agent until its absolute-path identities and retained proofs can be retired safely.
 
-The consumer migration to Study's promoted instrumentation selects the runtime and the tested subject separately. Each public profile declares `agent` beside `subject`, equal for these Agent studies, and the drivers construct the Agent from `options.agent` only. The memory driver takes the shared observer, judge and Ollama transport from Study and declares the exact wire policy of each role its arm dispatches: the summary role and strict native flags for Compaction, the one-token judge for Records, and neither for Full. Ledger and judge factories, the judge pin and the recap allowance are required only where the selected arm uses them. Grading runs through Study's `gradeStudyEvidence` with Agent's mechanical predicates, and tools ticket cleanup runs through `failStudyTicket`. Agent keeps the prompts, thresholds, provenance, checkpoints, lookup, summary policy and the whole-attempt operational predicate. The migration is unverified until the staged Study build runs its type, service and equivalence proofs. This installation stays unchanged.
+The consumer migration to Study's promoted instrumentation selects the runtime and the tested subject separately. Each public profile declares `agent` beside `subject`, equal for these Agent studies, and the drivers construct the Agent from `options.agent` only. The memory driver takes the shared observer, judge and Ollama transport from Study and declares the exact wire policy of each role its arm dispatches: the summary role and strict native flags for Compaction, the one-token judge for Records, and neither for Full. Ledger and judge factories, the judge pin and the recap allowance are required only where the selected arm uses them. Grading runs through Study's `gradeStudyEvidence` with Agent's mechanical predicates, and tools ticket cleanup runs through `failStudyTicket`. Agent keeps the prompts, thresholds, provenance, checkpoints, lookup, summary policy and the whole-attempt operational predicate. Staged consumer proofs and the promotion gates passed; the frozen root installation stays unchanged.
 
 The user authorizes needed Orkestrel dependencies without another permission request and requires their latest published versions. Non-Orkestrel additions still require explicit authorization. The final Fable allowance is consumed; never invoke it without new permission. Opus 5.5 remains authorized for subjective and adversarial work. No parallel GPU work.
 

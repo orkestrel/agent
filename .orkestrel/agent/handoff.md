@@ -30,12 +30,17 @@ The owned process and journal identities are:
 - Root launch receipt is `tmp/units/compaction-task-launch.json`; read progress metadata with
   `node tmp/units/compaction-task-progress.ts`.
 
-Sonnet is adapting `tmp/units/compaction-task-reader.ts` to require the instruction last as
-user, with source ids and provenance preceding it. Its prior full-horizon, correlation,
-nonempty/reducing/repeated-fold and deadline predicates remain binding. Run its selftest and
-pins before using it; never use the old instruction-first reader on this treatment. Public
-Study custody/grade/report remain separate terminal checks. No quality or speedup is accepted
-from progress metadata. Study's promotion and MCP repair are accepted; their records live in
+Sonnet's `tmp/units/compaction-task-reader.ts` adaptation is accepted. It requires the
+instruction once, last and as user, with source ids and provenance preceding it. Its prior
+full-horizon, correlation, nonempty/reducing/repeated-fold and deadline predicates remain
+binding. Strict standalone typechecking passed; selftest passed 53 controls and 25 rolling
+controls in 671 ms, and pins verified custody in 363 ms. Both commands exited 0 uncapped,
+read no live evidence and made no model calls. The reader SHA-256 is
+`4493b0c0b6f082c15bfa49600df3e47abc6cda489fb4bd1e60bb71f9184a2f00`.
+Use this reader only after the attempt seals; preserve the old reader for its earlier
+instruction-first treatment. Public Study custody/grade/report remain separate terminal
+checks. No quality or speedup is accepted from progress metadata. Study's promotion and MCP
+repair are accepted; their records live in
 Study's `.orkestrel/promotion.md`. MCP's root install was aligned to its accepted lockfile
 (Scaffold 0.0.101, npm ci exit 0, 8727 ms); no source changed or package was published.
 
@@ -45,7 +50,7 @@ The Compaction-only successor started at 19:05 UTC and stopped at goal 11, `ev-0
 10 complete products. Its summary returned an empty string. The content guard retained the
 attempted text, source ids and settled cost, then failed without retry. The remaining 85 goals
 are unexecuted, not independent model failures. Trial duration is 257249 ms; execute exited 1,
-uncapped, after 261007 ms. No generation is running.
+uncapped, after 261007 ms. This attempt is closed; the successor is recorded above.
 Records stays sealed and labeled at 96/96; never rerun or replay it for this campaign.
 
 Result `6ae6b4cc-833b-4227-9d27-ff57546ff54e` is sealed as
