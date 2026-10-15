@@ -1,4 +1,12 @@
-# Compaction recap-cap successor authorized on 2026-10-15
+# Production-compaction research changes the successor on 2026-10-15
+
+The user's comparability check withdrew the unlaunched sections:2 proposal. Read
+`rolling.md` for primary sources, the actual Opus opinion and the replacement decision:
+one-pass rolling text compaction over prior recap plus eligible live history. No successor
+has launched. Never execute the compaction-cap draft wrappers. Records and historical
+outputs remain immutable. Changed Agent core must build in isolation from captured runtimes.
+
+# Prior recap-cap authorization on 2026-10-15, superseded by the research decision
 
 The user authorized repairing the recap-growth policy and launching a separate Compaction-only
 treatment. The analyst unit compaction-cap-design selects a bounded use of the existing section
