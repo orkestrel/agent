@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { isStudyMemorySettings } from '../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
@@ -19,6 +20,8 @@ import {
 	readMemoryAdmission,
 	readMemoryEvents,
 	readMemoryModels,
+	readMemoryOrigins,
+	readMemoryParts,
 	readMemoryShapes,
 	readMemorySnapshot,
 	readMemoryStream,
@@ -32,7 +35,13 @@ import {
 	readMemoryToolResults,
 	runMemoryTrial,
 	totalMemoryUsage,
+	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_DISABLED_SETTINGS,
+	STUDY_MEMORY_ESTIMATE_KEYS,
+	STUDY_MEMORY_FOLD_ROOM,
+	STUDY_MEMORY_OBSERVED_EVENTS,
+	STUDY_MEMORY_OBSERVED_KEYS,
+	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_FIXED_PROJECTION,
 	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
@@ -243,6 +252,102 @@ describe('study service fixtures', () => {
 		expect(timed.every((row) => isRecord(row) && row.total_duration === 1234567890)).toBe(true)
 		expect(listMemoryKeys(['b', 'a'], ['c', 'a'], [])).toEqual(['a', 'b', 'c'])
 		expect(listMemoryKeys()).toEqual([])
+	})
+
+	it('pins the observed evidence vocabulary and reads context parts and origins strictly', () => {
+		expect(STUDY_MEMORY_OBSERVED_EVENTS).toEqual(['context', 'estimate', 'refusal'])
+		expect(STUDY_MEMORY_ESTIMATE_KEYS).toEqual(['dispatch', 'estimate', 'projected', 'revision'])
+		expect(STUDY_MEMORY_REFUSAL_KEYS).toEqual([
+			'cause',
+			'consumed',
+			'max',
+			'ordinal',
+			'revision',
+			'role',
+		])
+		expect([...STUDY_MEMORY_CONTEXT_KEYS].sort()).toEqual([...STUDY_MEMORY_CONTEXT_KEYS])
+		expect(STUDY_MEMORY_CONTEXT_KEYS).not.toContain('dispatch')
+		for (const event of ['dispatch', 'wire', 'wire-failure'] as const) {
+			expect(STUDY_MEMORY_OBSERVED_KEYS[event]).toEqual(
+				expect.arrayContaining(['canonical', 'revision']),
+			)
+			expect([...STUDY_MEMORY_OBSERVED_KEYS[event]].sort()).toEqual([
+				...STUDY_MEMORY_OBSERVED_KEYS[event],
+			])
+		}
+		const message = { content: 2, framing: 4, calls: 0, thinking: 1, images: 512 }
+		expect(readMemoryParts({ messages: [message, message], tools: 5, schema: 9 })).toEqual({
+			count: 2,
+			tools: 5,
+			schema: 9,
+			total: 2 * 519 + 14,
+		})
+		expect(readMemoryParts({ messages: [], tools: 0, schema: 0 })).toEqual({
+			count: 0,
+			tools: 0,
+			schema: 0,
+			total: 0,
+		})
+		for (const malformed of [
+			undefined,
+			[],
+			{ messages: 'none', tools: 0, schema: 0 },
+			{ messages: [], tools: '0', schema: 0 },
+			{ messages: [], tools: 0 },
+			{ messages: [7], tools: 0, schema: 0 },
+			{ messages: [{ ...message, images: '512' }], tools: 0, schema: 0 },
+		])
+			expect(() => readMemoryParts(malformed)).toThrow('Invalid context')
+		expect(
+			readMemoryOrigins([{ origin: 'arrival', source: 'source-1' }, { origin: 'tool' }]),
+		).toEqual([
+			{ origin: 'arrival', source: 'source-1' },
+			{ origin: 'tool', source: undefined },
+		])
+		expect(readMemoryOrigins([])).toEqual([])
+		for (const malformed of [undefined, {}, [7], [{ origin: 1 }], [{ origin: 'tool', source: 3 }]])
+			expect(() => readMemoryOrigins(malformed)).toThrow('Invalid')
+	})
+
+	it('builds the fold goal, keeps its room finite and lets a room reach a real trial', async () => {
+		const goals = buildMemoryFoldGoals()
+		expect(goals.map((goal) => goal.id)).toEqual(['opening'])
+		const input = goals[0]?.input
+		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid fold goal')
+		expect(input.arrivals).toHaveLength(8)
+		expect(
+			new Set(input.arrivals.map((arrival) => (isRecord(arrival) ? arrival.id : undefined))).size,
+		).toBe(8)
+		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).not.toBe(JSON.stringify(goals))
+		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).toContain('other. ')
+		const { context, output, safety, recap } = STUDY_MEMORY_FOLD_ROOM
+		expect(context).toBeGreaterThan(Math.max(output, recap) + safety)
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7', room: STUDY_MEMORY_FOLD_ROOM })
+		expect(profile.room).toMatchObject({ context: 1024, output: 128, safety: 128, recap: 64 })
+		const result = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+			room: STUDY_MEMORY_FOLD_ROOM,
+		})
+		expect(result.failure).toBeUndefined()
+		const body = parseJSON(
+			result.requests.find((request) => request.path === '/api/chat')?.body ?? '',
+		)
+		expect(body).toMatchObject({ options: { num_ctx: 1024, num_predict: 128 } })
+	})
+
+	it('hands the observer fixture each pre-encoding request beside its reading', async () => {
+		const server = await createMemoryServer()
+		try {
+			const { observer, readings, requests } = createMemoryObserver(server.url, undefined)
+			const { messages } = STUDY_MEMORY_OBSERVER_REQUEST
+			await observer.generate(messages, new AbortController().signal)
+			expect(requests).toEqual([{ messages }])
+			expect(readings).toHaveLength(requests.length)
+		} finally {
+			await server.close()
+		}
 	})
 
 	it('builds streamed rows and drains a real stream keeping deltas and result', async () => {

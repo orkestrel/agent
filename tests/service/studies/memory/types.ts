@@ -1,4 +1,9 @@
-import type { ProviderDelta, ProviderInterface, ProviderResult } from '@orkestrel/agent'
+import type {
+	ProviderDelta,
+	ProviderInterface,
+	ProviderRequest,
+	ProviderResult,
+} from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type {
 	StudyContext,
@@ -74,6 +79,8 @@ export interface MemoryObserverFixture {
 	readonly observer: StudyMemoryObserver
 	readonly inner: ProviderInterface
 	readonly readings: StudyMemoryEstimate[]
+	/** Holds the exact pre-encoding request each reading measured, in reading order. */
+	readonly requests: ProviderRequest[]
 }
 /** Holds the deltas a drained stream yielded in order and the result it returned. */
 export interface MemoryStreamFixture {
@@ -94,6 +101,8 @@ export interface MemoryTrialFixture {
 	readonly goals: readonly StudyGoal[]
 	readonly settings?: Readonly<Record<string, JSONValue>>
 	readonly duration?: number
+	/** Overrides room allowances, such as a window small enough to fold. */
+	readonly room?: Partial<StudyProfile['room']>
 }
 /** Holds what a real trial sent, admitted, retained and returned. */
 export interface MemoryTrialResult {

@@ -2,6 +2,7 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { StudyRole } from '@orkestrel/study'
 import type {
 	StudyMemoryActivity,
+	StudyMemoryDispatch,
 	StudyMemoryRequest,
 	StudyMemoryTransportOptions,
 	StudyMemoryWire,
@@ -9,6 +10,7 @@ import type {
 import { isRecord } from '@orkestrel/contract'
 import { StudyError, readStudyFailure } from '@orkestrel/study'
 import {
+	buildStudyMemoryRaw,
 	buildStudyMemoryTiming,
 	readStudyMemoryDigest,
 	readStudyMemoryRequest,
@@ -93,11 +95,12 @@ export class StudyMemoryTransport {
 		}
 	}
 
-	/** Dispatches exactly one admitted request with bounded streaming reads. @param role - Accountable responsibility. @param input - Exact configured URL. @param init - Native fetch settings. @returns A validated streaming response. */
+	/** Dispatches exactly one admitted request with bounded streaming reads. @param role - Accountable responsibility. @param input - Exact configured URL. @param init - Native fetch settings. @param dispatch - The immutable canonical dispatch the caller measured for this request; it joins the observation rows and never changes the request. @returns A validated streaming response. */
 	async fetch(
 		role: StudyRole,
 		input: string | URL | Request,
 		init?: RequestInit,
+		dispatch?: StudyMemoryDispatch,
 	): Promise<Response> {
 		this.check()
 		const activity = this.#activity
@@ -139,7 +142,7 @@ export class StudyMemoryTransport {
 						model: request.model ?? null,
 						options: { ...request.options },
 						bytes: request.bytes,
-						...(this.#options.observe ? this.#dispatch(activity, request, id, init) : {}),
+						...(this.#options.observe ? this.#dispatch(activity, request, id, init, dispatch) : {}),
 					},
 				})
 				signal.throwIfAborted()
@@ -159,6 +162,7 @@ export class StudyMemoryTransport {
 					started,
 					id,
 					sent,
+					dispatch,
 					bytes: request.bytes,
 					text: '',
 					terminal: undefined,
@@ -267,14 +271,18 @@ export class StudyMemoryTransport {
 		request: StudyMemoryRequest,
 		id: number,
 		init: RequestInit | undefined,
+		dispatch: StudyMemoryDispatch | undefined,
 	): Readonly<Record<string, JSONValue>> {
 		const previous = this.#previous
 		const model = request.role !== 'metadata'
 		if (model) this.#previous = request.model
 		const snapshot = activity.checkpoint !== undefined && !this.#attached
 		if (snapshot) this.#attached = true
+		const raw = buildStudyMemoryRaw(init?.body)
 		return {
 			id,
+			...this.#canonical(dispatch),
+			...(raw === undefined ? {} : { raw }),
 			digest: readStudyMemoryDigest(this.#options.profile, request),
 			previous: previous ?? null,
 			changed: model && previous !== undefined && previous !== request.model,
@@ -285,9 +293,14 @@ export class StudyMemoryTransport {
 		}
 	}
 
+	#canonical(dispatch: StudyMemoryDispatch | undefined): Readonly<Record<string, JSONValue>> {
+		return { canonical: dispatch?.id ?? null, revision: dispatch?.revision ?? null }
+	}
+
 	#timeline(wire: StudyMemoryWire): Readonly<Record<string, JSONValue>> {
 		return {
 			id: wire.id,
+			...this.#canonical(wire.dispatch),
 			started: wire.started,
 			sent: wire.sent,
 			elapsed: performance.now() - wire.sent,

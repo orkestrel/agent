@@ -78,7 +78,7 @@ export class StudyMemoryObserver implements ProviderInterface {
 		const estimate = this.#options.subject.estimateRequest(request)
 		const gauge = this.#options.gauge
 		const projected = gauge === undefined ? undefined : projectStudyMemoryRequest(gauge, estimate)
-		this.#options.record({ estimate, projected })
+		this.#options.record({ estimate, projected }, request)
 		return projected
 	}
 

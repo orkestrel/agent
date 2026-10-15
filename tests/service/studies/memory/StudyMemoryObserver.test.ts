@@ -116,6 +116,37 @@ describe('exact-request observation over the real provider', () => {
 		}
 	})
 
+	it('hands the recorder the exact pre-encoding request, keeping omitted members omitted', async () => {
+		const server = await createMemoryServer()
+		try {
+			const { observer, readings, requests } = createMemoryObserver(server.url, undefined)
+			const signal = new AbortController().signal
+			const schema = { type: 'object', properties: { count: { type: 'number' } } }
+			await observer.generate(messages, signal)
+			await observer.generate(messages, signal, tools, { think: false, schema })
+			await observer.generate(messages, signal, [], undefined)
+			expect(requests).toHaveLength(3)
+			expect(readings).toHaveLength(3)
+			const [bare, full, empty] = requests
+			expect(bare).toEqual({ messages })
+			expect(Object.keys(bare ?? {})).toEqual(['messages'])
+			expect(bare?.messages).toBe(messages)
+			expect(full).toEqual({ messages, tools, options: { think: false, schema } })
+			expect(Object.keys(empty ?? {})).toEqual(['messages', 'tools'])
+			// Every reading is the estimate of the request handed over beside it, tools and schema included.
+			const { estimateRequest, measureRequest } = STUDY_MEMORY_MODULES.subject
+			expect(readings.map((reading) => reading.estimate)).toEqual(
+				requests.map((request) => estimateRequest(request)),
+			)
+			const parts = measureRequest(full ?? { messages })
+			expect(parts.tools).toBeGreaterThan(0)
+			expect(parts.schema).toBeGreaterThan(0)
+			expect(measureRequest(bare ?? { messages })).toMatchObject({ tools: 0, schema: 0 })
+		} finally {
+			await server.close()
+		}
+	})
+
 	it('prices the estimate by the explicit gauge', async () => {
 		const server = await createMemoryServer()
 		try {

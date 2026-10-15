@@ -1,6 +1,7 @@
 import type {
 	AgentInterface,
 	ConversationInterface,
+	LedgerGauge,
 	LedgerInterface,
 	Message,
 	ProviderInterface,
@@ -17,10 +18,15 @@ import type {
 } from '@orkestrel/study'
 import type {
 	StudyMemoryActivity,
+	StudyMemoryDispatch,
 	StudyMemoryEstimate,
 	StudyMemoryInput,
+	StudyMemoryProvenance,
+	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
+	StudyMemoryStage,
+	StudyMemoryStamp,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
@@ -33,6 +39,9 @@ import {
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
 import {
+	buildStudyMemoryOrigins,
+	buildStudyMemoryParts,
+	buildStudyMemoryRevision,
 	projectStudyMemoryRequest,
 	readStudyMemoryError,
 	readStudyMemoryGauge,
@@ -56,6 +65,19 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #summary: ProviderInterface
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
+	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
+	readonly #explicit = new Map<string, StudyMemoryProvenance>([
+		['summary-instruction', { origin: 'instructions', source: 'summary' }],
+	])
+	// The session executes goals serially and awaits each summary before the Agent's next request, so one
+	// current dispatch per role cannot be overtaken by another of the same role.
+	#agentDispatch: StudyMemoryDispatch | undefined
+	#summaryDispatch: StudyMemoryDispatch | undefined
+	#ordinal = 0
+	#dispatches = 0
+	#input: string | undefined
+	#admission: StudyMemoryStamp | undefined
+	#refused: unknown
 	#active: StudyMemoryActivity | undefined
 	#trace: StudyEvidence[] = []
 	#work: Promise<StudyProduct> | undefined
@@ -85,11 +107,11 @@ export class StudyMemorySession implements StudySessionInterface {
 				think: room.think,
 				timeout: options.profile.bounds.request.duration,
 				options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
-				fetch: (input, init) => this.#transport.fetch('agent', input, init),
+				fetch: (input, init) => this.#transport.fetch('agent', input, init, this.#agentDispatch),
 			}),
 			subject: options.subject,
 			gauge,
-			record: (reading) => this.#record(reading),
+			record: (reading, request) => this.#record(reading, request),
 		})
 		this.#summary = options.provider.createOllama({
 			model: settings.model,
@@ -97,7 +119,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			think: false,
 			timeout: options.profile.bounds.request.duration,
 			options: { num_ctx: room.context, num_predict: room.recap, temperature: 0, seed: 0 },
-			fetch: (input, init) => this.#transport.fetch('summary', input, init),
+			fetch: (input, init) => this.#transport.fetch('summary', input, init, this.#summaryDispatch),
 		})
 		const lookup = createTool({
 			name: 'lookup',
@@ -173,8 +195,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					: {
 							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
-								consumer: (request) =>
-									projectStudyMemoryRequest(gauge, options.subject.estimateRequest(request)),
+								consumer: (request) => this.#admit(request, gauge),
 							}),
 						}),
 				on: { fault: (error) => this.#translate(error) },
@@ -214,6 +235,11 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#transport.prepare(activity)
 		this.#active = activity
 		this.#trace = []
+		this.#refused = undefined
+		this.#admission = undefined
+		// The previous goal's input is history now; membership or a section names it from here on.
+		if (this.#input !== undefined) this.#explicit.delete(this.#input)
+		this.#input = undefined
 		try {
 			await this.#transport.verify()
 			for (const record of input.records) {
@@ -227,6 +253,8 @@ export class StudyMemorySession implements StudySessionInterface {
 					role: 'user',
 					content: `[Source ${arrival.id}] ${arrival.content}`,
 				})
+				if (this.#settings.observe)
+					this.#explicit.set(message.id, { origin: 'arrival', source: arrival.id })
 				await context.evidence.append({
 					event: 'arrival',
 					goal,
@@ -234,8 +262,13 @@ export class StudyMemorySession implements StudySessionInterface {
 				})
 			}
 			const signal = AbortSignal.any([this.#options.signal, context.signal, context.meter.signal])
-			if (this.#ledger === undefined)
-				this.#conversation.add({ role: 'user', content: input.prompt })
+			if (this.#ledger === undefined) {
+				const prompt = this.#conversation.add({ role: 'user', content: input.prompt })
+				if (this.#settings.observe) {
+					this.#input = prompt.id
+					this.#explicit.set(prompt.id, { origin: 'input', source: goal })
+				}
+			}
 			const result: unknown =
 				this.#ledger === undefined
 					? await this.#agent.generate({ signal })
@@ -281,18 +314,107 @@ export class StudyMemorySession implements StudySessionInterface {
 	// Latch the study-level reading before any enclosing runtime can swallow the failure.
 	#translate(error: unknown): unknown {
 		const translated = readStudyMemoryError(error, this.#options.subject)
+		this.#refuse(error, translated)
 		this.#transport.fail(translated)
 		return translated
 	}
 
-	// Retains the reading without an awaited write; the goal's finally flush appends it, failure included.
-	#record(reading: StudyMemoryEstimate): void {
+	// Retains one refusal row per refused error identity in a goal, however many callbacks it traverses.
+	#refuse(error: unknown, translated: unknown): void {
+		const active = this.#active
+		if (
+			translated === error ||
+			!this.#settings.observe ||
+			active === undefined ||
+			this.#refused === error
+		)
+			return
+		this.#refused = error
+		const context = this.#options.subject.isAgentError(error) ? error.context : undefined
+		this.#trace.push({
+			event: 'refusal',
+			goal: active.goal,
+			value: {
+				cause: 'capacity',
+				role: 'agent',
+				ordinal: this.#admission?.ordinal ?? null,
+				revision: this.#admission?.revision ?? null,
+				consumed: typeof context?.consumed === 'number' ? context.consumed : null,
+				max: typeof context?.max === 'number' ? context.max : null,
+			},
+		})
+	}
+
+	// Takes one synchronous measurement row; the goal's finally flush appends it, failure included.
+	#stamp(
+		stage: StudyMemoryStage,
+		role: 'agent' | 'summary',
+		request: ProviderRequest,
+		reading: StudyMemoryEstimate,
+		dispatch: number | undefined,
+	): StudyMemoryStamp {
+		const ordinal = ++this.#ordinal
+		const revision = buildStudyMemoryRevision(request)
+		const active = this.#active
+		if (active !== undefined)
+			this.#trace.push({
+				event: 'context',
+				goal: active.goal,
+				value: {
+					stage,
+					role,
+					ordinal,
+					revision,
+					estimate: reading.estimate,
+					projected: reading.projected ?? null,
+					...(dispatch === undefined ? {} : { dispatch }),
+					parts: buildStudyMemoryParts(this.#options.subject.measureRequest(request)),
+					origins: buildStudyMemoryOrigins(request.messages, this.#provenance()),
+				},
+			})
+		return { ordinal, revision }
+	}
+
+	#provenance(): StudyMemoryProvenanceSource {
+		return {
+			explicit: this.#explicit,
+			sections: new Set(this.#conversation.sections.map((section) => section.id)),
+			members: new Set(this.#conversation.messages().map((message) => message.id)),
+			composed: this.#options.arm === 'records',
+		}
+	}
+
+	// Prices a window measurement exactly as before and, when observing, retains it as an admission row.
+	#admit(request: ProviderRequest, gauge: LedgerGauge): number {
+		const estimate = this.#options.subject.estimateRequest(request)
+		const projected = projectStudyMemoryRequest(gauge, estimate)
+		if (this.#settings.observe && this.#active !== undefined)
+			this.#admission = this.#stamp(
+				'admission',
+				'agent',
+				request,
+				{ estimate, projected },
+				undefined,
+			)
+		return projected
+	}
+
+	// Retains the reading of a dispatching agent request and names it for the wire request that follows.
+	#record(reading: StudyMemoryEstimate, request: ProviderRequest): void {
 		const active = this.#active
 		if (!this.#settings.observe || active === undefined) return
+		const id = ++this.#dispatches
+		const { revision } = this.#stamp('dispatch', 'agent', request, reading, id)
+		this.#agentDispatch = Object.freeze({ id, revision: revision ?? undefined })
 		this.#trace.push({
 			event: 'estimate',
 			goal: active.goal,
-			value: { estimate: reading.estimate, projected: reading.projected ?? null },
+			value: {
+				estimate: reading.estimate,
+				projected: reading.projected ?? null,
+				revision,
+				dispatch: id,
+			},
 		})
 	}
 
@@ -364,18 +486,29 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	async #summarize(messages: readonly Message[], signal?: AbortSignal): Promise<string> {
 		this.#transport.check()
-		const result = await this.#summary.generate(
-			[
-				{
-					id: 'summary-instruction',
-					role: 'system',
-					content:
-						'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.',
-				},
-				...messages,
-			],
-			signal ?? this.#options.signal,
-		)
+		// One canonical array: measured and recorded here, then sent as the very same array.
+		const canonical: readonly Message[] = [
+			{
+				id: 'summary-instruction',
+				role: 'system',
+				content:
+					'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.',
+			},
+			...messages,
+		]
+		if (this.#settings.observe && this.#active !== undefined) {
+			const request: ProviderRequest = { messages: canonical }
+			const id = ++this.#dispatches
+			const { revision } = this.#stamp(
+				'dispatch',
+				'summary',
+				request,
+				{ estimate: this.#options.subject.estimateRequest(request), projected: undefined },
+				id,
+			)
+			this.#summaryDispatch = Object.freeze({ id, revision: revision ?? undefined })
+		}
+		const result = await this.#summary.generate(canonical, signal ?? this.#options.signal)
 		this.#transport.check()
 		const active = this.#active
 		if (active === undefined || typeof result.content !== 'string')

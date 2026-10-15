@@ -559,15 +559,17 @@ export function createMemoryObserver(
 		options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
 	})
 	const readings: MemoryObserverFixture['readings'] = []
+	const requests: MemoryObserverFixture['requests'] = []
 	const observer = new StudyMemoryObserver({
 		provider: inner,
 		subject: admitted,
 		gauge,
-		record: (reading) => {
+		record: (reading, request) => {
 			readings.push(reading)
+			requests.push(request)
 		},
 	})
-	return { observer, inner, readings }
+	return { observer, inner, readings, requests }
 }
 
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
@@ -618,10 +620,43 @@ export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
 
 /** Pins the keys observation adds to each existing event, excluding selected-goal body and snapshot. */
 export const STUDY_MEMORY_OBSERVED_KEYS = Object.freeze({
-	dispatch: Object.freeze(['changed', 'digest', 'id', 'previous']),
-	wire: Object.freeze(['elapsed', 'id', 'sent', 'started', 'timing']),
-	'wire-failure': Object.freeze(['elapsed', 'id', 'sent', 'started']),
+	dispatch: Object.freeze(['canonical', 'changed', 'digest', 'id', 'previous', 'revision']),
+	wire: Object.freeze(['canonical', 'elapsed', 'id', 'revision', 'sent', 'started', 'timing']),
+	'wire-failure': Object.freeze(['canonical', 'elapsed', 'id', 'revision', 'sent', 'started']),
 })
+
+/** Pins the keys an observed estimate row holds: the calibration pair plus the revision and canonical dispatch it joins to. */
+export const STUDY_MEMORY_ESTIMATE_KEYS = Object.freeze([
+	'dispatch',
+	'estimate',
+	'projected',
+	'revision',
+])
+
+/** Pins the keys a context row holds beyond its dispatch member, which only dispatch-stage rows carry. */
+export const STUDY_MEMORY_CONTEXT_KEYS = Object.freeze([
+	'estimate',
+	'ordinal',
+	'origins',
+	'parts',
+	'projected',
+	'revision',
+	'role',
+	'stage',
+])
+
+/** Pins the keys a refusal row holds. */
+export const STUDY_MEMORY_REFUSAL_KEYS = Object.freeze([
+	'cause',
+	'consumed',
+	'max',
+	'ordinal',
+	'revision',
+	'role',
+])
+
+/** Pins the evidence events only observation adds, so an off-versus-on comparison can exclude exactly them. */
+export const STUDY_MEMORY_OBSERVED_EVENTS = Object.freeze(['context', 'estimate', 'refusal'])
 
 /** Pins the timing of a default reply whose terminal row carries no timing fields. */
 export const STUDY_MEMORY_TIMING_ABSENT = Object.freeze({
@@ -744,6 +779,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		url: server.url,
 		...(options.settings === undefined ? {} : { settings: options.settings }),
 		...(options.duration === undefined ? {} : { duration: options.duration }),
+		...(options.room === undefined ? {} : { room: options.room }),
 	})
 	const fixture = createMemoryContext(profile)
 	const products: StudyProduct[] = []
@@ -863,6 +899,84 @@ export function readMemoryTimeline(
 			throw new Error('Missing wire timeline')
 		return { started, sent, elapsed }
 	})
+}
+
+/** Reads a context row's structural parts, refusing any member that is not the retained shape.
+ * @param parts - The `parts` member of a context row.
+ * @returns The message count, tools and schema estimates, and the sum of every retained component.
+ */
+export function readMemoryParts(parts: unknown): {
+	readonly count: number
+	readonly tools: number
+	readonly schema: number
+	readonly total: number
+} {
+	if (
+		!isRecord(parts) ||
+		!Array.isArray(parts.messages) ||
+		typeof parts.tools !== 'number' ||
+		typeof parts.schema !== 'number'
+	)
+		throw new Error('Invalid context parts')
+	let total = parts.tools + parts.schema
+	for (const message of parts.messages) {
+		if (!isRecord(message)) throw new Error('Invalid context message')
+		for (const key of ['content', 'framing', 'calls', 'thinking', 'images']) {
+			const component = message[key]
+			if (typeof component !== 'number') throw new Error('Invalid context component')
+			total += component
+		}
+	}
+	return { count: parts.messages.length, tools: parts.tools, schema: parts.schema, total }
+}
+
+/** Reads a context row's origin annotations, refusing any entry that is not the retained shape.
+ * @param origins - The `origins` member of a context row.
+ * @returns One origin and optional source per message, in request order.
+ */
+export function readMemoryOrigins(
+	origins: unknown,
+): ReadonlyArray<{ readonly origin: string; readonly source: string | undefined }> {
+	if (!Array.isArray(origins)) throw new Error('Invalid context origins')
+	return origins.map((entry) => {
+		if (!isRecord(entry) || typeof entry.origin !== 'string')
+			throw new Error('Invalid origin entry')
+		if (entry.source !== undefined && typeof entry.source !== 'string')
+			throw new Error('Invalid origin source')
+		return { origin: entry.origin, source: entry.source }
+	})
+}
+
+/** Pins a room small enough that a long arrival trajectory must fold under the Compaction window. */
+export const STUDY_MEMORY_FOLD_ROOM = Object.freeze({
+	context: 1024,
+	output: 128,
+	safety: 128,
+	recap: 64,
+})
+
+/** Builds one goal whose eight long arrivals overflow STUDY_MEMORY_FOLD_ROOM before the Compaction fold.
+ * @param detail - Repeated filler text; changing one byte changes every request that carries it.
+ * @returns A single public goal.
+ */
+export function buildMemoryFoldGoals(
+	detail = 'Maintain this source detail. ',
+): readonly StudyGoal[] {
+	return Object.freeze([
+		Object.freeze({
+			id: 'opening',
+			input: Object.freeze({
+				prompt: 'Retain obligations',
+				arrivals: Object.freeze(
+					Array.from({ length: 8 }, (_, index) => ({
+						id: `source-${index}`,
+						content: `Obligation ${index}. ${detail.repeat(40)}`,
+					})),
+				),
+				records: Object.freeze([]),
+			}),
+		}),
+	])
 }
 
 /** Reads the top-level and option key sets of each recorded generation request from its exact wire bytes.

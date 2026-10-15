@@ -12,6 +12,7 @@ import type {
 	ProviderOptions,
 	ProviderRequest,
 	JudgeInterface,
+	RequestMeasure,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { OllamaTiming } from '@orkestrel/ollama'
@@ -47,6 +48,7 @@ export interface StudyMemorySubject {
 		options?: ConversationManagerOptions,
 	) => ConversationManagerInterface
 	readonly estimateRequest: (request: ProviderRequest) => number
+	readonly measureRequest: (request: ProviderRequest) => RequestMeasure
 	readonly isAgentError: (value: unknown) => value is AgentError
 	readonly LEDGER_QUESTIONS: LedgerQuestion
 }
@@ -91,8 +93,53 @@ export interface StudyMemoryObserverOptions {
 	readonly subject: StudyMemorySubject
 	/** Holds the validated gauge enforced after a successful return; undefined enforces nothing. */
 	readonly gauge: LedgerGauge | undefined
-	/** Receives exactly one reading, synchronously, before each delegated call. */
-	readonly record: (reading: StudyMemoryEstimate) => void
+	/** Receives exactly one reading and the exact pre-encoding request it measured, synchronously, before each delegated call. */
+	readonly record: (reading: StudyMemoryEstimate, request: ProviderRequest) => void
+}
+
+/** Names the stage a measurement was taken at: the Agent window's admission or the provider dispatch. */
+export type StudyMemoryStage = 'admission' | 'dispatch'
+
+/** Names where a request message came from, or that the composer mixes sources (`mixed`) or the consumer cannot tell (`unknown`). */
+export type StudyMemoryOrigin =
+	| 'input'
+	| 'arrival'
+	| 'summary'
+	| 'tool'
+	| 'history'
+	| 'instructions'
+	| 'mixed'
+	| 'unknown'
+
+/** Holds one message's nonadditive origin annotation and, when known, the source id it came from. */
+export interface StudyMemoryProvenance {
+	readonly origin: StudyMemoryOrigin
+	readonly source?: string | undefined
+}
+
+/** Holds the session state a message's origin is joined from; no text, position or substring is consulted. */
+export interface StudyMemoryProvenanceSource {
+	/** Holds message ids the consumer itself added or named: the current input, each arrival and the summary instruction. */
+	readonly explicit: ReadonlyMap<string, StudyMemoryProvenance>
+	/** Holds the ids of the conversation's compacted sections, which are also the ids of their recap messages. */
+	readonly sections: ReadonlySet<string>
+	/** Holds the ids of the messages the conversation stores. */
+	readonly members: ReadonlySet<string>
+	/** Reports that a composer builds the request from several sources, so its system messages are mixed. */
+	readonly composed: boolean
+}
+
+/** Holds the trial-local canonical dispatch identity the transport joins a wire request to. */
+export interface StudyMemoryDispatch {
+	readonly id: number
+	/** Holds the SHA-256 revision of the canonical request, or undefined when it could not be rendered. */
+	readonly revision: string | undefined
+}
+
+/** Holds the identity of one recorded measurement. */
+export interface StudyMemoryStamp {
+	readonly ordinal: number
+	readonly revision: string | null
 }
 
 /** Holds validated runtime dependencies for a fresh trial. */
@@ -162,6 +209,8 @@ export interface StudyMemoryWire {
 	readonly id: number
 	/** Holds the monotonic millisecond reading taken immediately before native fetch. */
 	readonly sent: number
+	/** Holds the canonical dispatch this wire request was made for, when the caller measured one. */
+	readonly dispatch: StudyMemoryDispatch | undefined
 	bytes: number
 	text: string
 	terminal: StudyMemoryTerminal | undefined

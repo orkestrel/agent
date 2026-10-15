@@ -10,6 +10,7 @@ import {
 } from '../../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
@@ -21,6 +22,8 @@ import {
 	readMemoryAdmission,
 	readMemoryEvents,
 	readMemoryModels,
+	readMemoryOrigins,
+	readMemoryParts,
 	readMemoryShapes,
 	readMemorySnapshot,
 	readMemoryTimeline,
@@ -28,9 +31,14 @@ import {
 	runMemoryTrial,
 	totalMemoryUsage,
 	STUDY_MEMORY_DISABLED_SETTINGS,
+	STUDY_MEMORY_CONTEXT_KEYS,
+	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_EVENT_KEYS,
+	STUDY_MEMORY_OBSERVED_EVENTS,
+	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_FIXED_PROJECTION,
 	STUDY_MEMORY_FIXED_SETTINGS,
+	STUDY_MEMORY_FOLD_ROOM,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
@@ -1125,9 +1133,11 @@ describe('passive observation of actual memory requests', () => {
 		expect(readMemoryAdmission(control)).toEqual(readMemoryAdmission(off))
 		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
 		expect(
-			on.evidence.filter((row) => row.event !== 'estimate').map((row) => [row.event, row.goal]),
+			on.evidence
+				.filter((row) => !STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))
+				.map((row) => [row.event, row.goal]),
 		).toEqual(off.evidence.map((row) => [row.event, row.goal]))
-		expect(off.evidence.some((row) => row.event === 'estimate')).toBe(false)
+		expect(off.evidence.some((row) => STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))).toBe(false)
 		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
 		expect(changed.requests.map((request) => request.body)).not.toEqual(
 			off.requests.map((request) => request.body),
@@ -1579,7 +1589,7 @@ describe('passive observation of actual memory requests', () => {
 					).length,
 				)
 			expect(rows.map((row) => Object.keys(row).sort())).toEqual(
-				rows.map(() => ['estimate', 'projected']),
+				rows.map(() => STUDY_MEMORY_ESTIMATE_KEYS),
 			)
 			const estimates = rows.map((row) => row.estimate)
 			expect(estimates.every((value) => typeof value === 'number' && value > 0)).toBe(true)
@@ -1601,6 +1611,282 @@ describe('passive observation of actual memory requests', () => {
 		])
 		expect(readMemoryEvents(compaction.evidence, 'estimate').map((row) => row.estimate)).toEqual(
 			readMemoryEvents(full.evidence, 'estimate').map((row) => row.estimate),
+		)
+	})
+
+	it('retains one dispatch context row per agent request, joined to its estimate, dispatch and wire rows by ordinal, canonical id and revision', async () => {
+		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		expect(result.failure).toBeUndefined()
+		const contexts = readMemoryEvents(result.evidence, 'context')
+		const estimates = readMemoryEvents(result.evidence, 'estimate')
+		const dispatches = readMemoryEvents(result.evidence, 'dispatch')
+		const agents = dispatches.filter((value) => value.role === 'agent')
+		const wires = readMemoryEvents(result.evidence, 'wire').filter(
+			(value) => value.role === 'agent',
+		)
+		expect(contexts.map((value) => [value.stage, value.role])).toEqual(
+			Array.from({ length: 4 }, () => ['dispatch', 'agent']),
+		)
+		expect(contexts.map((value) => value.ordinal)).toEqual([1, 2, 3, 4])
+		expect(contexts.map((value) => Object.keys(value).sort())).toEqual(
+			contexts.map(() => listMemoryKeys(STUDY_MEMORY_CONTEXT_KEYS, ['dispatch'])),
+		)
+		for (const rows of [contexts, estimates])
+			expect(rows.map((value) => value.dispatch)).toEqual([1, 2, 3, 4])
+		for (const rows of [agents, wires])
+			expect(rows.map((value) => value.canonical)).toEqual([1, 2, 3, 4])
+		const revisions = contexts.map((value) => value.revision)
+		expect(
+			revisions.every((value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)),
+		).toBe(true)
+		expect(new Set(revisions).size).toBe(4)
+		for (const rows of [estimates, agents, wires])
+			expect(rows.map((value) => value.revision)).toEqual(revisions)
+		const metadata = dispatches.filter((value) => value.role === 'metadata')
+		expect(metadata.length).toBeGreaterThan(0)
+		expect(metadata.map((value) => [value.canonical, value.revision])).toEqual(
+			metadata.map(() => [null, null]),
+		)
+		expect(contexts.map((value) => value.projected)).toEqual([null, null, null, null])
+		for (const [index, value] of contexts.entries()) {
+			const parts = readMemoryParts(value.parts)
+			// The structural components sum to the estimator reading taken for the same request.
+			expect(parts.total).toBe(estimates[index]?.estimate)
+			expect(parts.total).toBe(value.estimate)
+			expect(parts.tools).toBeGreaterThan(0)
+			expect(parts.schema).toBe(0)
+			expect(readMemoryOrigins(value.origins)).toHaveLength(parts.count)
+		}
+	})
+
+	it('annotates each message with a nonadditive origin from session joins and leaves the rest unknown', async () => {
+		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		const origins = readMemoryEvents(result.evidence, 'context').map((value) =>
+			readMemoryOrigins(value.origins),
+		)
+		expect(origins).toHaveLength(4)
+		expect(origins.flat().some((entry) => entry.origin === 'unknown')).toBe(false)
+		expect(origins[0]).toEqual(
+			expect.arrayContaining([
+				{ origin: 'instructions', source: 'desk' },
+				{ origin: 'arrival', source: 'source-1' },
+				{ origin: 'input', source: 'opening' },
+			]),
+		)
+		// After the tool turn the call is stored history and its receipt is a tool message.
+		expect(origins[1]?.map((entry) => entry.origin)).toEqual(
+			expect.arrayContaining(['history', 'tool', 'input']),
+		)
+		// The first request of the next goal: the old input is history, only the new prompt is input.
+		const correction = origins[2] ?? []
+		expect(correction.filter((entry) => entry.origin === 'input')).toEqual([
+			{ origin: 'input', source: 'correction' },
+		])
+		expect(
+			correction.filter((entry) => entry.origin === 'arrival').map((entry) => entry.source),
+		).toEqual(['source-1', 'source-2'])
+		expect(correction.some((entry) => entry.origin === 'history')).toBe(true)
+		expect(origins.flat().some((entry) => entry.origin === 'mixed')).toBe(false)
+	})
+
+	it('marks a composer-built Records system message mixed and never claims instructions or input', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: [],
+			goals: [
+				{
+					id: 'opening',
+					input: {
+						prompt: 'State the current order count',
+						arrivals: [{ id: 'source', content: 'The order count is two.' }],
+						records: [],
+					},
+				},
+			],
+			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const origins = readMemoryEvents(result.evidence, 'context').flatMap((value) =>
+			readMemoryOrigins(value.origins),
+		)
+		expect(origins.some((entry) => entry.origin === 'mixed')).toBe(true)
+		expect(
+			origins.some((entry) => entry.origin === 'instructions' || entry.origin === 'input'),
+		).toBe(false)
+	})
+
+	it('retains the admission measurement and a single refusal row for an oversize request with no agent dispatch', async () => {
+		const edge = buildMemoryEdge(buildMemoryProfile({ url: 'http://127.0.0.1:1' }), -1)
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals: [WINDOW_GOAL],
+			settings: { ...edge, observe: true },
+		})
+		expect(result.failure).toBeDefined()
+		expect(result.requests.filter((request) => request.path === '/api/chat')).toEqual([])
+		const contexts = readMemoryEvents(result.evidence, 'context')
+		expect(contexts.length).toBeGreaterThan(0)
+		expect(contexts.map((value) => [value.stage, value.role])).toEqual(
+			contexts.map(() => ['admission', 'agent']),
+		)
+		expect(contexts.map((value) => Object.keys(value).sort())).toEqual(
+			contexts.map(() => listMemoryKeys(STUDY_MEMORY_CONTEXT_KEYS)),
+		)
+		expect(
+			readMemoryEvents(result.evidence, 'dispatch').filter((value) => value.role === 'agent'),
+		).toEqual([])
+		expect(readMemoryEvents(result.evidence, 'estimate')).toEqual([])
+		const refusals = readMemoryEvents(result.evidence, 'refusal')
+		expect(refusals).toHaveLength(1)
+		const [refusal] = refusals
+		const last = contexts.at(-1)
+		expect(Object.keys(refusal ?? {}).sort()).toEqual(STUDY_MEMORY_REFUSAL_KEYS)
+		expect(refusal).toMatchObject({ cause: 'capacity', role: 'agent', max: 32128 })
+		expect(refusal?.ordinal).toBe(last?.ordinal)
+		expect(refusal?.revision).toBe(last?.revision)
+		expect(typeof refusal?.revision).toBe('string')
+		// The window refused the very projection the final admission row retained.
+		expect(refusal?.consumed).toBe(last?.projected)
+		expect(Number(refusal?.consumed)).toBeGreaterThanOrEqual(32128)
+		const parts = readMemoryParts(last?.parts)
+		expect(parts.total).toBe(last?.estimate)
+		expect(parts.tools).toBeGreaterThan(0)
+	})
+
+	it('records pre-fold and rebuilt post-fold admissions and the summary dispatch as separate joined measurements', async () => {
+		const settings = { ...STUDY_MEMORY_SETTINGS, observe: true }
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals: buildMemoryFoldGoals(),
+			settings,
+			room: STUDY_MEMORY_FOLD_ROOM,
+		})
+		expect(result.failure).toBeUndefined()
+		const max =
+			STUDY_MEMORY_FOLD_ROOM.context - STUDY_MEMORY_FOLD_ROOM.output - STUDY_MEMORY_FOLD_ROOM.safety
+		const contexts = readMemoryEvents(result.evidence, 'context')
+		const sequence = contexts.map((value) => `${String(value.stage)}:${String(value.role)}`)
+		const summaryAt = sequence.indexOf('dispatch:summary')
+		expect(summaryAt).toBeGreaterThan(0)
+		expect(sequence[0]).toBe('admission:agent')
+		expect(sequence.at(-1)).toBe('dispatch:agent')
+		expect(sequence.slice(summaryAt + 1)).toContain('admission:agent')
+		// Ordinals are one increasing count over admissions and dispatches of both roles.
+		expect(contexts.map((value) => value.ordinal)).toEqual(
+			Array.from({ length: contexts.length }, (_, index) => index + 1),
+		)
+		const admissions = contexts.filter((value) => value.stage === 'admission')
+		const first = admissions[0]
+		const final = admissions.at(-1)
+		expect(Number(first?.projected)).toBeGreaterThan(max)
+		expect(Number(final?.projected)).toBeLessThanOrEqual(max)
+		expect(first?.revision).not.toBe(final?.revision)
+		expect(final?.dispatch).toBeUndefined()
+		// Summary and agent dispatches keep their own canonical ids across the interleaving.
+		const summary = contexts[summaryAt]
+		const dispatched = contexts.filter((value) => value.stage === 'dispatch')
+		expect(dispatched.map((value) => value.dispatch)).toEqual(
+			Array.from({ length: dispatched.length }, (_, index) => index + 1),
+		)
+		for (const role of ['summary', 'agent']) {
+			const rows = dispatched.filter((value) => value.role === role)
+			const sent = readMemoryEvents(result.evidence, 'dispatch').filter(
+				(value) => value.role === role,
+			)
+			const settled = readMemoryEvents(result.evidence, 'wire').filter(
+				(value) => value.role === role,
+			)
+			expect(rows.length).toBeGreaterThan(0)
+			for (const events of [sent, settled]) {
+				expect([role, events.map((value) => value.canonical)]).toEqual([
+					role,
+					rows.map((value) => value.dispatch),
+				])
+				expect([role, events.map((value) => value.revision)]).toEqual([
+					role,
+					rows.map((value) => value.revision),
+				])
+			}
+		}
+		// The summary request is exactly its instruction plus the folded messages: no tools, no schema.
+		expect(readMemoryParts(summary?.parts)).toMatchObject({ tools: 0, schema: 0 })
+		expect(readMemoryOrigins(summary?.origins)[0]).toEqual({
+			origin: 'instructions',
+			source: 'summary',
+		})
+		expect(summary?.projected).toBeNull()
+		expect(Number(readMemoryParts(summary?.parts).count)).toBeGreaterThan(2)
+	})
+
+	it('keeps the fold trajectory identical with observation off and on, and fails on a changed byte', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'compaction',
+			responses: [],
+			goals: buildMemoryFoldGoals(),
+			room: STUDY_MEMORY_FOLD_ROOM,
+		}
+		const off = await runMemoryTrial({ ...trial, settings: STUDY_MEMORY_SETTINGS })
+		const on = await runMemoryTrial({
+			...trial,
+			settings: { ...STUDY_MEMORY_SETTINGS, observe: true },
+		})
+		const changed = await runMemoryTrial({
+			...trial,
+			goals: buildMemoryFoldGoals('Maintain this other detail. '),
+			settings: { ...STUDY_MEMORY_SETTINGS, observe: true },
+		})
+		expect(off.failure).toBeUndefined()
+		expect(off.requests.some((request) => request.path === '/api/chat')).toBe(true)
+		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+		expect(readMemoryAdmission(changed)).not.toEqual(readMemoryAdmission(off))
+		expect(off.evidence.some((row) => STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))).toBe(false)
+	})
+
+	it('adds only the raw prompt units and bytes to judge dispatch evidence, read from the actual body', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: [],
+			goals: [
+				{
+					id: 'opening',
+					input: {
+						prompt: 'State the current order count',
+						arrivals: [{ id: 'source', content: 'The order count is two.' }],
+						records: [],
+					},
+				},
+			],
+		}
+		const on = await runMemoryTrial({ ...trial, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		const off = await runMemoryTrial(trial)
+		const prompts = on.requests
+			.filter((request) => request.path === '/api/generate')
+			.map((request) => {
+				const body = parseJSON(request.body)
+				if (!isRecord(body) || typeof body.prompt !== 'string')
+					throw new Error('Missing raw prompt')
+				return body.prompt
+			})
+		expect(prompts.length).toBeGreaterThan(0)
+		const judged = readMemoryEvents(on.evidence, 'dispatch').filter(
+			(value) => value.role === 'judge',
+		)
+		expect(judged.map((value) => value.raw)).toEqual(
+			prompts.map((prompt) => ({
+				encoding: 'utf-8',
+				units: prompt.length,
+				bytes: Buffer.byteLength(prompt, 'utf8'),
+			})),
+		)
+		const others = readMemoryEvents(on.evidence, 'dispatch').filter(
+			(value) => value.role !== 'judge',
+		)
+		expect(others.some((value) => 'raw' in value)).toBe(false)
+		expect(readMemoryEvents(off.evidence, 'dispatch').some((value) => 'raw' in value)).toBe(false)
+		expect(on.requests.map((request) => request.path)).toEqual(
+			off.requests.map((request) => request.path),
 		)
 	})
 

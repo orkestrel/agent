@@ -2,15 +2,30 @@ import type { StudyAdjudication } from '@orkestrel/study/server'
 import type { JSONValue } from '@orkestrel/contract'
 import type { OllamaTiming } from '@orkestrel/ollama'
 import type { StudyJudgment, StudyProfile, StudyRole } from '@orkestrel/study'
-import type { LedgerGauge, ProviderResult } from '@orkestrel/agent'
 import type {
+	LedgerGauge,
+	Message,
+	ProviderRequest,
+	ProviderResult,
+	RequestMeasure,
+} from '@orkestrel/agent'
+import type {
+	StudyMemoryProvenance,
+	StudyMemoryProvenanceSource,
 	StudyMemoryProvider,
 	StudyMemoryRequest,
 	StudyMemoryObservation,
 	StudyMemorySubject,
 	StudyMemoryTerminal,
 } from './types.js'
-import { canonicalStringify, isArray, isObject, isRecord } from '@orkestrel/contract'
+import { createHash } from 'node:crypto'
+import {
+	attempt as attemptValue,
+	canonicalStringify,
+	isArray,
+	isObject,
+	isRecord,
+} from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
 import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
 
@@ -57,6 +72,70 @@ export function readStudyMemorySettings(settings: unknown): StudyMemoryObservati
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	const observe = settings.observe === true
 	return { observe, checkpoints: new Set(observe ? (settings.checkpoints ?? []) : []) }
+}
+
+/** Hashes the canonical rendering of a complete request so any change to content, order, ids, tools or options changes the revision. @param request - The exact pre-encoding request. @returns The SHA-256 hex digest, or null when the request cannot be canonically rendered; a rendering failure never throws. */
+export function buildStudyMemoryRevision(request: ProviderRequest): string | null {
+	const rendered = attemptValue(() => canonicalStringify(request))
+	if (!rendered.success || rendered.value === undefined) return null
+	return createHash('sha256').update(rendered.value).digest('hex')
+}
+
+/** Projects structural request components onto plain JSON without storing a total. @param measure - Disjoint per-message, tools and schema estimates. @returns The same components in request order. */
+export function buildStudyMemoryParts(measure: RequestMeasure): JSONValue {
+	return {
+		messages: measure.messages.map((message) => ({
+			id: message.id,
+			role: message.role,
+			content: message.content,
+			framing: message.framing,
+			calls: message.calls,
+			thinking: message.thinking,
+			images: message.images,
+		})),
+		tools: measure.tools,
+		schema: measure.schema,
+	}
+}
+
+/** Reads one message's origin from session-held joins only, never from its text or position. @param message - A message of a measured request. @param source - The session's explicit ids, section ids and conversation membership. @returns The nonadditive origin; `unknown` when no join applies. */
+export function readStudyMemoryProvenance(
+	message: Message,
+	source: StudyMemoryProvenanceSource,
+): StudyMemoryProvenance {
+	const explicit = source.explicit.get(message.id)
+	if (explicit !== undefined) return explicit
+	if (source.sections.has(message.id)) return { origin: 'summary', source: message.id }
+	if (message.role === 'tool') return { origin: 'tool' }
+	if (message.role === 'system')
+		return source.composed ? { origin: 'mixed' } : { origin: 'instructions', source: 'desk' }
+	return source.members.has(message.id) ? { origin: 'history' } : { origin: 'unknown' }
+}
+
+/** Builds the JSON origin annotations of a request's messages, aligned to them one to one. @param messages - The measured request's messages, duplicates included. @param source - The session's joins. @returns One origin object per message, with `source` only when known. */
+export function buildStudyMemoryOrigins(
+	messages: readonly Message[],
+	source: StudyMemoryProvenanceSource,
+): JSONValue {
+	return messages.map((message) => {
+		const found = readStudyMemoryProvenance(message, source)
+		return found.source === undefined
+			? { origin: found.origin }
+			: { origin: found.origin, source: found.source }
+	})
+}
+
+/** Measures the raw prompt of a body that carries a string `prompt`, as sent. @param body - The encoded request body. @returns UTF-16 code units and UTF-8 bytes of that prompt, labeled with its encoding; undefined when there is no string prompt. These are readings of the actual text, not token allocations. */
+export function buildStudyMemoryRaw(body: unknown): JSONValue | undefined {
+	if (typeof body !== 'string') return undefined
+	const parsed = attemptValue((): unknown => JSON.parse(body))
+	if (!parsed.success || !isRecord(parsed.value) || typeof parsed.value.prompt !== 'string')
+		return undefined
+	return {
+		encoding: 'utf-8',
+		units: parsed.value.prompt.length,
+		bytes: new TextEncoder().encode(parsed.value.prompt).byteLength,
+	}
 }
 
 /** Reads the pinned serving digest of an admitted request. @param profile - Runtime profile with the required digests. @param request - Admitted dispatch. @returns The pinned digest, or null for an inventory request. */

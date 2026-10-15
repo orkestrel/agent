@@ -1,10 +1,15 @@
-import type { StudyMemoryRequest } from '../../../../studies/memory/index.js'
+import type { Message, ProviderRequest } from '@orkestrel/agent'
+import type { StudyMemoryProvenance, StudyMemoryRequest } from '../../../../studies/memory/index.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, readStudyFailure, StudyError } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import { AgentError } from '../../../../src/core/index.js'
 import {
+	buildStudyMemoryOrigins,
+	buildStudyMemoryParts,
+	buildStudyMemoryRaw,
 	buildStudyMemoryReadings,
+	buildStudyMemoryRevision,
 	buildStudyMemoryTiming,
 	createStudyAdapter,
 	gradeStudyMemory,
@@ -18,6 +23,7 @@ import {
 	readStudyMemoryDigest,
 	readStudyMemoryError,
 	readStudyMemoryGauge,
+	readStudyMemoryProvenance,
 	readStudyMemoryRequest,
 	readStudyMemorySettings,
 	readStudyMemorySupport,
@@ -32,6 +38,8 @@ import {
 	buildMemoryProfile,
 	buildMemoryReply,
 	loadMemoryInputs,
+	readMemoryOrigins,
+	readMemoryParts,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_SETTINGS,
@@ -187,10 +195,23 @@ describe('memory declaration and mechanical evidence', () => {
 			createLedger: subject.createLedger,
 			createConversationManager: subject.createConversationManager,
 			estimateRequest: subject.estimateRequest,
+			measureRequest: subject.measureRequest,
 			LEDGER_QUESTIONS: subject.LEDGER_QUESTIONS,
 		}
+		const { measureRequest: omitted, ...withoutMeasure } = surface
+		expect(typeof omitted).toBe('function')
 		expect(isStudyMemorySubject(surface)).toBe(false)
 		expect(isStudyMemorySubject({ ...surface, isAgentError: 'guard' })).toBe(false)
+		expect(
+			isStudyMemorySubject({
+				...surface,
+				measureRequest: 'measure',
+				isAgentError: subject.isAgentError,
+			}),
+		).toBe(false)
+		expect(isStudyMemorySubject({ ...withoutMeasure, isAgentError: subject.isAgentError })).toBe(
+			false,
+		)
 		expect(isStudyMemorySubject({ ...surface, isAgentError: subject.isAgentError })).toBe(true)
 		const refusal = new STUDY_MEMORY_MODULES.subject.AgentError('WINDOW', 'Request fills window', {
 			context: { consumed: 9, max: 8 },
@@ -416,6 +437,220 @@ describe('memory declaration and mechanical evidence', () => {
 			{ key: 'second', phase: 'ask', outcome: 'asked', duration: null },
 			{ key: 'fifth', phase: 'ask', outcome: 'asked', duration: null },
 		])
+	})
+
+	it('hashes the canonical request so any change to content, ids, order, tools or options changes the revision', () => {
+		const user = { id: 'a', role: 'user', content: 'hello' } as const
+		const reply = { id: 'b', role: 'assistant', content: 'hi' } as const
+		const tool = { name: 'lookup', parameters: { type: 'object' } }
+		const base = buildStudyMemoryRevision({ messages: [user, reply], tools: [tool] })
+		expect(base).toMatch(/^[a-f0-9]{64}$/)
+		expect(buildStudyMemoryRevision({ messages: [user, reply], tools: [tool] })).toBe(base)
+		// Canonical form: member order inside an object does not change the revision.
+		expect(
+			buildStudyMemoryRevision({
+				tools: [{ parameters: { type: 'object' }, name: 'lookup' }],
+				messages: [
+					{ content: 'hello', role: 'user', id: 'a' },
+					{ content: 'hi', role: 'assistant', id: 'b' },
+				],
+			}),
+		).toBe(base)
+		const changed = [
+			['content', { messages: [{ ...user, content: 'hellp' }, reply], tools: [tool] }],
+			['id', { messages: [{ ...user, id: 'z' }, reply], tools: [tool] }],
+			['role', { messages: [{ ...user, role: 'system' }, reply], tools: [tool] }],
+			['order', { messages: [reply, user], tools: [tool] }],
+			['dropped message', { messages: [user], tools: [tool] }],
+			['tool', { messages: [user, reply], tools: [{ ...tool, name: 'search' }] }],
+			['absent tools', { messages: [user, reply] }],
+			['options', { messages: [user, reply], tools: [tool], options: { think: false } }],
+		] as const
+		for (const [label, request] of changed)
+			expect([label, buildStudyMemoryRevision(request)]).not.toEqual([label, base])
+		expect(new Set(changed.map(([, request]) => buildStudyMemoryRevision(request))).size).toBe(
+			changed.length,
+		)
+		// Absent and empty members are different requests.
+		expect(buildStudyMemoryRevision({ messages: [user] })).not.toBe(
+			buildStudyMemoryRevision({ messages: [user], options: {} }),
+		)
+		expect(buildStudyMemoryRevision({ messages: [user] })).not.toBe(
+			buildStudyMemoryRevision({ messages: [user], tools: [] }),
+		)
+		// Duplicate occurrences are not collapsed.
+		expect(buildStudyMemoryRevision({ messages: [user, user] })).not.toBe(
+			buildStudyMemoryRevision({ messages: [user] }),
+		)
+	})
+
+	it('reports an unrenderable or unreadable request as a null revision without throwing', () => {
+		const circular: Record<string, unknown> = { type: 'object' }
+		circular.self = circular
+		const hostile: ProviderRequest = {
+			get messages(): readonly Message[] {
+				throw new Error('Hostile getter')
+			},
+		}
+		expect(
+			buildStudyMemoryRevision({ messages: [], tools: [{ name: 'x', parameters: circular }] }),
+		).toBeNull()
+		expect(() => buildStudyMemoryRevision(hostile)).not.toThrow()
+		expect(buildStudyMemoryRevision(hostile)).toBeNull()
+	})
+
+	it('projects hand-counted structural parts onto plain JSON without a stored total', () => {
+		const { measureRequest } = STUDY_MEMORY_MODULES.subject
+		const parts = buildStudyMemoryParts(
+			measureRequest({
+				messages: [
+					{ id: 'm', role: 'user', content: 'hello' },
+					{ id: 'm', role: 'assistant', content: '', thinking: 'plan', images: ['x'] },
+				],
+				tools: [{ name: 'lookup' }],
+			}),
+		)
+		expect(parts).toEqual({
+			messages: [
+				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'assistant', content: 0, framing: 4, calls: 0, thinking: 1, images: 512 },
+			],
+			tools: 5,
+			schema: 0,
+		})
+		expect(readMemoryParts(parts)).toEqual({ count: 2, tools: 5, schema: 0, total: 6 + 517 + 5 })
+		expect(parseJSON(JSON.stringify(parts))).toEqual(parts)
+	})
+
+	it('joins message origins from session state only, in priority order, leaving the rest unknown', () => {
+		const source = {
+			explicit: new Map<string, StudyMemoryProvenance>([
+				['in', { origin: 'input', source: 'opening' }],
+				['ar', { origin: 'arrival', source: 'source-1' }],
+				['ti', { origin: 'instructions', source: 'summary' }],
+			]),
+			sections: new Set(['sec']),
+			members: new Set(['in', 'sec', 'kept', 'tool', 'rules']),
+			composed: false,
+		}
+		const composed = { ...source, composed: true }
+		const cases: ReadonlyArray<
+			readonly [string, Message, StudyMemoryProvenance, StudyMemoryProvenance]
+		> = [
+			[
+				'explicit input',
+				{ id: 'in', role: 'user', content: 'x' },
+				{ origin: 'input', source: 'opening' },
+				{ origin: 'input', source: 'opening' },
+			],
+			[
+				'explicit arrival',
+				{ id: 'ar', role: 'user', content: 'x' },
+				{ origin: 'arrival', source: 'source-1' },
+				{ origin: 'arrival', source: 'source-1' },
+			],
+			[
+				'explicit instruction beats system role',
+				{ id: 'ti', role: 'system', content: 'x' },
+				{ origin: 'instructions', source: 'summary' },
+				{ origin: 'instructions', source: 'summary' },
+			],
+			[
+				'section recap beats membership',
+				{ id: 'sec', role: 'assistant', content: 'x' },
+				{ origin: 'summary', source: 'sec' },
+				{ origin: 'summary', source: 'sec' },
+			],
+			[
+				'tool by role beats membership',
+				{ id: 'tool', role: 'tool', content: 'x' },
+				{ origin: 'tool' },
+				{ origin: 'tool' },
+			],
+			[
+				'system without a composer',
+				{ id: 'rules', role: 'system', content: 'x' },
+				{ origin: 'instructions', source: 'desk' },
+				{ origin: 'mixed' },
+			],
+			[
+				'stored message',
+				{ id: 'kept', role: 'assistant', content: 'x' },
+				{ origin: 'history' },
+				{ origin: 'history' },
+			],
+			[
+				'unjoined message',
+				{ id: 'orphan', role: 'user', content: 'x' },
+				{ origin: 'unknown' },
+				{ origin: 'unknown' },
+			],
+		]
+		for (const [label, message, plain, mixed] of cases) {
+			expect([label, readStudyMemoryProvenance(message, source)]).toEqual([label, plain])
+			expect([label, readStudyMemoryProvenance(message, composed)]).toEqual([label, mixed])
+		}
+		// Content and position never decide an origin: identical text under another id is unknown.
+		expect(
+			readStudyMemoryProvenance(
+				{ id: 'other', role: 'user', content: '[Source source-1] x' },
+				source,
+			),
+		).toEqual({ origin: 'unknown' })
+	})
+
+	it('builds JSON origin annotations aligned one to one with the messages, duplicates kept', () => {
+		const source = {
+			explicit: new Map<string, StudyMemoryProvenance>([
+				['d', { origin: 'arrival', source: 'source-1' }],
+			]),
+			sections: new Set<string>(),
+			members: new Set(['x']),
+			composed: false,
+		}
+		const messages: readonly Message[] = [
+			{ id: 'd', role: 'user', content: 'a' },
+			{ id: 'x', role: 'assistant', content: 'b' },
+			{ id: 'd', role: 'user', content: 'a' },
+			{ id: 'n', role: 'tool', content: 'c' },
+		]
+		expect(buildStudyMemoryOrigins(messages, source)).toEqual([
+			{ origin: 'arrival', source: 'source-1' },
+			{ origin: 'history' },
+			{ origin: 'arrival', source: 'source-1' },
+			{ origin: 'tool' },
+		])
+		expect(buildStudyMemoryOrigins([], source)).toEqual([])
+		expect(
+			readMemoryOrigins(buildStudyMemoryOrigins(messages, source)).map((entry) => entry.source),
+		).toEqual(['source-1', undefined, 'source-1', undefined])
+	})
+
+	it('measures only a string prompt of a body as UTF-16 units and UTF-8 bytes, labeled raw', () => {
+		const prompt = 'café \u{1F600}'
+		expect(buildStudyMemoryRaw(JSON.stringify({ model: 'judge', prompt, raw: true }))).toEqual({
+			encoding: 'utf-8',
+			units: 7,
+			bytes: 10,
+		})
+		expect(buildStudyMemoryRaw(JSON.stringify({ prompt: '' }))).toEqual({
+			encoding: 'utf-8',
+			units: 0,
+			bytes: 0,
+		})
+		for (const body of [
+			undefined,
+			null,
+			7,
+			'',
+			'not json',
+			'[]',
+			'null',
+			JSON.stringify({ messages: [] }),
+			JSON.stringify({ prompt: 7 }),
+			JSON.stringify({ prompt: null }),
+		])
+			expect([body, buildStudyMemoryRaw(body)]).toEqual([body, undefined])
 	})
 
 	it('accepts bounded inputs and rejects repeated source ids and malformed foreign namespaces', () => {
