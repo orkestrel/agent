@@ -7,8 +7,8 @@ commit `78ea378`; do not treat its historical process or deadline entries as act
 
 ## State and scope
 
-Compaction qualification is running. At `2026-10-15T22:17:45.691Z`, metadata recorded 29 of
-96 completed products, two summaries, and latest goal `ev-08-2`. Re-read progress before acting.
+Compaction qualification is running. At `2026-10-15T22:19:23.838Z`, metadata recorded 32 of
+96 completed products, three summaries, and most recent goal `ev-09-1`. Re-read progress before acting.
 Records is sealed and labeled at 96/96. Never rerun, replay, or relabel Records for this campaign.
 The original c1 thinking comparison is graded and closed; this run is the separate q4
 thinking-off Compaction qualification, not a restart of that comparison.
@@ -253,8 +253,15 @@ The accepted code seams in `series-audit-verdict.md` and `series-repair-verdict.
 archived at Agent `78ea378`; their verdict documents can be retired. Their acceptance does
 not close the live qualification or its grading.
 
-Prepare and commit this handoff before sweeping. Remove accepted bench transcripts, briefs,
-duplicate drafts and preparation copies only after their decisions/readings are retained.
+The ready handoff was committed before cleanup at Agent `dd170a8` and Study `aed20fc`.
+The 2026-10-15 sweep removed 49 reviewed artifacts totaling 2145106 bytes: accepted bench
+transcripts/briefs, duplicate drafts/preparation copies, the quota-refused lookup artifacts,
+and the archived verdicts. The sweep helper was also retired. A native Luna checker found
+no live dependency on the candidates. After deletion, reader pins and the external build
+receipt hash still matched; progress remained at 32/96 and the supervisor error file was empty.
+
+Remove further accepted bench transcripts, briefs, duplicate drafts and preparation copies
+only after their decisions/readings are retained.
 Protect all captured runtimes/results, original c1 evidence/oracle/golden inputs, worktrees and
 physical dependencies, label batches/receipts, and canonical dispatch tools. In particular,
 the current launcher rechecks the external build receipt; deleting it invalidates the run.
