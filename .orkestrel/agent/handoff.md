@@ -1,3 +1,31 @@
+# Compaction successor decision on 2026-10-15
+
+Reuse sealed candidate-3 Records, 96/96 complete; execute no Records replay. The repaired
+Compaction-only provisional attempt ended with 21 completed goals, one attempted failure,
+and 74 unexecuted goals. Actual prompt usage 10425 exceeded its frozen projection 10423 by
+2 tokens while remaining below reserved room 11776. It is rejected under its original criteria.
+The failure, empty first summary, grading limitations, and retained seal are in `compaction.md`.
+
+Root accepted a separate Compaction-only candidate with a 512-token predictive cushion.
+The base coefficients, context/output/physical safety/recap limits, runtime, and workload stay
+fixed. This is an engineering margin selected after failure. The absolute deadline remains
+2026-10-15T07:15:45.568Z; the final launch check requires 6396760 ms plus 60000 ms cleanup.
+If that check or the successor fails, stop GPU generation. No retries or further rerun are selected.
+
+Offline development replay covers 44 retained Full/Compaction requests; all fit the cushion,
+and the zero-cushion control reproduces the +2 failure. One agent request would require earlier
+compaction. The successor reader passes 30 controls, including +2 acceptance and +513 refusal.
+These reused measurements are not held-out validation. Root freezes reader and replay hashes
+before launch. Full calibration remains inconclusive; no historical outcome changes.
+
+The create-only project is `tmp/studies/compaction-cushion-project`; output is
+`tmp/studies/compaction-cushion`. Read its `launch.json` and
+`tmp/units/compaction-cushion.{jsonl,err}` for execution state. Until those exist, it has not
+launched. The earlier provisional artifacts remain preserved. No runtime build/install is needed.
+Records semantic batches are prepared at `tmp/studies/labels-2ac2a898`; no labels are applied.
+
+The following repair protocol is retained history; the cushion decision supersedes its launch.
+
 # Series repair accepted on 2026-10-15
 
 Reuse candidate-3 Records; execute Compaction only. Actual Sonnet implemented summary admission

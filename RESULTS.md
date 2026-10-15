@@ -1,5 +1,15 @@
 # Results
 
+**Compaction gauge qualification, 2026-10-15.** The repaired Compaction-only execution completed
+21 of 96 goals, failed on attempted goal 22, and left 74 unexecuted. It stopped because the
+actual prompt was 10425 tokens against a frozen projection of 10423; the reserved prompt limit
+was 11776. This falsifies that gauge on the observed request, not the model's context capacity.
+All 27 gauged requests joined to their provider receipts. The run produced an empty summary
+and a nonempty summary; the latter relieved measured context pressure. The execution exited 1,
+uncapped, after 732962 ms. Candidate-3 Records remains sealed at 96 completed goals and is not
+rerun. Semantic grading is pending; no strategy-quality or speed conclusion follows from this
+cross-build diagnostic. See [the retained qualification record](.orkestrel/agent/compaction.md).
+
 **Study admission, 2026-10-14.** After the loader repair, the thinking-disabled capacity successor completed 48 records products with no partials, then exhausted the goal request allowance while filing judgments at goal 49. Compaction never executed. The CLI exited 1, uncapped, in 2545154 ms; public grading and reporting succeeded. The sealed result retains 48 of 192 scheduled products and 144 unexecuted outcomes. Records lookup coverage was observed; compaction-summary coverage was not. This is an admission failure, not a context or output overflow, and it supports no quality comparison. Quality execution did not start. See [the sealed execution record](.orkestrel/agent/handoff.md).
 
 **Study execution, 2026-10-14.** The prospective thinking-disabled capacity attempt stopped before model requests because the captured loader rejected the provider's installed Agent dependency. Both trials are sealed infrastructure failures: 192 unexecuted goals, no products, and zero calls across every measured role. The CLI exited 1, uncapped, in 4520 ms; independent grading and reporting succeeded. This measures a workspace-loading failure, not model capacity or task quality. Quality execution did not start. See [the execution record](.orkestrel/agent/handoff.md).
