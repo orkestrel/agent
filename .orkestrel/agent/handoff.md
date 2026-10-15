@@ -1,3 +1,34 @@
+# Final-user summary qualification failed on 2026-10-15
+
+The Compaction-only attempt sealed at 20:14 UTC after 78 complete products. Goal 79,
+`ev-20-3`, failed when the summary reached its 2048-token output cap; 17 goals were then
+unexecuted. The final wire records prompt 10408, completion 2048 and finish `length`, under
+context 20480. This is an output-limit failure, not a context-window overflow or deadline.
+Seven preceding recaps were nonempty. The failed request's cost remains retained.
+Trial duration is 2210169 ms; execute exited 1 uncapped after 2216817 ms. No retry or
+successor was launched. Records stays sealed and labeled at 96/96.
+
+Result `7b227293-6f3c-4de5-8a16-80b0859069fb` is sealed as
+`80d29d82f5ad72e6e86fd5874a83a47c0234f5302bc603b29244cb1b24ef3c56`.
+The accepted independent reader verified the retained custody and returned rejected in
+1527 ms, exit 2 uncapped, at `tmp/units/compaction-task-reader-result.json`.
+Public operational grading and reporting passed in 3404 ms and 714 ms, both exit 0 uncapped.
+Grading identity is `6202868d10d5ccb3595644bfa5947ae66b513676bd32c9e333d3825fc111856e`.
+Its whole-trial criterion marks 96 rows unsuccessful; that is not 96 independent failures or
+semantic critical violations. The public report accounts for 79 executed goals, 78 completed,
+one actual failure and 17 unexecuted. Semantic grading is absent. Qualification failed, so no
+performance screen or speedup is accepted.
+
+Run captured public Study commands from `tmp/studies/compaction-task-runtime/project`, with
+absolute result and launcher paths. The first root-cwd grade attempt refused an unadmitted
+root Contract dependency in 2460 ms; preserve that receipt. The captured-project invocation
+passed without any dependency or source change. Journals use `tmp/units/compaction-task-grade-2`
+and `compaction-task-report`. After terminal reading, the owned daemon script PID 76008,
+daemon PID 20432 and conhost PID 81760 were stopped and confirmed gone, as was wrapper PID
+83012. The user's daemon was untouched. Preserve runtime, results, instruments and receipts.
+
+The following launch record is historical; no generation is running.
+
 # Final-user summary qualification started on 2026-10-15
 
 The Compaction-only `compaction-task` attempt started at 19:37 UTC from accepted Agent
