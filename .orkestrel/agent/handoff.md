@@ -1,4 +1,43 @@
-# c1 thinking results and retained harness
+# Series state at 2026-10-15 03:59 UTC
+
+Reuse completed candidate-3 Records; rerun Compaction only. Candidate 3 is terminal:
+Records completed96/96 without partials or failures; Compaction produced63 products, failed
+at attempted goal64, and left32 unexecuted. Its sealed custody remains under
+tmp/studies/endurance-capacity-3. No quality generation is admitted by that failed capacity
+result. Separate semantic grading of retained products is supported and avoids another
+Records execution. The prospective plan is in ../study/.orkestrel/series.md, resolved from
+the Agent repository root, with performance and metrics follow-ups beside it.
+
+Agent3f7c2bd, Studye008235, and Ollamaaad1e2d implement complete-request admission,
+strict refusal, structural context components, request/wire correlation, and passive timing.
+Integrated source review and final Agent/Study gates passed; see
+[series-audit-verdict.md](series-audit-verdict.md). No version bump or publication occurred.
+
+The separate Full calibration diagnostic has ended: result5659e8cc-9595-4727-a95c-b8481663b6f6,
+seal05fb70819a5a08063ec82a5dcb3fad6b0927bbba462757ca048e2e5e1d4b52f4, output
+tmp/studies/calibration-full. Its launcher exited1, uncapped, after250683ms. It completed the
+repeated first-goal controls and10 trajectory goals, then exceeded prompt room at goal11.
+Both control bodies were identical and reported1850 prompt tokens. Its training-only fit
+was frozen before validation under tmp/studies/calibration-project. Validation is inconclusive:
+held-out positions4and8 passed projection checks, but pressure coverage and the required
+held-out population were insufficient. Do not relabel it passed, overwrite it, or launch from
+its validation. The original candidate-3 deadline remains unchanged; this diagnostic was a
+separate bounded experiment.
+
+The live diagnostic also exposed a remaining error-attribution defect: the capacity error
+crosses the installed Study worker boundary as infrastructure. The installed Study bytes
+match the sibling build; independent Astra is reproducing the bundled nominal-error boundary
+with a CPU-only fixture. Actual Opus is deciding a bounded successor validation protocol from
+the inconclusive diagnostic. Fable remains forbidden. Neither lane may rerun Records.
+
+No GPU series is running after that terminal result. Dedicated daemon11435 remains under its
+recorded cap ending2026-10-15T12:53:19.339Z; user11434 is untouched. Runtime refresh or build
+requires checking that no successor has started. The source worktrees and installed-runtime
+backups remain preserved. Temporary active-lane details belong in
+tmp/units/study-performance-handoff.md; do not read the following historical running-PID
+paragraphs as live state.
+
+## Historical c1 and successor custody
 
 The user requested a capacity repair and a bounded comparison. The failed thinking-enabled attempts are tracked in [capacity.md](capacity.md); the selected prospective successor is tracked in [endurance.md](endurance.md). The closed baseline below remains unchanged evidence.
 
