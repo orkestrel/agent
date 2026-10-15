@@ -3,7 +3,7 @@ import type { StudyTicket } from '@orkestrel/study'
 import type { ScriptedStudyOptions } from './types.js'
 import { cloneJSONValue, isRecord } from '@orkestrel/contract'
 import { randomUUID } from 'node:crypto'
-import { StudyError, readStudyFailure } from '@orkestrel/study'
+import { StudyError, failStudyTicket } from '@orkestrel/study'
 import { encodeStudyJSON } from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { readStudyToolsMessages } from './helpers.js'
@@ -62,7 +62,6 @@ export class ScriptedStudyProvider implements ProviderInterface {
 		this.#cursor++
 		this.#running = true
 		let ticket: StudyTicket | undefined
-		let terminal = false
 		const started = performance.now()
 		try {
 			const request = readStudyToolsMessages(messages)
@@ -121,7 +120,6 @@ export class ScriptedStudyProvider implements ProviderInterface {
 			})
 			if (content.length > 0) yield { channel: 'content', text: content }
 			bounded.throwIfAborted()
-			terminal = true
 			ticket.finish({
 				role: 'agent',
 				calls: 1,
@@ -139,8 +137,7 @@ export class ScriptedStudyProvider implements ProviderInterface {
 			}
 			return result
 		} catch (error) {
-			if (ticket !== undefined && !terminal && !ticket.signal.aborted)
-				ticket.fail({ ...readStudyFailure(error), role: 'agent' })
+			if (ticket !== undefined) failStudyTicket(ticket, error, 'agent')
 			throw error
 		} finally {
 			this.#running = false

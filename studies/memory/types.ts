@@ -1,22 +1,12 @@
 import type {
-	AgentError,
-	AgentOptions,
-	AgentInterface,
-	ConversationManagerInterface,
-	ConversationManagerOptions,
+	Agent,
+	LEDGER_QUESTIONS,
 	LedgerGauge,
-	LedgerInterface,
-	LedgerOptions,
-	LedgerQuestion,
-	ProviderInterface,
-	ProviderOptions,
-	ProviderRequest,
-	JudgeInterface,
-	RequestMeasure,
+	createConversationManager,
+	createLedger,
 } from '@orkestrel/agent'
-import type { JSONValue } from '@orkestrel/contract'
-import type { OllamaTiming } from '@orkestrel/ollama'
-import type { StudyContext, StudyProfile, StudyRole, StudyTicket } from '@orkestrel/study'
+import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
+import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemorySettings {
@@ -42,38 +32,27 @@ export interface StudyMemoryInput {
 	}>
 }
 
-/** Holds the admitted public Agent factories this consumer invokes. */
-export interface StudyMemorySubject {
-	readonly Agent: new (provider: ProviderInterface, options?: AgentOptions) => AgentInterface
-	readonly createLedger: (provider: ProviderInterface, options: LedgerOptions) => LedgerInterface
-	readonly createConversationManager: (
-		options?: ConversationManagerOptions,
-	) => ConversationManagerInterface
-	readonly estimateRequest: (request: ProviderRequest) => number
-	readonly measureRequest: (request: ProviderRequest) => RequestMeasure
-	readonly isAgentError: (value: unknown) => value is AgentError
-	readonly LEDGER_QUESTIONS: LedgerQuestion
+/** Holds the admitted Agent runtime capabilities every memory arm invokes, beyond the shared instrumentation's own. */
+export interface StudyMemoryRuntime extends StudyAgentRuntime {
+	readonly Agent: typeof Agent
+	readonly createConversationManager: typeof createConversationManager
 }
 
-/** Mirrors the public Ollama factory settings without adding a provider dependency. */
-export interface StudyMemoryOllamaOptions extends ProviderOptions {
-	readonly model: string
-	readonly url: string
-	readonly think?: boolean
-	/** Mirrors the Ollama `truncate` field; false refuses an oversized prompt, and omission keeps the daemon default. */
-	readonly truncate?: boolean
-	/** Mirrors the Ollama `shift` field; false refuses a context overflow, and omission keeps the daemon default. */
-	readonly shift?: boolean
-	readonly options: Readonly<Record<string, unknown>>
+/** Holds the admitted Agent capabilities only the records arm invokes. */
+export interface StudyMemoryLedger {
+	readonly createLedger: typeof createLedger
+	readonly LEDGER_QUESTIONS: typeof LEDGER_QUESTIONS
 }
 
-/** Holds the admitted public Ollama factories. */
+/** Holds the admitted Ollama capabilities every memory arm invokes. */
 export interface StudyMemoryProvider {
-	readonly createOllama: (options: StudyMemoryOllamaOptions) => ProviderInterface
-	readonly createOllamaJudge: (
-		options: StudyMemoryOllamaOptions & { readonly system: string },
-	) => JudgeInterface
-	readonly extractTiming: (record: Readonly<Record<string, unknown>>) => OllamaTiming | undefined
+	readonly createOllama: typeof createOllama
+	readonly extractTiming: typeof extractTiming
+}
+
+/** Holds the admitted Ollama capability only the records arm invokes. */
+export interface StudyMemoryClassifier {
+	readonly createOllamaJudge: typeof createOllamaJudge
 }
 
 /** Holds the passive observation switches read from the generic profile settings. */
@@ -83,24 +62,10 @@ export interface StudyMemoryObservation {
 	readonly checkpoints: ReadonlySet<string>
 }
 
-/** Holds one dispatched agent request's explicit size reading. */
-export interface StudyMemoryEstimate {
-	/** Holds the subject's estimate of the complete pre-encoding request. */
-	readonly estimate: number
-	/** Holds the gauge projection of that estimate; undefined when no gauge applies. */
-	readonly projected: number | undefined
-}
-
-/** Holds the observing provider's real delegate and measurement seams. */
-export interface StudyMemoryObserverOptions {
-	/** Holds the real provider every call is delegated to unchanged. */
-	readonly provider: ProviderInterface
-	/** Holds the admitted Agent namespace measuring requests. */
-	readonly subject: StudyMemorySubject
-	/** Holds the validated gauge that prices each reading and requires a usable actual prompt count after a successful return; undefined requires nothing. */
-	readonly gauge: LedgerGauge | undefined
-	/** Receives exactly one reading and the exact pre-encoding request it measured, synchronously, before each delegated call. */
-	readonly record: (reading: StudyMemoryEstimate, request: ProviderRequest) => void
+/** Holds the declarations only the compaction arm reads: its explicit gauge and its recap allowance. */
+export interface StudyMemoryCompaction {
+	readonly gauge: LedgerGauge
+	readonly recap: number
 }
 
 /** Names the stage a measurement was taken at: the Agent window's admission or the provider dispatch. */
@@ -135,21 +100,20 @@ export interface StudyMemoryProvenanceSource {
 	readonly composed: boolean
 }
 
-/** Holds the trial-local canonical dispatch identity the transport joins a wire request to. */
-export interface StudyMemoryDispatch {
-	readonly id: number
-	/** Holds the SHA-256 revision of the canonical request, or undefined when it could not be rendered. */
-	readonly revision: string | undefined
-}
-
 /** Holds the identity of one recorded measurement. */
 export interface StudyMemoryStamp {
 	readonly ordinal: number
 	readonly revision: string | null
 }
 
-/** Holds validated runtime dependencies for a fresh trial. */
+/**
+ * Holds the admitted modules and profile for a fresh trial.
+ * @remarks
+ * `agent` supplies the runtime the driver constructs; `subject` identifies the artifact under
+ * study and is never loaded or read here.
+ */
 export interface StudyMemoryOptions {
+	readonly agent: unknown
 	readonly subject: unknown
 	readonly provider: unknown
 	readonly profile: StudyProfile
@@ -158,77 +122,19 @@ export interface StudyMemoryOptions {
 /** Holds the shared implementation's irreducible memory treatment. */
 export type StudyMemoryArm = 'records' | 'compaction' | 'full'
 
-/** Holds a fresh session's admitted dependencies and parent cancellation. */
+/**
+ * Holds a fresh session's admitted dependencies and parent cancellation.
+ * @remarks
+ * `ledger` and `classifier` are present exactly for the records arm; no other arm requires them.
+ */
 export interface StudyMemorySessionOptions {
-	readonly subject: StudyMemorySubject
+	readonly agent: StudyMemoryRuntime
+	readonly ledger: StudyMemoryLedger | undefined
 	readonly provider: StudyMemoryProvider
+	readonly classifier: StudyMemoryClassifier | undefined
 	readonly profile: StudyProfile
 	readonly arm: StudyMemoryArm
 	readonly signal: AbortSignal
-}
-
-/** Holds one active goal's accounting and attribution. */
-export interface StudyMemoryActivity {
-	readonly goal: string
-	readonly context: StudyContext
-	/** Holds the owned public view taken before a selected goal's arrivals; undefined retains neither it nor request bodies. */
-	readonly checkpoint: JSONValue | undefined
-}
-
-/** Holds the bounded transport's immutable configuration. */
-export interface StudyMemoryTransportOptions {
-	readonly profile: StudyProfile
-	readonly signal: AbortSignal
-	/** Adds passive timing and correlation fields to existing evidence when true. */
-	readonly observe: boolean
-	/** Requires every model chat request to carry `truncate: false` and `shift: false` when true; omission verifies nothing. */
-	readonly strict?: boolean
-	/** Extracts the daemon timing of a validated terminal record. */
-	readonly timing: StudyMemoryProvider['extractTiming']
-}
-
-/** Holds a validated response terminal's actual usage and finish reason. */
-export interface StudyMemoryTerminal {
-	readonly prompt: number | undefined
-	readonly completion: number | undefined
-	readonly reason: string
-}
-
-/** Holds validated wire dispatch facts without retaining payload text. */
-export interface StudyMemoryRequest {
-	readonly role: StudyRole
-	readonly path: string
-	readonly model: string | undefined
-	readonly output: number
-	readonly bytes: number
-	readonly options: Readonly<Record<string, number>>
-	/** Reports that the request's native `truncate` and `shift` fields were verified false; omitted when nothing was verified. */
-	readonly strict?: boolean
-}
-
-/** Tracks one owned HTTP response until EOF or cancellation. */
-export interface StudyMemoryWire {
-	readonly activity: StudyMemoryActivity
-	readonly request: StudyMemoryRequest
-	readonly ticket: StudyTicket
-	readonly signal: AbortSignal
-	readonly reader: ReadableStreamDefaultReader<Uint8Array>
-	readonly decoder: TextDecoder
-	/** Holds the HTTP status the daemon answered with. */
-	readonly status: number
-	readonly started: number
-	/** Holds the trial-local request id. */
-	readonly id: number
-	/** Holds the monotonic millisecond reading taken immediately before native fetch. */
-	readonly sent: number
-	/** Holds the canonical dispatch this wire request was made for, when the caller measured one. */
-	readonly dispatch: StudyMemoryDispatch | undefined
-	bytes: number
-	text: string
-	terminal: StudyMemoryTerminal | undefined
-	/** Holds the daemon timing of the terminal row once observed. */
-	timing: OllamaTiming | undefined
-	settled: boolean
 }
 
 /** Holds mechanical predicates over retained observations. */

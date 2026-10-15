@@ -1,17 +1,16 @@
 import type { JSONValue } from '@orkestrel/contract'
+import type { StudyEvidence, StudyJudgment, StudyRubric } from '@orkestrel/study'
 import type {
-	StudyAttempt,
-	StudyEvidence,
-	StudyJudgment,
-	StudyManifest,
-	StudyRubric,
-} from '@orkestrel/study'
+	StudyAdjudication,
+	StudyGradeReading,
+	StudyGradeTarget,
+} from '@orkestrel/study/server'
 import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
-import { canonicalStringify, isArray, isObject, isRecord } from '@orkestrel/contract'
+import { isArray, isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
-import { StudyError, buildStudySchedule, isStudyRubric } from '@orkestrel/study'
-import { isStudyCustodyAttempt, isStudyCustodyEvidence } from '@orkestrel/study/server'
+import { StudyError, isStudyRubric } from '@orkestrel/study'
+import { gradeStudyEvidence } from '@orkestrel/study/server'
 import { STUDY_TOOLS_TEXT } from './constants.js'
 import { StudyToolsRefusal } from './errors.js'
 import { isStudyToolsAssertion, isStudyToolsFile, isStudyToolsFileName } from './validators.js'
@@ -185,88 +184,47 @@ export function readStudyToolsPredicate(
 }
 
 /**
+ * Reads one declared target against the independent state or trace predicate its criterion names.
+ * @param target - The declared pair with its retained attempt and evidence rows
+ * @returns The verdict, method and reason, citing the zero-based evidence row the predicate matched
+ * @throws StudyError - Thrown when the criterion's assertion is unsupported or its evidence malformed
+ * @example
+ * ```ts
+ * readStudyToolsGrade(target)
+ * ```
+ */
+export function readStudyToolsGrade(target: StudyGradeTarget): StudyGradeReading {
+	const { criterion, evidence } = target
+	if (!isStudyToolsAssertion(criterion.assertion))
+		throw new StudyError('CONFIG', 'Unsupported tools assertion')
+	const reading = readStudyToolsPredicate(criterion.assertion, criterion.goal, evidence)
+	return {
+		verdict: reading.verdict,
+		method: criterion.method === 'state' ? 'state' : 'trace',
+		reason:
+			reading.row === undefined
+				? 'No retained observation for the declared predicate'
+				: reading.verdict === 'achieved'
+					? 'Retained observation matches the independent predicate'
+					: 'Retained observation differs from the independent predicate',
+		references: reading.row === undefined ? [] : [{ file: 'evidence', row: reading.row }],
+	}
+}
+
+/**
  * Grades only retained observations against independently declared mechanism predicates.
- * @param manifest - The execution's frozen population
- * @param rubric - The independently authored state and trace predicates
- * @param attempts - The retained terminal attempts
- * @param evidence - Retained evidence rows keyed by scheduled trial id
+ * @param input - The sealed declaration, retained attempts, retained evidence and independent rubric
  * @returns Whole-horizon judgments with exact retained row references
  * @throws StudyError - Thrown when declarations, attempts or evidence are incompatible
  * @example
  * ```ts
- * gradeStudyTools(manifest, rubric, attempts, evidence)
+ * gradeStudyTools({ manifest, rubric, attempts, evidence })
  * ```
  */
-export function gradeStudyTools(
-	manifest: StudyManifest,
-	rubric: StudyRubric,
-	attempts: readonly StudyAttempt[],
-	evidence: Readonly<Record<string, readonly StudyEvidence[]>>,
-): readonly StudyJudgment[] {
-	validateStudyToolsRubric(rubric)
-	const schedule = buildStudySchedule(manifest.definition, manifest.scenarios)
-	if (
-		manifest.definition.purpose !== 'mechanism' ||
-		manifest.definition.driver !== 'tools' ||
-		canonicalStringify(schedule) !== canonicalStringify(manifest.schedule)
-	)
-		throw new StudyError('CONFIG', 'Invalid tools study schedule')
-	const trials = new Map(schedule.map((trial) => [trial.id, trial]))
-	if (
-		!attempts.every((attempt) => isStudyCustodyAttempt(attempt, manifest)) ||
-		new Set(attempts.map((attempt) => attempt.trial.id)).size !== attempts.length
-	)
-		throw new StudyError('EVIDENCE', 'Invalid or duplicate tools attempts')
-	if (
-		!isRecord(evidence) ||
-		!Object.entries(evidence).every(
-			([id, rows]) =>
-				trials.has(id) && isArray(rows) && Array.from(rows).every(isStudyCustodyEvidence),
-		)
-	)
-		throw new StudyError('EVIDENCE', 'Invalid or foreign tools evidence')
-	for (const criterion of rubric.criteria) {
-		if (
-			!manifest.scenarios.some(
-				(scenario) =>
-					scenario.id === criterion.scenario &&
-					scenario.goals.some((goal) => goal.id === criterion.goal),
-			)
-		)
-			throw new StudyError('CONFIG', 'Tools criterion references an undeclared goal')
-	}
-	const retained = new Set(attempts.map((attempt) => attempt.trial.id))
-	const judgments: StudyJudgment[] = []
-	for (const trial of schedule) {
-		for (const criterion of rubric.criteria) {
-			if (criterion.scenario !== trial.scenario) continue
-			if (!isStudyToolsAssertion(criterion.assertion))
-				throw new StudyError('CONFIG', 'Unsupported tools assertion')
-			const reading = readStudyToolsPredicate(
-				criterion.assertion,
-				criterion.goal,
-				retained.has(trial.id) ? (evidence[trial.id] ?? []) : [],
-			)
-			judgments.push(
-				Object.freeze({
-					trial: trial.id,
-					criterion: criterion.id,
-					verdict: reading.verdict,
-					method: criterion.method === 'state' ? 'state' : 'trace',
-					reason:
-						reading.row === undefined
-							? 'No retained observation for the declared predicate'
-							: reading.verdict === 'achieved'
-								? 'Retained observation matches the independent predicate'
-								: 'Retained observation differs from the independent predicate',
-					references: Object.freeze(
-						reading.row === undefined
-							? []
-							: [`trials/${trial.id}/evidence.jsonl#${reading.row + 1}`],
-					),
-				}),
-			)
-		}
-	}
-	return Object.freeze(judgments)
+export function gradeStudyTools(input: StudyAdjudication): readonly StudyJudgment[] {
+	validateStudyToolsRubric(input.rubric)
+	const { definition } = input.manifest
+	if (definition.purpose !== 'mechanism' || definition.driver !== 'tools')
+		throw new StudyError('CONFIG', 'Invalid tools study declaration')
+	return gradeStudyEvidence(input, readStudyToolsGrade)
 }

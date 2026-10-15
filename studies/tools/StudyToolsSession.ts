@@ -19,7 +19,7 @@ import { createTool, createToolManager, isToolCall } from '@orkestrel/tool'
 import { errorToMessage } from '@orkestrel/workflow'
 import { open, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
-import { StudyError, readStudyFailure } from '@orkestrel/study'
+import { StudyError, failStudyTicket } from '@orkestrel/study'
 import { encodeStudyJSON } from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
@@ -42,8 +42,8 @@ export class StudyToolsSession implements StudySessionInterface {
 
 	/**
 	 * Constructs the actual admitted Agent with real scratch tools and an explicit authority gate.
-	 * @param options - The admitted namespace and fresh recorded scratch directory
-	 * @throws StudyError - Thrown when the subject lacks the required runtime operations
+	 * @param options - The admitted runtime namespace and fresh recorded scratch directory
+	 * @throws StudyError - Thrown when the runtime lacks the required operations
 	 */
 	constructor(options: StudyToolsSessionOptions) {
 		this.#options = { ...options }
@@ -59,7 +59,7 @@ export class StudyToolsSession implements StudySessionInterface {
 				execute: (args, context) => this.#read(args, context),
 			}),
 		])
-		const agent: unknown = new options.subject.Agent(this.#provider, {
+		const agent: unknown = new options.agent.Agent(this.#provider, {
 			tools: this.#tools,
 			signal: options.signal,
 			limit: 8,
@@ -143,12 +143,10 @@ export class StudyToolsSession implements StudySessionInterface {
 					tokens: 0,
 					bytes: STUDY_TOOLS_BYTES,
 				})
-				let terminal = false
 				try {
 					ticket.signal.throwIfAborted()
 					const observed = await observeStudyToolsFile(this.#options.directory, file)
 					await context.evidence.append({ event: 'file', goal: goal.id, value: { ...observed } })
-					terminal = true
 					ticket.finish({
 						role: 'metadata',
 						calls: 1,
@@ -157,8 +155,7 @@ export class StudyToolsSession implements StudySessionInterface {
 						duration: Math.ceil(performance.now() - started),
 					})
 				} catch (error) {
-					if (!terminal && !ticket.signal.aborted)
-						ticket.fail({ ...readStudyFailure(error), role: 'metadata' })
+					failStudyTicket(ticket, error, 'metadata')
 					throw error
 				}
 			}
@@ -231,7 +228,6 @@ export class StudyToolsSession implements StudySessionInterface {
 			tokens: 0,
 			bytes: STUDY_TOOLS_BYTES,
 		})
-		let terminal = false
 		try {
 			const signal = AbortSignal.any([
 				context.signal,
@@ -245,7 +241,6 @@ export class StudyToolsSession implements StudySessionInterface {
 				value = await operation(signal)
 			} catch (error) {
 				if (!isStudyToolsRefusal(error)) throw error
-				terminal = true
 				ticket.finish({
 					role: 'tool',
 					calls: 1,
@@ -256,7 +251,6 @@ export class StudyToolsSession implements StudySessionInterface {
 				throw error
 			}
 			signal.throwIfAborted()
-			terminal = true
 			ticket.finish({
 				role: 'tool',
 				calls: 1,
@@ -266,8 +260,7 @@ export class StudyToolsSession implements StudySessionInterface {
 			})
 			return value
 		} catch (error) {
-			if (!terminal && !ticket.signal.aborted)
-				ticket.fail({ ...readStudyFailure(error), role: 'tool' })
+			failStudyTicket(ticket, error, 'tool')
 			throw error
 		}
 	}

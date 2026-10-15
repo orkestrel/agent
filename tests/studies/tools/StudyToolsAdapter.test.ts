@@ -44,13 +44,16 @@ it('validates mechanism declarations and refuses incompatible execution before c
 	const scratch = createScratch()
 	try {
 		const options = {
+			agent: fixture.agent,
 			subject: fixture.subject,
 			provider: undefined,
 			profile: fixture.profile,
 			directory: scratch.path,
 		}
 		expect(adapter.driver(options)).toBeInstanceOf(StudyToolsDriver)
-		expect(() => adapter.driver({ ...options, subject: {} })).toThrow('Invalid')
+		expect(() => adapter.driver({ ...options, agent: {} })).toThrow('Invalid')
+		// The runtime is the selected Agent; the subject only identifies the tested artifact.
+		expect(adapter.driver({ ...options, subject: {} })).toBeInstanceOf(StudyToolsDriver)
 		expect(() => adapter.driver({ ...options, provider: {} })).toThrow('scripted provider')
 		expect(scratch.names()).toEqual([])
 	} finally {

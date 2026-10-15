@@ -1,10 +1,10 @@
 import type { MemoryTrialFixture } from './types.js'
 import { describe, expect, it, vi } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import { readStudyFailure, StudyError, validateStudyInputs } from '@orkestrel/study'
+import { isStudyError, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
 import {
 	isStudyMemoryProvider,
-	isStudyMemorySubject,
+	isStudyMemoryRuntime,
 	StudyMemoryDriver,
 	StudyMemorySession,
 } from '../../../studies/memory/index.js'
@@ -207,6 +207,115 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				await session.close()
 			}
 		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('constructs from the selected runtime without reading the subject and needs Ledger and judge factories only for records', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
+		const fixture = createMemoryContext(profile)
+		const { agent, provider } = STUDY_MEMORY_MODULES
+		// The subject identifies the tested artifact: an object that throws on any read proves it is never touched.
+		const untouched = new Proxy(
+			{},
+			{
+				get: () => {
+					throw new Error('subject read')
+				},
+				has: () => {
+					throw new Error('subject read')
+				},
+			},
+		)
+		const runtime = {
+			Agent: agent.Agent,
+			createConversationManager: agent.createConversationManager,
+			estimateRequest: agent.estimateRequest,
+			measureRequest: agent.measureRequest,
+			isAgentError: agent.isAgentError,
+		}
+		const lean = { createOllama: provider.createOllama, extractTiming: provider.extractTiming }
+		const records = { id: 'records', scenario: 'public', arm: 'records', repetition: 0 }
+		try {
+			// The runtime is the selected Agent: a valid subject cannot stand in for an invalid runtime.
+			expect(
+				() => new StudyMemoryDriver({ agent: untouched, subject: agent, provider, profile }),
+			).toThrow(expect.objectContaining({ code: 'CONFIG' }))
+			const driver = new StudyMemoryDriver({
+				agent: runtime,
+				subject: untouched,
+				provider: lean,
+				profile,
+			})
+			for (const arm of ['full', 'compaction']) {
+				const session = await driver.open(
+					{ id: arm, scenario: 'public', arm, repetition: 0 },
+					fixture.context.signal,
+				)
+				await session.close()
+			}
+			await expect(driver.open(records, fixture.context.signal)).rejects.toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('Ledger') }),
+			)
+			// A full runtime without the judge factory still refuses the records arm.
+			await expect(
+				new StudyMemoryDriver({ agent, subject: untouched, provider: lean, profile }).open(
+					records,
+					fixture.context.signal,
+				),
+			).rejects.toThrow(expect.objectContaining({ code: 'CONFIG' }))
+			const session = await new StudyMemoryDriver({
+				agent,
+				subject: untouched,
+				provider,
+				profile,
+			}).open(records, fixture.context.signal)
+			await session.close()
+			expect(server.requests).toEqual([])
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('runs the full arm with no declared judge or recap and pins only the served model', async () => {
+		const server = await createMemoryServer()
+		const base = buildMemoryProfile({ url: server.url })
+		const declared = base.provider
+		if (declared === undefined) throw new Error('Missing fixture provider')
+		const profile = {
+			...base,
+			provider: {
+				...declared,
+				judge: undefined,
+				digest: { model: declared.digest.model, judge: undefined },
+			},
+			room: { ...base.room, recap: undefined },
+		}
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'plain', scenario: 'public', arm: 'full', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			await expect(session.execute(WINDOW_GOAL, fixture.context)).resolves.toEqual({
+				value: { content: 'Receipt retained.' },
+				partial: false,
+			})
+			expect(readMemoryEvents(fixture.evidence, 'inventory')).toEqual([
+				{ model: 'a'.repeat(64) },
+				{ model: 'a'.repeat(64) },
+			])
+			expect(readMemoryEvents(fixture.evidence, 'support').map((value) => value.model)).toEqual([
+				'model',
+				'model',
+			])
+			expect(server.requests.some((request) => request.body.includes('judge'))).toBe(false)
+			expect(fixture.context.meter.usage.some((row) => row.role === 'judge')).toBe(false)
+		} finally {
+			await session.close()
 			fixture.close()
 			await server.close()
 		}
@@ -1014,7 +1123,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				() => undefined,
 				(reason: unknown) => reason,
 			)
-			expect(refused).toBeInstanceOf(StudyError)
+			expect(isStudyError(refused)).toBe(true)
 			expect(refused).toMatchObject({
 				code: 'CAPACITY',
 				failure: { cause: 'capacity', role: 'agent' },
@@ -1507,7 +1616,7 @@ describe('summary admission under the Compaction gauge', () => {
 						() => undefined,
 						(error: unknown) => error,
 					)
-				expect(latched).toBeInstanceOf(StudyError)
+				expect(isStudyError(latched)).toBe(true)
 				expect(latched).toMatchObject({ code })
 				expect(readStudyFailure(latched)).toMatchObject({ cause, role: 'summary' })
 			} finally {
@@ -1515,6 +1624,92 @@ describe('summary admission under the Compaction gauge', () => {
 				fixture.close()
 				await server.close()
 			}
+		},
+	)
+
+	it.each([
+		['an empty', ''],
+		['a whitespace-only', ' \n\t '],
+	])(
+		'rejects %s completed summary after retaining its exact output and usage, before any later dispatch',
+		async (_name, content) => {
+			const server = await createMemoryServer([
+				{ path: '/api/chat', body: buildMemoryReply({ content }) },
+			])
+			const profile = buildMemoryProfile({
+				url: server.url,
+				room: STUDY_MEMORY_SUMMARY_ROOM,
+				settings: { ...STUDY_MEMORY_SETTINGS, observe: true },
+			})
+			const fixture = createMemoryContext(profile)
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'blank', scenario: 'public', arm: 'compaction', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				const goal = buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0]
+				if (goal === undefined) throw new Error('Missing summary goal')
+				const failure = await session.execute(goal, fixture.context).then(
+					() => undefined,
+					(error: unknown) => error,
+				)
+				expect(isStudyError(failure)).toBe(true)
+				expect(failure).toMatchObject({
+					code: 'FAULT',
+					message: 'Summary returned no usable content',
+				})
+				expect(readStudyFailure(failure)).toMatchObject({ cause: 'content', role: 'summary' })
+				// The rejected output is retained byte for byte, ahead of the refusal.
+				const summaries = readMemoryEvents(fixture.evidence, 'summary')
+				expect(summaries).toHaveLength(1)
+				expect(summaries[0]?.content).toBe(content)
+				// Only the summary reached the model: no agent request or tool dispatch followed.
+				expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+				expect(readMemoryEvents(fixture.evidence, 'lookup')).toEqual([])
+				// The actual summary usage stays accounted and no agent usage exists.
+				const summaryTokens = fixture.context.meter.usage
+					.filter((row) => row.role === 'summary')
+					.map((row) => row.tokens)
+				// Unknown summary usage must refuse the fixture, never count as zero.
+				expect(summaryTokens.length).toBeGreaterThan(0)
+				expect(summaryTokens.every((tokens) => tokens !== undefined)).toBe(true)
+				expect(summaryTokens.reduce<number>((sum, tokens) => sum + (tokens ?? 0), 0)).toBe(12)
+				expect(fixture.context.meter.usage.some((row) => row.role === 'agent')).toBe(false)
+				// The failure is latched, so the next goal rethrows it instead of dispatching.
+				const latched = await session
+					.execute(
+						{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
+						fixture.context,
+					)
+					.then(
+						() => undefined,
+						(error: unknown) => error,
+					)
+				expect(readStudyFailure(latched)).toMatchObject({ cause: 'content', role: 'summary' })
+				expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+			} finally {
+				await session.close()
+				fixture.close()
+				await server.close()
+			}
+		},
+	)
+
+	it.each(['x', ' x\n'])(
+		'returns the nonblank summary %j unchanged into the next agent request',
+		async (content) => {
+			const result = await runMemorySummary(
+				STUDY_MEMORY_SUMMARY_FOLDS.below,
+				400,
+				[{ path: '/api/chat', body: buildMemoryReply({ content }) }],
+				true,
+			)
+			expect(result.failure).toBeUndefined()
+			const chats = result.requests.filter((request) => request.path === '/api/chat')
+			expect(chats).toHaveLength(2)
+			expect(chats[1]?.body).toContain(JSON.stringify(`[Summary of earlier messages] ${content}`))
+			expect(readMemoryEvents(result.evidence, 'summary')[0]?.content).toBe(content)
+			expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
 		},
 	)
 
@@ -1644,14 +1839,16 @@ describe('passive observation of actual memory requests', () => {
 			await expect(runMemoryTrial({ ...base, settings })).rejects.toThrow(
 				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
 			)
-			const { subject: admitted, provider: ollama } = STUDY_MEMORY_MODULES
-			if (!isStudyMemorySubject(admitted) || !isStudyMemoryProvider(ollama))
+			const { agent: admitted, provider: ollama } = STUDY_MEMORY_MODULES
+			if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
 				throw new Error('Missing admitted modules')
 			expect(
 				() =>
 					new StudyMemorySession({
-						subject: admitted,
+						agent: admitted,
+						ledger: undefined,
 						provider: ollama,
+						classifier: undefined,
 						profile: buildMemoryProfile({ url: 'http://127.0.0.1:1', settings }),
 						arm: 'full',
 						signal: new AbortController().signal,

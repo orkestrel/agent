@@ -5,6 +5,7 @@ import { expect, it } from 'vitest'
 import {
 	gradeStudyTools,
 	observeStudyToolsFile,
+	readStudyToolsGrade,
 	readStudyToolsMessages,
 	readStudyToolsPredicate,
 	resolveStudyToolsPath,
@@ -145,21 +146,63 @@ it('refuses unsupported assertions, foreign attempts/evidence and duplicate atte
 			criteria: fixture.rubric.criteria.map((criterion) => ({ ...criterion, method: 'semantic' })),
 		}),
 	).toThrow('Unsupported')
-	expect(
-		gradeStudyTools(manifest, fixture.rubric, [], {}).every(
-			(judgment) => judgment.verdict === 'unknown',
-		),
-	).toBe(true)
-	expect(() => gradeStudyTools(manifest, fixture.rubric, [attempt, attempt], {})).toThrow(
-		'duplicate',
-	)
+	const input = { manifest, rubric: fixture.rubric, attempts: [], evidence: {} }
+	expect(gradeStudyTools(input).every((judgment) => judgment.verdict === 'unknown')).toBe(true)
+	expect(() => gradeStudyTools({ ...input, attempts: [attempt, attempt] })).toThrow('duplicate')
 	expect(() =>
-		gradeStudyTools(
-			manifest,
-			fixture.rubric,
-			[{ ...attempt, trial: { ...trial, id: 'foreign' } }],
-			{},
-		),
+		gradeStudyTools({
+			...input,
+			attempts: [{ ...attempt, trial: { ...trial, id: 'foreign' } }],
+		}),
 	).toThrow('Invalid')
-	expect(() => gradeStudyTools(manifest, fixture.rubric, [], { foreign: [] })).toThrow('foreign')
+	expect(() => gradeStudyTools({ ...input, evidence: { foreign: [] } })).toThrow('foreign')
+	expect(() =>
+		gradeStudyTools({
+			...input,
+			manifest: { ...manifest, definition: { ...manifest.definition, purpose: 'quality' } },
+		}),
+	).toThrow('declaration')
+})
+
+it('cites the zero-based matched row as a one-based retained reference and keeps unmatched pairs unknown', () => {
+	const rows: readonly StudyEvidence[] = [
+		{ event: 'tool', goal: 'save', value: { name: 'write', success: true } },
+		{ event: 'tool', goal: 'save', value: { name: 'read', success: true } },
+	]
+	const target = {
+		trial: { id: 'r1-s1-a1', scenario: 'write', arm: 'agent', repetition: 0 },
+		criterion: {
+			id: 'read',
+			scenario: 'write',
+			goal: 'save',
+			method: 'trace' as const,
+			critical: false,
+			assertion: { observation: 'tool', name: 'read', success: true },
+		},
+		attempt: undefined,
+		evidence: rows,
+	}
+	expect(readStudyToolsGrade(target)).toEqual({
+		verdict: 'achieved',
+		method: 'trace',
+		reason: 'Retained observation matches the independent predicate',
+		references: [{ file: 'evidence', row: 1 }],
+	})
+	expect(
+		readStudyToolsGrade({
+			...target,
+			criterion: { ...target.criterion, assertion: { observation: 'denial', name: 'read' } },
+		}),
+	).toEqual({
+		verdict: 'unknown',
+		method: 'trace',
+		reason: 'No retained observation for the declared predicate',
+		references: [],
+	})
+	expect(() =>
+		readStudyToolsGrade({
+			...target,
+			criterion: { ...target.criterion, assertion: { unsupported: true } },
+		}),
+	).toThrow('Unsupported')
 })

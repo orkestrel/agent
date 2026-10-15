@@ -7,7 +7,7 @@ import {
 	isStudyToolsInput,
 	isStudyToolsRead,
 	isStudyToolsResponse,
-	isStudyToolsSubject,
+	isStudyToolsRuntime,
 	isStudyToolsWrite,
 } from '../../../studies/tools/validators.js'
 import { parseStudyToolsInput } from '../../../studies/tools/parsers.js'
@@ -16,11 +16,11 @@ import { loadStudyToolsFixture } from '../../setupStudy.js'
 
 it('validates actual admitted constructors and bounds every declared workload without coercion', async () => {
 	const fixture = await loadStudyToolsFixture()
-	expect(isStudyToolsSubject(fixture.subject)).toBe(true)
-	expect(isStudyToolsSubject({})).toBe(false)
-	expect(isStudyToolsSubject({ Agent: () => undefined })).toBe(false)
+	expect(isStudyToolsRuntime(fixture.agent)).toBe(true)
+	expect(isStudyToolsRuntime({})).toBe(false)
+	expect(isStudyToolsRuntime({ Agent: () => undefined })).toBe(false)
 	expect(
-		isStudyToolsSubject(
+		isStudyToolsRuntime(
 			new Proxy(
 				{},
 				{
@@ -31,9 +31,9 @@ it('validates actual admitted constructors and bounds every declared workload wi
 			),
 		),
 	).toBe(false)
-	expect(isStudyToolsSubject({ Agent: function Agent() {} })).toBe(true)
+	expect(isStudyToolsRuntime({ Agent: function Agent() {} })).toBe(true)
 	expect(
-		isStudyToolsSubject({
+		isStudyToolsRuntime({
 			get Agent() {
 				throw new Error('getter')
 			},

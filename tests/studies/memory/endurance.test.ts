@@ -5,6 +5,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { buildStudySchedule, parseStudyProfile, validateStudyInputs } from '@orkestrel/study'
 import { createStudyAdapter, isStudyMemoryInput } from '../../../studies/memory/index.js'
 import {
+	buildCustodyManifest,
 	buildMemoryProfile,
 	loadMemoryInputs,
 	STUDY_ENDURANCE_BOUNDARIES,
@@ -253,6 +254,7 @@ describe('prospective public endurance declarations', () => {
 		)
 		expect(q4).toMatchObject({
 			name: 'q4',
+			agent: 'dist/src/core/index.js',
 			subject: 'dist/src/core/index.js',
 			qualification: 'tmp/studies/endurance-capacity-2',
 			provider: {
@@ -308,29 +310,18 @@ describe('prospective public endurance declarations', () => {
 		).toBe(true)
 		const schedule = buildStudySchedule(quality.definition, quality.scenarios)
 		const judgments = createStudyAdapter().grade({
-			manifest: {
-				version: 1,
-				id: 'fixture',
-				created: '2026-10-14',
-				definition: quality.definition,
-				scenarios: quality.scenarios,
-				schedule,
-				bounds: profile.bounds,
-				qualification: undefined,
-				host: {},
-				identity: {
-					subject: 'subject',
-					provider: 'provider',
-					instrument: 'instrument',
-					fixtures: 'fixtures',
-					profile: 'profile',
-				},
-			},
+			manifest: buildCustodyManifest(
+				quality.definition,
+				quality.scenarios,
+				profile.bounds,
+				'e'.repeat(64),
+			),
 			rubric: quality.rubric,
 			attempts: schedule.map((trial) => ({
 				trial,
 				duration: 1,
 				failure: undefined,
+				executed: true,
 				observations: quality.scenarios.flatMap((scenario) =>
 					scenario.goals.map((goal) => ({
 						goal: goal.id,
@@ -338,6 +329,7 @@ describe('prospective public endurance declarations', () => {
 						failure: undefined,
 						usage: [],
 						duration: 1,
+						executed: true,
 					})),
 				),
 			})),

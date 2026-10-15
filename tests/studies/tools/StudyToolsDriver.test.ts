@@ -6,13 +6,31 @@ import { StudyToolsDriver } from '../../../studies/tools/StudyToolsDriver.js'
 import { loadStudyToolsFixture } from '../../setupStudy.js'
 import { createStudyMeterFixture } from '../../setupStudy.js'
 
-it('rejects malformed subjects and unsupported arms, serializes a real session and closes only its private child', async () => {
+it('rejects malformed runtimes and unsupported arms, serializes a real session and closes only its private child', async () => {
 	const fixture = await loadStudyToolsFixture()
 	const scratch = createScratch({ files: { 'sentinel.txt': 'keep' } })
 	const meter = createStudyMeterFixture(fixture.profile.bounds)
+	// The subject identifies the tested artifact: an object that throws on any read proves the driver never touches it.
+	const untouched = new Proxy(
+		{},
+		{
+			get: () => {
+				throw new Error('subject read')
+			},
+			has: () => {
+				throw new Error('subject read')
+			},
+		},
+	)
 	try {
-		expect(() => new StudyToolsDriver({ subject: {}, directory: scratch.path })).toThrow('Invalid')
-		const driver = new StudyToolsDriver({ subject: fixture.subject, directory: scratch.path })
+		expect(
+			() => new StudyToolsDriver({ agent: {}, subject: fixture.subject, directory: scratch.path }),
+		).toThrow('Invalid')
+		const driver = new StudyToolsDriver({
+			agent: fixture.agent,
+			subject: untouched,
+			directory: scratch.path,
+		})
 		const trial = fixture.manifest.schedule[0]
 		const goal = fixture.manifest.scenarios[0]?.goals[0]
 		if (trial === undefined || goal === undefined) throw new Error('Missing declared tools work')

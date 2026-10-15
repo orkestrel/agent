@@ -7,11 +7,12 @@ import type {
 	StudyScope,
 } from '@orkestrel/study'
 
-/** Holds actual declarations and the existing built subject used by CPU tool proofs. */
+/** Holds actual declarations and the existing built Agent used by CPU tool proofs, as both the runtime and the tested subject. */
 export interface StudyToolsFixture {
 	readonly manifest: StudyManifest
 	readonly rubric: StudyRubric
 	readonly profile: StudyProfile
+	readonly agent: unknown
 	readonly subject: unknown
 }
 

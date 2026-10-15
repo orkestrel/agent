@@ -37,7 +37,11 @@ export class StudyToolsAdapter implements StudyAdapterInterface {
 	driver(options: StudyDriverOptions): StudyDriverInterface {
 		if (options.provider !== undefined)
 			throw new StudyError('CONFIG', 'Tools mechanism uses its declared scripted provider')
-		return new StudyToolsDriver({ subject: options.subject, directory: options.directory })
+		return new StudyToolsDriver({
+			agent: options.agent,
+			subject: options.subject,
+			directory: options.directory,
+		})
 	}
 
 	/** Grades independent state and trace predicates against retained observations.
@@ -45,6 +49,6 @@ export class StudyToolsAdapter implements StudyAdapterInterface {
 	 * @returns Readings with exact evidence references and honest unknowns.
 	 */
 	grade(input: StudyAdjudication): readonly StudyJudgment[] {
-		return gradeStudyTools(input.manifest, input.rubric, input.attempts, input.evidence)
+		return gradeStudyTools(input)
 	}
 }

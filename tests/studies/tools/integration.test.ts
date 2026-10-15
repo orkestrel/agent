@@ -34,6 +34,7 @@ it('inspects the shipped package-root profile against the real offline artifact 
 	)
 	const resolved = {
 		...profile,
+		agent: realpathSync(resolve(root, profile.agent)),
 		subject: realpathSync(resolve(root, profile.subject)),
 		roots: profile.roots.map((packageRoot) => realpathSync(resolve(root, packageRoot))),
 	}
@@ -55,7 +56,11 @@ it('executes all declared tools goals through the actual built Agent and retains
 		const work = scratch.ensure('work')
 		const store = new StudyResults({ directory, manifest: fixture.manifest })
 		await store.create()
-		const driver = new StudyToolsDriver({ subject: fixture.subject, directory: work })
+		const driver = new StudyToolsDriver({
+			agent: fixture.agent,
+			subject: fixture.subject,
+			directory: work,
+		})
 		const parent = new AbortController()
 		const attempts = await new StudySeries({
 			manifest: fixture.manifest,
@@ -98,7 +103,12 @@ it('executes all declared tools goals through the actual built Agent and retains
 		const evidence: Record<string, readonly StudyEvidence[]> = {}
 		for (const trial of fixture.manifest.schedule)
 			evidence[trial.id] = await readStudyToolsEvidence(directory, trial.id)
-		const judgments = gradeStudyTools(result.manifest, fixture.rubric, result.attempts, evidence)
+		const judgments = gradeStudyTools({
+			manifest: result.manifest,
+			rubric: fixture.rubric,
+			attempts: result.attempts,
+			evidence,
+		})
 		expect(judgments).toHaveLength(22)
 		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
 		expect(
@@ -170,7 +180,11 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 		await store.create()
 		const attempts = await new StudySeries({
 			manifest,
-			driver: new StudyToolsDriver({ subject: fixture.subject, directory: work }),
+			driver: new StudyToolsDriver({
+				agent: fixture.agent,
+				subject: fixture.subject,
+				directory: work,
+			}),
 			store,
 			signal: new AbortController().signal,
 		}).execute()
@@ -203,7 +217,7 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 			...fixture.rubric,
 			criteria: fixture.rubric.criteria.filter((criterion) => criterion.scenario === 'write'),
 		}
-		const judgments = gradeStudyTools(manifest, rubric, attempts, evidence)
+		const judgments = gradeStudyTools({ manifest, rubric, attempts, evidence })
 		expect(judgments).toHaveLength(6)
 		expect(
 			judgments.every(

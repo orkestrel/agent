@@ -9,14 +9,20 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { ToolCall } from '@orkestrel/tool'
 import type { StudyContext, StudyJudgment } from '@orkestrel/study'
 
-/** Holds the admitted namespace and exclusive parent scratch directory. */
+/**
+ * Holds the admitted modules and exclusive parent scratch directory.
+ * @remarks
+ * `agent` supplies the runtime whose constructor the driver invokes; `subject` identifies the
+ * artifact under study and is never loaded or read here.
+ */
 export interface StudyToolsOptions {
+	readonly agent: unknown
 	readonly subject: unknown
 	readonly directory: string
 }
 
 /** Holds the one admitted built constructor the consumer invokes. */
-export interface StudyToolsSubject {
+export interface StudyToolsRuntime {
 	readonly Agent: new (provider: ProviderInterface, options?: AgentOptions) => unknown
 }
 
@@ -56,7 +62,7 @@ export interface ScriptedStudyOptions {
 
 /** Holds the fresh trial resources supplied by the driver. */
 export interface StudyToolsSessionOptions {
-	readonly subject: StudyToolsSubject
+	readonly agent: StudyToolsRuntime
 	readonly directory: string
 	readonly signal: AbortSignal
 }

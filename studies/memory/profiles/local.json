@@ -1,5 +1,6 @@
 {
 	"name": "local",
+	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
 		".",

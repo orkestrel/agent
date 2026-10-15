@@ -1,14 +1,11 @@
 import type {
 	MemoryAdmissionFixture,
 	MemoryContextFixture,
-	MemoryFailureFixture,
 	MemoryFailureResult,
 	MemoryNativeFixture,
-	MemoryObserverFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryServerFixture,
-	MemoryStreamFixture,
 	MemoryTrialFixture,
 	MemoryTrialResult,
 	MemoryUsageFixture,
@@ -17,14 +14,16 @@ import type {
 	StudyServicePackage,
 	StudyServiceResult,
 } from './studies/memory/types.js'
-import type { LedgerGauge, ProviderDelta, ProviderResult, ThinkingReplay } from '@orkestrel/agent'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
 	StudyAttempt,
 	StudyBounds,
+	StudyCriterion,
+	StudyDefinition,
 	StudyGrading,
 	StudyJudgment,
 	StudyManifest,
+	StudyScenario,
 	StudyTrial,
 	StudyEvidence,
 	StudyGoal,
@@ -34,6 +33,7 @@ import type {
 } from '@orkestrel/study'
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
+import type { JSONValue } from '@orkestrel/contract'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import {
 	parseStudyDefinition,
@@ -47,12 +47,8 @@ import {
 	StudyScope,
 } from '@orkestrel/study'
 import { isStudyCustodyEvidence } from '@orkestrel/study/server'
-import {
-	isStudyMemorySubject,
-	StudyMemoryDriver,
-	StudyMemoryObserver,
-} from '../studies/memory/index.js'
-import * as subject from '../dist/src/core/index.js'
+import { StudyMemoryDriver } from '../studies/memory/index.js'
+import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
@@ -62,8 +58,8 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-/** Composes the selected built Agent with the installed public Ollama provider. */
-export const STUDY_MEMORY_MODULES = Object.freeze({ subject, provider })
+/** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
+export const STUDY_MEMORY_MODULES = Object.freeze({ agent, subject: agent, provider })
 
 /** Pins the identity gauge compaction fixtures declare explicitly; it prices a request at its raw estimate. */
 export const STUDY_MEMORY_SETTINGS = Object.freeze({
@@ -239,14 +235,16 @@ export function createStudyServiceFixture(
 		if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
 		bounds[scope] = { ...limit, duration }
 	}
+	const entry = join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js')
 	scratch.write(
 		'studies/memory/profiles/local.json',
 		JSON.stringify({
 			...raw,
 			name: 'local',
 			settings: STUDY_MEMORY_SETTINGS,
-			subject: join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js'),
-			roots: packages.map((entry) => entry.target),
+			agent: entry,
+			subject: entry,
+			roots: packages.map((captured) => captured.target),
 			bounds,
 			provider: {
 				entry: join(scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
@@ -470,117 +468,6 @@ export function buildMemoryCall(options: MemoryReplyFixture = {}): string {
 	})
 }
 
-/** Builds a streamed protocol reply: one nonterminal row per content part, then a terminal row with the reply's counts.
- * @param parts - Content chunks in delta order.
- * @param options - Terminal row overrides; its content is ignored.
- * @returns Newline-delimited protocol rows.
- */
-export function buildMemoryStream(
-	parts: readonly string[],
-	options: MemoryReplyFixture = {},
-): string {
-	const rows = parts.map(
-		(content) =>
-			`${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content } })}\n`,
-	)
-	return rows.join('') + buildMemoryReply({ ...options, content: '' })
-}
-
-/** Drains a provider stream, keeping both the yielded deltas and the returned result.
- * @param stream - The generator to drain.
- * @returns Deltas in yield order and the assembled result.
- */
-export async function readMemoryStream(
-	stream: AsyncGenerator<ProviderDelta, ProviderResult>,
-): Promise<MemoryStreamFixture> {
-	const deltas: ProviderDelta[] = []
-	let next = await stream.next()
-	while (!next.done) {
-		deltas.push(next.value)
-		next = await stream.next()
-	}
-	return { deltas, result: next.value }
-}
-
-/** Pins one complete provider request: a user message, an advertised tool and a per-call option. */
-export const STUDY_MEMORY_OBSERVER_REQUEST = Object.freeze({
-	messages: Object.freeze([{ id: 'm1', role: 'user' as const, content: 'Count the orders' }]),
-	tools: Object.freeze([
-		Object.freeze({
-			name: 'lookup',
-			description: 'Reads a record',
-			parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-		}),
-	]),
-	options: Object.freeze({ think: false }),
-})
-
-/** Pins the reply an observer with STUDY_MEMORY_FIXED_PROJECTION must pass: a prompt equal to the projection. */
-export const STUDY_MEMORY_PROJECTION_PASS = Object.freeze({
-	name: 'a prompt equal to the projection',
-	reply: Object.freeze({ prompt: 101 }),
-})
-
-/** Pins the replies that miss STUDY_MEMORY_FIXED_PROJECTION (101) upward by 1 and by 35 and stay far inside the reserved room, so a gauged observer must return them unchanged. */
-export const STUDY_MEMORY_PROJECTION_MISSES = Object.freeze([
-	Object.freeze({
-		name: 'a prompt one over the projection',
-		reply: Object.freeze({ prompt: 102 }),
-	}),
-	Object.freeze({
-		name: 'a prompt thirty-five over the projection',
-		reply: Object.freeze({ prompt: 136 }),
-	}),
-])
-
-/** Pins the replies an observer with STUDY_MEMORY_FIXED_PROJECTION must refuse for carrying no usable prompt count, with the exact error each carries. */
-export const STUDY_MEMORY_PROJECTION_REFUSALS = Object.freeze([
-	Object.freeze({
-		name: 'unknown counts',
-		reply: Object.freeze({ unknown: true }),
-		code: 'FAULT',
-		failure: Object.freeze({
-			cause: 'infrastructure',
-			message: 'Gauged request returned no usable prompt count',
-			role: 'agent',
-		}),
-	}),
-	Object.freeze({
-		name: 'a zero prompt count',
-		reply: Object.freeze({ prompt: 0 }),
-		code: 'FAULT',
-		failure: Object.freeze({
-			cause: 'infrastructure',
-			message: 'Gauged request returned no usable prompt count',
-			role: 'agent',
-		}),
-	}),
-])
-
-/** Pins the exact agent chat body the default fixture profile admits, before any native control is added. */
-export const STUDY_MEMORY_CHAT_BODY = Object.freeze({
-	model: 'model',
-	stream: true,
-	think: false,
-	options: Object.freeze({ num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 }),
-})
-
-/** Pins the native control members a strict chat request must refuse, each as the fields it adds to STUDY_MEMORY_CHAT_BODY. */
-export const STUDY_MEMORY_STRICT_REFUSALS = Object.freeze([
-	Object.freeze({ name: 'both omitted', fields: Object.freeze({}) }),
-	Object.freeze({ name: 'shift omitted', fields: Object.freeze({ truncate: false }) }),
-	Object.freeze({ name: 'truncate omitted', fields: Object.freeze({ shift: false }) }),
-	Object.freeze({
-		name: 'truncate enabled',
-		fields: Object.freeze({ truncate: true, shift: false }),
-	}),
-	Object.freeze({ name: 'shift enabled', fields: Object.freeze({ truncate: false, shift: true }) }),
-	Object.freeze({
-		name: 'a non-boolean truncate',
-		fields: Object.freeze({ truncate: null, shift: false }),
-	}),
-])
-
 /** Pins the human message of the live Ollama 0.40.3 context refusal. */
 export const STUDY_MEMORY_NATIVE_MESSAGE =
 	'request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it'
@@ -597,247 +484,6 @@ export const STUDY_MEMORY_NATIVE_ERROR = Object.freeze({
 /** Pins the exact outer body recorded from that live refusal: `error` is a string that holds the structured JSON, not a nested object. */
 export const STUDY_MEMORY_NATIVE_BODY =
 	'{"error":"{\\"error\\":{\\"code\\":400,\\"message\\":\\"request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it\\",\\"type\\":\\"exceed_context_size_error\\",\\"n_prompt_tokens\\":8204,\\"n_ctx\\":2048}}"}'
-
-/** Pins the native error values and the failure each must read as, with the substrings its readable reason must keep. */
-export const STUDY_MEMORY_FAILURE_CASES: readonly MemoryFailureFixture[] = Object.freeze([
-	{
-		name: 'a structured error object',
-		value: { error: STUDY_MEMORY_NATIVE_ERROR },
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
-	},
-	{
-		name: 'the exact live string-wrapped body',
-		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
-	},
-	{
-		name: 'the exact live string-wrapped body on HTTP 400',
-		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
-		status: 400,
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error', 'HTTP 400'],
-	},
-	{
-		name: 'a string holding the bare error object',
-		value: { error: JSON.stringify(STUDY_MEMORY_NATIVE_ERROR) },
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_error'],
-	},
-	{
-		name: 'an object that wraps the error object once',
-		value: { error: { error: STUDY_MEMORY_NATIVE_ERROR } },
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'an error object without a code',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, code: undefined } },
-		code: 'CAPACITY',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'plain text that mentions the context',
-		value: { error: 'the prompt exceeds the available context size' },
-		code: 'FAULT',
-		reason: ['the prompt exceeds the available context size'],
-	},
-	{
-		name: 'context text under another native type',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'invalid_request_error' } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'invalid_request_error'],
-	},
-	{
-		name: 'a type that only resembles the capacity type',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'exceed_context_size_errors' } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'exceed_context_size_errors'],
-	},
-	{
-		name: 'the capacity type in another case',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: 'Exceed_Context_Size_Error' } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'an error object without a type',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, type: undefined } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a prompt count equal to the context',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 2048 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a prompt count below the context',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 100 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a zero context count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: 0 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a negative prompt count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: -8204, n_ctx: -9000 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a fractional prompt count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: 8204.5 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a prompt count written as text',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: '8204' } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a NaN context count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: Number.NaN } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'an infinite prompt count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: Number.POSITIVE_INFINITY } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a missing prompt count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_prompt_tokens: undefined } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'a missing context count',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, n_ctx: undefined } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'an error code other than 400',
-		value: { error: { ...STUDY_MEMORY_NATIVE_ERROR, code: 500 } },
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE],
-	},
-	{
-		name: 'the live body on another HTTP status',
-		value: parseJSON(STUDY_MEMORY_NATIVE_BODY),
-		status: 500,
-		code: 'FAULT',
-		reason: [STUDY_MEMORY_NATIVE_MESSAGE, 'HTTP 500'],
-	},
-	{
-		name: 'a string that wraps a string that wraps the error',
-		value: {
-			error: JSON.stringify({ error: JSON.stringify({ error: STUDY_MEMORY_NATIVE_ERROR }) }),
-		},
-		code: 'FAULT',
-		reason: ['Ollama error'],
-	},
-	{
-		name: 'a string that decodes to a JSON string',
-		value: { error: '"model not found"' },
-		code: 'FAULT',
-		reason: ['"model not found"'],
-	},
-	{
-		name: 'a numeric error member',
-		value: { error: 7 },
-		code: 'FAULT',
-		reason: ['Malformed Ollama error'],
-	},
-	{
-		name: 'a null error member',
-		value: { error: null },
-		code: 'FAULT',
-		reason: ['Malformed Ollama error'],
-	},
-	{
-		name: 'a blank error string',
-		value: { error: '  ' },
-		code: 'FAULT',
-		reason: ['Malformed Ollama error'],
-	},
-	{
-		name: 'an array error member',
-		value: { error: [STUDY_MEMORY_NATIVE_ERROR] },
-		code: 'FAULT',
-		reason: ['Malformed Ollama error'],
-	},
-	{
-		name: 'an empty error object on HTTP 500',
-		value: { error: {} },
-		status: 500,
-		code: 'FAULT',
-		reason: ['Malformed Ollama HTTP 500 error'],
-	},
-])
-
-/** Pins values that carry no `error` member and so must read as no failure at all. */
-export const STUDY_MEMORY_NO_FAILURES: readonly unknown[] = Object.freeze([
-	undefined,
-	null,
-	'error',
-	['error'],
-	{},
-	{ done: true },
-	{ model: 'model', done: false, message: { role: 'assistant', content: 'error' } },
-])
-
-/** Pins a protocol reply that streams one content row and then holds the response open without a terminal row. */
-export const STUDY_MEMORY_HUNG_STREAM = Object.freeze({
-	path: '/api/chat',
-	body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'par' } })}\n`,
-	open: true,
-})
-
-/** Wraps a real installed Ollama provider in the observer, recording every reading it takes.
- * @param url - Protocol fixture origin.
- * @param gauge - Gauge to enforce; undefined enforces nothing.
- * @param replay - Replay policy the real provider is constructed with; omitted keeps its default.
- * @returns The observer, its delegate and the recorded readings.
- */
-export function createMemoryObserver(
-	url: string,
-	gauge: LedgerGauge | undefined,
-	replay?: ThinkingReplay,
-): MemoryObserverFixture {
-	const { subject: admitted } = STUDY_MEMORY_MODULES
-	if (!isStudyMemorySubject(admitted)) throw new Error('Missing admitted Agent subject')
-	const inner = provider.createOllama({
-		model: 'model',
-		url,
-		think: false,
-		...(replay === undefined ? {} : { replay }),
-		options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
-	})
-	const readings: MemoryObserverFixture['readings'] = []
-	const requests: MemoryObserverFixture['requests'] = []
-	const observer = new StudyMemoryObserver({
-		provider: inner,
-		subject: admitted,
-		gauge,
-		record: (reading, request) => {
-			readings.push(reading)
-			requests.push(request)
-		},
-	})
-	return { observer, inner, readings, requests }
-}
 
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
 export const STUDY_MEMORY_TIMING = Object.freeze({
@@ -1667,6 +1313,7 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 	}
 	return {
 		name: 'cpu-fixture',
+		agent: 'dist/src/core/index.js',
 		subject: 'dist/src/core/index.js',
 		roots: ['.'],
 		qualification: 'tmp/unused-capacity',
@@ -1691,6 +1338,43 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 		},
 		settings: options.settings,
 	}
+}
+
+/**
+ * Removes the declared judge and recap from a profile, as a workflow that uses neither declares it.
+ * @param profile - A profile that declares a provider
+ * @returns The profile with no judge model, no judge digest and no recap allowance
+ * @throws Error - Thrown when the profile declares no provider
+ */
+export function omitMemoryAuxiliaries(profile: StudyProfile): StudyProfile {
+	const configured = profile.provider
+	if (configured === undefined) throw new Error('Missing fixture provider')
+	return {
+		...profile,
+		provider: {
+			...configured,
+			judge: undefined,
+			digest: { model: configured.digest.model, judge: undefined },
+		},
+		room: { ...profile.room, recap: undefined },
+	}
+}
+
+/**
+ * Builds a declared criterion in the `desk` scenario; only the `operational` criterion is critical.
+ * @param id - The criterion id
+ * @param method - The grading method
+ * @param assertion - The independent assertion
+ * @param goal - The declared goal it grades. Default: goal.
+ * @returns The criterion
+ */
+export function buildMemoryCriterion(
+	id: string,
+	method: StudyCriterion['method'],
+	assertion: JSONValue,
+	goal = 'goal',
+): StudyCriterion {
+	return { id, scenario: 'desk', goal, method, critical: id === 'operational', assertion }
 }
 
 /** Builds a gauge that prices any request at `offset` units from the profile's window max.
@@ -1803,25 +1487,9 @@ export async function loadStudyToolsFixture(): Promise<StudyToolsFixture> {
 		),
 	)
 	validateStudyInputs(definition, scenarios, rubric, profile)
-	const manifest = {
-		version: 1 as const,
-		id: 'a'.repeat(64),
-		created: '2026-10-14T12:00:00.000Z',
-		identity: {
-			subject: 'a'.repeat(64),
-			provider: undefined,
-			instrument: 'b'.repeat(64),
-			fixtures: 'c'.repeat(64),
-			profile: 'd'.repeat(64),
-		},
-		qualification: undefined,
-		host: {},
-		definition,
-		scenarios,
-		schedule: buildStudySchedule(definition, scenarios),
-		bounds: profile.bounds,
-	}
-	return { manifest, rubric, profile, subject: await import('../dist/src/core/index.js') }
+	const manifest = buildCustodyManifest(definition, scenarios, profile.bounds)
+	const namespace = await import('../dist/src/core/index.js')
+	return { manifest, rubric, profile, agent: namespace, subject: namespace }
 }
 
 /**
@@ -1854,7 +1522,6 @@ export function buildStudyGrading(
 	judgments: readonly StudyJudgment[] = [],
 ): StudyGrading {
 	return {
-		version: 1,
 		result: 'a'.repeat(64),
 		rubric: 'b'.repeat(64),
 		grader: 'grader-v1',
@@ -1899,6 +1566,40 @@ export function createStudyMeterFixture(
 }
 
 /**
+ * Builds a custody-valid sealed declaration whose schedule is derived from the supplied population.
+ * @param definition - The frozen study question and orders
+ * @param scenarios - The declared scenarios
+ * @param bounds - The execution allowances
+ * @param identity - The provider identity digest, or undefined when the study selects none
+ * @returns A manifest every custody guard admits
+ */
+export function buildCustodyManifest(
+	definition: StudyDefinition,
+	scenarios: readonly StudyScenario[],
+	bounds: StudyBounds,
+	identity: string | undefined = undefined,
+): StudyManifest {
+	return {
+		id: 'a'.repeat(64),
+		created: '2026-10-14T12:00:00.000Z',
+		identity: {
+			agent: 'a'.repeat(64),
+			subject: 'a'.repeat(64),
+			provider: identity,
+			instrument: 'b'.repeat(64),
+			fixtures: 'c'.repeat(64),
+			profile: 'd'.repeat(64),
+		},
+		qualification: undefined,
+		host: {},
+		definition,
+		scenarios,
+		schedule: buildStudySchedule(definition, scenarios),
+		bounds,
+	}
+}
+
+/**
  * Builds a complete terminal horizon from the supplied scheduled trial.
  * @param manifest - The authoritative goal horizon
  * @param trial - The scheduled trial
@@ -1915,8 +1616,10 @@ export function buildCustodyAttempt(manifest: StudyManifest, trial: StudyTrial):
 			failure: undefined,
 			usage: [],
 			duration: 0,
+			executed: true,
 		})),
 		failure: undefined,
 		duration: 0,
+		executed: true,
 	}
 }

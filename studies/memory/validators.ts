@@ -1,31 +1,41 @@
 import type {
 	StudyMemoryArm,
 	StudyMemoryAssertion,
+	StudyMemoryClassifier,
 	StudyMemoryInput,
+	StudyMemoryLedger,
 	StudyMemoryProvider,
+	StudyMemoryRuntime,
 	StudyMemorySettings,
-	StudyMemorySubject,
 } from './types.js'
 import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
-import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
+import { isStudyAgentRuntime } from '@orkestrel/study'
+import { STUDY_MEMORY_DIGEST, STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
-/** Checks the admitted Agent factory surface. @param value - Admitted namespace. @returns Whether the required exports exist. */
-export function isStudyMemorySubject(value: unknown): value is StudyMemorySubject {
+/** Checks a pinned serving digest. @param value - Declared digest. @returns Whether it is an exact SHA-256 hex digest, with or without its `sha256:` prefix. */
+export function isStudyMemoryDigest(value: unknown): value is string {
+	return typeof value === 'string' && STUDY_MEMORY_DIGEST.test(value)
+}
+
+/** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent and conversation factories exist. */
+export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
+	return holds(
+		() =>
+			isStudyAgentRuntime(value) &&
+			'Agent' in value &&
+			typeof value.Agent === 'function' &&
+			'createConversationManager' in value &&
+			typeof value.createConversationManager === 'function',
+	)
+}
+
+/** Checks the admitted Agent capabilities only the records arm invokes. @param value - Admitted namespace. @returns Whether the Ledger factory and its question set exist. */
+export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger {
 	return holds(
 		() =>
 			isObject(value) &&
-			'Agent' in value &&
-			typeof value.Agent === 'function' &&
 			'createLedger' in value &&
 			typeof value.createLedger === 'function' &&
-			'createConversationManager' in value &&
-			typeof value.createConversationManager === 'function' &&
-			'estimateRequest' in value &&
-			typeof value.estimateRequest === 'function' &&
-			'measureRequest' in value &&
-			typeof value.measureRequest === 'function' &&
-			'isAgentError' in value &&
-			typeof value.isAgentError === 'function' &&
 			'LEDGER_QUESTIONS' in value &&
 			isObject(value.LEDGER_QUESTIONS),
 	)
@@ -69,17 +79,25 @@ export function isStudyMemorySettings(value: unknown): value is StudyMemorySetti
 	})
 }
 
-/** Checks the admitted Ollama surface. @param value - Admitted namespace. @returns Whether both public factories and the timing extractor exist. */
+/** Checks the admitted Ollama surface every memory arm invokes. @param value - Admitted namespace. @returns Whether the provider factory and the timing extractor exist. */
 export function isStudyMemoryProvider(value: unknown): value is StudyMemoryProvider {
 	return holds(
 		() =>
 			isObject(value) &&
 			'createOllama' in value &&
 			typeof value.createOllama === 'function' &&
-			'createOllamaJudge' in value &&
-			typeof value.createOllamaJudge === 'function' &&
 			'extractTiming' in value &&
 			typeof value.extractTiming === 'function',
+	)
+}
+
+/** Checks the admitted Ollama capability only the records arm invokes. @param value - Admitted namespace. @returns Whether the judge factory exists. */
+export function isStudyMemoryClassifier(value: unknown): value is StudyMemoryClassifier {
+	return holds(
+		() =>
+			isObject(value) &&
+			'createOllamaJudge' in value &&
+			typeof value.createOllamaJudge === 'function',
 	)
 }
 

@@ -1,5 +1,6 @@
 {
 	"name": "q4",
+	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
 		".",

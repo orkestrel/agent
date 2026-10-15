@@ -4,8 +4,8 @@ import {
 	parseStudyGrading,
 	parseStudyProfile,
 	parseStudyRubric,
+	isStudyError,
 	readStudyFailure,
-	StudyError,
 } from '@orkestrel/study'
 import { readStudyResult } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
@@ -64,7 +64,8 @@ it('loads the actual q4 native topology with two distinct captured Agent occurre
 		const subject = realpathSync('dist/src/core/index.js')
 		const dependency = realpathSync('node_modules/@orkestrel/agent/dist/src/core/index.js')
 		const provider = realpathSync('node_modules/@orkestrel/ollama/dist/src/core/index.js')
-		expect(profile.subject).toBe('dist/src/core/index.js')
+		expect(profile.agent).toBe('dist/src/core/index.js')
+		expect(profile.subject).toBe(profile.agent)
 		expect(selection).toMatchObject({
 			roots: profile.roots.map((root) => realpathSync(root)),
 			entries: [subject, provider, dependency],
@@ -539,7 +540,7 @@ it.each([...STUDY_MEMORY_NATIVE_CAPACITY, ...STUDY_MEMORY_NATIVE_GENERIC])(
 		// The failure surfaces: no goal completes, and the latched fault carries the daemon's own words.
 		expect(result.first).toBeDefined()
 		expect(result.products).toEqual([])
-		expect(result.latched).toBeInstanceOf(StudyError)
+		expect(isStudyError(result.latched)).toBe(true)
 		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
 		expect(readStudyFailure(result.latched)).toMatchObject({
 			cause: code === 'CAPACITY' ? 'capacity' : 'infrastructure',
@@ -583,7 +584,7 @@ it.each(STUDY_MEMORY_NATIVE_MALFORMED)(
 		})
 		expect(result.first).toBeDefined()
 		expect(result.products).toEqual([])
-		expect(result.latched).toBeInstanceOf(StudyError)
+		expect(isStudyError(result.latched)).toBe(true)
 		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
 		expect(readStudyFailure(result.latched)).toMatchObject({ cause: 'infrastructure', role })
 		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)

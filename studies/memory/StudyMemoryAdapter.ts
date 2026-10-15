@@ -6,7 +6,11 @@ import type {
 	StudyValidation,
 } from '@orkestrel/study/server'
 import { StudyError } from '@orkestrel/study'
-import { gradeStudyMemory, readStudyMemoryGauge, validateStudyMemoryProfile } from './helpers.js'
+import {
+	gradeStudyMemory,
+	readStudyMemoryCompaction,
+	validateStudyMemoryProfile,
+} from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
 import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './validators.js'
 
@@ -14,16 +18,14 @@ import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './
 export class StudyMemoryAdapter implements StudyAdapterInterface {
 	/** Validates public inputs, memory arms and independent criteria offline. @param input - Parsed generic declarations. */
 	validate(input: StudyValidation): void {
-		validateStudyMemoryProfile(input.profile)
-		if (
-			input.definition.driver !== 'memory' ||
-			input.definition.arms.some((arm) => !isStudyMemoryArm(arm))
-		)
+		const arms = input.definition.arms.filter(isStudyMemoryArm)
+		if (input.definition.driver !== 'memory' || arms.length !== input.definition.arms.length)
 			throw new StudyError(
 				'CONFIG',
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
-		if (input.definition.arms.includes('compaction')) readStudyMemoryGauge(input.profile.settings)
+		validateStudyMemoryProfile(input.profile, arms)
+		if (arms.includes('compaction')) readStudyMemoryCompaction(input.profile)
 		if (input.definition.purpose === 'quality' && input.profile.qualification === undefined)
 			throw new StudyError('CONFIG', 'Memory quality requires a sealed capacity qualification')
 		for (const scenario of input.scenarios)

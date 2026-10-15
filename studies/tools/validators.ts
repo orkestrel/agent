@@ -5,7 +5,7 @@ import type {
 	StudyToolsInput,
 	StudyToolsRead,
 	StudyToolsResponse,
-	StudyToolsSubject,
+	StudyToolsRuntime,
 	StudyToolsWrite,
 } from './types.js'
 import { holds, isArray, isConstructor, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
@@ -20,15 +20,15 @@ import {
 } from './constants.js'
 
 /**
- * Checks whether an admitted namespace supplies a constructable Agent export.
+ * Checks whether an admitted runtime namespace supplies a constructable Agent export.
  * @param value - The admitted built module namespace
  * @returns True if the required constructor exists; false otherwise
  * @example
  * ```ts
- * isStudyToolsSubject({}) // false
+ * isStudyToolsRuntime({}) // false
  * ```
  */
-export function isStudyToolsSubject(value: unknown): value is StudyToolsSubject {
+export function isStudyToolsRuntime(value: unknown): value is StudyToolsRuntime {
 	return holds(() => isObject(value) && 'Agent' in value && isConstructor(value.Agent))
 }
 
