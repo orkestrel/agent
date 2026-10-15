@@ -1,3 +1,75 @@
+# Summary output qualification running on 2026-10-15
+
+The Compaction-only `compaction-output` attempt started at 22:04 UTC. Its first product
+completed and goal `ev-01-2` was active at 22:04:53 UTC. This is a separate treatment for the
+2048-token summary output failure below: recap output is now 4096, with summary prompt room
+15872 instead of 17920. Context 20480, Agent output 8192, safety 512, gauge, model/digests,
+workload, rubrics, final-user summary instruction, rolling history and strict native flags
+remain fixed. No retries or section caps were added. Records remains sealed and labeled at
+96/96; never rerun, replay or relabel it.
+
+The runtime captures the accepted slim Agent consumer and a fresh physical Study build at
+`422d549334ddb025651c9dd989168e1631938d5e`. The inherited Agent and Ollama runtime bytes remain
+the admitted frozen versions; this attempt does not upgrade an experimental dependency.
+The build ran in Study's `tmp/worktrees/compaction-output`, exit 0 uncapped in 9224 ms.
+Agent's historical root Study installation remains unchanged. Do not rebuild or modify the
+captured runtime, consumed instruments, build receipt or launch receipt during execution or
+terminal reading.
+
+The trial allowance remains 9600000 ms, request 360000 ms and goal 900000 ms. The fixed outer
+execute deadline is `2026-10-16T00:55:00.000Z`; the owned daemon expires at
+`2026-10-16T01:02:00.000Z`. The daemon wrapper has a 10800-second cap and the supervisor a
+10320-second cap. No deadline is extended. Output-limit, native capacity and blank-summary
+failures remain failures with retained evidence and cost; skipped goals are not new failures.
+
+Runtime: `tmp/studies/compaction-output-runtime`; captured project: its `project` directory;
+results: `tmp/studies/compaction-output`. Custody SHA-256 is
+`f7fd6acc551860ba89b904fc506b0eab5f11a49515ab1e183ea4fbb4a0bce4ef`; fingerprint is
+`50c186e330f2684ef3c0536c34dac0bc390db33fa522717a805640d7cd3ca7c0`.
+The root receipt is `tmp/units/compaction-output-launch.json`.
+
+- Supervisor PID 29536, `tmp/codex/compaction-output-supervisor.jsonl` and `.err`.
+- Execute PID 2268, `tmp/codex/compaction-output-series.jsonl` and `.err`.
+- Daemon PID 72624, script PID 55192; started `2026-10-15T22:04:15.149Z`, port 11435 only;
+  journals `tmp/codex/compaction-output-daemon.jsonl` and `.err`. User port 11434 is untouched.
+- Observer PID 84596, `tmp/units/compaction-output-watch.jsonl` and `.err`. It reports
+  milestones and terminal state without controlling execution. Metadata-only progress:
+  `node tmp/units/compaction-output-progress.ts`.
+
+Actual Opus design session `feac08f8-c4de-4b0e-baae-f9756204cc37` supported the finite 4096
+allowance (81954 ms, uncapped). Root accepted the room arithmetic, not the report's claim
+that only this power of two fits the request budget: every complementary prompt/output split
+totals 19968. All eight prior summary inputs fit 15872: maximum projected 13033 and actual
+12244. The known failing tuple matched exactly; the old evidence hash was unchanged.
+These readings do not guarantee successor completion or a speedup.
+
+Sonnet sessions `75f33e24-527a-4195-841d-de1c1dd512c6` and
+`56a32507-3d1b-47f9-a92d-a88b5b40b0f7` wrote disjoint launch and reader adaptations, uncapped
+in 166991 ms and 213037 ms. Independent Opus session
+`7ef12568-8d34-42e3-95e1-610076114d81` confirmed the scoped custody, budget wiring, single
+launch and reader claims, `VERDICT: PASS`, uncapped in 204981 ms. Its review was source-based;
+the host subsequently supplied the checks it could not read. Root checked the cited seams
+directly where the citation tool did not resolve abbreviated or Windows citations.
+
+Host verification passed Node parsing and standalone strict TypeScript checking for the
+successor scripts. Reader selftest passed 55 controls and 25 rolling controls. Public offline
+Study check passed in 1920 ms, then launch check in 1624 ms, both exit 0 uncapped. Wrong
+custody, extra project/runtime membership and stale-deadline controls refused before model
+calls and restored the staged inventory exactly. Reader pins verified without reading the
+result. Its fixed deadline/start/fingerprint are pinned; SHA-256 is
+`ea9bd6966cf9810c24f3711bb058a8ab348764c4abd71f483b5ab111d858e0ac`.
+
+After sealing, use `tmp/units/compaction-output-reader.ts read` with the result path, captured
+project, a fresh output path and the custody digest above. Run public grade/report from the
+captured project through its physical Study CLI, with the same frozen qualification and
+semantic rubrics as the historical attempt below. Semantic labeling remains separate and
+keeps the frozen Sol adjudicator. Do not reuse old namespace wrappers unchanged. No success,
+semantic quality or performance conclusion has been accepted yet. Preserve these runtime
+and instrument files until terminal reading and grading finish; sweep launch copies only
+after their evidence and recovery handles no longer depend on them.
+
+The following acceptance and failure records are historical.
+
 # Study consumer cleanup accepted on 2026-10-15
 
 Study `422d549` and Agent `34862bc` close the requested extraction before another model run.
