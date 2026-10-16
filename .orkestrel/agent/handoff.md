@@ -10,9 +10,10 @@ commit `78ea378`; do not treat its historical process or deadline entries as act
 The `compaction-output` attempt is interrupted, unsealed, and preserved; it has no operational
 reading. T3 Code stopped the owning Codex session at `2026-10-15T22:50:24.140Z` and its process tree
 died with it, during goal 95 (`ev-24-3`) with 94 of 96 products complete. See
-§ Interrupted Compaction attempt. Its successor `compaction-output-2`, with the same treatment, started
-execution at `2026-10-16T00:04:00Z`, detached through WMI outside every provider session tree; see
-§ Running successor attempt and read its progress before acting.
+§ Interrupted Compaction attempt. Its successor `compaction-output-2`, with the same treatment and
+detached through WMI outside every provider session tree, sealed 96/96 at `2026-10-16T00:51Z`. Its
+reader status is `acceptance-candidate`, and its operational grading achieved 96/96. Semantic grading
+waits for the frozen Sol-high adjudicator, by the user's choice; see § Sealed successor attempt.
 Records is sealed and labeled at 96/96. Never rerun, replay, or relabel Records for this campaign.
 The original c1 thinking comparison is graded and closed; this run is the separate q4
 thinking-off Compaction qualification, not a restart of that comparison.
@@ -141,7 +142,7 @@ and disclosure. Do not reuse an expired deadline, overwrite its result, or resta
 After terminal work, stop only the verified owned daemon tree and confirm its descendants
 are gone, following the canonical dispatch procedure. Never kill by process-name pattern.
 
-## Running successor attempt
+## Sealed successor attempt
 
 `compaction-output-2` repeats the `compaction-output` treatment and every control under a fresh
 namespace. Its tooling is `tmp/units/compaction-output-2-*.ts`, produced by the deterministic copy
@@ -171,20 +172,31 @@ daemon's `server config` line equals the predecessor's, on the same CUDA device.
 | Captured Study execute | 56332 | `tmp/codex/compaction-output-2-series.*` | child of the supervisor's dispatcher |
 | Observer launcher | 68192 | `tmp/units/compaction-output-2-watch.*` | `tmp/units/compaction-output-2-observer-detach.json` |
 
-Read progress without generating anything, and wait in-turn with a bounded wait:
+The captured Study execute exited 0, uncapped, in 2821089 ms, and the supervisor exited 0 with
+`custodyAfter: true`. The seal ID is `dfec78c05ee82231e8858d8721d03bbeffadcf0b23251bf768371b5aa398b017`
+and the result ID is `0b883171-6ddf-4574-bcd1-8cc03e10e954`. The reader
+(`tmp/units/compaction-output-2-reader-result.json`) returned `acceptance-candidate` with no issues.
+All 96 goals completed with known usage: 773 calls and 933394 tokens. The deadline window was
+accepted, and the rolling status is `qualified`, with 10 nonempty summaries, 9 repeated folds and
+9 reductions, starting at `ev-03-3`. The largest summary used 3244 of 4096 output tokens and 12244 of
+15872 prompt tokens. The largest Agent prompt was 11292 tokens and the largest Agent completion 1667.
+Recap length grew from 5545 to 11918 characters across the folds; this is a description, not a
+quality claim. Root stopped the daemon launcher tree by PID 100256 at about 00:52Z and confirmed every
+descendant gone and port 11435 free.
 
-```text
-node tmp/units/compaction-output-2-progress.ts
-node tmp/units/compaction-output-2-wait.ts --results GOALS --limit SECONDS
-node tmp/units/compaction-output-2-reader.ts pins 01f4be1742a6c35515e2752252a724eaa4459ef8e388af6b83468af529e8f2f9
-```
+Public operational grading ran through the captured CLI under the dispatch launcher. The grading
+`22edabb2ba21b843f3ee3a989f614951c8d62dd224ee7953d036118b3a9feb1d` (exit 0 in 2666 ms) achieved 96 of
+96 qualification criteria, with 0 critical, 0 unknown and no faults. The report (exit 0 in 671 ms)
+attributes 1900700 ms to the 120 Agent calls and 898612 ms to the 10 summary calls in a 2816236 ms
+trial. One repetition is descriptive and establishes no replicated capacity, quality or speed.
+Semantic grading with `studies/endurance/rubric.json` and the honest Records comparison remain; the
+user chose to wait for the frozen Sol-high adjudicator.
 
-`GOALS` is an observer milestone (a multiple of 8) and `SECONDS` is at most 570. After the seal,
-apply § Terminal reading and grading with the `compaction-output-2` paths, writing
-`tmp/units/compaction-output-2-reader-result.json`. Then stop the daemon launcher tree by PID 100256
-after confirming its command line; the daemon script also stops Ollama at its deadline.
+The observer reports milestones late. Windows defers change notices for a file another process holds
+open for appending, so `watch` emits when something else reads the evidence. The dispatcher `exit=`
+records, written through a separate append, arrive reliably.
 
-The tooling passed one independent review round on `tmp/units/compaction-output-2-claims.md`. The
+The tooling passed one independent review round on numbered claims, retired with this record. The
 Codex bench was probed dark at 2026-10-15T23:48Z (session `01a141f7-1001-7532-9de5-0dc254c4d4e8`,
 usage limit until 2026-10-22 06:12 local), so Claude Opus held the objective lane, with a Haiku
 checker. Two repairs followed the prescriptions. `pin` refuses unless the execute deadline still
@@ -305,8 +317,11 @@ A Study build needs the development Agent and Ollama, so build in an isolated wo
 
 The next work follows these dependencies:
 
-1. Close this Compaction attempt with terminal custody, operational reading, semantic grading,
-   and an honest comparison against retained Records. Preserve failures and unknowns.
+1. Grade `compaction-output-2` semantically after the Sol bench returns (2026-10-22 06:12 local);
+   its terminal custody and operational reading are complete. Then close the qualification with
+   an honest comparison against retained Records. Preserve failures and unknowns. The labeling
+   tools import `@orkestrel/study` from the root installation, which equals the captured `422d549`
+   build; confirm that equality again before dispatching labelers.
 2. Read qualified Compaction phase/component/checkpoint evidence before a performance
    diagnostic. Observation is implemented; no optimization or speedup is accepted. Follow
    [performance protocol](../../../study/.orkestrel/performance.md), which supersedes the
@@ -374,6 +389,10 @@ physical dependencies, label batches/receipts, and canonical dispatch tools. In 
 the current launcher rechecks the external build receipt; deleting it invalidates the run.
 Keep `tmp/units/compaction-output-{stage,launch,daemon,controls,progress,watch,reader}.ts`,
 their stage/build/launch/daemon/control/validation receipts, and every active check/series/
-daemon/supervisor/observer journal and PID file. Keep historical `compaction-task-*` and
-other frozen proof tools until their custody is retired. Do not use a broad `sweep --tmp`
-while this run is active. The next session must verify these paths before a further sweep.
+daemon/supervisor/observer journal and PID file. Keep every `tmp/units/compaction-output-2-*`
+script, receipt, detach receipt, reader result and grade journal, every
+`tmp/codex/compaction-output-2-*` journal and PID file, and the preserved
+`tmp/units/study-root-install-f977e68` copy until semantic grading and the Records comparison
+close. Keep historical `compaction-task-*` and other frozen proof tools until their custody is
+retired. Do not use a broad `sweep --tmp` before that grading. The next session must verify these
+paths before a further sweep.
