@@ -21,8 +21,8 @@ import {
 	buildMemoryReply,
 	createMemoryContext,
 	createMemoryServer,
-	createStudyServiceFixture,
-	executeStudyService,
+	createStudyInstallFixture,
+	executeStudyInstall,
 	executeStudyTopology,
 	readMemoryControls,
 	readMemoryEvents,
@@ -171,8 +171,8 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 	let server: Awaited<ReturnType<typeof createMemoryServer>> | undefined
 	try {
 		server = await createMemoryServer()
-		const fixture = createStudyServiceFixture(scratch, server.url)
-		const checked = await executeStudyService(fixture, ['check', 'capacity'])
+		const fixture = createStudyInstallFixture(scratch, server.url)
+		const checked = await executeStudyInstall(fixture, ['check', 'capacity'])
 		expect(checked).toMatchObject({ code: 0 })
 		const capacity = parseJSON(checked.stdout)
 		if (!isRecord(capacity)) throw new Error('Missing native check output')
@@ -186,7 +186,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 			capacity.fingerprint,
 		])
 		expect(server.requests).toEqual([])
-		const denied = await executeStudyService(
+		const denied = await executeStudyInstall(
 			fixture,
 			['execute', 'memory', '--out', join(scratch.path, 'unqualified')],
 			260000,
@@ -198,7 +198,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 		let qualification: string | undefined
 		for (const target of ['capacity', 'memory']) {
 			const beforeCheck = server.requests.length
-			const check = await executeStudyService(fixture, ['check', target])
+			const check = await executeStudyInstall(fixture, ['check', target])
 			expect(check).toMatchObject({ code: 0 })
 			expect(server.requests.length).toBe(beforeCheck)
 			const selection = parseJSON(check.stdout)
@@ -223,7 +223,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 				'studies',
 				target === 'capacity' ? 'memory-capacity' : 'memory-quality',
 			)
-			const executed = await executeStudyService(
+			const executed = await executeStudyInstall(
 				fixture,
 				[...selection.next, '--out', output],
 				260000,
@@ -276,7 +276,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 				expect(evidence.some((row) => row.event === 'wire')).toBe(true)
 			}
 			const beforeGrade = server.requests.length
-			const graded = await executeStudyService(fixture, execution.next)
+			const graded = await executeStudyInstall(fixture, execution.next)
 			expect(graded).toMatchObject({ code: 0 })
 			const grade = parseJSON(graded.stdout)
 			if (
@@ -359,7 +359,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 					).toBe(true)
 				}
 			}
-			const reported = await executeStudyService(fixture, grade.next)
+			const reported = await executeStudyInstall(fixture, grade.next)
 			expect(reported).toMatchObject({ code: 0 })
 			const report = parseJSON(reported.stdout)
 			if (!isRecord(report) || !isRecord(report.report) || !isArray(report.report.scores))

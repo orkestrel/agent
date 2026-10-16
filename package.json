@@ -69,12 +69,12 @@
 		"study:label": "study label",
 		"study:report": "study report",
 		"prepack": "npm run build",
-		"prepublishOnly": "npm run format:check && npm run lint:check && npm run check && npm run build && npm test && npm run test:service && npm run test:distribution -- --mode release",
+		"prepublishOnly": "npm run format:check && npm run lint:check && npm run check && npm run build && npm test && npm run test:studies && npm run test:distribution -- --mode release",
 		"test:distribution": "vitest run --config vite.config.ts --no-cache --reporter=dot --project distribution",
 		"test:probe": "vitest run --config vite.config.ts --no-cache --reporter=verbose --project probe",
 		"test:bench": "vitest bench --config vite.config.ts --no-cache --project probe",
 		"test:setup": "vitest run --config vite.config.ts --no-cache --reporter=dot --project setup",
-		"test:service": "vitest run --config vite.config.ts --no-cache --reporter=dot --project service"
+		"test:studies": "vitest run --config vite.config.ts --no-cache --reporter=dot --project studies"
 	},
 	"dependencies": {
 		"@orkestrel/abort": "^0.0.13",

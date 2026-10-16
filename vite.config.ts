@@ -201,13 +201,13 @@ export function guides(override?: UserConfig): UserConfig {
 	return mergeOverride(project, override)
 }
 
-// Authored study proofs use bounded subprocesses and protocol fixtures,
+// Authored study proofs run installed packages through bounded subprocesses and protocol fixtures,
 // so this project runs separately from `npm test`.
-export function service(override?: UserConfig): UserConfig {
+export function studies(override?: UserConfig): UserConfig {
 	const project: UserConfig = {
 		resolve,
 		test: {
-			name: { label: 'service', color: 'red' },
+			name: { label: 'studies', color: 'red' },
 			include: ['tests/studies/**/*.test.ts'],
 			setupFiles: ['./tests/setup.ts', './tests/setupStudy.ts'],
 			environment: 'node',
@@ -264,6 +264,6 @@ export function probe(override?: UserConfig): UserConfig {
 export default defineConfig({
 	resolve,
 	test: {
-		projects: [srcCore, policy, config, setup, guides, service, distribution, probe],
+		projects: [srcCore, policy, config, setup, guides, studies, distribution, probe],
 	},
 })

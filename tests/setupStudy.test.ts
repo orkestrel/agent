@@ -33,9 +33,9 @@ import {
 	readMemorySnapshot,
 	readMemoryTimeline,
 	readStudyToolsEvidence,
-	captureServicePackages,
-	createStudyServiceFixture,
-	executeStudyService,
+	captureStudyPackages,
+	createStudyInstallFixture,
+	executeStudyInstall,
 	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
@@ -120,7 +120,7 @@ describe('study declaration fixtures', () => {
 	})
 })
 
-describe('study service fixtures', () => {
+describe('study install fixtures', () => {
 	it('preserves fresh topology worker diagnostics and runs bounded native entries', async () => {
 		const scratch = createScratch({ prefix: 'study-topology-setup-' })
 		try {
@@ -162,7 +162,7 @@ describe('study service fixtures', () => {
 	it('copies actual package closure with one selected Agent and retains exact native command diagnostics', async () => {
 		const scratch = createScratch()
 		try {
-			const fixture = createStudyServiceFixture(scratch, 'http://127.0.0.1:7')
+			const fixture = createStudyInstallFixture(scratch, 'http://127.0.0.1:7')
 			expect(fixture.packages.filter((entry) => entry.name === '@orkestrel/agent')).toEqual([
 				{
 					name: '@orkestrel/agent',
@@ -185,14 +185,14 @@ describe('study service fixtures', () => {
 				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
 				roots: fixture.packages.map((captured) => captured.target),
 			})
-			const help = await executeStudyService(fixture, ['--help'])
+			const help = await executeStudyInstall(fixture, ['--help'])
 			expect(help).toMatchObject({ code: 0 })
 			expect(help.stdout).toContain('study execute')
-			const refused = await executeStudyService(fixture, ['unsupported'])
+			const refused = await executeStudyInstall(fixture, ['unsupported'])
 			expect(refused.code).toBe(64)
 			expect(refused.stderr).not.toBe('')
 			expect(() =>
-				captureServicePackages(scratch, new Map([['wrong-package', resolve('.')]])),
+				captureStudyPackages(scratch, new Map([['wrong-package', resolve('.')]])),
 			).toThrow('Malformed selected package')
 		} finally {
 			await destroyScratch(scratch)

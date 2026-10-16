@@ -10,19 +10,19 @@ import type {
 import type { ScratchInterface } from '@orkestrel/test/server'
 
 /** Holds one copied package selection in the installed fixture closure. */
-export interface StudyServicePackage {
+export interface StudyInstallPackage {
 	readonly name: string
 	readonly source: string
 	readonly target: string
 }
 /** Holds an actual installed CLI and its exclusive scratch workspace. */
-export interface StudyServiceFixture {
+export interface StudyInstallFixture {
 	readonly scratch: ScratchInterface
 	readonly entry: string
-	readonly packages: readonly StudyServicePackage[]
+	readonly packages: readonly StudyInstallPackage[]
 }
 /** Holds native command output without discarding failed-command diagnostics. */
-export interface StudyServiceResult {
+export interface StudyInstallResult {
 	readonly code: number
 	readonly stdout: string
 	readonly stderr: string

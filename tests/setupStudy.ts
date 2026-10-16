@@ -10,9 +10,9 @@ import type {
 	MemoryTrialResult,
 	MemoryUsageFixture,
 	MemoryWireFixture,
-	StudyServiceFixture,
-	StudyServicePackage,
-	StudyServiceResult,
+	StudyInstallFixture,
+	StudyInstallPackage,
+	StudyInstallResult,
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
@@ -177,12 +177,12 @@ export const STUDY_ENDURANCE_BOUNDARIES = Object.freeze([
  * @param selections - Initial package roots; an earlier selection wins throughout the graph.
  * @returns Every actual source and regular target package directory.
  */
-export function captureServicePackages(
+export function captureStudyPackages(
 	scratch: ScratchInterface,
 	selections: ReadonlyMap<string, string>,
-): readonly StudyServicePackage[] {
+): readonly StudyInstallPackage[] {
 	const sources = new Map(selections)
-	const packages: StudyServicePackage[] = []
+	const packages: StudyInstallPackage[] = []
 	for (const [name, source] of sources) {
 		const manifest = parseJSON(readFileSync(join(source, 'package.json'), 'utf8'))
 		if (!isRecord(manifest) || manifest.name !== name)
@@ -208,11 +208,11 @@ export function captureServicePackages(
  * @param url - Ephemeral native Ollama protocol fixture origin.
  * @returns The installed command and complete copied runtime closure.
  */
-export function createStudyServiceFixture(
+export function createStudyInstallFixture(
 	scratch: ScratchInterface,
 	url: string,
-): StudyServiceFixture {
-	const packages = captureServicePackages(
+): StudyInstallFixture {
+	const packages = captureStudyPackages(
 		scratch,
 		new Map([
 			['@orkestrel/agent', resolve('.')],
@@ -269,11 +269,11 @@ export function createStudyServiceFixture(
  * @param duration - Outer bound; execution retains its own request, trial and series limits.
  * @returns Native exit and separate stdout/stderr bytes.
  */
-export function executeStudyService(
-	fixture: StudyServiceFixture,
+export function executeStudyInstall(
+	fixture: StudyInstallFixture,
 	arguments_: readonly string[],
 	duration = 60000,
-): Promise<StudyServiceResult> {
+): Promise<StudyInstallResult> {
 	return executeStudyProcess([fixture.entry, ...arguments_], fixture.scratch.path, duration)
 }
 
@@ -287,7 +287,7 @@ export function executeStudyProcess(
 	arguments_: readonly string[],
 	root: string,
 	duration: number,
-): Promise<StudyServiceResult> {
+): Promise<StudyInstallResult> {
 	return new Promise((done) =>
 		execFile(
 			process.execPath,
@@ -317,7 +317,7 @@ export function executeStudyProcess(
 export function executeStudyTopology(
 	scratch: ScratchInterface,
 	roots?: readonly string[],
-): Promise<StudyServiceResult> {
+): Promise<StudyInstallResult> {
 	const entry = scratch.write(
 		'topology.ts',
 		`// Self-contained disposable entry: imported test setup would preload the measured modules.

@@ -250,7 +250,14 @@ without imports.
   there, and Study itself has nothing to drop. The design round (`tmp/units/studies-cleanup-design-brief.md`) runs as T3
   delegated tasks on Cursor: planner on Claude Opus 5.5 (`studies-cleanup-design-planner-1`), analyst on Gemini 4 Argon
   (`studies-cleanup-design-analyst-1`). Subagent work now routes to the user's enabled Cursor models, never Composer.
-  The analyst's plan is `tmp/units/studies-cleanup-design-analyst-1.md`; the planner is still running.
+  The lanes returned `tmp/units/studies-cleanup-design-{planner,analyst}-1.md`; the reconciled plan
+  `tmp/units/studies-cleanup-plan.md` (user-approved 2026-10-16, including the U4 layout unit and a recorded deviation
+  editing the scaffold content-owned `vite.config.ts` to rename project `service` to `studies`) keeps `setupStudy.ts`
+  in both repos, changes nothing under `studies/**`, and drops an Agent test only when a named Study test reddens under
+  a mutation of the mechanism it exercised (rule R). U1 (Study tests in; Cursor Claude Opus 5.5, task
+  `studies-cleanup-u1-1`) and U2 (Agent rename; Cursor Claude Sonnet 5.5, task `studies-cleanup-u2-1`) run in parallel
+  from briefs `tmp/units/studies-cleanup-u{1,2}-brief.md`; U3 (drops, folds, setup trim, ledger) follows U1, then U4,
+  one falsify round on the integrated result, and a verifier.
 - **Study commands (user decision 2026-10-16).** Agent's manifest adds one alias per Study operation beside the bare
   `study` passthrough: `study:check`, `study:execute`, `study:grade`, `study:label` and `study:report`, with arguments
   after `--` (from PowerShell call `npm.cmd`: PowerShell drops a bare `--` before `npm.ps1` receives it). Studies run
