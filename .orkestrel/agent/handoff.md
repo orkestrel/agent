@@ -305,6 +305,67 @@ without imports.
     the closed campaign.
   - The two-lane design round (Opus planner, Sonnet analyst, brief `tmp/units/boost-design-brief.md`) runs in the same
     workflow.
+- **Publish first, then boost locally (user, 2026-10-16).** Agent's distributable has moved since 0.0.30 (71 `src` files),
+  so the series fixes are pushed and published first. The boost then stays a local, unpushed version measured against
+  the published one.
+  - The release covers MCP (L4); Agent, Browser and Probe (L5); and Ollama and Toolbox (L6). Unpushed commits: Agent
+    58, Ollama 2, MCP 2.
+  - Scaffold learns the studies structure first: a planned `studies` project, `test:studies`, the `tests/setupStudy.ts`
+    harness module and the root `studies/` directory. Scaffold then releases, so the wave's `scaffold overwrite` keeps
+    the structure instead of restoring `vite.config.ts` to the canonical set (`scaffold/guides/scaffold.md:1679-1683`).
+  - The design round (brief `tmp/units/scaffold-studies-design-brief.md`) has an Opus planner (workflow
+    `wf_c6aa3609-269`) and a Grok analyst (task `scaffold-studies-design-analyst-1`).
+  - Grok 4.7 xhigh builds the scaffold fix and the release preparation under tightly constrained briefs (user).
+  - **Reconciliation.** Reports: `tmp/units/scaffold-studies-design-{planner-1,analyst-grok-1}.md`.
+    - Both lanes agree:
+      - an exact-case `tests/studies/**/*.test.ts` file selects the `studies` project, so Study gets none;
+      - the factory sits between `service` and `distribution`;
+      - `test:studies` runs from `prepublishOnly` after `npm test` (publishing) or from `test` (private);
+      - extra accepted `prepublishOnly` predecessors;
+      - no seeded `setupStudy.ts`, no `check:studies`, no `configs/studies`, no mirror law;
+      - scaffold bumps to 0.0.102; targets re-pin and repair without bumping.
+    - The Orchestrator ruled two splits:
+      - `setupFiles` is `['./tests/setup.ts']` only. That was the planner's reading and matches the user's `setupPolicy.ts` analogy. Agent's `vite.config.ts` rewrites once on repair.
+      - Widening the `setupPolicy.ts` sweeps to `studies/` is deferred to a later release.
+    - Build brief: `tmp/units/scaffold-studies-build-brief.md`, Grok task `scaffold-studies-build-1`.
+  - **Cleanup falsify round.** Verdict `.orkestrel/agent/studies-cleanup-audit-verdict.md`.
+    - Grok and Opus both returned FAIL. Study mechanisms unproven by any test: reported durations, the summary role
+      on room refusal, and the `collectStudyEvidence` checks. Also misplaced files, two uncovered removed
+      assertions, a guide sentence, a non-durable ledger, and a forbidden poll.
+    - Fix unit `tmp/units/studies-cleanup-u6-brief.md` (Sonnet, workflow `wf_d8ccec47-7be`) adopts the prescriptions
+      verbatim. It landed uncommitted with every gate green in both repos:
+      - Study `test:src` 527, with five new tests, each reddened by its mutation.
+      - Agent `test:studies` 94 and `test:setup` 155.
+      - Durable ledger: `.orkestrel/agent/studies-cleanup-ledger.md`.
+    - **User correction (2026-10-16).**
+      - Fix S4 hid two Study setup helpers (`buildOllamaJudgeRow`, `buildStudyAgentOrigins`), following the objective
+        lane's prescription, and U3 had hidden `executeStudyProcess`.
+      - The user rejected un-exporting. The law: `tests.md:189` (export every reusable setup helper) and
+        `architecture.md:51` (every declaration exported; fold or export and test, never hidden).
+      - Correction unit U7 (`tmp/units/studies-cleanup-u7-brief.md`, Sonnet, workflow `wf_4b2fc8aa-a69`) exports and
+        proves, or folds, every hidden declaration in the non-vendored setup modules of both repos, including five
+        pre-existing constants in Agent `tests/setup.ts`.
+      - Every subagent prompt now carries the user's instruction verbatim: read scaffold's `AGENTS.md` and the files it
+        points to (rules, agents, skills) and follow them strictly, especially on repository structure.
+    - **Naming correction (user, 2026-10-16).**
+      - U6's `MemoryGradingFixture` (`tests/studies/memory/types.ts`) has compound members (`completeAttempt`,
+        `faultedAttempt`, `completeEvidence`). `names.md` requires one-word entity members grouped by entity, for
+        example `complete: { trial, attempt, evidence }`.
+      - A Grok naming audit (`tmp/units/naming-audit-brief.md`) covers two areas: tests (Agent `tests/studies/**` and
+        setup modules; Study setup modules), task `naming-audit-tests-1`; and source (Agent `studies/**`, Study
+        `src/**`), task `naming-audit-source-1`.
+      - Fix units follow after U7.
+  - Each upload window needs the user at the keyboard for `npm login` and the one-time code.
+  - The boosted series uses one boosted run per arm, with no control run. Grok also grades the sealed Records packet,
+    started in parallel: `tmp/units/study-label-grok-records-population.ts`, output
+    `tmp/studies/labels-grok-2ac2a898`, journals `tmp/cursor/grok-label-records-*`. The largest batch runs first as the
+    pilot. Sol's labels stay untouched.
+    - The first launch (PID 60668, receipt `tmp/units/study-label-grok-records-detach.json`) stopped in 234 ms, before
+      any model call. The runner requires the output parent to exist ("Destination parent does not exist"). Its
+      journals were kept as `*.attempt1`.
+    - After the Orchestrator created the empty output directory, the relaunch runs as PID 32584 (receipt
+      `tmp/units/study-label-grok-records-detach-2.json`).
+  - Package improvements: now, in parallel, default-preserving.
 - **Lane routing (user, 2026-10-16).** Grok 4.7 xhigh (Cursor, T3 `delegate_task`, `reasoning_effort: xhigh`) is the
   Astra/Sol alternative for every adversary (falsify/reviewer) and objective (analyst) lane while Codex is dark. Opus
   holds subjective/planner lanes; Sonnet builds. The running Sonnet analyst lane was not interrupted. A Grok analyst

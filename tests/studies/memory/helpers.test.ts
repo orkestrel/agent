@@ -5,6 +5,7 @@ import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	readStudyMemoryCompaction,
+	readStudyMemoryGrade,
 	readStudyMemoryGauge,
 	readStudyMemoryJudge,
 	readStudyMemoryProvenance,
@@ -13,6 +14,8 @@ import {
 	validateStudyMemoryProfile,
 } from '../../../studies/memory/index.js'
 import {
+	buildMemoryCriterion,
+	buildMemoryGradingFixture,
 	buildMemoryProfile,
 	omitMemoryAuxiliaries,
 	readMemoryOrigins,
@@ -327,5 +330,40 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(
 			readMemoryOrigins(buildStudyMemoryOrigins(messages, source)).map((entry) => entry.source),
 		).toEqual(['source-1', undefined, 'source-1', undefined])
+	})
+})
+
+describe('memory mechanical grading over the shared traversal', () => {
+	it('reads each mechanism predicate with zero-based row citations and unknown for foreign assertions', () => {
+		const { complete, completeAttempt, completeEvidence, source, meaning } =
+			buildMemoryGradingFixture()
+		const target = {
+			trial: complete,
+			criterion: source,
+			attempt: completeAttempt,
+			evidence: completeEvidence,
+		}
+		expect(readStudyMemoryGrade(target)).toEqual({
+			verdict: 'achieved',
+			method: 'trace',
+			reason: 'Retained observable mechanism evidence',
+			references: [{ file: 'evidence', row: 1 }],
+		})
+		expect(
+			readStudyMemoryGrade({
+				...target,
+				criterion: buildMemoryCriterion('weird', 'trace', { observation: 'unsupported' }),
+			}),
+		).toMatchObject({ verdict: 'unknown', references: [] })
+		expect(readStudyMemoryGrade({ ...target, attempt: undefined, evidence: [] })).toMatchObject({
+			verdict: 'unknown',
+			references: [],
+		})
+		expect(readStudyMemoryGrade({ ...target, criterion: meaning })).toEqual({
+			verdict: 'unknown',
+			method: 'human',
+			reason: 'Requires an independent blind semantic label',
+			references: [],
+		})
 	})
 })

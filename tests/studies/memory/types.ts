@@ -1,11 +1,18 @@
 import type { JSONValue } from '@orkestrel/contract'
 import type {
+	StudyAttempt,
 	StudyContext,
+	StudyCriterion,
+	StudyDefinition,
 	StudyEvidence,
+	StudyFailure,
 	StudyGoal,
+	StudyManifest,
 	StudyProduct,
 	StudyProfile,
 	StudyRole,
+	StudyRubric,
+	StudyTrial,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
 
@@ -122,6 +129,31 @@ export interface MemoryNativeFixture {
 	readonly code: 'CAPACITY' | 'FAULT'
 	/** Holds a substring of the readable failure message. */
 	readonly message: string
+}
+
+/** Holds a two-trial mechanical grading population: one complete retained trial and one faulted trial, with one criterion per predicate family. */
+export interface MemoryGradingFixture {
+	readonly profile: StudyProfile
+	readonly definition: StudyDefinition
+	readonly manifest: StudyManifest
+	/** Holds the trial that completed with retained evidence. */
+	readonly complete: StudyTrial
+	/** Holds the trial that failed with a capacity refusal. */
+	readonly faulted: StudyTrial
+	readonly operational: StudyCriterion
+	readonly meaning: StudyCriterion
+	readonly source: StudyCriterion
+	readonly lookup: StudyCriterion
+	readonly result: StudyCriterion
+	readonly rubric: StudyRubric
+	readonly failure: StudyFailure
+	readonly completeAttempt: StudyAttempt
+	readonly faultedAttempt: StudyAttempt
+	/** Holds the rows retained for the complete trial: one foreign-goal row, then the arrival that cites `receipt`. */
+	readonly completeEvidence: readonly StudyEvidence[]
+	readonly attempts: readonly StudyAttempt[]
+	/** Holds the evidence rows keyed by trial id. */
+	readonly evidence: Readonly<Record<string, readonly StudyEvidence[]>>
 }
 
 /** Holds the observation-independent subset two trials must agree on. */

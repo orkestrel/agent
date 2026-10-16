@@ -6,7 +6,9 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
 	buildCustodyManifest,
+	buildMemoryGradingFixture,
 	buildStudyGrading,
+	captureStudyPackages,
 	createStudyMeterFixture,
 	buildMemoryEdge,
 	buildMemoryCriterion,
@@ -23,6 +25,7 @@ import {
 	readMemoryAdmission,
 	readMemoryControls,
 	readMemoryEvents,
+	readMemoryModels,
 	readMemoryOrigins,
 	readMemoryParts,
 	readMemoryShapes,
@@ -30,7 +33,9 @@ import {
 	readMemoryTimeline,
 	createStudyInstallFixture,
 	executeStudyInstall,
+	executeStudyProcess,
 	executeStudyTopology,
+	loadStudyDeclaration,
 	readMemoryToolResults,
 	runMemoryFailure,
 	runMemoryTrial,
@@ -79,6 +84,20 @@ describe('study declaration fixtures', () => {
 		expect(buildStudyGrading(first.schedule).attempts).toEqual(
 			first.schedule.map((item) => item.id),
 		)
+		const grading = buildMemoryGradingFixture()
+		const scheduled = grading.manifest.schedule.map((item) => item.id)
+		expect(isStudyCustodyManifest(grading.manifest)).toBe(true)
+		expect(scheduled).toEqual([grading.complete.id, grading.faulted.id])
+		expect(grading.attempts.map((item) => item.trial.id)).toEqual(scheduled)
+		expect(Object.keys(grading.evidence)).toEqual(scheduled)
+		expect(grading.evidence[grading.complete.id]).toBe(grading.completeEvidence)
+		expect(grading.rubric.criteria.map((item) => item.id)).toEqual([
+			'operational',
+			'meaning',
+			'source',
+			'lookup',
+			'result',
+		])
 	})
 })
 
@@ -144,6 +163,9 @@ describe('study install fixtures', () => {
 			const refused = await executeStudyInstall(fixture, ['unsupported'])
 			expect(refused.code).toBe(64)
 			expect(refused.stderr).not.toBe('')
+			expect(() =>
+				captureStudyPackages(scratch, new Map([['wrong-package', resolve('.')]])),
+			).toThrow('Malformed selected package')
 		} finally {
 			await destroyScratch(scratch)
 		}
@@ -177,6 +199,56 @@ describe('study install fixtures', () => {
 			fixture.close()
 			await server.close()
 		}
+	})
+
+	it('executes a real Node entry and reports its exit and separate output bytes', async () => {
+		const scratch = createScratch({ prefix: 'study-process-setup-' })
+		try {
+			const quiet = scratch.write(
+				'quiet.js',
+				`process.stdout.write('out'); process.stderr.write('err')`,
+			)
+			const exits = scratch.write('exits.js', `process.exit(3)`)
+			const throws = scratch.write('throws.js', `throw new Error('process refusal')`)
+			const holds = scratch.write('holds.js', `setTimeout(() => {}, 30000)`)
+			expect(await executeStudyProcess([quiet], scratch.path, 60000)).toEqual({
+				code: 0,
+				stdout: 'out',
+				stderr: 'err',
+			})
+			expect(await executeStudyProcess([exits], scratch.path, 60000)).toEqual({
+				code: 3,
+				stdout: '',
+				stderr: '',
+			})
+			const thrown = await executeStudyProcess([throws], scratch.path, 60000)
+			expect(thrown.code).toBe(1)
+			expect(thrown.stderr).toContain('process refusal')
+			const started = performance.now()
+			const deadline = await executeStudyProcess([holds], scratch.path, 1500)
+			expect(deadline.code).toBe(1)
+			expect(performance.now() - started).toBeLessThan(20000)
+		} finally {
+			await destroyScratch(scratch)
+		}
+	})
+
+	it('loads an authored declaration, its rubric and the scenarios of its driver in declared order', async () => {
+		const capacity = await loadStudyDeclaration('capacity', 'memory')
+		expect(capacity.definition.name).toBe('capacity')
+		expect(capacity.definition.arms).toEqual(['records', 'compaction', 'full'])
+		expect(capacity.scenarios.map((scenario) => scenario.id)).toEqual(['handoff'])
+		expect(capacity.rubric.criteria[0]?.id).toBe('opening-operational')
+		const tools = await loadStudyDeclaration('tools', 'tools')
+		expect(tools.definition.name).toBe('tools')
+		expect(tools.scenarios.map((scenario) => scenario.id)).toEqual([
+			'write',
+			'refusal',
+			'admission',
+			'cancellation',
+			'continuation',
+		])
+		await expect(loadStudyDeclaration('absent', 'memory')).rejects.toThrow(/ENOENT/)
 	})
 
 	it('leaves the authored local profile without settings', () => {
@@ -420,6 +492,7 @@ describe('study install fixtures', () => {
 			'usage',
 		])
 		expect(totalMemoryUsage(result.usage).agent).toEqual({ calls: 1, tokens: 12 })
+		expect(readMemoryModels(result.requests)).toEqual(['model'])
 		const shapes = readMemoryShapes(result.requests)
 		expect(shapes.map((shape) => shape.options)).toEqual([
 			['num_ctx', 'num_predict', 'seed', 'temperature'],
@@ -474,10 +547,14 @@ describe('study install fixtures', () => {
 			{ path: '/api/chat', body: '{"model":"model","options":{"seed":0,"num_ctx":1}}' },
 			{ path: '/api/generate', body: '{"model":"judge","options":{"temperature":1},"raw":true}' },
 		]
+		expect(readMemoryModels(requests)).toEqual(['model', 'judge'])
 		expect(readMemoryShapes(requests)).toEqual([
 			{ body: ['model', 'options'], options: ['num_ctx', 'seed'] },
 			{ body: ['model', 'options', 'raw'], options: ['temperature'] },
 		])
+		expect(() => readMemoryModels([{ path: '/api/chat', body: '{}' }])).toThrow(
+			'Invalid generation request',
+		)
 		expect(() => readMemoryShapes([{ path: '/api/chat', body: '{"model":"m"}' }])).toThrow(
 			'Invalid generation request',
 		)

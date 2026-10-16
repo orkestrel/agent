@@ -2,6 +2,7 @@ import type {
 	MemoryAdmissionFixture,
 	MemoryContextFixture,
 	MemoryFailureResult,
+	MemoryGradingFixture,
 	MemoryNativeFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
@@ -16,6 +17,7 @@ import type {
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
+	StudyAttempt,
 	StudyBounds,
 	StudyCriterion,
 	StudyDefinition,
@@ -172,7 +174,7 @@ export const STUDY_ENDURANCE_BOUNDARIES = Object.freeze([
  * @param selections - Initial package roots; an earlier selection wins throughout the graph.
  * @returns Every actual source and regular target package directory.
  */
-function captureStudyPackages(
+export function captureStudyPackages(
 	scratch: ScratchInterface,
 	selections: ReadonlyMap<string, string>,
 ): readonly StudyInstallPackage[] {
@@ -278,7 +280,7 @@ export function executeStudyInstall(
  * @param duration - Outer process deadline in milliseconds.
  * @returns Native exit and separate stdout/stderr bytes.
  */
-function executeStudyProcess(
+export function executeStudyProcess(
 	arguments_: readonly string[],
 	root: string,
 	duration: number,
@@ -1017,6 +1019,21 @@ export function readMemoryShapes(
 		})
 }
 
+/** Reads the model name each recorded generation request carried, from its exact wire bytes.
+ * @param requests - Recorded HTTP requests.
+ * @returns Model names of chat and generate requests in arrival order.
+ */
+export function readMemoryModels(requests: MemoryTrialResult['requests']): readonly string[] {
+	return requests
+		.filter((request) => request.path === '/api/chat' || request.path === '/api/generate')
+		.map((request) => {
+			const body = parseJSON(request.body)
+			if (!isRecord(body) || typeof body.model !== 'string')
+				throw new Error('Invalid generation request')
+			return body.model
+		})
+}
+
 /** Reads the native truncate and shift members of each recorded chat request from its exact wire bytes.
  * @param requests - Recorded HTTP requests.
  * @returns One entry per chat request in arrival order; a member the body omits is undefined.
@@ -1139,7 +1156,7 @@ export async function loadMemoryInputs(
  * @param driver - The driver directory under `studies/` whose `scenarios/` holds the declared scenarios.
  * @returns The parsed definition, rubric and scenarios in declared order.
  */
-async function loadStudyDeclaration(
+export async function loadStudyDeclaration(
 	target: string,
 	driver: string,
 ): Promise<Omit<StudyValidation, 'profile'>> {
@@ -1292,5 +1309,88 @@ export function buildCustodyManifest(
 		scenarios,
 		schedule: buildStudySchedule(definition, scenarios),
 		bounds,
+	}
+}
+
+/**
+ * Builds a two-trial memory grading population over the `full` arm: one complete retained trial and one capacity-faulted trial.
+ * @returns The profile, declaration, schedule, criteria, rubric, attempts and evidence the mechanical grading proofs share
+ */
+export function buildMemoryGradingFixture(): MemoryGradingFixture {
+	const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+	const definition: StudyDefinition = {
+		name: 'test',
+		version: '1',
+		question: 'mechanisms',
+		purpose: 'capacity',
+		driver: 'memory',
+		arms: ['full'],
+		scenarios: ['desk'],
+		order: [['full'], ['full']],
+		retries: 0,
+		rubric: 'rubric.json',
+	}
+	const manifest = buildCustodyManifest(
+		definition,
+		[parseStudyScenario({ id: 'desk', goals: [{ id: 'goal', input: {} }] })],
+		profile.bounds,
+	)
+	const [complete, faulted] = manifest.schedule
+	if (complete === undefined || faulted === undefined) throw new Error('Missing fixture trials')
+	const operational = buildMemoryCriterion('operational', 'state', { observation: 'operational' })
+	const meaning = buildMemoryCriterion('meaning', 'semantic', {
+		criterion: 'Correctly repaired handoff',
+	})
+	const source = buildMemoryCriterion('source', 'trace', { observation: 'arrival', id: 'receipt' })
+	const lookup = buildMemoryCriterion('lookup', 'trace', { observation: 'lookup', id: 'record' })
+	const result = buildMemoryCriterion('result', 'state', { observation: 'result', partial: false })
+	const failure = { cause: 'capacity', message: 'Output cap', role: 'agent' } as const
+	const completeAttempt: StudyAttempt = {
+		trial: complete,
+		duration: 1,
+		failure: undefined,
+		executed: true,
+		observations: [
+			{
+				goal: 'goal',
+				product: { value: { content: '' }, partial: true },
+				failure: undefined,
+				usage: [],
+				duration: 1,
+				executed: true,
+			},
+		],
+	}
+	const faultedAttempt: StudyAttempt = {
+		trial: faulted,
+		duration: 1,
+		failure,
+		executed: true,
+		observations: [
+			{ goal: 'goal', product: undefined, failure, usage: [], duration: 1, executed: true },
+		],
+	}
+	const completeEvidence: readonly StudyEvidence[] = [
+		{ event: 'summary', goal: 'other', value: 'unrelated' },
+		{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
+	]
+	return {
+		profile,
+		definition,
+		manifest,
+		complete,
+		faulted,
+		operational,
+		meaning,
+		source,
+		lookup,
+		result,
+		rubric: { version: '1', criteria: [operational, meaning, source, lookup, result] },
+		failure,
+		completeAttempt,
+		faultedAttempt,
+		completeEvidence,
+		attempts: [completeAttempt, faultedAttempt],
+		evidence: { [complete.id]: completeEvidence, [faulted.id]: [] },
 	}
 }

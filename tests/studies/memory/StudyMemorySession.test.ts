@@ -1,6 +1,7 @@
 import type { MemoryTrialFixture } from './types.js'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
+import { waitForCondition } from '@orkestrel/test'
 import { isStudyError, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
 import { StudyMemoryDriver } from '../../../studies/memory/index.js'
 import {
@@ -1040,9 +1041,10 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				() => undefined,
 				(reason: unknown) => reason,
 			)
-			await vi.waitFor(
-				() => expect(server.requests.some((request) => request.path === '/api/chat')).toBe(true),
-				{ timeout: 5000 },
+			await waitForCondition(
+				'the first chat request',
+				() => server.requests.some((request) => request.path === '/api/chat'),
+				{ budget: 5000 },
 			)
 			controller.abort(new Error('Cancelled by the study caller'))
 			const cancelled = await running

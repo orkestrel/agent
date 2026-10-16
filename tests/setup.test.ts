@@ -1,4 +1,13 @@
-import { buildLedgerTailScenario, MESSAGE_MEASURE_CASES, REQUEST_MEASURE_CASES } from './setup.js'
+import {
+	buildLedgerTailScenario,
+	MEASURE_CALLS,
+	MEASURE_CIRCULAR,
+	MESSAGE_MEASURE_CASES,
+	REQUEST_ADD,
+	REQUEST_HELLO,
+	REQUEST_LONG,
+	REQUEST_MEASURE_CASES,
+} from './setup.js'
 import {
 	createPhraseJudge,
 	LEDGER_REFUNDS_TOPIC,
@@ -18,7 +27,7 @@ import {
 } from './setup.js'
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { Channel, createAgent, ProviderAbortError } from '@src/core'
+import { Channel, createAgent, estimateRequest, ProviderAbortError } from '@src/core'
 import { createRecorder } from '@orkestrel/test'
 import {
 	createAuthorityContext,
@@ -384,6 +393,33 @@ describe('hand-counted measure fixtures', () => {
 		}
 		expect(REQUEST_MEASURE_CASES.some((entry) => entry.expected.tools > 0)).toBe(true)
 		expect(REQUEST_MEASURE_CASES.some((entry) => entry.expected.schema > 0)).toBe(true)
+	})
+})
+
+describe('shared request and measure fixtures', () => {
+	it('price at the hand counts their tables rest on', () => {
+		// `hello` is 5 characters, so content 2 with framing 4; 40 characters is content 10 with framing 4.
+		expect(estimateRequest({ messages: [REQUEST_HELLO] })).toBe(6)
+		expect(estimateRequest({ messages: [REQUEST_LONG] })).toBe(14)
+		// The advertised `add` definition costs 18 beside no messages.
+		expect(estimateRequest({ messages: [], tools: [REQUEST_ADD] })).toBe(18)
+		expect([REQUEST_HELLO.id, REQUEST_LONG.id, REQUEST_ADD.name]).toEqual(['m', 'n', 'add'])
+		// One `add` call renders to 41 characters, so 11, beside framing 4.
+		expect(
+			estimateRequest({
+				messages: [{ id: 'x', role: 'assistant', content: '', calls: MEASURE_CALLS }],
+			}),
+		).toBe(15)
+		expect(MEASURE_CALLS.map((call) => call.name)).toEqual(['add'])
+	})
+
+	it('hold an object JSON cannot render, which costs the framing alone', () => {
+		expect(MEASURE_CIRCULAR.self).toBe(MEASURE_CIRCULAR)
+		expect(() => JSON.stringify(MEASURE_CIRCULAR)).toThrow(TypeError)
+		expect(estimateRequest({ messages: [], options: { schema: MEASURE_CIRCULAR } })).toBe(4)
+		expect(
+			estimateRequest({ messages: [], tools: [{ name: 'lookup', parameters: MEASURE_CIRCULAR }] }),
+		).toBe(4)
 	})
 })
 

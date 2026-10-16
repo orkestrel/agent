@@ -198,13 +198,26 @@ export function measureMessages(request: ProviderRequest): number {
 	return estimateMessages(request.messages)
 }
 
-const REQUEST_HELLO: Message = { id: 'm', role: 'user', content: 'hello' }
-const REQUEST_LONG: Message = { id: 'n', role: 'user', content: 'a'.repeat(40) }
-const REQUEST_ADD: ToolDefinition = {
+/** Supplies the five-character user message the request estimate and measure cases share: content 2 and framing 4. */
+export const REQUEST_HELLO: Message = Object.freeze<Message>({
+	id: 'm',
+	role: 'user',
+	content: 'hello',
+})
+
+/** Supplies the forty-character user message the request estimate and measure cases share: content 10 and framing 4. */
+export const REQUEST_LONG: Message = Object.freeze<Message>({
+	id: 'n',
+	role: 'user',
+	content: 'a'.repeat(40),
+})
+
+/** Supplies the described tool with an object parameter schema the request estimate and measure cases advertise. */
+export const REQUEST_ADD: ToolDefinition = Object.freeze<ToolDefinition>({
 	name: 'add',
 	description: 'Adds.',
 	parameters: { type: 'object' },
-}
+})
 
 /**
  * Supplies request estimates counted by hand. The message term is `hello` at 2 tokens plus 4 of
@@ -265,9 +278,14 @@ export const REQUEST_ESTIMATE_CASES: ReadonlyArray<{
 	},
 ])
 
-const MEASURE_CIRCULAR: Record<string, unknown> = { type: 'object' }
+/** Supplies an object that holds itself, which JSON cannot render, so every measure of it costs the framing alone. */
+export const MEASURE_CIRCULAR: Record<string, unknown> = { type: 'object' }
 MEASURE_CIRCULAR.self = MEASURE_CIRCULAR
-const MEASURE_CALLS: readonly ToolCall[] = [{ id: 'c1', name: 'add', arguments: {} }]
+
+/** Supplies one `add` call whose arguments render to a 41-character JSON call, so its measure is 11. */
+export const MEASURE_CALLS: readonly ToolCall[] = Object.freeze<readonly ToolCall[]>([
+	{ id: 'c1', name: 'add', arguments: {} },
+])
 
 /**
  * Supplies message measures counted by hand: content is `ceil(length / 4)` over UTF-16 length, framing
