@@ -289,6 +289,27 @@ without imports.
   Six tests stayed in Agent because no Study test binds their Study mechanism. U5 (native Sonnet, brief
   `tmp/units/studies-cleanup-u5-brief.md`, ledger checked by `studies-cleanup-ledger-check.ts u5`) moves those claims
   into Study and then drops the Agent copies. U4 (layout), the falsify round and the verifier follow.
+- **U5 landed** as Study `a1dea1a` and Agent `8641370`. Study's tests now redden under all six gap mutations, which
+  the Orchestrator reproduced. `h-canonical-zero` was already caught in `src:core`. The six Agent tests were trimmed
+  rather than dropped, because each still carries Agent-only claims, so the `u5` ledger is empty and the checker
+  passes. A Study deadline test (`StudyResults.test.ts`, "expired within budget") flaked under heavy mutation load and
+  passed alone. U4, the test layout, runs in workflow `wf_6f6ce0b4-9d0`.
+- **Boost and boosted series (user decisions 2026-10-16).**
+  - Set Sol aside for now.
+  - Do the deferred performance and quality work and implement it.
+  - Then run Records and Compaction again with the boost, as one boosted run per arm compared against the sealed
+    runs. The user chose this over fresh paired baselines; the plan must disclose its confounds.
+  - Grade semantics with Grok 4.7 Extra High through the Cursor CLI. It is outside the Cursor premium limit:
+    `grok-4.7-xhigh` was bench-probed live after the limit hit.
+  - This is a new series. The sealed runs and their gradings stay untouched; the "never rerun Records" line governed
+    the closed campaign.
+  - The two-lane design round (Opus planner, Sonnet analyst, brief `tmp/units/boost-design-brief.md`) runs in the same
+    workflow.
+- **Lane routing (user, 2026-10-16).** Grok 4.7 xhigh (Cursor, T3 `delegate_task`, `reasoning_effort: xhigh`) is the
+  Astra/Sol alternative for every adversary (falsify/reviewer) and objective (analyst) lane while Codex is dark. Opus
+  holds subjective/planner lanes; Sonnet builds. The running Sonnet analyst lane was not interrupted. A Grok analyst
+  lane (task `boost-design-analyst-grok-1`) holds the round's objective verdict, and the Sonnet report is
+  supplementary evidence at reconciliation.
 - **Deferred to the post-results sweep (found 2026-10-16).** These are changes under `studies/**`, so they wait for
   the series' final results:
   - Bind or remove two seams of `studies/memory/StudyMemorySession.ts` that no test binds. Removing the
