@@ -7,8 +7,12 @@ commit `78ea378`; do not treat its historical process or deadline entries as act
 
 ## State and scope
 
-Compaction qualification is running. At `2026-10-15T22:19:23.838Z`, metadata recorded 32 of
-96 completed products, three summaries, and most recent goal `ev-09-1`. Re-read progress before acting.
+The `compaction-output` attempt is interrupted, unsealed, and preserved; it has no operational
+reading. T3 Code stopped the owning Codex session at `2026-10-15T22:50:24.140Z` and its process tree
+died with it, during goal 95 (`ev-24-3`) with 94 of 96 products complete. See
+§ Interrupted Compaction attempt. Its successor `compaction-output-2`, with the same treatment, started
+execution at `2026-10-16T00:04:00Z`, detached through WMI outside every provider session tree; see
+§ Running successor attempt and read its progress before acting.
 Records is sealed and labeled at 96/96. Never rerun, replay, or relabel Records for this campaign.
 The original c1 thinking comparison is graded and closed; this run is the separate q4
 thinking-off Compaction qualification, not a restart of that comparison.
@@ -41,11 +45,38 @@ subjective and adversarial work, and Haiku for precise lookups. No Fable without
 permission. On 2026-10-15 around 22:09 UTC, the Haiku lookup returned a session-limit refusal
 until 18:30 America/New_York (22:30 UTC); no substantive lookup ran. No allowance percentages
 are visible. The refused session was `4cb1d976-b61b-4c17-ad0e-24980edc59c1`; its launcher
-exited 1 uncapped in 2865 ms. Stop Claude scheduling on that failure, and re-probe availability before reuse.
+exited 1 uncapped in 2865 ms. Native Claude Code subagents later ran without refusal: an Opus
+objective lane and a Haiku checker (2026-10-15 23:49Z to 23:58Z), and a Haiku verifier
+(2026-10-16 00:00Z). Re-probe availability after any refusal.
 Native Luna handled mechanical verification; this is not a Claude gate claim. The semantic
 adjudicator is independently frozen as GPT-6.1 Sol high and must not change with helper routing.
 
-## Running Compaction attempt
+## Interrupted Compaction attempt
+
+At `2026-10-15T22:50:24.140Z` the T3 Code server ran `stopSession` (`provider.kind` `codex`) for
+thread `caf10b8d-3ff4-4392-bfe5-d98dad29bdb1`, titled "Finish Thinking Series Handoff", 30 minutes
+after that thread's last turn completed at `22:20:03.268Z`. The thread had launched the supervisor
+through its own `exec_command`, so the supervisor, the captured Study execute, the daemon script,
+and the Ollama daemon died with the session. None wrote an exit record; the daemon log stops
+mid-generation of request 695. The observer stopped writing after goal 32. The Codex app-server
+restarted at `23:04:07.126Z`, and its next turn refused on a usage limit until
+`2026-10-22 06:12` local, so the Codex bench, and with it the frozen Sol-high semantic
+adjudicator, is dark until then.
+
+The result tree holds `execution/manifest.json` and an unsealed trial `evidence.jsonl`
+(4717180 bytes, SHA-256 `d08fc82b2fcf2b71bb07a7ae1d27b60653d1be519c6d5a266917cc4e3bce7811`, no
+partial line): 95 goals started, 94 completed, `ev-24-3` attempted, one unexecuted, 10 summaries.
+The 4096 summary allowance carried the trial past the predecessor's goal-79 output-limit failure.
+The reader refuses unsealed evidence by design, so the attempt has no operational reading and
+proves no quality claim; do not run `read` against it. `tmp/units/compaction-output-terminal.json`
+records these identities and the cause, and `tmp/units/compaction-output-stop-spans.ndjson`
+preserves the T3 trace spans, which rotate out of T3's own logs. Reader pins and the external
+build receipt verified after the death. No owned process or listener on 11434 or 11435 remains.
+
+A successor needs a fresh namespace and staged custody, because `custody.json` binds the output
+path. Launch it outside every T3 provider session's process tree: T3 stops an idle provider
+session and its descendants, and a harness background command dies with its session. The
+predecessor's facts follow; § Running successor attempt records the successor that applies them.
 
 The `compaction-output` treatment raises summary output allowance from 2048 to 4096. It keeps
 context 20480, Agent output 8192, safety 512, `think:false`, the affine gauge, model/digests,
@@ -109,6 +140,61 @@ attempt; a repaired successor needs a separate namespace, captured identity, fin
 and disclosure. Do not reuse an expired deadline, overwrite its result, or restart Records.
 After terminal work, stop only the verified owned daemon tree and confirm its descendants
 are gone, following the canonical dispatch procedure. Never kill by process-name pattern.
+
+## Running successor attempt
+
+`compaction-output-2` repeats the `compaction-output` treatment and every control under a fresh
+namespace. Its tooling is `tmp/units/compaction-output-2-*.ts`, produced by the deterministic copy
+`tmp/units/compaction-output-2-copy.ts` (readings in `-copy-result.json`) plus reviewed hand edits.
+It reuses the accepted Study build worktree and `tmp/units/compaction-output-build-receipt.json`;
+the staged source delta, file counts and package counts equal the predecessor's.
+
+`tmp/units/compaction-output-2-detach.ts` started every long-lived process through WMI
+`Win32_Process.Create`; each launcher's parent is `WmiPrvSE.exe` in session 1. On 2026-10-16 a probe
+found a WMI-started process in no job object while this session's shell was in one. The live
+daemon's `server config` line equals the predecessor's, on the same CUDA device.
+
+| Item | Identity |
+| --- | --- |
+| Runtime and result | `tmp/studies/compaction-output-2-runtime`, `tmp/studies/compaction-output-2` |
+| Custody SHA-256 | `01f4be1742a6c35515e2752252a724eaa4459ef8e388af6b83468af529e8f2f9` |
+| Study fingerprint | `d13d3477c391e9e243caa2dc5b0b0caa1bc16c68a133916c6ed13e021bf741f9` |
+| Pinned reader SHA-256 | `5b936b22bbb333bdd936d81f0812c057866b667bb1db9af51f2f563000334b73` |
+| Launch receipt | `tmp/units/compaction-output-2-launch.json` |
+| Execute and daemon deadlines | `2026-10-16T02:54:33.403Z`, `2026-10-16T03:01:33.403Z` |
+| Daemon start | `2026-10-16T00:03:34.053Z` |
+
+| Process | PID | Journal | Detach receipt |
+| --- | --- | --- | --- |
+| Daemon launcher, script, Ollama | 100256, 16052, 83388 | `tmp/codex/compaction-output-2-daemon.*` | `tmp/units/compaction-output-2-daemon-detach.json` |
+| Supervisor launcher | 78236 | `tmp/codex/compaction-output-2-supervisor.*` | `tmp/units/compaction-output-2-supervisor-detach.json` |
+| Captured Study execute | 56332 | `tmp/codex/compaction-output-2-series.*` | child of the supervisor's dispatcher |
+| Observer launcher | 68192 | `tmp/units/compaction-output-2-watch.*` | `tmp/units/compaction-output-2-observer-detach.json` |
+
+Read progress without generating anything, and wait in-turn with a bounded wait:
+
+```text
+node tmp/units/compaction-output-2-progress.ts
+node tmp/units/compaction-output-2-wait.ts --results GOALS --limit SECONDS
+node tmp/units/compaction-output-2-reader.ts pins 01f4be1742a6c35515e2752252a724eaa4459ef8e388af6b83468af529e8f2f9
+```
+
+`GOALS` is an observer milestone (a multiple of 8) and `SECONDS` is at most 570. After the seal,
+apply § Terminal reading and grading with the `compaction-output-2` paths, writing
+`tmp/units/compaction-output-2-reader-result.json`. Then stop the daemon launcher tree by PID 100256
+after confirming its command line; the daemon script also stops Ollama at its deadline.
+
+The tooling passed one independent review round on `tmp/units/compaction-output-2-claims.md`. The
+Codex bench was probed dark at 2026-10-15T23:48Z (session `01a141f7-1001-7532-9de5-0dc254c4d4e8`,
+usage limit until 2026-10-22 06:12 local), so Claude Opus held the objective lane, with a Haiku
+checker. Two repairs followed the prescriptions. `pin` refuses unless the execute deadline still
+leaves the supervisor's 9805000 ms plus 120 s; a live negative control refused before any write.
+`detach` writes its receipt whenever WMI started a process. The adopted advisories are canonical ISO
+deadlines, mirrored daemon checks in `pin`, and complete-line observer parsing. Validation
+(`tmp/units/compaction-output-2-validation.json`) ran strict `tsc --erasableSyntaxOnly`, the reader
+selftest (55 and 25 controls), and a write-free stage validation. The predecessor's validation
+recorded `node --check` exits it never ran, and `node --check` does not strip types from a module
+without imports.
 
 ## Terminal reading and grading
 
@@ -186,15 +272,36 @@ skips and 155 separate study integration tests. Both packages passed formatting,
 and build. Agent's discovery instrument still flags core as ungated, but direct discovery
 matched 44 files and `npm test` ran them with 1474 passes; no configuration was changed.
 
-Agent's root installed Study is historical: core SHA-256
-`8fa96e330fad15c9e63c3d842d67164825cbc965c84addb2e4620bf4c5a36430`.
-Do not replace it to run the promoted consumer. The accepted consumer proof worktree is
+Agent consumes Study as the devDependency `file:../study`, a copied `--install-links
+--ignore-scripts` installation. On 2026-10-16 root replaced the frozen `f977e68` copy (preserved at
+`tmp/units/study-root-install-f977e68`) with the accepted `422d549` build: all 14 installed `dist`
+files equal `../study/tmp/worktrees/compaction-output/dist`, and the other 32 root `@orkestrel`
+packages are byte-unchanged (`tmp/units/compaction-output-2-root-orkestrel-before.json`), as are
+`package.json` and `package-lock.json`. The refresh happened after staging; staging reads Study from
+the build worktree. A Haiku verifier then measured `npm run check` passing (54 type errors before),
+`npm test` passing 2118 with two applicability skips, and `npm run test:service` passing 154 of 155.
+The failing test, `StudyMemoryDriver.test.ts:704` (rolling recap framing), passes alone in
+`tmp/worktrees/study-slim` and fails alone at root. The difference is the `@orkestrel/agent` that
+Ollama loads: published 0.0.30 at root, a development build in the slim tree. That is the unpublished
+Agent API limit, not a Study install defect.
+
+npm's `install-links` is `false` in this project, so a plain `npm install` replaces the copy with a
+link to `../study` (a dry run reports `change @orkestrel/study`). Because the version stays 0.0.1,
+npm also treats an outdated copy as up to date. Refresh it by moving the copy aside and running
+`npm install --install-links --ignore-scripts`. Persisting `install-links=true` belongs in a
+project `.npmrc`, which agents may not read or write; it is the user's change. Both lockfiles still
+list Study's `f977e68` dependency set, without `@orkestrel/agent`, `@orkestrel/ollama` and
+`@orkestrel/tool`. The checkout's own build cannot compile against the published Agent 0.0.30 it
+resolves (`RequestMeasure`, `estimateRequest` and `measureRequest` are absent), so root restored
+`../study/dist` from the accepted build after a failed rebuild. Study root `dist` equals that
+build. The accepted consumer proof worktree is
 `tmp/worktrees/study-slim`, with physical dependencies under
 `tmp/studies/study-slim-dependencies`. Its Study server SHA-256 is
 `01bff1edf977435415d21bb572150ae6434fb900a65dd3c53c877720a6304ecd`.
 Study's older `tmp/worktrees/slim` proof tree is dirty but source-equivalent to accepted root;
 do not reset it. Its dependencies live under `../study/tmp/studies/slim-dependencies`.
-Study root `dist` is not proof of its accepted source; build in isolation when needed.
+A Study build needs the development Agent and Ollama, so build in an isolated worktree whose
+`node_modules` resolves them (as `slim-dependencies` does), then compare its `dist` before copying.
 
 The next work follows these dependencies:
 
