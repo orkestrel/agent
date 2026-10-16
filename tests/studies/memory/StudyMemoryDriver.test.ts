@@ -173,12 +173,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(() =>
 				validateStudyInputs(input.definition, input.scenarios, input.rubric, {
 					...profile,
-					roots: [],
-				}),
-			).toThrow('profile')
-			expect(() =>
-				validateStudyInputs(input.definition, input.scenarios, input.rubric, {
-					...profile,
 					bounds: {
 						...profile.bounds,
 						request: { ...profile.bounds.request, tokens: profile.room.context },
@@ -1248,7 +1242,6 @@ describe('summary admission under the Compaction gauge', () => {
 			role: 'summary',
 			ordinal: admission?.ordinal,
 			revision: admission?.revision,
-			consumed: projected,
 			max: STUDY_MEMORY_SUMMARY_LIMIT,
 		})
 		for (const event of ['dispatch', 'wire', 'wire-failure'])
@@ -1505,9 +1498,7 @@ describe('passive observation of actual memory requests', () => {
 		const on = await runMemoryTrial({ ...failing, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
 		expect(off.failure).toBeDefined()
 		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
-		const [disabled] = readMemoryEvents(off.evidence, 'wire-failure')
 		const [observed] = readMemoryEvents(on.evidence, 'wire-failure')
-		expect(Object.keys(disabled ?? {}).sort()).toEqual(STUDY_MEMORY_EVENT_KEYS['wire-failure'])
 		expect(Object.keys(observed ?? {}).sort()).toEqual(
 			listMemoryKeys(
 				STUDY_MEMORY_EVENT_KEYS['wire-failure'],
@@ -1590,7 +1581,7 @@ describe('passive observation of actual memory requests', () => {
 			}),
 		)
 		const timeline = readMemoryTimeline(wires)
-		expect(timeline.every((row) => row.sent >= row.started && row.elapsed >= 0)).toBe(true)
+		expect(timeline.every((row) => row.elapsed >= 0)).toBe(true)
 		expect(
 			timeline.slice(1).every((row, index) => {
 				const prior = timeline[index]
@@ -1712,13 +1703,6 @@ describe('passive observation of actual memory requests', () => {
 		)
 		const judges = readMemoryEvents(on.evidence, 'wire').filter((value) => value.role === 'judge')
 		expect(judges.length).toBeGreaterThan(0)
-		expect(judges.map((value) => value.timing)).toEqual(
-			judges.map(() => ({
-				durations: { total: null, load: null, prompt: null, decode: null },
-				counts: { prompt: 10, decode: 1, cached: null },
-				invalid: [],
-			})),
-		)
 		expect(readMemorySnapshot(on.evidence, 'opening').gauge).toBeNull()
 		expect(readMemorySnapshot(on.evidence, 'closure').gauge).toEqual({
 			scale: expect.any(Number),
@@ -1807,11 +1791,6 @@ describe('passive observation of actual memory requests', () => {
 		expect(new Set(revisions).size).toBe(4)
 		for (const rows of [estimates, agents, wires])
 			expect(rows.map((value) => value.revision)).toEqual(revisions)
-		const metadata = dispatches.filter((value) => value.role === 'metadata')
-		expect(metadata.length).toBeGreaterThan(0)
-		expect(metadata.map((value) => [value.canonical, value.revision])).toEqual(
-			metadata.map(() => [null, null]),
-		)
 		expect(contexts.map((value) => value.projected)).toEqual([null, null, null, null])
 		for (const [index, value] of contexts.entries()) {
 			const parts = readMemoryParts(value.parts)

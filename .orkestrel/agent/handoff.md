@@ -282,7 +282,22 @@ without imports.
   U3 builder stopped on a Cursor provider failure after 31 minutes with draft edits and no ledger (diff saved as
   `tmp/units/studies-cleanup-u3-1-partial.patch`; `studies` 155 to 88); the successor (task `studies-cleanup-u3-2`, brief
   `tmp/units/studies-cleanup-u3-brief-2.md`) accounts for every draft removal or restores it, writes the ledger
-  incrementally, and must pass `tmp/units/studies-cleanup-ledger-check.ts`.
+  incrementally, and must pass `tmp/units/studies-cleanup-ledger-check.ts`. U3 landed as Agent `a96fe45` (native
+  Sonnet after Cursor's limit). `studies` went from 155 to 94 tests and `setup` from 159 to 155. The 79 removed names
+  are 20 U1 claims, 38 drops each reddened by a Study mutation, and 21 folds (`tmp/units/studies-cleanup-ledger.md`).
+  The Orchestrator re-ran every gate and the checker against regenerated lists, and reproduced two drop mutations.
+  Six tests stayed in Agent because no Study test binds their Study mechanism. U5 (native Sonnet, brief
+  `tmp/units/studies-cleanup-u5-brief.md`, ledger checked by `studies-cleanup-ledger-check.ts u5`) moves those claims
+  into Study and then drops the Agent copies. U4 (layout), the falsify round and the verifier follow.
+- **Deferred to the post-results sweep (found 2026-10-16).** These are changes under `studies/**`, so they wait for
+  the series' final results:
+  - Bind or remove two seams of `studies/memory/StudyMemorySession.ts` that no test binds. Removing the
+    post-generate `check()` (near `:293`) or the provider request-timeout wiring (near `:99`) leaves every test green.
+  - Decide whether `isStudyToolsResponse` should validate scripted tool arguments. It does not today; the analyst's
+    cited `isStudyToolsArguments` does not exist, and U3 asserts `isStudyToolsWrite` refusing `../escape` instead.
+  - Resolve the planner/analyst split on the profile re-checks in `studies/memory/helpers.ts` (planner U6).
+  - Make the memory profiles runnable from the root.
+  - Extract what Agent's own studies keep from the series, then sweep the series declarations and runtimes.
 - **Cursor usage exhausted (2026-10-16 ~06:49 local).** Every premium Cursor model returns `You've hit your usage limit
   ... set a Spend Limit`, resetting 2026-11-16; T3 tasks then fail in seconds as "Provider turn failed" (the first U3
   builder, its successor and the label-import builder all ended this way; trees verified clean of mutations, draft
