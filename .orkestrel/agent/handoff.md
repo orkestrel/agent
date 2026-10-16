@@ -39,7 +39,10 @@ versions for ordinary development. Non-Orkestrel additions need explicit authori
 Frozen experiments retain their admitted versions. No version bump or publication was
 authorized for this continuation. Scaffold was published by another session; leave its
 release and `PARALLEL.md` work alone. Use the canonical contracts and direct matching Orkestrel
-primitives; retain the user's single setup-file-per-layer convention.
+primitives; retain the user's single setup-file-per-layer convention. In both Agent and Study, `tests/setupStudy.ts`
+is the harness and development setup module, kept separate from implementation setup (`setup.ts`, `setupServer.ts`)
+the way `tests/setupPolicy.ts` is (user decision, 2026-10-16). Scaffold does not plan it or the `tests/studies`
+project; that deviation stands until Study is production-ready and scaffold is updated to propagate the structure.
 
 The user requests Claude models for implementation: Sonnet for bounded work, Opus for
 subjective and adversarial work, and Haiku for precise lookups. No Fable without fresh explicit
@@ -207,6 +210,67 @@ deadlines, mirrored daemon checks in `pin`, and complete-line observer parsing. 
 selftest (55 and 25 controls), and a write-free stage validation. The predecessor's validation
 recorded `node --check` exits it never ran, and `node --check` does not strip types from a module
 without imports.
+
+## Work in flight on 2026-10-16
+
+- **Exploratory Grok semantic labeling (user decision).** Grok 4.7 Extra High labels `compaction-output-2` only; Sol-high
+  labels it after 2026-10-22 06:12 local for the Records comparison, and Records is never relabeled. Semantic grading
+  `54a3e4844ae71627aab629e282094f9efd50cb5dd3f7456b85e37e560f6557de` created packet `30e98922…` (trial `t-e41a44ec…`);
+  batches are `tmp/studies/labels-30e98922/` (96, largest 410211 bytes). The reviewed Cursor runner is
+  `tmp/units/study-label-grok/` (Opus review: resolved model pinned to `Grok 4.7 256K Extra High`, atomic labels write).
+  Runner v1 stopped at batch 001 on a judgments object keyed by criterion (Cursor has no output-schema option); runner v2
+  states the answer schema in the prompt (mutation-probed). v2 synthetic controls passed 9 of 9 expected verdicts and the
+  v2 pilot (batch 096) passed in 278 s. The population runs WMI-detached from
+  `tmp/units/study-label-grok-population.ts` (launcher PID 51320, journal `tmp/cursor/grok-label-population-v2.jsonl`,
+  output `tmp/studies/labels-grok-30e98922-v2/`, 900 s per batch, 36000 s outer cap, about 4.3 minutes per batch). It
+  stops at the first failure without retry. v1 artifacts stay in `tmp/studies/labels-grok-30e98922/`. When it
+  completes, import with `study label` and report through the captured CLI, disclosing the adjudicator substitution.
+- **Performance diagnostic (complete).** See `tmp/units/compaction-output-2-perf-diagnostic.md`: gate table, the
+  cold/warm/changed checkpoint replay (21.2 minutes of model time), and the single admitted candidate, summary prefix
+  alignment. Prefix reuse is output-neutral on this runner; uncached prefill is fixed near 223 tokens/s.
+- **Local dependencies follow the scaffold's tarball law.** `orkestrel-publish/references/release.md` § Fix a dependency
+  before it publishes and `wave.md:50-52` govern: manifests keep registry ranges and local builds are packed and staged
+  with `npm install --no-save`. A first attempt that added a tracked `tools/siblings/`, a `tools` test project and
+  `file:` ranges in Study's manifest contradicted those laws and the project model; it was taken out of both trees on
+  2026-10-16 (kept for reference in `tmp/units/siblings-retired/`). `tmp/units/local-stage.ts` stages local Agent, Ollama
+  and MCP builds into Study; Study's audit is clean, its build stays byte-identical to the accepted `422d549` build, and
+  its gates pass (two `test:src` timeouts under load pass alone). Rerun it after any source change. Agent's installed
+  Study stays held at the captured `422d549` build until Sol grading closes; run no npm install in Agent root before then.
+- **Routing decision (user, 2026-10-16).** While Grok serves series work, non-series absorption uses another model
+  rather than waiting: Claude Sonnet 5.5 native lanes for classification reading, and Cursor models for quick small
+  subagent work (`composer-2.5-fast` bench-probed live, session `6dea88b0-d445-4f31-b160-95f389d6e2e9`). Codex stays dark
+  until 2026-10-22 06:12 local.
+- **Open cleanup (user request 2026-10-16).** Finish the studies extraction cleanup: keep Agent's study tests in
+  `tests/studies` under a renamed project and script (the blueprint plans no such project, so its audit question
+  stands), move tests of extracted mechanisms to Study with their code, drop what neither package needs, and decide what
+  belongs in Study versus Agent. Maps: `tmp/units/studies-cleanup-map-{agent,study}.txt`. Absorption
+  (`tmp/units/studies-cleanup-absorb-{a,b,c,d}.md`; lanes A-C on native Sonnet, lane D on Cursor `composer-2.5-fast`,
+  session `6f705a16-60bf-4f06-b53d-945c7f8d4af4`) found that most Agent study tests to clean up re-test Study-owned
+  transport, trace and summary mechanisms already covered in Study, two summary cases have no Study equivalent and move
+  there, and Study itself has nothing to drop. The design round (`tmp/units/studies-cleanup-design-brief.md`) runs as T3
+  delegated tasks on Cursor: planner on Claude Opus 5.5 (`studies-cleanup-design-planner-1`), analyst on Gemini 4 Argon
+  (`studies-cleanup-design-analyst-1`). Subagent work now routes to the user's enabled Cursor models, never Composer.
+  The analyst's plan is `tmp/units/studies-cleanup-design-analyst-1.md`; the planner is still running.
+- **Study commands (user decision 2026-10-16).** Agent's manifest adds one alias per Study operation beside the bare
+  `study` passthrough: `study:check`, `study:execute`, `study:grade`, `study:label` and `study:report`, with arguments
+  after `--` (from PowerShell call `npm.cmd`: PowerShell drops a bare `--` before `npm.ps1` receives it). Studies run
+  evaluations, not tests, so they never take the `test:` prefix; the `tests/studies` proofs keep a `test:` script. No
+  `study:*` plan existed before; the 2026-10-14 design planned a single `npm run study` entry
+  (`tmp/units/study-scripts-evidence-archaeology.md`). The scaffold audit never examines a script without `vitest`, so
+  the aliases raise no question (audit unchanged; config 229 and policy 119 pass). Agent's root is a captured root of
+  every root-run identity, so the manifest edit moved the `tools`/`local` fingerprint from `fa42d8d9…` to `a9540f90…`,
+  and the next Compaction staging must disclose `package.json` through `--delta`.
+- **Committed declarations (finding 2026-10-16).** From the root, `study check` passes only `tools`/`local` of the 13
+  study and profile pairs (`tmp/units/study-scripts-evidence-guide.md`): the memory `local` profile is a placeholder
+  template, and `q4` and `q4-room` lack the `settings.gauge` the compaction arm now requires. The series runs from staged
+  runtimes whose derived `compaction` profile carries the gauge, observation, checkpoint and rolling settings. Study's
+  guide placed the rubric in the driver bundle; the source resolves it in the study's own directory. The guide now says
+  so and states the forward-slash path rule and the `--out` default (Study `guides/study.md`, uncommitted; `test:guides`
+  13 pass; guides do not ship, so Agent's installed copy stays current).
+- **Series viability first (user decision 2026-10-16).** Keep the series runnable until its final results are in: the
+  cleanup changes nothing the series stages or reads (`studies/memory/**`, its profiles and scenarios). After the final
+  results, extract what Agent's own studies should keep from the series, then clean and sweep the series declarations
+  and runtimes, keeping the Agent-specific studies.
 
 ## Terminal reading and grading
 
