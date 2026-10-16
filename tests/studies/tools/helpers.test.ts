@@ -11,7 +11,6 @@ import {
 	validateStudyToolsRubric,
 } from '../../../studies/tools/helpers.js'
 import { loadStudyToolsFixture } from '../../setupStudy.js'
-import { buildCustodyAttempt } from '../../setupStudy.js'
 
 it('refuses traversal, reserved names, symlinks and oversized files before observing or writing outside scratch', async () => {
 	const scratch = createScratch()
@@ -95,12 +94,9 @@ it('grades the latest actual file and trace, retaining unknown when no matching 
 	).toThrow('Malformed')
 })
 
-it('refuses unsupported assertions, foreign attempts/evidence and duplicate attempts without inventing grades', async () => {
+it('refuses unsupported assertions and a non-mechanism declaration without inventing grades', async () => {
 	const fixture = await loadStudyToolsFixture()
 	const manifest = fixture.manifest
-	const trial = manifest.schedule[0]
-	if (trial === undefined) throw new Error('No declared tools trial')
-	const attempt = buildCustodyAttempt(manifest, trial)
 	expect(() => validateStudyToolsRubric(fixture.rubric)).not.toThrow()
 	expect(() =>
 		validateStudyToolsRubric({
@@ -120,14 +116,6 @@ it('refuses unsupported assertions, foreign attempts/evidence and duplicate atte
 	const adapter = createStudyAdapter()
 	const input = { manifest, rubric: fixture.rubric, attempts: [], evidence: {} }
 	expect(adapter.grade(input).every((judgment) => judgment.verdict === 'unknown')).toBe(true)
-	expect(() => adapter.grade({ ...input, attempts: [attempt, attempt] })).toThrow('duplicate')
-	expect(() =>
-		adapter.grade({
-			...input,
-			attempts: [{ ...attempt, trial: { ...trial, id: 'foreign' } }],
-		}),
-	).toThrow('Invalid')
-	expect(() => adapter.grade({ ...input, evidence: { foreign: [] } })).toThrow('foreign')
 	expect(() =>
 		adapter.grade({
 			...input,

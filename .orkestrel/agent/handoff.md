@@ -223,8 +223,28 @@ without imports.
   v2 pilot (batch 096) passed in 278 s. The population runs WMI-detached from
   `tmp/units/study-label-grok-population.ts` (launcher PID 51320, journal `tmp/cursor/grok-label-population-v2.jsonl`,
   output `tmp/studies/labels-grok-30e98922-v2/`, 900 s per batch, 36000 s outer cap, about 4.3 minutes per batch). It
-  stops at the first failure without retry. v1 artifacts stay in `tmp/studies/labels-grok-30e98922/`. When it
-  completes, import with `study label` and report through the captured CLI, disclosing the adjudicator substitution.
+  stops at the first failure without retry. v1 artifacts stay in `tmp/studies/labels-grok-30e98922/`. It completed on
+  2026-10-16 (95 labeled plus the retained 096 pilot; summary `complete: true`; terminal exit 0, uncapped, 17688507 ms).
+  The import unit (Cursor Claude Sonnet 5.5, task `compaction-output-2-label-import-1`, brief
+  `tmp/units/compaction-output-2-label-import-brief.md`) writes an audit modeled on the Records import and a create-only
+  merged file `tmp/studies/compaction-output-2-grok-labels.json`; after an independent review the Orchestrator runs
+  `study label` against grading `54a3e484…` and `study report` through the captured CLI, disclosing the adjudicator
+  substitution. Cursor's limit stopped that builder, so the unit ran as native Claude subagents: a Sonnet builder wrote
+  `tmp/units/compaction-output-2-label-import-audit.ts` and `-label-command.ts`, and an independent Opus review
+  (`tmp/units/compaction-output-2-label-import-review.md`) confirmed all nine claims and found two low custody gaps
+  outside them. F1: the audit did not compare `answer.json` with the transport result. F2: the launcher did not pin
+  the audited merged hash. The Orchestrator applied both prescribed fixes and re-ran the audit (exit 0, all 96 answers
+  equal their transport results, merged file `verified-existing` at
+  `bb398331cadc06b8488a161770b32659008642416d0991154e23e914414221fd`). Root and captured Study `dist` are byte-equal
+  (14 files). The label command (exit 0, uncapped, 3407 ms) returned grading
+  `69a7a63af747be903fb414daa36756dafbe04cbae8d406d61f5fe16391ed2061` over `54a3e484…`, packet `30e98922…`, labeler
+  `grok-4.7-xhigh`. Its `grading.json` hashes to its id, and the two earlier gradings are unchanged. The report (exit
+  0, uncapped, 1721 ms) reads Compaction 56 achieved, 328 unsuccessful, 0 unknown, 41 critical over 384 criteria
+  (0.146), with 96 of 96 goals completed and no faults. Judge usage: 96 calls, 7512618 tokens (6110917 input plus
+  1401701 output; 559872 cached input not added again), 17944685 ms. **Exploratory only:** Grok 4.7 Extra High
+  substituted for the frozen GPT-6.1 Sol high adjudicator. Records (78 achieved, 305 unsuccessful, 1 unknown, Sol
+  labels over a different build and room) is not comparable with it. The honest Records comparison waits for Sol
+  labels after 2026-10-22 06:12 local.
 - **Performance diagnostic (complete).** See `tmp/units/compaction-output-2-perf-diagnostic.md`: gate table, the
   cold/warm/changed checkpoint replay (21.2 minutes of model time), and the single admitted candidate, summary prefix
   alignment. Prefix reuse is output-neutral on this runner; uncached prefill is fixed near 223 tokens/s.
@@ -257,7 +277,17 @@ without imports.
   a mutation of the mechanism it exercised (rule R). U1 (Study tests in; Cursor Claude Opus 5.5, task
   `studies-cleanup-u1-1`) and U2 (Agent rename; Cursor Claude Sonnet 5.5, task `studies-cleanup-u2-1`) run in parallel
   from briefs `tmp/units/studies-cleanup-u{1,2}-brief.md`; U3 (drops, folds, setup trim, ledger) follows U1, then U4,
-  one falsify round on the integrated result, and a verifier.
+  one falsify round on the integrated result, and a verifier. U1 landed as Study `7508dff` (19 claims, each reddened by
+  a mutation; two reproduced by the Orchestrator; Study gates green, `test:src` 522) and U2 as Agent `74604c6`. The first
+  U3 builder stopped on a Cursor provider failure after 31 minutes with draft edits and no ledger (diff saved as
+  `tmp/units/studies-cleanup-u3-1-partial.patch`; `studies` 155 to 88); the successor (task `studies-cleanup-u3-2`, brief
+  `tmp/units/studies-cleanup-u3-brief-2.md`) accounts for every draft removal or restores it, writes the ledger
+  incrementally, and must pass `tmp/units/studies-cleanup-ledger-check.ts`.
+- **Cursor usage exhausted (2026-10-16 ~06:49 local).** Every premium Cursor model returns `You've hit your usage limit
+  ... set a Spend Limit`, resetting 2026-11-16; T3 tasks then fail in seconds as "Provider turn failed" (the first U3
+  builder, its successor and the label-import builder all ended this way; trees verified clean of mutations, draft
+  edits intact). By user decision the delegated units now run as native Claude subagents (Sonnet 5.5 builders, Opus
+  review) in workflow `wf_89a0ac79-c4f`. Bench-probe before routing to Cursor again.
 - **Study commands (user decision 2026-10-16).** Agent's manifest adds one alias per Study operation beside the bare
   `study` passthrough: `study:check`, `study:execute`, `study:grade`, `study:label` and `study:report`, with arguments
   after `--` (from PowerShell call `npm.cmd`: PowerShell drops a bare `--` before `npm.ps1` receives it). Studies run

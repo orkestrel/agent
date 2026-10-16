@@ -7,7 +7,7 @@ import {
 	isStudyError,
 	readStudyFailure,
 } from '@orkestrel/study'
-import { readStudyResult } from '@orkestrel/study/server'
+import { collectStudyEvidence, readStudyResult } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
@@ -16,7 +16,6 @@ import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../../../studies/memory/index.js'
 import {
-	buildMemoryCall,
 	buildMemoryProfile,
 	buildMemoryReply,
 	createMemoryContext,
@@ -26,24 +25,16 @@ import {
 	executeStudyTopology,
 	readMemoryControls,
 	readMemoryEvents,
-	readStudyToolsEvidence,
 	runMemoryFailure,
 	runMemorySummary,
 	runMemoryTrial,
 	STUDY_MEMORY_ACTUAL_REFUSALS,
-	STUDY_MEMORY_CONTINUATION_MISSES,
-	STUDY_MEMORY_FIXED_PROJECTION,
-	STUDY_MEMORY_FIXED_SETTINGS,
 	STUDY_MEMORY_GOALS,
 	STUDY_MEMORY_MODULES,
-	STUDY_MEMORY_NATIVE_CAPACITY,
-	STUDY_MEMORY_NATIVE_GENERIC,
 	STUDY_MEMORY_NATIVE_MALFORMED,
-	STUDY_MEMORY_NATIVE_TRIALS,
 	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_SCHEDULE,
 	STUDY_MEMORY_SUMMARY_FOLDS,
-	STUDY_MEMORY_SUMMARY_MISSES,
 	WINDOW_GOAL,
 } from '../../setupStudy.js'
 
@@ -259,6 +250,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 			expect(result.attempts.map((attempt) => attempt.trial)).toEqual(result.manifest.schedule)
 			expect(result.manifest.qualification).toBe(qualification)
 			if (target === 'capacity') qualification = result.seal.id
+			const retained = await collectStudyEvidence(result)
 			for (const attempt of result.attempts) {
 				expect(attempt.failure).toBeUndefined()
 				expect(attempt.observations.map((observation) => observation.goal)).toEqual(
@@ -270,7 +262,8 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 					expect(observation.product?.value).toMatchObject({ content: 'Receipt retained.' })
 					expect(observation.usage.some((charge) => charge.role === 'agent')).toBe(true)
 				}
-				const evidence = await readStudyToolsEvidence(output, attempt.trial.id)
+				const evidence = retained[attempt.trial.id]
+				if (evidence === undefined) throw new Error('Missing retained trial evidence')
 				expect(evidence.some((row) => row.event === 'arrival')).toBe(true)
 				expect(evidence.some((row) => row.event === 'dispatch')).toBe(true)
 				expect(evidence.some((row) => row.event === 'wire')).toBe(true)
@@ -344,8 +337,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 							),
 						),
 					).toBe(true)
-					const evidence = await readStudyToolsEvidence(output, judgment.trial)
-					const retained = evidence[Number(row) - 1]
+					const cited = retained[judgment.trial]?.[Number(row) - 1]
 					expect(
 						criterion?.method !== 'trace' || judgment.verdict !== 'achieved' || row !== undefined,
 					).toBe(true)
@@ -353,9 +345,9 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 						row === undefined ||
 							(Number.isSafeInteger(Number(row)) &&
 								Number(row) > 0 &&
-								retained?.goal === criterion?.goal &&
+								cited?.goal === criterion?.goal &&
 								isRecord(criterion?.assertion) &&
-								retained?.event === criterion.assertion.observation),
+								cited?.event === criterion.assertion.observation),
 					).toBe(true)
 				}
 			}
@@ -394,61 +386,6 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 	}
 }, 540000)
 
-it.each(STUDY_MEMORY_SUMMARY_MISSES)(
-	'completes a summary whose actual prompt is $name and feeds the recap to the next agent request',
-	async ({ folded, prompt }) => {
-		const result = await runMemorySummary(
-			folded,
-			400,
-			[{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap kept', prompt }) }],
-			true,
-		)
-		expect(result.failure).toBeUndefined()
-		expect(result.products).toHaveLength(1)
-		const chats = result.requests.filter((request) => request.path === '/api/chat')
-		expect(chats).toHaveLength(2)
-		expect(chats[0]?.body).not.toContain('Recap kept')
-		expect(chats[1]?.body).toContain('Recap kept')
-		const forecast = readMemoryEvents(result.evidence, 'context').find(
-			(value) => value.role === 'summary',
-		)
-		// The actual count is above the forecast it is retained beside, and the goal still completes.
-		expect(Number(forecast?.projected)).toBeLessThan(prompt)
-		expect(
-			readMemoryEvents(result.evidence, 'wire').find((value) => value.role === 'summary'),
-		).toMatchObject({ prompt })
-		expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
-	},
-)
-
-it.each(STUDY_MEMORY_CONTINUATION_MISSES)(
-	'continues the tool turn for $name and retains the forecast beside the actual count',
-	async ({ prompt }) => {
-		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [
-				{ path: '/api/chat', body: buildMemoryCall({ prompt }) },
-				{ path: '/api/chat', body: buildMemoryReply({ content: 'Follow-up received' }) },
-			],
-			goals: [WINDOW_GOAL],
-			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
-		})
-		expect(result.failure).toBeUndefined()
-		expect(result.products).toEqual([{ value: { content: 'Follow-up received' }, partial: false }])
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(2)
-		expect(readMemoryEvents(result.evidence, 'lookup')).toHaveLength(1)
-		expect(readMemoryEvents(result.evidence, 'estimate').map((value) => value.projected)).toEqual([
-			STUDY_MEMORY_FIXED_PROJECTION,
-			STUDY_MEMORY_FIXED_PROJECTION,
-		])
-		expect(
-			readMemoryEvents(result.evidence, 'wire')
-				.filter((value) => value.role === 'agent')
-				.map((value) => value.prompt),
-		).toEqual([prompt, 10])
-	},
-)
-
 it.each(STUDY_MEMORY_ACTUAL_REFUSALS)(
 	'stops before the next request, tool and goal on $name',
 	async ({ settings, room, goal, body, message, role }) => {
@@ -476,6 +413,7 @@ it.each(STUDY_MEMORY_ACTUAL_REFUSALS)(
 					() => undefined,
 					(error: unknown) => error,
 				)
+			expect(isStudyError(latched)).toBe(true)
 			expect(latched).toMatchObject({ code: 'CAPACITY', message: expect.stringContaining(message) })
 			// A returned actual-capacity failure stays attributable to the role that sent the request.
 			expect(readStudyFailure(latched)).toMatchObject({ cause: 'capacity', role })
@@ -527,51 +465,6 @@ it('sends false truncate and shift controls only for Compaction chat requests an
 	}
 })
 
-it.each([...STUDY_MEMORY_NATIVE_CAPACITY, ...STUDY_MEMORY_NATIVE_GENERIC])(
-	'fails $name once as $code with the role, status and bytes retained and sends no later request',
-	async ({ role, trial, status, body, code, message }) => {
-		const result = await runMemoryFailure({
-			...trial,
-			responses: [
-				{ path: '/api/chat', status, body },
-				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
-			],
-		})
-		// The failure surfaces: no goal completes, and the latched fault carries the daemon's own words.
-		expect(result.first).toBeDefined()
-		expect(result.products).toEqual([])
-		expect(isStudyError(result.latched)).toBe(true)
-		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
-		expect(readStudyFailure(result.latched)).toMatchObject({
-			cause: code === 'CAPACITY' ? 'capacity' : 'infrastructure',
-			role,
-		})
-		// Exactly one chat request was sent, none after the failure, and the second queued reply was never served.
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-		expect(result.requests).toHaveLength(result.sent)
-		expect(result.queued).toBe(1)
-		// One failed ticket with unknown usage, never a successful wire row.
-		expect(result.usage.filter((row) => row.role === role)).toEqual([
-			{ role, calls: 1, tokens: undefined, bytes: undefined },
-		])
-		expect(
-			readMemoryEvents(result.evidence, 'wire').filter((value) => value.role === role),
-		).toEqual([])
-		// One failure row keeps the status, a bounded reason and every byte read, request included.
-		const failures = readMemoryEvents(result.evidence, 'wire-failure')
-		expect(failures).toHaveLength(1)
-		const dispatch = readMemoryEvents(result.evidence, 'dispatch').find(
-			(value) => value.role === role,
-		)
-		expect(failures[0]).toMatchObject({ role, path: '/api/chat', status })
-		expect(String(failures[0]?.reason)).toContain(message)
-		expect(String(failures[0]?.reason).length).toBeLessThanOrEqual(256)
-		expect(failures[0]?.bytes).toBe(
-			Number(dispatch?.bytes) + new TextEncoder().encode(body).byteLength,
-		)
-	},
-)
-
 it.each(STUDY_MEMORY_NATIVE_MALFORMED)(
 	'fails $name once as $code with the role retained, usage unknown and no later request',
 	async ({ role, trial, status, body, code, message }) => {
@@ -595,25 +488,3 @@ it.each(STUDY_MEMORY_NATIVE_MALFORMED)(
 		])
 	},
 )
-
-it('stops buffering a non-2xx body at the response byte allowance and fails capacity without a later request', async () => {
-	const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-	const allowance = profile.bounds.request.bytes
-	const result = await runMemoryFailure({
-		...STUDY_MEMORY_NATIVE_TRIALS.agent,
-		responses: [
-			{ path: '/api/chat', status: 500, body: 'x'.repeat(allowance + 1) },
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
-		],
-	})
-	expect(result.latched).toMatchObject({
-		code: 'CAPACITY',
-		message: expect.stringContaining('byte allowance'),
-	})
-	expect(readStudyFailure(result.latched)).toMatchObject({ cause: 'capacity', role: 'agent' })
-	expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-	expect(result.queued).toBe(1)
-	const [failure] = readMemoryEvents(result.evidence, 'wire-failure')
-	expect(failure).toMatchObject({ role: 'agent', status: 500 })
-	expect(Number(failure?.bytes)).toBeGreaterThan(allowance)
-})

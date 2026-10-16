@@ -15,6 +15,7 @@ import {
 import {
 	StudyArtifacts,
 	StudyResults,
+	collectStudyEvidence,
 	encodeStudyJSON,
 	hashStudyBytes,
 	readStudyResult,
@@ -24,8 +25,11 @@ import {
 	parseStudyToolsInput,
 	StudyToolsDriver,
 } from '../../../studies/tools/index.js'
-import { loadStudyToolsFixture, readStudyToolsEvidence } from '../../setupStudy.js'
-import { buildStudyGrading } from '../../setupStudy.js'
+import {
+	buildStudyGrading,
+	createStudyMeterFixture,
+	loadStudyToolsFixture,
+} from '../../setupStudy.js'
 
 it('inspects the shipped package-root profile against the real offline artifact inventory', async () => {
 	const root = realpathSync(resolve('.'))
@@ -100,14 +104,11 @@ it('executes all declared tools goals through the actual built Agent and retains
 		await store.seal()
 		const result = await readStudyResult(directory)
 		if (result.status !== 'sealed') throw new Error('Real tools result did not seal')
-		const evidence: Record<string, readonly StudyEvidence[]> = {}
-		for (const trial of fixture.manifest.schedule)
-			evidence[trial.id] = await readStudyToolsEvidence(directory, trial.id)
 		const judgments = createStudyAdapter().grade({
 			manifest: result.manifest,
 			rubric: fixture.rubric,
 			attempts: result.attempts,
-			evidence,
+			evidence: await collectStudyEvidence(result),
 		})
 		expect(judgments).toHaveLength(22)
 		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
@@ -200,9 +201,9 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 		).toBe(true)
 		expect(scratch.names('work')).toEqual([])
 		await store.seal()
-		const evidence: Record<string, readonly StudyEvidence[]> = {}
-		for (const trial of manifest.schedule)
-			evidence[trial.id] = await readStudyToolsEvidence(directory, trial.id)
+		const sealed = await readStudyResult(directory)
+		if (sealed.status !== 'sealed') throw new Error('Real tools result did not seal')
+		const evidence = await collectStudyEvidence(sealed)
 		expect(
 			Object.values(evidence)
 				.flat()
@@ -225,6 +226,62 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 			),
 		).toBe(true)
 	} finally {
+		scratch.destroy()
+	}
+})
+
+it('keeps a cancelled workload inside its goal and serves the next goal of the same session', async () => {
+	const fixture = await loadStudyToolsFixture()
+	const scratch = createScratch()
+	const meter = createStudyMeterFixture(fixture.profile.bounds)
+	try {
+		const trial = fixture.manifest.schedule.find((entry) => entry.scenario === 'cancellation')
+		const cancel = fixture.manifest.scenarios.find((scenario) => scenario.id === 'cancellation')
+			?.goals[0]
+		if (trial === undefined || cancel === undefined)
+			throw new Error('No declared cancellation workload')
+		const driver = new StudyToolsDriver({
+			agent: fixture.agent,
+			subject: fixture.subject,
+			directory: scratch.ensure('work'),
+		})
+		const session = await driver.open(trial, meter.control.signal)
+		const rows: StudyEvidence[] = []
+		const context = {
+			signal: meter.control.signal,
+			meter: meter.meter,
+			evidence: {
+				append: async (row: StudyEvidence) => {
+					rows.push(row)
+				},
+			},
+		}
+		try {
+			// The declared goal cancels its own workload and returns the partial product.
+			await expect(session.execute(cancel, context)).resolves.toMatchObject({ partial: true })
+			expect(meter.control.signal.aborted).toBe(false)
+			// The next goal of the same session runs under a fresh workload and completes.
+			const next = {
+				id: 'after',
+				input: {
+					prompt: 'Answer after the cancelled workload.',
+					admitted: true,
+					files: [],
+					responses: [{ content: 'after-cancel', calls: [] }],
+				},
+			}
+			await expect(session.execute(next, context)).resolves.toEqual({
+				value: { content: 'after-cancel' },
+				partial: false,
+			})
+			expect(rows.filter((row) => row.event === 'workload').map((row) => row.goal)).toEqual([
+				cancel.id,
+			])
+		} finally {
+			await session.close()
+		}
+	} finally {
+		meter.close()
 		scratch.destroy()
 	}
 })

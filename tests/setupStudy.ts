@@ -16,7 +16,6 @@ import type {
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
-	StudyAttempt,
 	StudyBounds,
 	StudyCriterion,
 	StudyDefinition,
@@ -46,7 +45,6 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { isStudyCustodyEvidence } from '@orkestrel/study/server'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
@@ -73,9 +71,6 @@ export const STUDY_MEMORY_FIXED_SETTINGS = Object.freeze({
 
 /** Pins the projection STUDY_MEMORY_FIXED_SETTINGS gives any realistic request, written as arithmetic rather than derived from the helper. */
 export const STUDY_MEMORY_FIXED_PROJECTION = 101
-
-/** Pins the agent prompt room of the default fixture profile, written as arithmetic: context 32768 less output 512 less safety 128. */
-export const STUDY_MEMORY_AGENT_LIMIT = 32128
 
 /** Pins a short request whose admission depends on the declared gauge. */
 export const WINDOW_GOAL = Object.freeze({
@@ -177,7 +172,7 @@ export const STUDY_ENDURANCE_BOUNDARIES = Object.freeze([
  * @param selections - Initial package roots; an earlier selection wins throughout the graph.
  * @returns Every actual source and regular target package directory.
  */
-export function captureStudyPackages(
+function captureStudyPackages(
 	scratch: ScratchInterface,
 	selections: ReadonlyMap<string, string>,
 ): readonly StudyInstallPackage[] {
@@ -283,7 +278,7 @@ export function executeStudyInstall(
  * @param duration - Outer process deadline in milliseconds.
  * @returns Native exit and separate stdout/stderr bytes.
  */
-export function executeStudyProcess(
+function executeStudyProcess(
 	arguments_: readonly string[],
 	root: string,
 	duration: number,
@@ -456,35 +451,6 @@ export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
 }
 
-/** Builds a protocol reply that has the model call the lookup tool for `order-1` instead of answering.
- * @param options - Terminal row overrides; its content and calls are ignored.
- * @returns A newline-delimited terminal row.
- */
-export function buildMemoryCall(options: MemoryReplyFixture = {}): string {
-	return buildMemoryReply({
-		...options,
-		content: '',
-		calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
-	})
-}
-
-/** Pins the human message of the live Ollama 0.40.3 context refusal. */
-export const STUDY_MEMORY_NATIVE_MESSAGE =
-	'request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it'
-
-/** Pins the structured error that live refusal carried. */
-export const STUDY_MEMORY_NATIVE_ERROR = Object.freeze({
-	code: 400,
-	message: STUDY_MEMORY_NATIVE_MESSAGE,
-	type: 'exceed_context_size_error',
-	n_prompt_tokens: 8204,
-	n_ctx: 2048,
-})
-
-/** Pins the exact outer body recorded from that live refusal: `error` is a string that holds the structured JSON, not a nested object. */
-export const STUDY_MEMORY_NATIVE_BODY =
-	'{"error":"{\\"error\\":{\\"code\\":400,\\"message\\":\\"request (8204 tokens) exceeds the available context size (2048 tokens), try increasing it\\",\\"type\\":\\"exceed_context_size_error\\",\\"n_prompt_tokens\\":8204,\\"n_ctx\\":2048}}"}'
-
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
 export const STUDY_MEMORY_TIMING = Object.freeze({
 	total_duration: 1234567890,
@@ -492,27 +458,6 @@ export const STUDY_MEMORY_TIMING = Object.freeze({
 	prompt_eval_duration: 345678,
 	eval_duration: 456789,
 	prompt_eval_cached_count: 3,
-})
-
-/** Pins the timing a default reply with STUDY_MEMORY_TIMING must yield, written independently of the extractor. */
-export const STUDY_MEMORY_TIMING_EXPECTED = Object.freeze({
-	durations: { total: 1234567890, load: 234567, prompt: 345678, decode: 456789 },
-	counts: { prompt: 10, decode: 2, cached: 3 },
-	invalid: [],
-})
-
-/** Pins timing fields that are present but not non-negative safe integers, valid as protocol rows. */
-export const STUDY_MEMORY_TIMING_INVALID = Object.freeze({
-	total_duration: -1,
-	load_duration: '5',
-	prompt_eval_duration: 1.5,
-})
-
-/** Pins the timing a default reply with STUDY_MEMORY_TIMING_INVALID must yield. */
-export const STUDY_MEMORY_TIMING_REFUSED = Object.freeze({
-	durations: { total: null, load: null, prompt: null, decode: null },
-	counts: { prompt: 10, decode: 2, cached: null },
-	invalid: ['total_duration', 'load_duration', 'prompt_eval_duration'],
 })
 
 /** Pins the event keys present with observation disabled. */
@@ -571,28 +516,6 @@ export const STUDY_MEMORY_REFUSAL_KEYS = Object.freeze([
 /** Pins the evidence events only observation adds, so an off-versus-on comparison can exclude exactly them. */
 export const STUDY_MEMORY_OBSERVED_EVENTS = Object.freeze(['context', 'estimate', 'refusal'])
 
-/** Pins the timing of a default reply whose terminal row carries no timing fields. */
-export const STUDY_MEMORY_TIMING_ABSENT = Object.freeze({
-	durations: { total: null, load: null, prompt: null, decode: null },
-	counts: { prompt: 10, decode: 2, cached: null },
-	invalid: [],
-})
-
-/** Pins the complete, invalid and absent timing replies with their independently written expectations. */
-export const STUDY_MEMORY_TIMING_CASES = Object.freeze([
-	Object.freeze({
-		name: 'complete',
-		timing: STUDY_MEMORY_TIMING,
-		expected: STUDY_MEMORY_TIMING_EXPECTED,
-	}),
-	Object.freeze({
-		name: 'invalid',
-		timing: STUDY_MEMORY_TIMING_INVALID,
-		expected: STUDY_MEMORY_TIMING_REFUSED,
-	}),
-	Object.freeze({ name: 'absent', timing: undefined, expected: STUDY_MEMORY_TIMING_ABSENT }),
-])
-
 /** Pins settings the driver must refuse with CONFIG: checkpoints without observation, a text switch, an unrelated key and an unknown key. */
 export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 	Object.freeze({
@@ -605,12 +528,6 @@ export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 		settings: Object.freeze({ checkpoints: Object.freeze(['opening']) }),
 	}),
 	Object.freeze({ name: 'unknown key', settings: Object.freeze({ observe: true, extra: 1 }) }),
-])
-
-/** Pins well-formed generic settings that leave observation disabled. */
-export const STUDY_MEMORY_DISABLED_SETTINGS = Object.freeze([
-	Object.freeze({ name: 'absent', settings: undefined }),
-	Object.freeze({ name: 'false', settings: Object.freeze({ observe: false }) }),
 ])
 
 /** Builds a three-goal trajectory with a lookup, a correction and a closing request.
@@ -921,15 +838,7 @@ export function readMemoryOrigins(
 	})
 }
 
-/** Pins a room small enough that a long arrival trajectory must fold under the Compaction window. */
-export const STUDY_MEMORY_FOLD_ROOM = Object.freeze({
-	context: 1024,
-	output: 128,
-	safety: 128,
-	recap: 64,
-})
-
-/** Builds one goal whose eight long arrivals overflow STUDY_MEMORY_FOLD_ROOM before the Compaction fold.
+/** Builds one goal whose eight long arrivals overflow STUDY_MEMORY_SUMMARY_ROOM before the Compaction fold.
  * @param detail - Repeated filler text; changing one byte changes every request that carries it.
  * @returns A single public goal.
  */
@@ -985,20 +894,6 @@ export const STUDY_MEMORY_SUMMARY_PROJECTIONS = Object.freeze({
 	over: 4261,
 	small: 2161,
 })
-
-/** Pins summary replies whose prompt misses the identity-gauge projection of their fold upward and still fits the summary room: the below fold projects 3903 and replies 3904, equal to the room; the small fold projects 2161 and replies 2196, 35 over. */
-export const STUDY_MEMORY_SUMMARY_MISSES = Object.freeze([
-	Object.freeze({
-		name: '1 over the projection and equal to the room',
-		folded: STUDY_MEMORY_SUMMARY_FOLDS.below,
-		prompt: 3904,
-	}),
-	Object.freeze({
-		name: '35 over the projection and inside the room',
-		folded: STUDY_MEMORY_SUMMARY_FOLDS.small,
-		prompt: 2196,
-	}),
-])
 
 /**
  * Builds one goal of exactly counted arrivals: the folded ones, then one live one, then the prompt.
@@ -1075,146 +970,25 @@ export function runMemorySummary(
 	})
 }
 
-/** Pins the treatments that make an agent request and a summary request the first chat request of a trial. */
-export const STUDY_MEMORY_NATIVE_TRIALS = Object.freeze({
-	agent: Object.freeze({ arm: 'full' as const, goals: Object.freeze([WINDOW_GOAL]) }),
-	summary: Object.freeze({
-		arm: 'compaction' as const,
-		goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
-		settings: STUDY_MEMORY_SETTINGS,
-		room: STUDY_MEMORY_SUMMARY_ROOM,
-	}),
-})
-
-/** Pins the content row a stream sends before it fails. */
-export const STUDY_MEMORY_NATIVE_PARTIAL = `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'par' } })}\n`
-
-/** Pins the live context refusal as an HTTP 400 body and as an error row after a content row, for each role that sends chat requests; every one must become attributed capacity. */
-export const STUDY_MEMORY_NATIVE_CAPACITY: readonly MemoryNativeFixture[] = Object.freeze(
-	(['agent', 'summary'] as const).flatMap((role) => [
-		{
-			name: `an HTTP 400 refusal of a ${role} request`,
-			role,
-			trial: STUDY_MEMORY_NATIVE_TRIALS[role],
-			status: 400,
-			body: STUDY_MEMORY_NATIVE_BODY,
-			code: 'CAPACITY' as const,
-			message: STUDY_MEMORY_NATIVE_MESSAGE,
-		},
-		{
-			name: `an HTTP 200 error row after a content row of a ${role} request`,
-			role,
-			trial: STUDY_MEMORY_NATIVE_TRIALS[role],
-			status: 200,
-			body: `${STUDY_MEMORY_NATIVE_PARTIAL}${STUDY_MEMORY_NATIVE_BODY}\n`,
-			code: 'CAPACITY' as const,
-			message: STUDY_MEMORY_NATIVE_MESSAGE,
-		},
-	]),
-)
-
-/** Pins agent replies that carry a provider error or an invalid body but are not the live context refusal; every one must stay a generic fault. */
-export const STUDY_MEMORY_NATIVE_GENERIC: readonly MemoryNativeFixture[] = Object.freeze([
+/** Pins a negative prompt count in a summary terminal row; it must stay a generic fault that keeps the summary role and its unknown usage. */
+export const STUDY_MEMORY_NATIVE_MALFORMED: readonly MemoryNativeFixture[] = Object.freeze([
 	{
-		name: 'a pretty-printed error on a non-2xx response',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 500,
-		body: JSON.stringify({ error: 'model runner crashed' }, null, 2),
-		code: 'FAULT',
-		message: 'Ollama HTTP 500 error: model runner crashed',
-	},
-	{
-		name: 'context text on a non-2xx response',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 400,
-		body: JSON.stringify({ error: 'the prompt exceeds the available context size' }),
-		code: 'FAULT',
-		message: 'Ollama HTTP 400 error: the prompt exceeds the available context size',
-	},
-	{
-		name: 'the structured capacity type on a non-400 response',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 500,
-		body: STUDY_MEMORY_NATIVE_BODY,
-		code: 'FAULT',
-		message: 'Ollama HTTP 500 error (exceed_context_size_error)',
-	},
-	{
-		name: 'a non-2xx JSON body without an error member',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 500,
-		body: '{"detail":"x"}',
-		code: 'FAULT',
-		message: 'Ollama HTTP response refused: 500',
-	},
-	{
-		name: 'a non-2xx plain text body',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 503,
-		body: 'Unavailable',
-		code: 'FAULT',
-		message: 'Ollama HTTP response refused: 503',
-	},
-	{
-		name: 'a non-2xx empty body',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 502,
-		body: '',
-		code: 'FAULT',
-		message: 'Ollama HTTP response refused: 502',
-	},
-	{
-		name: 'context text in an HTTP 200 error row',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 200,
-		body: `${JSON.stringify({ error: 'the prompt exceeds the context window' })}\n`,
-		code: 'FAULT',
-		message: 'Ollama error: the prompt exceeds the context window',
-	},
-	{
-		name: 'a malformed member in an HTTP 200 error row',
-		role: 'agent',
-		trial: STUDY_MEMORY_NATIVE_TRIALS.agent,
-		status: 200,
-		body: '{"error":7}\n',
-		code: 'FAULT',
-		message: 'Malformed Ollama error',
-	},
-])
-
-/** Pins a negative prompt count in a terminal row of each role that sends chat requests; every one must stay a generic fault that keeps its role and its unknown usage. */
-export const STUDY_MEMORY_NATIVE_MALFORMED: readonly MemoryNativeFixture[] = Object.freeze(
-	(['agent', 'summary'] as const).map((role) => ({
-		name: `a negative prompt count in an HTTP 200 terminal row of a ${role} request`,
-		role,
-		trial: STUDY_MEMORY_NATIVE_TRIALS[role],
+		name: 'a negative prompt count in an HTTP 200 terminal row of a summary request',
+		role: 'summary',
+		trial: Object.freeze({
+			arm: 'compaction' as const,
+			goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
+			settings: STUDY_MEMORY_SETTINGS,
+			room: STUDY_MEMORY_SUMMARY_ROOM,
+		}),
 		status: 200,
 		body: buildMemoryReply({ prompt: -1 }),
 		code: 'FAULT' as const,
 		message: 'Malformed Ollama usage',
-	})),
-)
-
-/** Pins the tool-turn prompts that miss the fixed projection upward or equal the reserved room and must still continue to the follow-up request. */
-export const STUDY_MEMORY_CONTINUATION_MISSES = Object.freeze([
-	Object.freeze({
-		name: 'a forecast miss of 35',
-		prompt: STUDY_MEMORY_FIXED_PROJECTION + 35,
-	}),
-	Object.freeze({
-		name: 'a prompt equal to the reserved room',
-		prompt: STUDY_MEMORY_AGENT_LIMIT,
-	}),
+	},
 ])
 
-/** Pins the actual summary and agent replies that exceed their reserved room or output allowance and must stop before the next request, tool and goal. */
+/** Pins the actual summary reply that exceeds its reserved room and must stop before the next request, tool and goal. */
 export const STUDY_MEMORY_ACTUAL_REFUSALS = Object.freeze([
 	Object.freeze({
 		name: 'a summary prompt one over the summary room',
@@ -1224,33 +998,6 @@ export const STUDY_MEMORY_ACTUAL_REFUSALS = Object.freeze([
 		body: buildMemoryReply({ content: 'Recap kept', prompt: STUDY_MEMORY_SUMMARY_LIMIT + 1 }),
 		message: 'reserved context capacity',
 		role: 'summary',
-	}),
-	Object.freeze({
-		name: 'a summary that exhausts its recap allowance',
-		settings: STUDY_MEMORY_SETTINGS,
-		room: STUDY_MEMORY_SUMMARY_ROOM,
-		goal: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0],
-		body: buildMemoryReply({ content: 'Recap kept', completion: STUDY_MEMORY_SUMMARY_ROOM.recap }),
-		message: 'output cap',
-		role: 'summary',
-	}),
-	Object.freeze({
-		name: 'an agent prompt one over the reserved room',
-		settings: STUDY_MEMORY_FIXED_SETTINGS,
-		room: Object.freeze({}),
-		goal: WINDOW_GOAL,
-		body: buildMemoryCall({ prompt: STUDY_MEMORY_AGENT_LIMIT + 1 }),
-		message: 'reserved context capacity',
-		role: 'agent',
-	}),
-	Object.freeze({
-		name: 'an agent turn that exhausts its output allowance',
-		settings: STUDY_MEMORY_FIXED_SETTINGS,
-		room: Object.freeze({}),
-		goal: WINDOW_GOAL,
-		body: buildMemoryCall({ completion: 512 }),
-		message: 'output cap',
-		role: 'agent',
 	}),
 ])
 
@@ -1267,21 +1014,6 @@ export function readMemoryShapes(
 			const body = parseJSON(request.body)
 			if (!isRecord(body) || !isRecord(body.options)) throw new Error('Invalid generation request')
 			return { body: Object.keys(body).sort(), options: Object.keys(body.options).sort() }
-		})
-}
-
-/** Reads the model name each recorded generation request carried, from its exact wire bytes.
- * @param requests - Recorded HTTP requests.
- * @returns Model names of chat and generate requests in arrival order.
- */
-export function readMemoryModels(requests: MemoryTrialResult['requests']): readonly string[] {
-	return requests
-		.filter((request) => request.path === '/api/chat' || request.path === '/api/generate')
-		.map((request) => {
-			const body = parseJSON(request.body)
-			if (!isRecord(body) || typeof body.model !== 'string')
-				throw new Error('Invalid generation request')
-			return body.model
 		})
 }
 
@@ -1399,18 +1131,29 @@ export async function loadMemoryInputs(
 	profile: StudyProfile,
 	name = 'capacity',
 ): Promise<StudyValidation> {
-	const definition = parseStudyDefinition(
-		parseJSON(await readFile(`studies/${name}/study.json`, 'utf8')),
-	)
-	const rubric = parseStudyRubric(parseJSON(await readFile(`studies/${name}/rubric.json`, 'utf8')))
+	return { ...(await loadStudyDeclaration(name, 'memory')), profile }
+}
+
+/** Loads one authored declaration as the CLI resolves it: the declaration and rubric from its own directory, the scenarios from its driver's.
+ * @param target - The declaration directory under `studies/`.
+ * @param driver - The driver directory under `studies/` whose `scenarios/` holds the declared scenarios.
+ * @returns The parsed definition, rubric and scenarios in declared order.
+ */
+async function loadStudyDeclaration(
+	target: string,
+	driver: string,
+): Promise<Omit<StudyValidation, 'profile'>> {
+	const root = new URL('../studies/', import.meta.url)
+	const read = async (path: string): Promise<unknown> =>
+		parseJSON(await readFile(new URL(path, root), 'utf8'))
+	const definition = parseStudyDefinition(await read(`${target}/study.json`))
+	const rubric = parseStudyRubric(await read(`${target}/rubric.json`))
 	const scenarios = await Promise.all(
 		definition.scenarios.map(async (scenario) =>
-			parseStudyScenario(
-				parseJSON(await readFile(`studies/memory/scenarios/${scenario}.json`, 'utf8')),
-			),
+			parseStudyScenario(await read(`${driver}/scenarios/${scenario}.json`)),
 		),
 	)
-	return { definition, rubric, scenarios, profile }
+	return { definition, rubric, scenarios }
 }
 
 /** Reads actual tool-result strings from recorded Ollama chat request bytes.
@@ -1435,20 +1178,12 @@ export function createMemoryContext(
 	profile: StudyProfile,
 	signal = new AbortController().signal,
 ): MemoryContextFixture {
-	const control = new StudyControl(signal)
-	const series = new StudyScope({ label: 'series', limit: profile.bounds.series, control })
-	const trial = new StudyScope({ label: 'trial', limit: profile.bounds.trial, control })
-	const goal = new StudyScope({ label: 'goal', limit: profile.bounds.goal, control })
-	const meter = new StudyMeter({
-		request: profile.bounds.request,
-		scopes: [series, trial, goal],
-		control,
-	})
+	const accounting = createStudyMeterFixture(profile.bounds, signal)
 	const evidence: StudyEvidence[] = []
 	return {
 		context: {
 			signal,
-			meter,
+			meter: accounting.meter,
 			evidence: {
 				append: async (row) => {
 					evidence.push(row)
@@ -1456,13 +1191,7 @@ export function createMemoryContext(
 			},
 		},
 		evidence,
-		close: () => {
-			meter.close()
-			goal.close()
-			trial.close()
-			series.close()
-			control.close()
-		},
+		close: () => accounting.close(),
 	}
 }
 
@@ -1471,49 +1200,16 @@ export function createMemoryContext(
  * @returns Actual declarations and a built ESM namespace
  */
 export async function loadStudyToolsFixture(): Promise<StudyToolsFixture> {
-	const root = new URL('../studies/tools/', import.meta.url)
-	const definition = parseStudyDefinition(
-		parseJSON(await readFile(new URL('study.json', root), 'utf8')),
-	)
+	const { definition, rubric, scenarios } = await loadStudyDeclaration('tools', 'tools')
 	const profile = parseStudyProfile(
-		parseJSON(await readFile(new URL('profiles/local.json', root), 'utf8')),
-	)
-	const rubric = parseStudyRubric(parseJSON(await readFile(new URL('rubric.json', root), 'utf8')))
-	const scenarios = await Promise.all(
-		definition.scenarios.map(async (name) =>
-			parseStudyScenario(
-				parseJSON(await readFile(new URL(`scenarios/${name}.json`, root), 'utf8')),
-			),
+		parseJSON(
+			await readFile(new URL('../studies/tools/profiles/local.json', import.meta.url), 'utf8'),
 		),
 	)
 	validateStudyInputs(definition, scenarios, rubric, profile)
 	const manifest = buildCustodyManifest(definition, scenarios, profile.bounds)
 	const namespace = await import('../dist/src/core/index.js')
 	return { manifest, rubric, profile, agent: namespace, subject: namespace }
-}
-
-/**
- * Reads retained tool evidence through the JSON parser and custody guard.
- * @param directory - The retained result directory
- * @param trial - The scheduled trial identity
- * @returns Ordered validated evidence rows
- */
-export async function readStudyToolsEvidence(
-	directory: string,
-	trial: string,
-): Promise<readonly StudyEvidence[]> {
-	const text = await readFile(
-		join(directory, 'execution', 'trials', trial, 'evidence.jsonl'),
-		'utf8',
-	)
-	const rows: StudyEvidence[] = []
-	for (const line of text.split(/\r\n|\n/)) {
-		if (line === '') continue
-		const row = parseJSON(line)
-		if (!isStudyCustodyEvidence(row)) throw new Error('Retained fixture contains invalid evidence')
-		rows.push(row)
-	}
-	return Object.freeze(rows)
 }
 
 /** Returns independently attributed grading over the supplied scheduled attempts. */
@@ -1596,30 +1292,5 @@ export function buildCustodyManifest(
 		scenarios,
 		schedule: buildStudySchedule(definition, scenarios),
 		bounds,
-	}
-}
-
-/**
- * Builds a complete terminal horizon from the supplied scheduled trial.
- * @param manifest - The authoritative goal horizon
- * @param trial - The scheduled trial
- * @returns The inert terminal record
- */
-export function buildCustodyAttempt(manifest: StudyManifest, trial: StudyTrial): StudyAttempt {
-	const scenario = manifest.scenarios.find((entry) => entry.id === trial.scenario)
-	if (scenario === undefined) throw new Error('Fixture trial has no scenario')
-	return {
-		trial,
-		observations: scenario.goals.map((goal) => ({
-			goal: goal.id,
-			product: { value: 'remember', partial: false },
-			failure: undefined,
-			usage: [],
-			duration: 0,
-			executed: true,
-		})),
-		failure: undefined,
-		duration: 0,
-		executed: true,
 	}
 }

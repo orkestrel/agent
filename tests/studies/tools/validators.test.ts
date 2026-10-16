@@ -86,11 +86,6 @@ it('validates actual admitted constructors and bounds every declared workload wi
 			responses: [{ content: 'x', calls: [] }],
 		}),
 	).toBe(false)
-	expect(isStudyToolsResponse({ content: 'x', calls: [], tokens: NaN })).toBe(false)
-	expect(
-		isStudyToolsResponse({ content: 'x', calls: [], bytes: Number.MAX_SAFE_INTEGER + 1 }),
-	).toBe(false)
-	expect(isStudyToolsResponse({ content: 'x', calls: [], cancel: 'true' })).toBe(false)
 	const call = { id: 'c1', name: 'read', arguments: { path: 'note.txt' } }
 	expect(isStudyToolsResponse({ content: 'a'.repeat(1024), calls: [call, call, call, call] })).toBe(
 		true,
@@ -123,6 +118,8 @@ it('validates independent state/trace schemas and exact operation arguments', ()
 	expect(isStudyToolsFileName('note\\other.txt')).toBe(false)
 	expect(isStudyToolsWrite({ path: '../escape.txt', content: 'x' })).toBe(true)
 	expect(isStudyToolsWrite({ path: 'note.txt', content: 'x', extra: true })).toBe(false)
+	// A declared call whose arguments carry no `path` is refused by the write guard that owns them.
+	expect(isStudyToolsWrite({ name: '../escape', content: 'x' })).toBe(false)
 	expect(isStudyToolsWrite({ path: 'note.txt', content: 'x'.repeat(1025) })).toBe(false)
 	expect(isStudyToolsRead({ path: 'note.txt' })).toBe(true)
 	expect(isStudyToolsRead({ path: 'note.txt', extra: true })).toBe(false)

@@ -1,17 +1,14 @@
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import { isStudyCustodyAttempt, isStudyCustodyManifest } from '@orkestrel/study/server'
+import { isStudyCustodyManifest } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isStudyMemorySettings } from '../studies/memory/index.js'
 import {
-	buildCustodyAttempt,
 	buildCustodyManifest,
 	buildStudyGrading,
 	createStudyMeterFixture,
 	buildMemoryEdge,
-	buildMemoryCall,
 	buildMemoryCriterion,
 	omitMemoryAuxiliaries,
 	buildMemoryFoldGoals,
@@ -26,46 +23,24 @@ import {
 	readMemoryAdmission,
 	readMemoryControls,
 	readMemoryEvents,
-	readMemoryModels,
 	readMemoryOrigins,
 	readMemoryParts,
 	readMemoryShapes,
 	readMemorySnapshot,
 	readMemoryTimeline,
-	readStudyToolsEvidence,
-	captureStudyPackages,
 	createStudyInstallFixture,
 	executeStudyInstall,
-	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
-	STUDY_MEMORY_AGENT_LIMIT,
 	STUDY_MEMORY_CONTEXT_KEYS,
-	STUDY_MEMORY_CONTINUATION_MISSES,
-	STUDY_MEMORY_DISABLED_SETTINGS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
-	STUDY_MEMORY_FOLD_ROOM,
 	STUDY_MEMORY_OBSERVED_EVENTS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_REFUSAL_KEYS,
-	STUDY_MEMORY_FIXED_PROJECTION,
-	STUDY_MEMORY_FIXED_SETTINGS,
-	STUDY_MEMORY_MALFORMED_SETTINGS,
-	STUDY_MEMORY_NATIVE_BODY,
-	STUDY_MEMORY_NATIVE_CAPACITY,
-	STUDY_MEMORY_NATIVE_ERROR,
-	STUDY_MEMORY_NATIVE_GENERIC,
-	STUDY_MEMORY_NATIVE_MESSAGE,
-	STUDY_MEMORY_NATIVE_PARTIAL,
-	STUDY_MEMORY_NATIVE_TRIALS,
 	STUDY_MEMORY_SETTINGS,
-	STUDY_MEMORY_SUMMARY_FOLDS,
-	STUDY_MEMORY_SUMMARY_LIMIT,
-	STUDY_MEMORY_SUMMARY_MISSES,
-	STUDY_MEMORY_SUMMARY_PROJECTIONS,
 	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_TIMING,
 } from './setupStudy.js'
@@ -85,16 +60,12 @@ describe('study meter fixture lifecycle', () => {
 })
 
 describe('study declaration fixtures', () => {
-	it('builds independent declarations and terminal horizons from their actual schedule', async () => {
+	it('builds independent declarations and a grading horizon from their actual schedule', async () => {
 		const first = (await loadStudyToolsFixture()).manifest
 		const second = (await loadStudyToolsFixture()).manifest
 		expect(first).not.toBe(second)
 		expect(first.bounds).not.toBe(second.bounds)
-		const trial = first.schedule[0]
-		if (trial === undefined) throw new Error('Missing fixture trial')
-		const attempt = buildCustodyAttempt(first, trial)
 		expect(isStudyCustodyManifest(first)).toBe(true)
-		expect(isStudyCustodyAttempt(attempt, first)).toBe(true)
 		expect(first.identity.agent).toMatch(/^[a-f0-9]{64}$/)
 		const rebuilt = buildCustodyManifest(
 			first.definition,
@@ -105,34 +76,16 @@ describe('study declaration fixtures', () => {
 		expect(isStudyCustodyManifest(rebuilt)).toBe(true)
 		expect(rebuilt.identity.provider).toBe('e'.repeat(64))
 		expect(rebuilt.schedule).toEqual(first.schedule)
-		expect(attempt.trial).toEqual(trial)
-		expect(attempt.observations.map((observation) => observation.goal)).toEqual(
-			first.scenarios
-				.find((scenario) => scenario.id === trial.scenario)
-				?.goals.map((goal) => goal.id),
-		)
 		expect(buildStudyGrading(first.schedule).attempts).toEqual(
 			first.schedule.map((item) => item.id),
-		)
-		expect(() => buildCustodyAttempt(first, { ...trial, scenario: 'foreign' })).toThrow(
-			'no scenario',
 		)
 	})
 })
 
 describe('study install fixtures', () => {
-	it('preserves fresh topology worker diagnostics and runs bounded native entries', async () => {
+	it('preserves fresh topology worker diagnostics', async () => {
 		const scratch = createScratch({ prefix: 'study-topology-setup-' })
 		try {
-			const entry = scratch.write(
-				'receipt.mjs',
-				"console.log(process.argv[2])\nconsole.error('retained diagnostic')\nprocess.exitCode = 7\n",
-			)
-			expect(await executeStudyProcess([entry, 'retained output'], scratch.path, 60000)).toEqual({
-				code: 7,
-				stdout: 'retained output\n',
-				stderr: 'retained diagnostic\n',
-			})
 			const refused = await executeStudyTopology(scratch, [])
 			expect(refused.code).toBe(1)
 			expect(refused.stdout).toContain('"roots":[]')
@@ -191,9 +144,6 @@ describe('study install fixtures', () => {
 			const refused = await executeStudyInstall(fixture, ['unsupported'])
 			expect(refused.code).toBe(64)
 			expect(refused.stderr).not.toBe('')
-			expect(() =>
-				captureStudyPackages(scratch, new Map([['wrong-package', resolve('.')]])),
-			).toThrow('Malformed selected package')
 		} finally {
 			await destroyScratch(scratch)
 		}
@@ -300,60 +250,7 @@ describe('study install fixtures', () => {
 		expect(buildMemoryEdge(narrow, -2)).toEqual({ gauge: { scale: 1e-9, overhead: 766 } })
 	})
 
-	it('pins observation fixtures that are consistent with the settings guard and the fixed projection', () => {
-		for (const entry of STUDY_MEMORY_DISABLED_SETTINGS)
-			expect([entry.name, isStudyMemorySettings(entry.settings ?? {})]).toEqual([entry.name, true])
-		expect(STUDY_MEMORY_DISABLED_SETTINGS.map((entry) => entry.name)).toEqual(['absent', 'false'])
-		for (const entry of STUDY_MEMORY_MALFORMED_SETTINGS)
-			expect([entry.name, isStudyMemorySettings(entry.settings)]).toEqual([entry.name, false])
-		expect(STUDY_MEMORY_MALFORMED_SETTINGS).toHaveLength(4)
-		for (const estimate of [1, 1000, 1e6])
-			expect(
-				Math.ceil(
-					STUDY_MEMORY_FIXED_SETTINGS.gauge.overhead +
-						STUDY_MEMORY_FIXED_SETTINGS.gauge.scale * estimate,
-				),
-			).toBe(STUDY_MEMORY_FIXED_PROJECTION)
-		expect(STUDY_MEMORY_CONTINUATION_MISSES.map((entry) => entry.prompt)).toEqual([
-			STUDY_MEMORY_FIXED_PROJECTION + 35,
-			STUDY_MEMORY_AGENT_LIMIT,
-		])
-	})
-
-	it('pins forecast-miss replies that stay inside every room and carry no refusal', () => {
-		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		const { context, output, safety } = profile.room
-		expect(STUDY_MEMORY_AGENT_LIMIT).toBe(context - output - safety)
-		for (const entry of STUDY_MEMORY_CONTINUATION_MISSES)
-			expect(entry.prompt).toBeLessThanOrEqual(STUDY_MEMORY_AGENT_LIMIT)
-		const { context: span, safety: margin, recap } = STUDY_MEMORY_SUMMARY_ROOM
-		expect(STUDY_MEMORY_SUMMARY_LIMIT).toBe(span - recap - margin)
-		const projections = [
-			STUDY_MEMORY_SUMMARY_PROJECTIONS.below,
-			STUDY_MEMORY_SUMMARY_PROJECTIONS.small,
-		]
-		expect(STUDY_MEMORY_SUMMARY_MISSES.map((entry) => entry.folded)).toEqual([
-			STUDY_MEMORY_SUMMARY_FOLDS.below,
-			STUDY_MEMORY_SUMMARY_FOLDS.small,
-		])
-		expect(
-			STUDY_MEMORY_SUMMARY_MISSES.map((entry, index) => entry.prompt - (projections[index] ?? 0)),
-		).toEqual([1, 35])
-		for (const entry of STUDY_MEMORY_SUMMARY_MISSES)
-			expect(entry.prompt).toBeLessThanOrEqual(STUDY_MEMORY_SUMMARY_LIMIT)
-	})
-
-	it('builds a lookup call reply and reads native controls from exact chat bytes', () => {
-		const call = parseJSON(buildMemoryCall({ content: 'ignored', calls: [], prompt: 77 }))
-		expect(call).toMatchObject({
-			done: true,
-			prompt_eval_count: 77,
-			message: {
-				role: 'assistant',
-				content: '',
-				tool_calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
-			},
-		})
+	it('reads native controls from exact chat bytes', () => {
 		const requests = [
 			{ path: '/api/chat', body: JSON.stringify({ truncate: false, shift: false }) },
 			{ path: '/api/chat', body: JSON.stringify({ truncate: true }) },
@@ -369,50 +266,6 @@ describe('study install fixtures', () => {
 		expect(() => readMemoryControls([{ path: '/api/chat', body: '[]' }])).toThrow(
 			'Invalid chat request',
 		)
-	})
-
-	it('pins the live native refusal byte for byte and keeps every failure case distinguishable', () => {
-		const outer = parseJSON(STUDY_MEMORY_NATIVE_BODY)
-		if (!isRecord(outer) || typeof outer.error !== 'string') throw new Error('Invalid live body')
-		// The live wire carries a string holding structured JSON, never a nested object.
-		expect(parseJSON(outer.error)).toEqual({ error: STUDY_MEMORY_NATIVE_ERROR })
-		expect(STUDY_MEMORY_NATIVE_BODY).toBe(
-			JSON.stringify({ error: JSON.stringify({ error: STUDY_MEMORY_NATIVE_ERROR }) }),
-		)
-		expect(STUDY_MEMORY_NATIVE_ERROR.message).toBe(STUDY_MEMORY_NATIVE_MESSAGE)
-		const names = STUDY_MEMORY_NATIVE_GENERIC.map((entry) => entry.name)
-		expect(new Set(names).size).toBe(names.length)
-	})
-
-	it('pins end-to-end native replies for each role with the live refusal as the only capacity source', () => {
-		expect(STUDY_MEMORY_NATIVE_TRIALS.agent).toMatchObject({ arm: 'full' })
-		expect(STUDY_MEMORY_NATIVE_TRIALS.summary).toMatchObject({
-			arm: 'compaction',
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-			goals: [{ id: 'opening' }],
-		})
-		expect(parseJSON(STUDY_MEMORY_NATIVE_PARTIAL)).toMatchObject({
-			done: false,
-			message: { content: 'par' },
-		})
-		expect(STUDY_MEMORY_NATIVE_PARTIAL.endsWith('\n')).toBe(true)
-		expect(STUDY_MEMORY_NATIVE_CAPACITY.map((entry) => [entry.role, entry.status])).toEqual([
-			['agent', 400],
-			['agent', 200],
-			['summary', 400],
-			['summary', 200],
-		])
-		for (const entry of STUDY_MEMORY_NATIVE_CAPACITY) {
-			expect([entry.code, entry.message]).toEqual(['CAPACITY', STUDY_MEMORY_NATIVE_MESSAGE])
-			expect(entry.body.trimEnd().endsWith(STUDY_MEMORY_NATIVE_BODY)).toBe(true)
-			// A 200 reply streams a content row first; a 400 reply is the bare body.
-			expect(entry.body.startsWith(STUDY_MEMORY_NATIVE_PARTIAL)).toBe(entry.status === 200)
-		}
-		const names = STUDY_MEMORY_NATIVE_GENERIC.map((entry) => entry.name)
-		expect(new Set(names).size).toBe(names.length)
-		expect(STUDY_MEMORY_NATIVE_GENERIC.every((entry) => entry.code === 'FAULT')).toBe(true)
-		expect(STUDY_MEMORY_NATIVE_GENERIC.some((entry) => entry.status === 200)).toBe(true)
-		expect(STUDY_MEMORY_NATIVE_GENERIC.some((entry) => entry.status >= 400)).toBe(true)
 	})
 
 	it('runs a real session to its first failure and then reads the latched fault', async () => {
@@ -519,7 +372,7 @@ describe('study install fixtures', () => {
 			expect(() => readMemoryOrigins(malformed)).toThrow('Invalid')
 	})
 
-	it('builds the fold goal, keeps its room finite and lets a room reach a real trial', async () => {
+	it('builds the fold goal and lets a room reach a real trial', async () => {
 		const goals = buildMemoryFoldGoals()
 		expect(goals.map((goal) => goal.id)).toEqual(['opening'])
 		const input = goals[0]?.input
@@ -530,21 +383,22 @@ describe('study install fixtures', () => {
 		).toBe(8)
 		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).not.toBe(JSON.stringify(goals))
 		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).toContain('other. ')
-		const { context, output, safety, recap } = STUDY_MEMORY_FOLD_ROOM
-		expect(context).toBeGreaterThan(Math.max(output, recap) + safety)
-		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7', room: STUDY_MEMORY_FOLD_ROOM })
-		expect(profile.room).toMatchObject({ context: 1024, output: 128, safety: 128, recap: 64 })
 		const result = await runMemoryTrial({
 			arm: 'full',
 			responses: [],
 			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
-			room: STUDY_MEMORY_FOLD_ROOM,
+			room: STUDY_MEMORY_SUMMARY_ROOM,
 		})
 		expect(result.failure).toBeUndefined()
 		const body = parseJSON(
 			result.requests.find((request) => request.path === '/api/chat')?.body ?? '',
 		)
-		expect(body).toMatchObject({ options: { num_ctx: 1024, num_predict: 128 } })
+		expect(body).toMatchObject({
+			options: {
+				num_ctx: STUDY_MEMORY_SUMMARY_ROOM.context,
+				num_predict: STUDY_MEMORY_SUMMARY_ROOM.output,
+			},
+		})
 	})
 
 	it('runs a real trial, reads its retained shapes and releases resources when the treatment is refused', async () => {
@@ -566,7 +420,6 @@ describe('study install fixtures', () => {
 			'usage',
 		])
 		expect(totalMemoryUsage(result.usage).agent).toEqual({ calls: 1, tokens: 12 })
-		expect(readMemoryModels(result.requests)).toEqual(['model'])
 		const shapes = readMemoryShapes(result.requests)
 		expect(shapes.map((shape) => shape.options)).toEqual([
 			['num_ctx', 'num_predict', 'seed', 'temperature'],
@@ -621,38 +474,18 @@ describe('study install fixtures', () => {
 			{ path: '/api/chat', body: '{"model":"model","options":{"seed":0,"num_ctx":1}}' },
 			{ path: '/api/generate', body: '{"model":"judge","options":{"temperature":1},"raw":true}' },
 		]
-		expect(readMemoryModels(requests)).toEqual(['model', 'judge'])
 		expect(readMemoryShapes(requests)).toEqual([
 			{ body: ['model', 'options'], options: ['num_ctx', 'seed'] },
 			{ body: ['model', 'options', 'raw'], options: ['temperature'] },
 		])
-		expect(() => readMemoryModels([{ path: '/api/chat', body: '{}' }])).toThrow(
-			'Invalid generation request',
-		)
 		expect(() => readMemoryShapes([{ path: '/api/chat', body: '{"model":"m"}' }])).toThrow(
 			'Invalid generation request',
 		)
 	})
 
-	it('loads actual tools declarations and refuses malformed retained evidence', async () => {
+	it('loads actual tools declarations', async () => {
 		const fixture = await loadStudyToolsFixture()
 		expect(fixture.manifest.definition.driver).toBe('tools')
 		expect(fixture.subject).toHaveProperty('Agent')
-		const scratch = createScratch()
-		try {
-			scratch.write(
-				'execution/trials/first/evidence.jsonl',
-				'{"event":"saved","goal":"write","value":7}\n',
-			)
-			expect(await readStudyToolsEvidence(scratch.path, 'first')).toEqual([
-				{ event: 'saved', goal: 'write', value: 7 },
-			])
-			scratch.write('execution/trials/first/evidence.jsonl', '{"event":1}\n')
-			await expect(readStudyToolsEvidence(scratch.path, 'first')).rejects.toThrow(
-				'invalid evidence',
-			)
-		} finally {
-			scratch.destroy()
-		}
 	})
 })

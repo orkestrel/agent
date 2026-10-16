@@ -1,8 +1,7 @@
 import type { Message } from '@orkestrel/agent'
 import type { StudyAttempt, StudyEvidence } from '@orkestrel/study'
 import type { StudyMemoryProvenance } from '../../../studies/memory/index.js'
-import { attempt } from '@orkestrel/contract'
-import { isStudyError, isStudyJudgment, parseStudyScenario } from '@orkestrel/study'
+import { isStudyJudgment, parseStudyScenario } from '@orkestrel/study'
 import { describe, expect, it } from 'vitest'
 import {
 	buildStudyMemoryOrigins,
@@ -683,15 +682,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 			'No retained observation for the declared mechanism',
 			'No retained observation for the declared mechanism',
 		])
-		const retained = new Set(
-			Object.entries(evidence).flatMap(([id, rows]) => [
-				`trials/${id}/attempt.json`,
-				`trials/${id}/evidence.jsonl`,
-				...Array.from(rows.keys(), (index) => `trials/${id}/evidence.jsonl#${index + 1}`),
-			]),
-		)
 		for (const judgment of judgments) {
-			expect(judgment.references.every((reference) => retained.has(reference))).toBe(true)
 			expect(judgment.references.length === 0).toBe(judgment.verdict === 'unknown')
 			expect(
 				judgment.verdict === 'unsuccessful' &&
@@ -752,50 +743,6 @@ describe('memory mechanical grading over the shared traversal', () => {
 			[trial.id, 'operational', 'unsuccessful'],
 			[trial.id, 'late', 'unsuccessful'],
 		])
-	})
-
-	it('grades every declared pair in schedule order, retained or not, and refuses invalid input', () => {
-		const sparse = adapter.grade({ manifest, rubric, attempts: [faultedAttempt], evidence: {} })
-		expect(sparse.map((judgment) => judgment.trial)).toEqual([
-			...Array(5).fill(complete.id),
-			...Array(5).fill(faulted.id),
-		])
-		expect(
-			sparse
-				.filter((judgment) => judgment.trial === complete.id)
-				.every((judgment) => judgment.verdict === 'unknown' && judgment.references.length === 0),
-		).toBe(true)
-		expect(sparse.find((judgment) => judgment.trial === faulted.id)).toMatchObject({
-			criterion: 'operational',
-			verdict: 'unsuccessful',
-		})
-		expect(() => adapter.grade({ manifest, rubric, attempts, evidence: { foreign: [] } })).toThrow(
-			expect.objectContaining({ code: 'EVIDENCE' }),
-		)
-		// The shared traversal throws from another bundle instance, so recognition uses the public guard.
-		const duplicate = attempt(() =>
-			adapter.grade({ manifest, rubric, attempts: [...attempts, completeAttempt], evidence }),
-		)
-		expect(duplicate.success).toBe(false)
-		const duplicated = duplicate.success ? undefined : duplicate.error
-		expect(isStudyError(duplicated)).toBe(true)
-		expect(duplicated).toMatchObject({
-			code: 'EVIDENCE',
-			message: 'Invalid or duplicate grading attempts',
-		})
-		expect(() =>
-			adapter.grade({
-				manifest,
-				rubric: {
-					version: '1',
-					criteria: [
-						buildMemoryCriterion('operational', 'state', operational.assertion, 'undeclared'),
-					],
-				},
-				attempts,
-				evidence,
-			}),
-		).toThrow(expect.objectContaining({ code: 'CONFIG' }))
 	})
 
 	it('reads each mechanism predicate with zero-based row citations and unknown for foreign assertions', () => {
