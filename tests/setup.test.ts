@@ -787,12 +787,12 @@ describe('conversation-store contract scenarios run against a conforming store',
 
 	describe('delete & absent', () => {
 		it('set → delete → get returns undefined', async () => {
-			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
+			const { before, after } = await exerciseConversationStoreDeleteThenAbsent(
 				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
-			expect(beforeDelete).toBeDefined()
-			expect(afterDelete).toBeUndefined()
+			expect(before).toBeDefined()
+			expect(after).toBeUndefined()
 		})
 
 		it('deleting an absent id does not throw (a no-op)', async () => {
@@ -810,15 +810,14 @@ describe('conversation-store contract scenarios run against a conforming store',
 
 	describe('two distinct conversation ids coexist', () => {
 		it('two distinct conversation ids coexist without cross-contamination', async () => {
-			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
-				await exerciseConversationStoreTwoIds(
-					createMemoryConversationStore,
-					buildConversationSnapshot,
-				)
-			expect(gotAlpha).toEqual(alpha)
-			expect(gotBeta).toEqual(beta)
-			expect(gotAlphaAfterDelete).toBeUndefined()
-			expect(gotBetaAfterDelete).toEqual(beta)
+			const { alpha, beta } = await exerciseConversationStoreTwoIds(
+				createMemoryConversationStore,
+				buildConversationSnapshot,
+			)
+			expect(alpha.before).toEqual(alpha.snapshot)
+			expect(beta.before).toEqual(beta.snapshot)
+			expect(alpha.after).toBeUndefined()
+			expect(beta.after).toEqual(beta.snapshot)
 		})
 	})
 })

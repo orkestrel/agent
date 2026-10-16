@@ -87,10 +87,10 @@ describe('study declaration fixtures', () => {
 		const grading = buildMemoryGradingFixture()
 		const scheduled = grading.manifest.schedule.map((item) => item.id)
 		expect(isStudyCustodyManifest(grading.manifest)).toBe(true)
-		expect(scheduled).toEqual([grading.complete.id, grading.faulted.id])
+		expect(scheduled).toEqual([grading.complete.trial.id, grading.faulted.trial.id])
 		expect(grading.attempts.map((item) => item.trial.id)).toEqual(scheduled)
 		expect(Object.keys(grading.evidence)).toEqual(scheduled)
-		expect(grading.evidence[grading.complete.id]).toBe(grading.completeEvidence)
+		expect(grading.evidence[grading.complete.trial.id]).toBe(grading.complete.evidence)
 		expect(grading.rubric.criteria.map((item) => item.id)).toEqual([
 			'operational',
 			'meaning',

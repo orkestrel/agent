@@ -83,12 +83,12 @@ describe('DatabaseConversationStore', () => {
 
 	describe('delete & absent', () => {
 		it('set → delete → get returns undefined', async () => {
-			const { beforeDelete, afterDelete } = await exerciseConversationStoreDeleteThenAbsent(
+			const { before, after } = await exerciseConversationStoreDeleteThenAbsent(
 				() => createDatabaseConversationStore(createMemoryDriver()),
 				buildConversationSnapshot,
 			)
-			expect(beforeDelete).toBeDefined()
-			expect(afterDelete).toBeUndefined()
+			expect(before).toBeDefined()
+			expect(after).toBeUndefined()
 		})
 
 		it('deleting an absent id does not throw (a no-op)', async () => {
@@ -110,16 +110,15 @@ describe('DatabaseConversationStore', () => {
 
 	describe('two distinct conversation ids coexist', () => {
 		it('two distinct conversation ids coexist without cross-contamination', async () => {
-			const { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete } =
-				await exerciseConversationStoreTwoIds(
-					() => createDatabaseConversationStore(createMemoryDriver()),
-					buildConversationSnapshot,
-				)
-			expect(gotAlpha).toEqual(alpha)
-			expect(gotBeta).toEqual(beta)
+			const { alpha, beta } = await exerciseConversationStoreTwoIds(
+				() => createDatabaseConversationStore(createMemoryDriver()),
+				buildConversationSnapshot,
+			)
+			expect(alpha.before).toEqual(alpha.snapshot)
+			expect(beta.before).toEqual(beta.snapshot)
 			// Dropping one leaves the other intact.
-			expect(gotAlphaAfterDelete).toBeUndefined()
-			expect(gotBetaAfterDelete).toEqual(beta)
+			expect(alpha.after).toBeUndefined()
+			expect(beta.after).toEqual(beta.snapshot)
 		})
 	})
 })

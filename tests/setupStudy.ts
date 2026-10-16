@@ -17,7 +17,6 @@ import type {
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
-	StudyAttempt,
 	StudyBounds,
 	StudyCriterion,
 	StudyDefinition,
@@ -1335,8 +1334,8 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 		[parseStudyScenario({ id: 'desk', goals: [{ id: 'goal', input: {} }] })],
 		profile.bounds,
 	)
-	const [complete, faulted] = manifest.schedule
-	if (complete === undefined || faulted === undefined) throw new Error('Missing fixture trials')
+	const [first, second] = manifest.schedule
+	if (first === undefined || second === undefined) throw new Error('Missing fixture trials')
 	const operational = buildMemoryCriterion('operational', 'state', { observation: 'operational' })
 	const meaning = buildMemoryCriterion('meaning', 'semantic', {
 		criterion: 'Correctly repaired handoff',
@@ -1345,35 +1344,41 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 	const lookup = buildMemoryCriterion('lookup', 'trace', { observation: 'lookup', id: 'record' })
 	const result = buildMemoryCriterion('result', 'state', { observation: 'result', partial: false })
 	const failure = { cause: 'capacity', message: 'Output cap', role: 'agent' } as const
-	const completeAttempt: StudyAttempt = {
-		trial: complete,
-		duration: 1,
-		failure: undefined,
-		executed: true,
-		observations: [
-			{
-				goal: 'goal',
-				product: { value: { content: '' }, partial: true },
-				failure: undefined,
-				usage: [],
-				duration: 1,
-				executed: true,
-			},
+	const complete: MemoryGradingFixture['complete'] = {
+		trial: first,
+		attempt: {
+			trial: first,
+			duration: 1,
+			failure: undefined,
+			executed: true,
+			observations: [
+				{
+					goal: 'goal',
+					product: { value: { content: '' }, partial: true },
+					failure: undefined,
+					usage: [],
+					duration: 1,
+					executed: true,
+				},
+			],
+		},
+		evidence: [
+			{ event: 'summary', goal: 'other', value: 'unrelated' },
+			{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
 		],
 	}
-	const faultedAttempt: StudyAttempt = {
-		trial: faulted,
-		duration: 1,
-		failure,
-		executed: true,
-		observations: [
-			{ goal: 'goal', product: undefined, failure, usage: [], duration: 1, executed: true },
-		],
+	const faulted: MemoryGradingFixture['faulted'] = {
+		trial: second,
+		attempt: {
+			trial: second,
+			duration: 1,
+			failure,
+			executed: true,
+			observations: [
+				{ goal: 'goal', product: undefined, failure, usage: [], duration: 1, executed: true },
+			],
+		},
 	}
-	const completeEvidence: readonly StudyEvidence[] = [
-		{ event: 'summary', goal: 'other', value: 'unrelated' },
-		{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
-	]
 	return {
 		profile,
 		definition,
@@ -1387,10 +1392,7 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 		result,
 		rubric: { version: '1', criteria: [operational, meaning, source, lookup, result] },
 		failure,
-		completeAttempt,
-		faultedAttempt,
-		completeEvidence,
-		attempts: [completeAttempt, faultedAttempt],
-		evidence: { [complete.id]: completeEvidence, [faulted.id]: [] },
+		attempts: [complete.attempt, faulted.attempt],
+		evidence: { [first.id]: complete.evidence, [second.id]: [] },
 	}
 }

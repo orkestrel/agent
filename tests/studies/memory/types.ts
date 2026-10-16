@@ -136,10 +136,17 @@ export interface MemoryGradingFixture {
 	readonly profile: StudyProfile
 	readonly definition: StudyDefinition
 	readonly manifest: StudyManifest
-	/** Holds the trial that completed with retained evidence. */
-	readonly complete: StudyTrial
-	/** Holds the trial that failed with a capacity refusal. */
-	readonly faulted: StudyTrial
+	/** Holds the trial that completed with retained evidence, its attempt, and the rows retained for it: one foreign-goal row, then the arrival that cites `receipt`. */
+	readonly complete: {
+		readonly trial: StudyTrial
+		readonly attempt: StudyAttempt
+		readonly evidence: readonly StudyEvidence[]
+	}
+	/** Holds the trial that failed with a capacity refusal and its attempt. */
+	readonly faulted: {
+		readonly trial: StudyTrial
+		readonly attempt: StudyAttempt
+	}
 	readonly operational: StudyCriterion
 	readonly meaning: StudyCriterion
 	readonly source: StudyCriterion
@@ -147,10 +154,6 @@ export interface MemoryGradingFixture {
 	readonly result: StudyCriterion
 	readonly rubric: StudyRubric
 	readonly failure: StudyFailure
-	readonly completeAttempt: StudyAttempt
-	readonly faultedAttempt: StudyAttempt
-	/** Holds the rows retained for the complete trial: one foreign-goal row, then the arrival that cites `receipt`. */
-	readonly completeEvidence: readonly StudyEvidence[]
 	readonly attempts: readonly StudyAttempt[]
 	/** Holds the evidence rows keyed by trial id. */
 	readonly evidence: Readonly<Record<string, readonly StudyEvidence[]>>

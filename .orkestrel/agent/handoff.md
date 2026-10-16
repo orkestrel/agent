@@ -315,7 +315,18 @@ without imports.
     the structure instead of restoring `vite.config.ts` to the canonical set (`scaffold/guides/scaffold.md:1679-1683`).
   - The design round (brief `tmp/units/scaffold-studies-design-brief.md`) has an Opus planner (workflow
     `wf_c6aa3609-269`) and a Grok analyst (task `scaffold-studies-design-analyst-1`).
-  - Grok 4.7 xhigh builds the scaffold fix and the release preparation under tightly constrained briefs (user).
+  - Grok 4.7 xhigh was to build the scaffold fix and the release preparation under tightly constrained briefs (user).
+  - **Superseded (user, 2026-10-16).** Only Claude models implement.
+    - Sonnet builds; Grok does non-implementation work: objective and adversary lanes, audits, labeling, readings.
+    - The Grok scaffold build (`scaffold-studies-build-1`) added local functions to the vendored
+      `tests/config.test.ts`, which had none at HEAD.
+    - The build was cancelled. Its 51 KB partial diff is kept in
+      `tmp/units/scaffold-studies-build-grok-partial.patch`, and scaffold was reset to `1f2eed70e` so the Sonnet
+      builder starts clean.
+    - The Sonnet successor build runs from `tmp/units/scaffold-studies-build-brief-2.md` (workflow
+      `wf_65bc6dda-e7b`). The brief states the law that was broken: declaration placement, no local helpers in test
+      files, and the vendored set's helpers as exported members of `tests/setupPolicy.ts`. It also states the naming
+      law and requires a cleanup-pass scan.
   - **Reconciliation.** Reports: `tmp/units/scaffold-studies-design-{planner-1,analyst-grok-1}.md`.
     - Both lanes agree:
       - an exact-case `tests/studies/**/*.test.ts` file selects the `studies` project, so Study gets none;
@@ -355,6 +366,12 @@ without imports.
         setup modules; Study setup modules), task `naming-audit-tests-1`; and source (Agent `studies/**`, Study
         `src/**`), task `naming-audit-source-1`.
       - Fix units follow after U7.
+      - The tests-area audit returned 13 violations, all in Agent tests: the `MemoryGradingFixture` grouping, the
+        conversation-store exercise results (`beforeDelete`, `gotAlpha`…), the plural types `RecordedHeaders`,
+        `LedgerClassificationParts` and `LedgerInputParts`, and a non-verb method `headers`.
+      - Study's setup modules are clean.
+      - The Orchestrator checked every row against `names.md`. Fix unit `tmp/units/naming-u8-brief.md` (Sonnet,
+        workflow `wf_0ea2cbe8-bb8`) applies them. The source-area audit is still running.
   - Each upload window needs the user at the keyboard for `npm login` and the one-time code.
   - The boosted series uses one boosted run per arm, with no control run. Grok also grades the sealed Records packet,
     started in parallel: `tmp/units/study-label-grok-records-population.ts`, output

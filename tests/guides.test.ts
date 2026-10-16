@@ -148,7 +148,7 @@ await new GuideCommand({
 		createStubSummarizer,
 		createToolCall,
 		JUDGE_ENVELOPE,
-		RecordedHeaders,
+		RecordedHeader,
 		RecordedProvider,
 		RecordedTransport,
 		rejectTransportOnAbort,
@@ -3727,12 +3727,12 @@ await new GuideCommand({
 
 		it('aborts a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
 			const caller = new AbortController()
-			const hook = new RecordedHeaders({ authorization: 'Bearer fixture-key' })
+			const hook = new RecordedHeader({ authorization: 'Bearer fixture-key' })
 			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
 			await new SystemOneJudge({
 				url: 'https://api.typesafe.ai',
 				model: 'jev-latest',
-				headers: hook.headers.bind(hook),
+				headers: hook.read.bind(hook),
 				fetch: transport.fetch,
 			}).ask(SYSTEM_ONE_JUDGE_REQUEST, caller.signal)
 			// The hook receives the call's own bound, the one the transport receives, never the caller's.
@@ -3740,13 +3740,13 @@ await new GuideCommand({
 			expect(hook.signals[0]).toBe(transport.signals[0])
 			expect(hook.signals[0]).not.toBe(caller.signal)
 
-			const stalled = new RecordedHeaders(new Promise(() => {}))
+			const stalled = new RecordedHeader(new Promise(() => {}))
 			const untouched = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
 			const failure: unknown = await new SystemOneJudge({
 				url: 'https://api.typesafe.ai',
 				model: 'jev-latest',
 				timeout: 10,
-				headers: stalled.headers.bind(stalled),
+				headers: stalled.read.bind(stalled),
 				fetch: untouched.fetch,
 			})
 				.ask(SYSTEM_ONE_JUDGE_REQUEST, caller.signal)

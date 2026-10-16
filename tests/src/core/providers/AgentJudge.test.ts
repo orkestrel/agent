@@ -16,7 +16,7 @@ import {
 	JUDGE_ENVELOPE,
 	JUDGE_PROTOCOL_CASES,
 	RecordedBody,
-	RecordedHeaders,
+	RecordedHeader,
 	RecordedTransport,
 	rejectTransportOnAbort,
 	ScriptedJudge,
@@ -363,7 +363,7 @@ describe('AgentJudge — HTTP and protocol failures', () => {
 
 describe('AgentJudge — the header hook inside each call’s bound', () => {
 	it('passes each call’s combined signal to the hook and sends its headers', async () => {
-		const hook = new RecordedHeaders({ authorization: 'Bearer KEY' })
+		const hook = new RecordedHeader({ authorization: 'Bearer KEY' })
 		const transport = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
 		const caller = new AbortController().signal
 		const judge = new ScriptedJudge({
@@ -372,7 +372,7 @@ describe('AgentJudge — the header hook inside each call’s bound', () => {
 			fetch: transport.fetch,
 			batch: false,
 			answers: TEV1_ANSWERS,
-			headers: hook.headers.bind(hook),
+			headers: hook.read.bind(hook),
 		})
 		await judge.ask(TEV1_REQUEST, caller)
 		expect(hook.signals).toHaveLength(3)
@@ -541,13 +541,13 @@ describe('AgentJudge — cancellation and partial results', () => {
 
 	it('cancels an unresolved header hook through the caller signal', async () => {
 		const transport = createRefusingTransport()
-		const hook = new RecordedHeaders(new Promise(() => {}))
+		const hook = new RecordedHeader(new Promise(() => {}))
 		const abort = new AbortController()
 		const judge = new ScriptedJudge({
 			url: 'http://judge.test',
 			model: 'm',
 			fetch: transport.fetch,
-			headers: hook.headers.bind(hook),
+			headers: hook.read.bind(hook),
 		})
 		const result = judge.ask(TEV1_REQUEST, abort.signal)
 		await hook.entered

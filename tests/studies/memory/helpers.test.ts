@@ -335,13 +335,12 @@ describe('memory declaration and mechanical evidence', () => {
 
 describe('memory mechanical grading over the shared traversal', () => {
 	it('reads each mechanism predicate with zero-based row citations and unknown for foreign assertions', () => {
-		const { complete, completeAttempt, completeEvidence, source, meaning } =
-			buildMemoryGradingFixture()
+		const { complete, source, meaning } = buildMemoryGradingFixture()
 		const target = {
-			trial: complete,
+			trial: complete.trial,
 			criterion: source,
-			attempt: completeAttempt,
-			evidence: completeEvidence,
+			attempt: complete.attempt,
+			evidence: complete.evidence,
 		}
 		expect(readStudyMemoryGrade(target)).toEqual({
 			verdict: 'achieved',

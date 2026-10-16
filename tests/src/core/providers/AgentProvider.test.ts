@@ -16,7 +16,7 @@ import {
 	drainProvider,
 	RecordedBody,
 	RecordedTransport,
-	RecordedHeaders,
+	RecordedHeader,
 	rejectTransportOnAbort,
 	recordGlobalTransport,
 	ScriptedWire,
@@ -474,13 +474,13 @@ describe('AgentProvider — the header hook inside the cancellation bound', () =
 describe('AgentProvider — abort listener removal after the header hook', () => {
 	it('removes abort listeners after hook success and clears the deadline', async () => {
 		const pending = Promise.withResolvers<Readonly<Record<string, string>>>()
-		const hook = new RecordedHeaders(pending.promise)
+		const hook = new RecordedHeader(pending.promise)
 		const transport = new RecordedTransport(() => new Response('c:done'))
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 40,
-			headers: hook.headers.bind(hook),
+			headers: hook.read.bind(hook),
 		})
 		const result = provider.generate([], new AbortController().signal)
 		try {
@@ -504,11 +504,11 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 
 	it('removes abort listeners after hook rejection and clears the deadline', async () => {
 		const failure = new Error('header failed')
-		const hook = new RecordedHeaders(failure)
+		const hook = new RecordedHeader(failure)
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			timeout: 40,
-			headers: hook.headers.bind(hook),
+			headers: hook.read.bind(hook),
 		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
 		await waitForDelay(60)
@@ -519,12 +519,12 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 
 	it('removes abort listeners after caller cancellation during the hook', async () => {
 		const pending = Promise.withResolvers<Readonly<Record<string, string>>>()
-		const hook = new RecordedHeaders(pending.promise)
+		const hook = new RecordedHeader(pending.promise)
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			timeout: 40,
-			headers: hook.headers.bind(hook),
+			headers: hook.read.bind(hook),
 		})
 		const result = provider.generate([], abort.signal)
 		try {
@@ -545,12 +545,12 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 
 	it('removes abort listeners after deadline expiry during the hook', async () => {
 		const pending = Promise.withResolvers<Readonly<Record<string, string>>>()
-		const hook = new RecordedHeaders(pending.promise)
+		const hook = new RecordedHeader(pending.promise)
 		try {
 			const provider = new ScriptedWire({
 				url: 'https://provider.test',
 				timeout: 40,
-				headers: hook.headers.bind(hook),
+				headers: hook.read.bind(hook),
 			})
 			await expect(provider.generate([], new AbortController().signal)).rejects.toBeInstanceOf(
 				ProviderAbortError,

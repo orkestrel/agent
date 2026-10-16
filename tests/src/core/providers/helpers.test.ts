@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	createToolCall,
 	RecordedBody,
-	RecordedHeaders,
+	RecordedHeader,
 	TEV1_CHOICE,
 	TEV1_NOUL,
 	TEV1_SCORE,
@@ -408,9 +408,9 @@ describe('buildProviderHeaders — request headers inside the cancellation bound
 	})
 
 	it('passes the signal to the hook and sets its entries over the content type', async () => {
-		const hook = new RecordedHeaders({ authorization: 'Bearer KEY', 'Content-Type': 'text/plain' })
+		const hook = new RecordedHeader({ authorization: 'Bearer KEY', 'Content-Type': 'text/plain' })
 		const signal = new AbortController().signal
-		const headers = await buildProviderHeaders(hook.headers.bind(hook), signal)
+		const headers = await buildProviderHeaders(hook.read.bind(hook), signal)
 		expect(hook.signals).toEqual([signal])
 		expect(headers.get('authorization')).toBe('Bearer KEY')
 		expect(headers.get('content-type')).toBe('text/plain')
@@ -418,19 +418,19 @@ describe('buildProviderHeaders — request headers inside the cancellation bound
 	})
 
 	it('refuses an aborted signal without calling the hook', async () => {
-		const hook = new RecordedHeaders()
+		const hook = new RecordedHeader()
 		const abort = new AbortController()
 		const reason = new Error('cancelled')
 		abort.abort(reason)
-		await expect(buildProviderHeaders(hook.headers.bind(hook), abort.signal)).rejects.toBe(reason)
+		await expect(buildProviderHeaders(hook.read.bind(hook), abort.signal)).rejects.toBe(reason)
 		expect(hook.signals).toEqual([])
 	})
 
 	it('rejects a pending hook with the abort reason and removes its listener', async () => {
-		const hook = new RecordedHeaders(new Promise(() => {}))
+		const hook = new RecordedHeader(new Promise(() => {}))
 		const abort = new AbortController()
 		const reason = new Error('cancelled')
-		const headers = buildProviderHeaders(hook.headers.bind(hook), abort.signal)
+		const headers = buildProviderHeaders(hook.read.bind(hook), abort.signal)
 		await hook.entered
 		expect(getEventListeners(abort.signal, 'abort')).toHaveLength(1)
 		abort.abort(reason)
@@ -440,9 +440,9 @@ describe('buildProviderHeaders — request headers inside the cancellation bound
 
 	it('rethrows a throwing hook unchanged', async () => {
 		const error = new Error('token unavailable')
-		const hook = new RecordedHeaders(error)
+		const hook = new RecordedHeader(error)
 		await expect(
-			buildProviderHeaders(hook.headers.bind(hook), new AbortController().signal),
+			buildProviderHeaders(hook.read.bind(hook), new AbortController().signal),
 		).rejects.toBe(error)
 	})
 })

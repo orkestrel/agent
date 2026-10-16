@@ -2313,7 +2313,7 @@ export async function exerciseConversationStoreUpsert(
 
 /**
  * Drives the delete scenario: set a snapshot, read it back (proving it landed), delete it, then read
- * again — the caller asserts `beforeDelete` is defined and `afterDelete` is `undefined`.
+ * again — the caller asserts `before` is defined and `after` is `undefined`.
  *
  * @param create - Builds a fresh, empty store (the twin's own factory)
  * @param build - The snapshot builder ({@link buildConversationSnapshot})
@@ -2323,16 +2323,16 @@ export async function exerciseConversationStoreDeleteThenAbsent(
 	create: ConversationStoreFunction,
 	build: ConversationSnapshotFunction,
 ): Promise<{
-	readonly beforeDelete: ConversationSnapshot | undefined
-	readonly afterDelete: ConversationSnapshot | undefined
+	readonly before: ConversationSnapshot | undefined
+	readonly after: ConversationSnapshot | undefined
 }> {
 	const store = create()
 	const snapshot = await build()
 	await store.set(snapshot)
-	const beforeDelete = await store.get(snapshot.id)
+	const before = await store.get(snapshot.id)
 	await store.delete(snapshot.id)
-	const afterDelete = await store.get(snapshot.id)
-	return { beforeDelete, afterDelete }
+	const after = await store.get(snapshot.id)
+	return { before, after }
 }
 
 /**
@@ -2374,24 +2374,31 @@ export async function exerciseConversationStoreTwoIds(
 	create: ConversationStoreFunction,
 	build: ConversationSnapshotFunction,
 ): Promise<{
-	readonly alpha: ConversationSnapshot
-	readonly beta: ConversationSnapshot
-	readonly gotAlpha: ConversationSnapshot | undefined
-	readonly gotBeta: ConversationSnapshot | undefined
-	readonly gotAlphaAfterDelete: ConversationSnapshot | undefined
-	readonly gotBetaAfterDelete: ConversationSnapshot | undefined
+	readonly alpha: {
+		readonly snapshot: ConversationSnapshot
+		readonly before: ConversationSnapshot | undefined
+		readonly after: ConversationSnapshot | undefined
+	}
+	readonly beta: {
+		readonly snapshot: ConversationSnapshot
+		readonly before: ConversationSnapshot | undefined
+		readonly after: ConversationSnapshot | undefined
+	}
 }> {
 	const store = create()
 	const alpha = await build('alpha')
 	const beta = await build('beta')
 	await store.set(alpha)
 	await store.set(beta)
-	const gotAlpha = await store.get('alpha')
-	const gotBeta = await store.get('beta')
+	const alphaBefore = await store.get('alpha')
+	const betaBefore = await store.get('beta')
 	await store.delete('alpha')
-	const gotAlphaAfterDelete = await store.get('alpha')
-	const gotBetaAfterDelete = await store.get('beta')
-	return { alpha, beta, gotAlpha, gotBeta, gotAlphaAfterDelete, gotBetaAfterDelete }
+	const alphaAfter = await store.get('alpha')
+	const betaAfter = await store.get('beta')
+	return {
+		alpha: { snapshot: alpha, before: alphaBefore, after: alphaAfter },
+		beta: { snapshot: beta, before: betaBefore, after: betaAfter },
+	}
 }
 
 // ── Scenario builders (the seeded entities several suites drive) ─────────────
@@ -2854,7 +2861,7 @@ export class RecordedBody {
 }
 
 /** Records the call signal received by a request-header hook. */
-export class RecordedHeaders {
+export class RecordedHeader {
 	readonly #signals: AbortSignal[] = []
 	readonly #entered = Promise.withResolvers<AbortSignal>()
 	readonly #result:
@@ -2875,7 +2882,7 @@ export class RecordedHeaders {
 	get entered(): Promise<AbortSignal> {
 		return this.#entered.promise
 	}
-	headers(
+	read(
 		signal: AbortSignal,
 	): Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>> {
 		this.#signals.push(signal)
@@ -3468,7 +3475,7 @@ export const LEDGER_DESK_OWNERS: Readonly<Record<string, readonly string[]>> = O
 })
 
 /** Carries the parts of a classification as plain collections, which {@link buildLedgerClassification} turns into the projection's maps and sets. */
-export interface LedgerClassificationParts {
+export interface LedgerClassificationInput {
 	readonly quiet?: readonly string[]
 	readonly categories?: Readonly<Record<string, LedgerCategory>>
 	readonly topics?: Readonly<Record<string, readonly string[]>>
@@ -3477,14 +3484,14 @@ export interface LedgerClassificationParts {
 }
 
 /** Carries the parts of a projection input as plain collections, which {@link buildLedgerInput} turns into the projection's maps. */
-export interface LedgerInputParts {
+export interface LedgerProjectionSource {
 	readonly system?: string
 	readonly exclusions?: readonly string[]
 	readonly owners?: Readonly<Record<string, readonly string[]>>
 	readonly messages?: readonly Message[]
 	readonly readings?: readonly LedgerLookupReading[]
 	readonly entities?: Readonly<Record<string, readonly string[]>>
-	readonly classification?: LedgerClassificationParts
+	readonly classification?: LedgerClassificationInput
 }
 
 /**
@@ -3494,7 +3501,7 @@ export interface LedgerInputParts {
  * @returns The classification
  */
 export function buildLedgerClassification(
-	parts: LedgerClassificationParts = {},
+	parts: LedgerClassificationInput = {},
 ): LedgerClassification {
 	return {
 		quiet: new Set(parts.quiet ?? []),
@@ -3511,7 +3518,7 @@ export function buildLedgerClassification(
  * @param parts - The parts to set; an absent part is empty
  * @returns The projection input
  */
-export function buildLedgerInput(parts: LedgerInputParts = {}): LedgerProjectionInput {
+export function buildLedgerInput(parts: LedgerProjectionSource = {}): LedgerProjectionInput {
 	return {
 		system: parts.system ?? '',
 		exclusions: parts.exclusions ?? [],
