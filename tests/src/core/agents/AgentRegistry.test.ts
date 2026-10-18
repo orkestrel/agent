@@ -248,7 +248,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		})
 		const result = await agent.generate()
 		// The resolved authority denied `add` → its handler never ran, yet the run settled.
-		expect(executions.count).toBe(0)
+		expect(executions.calls).toEqual([])
 		expect(result.content).toBe('blocked')
 		expect(result.partial).toBe(false)
 	})

@@ -149,8 +149,8 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 	})
 
 	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
-		const sectionReads = createRecorder<readonly []>()
-		const snapshotReads = createRecorder<readonly []>()
+		const sectionReads = createRecorder<readonly [string]>()
+		const snapshotReads = createRecorder<readonly [string]>()
 		const revoked = Proxy.revocable({}, {})
 		revoked.revoke()
 		expect(
@@ -158,12 +158,12 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 				id: 's',
 				summary: 'recap',
 				get messages(): never {
-					sectionReads.handler()
+					sectionReads.handler('messages')
 					throw new Error('unreadable')
 				},
 			}),
 		).toBe(false)
-		expect(sectionReads.count).toBe(1)
+		expect(sectionReads.calls).toEqual([['messages']])
 		expect(isSection(revoked.proxy)).toBe(false)
 		expect(
 			isConversationSnapshot({
@@ -173,7 +173,7 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 						id: 's',
 						summary: 'recap',
 						get messages(): never {
-							snapshotReads.handler()
+							snapshotReads.handler('messages')
 							throw new Error('unreadable')
 						},
 					},
@@ -181,7 +181,7 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 				messages: [],
 			}),
 		).toBe(false)
-		expect(snapshotReads.count).toBe(1)
+		expect(snapshotReads.calls).toEqual([['messages']])
 	})
 })
 

@@ -1,4 +1,4 @@
-import type { ConversationEventMap, Message } from '@src/core'
+import type { ConversationEventMap, Message, Section } from '@src/core'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -14,9 +14,11 @@ import {
 	createStubSummarizer,
 	createToolCall,
 	renderRecap,
+	ScriptedReads,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 } from '../../../setup.js'
 import {
+	captureError,
 	createRecorder,
 	createRecorders,
 	requireValue,
@@ -205,8 +207,8 @@ describe('Conversation — compact() with the default keep (0) folds up to the n
 		expect(conversation.sections).toHaveLength(1)
 		// Only `compact` fired, carrying the section.
 		expect(events.compact.calls).toEqual([[section]])
-		expect(events.collapse.count).toBe(0)
-		expect(events.rehydrate.count).toBe(0)
+		expect(events.collapse.calls).toEqual([])
+		expect(events.rehydrate.calls).toEqual([])
 	})
 
 	it('makes ONE summarizer call per compaction, over the folded slice', async () => {
@@ -304,8 +306,8 @@ describe('Conversation — compact() with nothing to fold is a no-op', () => {
 		expect(section).toBeUndefined()
 		// No fold ⇒ no summarizer call, no events, the live tail intact.
 		expect(stub.calls).toHaveLength(0)
-		expect(events.compact.count).toBe(0)
-		expect(events.collapse.count).toBe(0)
+		expect(events.compact.calls).toEqual([])
+		expect(events.collapse.calls).toEqual([])
 		expect(conversation.count).toBe(2)
 	})
 
@@ -550,7 +552,7 @@ describe('Conversation — rehydrate(id) reads the retained originals', () => {
 
 		expect(conversation.rehydrate('nope')).toBeUndefined()
 		expect(conversation.snapshot()).toEqual(snapshot)
-		expect(events.rehydrate.count).toBe(0)
+		expect(events.rehydrate.calls).toEqual([])
 	})
 
 	it('returns an empty retained list and emits the known section id', () => {
@@ -818,6 +820,19 @@ describe('Conversation — reference() renders a provenance-labeled cross-conver
 		expect(block).toContain('- user: one')
 		expect(block).toContain('- assistant: two')
 	})
+
+	it('refuses a hole in the excerpt list, as a for…of visits it as an undefined message', () => {
+		const conversation = new Conversation({ id: 'chat' })
+		const [one, two] = conversation.add([
+			{ role: 'user', content: 'one' },
+			{ role: 'assistant', content: 'two' },
+		])
+		const messages: Message[] = []
+		messages[0] = requireValue(one)
+		messages[2] = requireValue(two)
+
+		expect(captureError(() => conversation.reference({ messages }))).toBeInstanceOf(TypeError)
+	})
 })
 
 describe('Conversation — snapshot() serializes id + sections + live tail (C-c)', () => {
@@ -884,7 +899,7 @@ describe('Conversation — snapshot() serializes id + sections + live tail (C-c)
 
 		expect(restored.id).toBe('stored')
 		expect(restored.messages().map((one) => one.content)).toEqual(['hi'])
-		expect(compacted.count).toBe(0) // hydration edits nothing, so it emits nothing
+		expect(compacted.calls).toEqual([]) // hydration edits nothing, so it emits nothing
 	})
 
 	it('snapshot() is pure JSON DATA — it survives a JSON round-trip identically', async () => {
@@ -929,8 +944,8 @@ describe('Conversation — sections cap', () => {
 		)
 		expect(conversation.snapshot()).toEqual(snapshot)
 		expect(stub.calls).toHaveLength(0)
-		expect(events.compact.count).toBe(0)
-		expect(events.collapse.count).toBe(0)
+		expect(events.compact.calls).toEqual([])
+		expect(events.collapse.calls).toEqual([])
 	})
 
 	it('throws ConversationError code SECTIONS for a zero or negative constructor cap', () => {
@@ -1107,11 +1122,10 @@ describe('Conversation — sections cap', () => {
 	// folds at call 3 and merges at call 4, the only call that throws.
 	it('keeps the unmerged sections and propagates the error when the overflow merge throws', async () => {
 		const boom = new Error('merge summarizer boom')
-		const calls = createRecorder<readonly []>()
+		const throws = new ScriptedReads<boolean>([false, false, false, true], false)
 		const conversation = new Conversation({
 			summarize: async (messages) => {
-				calls.handler()
-				if (calls.count === 4) throw boom
+				if (throws.read()) throw boom
 				return `recap of ${messages.length}`
 			},
 			sections: 2,
@@ -1122,22 +1136,23 @@ describe('Conversation — sections cap', () => {
 		)
 
 		conversation.add({ role: 'assistant', content: 'round-1' })
-		await conversation.compact()
+		const first = requireValue(await conversation.compact())
 		conversation.add({ role: 'assistant', content: 'round-2' })
-		await conversation.compact()
+		const second = requireValue(await conversation.compact())
 		expect(conversation.sections).toHaveLength(2)
 
 		// Round 3 overflows the cap — the merge call throws.
 		conversation.add({ role: 'assistant', content: 'round-3' })
 		await expect(conversation.compact()).rejects.toBe(boom)
+		expect(throws.reported).toEqual([false, false, false, true])
 
 		// No merge, no loss: 3 sections remain (transiently over the cap of 2), unmerged, and the
 		// failed round emitted neither `collapse` nor `compact`.
 		expect(
 			conversation.sections.map((one) => one.messages.map((message) => message.content)),
 		).toEqual([['round-1'], ['round-2'], ['round-3']])
-		expect(events.compact.count).toBe(2)
-		expect(events.collapse.count).toBe(0)
+		expect(events.compact.calls).toEqual([[first], [second]])
+		expect(events.collapse.calls).toEqual([])
 
 		// A subsequent successful compact() restores the cap.
 		conversation.add({ role: 'assistant', content: 'round-4' })
@@ -1222,16 +1237,16 @@ describe('Conversation — hydrating through the snapshot option (C-c)', () => {
 				rehydrate: rehydrated.handler,
 			},
 		})
-		expect(compacted.count).toBe(0)
-		expect(collapsed.count).toBe(0)
-		expect(rehydrated.count).toBe(0)
+		expect(compacted.calls).toEqual([])
+		expect(collapsed.calls).toEqual([])
+		expect(rehydrated.calls).toEqual([])
 
 		// The same hooks see each event once the conversation is edited or read.
 		restored.rehydrate(folded.id)
 		restored.add({ role: 'user', content: 'c' })
-		await restored.compact()
-		expect(compacted.count).toBe(1)
-		expect(collapsed.count).toBe(1)
+		const section = requireValue(await restored.compact())
+		expect(compacted.calls).toEqual([[section]])
+		expect(collapsed.calls).toEqual([[restored.sections[0]]])
 		expect(rehydrated.calls).toEqual([[folded.id]])
 	})
 })
@@ -1263,7 +1278,43 @@ describe('Conversation — concurrent compact() calls and edits during the summa
 			'The depot opens at dawn.',
 		])
 		expect(none).toBeUndefined()
-		expect(calls.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+		])
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['Which order is late?'])
+	})
+
+	it('commits one section when a summarizer compacts its own conversation without awaiting it', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const nested = createRecorder<readonly [Promise<Section | undefined>]>()
+		const reentry = new AbortController()
+		const conversation = new Conversation({
+			summarize(messages, signal) {
+				calls.handler(messages)
+				// Only the outer fold reaches the summarizer without a signal, so the nested call is the one re-entry.
+				if (signal === undefined) nested.handler(conversation.compact({ signal: reentry.signal }))
+				return gate.promise
+			},
+		})
+		conversation.add([
+			{ role: 'user', content: 'Remember the depot hours.' },
+			{ role: 'assistant', content: 'The depot opens at dawn.' },
+			{ role: 'user', content: 'Which order is late?' },
+		])
+
+		const outer = conversation.compact()
+		gate.resolve('recap')
+		const settled = await Promise.all([outer, ...nested.calls.map(([call]) => call)])
+
+		// The nested call found no fold in flight to wait for, so it summarized the same slice again.
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+		])
+		// The commit check admits one of the two folds, so one section lands.
+		expect(settled.filter((section) => section !== undefined)).toEqual(conversation.sections)
 		expect(conversation.sections).toHaveLength(1)
 		expect(conversation.messages().map(({ content }) => content)).toEqual(['Which order is late?'])
 	})
@@ -1291,7 +1342,9 @@ describe('Conversation — concurrent compact() calls and edits during the summa
 			{ role: 'user', content: 'Third request.' },
 		])
 		await waitForDelay()
-		expect(calls.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['First request.', 'First answer.'],
+		])
 		gate.resolve('recap')
 		await first
 		const later = requireValue(await second)
@@ -1333,8 +1386,11 @@ describe('Conversation — concurrent compact() calls and edits during the summa
 			'The depot opens at dawn.',
 			'Which order is late?',
 		])
-		expect(events.compact.count).toBe(0)
-		expect(events.collapse.count).toBe(0)
+		expect(events.compact.calls).toEqual([])
+		expect(events.collapse.calls).toEqual([])
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+		])
 	})
 
 	it('resolves undefined and leaves no section when clear() empties the tail mid-summary', async () => {
@@ -1363,7 +1419,10 @@ describe('Conversation — concurrent compact() calls and edits during the summa
 		expect(await pending).toBeUndefined()
 		expect(conversation.sections).toEqual([])
 		expect(conversation.count).toBe(0)
-		expect(events.compact.count).toBe(0)
+		expect(events.compact.calls).toEqual([])
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+		])
 	})
 })
 
@@ -1427,11 +1486,16 @@ describe('Conversation — compact() cancellation through CompactOptions.signal'
 		const later = conversation.compact()
 		await waitForCondition('the later summarizer call', () => calls.count === 2)
 		gate.resolve('recap')
-		expect(requireValue(await later).messages).toHaveLength(2)
+		const folded = requireValue(await later)
+		expect(folded.messages).toHaveLength(2)
 		// The abandoned call's late digest committed nothing beside the later fold.
 		await waitForDelay()
 		expect(conversation.sections).toHaveLength(1)
-		expect(events.compact.count).toBe(1)
+		expect(events.compact.calls).toEqual([[folded]])
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+			['Remember the depot hours.', 'The depot opens at dawn.'],
+		])
 	})
 
 	it('handles a summarizer rejection that lands after the abort', async () => {
@@ -1457,6 +1521,7 @@ describe('Conversation — compact() cancellation through CompactOptions.signal'
 
 		expect(conversation.sections).toEqual([])
 		expect(conversation.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([['a']])
 	})
 
 	it('rejects a call aborted while queued, and still holds the next call behind the fold in flight', async () => {
@@ -1487,12 +1552,17 @@ describe('Conversation — compact() cancellation through CompactOptions.signal'
 		])
 		const third = conversation.compact()
 		await waitForDelay()
-		expect(calls.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['First request.', 'First answer.'],
+		])
 
 		gate.resolve('recap')
 		await first
 		await third
-		expect(calls.count).toBe(2)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['First request.', 'First answer.'],
+			['Second request.', 'Second answer.'],
+		])
 		expect(conversation.sections).toHaveLength(2)
 	})
 
@@ -1521,12 +1591,16 @@ describe('Conversation — compact() cancellation through CompactOptions.signal'
 		controller.abort(reason)
 		await expect(intermediate).rejects.toBe(reason)
 		await waitForDelay()
-		expect(calls.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['First request.', 'First answer.'],
+		])
 
 		gate.resolve('recap')
 		await first
 		await third
-		expect(calls.count).toBe(1)
+		expect(calls.calls.map(([messages]) => messages.map(({ content }) => content))).toEqual([
+			['First request.', 'First answer.'],
+		])
 		expect(conversation.sections).toHaveLength(1)
 	})
 })
@@ -1611,7 +1685,7 @@ describe('Conversation — rolling folds', () => {
 		expect(conversation.rehydrate(second.id)).toEqual(second.messages)
 		expect(conversation.rehydrate(first.id)).toBeUndefined()
 		expect(events.compact.calls).toEqual([[first], [second]])
-		expect(events.collapse.count).toBe(0)
+		expect(events.collapse.calls).toEqual([])
 	})
 
 	it('keeps the newest user exchange and its tool turns live', async () => {
@@ -1689,12 +1763,11 @@ describe('Conversation — rolling folds', () => {
 
 	it('commits nothing and emits nothing when the summarizer throws, then folds on retry', async () => {
 		const boom = new Error('rolling summarizer boom')
-		const calls = createRecorder<readonly []>()
+		const throws = new ScriptedReads<boolean>([false, true], false)
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize(messages) {
-				calls.handler()
-				if (calls.count === 2) throw boom
+				if (throws.read()) throw boom
 				return `recap of ${messages.length}`
 			},
 		})
@@ -1718,8 +1791,9 @@ describe('Conversation — rolling folds', () => {
 		expect(conversation.sections).toEqual([first])
 		expect(conversation.sections[0]).toBe(first)
 		expect(conversation.messages()).toEqual(live)
-		expect(events.compact.count).toBe(1)
-		expect(events.collapse.count).toBe(0)
+		expect(throws.reported).toEqual([false, true])
+		expect(events.compact.calls).toEqual([[first]])
+		expect(events.collapse.calls).toEqual([])
 
 		const retried = requireValue(await conversation.compact())
 		expect(retried.messages.map(({ content }) => content)).toEqual(['u1', 'a1', 'u2', 'a2'])
@@ -1728,12 +1802,11 @@ describe('Conversation — rolling folds', () => {
 
 	it('commits nothing when aborted mid-fold, even if the summarizer ignores the signal', async () => {
 		const gate = Promise.withResolvers<string>()
-		const calls = createRecorder<readonly []>()
+		const gated = new ScriptedReads<boolean>([false], true)
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize() {
-				calls.handler()
-				return calls.count === 1 ? 'recap' : gate.promise
+				return gated.read() ? gate.promise : 'recap'
 			},
 		})
 		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
@@ -1754,7 +1827,7 @@ describe('Conversation — rolling folds', () => {
 		const reason = new Error('cancelled')
 
 		const pending = conversation.compact({ signal: controller.signal })
-		await waitForCondition('the rolling summarizer call', () => calls.count === 2)
+		await waitForCondition('the rolling summarizer call', () => gated.reported.length === 2)
 		controller.abort(reason)
 		await expect(pending).rejects.toBe(reason)
 		gate.resolve('late recap')
@@ -1763,17 +1836,17 @@ describe('Conversation — rolling folds', () => {
 		expect(conversation.sections[0]).toBe(first)
 		expect(conversation.sections).toHaveLength(1)
 		expect(conversation.messages()).toEqual(live)
-		expect(events.compact.count).toBe(1)
+		expect(gated.reported).toEqual([false, true])
+		expect(events.compact.calls).toEqual([[first]])
 	})
 
 	it('commits nothing when a slice message is removed while the summarizer runs', async () => {
 		const gate = Promise.withResolvers<string>()
-		const calls = createRecorder<readonly []>()
+		const gated = new ScriptedReads<boolean>([false], true)
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize() {
-				calls.handler()
-				return calls.count === 1 ? 'recap' : gate.promise
+				return gated.read() ? gate.promise : 'recap'
 			},
 		})
 		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
@@ -1791,7 +1864,7 @@ describe('Conversation — rolling folds', () => {
 		])
 
 		const pending = conversation.compact()
-		await waitForCondition('the rolling summarizer call', () => calls.count === 2)
+		await waitForCondition('the rolling summarizer call', () => gated.reported.length === 2)
 		expect(conversation.remove(requireValue(dropped).id)).toBe(true)
 		gate.resolve('late recap')
 
@@ -1799,7 +1872,8 @@ describe('Conversation — rolling folds', () => {
 		expect(conversation.sections[0]).toBe(first)
 		expect(conversation.sections).toHaveLength(1)
 		expect(conversation.messages().map(({ content }) => content)).toEqual(['u2', 'u3'])
-		expect(events.compact.count).toBe(1)
+		expect(gated.reported).toEqual([false, true])
+		expect(events.compact.calls).toEqual([[first]])
 	})
 
 	it('refuses a sections cap at construction, per call, and from a manager default', async () => {
@@ -1881,7 +1955,7 @@ describe('Conversation — rolling folds', () => {
 			'a3',
 		])
 		expect(conversation.messages().map(({ content }) => content)).toEqual(['u4'])
-		expect(events.compact.count).toBe(1)
-		expect(events.collapse.count).toBe(0)
+		expect(events.compact.calls).toEqual([[section]])
+		expect(events.collapse.calls).toEqual([])
 	})
 })

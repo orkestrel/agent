@@ -254,12 +254,12 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 	it('runs the agent tool loop in Node and feeds the result into the next provider turn', async () => {
 		// The provider boundary requests a tool and returns the next turn through the same contract.
 		const tools = createToolManager()
-		const executions = createRecorder<readonly []>()
+		const executions = createRecorder<readonly [args: Readonly<Record<string, unknown>>]>()
 		tools.add(
 			createTool({
 				name: 'add',
 				execute: (args) => {
-					executions.handler()
+					executions.handler(args)
 					return Number(args.a) + Number(args.b)
 				},
 			}),
@@ -278,7 +278,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 
-		expect(executions.count).toBe(1)
+		expect(executions.calls).toEqual([[{ a: 2, b: 3 }]])
 		const dispatched = chunks.flatMap((chunk) =>
 			chunk.category === 'tool' && chunk.result.success
 				? [{ name: chunk.call.name, value: chunk.result.value }]

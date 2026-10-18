@@ -126,10 +126,12 @@ export class Ledger implements LedgerInterface {
 			if (value !== undefined && !isNonNegativeSafeInteger(value))
 				throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
 		}
-		const topics = options.topics.map((topic) => topic.name)
+		// `Array.from` visits a hole in either list as an undefined entry, as iteration does, so the
+		// read of its `name` refuses it; `map` skips it.
+		const topics = Array.from(options.topics, (topic) => topic.name)
 		if (topics.some((name) => name.trim() === '') || new Set(topics).size !== topics.length)
 			throw new LedgerError('TOPIC', 'topic names must be nonempty and unique')
-		const lookups = ['recall', ...(options.lookups ?? []).map((lookup) => lookup.tool.name)]
+		const lookups = ['recall', ...Array.from(options.lookups ?? [], (lookup) => lookup.tool.name)]
 		if (new Set(lookups).size !== lookups.length)
 			throw new LedgerError('LOOKUP', 'lookup names must be unique and cannot be recall')
 		this.#provider = provider

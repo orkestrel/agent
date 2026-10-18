@@ -295,8 +295,9 @@ export function computeReading(answer: JudgeAnswer): Reading {
 	if (count < 2) {
 		throw new JudgeError('PROTOCOL', 'judge error: an answer needs at least 2 candidates')
 	}
-	// The first strictly greatest candidate wins a tie.
-	const { winner, index, probability } = candidates.reduce(
+	// The first strictly greatest candidate wins a tie. The spread visits a hole in a score
+	// distribution as an undefined candidate, which the destructuring refuses; `reduce` skips it.
+	const { winner, index, probability } = [...candidates].reduce(
 		(top, [name, candidate], position) =>
 			candidate > top.probability ? { winner: name, index: position, probability: candidate } : top,
 		{ winner: '', index: 0, probability: -Infinity },
@@ -340,15 +341,17 @@ export function computeReading(answer: JudgeAnswer): Reading {
  * ```
  */
 export function buildJudgeResult(model: string, results: readonly JudgeResult[]): JudgeResult {
-	const answers = results.reduce<Readonly<Record<string, JudgeAnswer>>>(
+	// The spread visits a hole in `results` as an undefined result, as iteration does; `reduce` skips it.
+	const calls = [...results]
+	const answers = calls.reduce<Readonly<Record<string, JudgeAnswer>>>(
 		(merged, result) => ({ ...merged, ...result.answers }),
 		{},
 	)
-	const refusals = results.reduce<Readonly<Record<string, Refusal>>>(
+	const refusals = calls.reduce<Readonly<Record<string, Refusal>>>(
 		(merged, result) => ({ ...merged, ...result.refusals }),
 		{},
 	)
-	const usage = results.reduce<TokenUsage | undefined>(
+	const usage = calls.reduce<TokenUsage | undefined>(
 		(total, result) =>
 			result.usage === undefined ? total : sumUsage(total, sanitizeUsage(result.usage)),
 		undefined,

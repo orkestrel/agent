@@ -1,4 +1,5 @@
 import type { Message } from '@src/core'
+import type { FileInterface } from '@orkestrel/workspace'
 import {
 	attachImages,
 	attachUserImages,
@@ -7,6 +8,7 @@ import {
 	intersectKeys,
 	renderSection,
 } from '@src/core'
+import { captureError } from '@orkestrel/test'
 import { createBinaryContent, createFile, createTextContent, isText } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import { createToolCall } from '../../../setup.js'
@@ -217,6 +219,13 @@ describe('collectImageData — the image carrier split', () => {
 
 	it('returns an empty list for no files at all', () => {
 		expect(collectImageData([])).toEqual([])
+	})
+
+	it('refuses a hole in the file list, as a for…of visits it as an undefined file', () => {
+		const files: FileInterface[] = []
+		files[0] = createFile({ path: 'a.png', content: createBinaryContent('first', 'image/png') })
+		files[2] = createFile({ path: 'c.jpg', content: createBinaryContent('third', 'image/jpeg') })
+		expect(captureError(() => collectImageData(files))).toBeInstanceOf(TypeError)
 	})
 })
 

@@ -51,7 +51,58 @@ it('rejects malformed runtimes and unsupported arms, serializes a real session a
 		const running = session.execute(goal, context)
 		await expect(session.execute(goal, context)).rejects.toThrow('already executing')
 		expect((await running).partial).toBe(false)
-		expect(rows.count).toBeGreaterThan(0)
+		expect(rows.calls).toEqual([
+			[
+				{
+					event: 'provider',
+					goal: 'save',
+					value: {
+						request: [{ role: 'user', content: 'Create the scratch note.' }],
+						response: {
+							content: '',
+							calls: [
+								{ id: 'saved', name: 'write', arguments: { path: 'note.txt', content: 'alpha' } },
+							],
+						},
+					},
+				},
+			],
+			[
+				{
+					event: 'provider',
+					goal: 'save',
+					value: {
+						request: [
+							{ role: 'user', content: 'Create the scratch note.' },
+							{ role: 'assistant', content: '' },
+							{ role: 'tool', call: 'saved', content: 'stored note.txt' },
+						],
+						response: { content: 'Saved.', calls: [] },
+					},
+				},
+			],
+			[
+				{
+					event: 'file',
+					goal: 'save',
+					value: { path: 'note.txt', exists: true, bytes: 5, content: 'alpha' },
+				},
+			],
+			[{ event: 'result', goal: 'save', value: { content: 'Saved.', partial: false } }],
+			[
+				{
+					event: 'tool',
+					goal: 'save',
+					value: {
+						id: 'saved',
+						name: 'write',
+						arguments: { path: 'note.txt', content: 'alpha' },
+						success: true,
+						value: 'stored note.txt',
+					},
+				},
+			],
+		])
 		await session.close()
 		await session.close()
 		await expect(session.execute(goal, context)).rejects.toThrow('closed')

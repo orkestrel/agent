@@ -69,7 +69,7 @@ import {
 	isProviderAbortError,
 	ThinkSplitter,
 } from '@src/core'
-import { requireValue } from '@orkestrel/test'
+import { requireValue, waitForDelay } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	JUDGMENT_QUESTION,
@@ -166,6 +166,8 @@ import {
 	createRecordedBudget,
 	createRecordedTool,
 	createRelayHop,
+	RecordedScheduler,
+	ScriptedReads,
 } from './setup.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
@@ -323,6 +325,47 @@ describe('agent scenario infrastructure', () => {
 		expect(await right.next()).toEqual({ done: true, value: { content: 'full-2' } })
 		const shared = createSharedGatedProvider(first, second)
 		expect((await drainProvider(shared.stream([], controller.signal))).result.content).toBe('full')
+	})
+
+	it('parks the first shared call on the first gate and every later call on the second', async () => {
+		const first = Promise.withResolvers<void>()
+		const second = Promise.withResolvers<void>()
+		const controller = new AbortController()
+		const provider = createSharedGatedProvider(first, second)
+		const left = provider.stream([], controller.signal)
+		const middle = provider.stream([], controller.signal)
+		const right = provider.stream([], controller.signal)
+		for (const stream of [left, middle, right]) await stream.next()
+		const one = left.next()
+		const two = middle.next()
+		const three = right.next()
+		second.resolve()
+		expect(await two).toEqual({ done: true, value: { content: 'full' } })
+		expect(await three).toEqual({ done: true, value: { content: 'full' } })
+		expect(
+			await Promise.race([one.then(() => 'settled'), waitForDelay(20).then(() => 'parked')]),
+		).toBe('parked')
+		first.resolve()
+		expect(await one).toEqual({ done: true, value: { content: 'full' } })
+	})
+
+	it('numbers independent calls by arrival and parks each on its own gate', async () => {
+		const first = Promise.withResolvers<void>()
+		const second = Promise.withResolvers<void>()
+		const controller = new AbortController()
+		const provider = createIndependentGatedProvider(first, second)
+		const left = provider.stream([], controller.signal)
+		const right = provider.stream([], controller.signal)
+		for (const stream of [left, right]) await stream.next()
+		const one = left.next()
+		const two = right.next()
+		second.resolve()
+		expect(await two).toEqual({ done: true, value: { content: 'full-2' } })
+		expect(
+			await Promise.race([one.then(() => 'settled'), waitForDelay(20).then(() => 'parked')]),
+		).toBe('parked')
+		first.resolve()
+		expect(await one).toEqual({ done: true, value: { content: 'full-1' } })
 	})
 
 	it('supplies provider and scheduler failure boundaries', async () => {
@@ -727,19 +770,66 @@ describe('createStubSummarizer', () => {
 
 describe('createRecordingScheduler', () => {
 	it('counts each paced turn boundary and resolves its delay as a no-op', async () => {
-		const scheduler = createRecordingScheduler()
-		expect(scheduler.yields).toBe(0)
-		await scheduler.yield()
-		await scheduler.yield()
-		expect(scheduler.yields).toBe(2)
-		await expect(scheduler.delay(1_000)).resolves.toBeUndefined()
+		for (const scheduler of [createRecordingScheduler(), new RecordedScheduler()]) {
+			expect(scheduler.yields).toBe(0)
+			await scheduler.yield()
+			await scheduler.yield()
+			expect(scheduler.yields).toBe(2)
+			await expect(scheduler.delay(1_000)).resolves.toBeUndefined()
+		}
 	})
 
 	it('rejects with the signal reason on an aborted yield and paces nothing', async () => {
-		const scheduler = createRecordingScheduler()
-		const reason = new Error('cancelled')
-		await expect(scheduler.yield({ signal: AbortSignal.abort(reason) })).rejects.toBe(reason)
-		expect(scheduler.yields).toBe(0)
+		for (const scheduler of [createRecordingScheduler(), new RecordedScheduler()]) {
+			const reason = new Error('cancelled')
+			await expect(scheduler.yield({ signal: AbortSignal.abort(reason) })).rejects.toBe(reason)
+			expect(scheduler.yields).toBe(0)
+		}
+	})
+
+	it('keeps one scheduler’s count apart from another’s', async () => {
+		const first = createRecordingScheduler()
+		const second = createRecordingScheduler()
+		await first.yield()
+		expect([first.yields, second.yields]).toEqual([1, 0])
+	})
+})
+
+describe('ScriptedReads', () => {
+	it('reports the script in read order, repeats the rest, and keeps what it reported', () => {
+		const reads = new ScriptedReads<'none' | 'all'>(['none', 'none'], 'all')
+		expect(reads.reported).toEqual([])
+		expect([reads.read(), reads.read(), reads.read(), reads.read()]).toEqual([
+			'none',
+			'none',
+			'all',
+			'all',
+		])
+		expect(reads.reported).toEqual(['none', 'none', 'all', 'all'])
+	})
+
+	it('reports the rest from the first read when the script is empty', () => {
+		const reads = new ScriptedReads<number>([], 7)
+		expect([reads.read(), reads.read()]).toEqual([7, 7])
+		expect(reads.reported).toEqual([7, 7])
+	})
+
+	it('keeps an absent rest as a reported value', () => {
+		const reads = new ScriptedReads<string | undefined>(['desk'], undefined)
+		expect([reads.read(), reads.read(), reads.read()]).toEqual(['desk', undefined, undefined])
+		expect(reads.reported).toEqual(['desk', undefined, undefined])
+	})
+
+	it('hands out a copy of its history and keeps one script per instance', () => {
+		const first = new ScriptedReads<number>([1], 2)
+		const second = new ScriptedReads<number>([1], 2)
+		first.read()
+		const history = first.reported
+		first.read()
+		expect(history).toEqual([1])
+		expect(first.reported).toEqual([1, 2])
+		expect(second.reported).toEqual([])
+		expect(second.read()).toBe(1)
 	})
 })
 
@@ -2172,7 +2262,7 @@ describe('createRelayHop', () => {
 	it('hands the handler the request its builder returns and the observer the response', async () => {
 		const upstream = createScriptedProvider([{ content: 'admitted' }])
 		const urls = createRecorder<[string]>()
-		const bodies = createRecorder<[string]>()
+		const replies = createRecorder<readonly [status: number, body: string]>()
 		const hop = createRelayHop({
 			provider: upstream,
 			url: 'http://relay.test/exact?route=turn',
@@ -2182,7 +2272,7 @@ describe('createRelayHop', () => {
 				return new Request(request, { body: '{"messages":null}' })
 			},
 			response: async (response) => {
-				bodies.handler(await response.clone().text())
+				replies.handler(response.status, await response.clone().text())
 			},
 		})
 		await expect(hop.generate([], new AbortController().signal)).rejects.toMatchObject({
@@ -2190,7 +2280,7 @@ describe('createRelayHop', () => {
 			status: 400,
 		})
 		expect(urls.calls).toEqual([['http://relay.test/exact?route=turn']])
-		expect(bodies.count).toBe(1)
+		expect(replies.calls).toEqual([[400, '']])
 		expect(upstream.started).toBe(0)
 	})
 })

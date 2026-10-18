@@ -448,9 +448,10 @@ export function linkOwners(
 	readings: readonly LedgerLookupReading[],
 	owners: ReadonlyMap<string, readonly string[]>,
 ): ReadonlyMap<string, string> {
-	// A later pair of the same argument overwrites an earlier one, as the `Map` constructor does.
+	// A later pair of the same argument overwrites an earlier one, as the `Map` constructor does. The
+	// spread visits a hole in `readings` as an undefined reading, as iteration does; `flatMap` skips it.
 	return new Map(
-		readings.flatMap((reading) => {
+		[...readings].flatMap((reading) => {
 			if (reading.result === undefined) return []
 			const named = [...extractTokens(reading.text).ids].filter((id) => owners.has(id))
 			const [only] = named
@@ -485,17 +486,22 @@ export function linkOwners(
  * ```
  */
 export function collectRegistry(readings: readonly LedgerLookupReading[]): LedgerRegistry {
-	const results = readings.flatMap((reading) =>
+	// The spread and `Array.from` visit a hole in `readings` or in an owner list as an undefined
+	// entry, as iteration does; `flatMap` and `map` skip it.
+	const results = [...readings].flatMap((reading) =>
 		reading.result === undefined ? [] : [reading.result],
 	)
 	return {
 		ids: new Set(
-			results.flatMap((result) => [...result.ids, ...result.owners.map((owner) => owner.id)]),
+			results.flatMap((result) => [
+				...result.ids,
+				...Array.from(result.owners, (owner) => owner.id),
+			]),
 		),
 		owners: new Map(
 			[
 				...Map.groupBy(
-					results.flatMap((result) => result.owners),
+					results.flatMap((result) => Array.from(result.owners)),
 					(owner) => owner.id,
 				),
 			].map(([id, listed]) => [
@@ -538,8 +544,9 @@ export function matchEntities(
 	partial: boolean,
 ): ReadonlySet<string> {
 	const tokens = extractTokens(text).ids
+	// `Array.from` visits a hole in an owner's names as an undefined name, as iteration does; `map` skips it.
 	const aliases = Map.groupBy(
-		[...registry.owners].flatMap(([id, names]) => names.map((name) => ({ name, id }))),
+		[...registry.owners].flatMap(([id, names]) => Array.from(names, (name) => ({ name, id }))),
 		(entry) => entry.name,
 	)
 	// A word's carriers are the distinct names it appears in.
@@ -694,9 +701,11 @@ export function selectRecords(
 ): readonly LedgerRecord[] {
 	const topics = new Set(request.topics)
 	const rules = projection.records.find((one) => one.key === LEDGER_RULES_KEY)
-	// Lines that meet a request topic lead; each side keeps its position order.
-	const sides = Map.groupBy(rules?.lines ?? [], (line) =>
-		line.topics.some((topic) => topics.has(topic)),
+	// Lines that meet a request topic lead; each side keeps its position order. `groupBy` visits a
+	// hole in `lines` as an undefined line, as iteration does; `filter` skips it.
+	const sides = Map.groupBy(
+		(rules?.lines ?? []).filter(() => true),
+		(line) => line.topics.some((topic) => topics.has(topic)),
 	)
 	return [
 		...[...new Set(request.owners)].flatMap((owner) => {
@@ -872,7 +881,8 @@ export function renderStub(
  * ```
  */
 export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | undefined {
-	const terms = groups.flatMap((group) =>
+	// The spread visits a hole in `groups` as an undefined group, as iteration does; `flatMap` skips it.
+	const terms = [...groups].flatMap((group) =>
 		[...Map.groupBy(group, (call) => call.tools).values()].flatMap((set) => {
 			const points = set.flatMap((call) =>
 				isFiniteNumber(call.prompt) && call.estimate > 0

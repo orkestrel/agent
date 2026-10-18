@@ -239,7 +239,7 @@ describe('createAgentQueue', () => {
 		// The entry rejected (a queue abort), and — the load-bearing part — the agent's provider
 		// saw the abort, so the cancel threaded all the way through build → agent → provider.
 		expect(caught).toBeInstanceOf(Error)
-		expect(aborts.calls.at(-1)?.[0]).toBe(true)
+		expect(aborts.calls).toEqual([[true]])
 	})
 })
 
@@ -331,7 +331,7 @@ describe('createAgentRunner', () => {
 		// The run rejected, and the agent's provider saw the abort — the cancel threaded
 		// through controller.signal → build → agent → provider.
 		expect(caught).toBeInstanceOf(Error)
-		expect(aborts.calls.at(-1)?.[0]).toBe(true)
+		expect(aborts.calls).toEqual([[true]])
 	})
 })
 

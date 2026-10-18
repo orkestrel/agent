@@ -20,6 +20,7 @@ import type {
 	ProviderRequest,
 	ProviderResult,
 	ScopeInterface,
+	Section,
 	Selection,
 	SelectionHandler,
 } from '@src/core'
@@ -153,6 +154,7 @@ await new GuideCommand({
 		createStubSummarizer,
 		createToolCall,
 		drainProvider,
+		FailingProvider,
 		JUDGE_ENVELOPE,
 		RecordedBody,
 		RecordedHeader,
@@ -704,7 +706,14 @@ await new GuideCommand({
 				expect(asked?.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
 				const [reused] = await conversation.judgments.resolve(judge, request, [ticket.id], signal)
 				expect(reused?.time).toBe(asked?.time)
-				expect(posted.count).toBe(1)
+				expect(posted.calls).toEqual([
+					[
+						{
+							...SYSTEM_ONE_TEV1_REQUEST,
+							questions: { refund: SYSTEM_ONE_TEV1_REQUEST.questions.refund },
+						},
+					],
+				])
 				expect(conversation.snapshot().judgments).toHaveLength(1)
 			} finally {
 				await server.stop()
@@ -915,10 +924,52 @@ await new GuideCommand({
 
 			expect(await folding).toBeUndefined()
 			expect(await queued).toBeUndefined()
-			expect(calls.count).toBe(1)
+			expect(
+				calls.calls.map(([messages]) => messages.map(({ role, content }) => [role, content])),
+			).toEqual([
+				[
+					['user', 'My name is Ada.'],
+					['assistant', 'Nice to meet you, Ada.'],
+				],
+			])
 			expect(conversation.sections).toEqual([])
 			expect(guideText).toContain(
 				'Calls to `compact()` run one at a time: a call made while another is in flight waits for it, then folds from the live tail it finds. A fold commits only when every folded message is still the same live entry after the summarizer settles, so a `remove` or `clear` during the initial summarizer makes `compact()` resolve `undefined` and leaves no section.',
+			)
+		})
+
+		it('summarizes one slice twice and commits one section when a summarizer compacts its own conversation (the summarizer re-entry sentence)', async () => {
+			// The first summarizer call starts the conversation's own `compact()` without awaiting it.
+			const slices = createRecorder<readonly [readonly Message[]]>()
+			const reentries = [true].values()
+			const reentered = Promise.withResolvers<Section | undefined>()
+			const conversation = createConversation({
+				async summarize(messages) {
+					slices.handler(messages)
+					if (reentries.next().value === true) reentered.resolve(conversation.compact())
+					return 'recap'
+				},
+			})
+			conversation.add([
+				{ role: 'user', content: 'My name is Ada.' },
+				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
+				{ role: 'user', content: 'What did I say my name was?' },
+			])
+			const outer = await conversation.compact()
+			const inner = await reentered.promise
+			const folded = [
+				['user', 'My name is Ada.'],
+				['assistant', 'Nice to meet you, Ada.'],
+			]
+
+			expect(
+				slices.calls.map(([messages]) => messages.map(({ role, content }) => [role, content])),
+			).toEqual([folded, folded])
+			expect(outer).toBeUndefined()
+			expect(inner?.messages.map(({ role, content }) => [role, content])).toEqual(folded)
+			expect(conversation.sections).toEqual([inner])
+			expect(guideText).toContain(
+				"A summarizer must not call `compact()` on the conversation it serves. When no other fold is in flight, a fold counts as in flight only after its summarizer returns, so the summarizer's own call waits for nothing and summarizes the same slice again; the commit check keeps one section, because the later fold finds its slice already folded and resolves `undefined`.",
 			)
 		})
 
@@ -1690,7 +1741,7 @@ await new GuideCommand({
 			)
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
-			const asks = createRecorder<readonly []>()
+			const asks = createRecorder<readonly [questions: readonly string[]]>()
 			const phrases = createPhraseJudge(['Refunds over'])
 			// The supplied gauge skips calibration in `respond`, and the agent runs reach the provider
 			// through `stream`, so only the `calibrate` call reaches `generate` and parks there.
@@ -1709,7 +1760,7 @@ await new GuideCommand({
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
-							asks.handler()
+							asks.handler(Object.keys(request.questions))
 							return phrases.ask(request, signal)
 						},
 					},
@@ -1717,9 +1768,24 @@ await new GuideCommand({
 					gauge: { scale: 1, overhead: 0 },
 				}),
 			)
-			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			const rule = ledger.conversation.add({
+				role: 'user',
+				content: 'Refunds over $100 need a manager.',
+			})
 			await ledger.respond('Does a $148.50 refund need a manager?')
-			const asked = asks.count
+			const owned = requireValue(
+				ledger.conversation
+					.messages()
+					.find((message) => message.content === 'Does a $148.50 refund need a manager?'),
+				'Missing request message',
+			)
+			// The asks the owned `respond` call made; the unowned runs that follow add none.
+			const asked = [...asks.calls]
+			expect(asked).toEqual([
+				[[JSON.stringify(['category', rule.id])]],
+				[[JSON.stringify(['topic', rule.id, 'refunds'])]],
+				[[JSON.stringify(['topic', owned.id, 'refunds'])]],
+			])
 			const faults = createRecorder<readonly [unknown]>()
 			const selections = createRecorder<readonly [Selection]>()
 			ledger.agent.emitter.on('fault', faults.handler)
@@ -1749,7 +1815,7 @@ await new GuideCommand({
 					.messages.slice(1)
 					.map(({ role, content }) => [role, content]),
 			).toEqual(asking.map(({ role, content }) => [role, content]))
-			expect(asks.count).toBe(asked)
+			expect(asks.calls).toEqual(asked)
 
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
@@ -1763,7 +1829,7 @@ await new GuideCommand({
 			expect(isLedgerError(measured.fault)).toBe(true)
 			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
 			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
-			expect(asks.count).toBe(asked)
+			expect(asks.calls).toEqual(asked)
 			expect(guideText).toContain(
 				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
 			)
@@ -2347,8 +2413,9 @@ await new GuideCommand({
 
 		it('files one rule and prices one request as the classifier and gauge fence claims', async () => {
 			// The fence declares the judge, the cutoffs, and the signal; the transcription supplies them.
+			const asked = createRecorder<readonly [key: string]>()
 			const judge = createLedgerJudge(
-				createRecorder<readonly [key: string]>(),
+				asked,
 				async (request) => {
 					const answers = Object.fromEntries(
 						Object.entries(request.questions).map(
@@ -2380,6 +2447,10 @@ await new GuideCommand({
 			})
 			const filed = await classifier.classify(new Set(), signal)
 
+			expect(asked.calls).toEqual([
+				[JSON.stringify(['category', rule.id])],
+				[JSON.stringify(['topic', rule.id, 'refunds'])],
+			])
 			expect(filed.judgments).toHaveLength(2)
 			expect(filed.readings.map((reading) => reading.outcome)).toEqual(['resolved', 'resolved'])
 			expect(classifier.category(rule.id)).toBe('rule')
@@ -2917,6 +2988,145 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				'With a separate `allowance`, or none, the `budget` is charged exactly the reported usage, or the streamed-answer estimate when the call reported none.',
+			)
+		})
+
+		it('charges a budget-only run nothing while the provider streams and the allowance each delta (the bounds sentences)', async () => {
+			// The provider takes each reading after the loop has taken the delta before it, so a charge made
+			// while the call streams shows before the call returns.
+			const readings = createRecorder<readonly [label: string, consumed: number]>()
+			const usage = { prompt: 3, completion: 5, total: 8 }
+			const solo = createTokenBudget({ max: 1_000, scope: 'completion' })
+			const shared = createTokenBudget({ max: 1_000, scope: 'completion' })
+			for (const [label, budget, allowance] of [
+				['budget only', solo, undefined],
+				['shared allowance', shared, shared],
+			] as const) {
+				const provider: ProviderInterface = {
+					id: 'scripted',
+					name: 'scripted',
+					generate: async () => ({ content: 'x'.repeat(40), usage }),
+					async *stream() {
+						for (const text of ['x'.repeat(20), 'x'.repeat(20)]) {
+							yield { channel: 'content', text }
+							readings.handler(label, budget.consumed)
+						}
+						return { content: 'x'.repeat(40), usage }
+					},
+				}
+				const agent = createAgent(provider, {
+					budget,
+					...(allowance === undefined ? {} : { allowance }),
+				})
+				agent.context.messages.add({ role: 'user', content: 'Write a short story.' })
+				await agent.generate()
+				readings.handler(label, budget.consumed)
+			}
+
+			// Twenty characters estimate 5 tokens. The budget alone reads 0 until the call returns its
+			// usage; the shared allowance takes each delta's estimate as it streams.
+			expect(readings.calls).toEqual([
+				['budget only', 0],
+				['budget only', 0],
+				['budget only', 5],
+				['shared allowance', 5],
+				['shared allowance', 10],
+				['shared allowance', 10],
+			])
+			expect(guideText).toContain(
+				'The allowance is charged during provider streaming and the budget after each provider call and between turns, before tool dispatch; exhaustion ends the run without dispatching, never inside a handler.',
+			)
+			expect(guideText).toContain(
+				'The allowance is charged during provider streaming and the token budget after each provider call and between turns, before tool dispatch; exhaustion ends the run without dispatching, never inside a handler.',
+			)
+			expect(guideText).not.toContain('budget is charged during provider streaming')
+		})
+
+		it('charges the failed call’s streamed estimate once before a genuine provider error rejects the run (the bounds paragraph)', async () => {
+			const failure = new Error('connection reset')
+			const solo = createTokenBudget({ max: 1_000, scope: 'total' })
+			const separate = createTokenBudget({ max: 1_000, scope: 'total' })
+			const shared = createTokenBudget({ max: 1_000, scope: 'total' })
+			const outcomes = await Promise.all(
+				[
+					[solo, undefined],
+					[separate, createTokenBudget({ max: 1_000 })],
+					[shared, shared],
+				].map(async ([budget, allowance]) => {
+					const agent = createAgent(new FailingProvider({ content: 'Once upon' }, failure), {
+						...(budget === undefined ? {} : { budget }),
+						...(allowance === undefined ? {} : { allowance }),
+					})
+					agent.context.messages.add({ role: 'user', content: 'Write a short story.' })
+					const rejected = await agent.generate().catch((cause: unknown) => cause)
+					return [rejected === failure, agent.status, budget?.consumed]
+				}),
+			)
+
+			// Nine streamed characters estimate 3 tokens: each run rejects with the provider's error, and
+			// its budget holds the estimate once, the shared ceiling included.
+			expect(outcomes).toEqual([
+				[true, 'error', 3],
+				[true, 'error', 3],
+				[true, 'error', 3],
+			])
+			expect(guideText).toContain(
+				"A genuine provider error after streaming still charges the `budget` the failed call's streamed-answer estimate, once, before the run rejects.",
+			)
+		})
+
+		it('starts and charges a per-run budget and allowance and leaves the constructed ones untouched (the per-run options paragraph)', async () => {
+			const constructed = {
+				budget: createTokenBudget({ max: 1_000, scope: 'completion' }),
+				allowance: createTokenBudget({ max: 1_000, scope: 'completion' }),
+			}
+			const run = {
+				budget: createTokenBudget({ max: 1_000, scope: 'completion' }),
+				allowance: createTokenBudget({ max: 1_000, scope: 'completion' }),
+			}
+			const agent = createAgent(
+				createScriptedProvider([
+					{
+						result: { content: 'x'.repeat(40), usage: { prompt: 3, completion: 5, total: 8 } },
+						deltas: ['x'.repeat(20), 'x'.repeat(20)],
+					},
+				]),
+				constructed,
+			)
+			agent.context.messages.add({ role: 'user', content: 'Write a short story.' })
+			const signals = {
+				run: [run.budget.signal, run.allowance.signal],
+				constructed: [constructed.budget.signal, constructed.allowance.signal],
+			}
+			await agent.generate(run)
+
+			expect([
+				run.budget.consumed,
+				run.allowance.consumed,
+				constructed.budget.consumed,
+				constructed.allowance.consumed,
+			]).toEqual([5, 10, 0, 0])
+			// `start()` replaces a held budget's signal, so only a started bound changes identity: each
+			// per-run signal is new and each constructed signal is the one it was built with.
+			expect([
+				run.budget.signal !== signals.run[0],
+				run.allowance.signal !== signals.run[1],
+			]).toEqual([true, true])
+			expect([
+				constructed.budget.signal === signals.constructed[0],
+				constructed.allowance.signal === signals.constructed[1],
+			]).toEqual([true, true])
+			expect(guideText).toContain(
+				'plus `limit` / `timeout` / `budget` / `allowance` / `signal`, each overriding its `AgentOptions` construction default for this run only.',
+			)
+			expect(guideText).toContain(
+				'the loop calls `start()` on a per-run `budget` or `allowance` for that run and charges it, leaving a constructed one untouched:',
+			)
+			expect(guideText).toContain(
+				'The turn is bounded by one cancel folded from the external `signal` + the `timeout` deadline + the `budget` and `allowance` signals through `AbortSignal.any`;',
+			)
+			expect(guideText).toContain(
+				'A cancel — external, deadline, budget, allowance, or `abort()` — commits a partial result:',
 			)
 		})
 

@@ -453,7 +453,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		expect(opened).toBe(b) // the SAME live instance
 		expect(manager.active).toBe(b) // activated
 		expect(b.messages().map(({ content }) => content)).toEqual(['live turn'])
-		expect(reads.count).toBe(0)
+		expect(reads.calls).toEqual([])
 	})
 
 	it('open(id) keeps a conversation added under that id while the store read was pending', async () => {

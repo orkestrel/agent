@@ -1,7 +1,7 @@
-import type { ClassifierReading } from '@src/core'
+import type { ClassifierReading, LedgerTopic } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
-import { createRecorder, requireValue } from '@orkestrel/test'
+import { captureError, createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
@@ -29,6 +29,15 @@ import {
 } from '../../../setup.js'
 
 describe('Classifier', () => {
+	it('refuses a hole in the topic list, as a for…of visits it as an undefined topic', () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const topics: LedgerTopic[] = []
+		topics[1] = { name: 'refunds', criterion: 'refund amounts' }
+		const classifier = new Classifier(buildClassifierOptions({ conversation, topics }))
+		expect(captureError(() => classifier.topics(message.id))).toBeInstanceOf(TypeError)
+	})
+
 	it('returns completed judgments when an assign throw cannot be converted to a string', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
@@ -772,12 +781,14 @@ describe('Classifier', () => {
 				duration: 'valid',
 			})),
 		)
-		expect(asked.count).toBe(2)
+		expect(asked.calls.map(([key]) => key)).toEqual(
+			conversation.messages().map((message) => JSON.stringify(['category', message.id])),
+		)
 	})
 
 	it('holds a deterministic failure that sits as the cause of another error', async () => {
 		const conversation = createConversation()
-		conversation.add({ role: 'user', content: 'First statement.' })
+		const statement = conversation.add({ role: 'user', content: 'First statement.' })
 		const asked = createRecorder<readonly [key: string]>()
 		const judge = createLedgerJudge(
 			asked,
@@ -798,7 +809,7 @@ describe('Classifier', () => {
 		)
 		await classifier.classify(new Set(), new AbortController().signal)
 		await classifier.classify(new Set(), new AbortController().signal)
-		expect(asked.count).toBe(1)
+		expect(asked.calls).toEqual([[JSON.stringify(['category', statement.id])]])
 	})
 
 	it('keeps the recorded topic of an assigned message and files an assigned distractor as quiet', () => {

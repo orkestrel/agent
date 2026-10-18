@@ -1,4 +1,3 @@
-import { createRecorder } from '@orkestrel/test'
 import { expect, it } from 'vitest'
 import {
 	isStudyToolsAgent,
@@ -13,6 +12,7 @@ import {
 } from '../../../studies/tools/validators.js'
 import { parseStudyToolsInput } from '../../../studies/tools/parsers.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from '../../../studies/tools/errors.js'
+import { ScriptedReads } from '../../setup.js'
 import { loadStudyToolsFixture } from '../../setupStudy.js'
 
 it('validates actual admitted constructors and bounds every declared workload without coercion', async () => {
@@ -97,19 +97,18 @@ it('validates actual admitted constructors and bounds every declared workload wi
 	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: 'a'.repeat(129) })).toBe(false)
 	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: '' })).toBe(false)
 	// A foreign proxy that passes the shared guard and then throws on a later read stays total.
-	const reads = createRecorder<readonly []>()
+	const refusals = new ScriptedReads<boolean>([false], true)
 	const hostile = new Proxy(
 		{ content: '', calls: [] },
 		{
 			get(target, key, receiver) {
-				if (key === 'content') reads.handler()
-				if (key === 'content' && reads.count > 1) throw new Error('Later read refused')
+				if (key === 'content' && refusals.read()) throw new Error('Later read refused')
 				return Reflect.get(target, key, receiver)
 			},
 		},
 	)
 	expect(isStudyToolsResponse(hostile)).toBe(false)
-	expect(reads.count).toBe(2)
+	expect(refusals.reported).toEqual([false, true])
 	expect(() => parseStudyToolsInput({})).toThrow('Invalid')
 })
 

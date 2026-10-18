@@ -445,6 +445,13 @@ export interface ConversationInterface {
 	 * folded sections are still the oldest; otherwise the call resolves `undefined` and emits
 	 * nothing, so a `remove` or `clear` during the summarizer leaves no section.
 	 *
+	 * A summarizer must not call `compact` on the conversation it serves. A call that finds no fold in
+	 * flight calls its summarizer before its own fold counts as in flight, so that summarizer's own
+	 * `compact` finds nothing to wait for and summarizes the same slice again; the commit check above
+	 * keeps one section, because the later fold finds its slice already folded and resolves
+	 * `undefined`. A call queued behind an earlier fold counts as in flight before its summarizer
+	 * runs, so its summarizer's own `compact` waits for the fold that called it.
+	 *
 	 * `options.signal` cancels the call. An already-aborted signal rejects with its reason before
 	 * the summarizer is called. An abort while waiting for an earlier call or while the summarizer
 	 * runs rejects with the reason at once, even when the summarizer ignores the signal, and the

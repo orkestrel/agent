@@ -9,13 +9,17 @@ import { sumUsage } from '../helpers.js'
  *
  * @remarks
  * A `LedgerRequest` opens one pass per agent run and exposes only projections of it, so no public
- * signature names this class. The call in flight takes its usage and thinking until the pass
- * observes the next call, which appends it to `calls` as a final record.
+ * signature names this class. The pass appends one final record to its log for each call observed,
+ * each usage reported, and each thinking share, in emission order, and derives `calls`, `call`, and
+ * `position` from it: a usage or thinking record joins the last call observed before it, and one
+ * recorded before the first call joins none.
  */
 export class LedgerPass {
-	#calls: readonly GaugeCall[] = []
-	#call: GaugeCall | undefined
-	#position: number | undefined
+	#log: ReadonlyArray<
+		| { readonly call: GaugeCall; readonly position: number }
+		| { readonly usage: { readonly prompt: number; readonly completion: number } }
+		| { readonly thinking: number }
+	> = []
 	#selection: Selection | undefined
 	#boundary: number
 	#usage: TokenUsage | undefined
@@ -62,7 +66,7 @@ export class LedgerPass {
 	 * @returns The latest call the pass observed, or undefined before one
 	 */
 	get call(): GaugeCall | undefined {
-		return this.#call
+		return this.calls.at(-1)
 	}
 
 	/**
@@ -71,16 +75,28 @@ export class LedgerPass {
 	 * @returns The position, or undefined before a call
 	 */
 	get position(): number | undefined {
-		return this.#position
+		return this.#log.flatMap((entry) => ('position' in entry ? [entry.position] : [])).at(-1)
 	}
 
 	/**
 	 * Returns the pass's gauge calls in order.
 	 *
-	 * @returns The final calls followed by the call in flight
+	 * @returns Each observed call with the last usage and thinking recorded after it, before the next call
 	 */
 	get calls(): readonly GaugeCall[] {
-		return this.#call === undefined ? this.#calls : [...this.#calls, this.#call]
+		return this.#log.flatMap((entry, index) => {
+			if (!('call' in entry)) return []
+			const after = this.#log.slice(index + 1)
+			const next = after.findIndex((one) => 'call' in one)
+			const joined = next === -1 ? after : after.slice(0, next)
+			const usage = joined.flatMap((one) => ('usage' in one ? [one.usage] : [])).at(-1)
+			const thinking = joined.flatMap((one) => ('thinking' in one ? [one.thinking] : [])).at(-1)
+			const billed =
+				usage === undefined
+					? entry.call
+					: { ...entry.call, prompt: usage.prompt, completion: usage.completion }
+			return [thinking === undefined ? billed : { ...billed, thinking }]
+		})
 	}
 
 	/**
@@ -96,15 +112,13 @@ export class LedgerPass {
 	}
 
 	/**
-	 * Starts a call, appending the call in flight to `calls` as final.
+	 * Starts a call, appending its record to the log.
 	 *
 	 * @param call - The call's estimate and advertised tool count
 	 * @param position - The conversation length when the call starts
 	 */
 	observe(call: GaugeCall, position: number): void {
-		if (this.#call !== undefined) this.#calls = [...this.#calls, this.#call]
-		this.#call = call
-		this.#position = position
+		this.#log = [...this.#log, { call, position }]
 	}
 
 	/**
@@ -117,21 +131,24 @@ export class LedgerPass {
 	}
 
 	/**
-	 * Records a reported usage as the prompt and completion of the call in flight.
+	 * Appends a reported usage to the log, which joins the call observed last as its prompt and completion.
+	 *
+	 * @remarks
+	 * The record keeps the prompt and completion values the usage held at this call, so a later change
+	 * to the caller's object never reaches a reading.
 	 *
 	 * @param usage - The usage the provider reported for the call
 	 */
 	bill(usage: TokenUsage): void {
-		if (this.#call !== undefined)
-			this.#call = { ...this.#call, prompt: usage.prompt, completion: usage.completion }
+		this.#log = [...this.#log, { usage: { prompt: usage.prompt, completion: usage.completion } }]
 	}
 
 	/**
-	 * Records the thinking share of the call in flight.
+	 * Appends the thinking share to the log, which joins the call observed last.
 	 *
 	 * @param thinking - The completion tokens attributed to the call's thinking
 	 */
 	think(thinking: number): void {
-		if (this.#call !== undefined) this.#call = { ...this.#call, thinking }
+		this.#log = [...this.#log, { thinking }]
 	}
 }

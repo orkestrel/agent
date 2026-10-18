@@ -129,7 +129,7 @@ export interface AgentRunResult {
 
 /**
  * Holds what one agent loop turn contributed to its run and how the turn ended — the readonly
- * record each turn returns, from which the run derives its {@link AgentRunResult}.
+ * record the loop appends for each turn, from which the run derives its {@link AgentRunResult}.
  *
  * @remarks
  * `content` is the final answer on an `answer` turn and the content the provider streamed on any

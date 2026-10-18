@@ -103,3 +103,36 @@ which is quadratic in the chunk count. No measured effect under the byte limits.
 Closing: C1–C4, C7 and C8 adopt the lanes' prescriptions, so each closes with a mutation probe (the reconcile rule for
 a verbatim fix). C6 closes when the repaired instruments run clean and their new controls fail as designed, which also
 settles 2b.
+
+## Added after the round (2026-10-18)
+
+- **C9: count-only recorders in scaffold's tests.**
+  - **Source.** Agent round 2's falsify ruled that count-only recorders are banned in tests too. The grounds are
+    `running.carriers` and `logs.reads`, whose draft-4 example is a test that "reads only its length", and census item
+    N6's `toHaveLength(` signature. Ruling: `.orkestrel/agent/agent-r2-audit-verdict.md` § Rulings added during the
+    fix round.
+  - **Why the census missed them.** Scaffold's census and both round-3 lanes missed this class, because the census
+    signatures never matched recorders.
+  - **Fix.** Sweep scaffold's own tests under the declaration-site rule (`agent/tmp/units/agent-r2-fix-fs-brief.md`).
+    Candidates include `tests/src/server/Upstream.test.ts:68`, `:282`, `:441` and `:610`, and
+    `tests/src/server/Materializer.test.ts:515` and `:588`.
+  - **Bound.** No emitted template declares a recorder, so emission is unchanged. `tests/config.test.ts` is vendored,
+    and its one `createRecorder` text is a code string in a case table.
+- **Close-out gates for C and C-instruments: GATE PASS.** Verifier workflow `wf_5f39527e-88f`, outputs in
+  `agent/tmp/units/scaffold-fix-c-verify-*.txt`.
+  - The build moved four host digests (`launch.ts`, `workspace.md`, `guides/scaffold.md`, `tests/setupPolicy.ts`).
+  - Instruments: behaviour 112 cases, 5 declared deviations, 11 approved absences; emission 331 blueprints and 278
+    declared regions, with LICENSE equal as hydrated bytes. All nine controls fail as designed.
+  - `npm test`: src:core 500, src:server 498, src:bin 333, policy 121, config 236, setup 282, skills 108, guides 47.
+  - `test:templates` 64, `test:distribution` 11, `check:skills` and discovery clean.
+- **C9 result (native Workflow `wf_eaf21bbd-c18`). Accepted.**
+  - The census found count-only recorders in two files: `tests/src/server/Upstream.test.ts` and
+    `tests/src/server/Materializer.test.ts`.
+    - Upstream: the destroy, error, release (read by last entry), mirror and file listeners.
+    - Materializer: the error and destroy listeners.
+  - Each now asserts its whole history. The independent checkers passed Upstream 62 of 62 and Materializer 63 of 63,
+    with nothing removed or weakened.
+  - A `mirror` payload mutation that the old `count` passed fails the converted assertion.
+  - Everything else is lawful by declaration site. That includes `createSink` and the server fixtures in
+    `tests/setupServer.ts`, and inert `createRecorder().handler` callback values.
+- **Falsify round 4.** One Astra lane, claims `agent/tmp/units/scaffold-fix-c-claims.md` 1–10 (C9 included).

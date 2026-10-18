@@ -32,10 +32,12 @@ export class JudgmentManager implements JudgmentManagerInterface {
 	 * @param judgments - The previously stored judgments to restore. Default: an empty list
 	 */
 	constructor(judgments: readonly Judgment[] = []) {
+		// `Array.from` visits a hole in `judgments` as an undefined record, which `requireJudgment` refuses; `map` skips it.
 		this.#judgments = new Map(
-			judgments
-				.map((judgment) => requireJudgment(copyJSON(judgment)))
-				.map((owned) => [owned.id, owned]),
+			Array.from(judgments, (judgment) => requireJudgment(copyJSON(judgment))).map((owned) => [
+				owned.id,
+				owned,
+			]),
 		)
 	}
 

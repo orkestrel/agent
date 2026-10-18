@@ -85,6 +85,25 @@ reproduction notes are `tmp/units/agent-r2-reconcile-notes.md`.
 - **The `#input` ruling** was reversed: it is lawful (`tmp/units/agent-r2-verify.md`). Both lanes treated it as
   carried, as their brief told them, so neither attacked it.
 
+## Rulings added during the fix round
+
+- **Count-only recorders in tests are banned, everywhere.** FH found 35 that were already in its files, and a
+  `.count`/`toHaveLength` survey finds them across the suites.
+  - **The census bound.** It confined T1 to the 11 sites where a count drives fixture logic.
+  - **The rule's own text goes further.**
+    - The draft-4 `logs.reads` example bans `Classifier.test.ts`'s `asked` because "the test reads only its length".
+    - Census item N6 counts `toHaveLength(` among its signatures.
+    - `running.carriers` names a recorder as a carrier.
+  - So a recorder whose every read, followed through its aliases and calls, is `count`, a length, or its last entry
+    is banned in a test too. The lawful form records the callback's arguments and asserts the whole history.
+  - **Why the censuses missed it.** Their N2 and N6 signatures never matched `createRecorder`, `.count` or
+    `toHaveLength` on `calls`. The Agent census said so itself.
+  - **Consequences.** Agent's fix round gains FS, a sweep of every test file. Scaffold's fix chain gains C9. The
+    Study and budget sweeps, accepted under the same blind census, owe a recorder sweep, recorded in the handoff.
+- **`selectRecords` breaks equivalence in the opposite direction (FH deviation 2).** A hole in `rules.lines` returned
+  the record at the baseline, which filtered holes out. It now throws `TypeError`. Equivalence binds both directions,
+  so the baseline behaviour is restored, in fix item FH2.
+
 ## Fix items
 
 | Item | Findings | Owner files | Prescription | Bound |

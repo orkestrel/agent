@@ -710,18 +710,53 @@ export function createAbortingResultProvider(
 	}
 }
 
+/**
+ * Reports a scripted value per read: the script in read order, then `rest` for every later read.
+ * It keeps each value it reported, so a test asserts the whole read history instead of a count.
+ *
+ * @example
+ * ```ts
+ * const replays = new ScriptedReads<ThinkingReplay>(['none'], 'all')
+ * replays.read() // 'none'
+ * replays.read() // 'all'
+ * replays.reported // ['none', 'all']
+ * ```
+ */
+export class ScriptedReads<T> {
+	readonly #script: Iterator<T>
+	readonly #rest: T
+	readonly #reported: T[] = []
+
+	constructor(script: readonly T[], rest: T) {
+		this.#script = script.values()
+		this.#rest = rest
+	}
+
+	/** Each value reported so far, in read order. */
+	get reported(): readonly T[] {
+		return [...this.#reported]
+	}
+
+	/** Reports the next scripted value, or `rest` once the script is spent. */
+	read(): T {
+		const step = this.#script.next()
+		const value = step.done === true ? this.#rest : step.value
+		this.#reported.push(value)
+		return value
+	}
+}
+
 /** Coordinates overlapping provider calls through caller-owned gates. */
 export function createSharedGatedProvider(
 	g1: PromiseWithResolvers<void>,
 	g2: PromiseWithResolvers<void>,
 ): ProviderInterface {
-	const starts = createRecorder<readonly []>()
+	const gates = new ScriptedReads([g1], g2)
 	return {
 		id: 'm',
 		name: 'm',
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-			starts.handler()
-			const gate = starts.count === 1 ? g1 : g2
+			const gate = gates.read()
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
 			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
@@ -733,23 +768,24 @@ export function createSharedGatedProvider(
 	}
 }
 
-/** Coordinates overlapping provider calls through caller-owned gates. */
+/**
+ * Coordinates overlapping provider calls through caller-owned gates: the first call parks on `g1`
+ * and finishes `full-1`, and every later call parks on `g2` and finishes `full-2`.
+ */
 export function createIndependentGatedProvider(
 	g1: PromiseWithResolvers<void>,
 	g2: PromiseWithResolvers<void>,
 ): ProviderInterface {
-	const starts = createRecorder<readonly []>()
+	const turns = new ScriptedReads([{ ordinal: 1, gate: g1 }], { ordinal: 2, gate: g2 })
 	return {
 		id: 'own',
 		name: 'own',
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-			starts.handler()
-			const me = starts.count
-			const gate = me === 1 ? g1 : g2
+			const { ordinal, gate } = turns.read()
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
 			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
-			return { content: `full-${me}` }
+			return { content: `full-${ordinal}` }
 		},
 		async generate() {
 			return { content: 'full' }
@@ -759,13 +795,12 @@ export function createIndependentGatedProvider(
 
 /** Requests a tool then fails the following provider turn. */
 export function createSecondTurnFailureProvider(): ProviderInterface {
-	const turns = createRecorder<readonly []>()
+	const tooling = new ScriptedReads([true], false)
 	return {
 		id: 'fault',
 		name: 'fault',
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			turns.handler()
-			if (turns.count === 1) {
+			if (tooling.read()) {
 				yield { channel: 'content', text: '' }
 				return { content: '', tools: [createToolCall()] }
 			}
@@ -2156,23 +2191,32 @@ export interface RecordingSchedulerInterface extends SchedulerInterface {
 }
 
 /**
+ * Counts each successful yield and resolves immediately. An aborted signal rejects with its
+ * reason; delay resolves without a timer so loop tests isolate pacing.
+ */
+export class RecordedScheduler implements RecordingSchedulerInterface {
+	#yields = 0
+
+	get yields(): number {
+		return this.#yields
+	}
+
+	async yield(options?: SchedulerOptions): Promise<void> {
+		if (options?.signal?.aborted) throw options.signal.reason
+		this.#yields += 1
+	}
+
+	async delay(): Promise<void> {}
+}
+
+/**
  * Creates a scheduler boundary fixture that records successful yields and resolves immediately.
  * An aborted signal rejects with its reason; delay resolves without a timer so loop tests isolate pacing.
  *
  * @returns A scheduler whose yields report successful turn boundaries
  */
 export function createRecordingScheduler(): RecordingSchedulerInterface {
-	const recorder = createRecorder<readonly []>()
-	return {
-		get yields() {
-			return recorder.count
-		},
-		async yield(options?: SchedulerOptions) {
-			if (options?.signal?.aborted) throw options.signal.reason
-			recorder.handler()
-		},
-		async delay() {},
-	}
+	return new RecordedScheduler()
 }
 
 // Store scenarios share this host-independent battery so each backend exercises the same snapshots.
@@ -4699,9 +4743,11 @@ export async function classifyLedgerCorrection(
 	conversation.add({ role: 'user', content: correction })
 	const classifier = new Classifier({
 		conversation,
-		judge: createLedgerJudge(
-			createRecorder<readonly [key: string]>(),
-			async (request) => {
+		judge: {
+			id: 'scripted',
+			name: 'scripted',
+			model: 'scripted',
+			ask: async (request) => {
 				const state = isString(request.state) ? request.state : ''
 				const answers = Object.fromEntries(
 					Object.entries(request.questions).map(
@@ -4726,8 +4772,7 @@ export async function classifyLedgerCorrection(
 				)
 				return { model: 'scripted', answers }
 			},
-			'scripted',
-		),
+		},
 		questions: LEDGER_QUESTIONS,
 		topics: [LEDGER_REFUNDS_TOPIC],
 		thresholds: LEDGER_DESK_THRESHOLDS,

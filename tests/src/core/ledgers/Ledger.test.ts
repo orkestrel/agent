@@ -24,6 +24,7 @@ import {
 	LEDGER_HANDLE,
 	RecordedTransport,
 	RecordingJudge,
+	ScriptedReads,
 	SequentialSystemOneJudge,
 	createForeignSignal,
 	createScriptedProvider,
@@ -803,7 +804,7 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		// The policy reads `none` for the reads construction makes, the ledger's and its agent's, then
 		// `all` for every later read.
-		const reads = createRecorder<readonly []>()
+		const replays = new ScriptedReads<ThinkingReplay>(['none', 'none'], 'all')
 		const provider = createScriptedProvider(
 			[
 				{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
@@ -823,8 +824,7 @@ describe('Ledger', () => {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					reads.handler()
-					return reads.count <= 2 ? 'none' : 'all'
+					return replays.read()
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -834,7 +834,7 @@ describe('Ledger', () => {
 				predict: 1024,
 			},
 		)
-		expect(reads.count).toBe(2)
+		expect(replays.reported).toEqual(['none', 'none'])
 		ledger.conversation.add([
 			{ role: 'user', content: 'Seed.' },
 			{ role: 'assistant', content: 'Earlier reply.', thinking: 'Check the account.' },
@@ -1721,7 +1721,7 @@ describe('Ledger', () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
 		// The system text reads once at construction, for the agent's options; every later read fails.
-		const reads = createRecorder<readonly []>()
+		const systems = new ScriptedReads<string | undefined>(['Serve the desk.'], undefined)
 		const fault = new Error('system unavailable')
 		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
 			...options,
@@ -1733,12 +1733,12 @@ describe('Ledger', () => {
 				fetch: transport.fetch,
 			}),
 			get system() {
-				reads.handler()
-				if (reads.count > 1) throw fault
-				return 'Serve the desk.'
+				const system = systems.read()
+				if (system === undefined) throw fault
+				return system
 			},
 		})
-		expect(reads.count).toBe(1)
+		expect(systems.reported).toEqual(['Serve the desk.'])
 		const request = ledger.conversation.add({ role: 'user', content: 'Statement.' })
 		const selected = waitForEvent<readonly [selection: Selection]>(
 			(listener) => ledger.agent.emitter.once('select', listener),

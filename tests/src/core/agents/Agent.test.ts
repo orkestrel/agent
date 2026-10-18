@@ -39,6 +39,7 @@ import {
 	createForeignSignal,
 	createRecordedBudget,
 	createRecordedTool,
+	FailingProvider,
 } from '../../../setup.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
@@ -588,7 +589,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		new Scope({ name: 'missing', tools: ['missing'] }),
 		undefined,
 	])('ends a reply without calls when no tool is advertised (%j)', async (scope) => {
-		const executed = createRecorder<[]>()
+		const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 		const evaluated = createRecorder<[call: ToolCall]>()
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const exhausted = createRecorder<AgentEventMap['exhaust']>()
@@ -619,9 +620,9 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		expect(await run.result).toEqual({ content: 'answer', partial: false })
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.tools).toBeUndefined()
-		expect(executed.count).toBe(0)
-		expect(evaluated.count).toBe(0)
-		expect(exhausted.count).toBe(0)
+		expect(executed.calls).toEqual([])
+		expect(evaluated.calls).toEqual([])
+		expect(exhausted.calls).toEqual([])
 		expect(denied.calls).toEqual(
 			calls.map((call) => [call, 'no tool is advertised in the active scope']),
 		)
@@ -663,7 +664,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const agent = createAgent(provider, { tools, on: { deny: denied.handler } })
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(executed.calls).toEqual([['alpha'], ['beta']])
-		expect(denied.count).toBe(0)
+		expect(denied.calls).toEqual([])
 	})
 
 	it('keeps duplicate-id results, tool events, and tool messages in call order without scope or authority', async () => {
@@ -738,7 +739,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		})
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(evaluated.calls).toEqual([[call]])
-		expect(denied.count).toBe(0)
+		expect(denied.calls).toEqual([])
 		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['alpha'])
 		expect(
 			provider.calls[1]?.messages
@@ -748,7 +749,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 	})
 
 	it('snapshots the scope before a usage listener narrows it for the next turn', async () => {
-		const executed = createRecorder<[]>()
+		const executed = createRecorder<[tools: readonly string[] | undefined]>()
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const tools = createToolManager()
 		const calls = [createToolCall({ id: 'save', name: 'save' })]
@@ -770,8 +771,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			createTool({
 				name: 'save',
 				execute: () => {
-					expect(agent.context.scope?.tools).toEqual([])
-					executed.handler()
+					executed.handler(agent.context.scope?.tools)
 					return 'saved'
 				},
 			}),
@@ -781,7 +781,8 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			partial: false,
 			usage: AGENT_USAGE,
 		})
-		expect(executed.count).toBe(1)
+		// The save tool ran once, after the listener had narrowed the active scope.
+		expect(executed.calls).toEqual([[[]]])
 		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['save'])
 		expect(provider.calls[1]?.tools).toBeUndefined()
 		expect(denied.calls).toEqual([
@@ -792,7 +793,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 
 	it('checks scope before authority and keeps authority denials for admitted calls', async () => {
 		const evaluated = createRecorder<[name: string]>()
-		const executed = createRecorder<[]>()
+		const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const tools = createToolManager()
 		tools.add(['safe', 'secret'].map((name) => createTool({ name, execute: executed.handler })))
@@ -817,7 +818,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		})
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(evaluated.calls).toEqual([['safe']])
-		expect(executed.count).toBe(0)
+		expect(executed.calls).toEqual([])
 		expect(denied.calls).toEqual([
 			[calls[0], 'secret is not in the active scope'],
 			[calls[1], 'policy refusal'],
@@ -981,7 +982,7 @@ describe('Agent — authority gate', () => {
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
-		expect(recorder.count).toBe(1)
+		expect(recorder.calls).toEqual([[{ a: 2, b: 3 }]])
 		// The tool's value was fed back as the tool message.
 		const [, second] = provider.calls
 		expect(second?.messages.at(-1)?.content).toBe(JSON.stringify(5))
@@ -1008,7 +1009,7 @@ describe('Agent — authority gate', () => {
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 		expect(result.content).toBe('sum is 5')
-		expect(recorder.count).toBe(1)
+		expect(recorder.calls).toEqual([[{ a: 2, b: 3 }]])
 		// The tool chunk carries the executed (real) result, not a denial.
 		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
@@ -1045,7 +1046,7 @@ describe('Agent — authority gate', () => {
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 		// The tool's handler NEVER ran (no execute, no budget cost).
-		expect(recorder.count).toBe(0)
+		expect(recorder.calls).toEqual([])
 		// A `tool` chunk still appeared, carrying the denial error result.
 		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
@@ -1128,8 +1129,8 @@ describe('Agent — authority gate', () => {
 		const chunks = await collect(stream.events)
 		await stream.result
 		// `delete` never executed; `add` executed twice.
-		expect(delRecorder.count).toBe(0)
-		expect(addRecorder.count).toBe(2)
+		expect(delRecorder.calls).toEqual([])
+		expect(addRecorder.calls).toEqual([[{ n: 1 }], [{ n: 2 }]])
 		// The tool chunks are in ORIGINAL call order, with the denied one carrying the error.
 		const toolResults = chunks.flatMap((c) =>
 			c.category === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
@@ -1180,7 +1181,7 @@ describe('Agent — authority gate', () => {
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 		// No tool ever ran; the cap still bounded the loop at 3 turns.
-		expect(recorder.count).toBe(0)
+		expect(recorder.calls).toEqual([])
 		expect(provider.calls).toHaveLength(3)
 		// Limit exhaustion: the model still held unresolved tool intent on the last allowed turn (every turn
 		// requested the denied tool) — the loop exhausted its limit, so the outcome is partial.
@@ -1417,7 +1418,7 @@ describe('Agent — abort', () => {
 		const result = await agent.generate()
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('')
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('abort() mid-stream resolves partial with the accumulated content', async () => {
@@ -1468,8 +1469,10 @@ describe('Agent — abort', () => {
 			stop: { layer: 'meter', id: 'budget', max: 1, consumed: 2, estimate: 2 },
 		})
 		expect(agent.status).toBe('done')
-		expect(events.abort.count).toBe(1)
-		expect(events.error.count).toBe(0)
+		expect(
+			events.abort.calls.map(([reason]) => (isBudgetError(reason) ? reason.context.id : reason)),
+		).toEqual(['budget'])
+		expect(events.error.calls).toEqual([])
 	})
 })
 
@@ -1647,6 +1650,53 @@ describe('Agent — stream drive (result settles independently of events)', () =
 		expect(agent.status).not.toBe('running')
 		expect(agent.status).toBe('done')
 		expect(process.getActiveResourcesInfo().filter((one) => one === 'Timeout').length).toBe(before)
+	})
+
+	it('keeps pulling the provider while an early break after the first token unwinds', async () => {
+		// The drive pulls `b` and `c` while the consumer's `return()` reaches the cancel, so the
+		// cancel lands after the last delta.
+		const provider = createScriptedProvider(
+			[{ result: { content: 'abc' }, deltas: ['a', 'b', 'c'] }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const stream = agent.stream()
+		const iterator = stream.events[Symbol.asyncIterator]()
+		expect(await iterator.next()).toEqual({
+			done: false,
+			value: { category: 'token', content: 'a' },
+		})
+		await iterator.return?.()
+		expect(await stream.result).toEqual({ content: 'abc', partial: true })
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it('keeps running into the next turn while an early break after a tool chunk unwinds', async () => {
+		// The drive finishes the tool turn and streams the whole next answer while the consumer's
+		// `return()` reaches the cancel, so the cancel reaches the provider only after its last delta.
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall()] }, deltas: [] },
+				{ result: { content: 'sum 5' }, deltas: ['sum', ' 5'] },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools: createSeededToolManager() })
+		agent.context.messages.add({ role: 'user', content: 'add' })
+		const stream = agent.stream()
+		const iterator = stream.events[Symbol.asyncIterator]()
+		expect(await iterator.next()).toEqual({
+			done: false,
+			value: {
+				category: 'tool',
+				call: createToolCall(),
+				result: { id: 'c1', name: 'add', success: true, value: 5 },
+			},
+		})
+		await iterator.return?.()
+		expect(await stream.result).toEqual({ content: 'sum 5', partial: true })
+		expect(provider.calls).toHaveLength(2)
 	})
 
 	it('rejects result on a genuine provider error without draining events', async () => {
@@ -1913,7 +1963,7 @@ describe('Agent — cancellation timing matrix', () => {
 	it.each(AUTHORITY_STATES)(
 		'budget exhaustion before dispatch preserves only the prior conversation (authority: %s)',
 		async (authorized) => {
-			const executed = createRecorder<[]>()
+			const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'wait', execute: executed.handler }))
 			const budget = createTokenBudget({ max: AGENT_USAGE.total, scope: 'total' })
@@ -1940,7 +1990,7 @@ describe('Agent — cancellation timing matrix', () => {
 			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
 			expect(budget.signal.aborted).toBe(true)
 			expect(provider.calls).toHaveLength(1)
-			expect(executed.count).toBe(0)
+			expect(executed.calls).toEqual([])
 			expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
 			expect(agent.context.messages.messages()).toEqual([seed])
 		},
@@ -1950,7 +2000,7 @@ describe('Agent — cancellation timing matrix', () => {
 		'external abort in a usage listener preserves only the prior conversation (authority: %s)',
 		async (authorized) => {
 			const external = new AbortController()
-			const executed = createRecorder<[]>()
+			const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'wait', execute: executed.handler }))
 			const provider = createScriptedProvider(
@@ -1977,14 +2027,14 @@ describe('Agent — cancellation timing matrix', () => {
 			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
 			expect(external.signal.aborted).toBe(true)
 			expect(provider.calls).toHaveLength(1)
-			expect(executed.count).toBe(0)
+			expect(executed.calls).toEqual([])
 			expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
 			expect(agent.context.messages.messages()).toEqual([seed])
 		},
 	)
 
 	it('abort in a deny listener preserves only the prior conversation', async () => {
-		const executed = createRecorder<[]>()
+		const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const tools = createToolManager()
 		tools.add([
@@ -2018,7 +2068,7 @@ describe('Agent — cancellation timing matrix', () => {
 		expect(await stream.result).toMatchObject({ content: 'working', partial: true })
 		expect(denied.calls).toEqual([[denial, 'blocked']])
 		expect(provider.calls).toHaveLength(1)
-		expect(executed.count).toBe(0)
+		expect(executed.calls).toEqual([])
 		expect(chunks.filter((chunk) => chunk.category === 'tool')).toEqual([])
 		expect(agent.context.messages.messages()).toEqual([seed])
 	})
@@ -2090,8 +2140,7 @@ describe('Agent — cancellation timing matrix', () => {
 				},
 			)
 			expect(observed.calls).toEqual([[true]])
-			expect(signals.count).toBe(1)
-			expect(signals.calls[0]?.[0]).toBe(provider.calls[0]?.signal)
+			expect(signals.calls.map(([signal]) => signal === provider.calls[0]?.signal)).toEqual([true])
 			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
 			expect(provider.calls).toHaveLength(1)
 			expect(agent.status).toBe('done')
@@ -2126,7 +2175,7 @@ describe('Agent — cancellation timing matrix', () => {
 			await waitForDelay()
 			expect(signal.aborted).toBe(true)
 			expect(agent.status).toBe('running')
-			expect(finished.count).toBe(0)
+			expect(finished.calls).toEqual([])
 			completion.resolve('finished work')
 			expect(await stream.result).toMatchObject({ content: 'working', partial: true })
 			const chunks = await collect(stream.events)
@@ -2136,7 +2185,7 @@ describe('Agent — cancellation timing matrix', () => {
 				result: { id: 'c1', name: 'wait', success: true, value: 'finished work' },
 			})
 			expect(provider.calls).toHaveLength(1)
-			expect(finished.count).toBe(1)
+			expect(finished.calls).toEqual([[await stream.result]])
 			expect(agent.status).toBe('done')
 		} finally {
 			completion.resolve('cleanup')
@@ -2325,7 +2374,7 @@ describe('Agent — limit boundary', () => {
 		// One provider call only; the tool DID run on that turn (it was dispatched), and a
 		// tool chunk was emitted — but no second turn followed.
 		expect(provider.calls).toHaveLength(1)
-		expect(recorder.count).toBe(1)
+		expect(recorder.calls).toEqual([[{}]])
 		expect(chunks.some((c) => c.category === 'tool')).toBe(true)
 		// Limit exhaustion: the single allowed turn requested a tool (unresolved intent) and the limit was
 		// then exhausted — the cap-bounded finish reports `partial: true` with whatever the
@@ -2452,9 +2501,13 @@ describe('Agent — provider failure modes', () => {
 		await expect(agent.generate()).rejects.toThrow('turn 2 boom')
 
 		expect(agent.status).toBe('error')
-		expect(events.error.count).toBe(1)
-		expect(events.error.calls[0]?.[0]).toBeInstanceOf(Error)
-		expect(events.finish.count).toBe(0)
+		// The event carries an `Error` instance; the message read is a second claim, so a string
+		// payload cannot pass for the thrown fault.
+		expect(events.error.calls).toEqual([[expect.any(Error)]])
+		expect(
+			events.error.calls.map(([error]) => (error instanceof Error ? error.message : error)),
+		).toEqual(['turn 2 boom'])
+		expect(events.finish.calls).toEqual([])
 		// Turn 1's tool call + tool result are still present in the conversation, untouched by the
 		// turn-2 rejection.
 		const contents = agent.context.messages.messages().map((message) => message.content)
@@ -2535,7 +2588,7 @@ describe('Agent — authority deeper', () => {
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 		// The tool NEVER ran (fail-closed on execution).
-		expect(recorder.count).toBe(0)
+		expect(recorder.calls).toEqual([])
 		// A tool chunk carries the fail-closed denial, with the thrown message as the reason.
 		const toolChunk = chunks.find((c) => c.category === 'tool')
 		expect(toolChunk).toEqual({
@@ -2664,7 +2717,7 @@ describe('Agent — authority deeper', () => {
 		const agent = createAgent(provider, { tools, authority, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
-		expect(recorder.count).toBe(0) // denied → never executed
+		expect(recorder.calls).toEqual([]) // denied → never executed
 		expect(result.partial).toBe(true) // budget crossed at the boundary
 		expect(provider.calls).toHaveLength(1)
 	})
@@ -2709,8 +2762,8 @@ describe('Agent — authority deeper', () => {
 		const result = await stream.result
 		expect(result.content).toBe('final')
 		// `safe` ran on both turns; `danger` never ran.
-		expect(allowRec.count).toBe(2)
-		expect(denyRec.count).toBe(0)
+		expect(allowRec.calls).toEqual([[{ n: 1 }], [{ n: 2 }]])
+		expect(denyRec.calls).toEqual([])
 		// Every danger tool chunk is a denial; every safe one a value.
 		const byName = chunks.flatMap((c) =>
 			c.category === 'tool' ? [{ name: c.call.name, result: c.result }] : [],
@@ -2772,8 +2825,7 @@ describe('Agent — authority deeper', () => {
 		const chunks = await collect(stream.events)
 		await stream.result
 		// Only the small transfer executed.
-		expect(recorder.count).toBe(1)
-		expect(recorder.calls[0]?.[0]).toEqual({ amount: 50 })
+		expect(recorder.calls).toEqual([[{ amount: 50 }]])
 		const results = chunks.flatMap((c) =>
 			c.category === 'tool' ? [{ id: c.call.id, result: c.result }] : [],
 		)
@@ -2966,10 +3018,10 @@ describe('Agent — emitter (push observation surface)', () => {
 			partial: false,
 		})
 		// A clean no-tools, non-cancel run fires neither `tool` / `deny` / `error` / `abort`.
-		expect(events.tool.count).toBe(0)
-		expect(events.deny.count).toBe(0)
-		expect(events.error.count).toBe(0)
-		expect(events.abort.count).toBe(0)
+		expect(events.tool.calls).toEqual([])
+		expect(events.deny.calls).toEqual([])
+		expect(events.error.calls).toEqual([])
+		expect(events.abort.calls).toEqual([])
 	})
 
 	it('fires one turn event per iteration (count === turns run)', async () => {
@@ -3019,7 +3071,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			],
 		])
 		// Two usage events (one per reporting turn); finish carries the summed usage.
-		expect(events.usage.count).toBe(2)
+		expect(events.usage.calls.map(([usage]) => usage)).toEqual([AGENT_USAGE, AGENT_USAGE])
 		expect(result.usage).toEqual({ prompt: 10, completion: 14, total: 24 })
 		expect(events.finish.calls).toEqual([[result]])
 	})
@@ -3046,7 +3098,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		await agent.generate()
 		// The tool never ran; `deny` fired once carrying the call + the RULE's reason (not the
 		// formatted `denied: …` error — that is the ToolResult's; the event carries the reason).
-		expect(recorder.count).toBe(0)
+		expect(recorder.calls).toEqual([])
 		expect(events.deny.calls).toEqual([
 			[{ id: 'd1', name: 'del', arguments: { id: 'x' } }, 'blocked'],
 		])
@@ -3096,14 +3148,14 @@ describe('Agent — emitter (push observation surface)', () => {
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await expect(agent.generate()).rejects.toThrow('boom')
-		// `error` fired once carrying the thrown value; `finish` / `abort` did NOT fire.
-		expect(events.error.count).toBe(1)
-		const reported = events.error.calls[0]?.[0]
-		expect(reported).toBeInstanceOf(Error)
+		// `error` fired once carrying the thrown `Error`; `finish` / `abort` did NOT fire.
 		// Narrow with `instanceof` (never `as`) to read the message off the reported error.
-		expect(reported instanceof Error ? reported.message : undefined).toBe('boom')
-		expect(events.finish.count).toBe(0)
-		expect(events.abort.count).toBe(0)
+		expect(events.error.calls).toEqual([[expect.any(Error)]])
+		expect(
+			events.error.calls.map(([error]) => (error instanceof Error ? error.message : error)),
+		).toEqual(['boom'])
+		expect(events.finish.calls).toEqual([])
+		expect(events.abort.calls).toEqual([])
 	})
 
 	it('a cancelled run fires abort THEN finish (the partial) — the documented semantics', async () => {
@@ -3132,7 +3184,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		// `abort` fired once carrying the cancel reason; `finish` fired once with the partial.
 		expect(events.abort.calls).toEqual([['user navigated away']])
 		expect(events.finish.calls).toEqual([[result]])
-		expect(events.error.count).toBe(0)
+		expect(events.error.calls).toEqual([])
 		// And in that ORDER: abort before finish (so observers see "cancelled" then the outcome).
 		expect(order).toEqual(['abort', 'finish'])
 	})
@@ -3151,11 +3203,11 @@ describe('Agent — emitter (push observation surface)', () => {
 		expect(result).toEqual({ content: '', partial: true })
 		// The provider was never called, but the lifecycle still observes start + a turn +
 		// abort + finish (the empty partial).
-		expect(events.start.count).toBe(1)
+		expect(events.start.calls).toEqual([[agent.id]])
 		expect(events.turn.calls).toEqual([[0]])
 		expect(events.abort.calls).toEqual([['preempted']])
 		expect(events.finish.calls).toEqual([[result]])
-		expect(events.error.count).toBe(0)
+		expect(events.error.calls).toEqual([])
 	})
 
 	it('a cap-bounded finish fires finish only (a cap is NOT a cancel — no abort)', async () => {
@@ -3174,8 +3226,8 @@ describe('Agent — emitter (push observation surface)', () => {
 		// Limit-exhaustion with unresolved tool intent is NOT a cancel — `finish` fires,
 		// `abort` does not (an `exhaust` event fires instead, covered by the limit-exhaustion block).
 		expect(result.partial).toBe(true)
-		expect(events.finish.count).toBe(1)
-		expect(events.abort.count).toBe(0)
+		expect(events.finish.calls).toEqual([[result]])
+		expect(events.abort.calls).toEqual([])
 	})
 
 	it('the on? option wires initial listeners at construction', async () => {
@@ -3224,12 +3276,14 @@ describe('Agent — emitter (push observation surface)', () => {
 		// The throw was routed to the emitter's error handler — (error, event) order.
 		expect(errors.calls).toEqual([[thrown, 'tool']])
 		// Every OTHER event still fired normally — the buggy listener didn't suppress siblings.
-		expect(events.start.count).toBe(1)
+		expect(events.start.calls).toEqual([[agent.id]])
 		expect(events.turn.calls).toEqual([[0], [1]])
-		expect(events.usage.count).toBe(2)
+		expect(events.usage.calls.map(([usage]) => usage)).toEqual([AGENT_USAGE, AGENT_USAGE])
 		expect(events.finish.calls).toEqual([[result]])
 		// The non-throwing `tool` recorder still saw the dispatched call (sibling isolation).
-		expect(events.tool.count).toBe(1)
+		expect(events.tool.calls).toEqual([
+			[createToolCall(), { id: 'c1', name: 'add', success: true, value: 5 }],
+		])
 	})
 
 	it('EMIT SAFETY: a throwing error handler neither escapes nor recurses', async () => {
@@ -3261,8 +3315,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		expect(agent.status).toBe('done')
 		// The error handler fired exactly once (its own throw was swallowed, never re-entered —
 		// so it could not recurse).
-		expect(errors.count).toBe(1)
-		expect(errors.calls[0]?.[1]).toBe('tool')
+		expect(errors.calls.map(([, event]) => event)).toEqual(['tool'])
 	})
 
 	it('generate() and stream() drive the SAME events for the same script (parity)', async () => {
@@ -3294,16 +3347,18 @@ describe('Agent — emitter (push observation surface)', () => {
 		// Same settled result, and the SAME push events fired (both share `#execute`).
 		expect(rb).toEqual(ra)
 		expect(eb.turn.calls).toEqual(ea.turn.calls)
-		expect(eb.usage.count).toBe(ea.usage.count)
+		expect(eb.usage.calls).toEqual(ea.usage.calls)
 		expect(eb.tool.calls).toEqual(ea.tool.calls)
 		expect(eb.finish.calls).toEqual(ea.finish.calls)
 		// Both fired `tool` once, `usage` twice, two turns, one finish, no abort/error.
-		expect(ea.tool.count).toBe(1)
-		expect(ea.usage.count).toBe(2)
+		expect(ea.tool.calls).toEqual([
+			[createToolCall(), { id: 'c1', name: 'add', success: true, value: 5 }],
+		])
+		expect(ea.usage.calls.map(([usage]) => usage)).toEqual([AGENT_USAGE, AGENT_USAGE])
 		expect(ea.turn.calls).toEqual([[0], [1]])
-		expect(ea.finish.count).toBe(1)
-		expect(ea.abort.count).toBe(0)
-		expect(ea.error.count).toBe(0)
+		expect(ea.finish.calls).toEqual([[ra]])
+		expect(ea.abort.calls).toEqual([])
+		expect(ea.error.calls).toEqual([])
 	})
 })
 
@@ -3363,8 +3418,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		// (c) The conversation's `compact` event fired once, carrying the section.
-		expect(compacted.compact.count).toBe(1)
-		expect(compacted.compact.calls[0]?.[0]?.summary).toBe('recap of 2')
+		expect(compacted.compact.calls.map(([section]) => section.summary)).toEqual(['recap of 2'])
 		// (d) The REBUILD shrank the prompt: turn 2 ran on 4 messages instead of the uncompacted 5,
 		// and the request stayed live in every prompt.
 		const promptSizes = provider.calls.map((call) => call.messages.length)
@@ -3388,7 +3442,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		const result = await agent.generate()
 
 		expect(conversation.sections.length).toBe(0)
-		expect(compacted.compact.count).toBe(0)
+		expect(compacted.compact.calls).toEqual([])
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 		// The budget was re-measured each turn against the ABSOLUTE prompt and never crossed the
@@ -3423,7 +3477,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		const result = await agent.generate()
 
 		expect(conversation.sections.length).toBe(0)
-		expect(compacted.compact.count).toBe(0)
+		expect(compacted.compact.calls).toEqual([])
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
 	})
@@ -3571,12 +3625,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		// and `error` never fired (a non-fatal warn, not a genuine failure).
 		expect(result.content).toBe('the answer is 42')
 		expect(result.partial).toBe(false)
-		expect(events.error.count).toBe(0)
-		expect(events.finish.count).toBe(1)
+		expect(events.error.calls).toEqual([])
+		expect(events.finish.calls).toEqual([[result]])
 		// `fault` fired (≥ once — the prompt crossed the window each tool turn), carrying the
 		// thrown summarizer error verbatim; and NOTHING folded (every attempt threw).
-		expect(events.fault.count).toBeGreaterThanOrEqual(1)
-		expect(events.fault.calls[0]?.[0]).toBe(boom)
+		expect(new Set(events.fault.calls.map(([error]) => error))).toEqual(new Set([boom]))
 		expect(conversation.sections.length).toBe(0)
 		// A MANUAL compact() still PROPAGATES the throw — only the AUTO path is resilient.
 		await expect(conversation.compact()).rejects.toThrow('summarizer exploded')
@@ -3626,12 +3679,11 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		expect(conversation.sections.length).toBe(0)
 		expect(result.content).toBe('done')
 		expect(result.partial).toBe(false)
-		expect(events.finish.count).toBe(1)
-		// One measurement per dispatch, latched or not; nothing folded, so the summarizer never ran
-		// and no `fault` fired.
-		expect(measured.count).toBe(3)
-		expect(stub.calls).toHaveLength(0)
-		expect(events.fault.count).toBe(0)
+		expect(events.finish.calls).toEqual([[result]])
+		// One measurement per dispatch, latched or not (the final assertion pairs them); nothing
+		// folded, so the summarizer never ran and no `fault` fired.
+		expect(stub.calls).toEqual([])
+		expect(events.fault.calls).toEqual([])
 		// The over-window run still ran all three scripted turns (the futile request proceeded to the
 		// provider rather than looping on compaction), and each measured request is the dispatched one.
 		expect(provider.calls).toHaveLength(3)
@@ -3659,7 +3711,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const tools = createToolManager()
-		const executed = createRecorder<[]>()
+		const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
@@ -3676,8 +3728,8 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		tools.add(
 			createTool({
 				name: 'note',
-				execute: () => {
-					executed.handler()
+				execute: (args) => {
+					executed.handler(args)
 					return 'noted'
 				},
 			}),
@@ -3687,7 +3739,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const result = await agent.generate()
 
 		expect(result.content).toBe('done')
-		expect(executed.count).toBe(3)
+		expect(executed.calls).toEqual([[{}], [{}], [{}]])
 		expect(stub.calls).toHaveLength(folds)
 		expect(conversation.sections).toHaveLength(folds)
 	})
@@ -3729,7 +3781,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const aborted = await agent.generate()
 
 		expect(aborted.partial).toBe(true)
-		expect(stub.calls).toHaveLength(0)
+		expect(stub.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
 		expect(conversation.messages().map((message) => message.role)).toEqual([
 			'user',
@@ -3890,7 +3942,7 @@ describe('Agent — limit exhaustion', () => {
 		const result = await agent.generate()
 		expect(result.partial).toBe(true)
 		expect(provider.calls).toHaveLength(2)
-		expect(recorder.count).toBe(2)
+		expect(recorder.calls).toEqual([[{}], [{}]])
 		// exhaust fired (carrying the effective limit) INSTEAD of abort, then finish -- in that order.
 		expect(order).toEqual(['exhaust', 'finish'])
 	})
@@ -3931,7 +3983,7 @@ describe('Agent — limit exhaustion', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result).toEqual({ content: '', partial: false })
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 		expect(order).toEqual(['finish'])
 	})
 
@@ -4108,7 +4160,7 @@ describe('Agent — per-run overrides', () => {
 		const quietRunSignal = new AbortController().signal
 		const resultA = await agentA.generate({ signal: quietRunSignal })
 		expect(resultA.partial).toBe(true)
-		expect(providerA.calls).toHaveLength(0)
+		expect(providerA.calls).toEqual([])
 
 		// The per-run signal aborts; the constructed signal stays quiet.
 		const providerB = createScriptedProvider(
@@ -4121,7 +4173,7 @@ describe('Agent — per-run overrides', () => {
 		runController.abort()
 		const resultB = await agentB.generate({ signal: runController.signal })
 		expect(resultB.partial).toBe(true)
-		expect(providerB.calls).toHaveLength(0)
+		expect(providerB.calls).toEqual([])
 	})
 
 	it('a per-run timeout commits a partial when it elapses', async () => {
@@ -4373,11 +4425,9 @@ describe('Agent — strict compaction', () => {
 
 		expect(agent.status).toBe('error')
 		// `fault` fired BEFORE the rejection (the loop surfaces it observably, then rethrows).
-		expect(events.fault.count).toBe(1)
-		expect(events.fault.calls[0]?.[0]).toBe(boom)
-		expect(events.error.count).toBe(1)
-		expect(events.error.calls[0]?.[0]).toBe(boom)
-		expect(events.finish.count).toBe(0)
+		expect(events.fault.calls).toEqual([[boom]])
+		expect(events.error.calls).toEqual([[boom]])
+		expect(events.finish.calls).toEqual([])
 	})
 })
 
@@ -4409,7 +4459,7 @@ describe('Agent — strict window admission', () => {
 		expect(conversation.sections).toHaveLength(1)
 		expect(estimateMessages(conversation.view())).toBeGreaterThan(10)
 		expect(agent.status).toBe('error')
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('strict window: refuses an over-max request when the fold returns undefined, with zero provider calls', async () => {
@@ -4430,10 +4480,10 @@ describe('Agent — strict window admission', () => {
 
 		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
 
-		expect(stub.calls).toHaveLength(0)
+		expect(stub.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
 		expect(agent.status).toBe('error')
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('strict window: refuses an exhausted window on a non-summarizable conversation, with zero provider calls', async () => {
@@ -4448,7 +4498,7 @@ describe('Agent — strict window admission', () => {
 		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
 
 		expect(agent.status).toBe('error')
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('strict window: refuses a request equal to max, naming the agent, the measure, and the max', async () => {
@@ -4464,7 +4514,7 @@ describe('Agent — strict window admission', () => {
 			context: { agent: agent.id, consumed: 5, max: 5 },
 		})
 
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('strict window: sends a request one token under max', async () => {
@@ -4501,7 +4551,7 @@ describe('Agent — strict window admission', () => {
 		})
 
 		expect(provider.calls).toHaveLength(1)
-		expect(stub.calls).toHaveLength(0)
+		expect(stub.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
 		expect(agent.status).toBe('error')
 	})
@@ -4536,12 +4586,14 @@ describe('Agent — strict window admission', () => {
 
 		const result = await agent.generate()
 
-		expect(summarized.count).toBe(1)
+		expect(summarized.calls.map(([messages]) => messages.map((one) => one.content))).toEqual([
+			['q'.repeat(200)],
+		])
 		expect(result.partial).toBe(true)
-		expect(faults.count).toBe(0)
-		expect(errors.count).toBe(0)
+		expect(faults.calls).toEqual([])
+		expect(errors.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 		expect(agent.status).toBe('done')
 	})
 })
@@ -4690,9 +4742,9 @@ describe('Agent — complete-request window admission', () => {
 
 		await agent.generate()
 
-		expect(stub.calls).toHaveLength(0)
+		expect(stub.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 		expect(window.consumed).toBe(0)
 	})
 })
@@ -4941,7 +4993,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 
 		const result = await agent.generate()
 
-		expect(selection.calls).toHaveLength(1)
+		expect(selection.calls.map(([, received]) => received.content)).toEqual(['Refund invoice 42.'])
 		expect(result).toEqual({ content: 'Refunds need a manager.', partial: false })
 		expect(provider.calls[0]?.tools).toBeUndefined()
 		expect(denied.calls).toEqual([[calls[0], 'no tool is advertised in the active scope']])
@@ -4962,8 +5014,8 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 
 		await agent.generate()
 
-		expect(selection.calls).toHaveLength(0)
-		expect(selected.count).toBe(0)
+		expect(selection.calls).toEqual([])
+		expect(selected.calls).toEqual([])
 		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
 			'Invoice 42.',
 			'It totals 120 EUR.',
@@ -5046,7 +5098,7 @@ describe('Agent — the select event follows each select-site build', () => {
 
 		expect(result.content).toBe('the answer is 42')
 		expect(provider.calls.map((call) => call.messages.length)).toEqual([3, 4, 6])
-		expect(selected.count).toBe(2)
+		expect(selection.selections).toEqual([expect.any(Object), expect.any(Object)])
 		expect(selected.calls.map(([picked]) => picked)).toEqual(selection.selections)
 		expect(selection.calls.map(([, received]) => received)).toEqual([request, request])
 		expect(selection.calls.every(([, received]) => received === request)).toBe(true)
@@ -5108,9 +5160,9 @@ describe('Agent — the select event follows each select-site build', () => {
 		const result = await run.result
 
 		expect(result).toEqual({ content: '', usage: SELECTION_USAGE, partial: true })
-		expect(provider.calls).toHaveLength(0)
-		expect(selected.count).toBe(0)
-		expect(faults.count).toBe(0)
+		expect(provider.calls).toEqual([])
+		expect(selected.calls).toEqual([])
+		expect(faults.calls).toEqual([])
 		expect(agent.status).toBe('done')
 	})
 
@@ -5131,8 +5183,8 @@ describe('Agent — the select event follows each select-site build', () => {
 		run.abort('the operator closed the ticket')
 
 		expect(await run.result).toEqual({ content: '', usage: SELECTION_USAGE, partial: true })
-		expect(provider.calls).toHaveLength(0)
-		expect(selected.count).toBe(0)
+		expect(provider.calls).toEqual([])
+		expect(selected.calls).toEqual([])
 	})
 })
 
@@ -5154,8 +5206,8 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 		run.abort('the operator closed the ticket')
 
 		expect(await run.result).toEqual({ content: '', partial: true })
-		expect(faults.count).toBe(0)
-		expect(provider.calls).toHaveLength(0)
+		expect(faults.calls).toEqual([])
+		expect(provider.calls).toEqual([])
 	})
 
 	it('emits fault for a thrown handler and sends view() without a select event', async () => {
@@ -5177,7 +5229,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 
 		expect(result).toEqual({ content: 'done', partial: false })
 		expect(faults.calls).toEqual([[new Error('the judge is unreachable')]])
-		expect(selected.count).toBe(0)
+		expect(selected.calls).toEqual([])
 		expect(provider.calls[0]?.messages.map(({ id, ...body }) => body)).toEqual([
 			{ role: 'system', content: 'You triage billing tickets.' },
 			{ role: 'user', content: 'The invoice total is wrong.' },
@@ -5257,11 +5309,13 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 			await expect(agent.generate()).rejects.toThrow(message)
 
 			expect(agent.status).toBe('error')
-			expect(faults.count).toBe(1)
-			expect(errors.calls).toEqual([[faults.calls[0]?.[0]]])
-			expect(finished.count).toBe(0)
-			expect(selected.count).toBe(0)
-			expect(provider.calls).toHaveLength(0)
+			expect(
+				faults.calls.map(([fault]) => (fault instanceof Error ? fault.message : fault)),
+			).toEqual([expect.stringContaining(message)])
+			expect(errors.calls).toEqual(faults.calls)
+			expect(finished.calls).toEqual([])
+			expect(selected.calls).toEqual([])
+			expect(provider.calls).toEqual([])
 		},
 	)
 
@@ -5269,7 +5323,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 	// emit and the strict throw or the `select` emit that would otherwise follow.
 	it.each(SELECTION_FAULT_CASES)(
 		'commits partial when a strict fault listener aborts $label',
-		async ({ select, usage }) => {
+		async ({ select, usage, message }) => {
 			const controller = new AbortController()
 			const selected = createRecorder<AgentEventMap['select']>()
 			const errors = createRecorder<AgentEventMap['error']>()
@@ -5295,17 +5349,19 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 				partial: true,
 				...(usage === undefined ? {} : { usage }),
 			})
-			expect(faults.count).toBe(1)
-			expect(selected.count).toBe(0)
-			expect(errors.count).toBe(0)
-			expect(provider.calls).toHaveLength(0)
+			expect(
+				faults.calls.map(([fault]) => (fault instanceof Error ? fault.message : fault)),
+			).toEqual([expect.stringContaining(message)])
+			expect(selected.calls).toEqual([])
+			expect(errors.calls).toEqual([])
+			expect(provider.calls).toEqual([])
 			expect(agent.status).toBe('done')
 		},
 	)
 
 	it.each(SELECTION_FAULT_CASES)(
 		'commits partial when a lenient fault listener aborts $label',
-		async ({ select, usage }) => {
+		async ({ select, usage, message }) => {
 			const controller = new AbortController()
 			const selected = createRecorder<AgentEventMap['select']>()
 			const errors = createRecorder<AgentEventMap['error']>()
@@ -5331,10 +5387,12 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 				partial: true,
 				...(usage === undefined ? {} : { usage }),
 			})
-			expect(faults.count).toBe(1)
-			expect(selected.count).toBe(0)
-			expect(errors.count).toBe(0)
-			expect(provider.calls).toHaveLength(0)
+			expect(
+				faults.calls.map(([fault]) => (fault instanceof Error ? fault.message : fault)),
+			).toEqual([expect.stringContaining(message)])
+			expect(selected.calls).toEqual([])
+			expect(errors.calls).toEqual([])
+			expect(provider.calls).toEqual([])
 			expect(agent.status).toBe('done')
 		},
 	)
@@ -5411,8 +5469,8 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 		gate.resolve()
 		await run.result
 
-		expect(first.calls).toHaveLength(1)
-		expect(second.calls).toHaveLength(1)
+		expect(first.calls.map(([, request]) => request.content)).toEqual(['go'])
+		expect(second.calls.map(([, request]) => request.content)).toEqual(['go'])
 		expect(selected.calls.map(([picked]) => picked)).toEqual([
 			first.selections[0],
 			second.selections[0],
@@ -5472,8 +5530,8 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 			}),
 		)
 
-		expect(judge.calls).toHaveLength(0)
-		expect(passThrough.calls).toHaveLength(1)
+		expect(judge.calls).toEqual([])
+		expect(passThrough.calls.map(([, request]) => request.content)).toEqual(['Invoice 42.'])
 		expect(bodies[1]).toEqual(bodies[0])
 		expect(bodies[0]).toHaveLength(4)
 	})
@@ -5492,7 +5550,9 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 
 		await agent.generate()
 
-		expect(passThrough.calls).toHaveLength(1)
+		expect(passThrough.calls.map(([, request]) => request.content)).toEqual([
+			RECORDED_REQUEST.at(-1)?.content,
+		])
 		const sent = requireValue(provider.calls[0]).messages
 		expect(sent.map(({ id, ...body }) => body)).toStrictEqual(RECORDED_REQUEST)
 	})
@@ -5509,10 +5569,10 @@ describe('Agent — with no handler in either home the loop adds no await', () =
 
 		const runs = [agent.stream(), selected.stream()]
 
-		expect(plain.calls).toHaveLength(1)
-		expect(selecting.calls).toHaveLength(0)
+		expect(plain.calls.map((call) => call.messages.at(-1)?.content)).toEqual(['Invoice 42.'])
+		expect(selecting.calls).toEqual([])
 		await Promise.all(runs.map((run) => run.result))
-		expect(selecting.calls).toHaveLength(1)
+		expect(selecting.calls.map((call) => call.messages.at(-1)?.content)).toEqual(['Invoice 42.'])
 	})
 })
 
@@ -5572,7 +5632,7 @@ describe('Agent — run boundaries', () => {
 			const run = captureError(() => agent.stream({ limit }))
 			expect(isAgentError(run) ? run.code : undefined).toBe('LIMIT')
 			expect(agent.status).toBe('idle')
-			expect(provider.calls).toHaveLength(0)
+			expect(provider.calls).toEqual([])
 		}
 	})
 
@@ -5581,7 +5641,7 @@ describe('Agent — run boundaries', () => {
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		expect(await agent.generate({ limit: 0 })).toEqual({ content: '', partial: false })
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('throws a signal AbortSignal.any refuses before arming the deadline, unlike a native signal', async () => {
@@ -5607,11 +5667,11 @@ describe('Agent — run boundaries', () => {
 	})
 
 	it('cuts off a summarizer that ignores its signal at the run deadline and settles partial without a fault', async () => {
-		const finished = createRecorder<[]>()
+		const finished = createRecorder<[messages: readonly Message[]]>()
 		const conversations = createConversationManager({
-			summarize: async () => {
+			summarize: async (messages) => {
 				await waitForDelay(AGENT_DEADLINE * 10)
-				finished.handler()
+				finished.handler(messages)
 				return 'Late recap.'
 			},
 			keep: 0,
@@ -5632,10 +5692,10 @@ describe('Agent — run boundaries', () => {
 		})
 
 		expect(await agent.generate()).toEqual({ content: '', partial: true })
-		expect(finished.count).toBe(0)
-		expect(faults.count).toBe(0)
+		expect(finished.calls).toEqual([])
+		expect(faults.calls).toEqual([])
 		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toHaveLength(0)
+		expect(provider.calls).toEqual([])
 	})
 })
 
@@ -5677,19 +5737,24 @@ describe('Agent — turn records', () => {
 		])
 		const provider = createScriptedProvider([{ content: 'never' }], AGENT_SCRIPT_OPTIONS)
 		const selected = createRecorder<AgentEventMap['select']>()
+		const recording = createRecordingSelection({ usage: SELECTION_USAGE })
 		const agent = createAgent(provider, {
 			conversations,
 			window: createBudget({ max: 1, consumer: measureMessages }),
-			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+			select: recording.handler,
 		})
 		// The second `select` is the compaction rebuild's; cancelling there stops the turn before its call.
+		const cancels = [false, true].values()
 		agent.emitter.on('select', (selection) => {
 			selected.handler(selection)
-			if (selected.count === 2) agent.abort()
+			if (cancels.next().value === true) agent.abort()
 		})
 		const result = await agent.generate()
-		expect(selected.count).toBe(2)
-		expect(provider.calls).toHaveLength(0)
+		// The entry selection and the rebuild selection were each observed, and nothing selected after.
+		expect(recording.selections).toEqual([expect.any(Object), expect.any(Object)])
+		expect(selected.calls).toEqual(recording.selections.map((selection) => [selection]))
+		expect([...cancels]).toEqual([])
+		expect(provider.calls).toEqual([])
 		expect(result).toEqual({
 			content: '',
 			partial: true,
@@ -6050,8 +6115,51 @@ describe('Agent — three failure layers', () => {
 		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
 		expect(await agent.generate().catch((error: unknown) => error)).toBe(failure)
 		expect(events.error.calls).toEqual([[failure]])
-		expect(events.abort.count).toBe(0)
+		expect(events.abort.calls).toEqual([])
 		expect(allowance.consumed).toBe(3)
+	})
+
+	it('rejects a provider error after streaming and charges the budget the streamed estimate once', async () => {
+		for (const bounds of ['budget', 'separate', 'shared'] as const) {
+			const failure = new Error('connection reset after streaming')
+			const charges = createRecorder<[TokenUsage]>()
+			const budget = createRecordedBudget(charges)
+			const allowance =
+				bounds === 'budget'
+					? {}
+					: { allowance: bounds === 'shared' ? budget : createTokenBudget({ max: 1_000 }) }
+			const agent = createAgent(new FailingProvider({ content: 'Once upon' }, failure), {
+				budget,
+				...allowance,
+			})
+			const events = createRecorders<AgentEventMap, 'abort' | 'error'>(agent.emitter, [
+				'abort',
+				'error',
+			])
+			agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+			// 'Once upon' estimates 3; the shared bound took it from the meter, the others at the reconcile.
+			expect(await agent.generate().catch((error: unknown) => error)).toBe(failure)
+			expect([events.error.calls, events.abort.calls, agent.status]).toEqual([
+				[[failure]],
+				[],
+				'error',
+			])
+			expect(charges.calls).toEqual([[{ prompt: 0, completion: 3, total: 3 }]])
+		}
+	})
+
+	it("charges the streamed estimate and never the partial usage of an abort error the run's signal did not raise", async () => {
+		const failure = new ProviderAbortError({
+			content: 'Once upon',
+			usage: { prompt: 5, completion: 3, total: 8 },
+		})
+		const charges = createRecorder<[TokenUsage]>()
+		const agent = createAgent(new FailingProvider({ content: 'Once upon' }, failure), {
+			budget: createRecordedBudget(charges),
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate().catch((error: unknown) => error)).toBe(failure)
+		expect(charges.calls).toEqual([[{ prompt: 0, completion: 3, total: 3 }]])
 	})
 
 	it('refuses a bound that is not a budget before either bound starts', () => {
@@ -6090,7 +6198,7 @@ describe('Agent — three failure layers', () => {
 			])
 		}
 		expect(real.signal).toBe(armed)
-		expect(starts.count).toBe(0)
+		expect(starts.calls).toEqual([])
 	})
 
 	it('charges a budget with no meter layer the reported usage, or the estimate when none is reported', async () => {

@@ -1,4 +1,5 @@
 import type { Message, ProviderIncrement } from '@src/core'
+import type { ToolCall } from '@orkestrel/tool'
 import { getEventListeners } from 'node:events'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
@@ -144,6 +145,22 @@ describe('AgentProvider — stream assembly and settled results', () => {
 			],
 			usage: { prompt: 2, completion: 4, total: 6 },
 		})
+	})
+
+	it('keeps a hole in an increment’s tools as an own undefined entry', async () => {
+		const call = { id: 'a', name: 'lookup', arguments: {} }
+		const sparse: ToolCall[] = []
+		sparse[1] = call
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records: new Map<string, ProviderIncrement>([
+				['sparse', { content: '', thinking: '', tools: sparse }],
+			]),
+			fetch: createStreamingTransport(['sparse']),
+		})
+		const result = await provider.generate([], new AbortController().signal)
+		expect(result.tools).toHaveLength(2)
+		expect(result.tools).toStrictEqual([undefined, call])
 	})
 
 	it('reclassifies implicit-open reasoning in the authoritative result', async () => {

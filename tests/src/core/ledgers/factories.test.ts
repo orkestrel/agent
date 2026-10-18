@@ -1,5 +1,6 @@
-import type { LedgerAgentOptions, LedgerOptions } from '@src/core'
+import type { LedgerAgentOptions, LedgerLookup, LedgerOptions, LedgerTopic } from '@src/core'
 import { Classifier, Gauge, Ledger, createLedger } from '@src/core'
+import { captureError } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { buildLedgerOptions, createScriptedProvider } from '../../../setup.js'
@@ -111,6 +112,19 @@ describe('createLedger', () => {
 				lookups: [{ ...lookup, tool: createTool({ name: 'recall', execute: () => '' }) }],
 			}),
 		).toThrow(expect.objectContaining({ code: 'LOOKUP' }))
+	})
+	it('refuses a hole in the topic or lookup list, as a for…of visits it as an undefined entry', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
+		const topics: LedgerTopic[] = []
+		topics[1] = { name: 'desk', criterion: 'a' }
+		const lookups: LedgerLookup[] = []
+		lookups.length = 2
+		expect(
+			captureError(() => createLedger(createScriptedProvider([]), { ...options, topics })),
+		).toBeInstanceOf(TypeError)
+		expect(
+			captureError(() => createLedger(createScriptedProvider([]), { ...options, lookups })),
+		).toBeInstanceOf(TypeError)
 	})
 	it('refuses invalid supplied gauge values', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })

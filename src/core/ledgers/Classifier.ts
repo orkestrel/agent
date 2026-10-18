@@ -124,10 +124,11 @@ export class Classifier implements ClassifierInterface {
 	 */
 	topics(id: string): ReadonlySet<string> {
 		const message = this.#options.conversation.message(id)
+		// The spread visits a hole in the topic list as an undefined topic, as iteration does; `filter` skips it.
 		return new Set(
 			message === undefined
 				? []
-				: this.#options.topics
+				: [...this.#options.topics]
 						.filter(
 							(topic) =>
 								(this.#readNoul(this.#buildTopic(id, topic)) ?? 0) >=

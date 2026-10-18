@@ -239,12 +239,13 @@ export class Conversation implements ConversationInterface {
 		// never as its own latest turns.
 		const label = options?.label ?? this.#id
 		const messages = options?.messages ?? []
+		// `Array.from` visits a hole in `messages` as an undefined message, as iteration does; `map` skips it.
 		return [
 			`[Reference — conversation "${label}" — NOT part of this conversation]`,
 			...(messages.length > 0
 				? [
 						'Relevant messages:',
-						...messages.map((message) => `- ${message.role}: ${message.content}`),
+						...Array.from(messages, (message) => `- ${message.role}: ${message.content}`),
 					]
 				: []),
 		].join('\n')

@@ -65,3 +65,21 @@ Every dispatch, its engine, and any bench substitution. Plan: `.orkestrel/plan.m
 | agent-r2-falsify subjective (three lenses and a synthesizer, in the child's own Workflow) | reviewer | Claude Opus 5.5 ultracode | T3 `delegate_task` (claudeAgent) | `agent-r2-falsify-subjective-opus-1` | `tmp/units/agent-r2-falsify-brief.md` |
 | local-pin-absolute | builder | Claude Sonnet 5.5 high | T3 `delegate_task` (claudeAgent) | `local-pin-absolute-sonnet-1` | `tmp/units/local-pin-absolute-brief.md` |
 | scaffold-fix-c integration (Orchestrator: the C8 clause at `src/core/types.ts:291` and `tests/setupPolicy.ts:3918`, both found by the unit's deviation 4) | Orchestrator | none | none | none | none |
+| agent-r2 falsify reconcile (verdict `.orkestrel/agent/agent-r2-audit-verdict.md`; reproductions `tmp/probes/orchestrator-r2-repro.test.ts`) | Orchestrator | none | none | none | none |
+| local-pin re-pin of Agent to absolute specs (same tarball hashes; `test:distribution` 9/9 on the real pins) | Orchestrator | none | `tmp/units/local-pin.ts` | receipt `tmp/units/local-pin-agent-*.json` | none |
+| agent-r2 checkpoint `0192ced` (pins excluded) | Orchestrator | none | git | `0192ced` | none |
+| scaffold-fix-c verify (build, instruments, controls, gates) | verifier | Claude Haiku 5.5 high | native Workflow | `wf_5f39527e-88f` | inline |
+| agent-r2-fix FH2 (`selectRecords` holes; recorders in `ledgers/helpers.test.ts`) | builder | Claude Sonnet 5.5 high | T3 `delegate_task` (claudeAgent) | `agent-r2-fix-fh2-sonnet-1` | `tmp/units/agent-r2-fix-fh2-brief.md` |
+| agent-r2-fix FH integration (the Orchestrator applied FH's `Classifier.test.ts` hole-test patch: 19/19) | Orchestrator | none | none | none | none |
+| agent-r2-fix integration (Orchestrator: FD's `AgentTurn` and `compact` doc patches; `validators.test.ts` getter member name for `tsc`) | Orchestrator | none | none | none | none |
+| agent-r2-fix verify (tree-wide gates) | verifier | Claude Haiku 5.5 high | native Workflow | `wf_d9f983ac-d53` | inline |
+| agent-r2-fix falsify (one lane) | analyst | GPT-6 Astra xhigh | T3 `delegate_task` (codex) | `agent-r2-fix-falsify-astra-1` | `tmp/units/agent-r2-fix-claims.md` |
+| agent-r2-fix falsify reconcile (verdict `.orkestrel/agent/agent-r2-fix-audit-verdict.md`; claim 1 ruled approved B0; 3 and 5 reproduced) | Orchestrator | none | none | none | none |
+| agent-r2-fix R5 (`AgentProvider.#assemble` sparse `tools`, from R1's sweep) | builder | Claude Sonnet 5.5 high | T3 `delegate_task` (claudeAgent) | `agent-r2-fix-r5-sonnet-1` | inline |
+| agent-r2 final gates before commit | verifier | Claude Haiku 5.5 high | native Workflow | `wf_ff334071-025` | inline |
+| agent-r2-fix R1–R4 (builders, then independent mutation checkers) | builder, checker | Claude Sonnet 5.5 high; Claude Haiku 5.5 high | native Workflow | `wf_a6af27b8-cde` | the verdict's § Fix items |
+| scaffold-fix-c falsify round 4 (one lane, claims 1–10) | analyst | GPT-6 Astra xhigh | T3 `delegate_task` (codex) | `scaffold-fix-c-falsify-astra-1` | `tmp/units/scaffold-fix-c-claims.md` |
+| scaffold-fix-c9 (census, one builder per file, independent check) | checker, builder, checker | Claude Sonnet 5.5 high; Claude Sonnet 5.5 high; Claude Haiku 5.5 high | native Workflow | `wf_eaf21bbd-c18` | the scaffold verdict's § Added after the round |
+| agent-r2-fix FD (wave 2) | opus | Claude Opus 5.5 high | T3 `delegate_task` (claudeAgent) | `agent-r2-fix-fd-opus-1` | `tmp/units/agent-r2-fix-brief.md` (D1 and FD addendum) |
+| agent-r2-fix FS (wave 2: census, one builder per file, independent check) | checker, builder, checker | Claude Sonnet 5.5 high; Claude Sonnet 5.5 high; Claude Haiku 5.5 high | native Workflow | `wf_f4a508f1-b76` | `tmp/units/agent-r2-fix-fs-brief.md` |
+| agent-r2-fix FA, FH, FL, FT (wave 1) | opus, builder | Claude Opus 5.5 high (FA); Claude Sonnet 5.5 high (FH, FL, FT) | T3 `delegate_task` (claudeAgent) | `agent-r2-fix-fa-opus-1`, `agent-r2-fix-fh-sonnet-1`, `agent-r2-fix-fl-sonnet-1`, `agent-r2-fix-ft-sonnet-1` | `tmp/units/agent-r2-fix-brief.md` |

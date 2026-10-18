@@ -7,7 +7,7 @@ import {
 	JudgmentManager,
 	JudgeAbortError,
 } from '@src/core'
-import { requireValue } from '@orkestrel/test'
+import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	JUDGMENT_INPUT,
@@ -322,6 +322,14 @@ describe('JudgmentManager', () => {
 		expect(() => new JudgmentManager().add(hostile)).toThrow(
 			expect.objectContaining({ name: 'ConversationError', code: 'JUDGMENT' }),
 		)
+	})
+
+	it('refuses a hole in the restored list with the JUDGMENT code, as a for…of visits it as an undefined record', () => {
+		const judgments: Judgment[] = []
+		judgments[1] = JUDGMENT_RECORD
+		const error = captureError(() => new JudgmentManager(judgments))
+		expect(isConversationError(error)).toBe(true)
+		expect(error).toMatchObject({ code: 'JUDGMENT' })
 	})
 
 	it('creates an independent manager per conversation and restores snapshot records', () => {

@@ -82,14 +82,15 @@ describe('stopTimed', () => {
 		])
 		const port = await server.start()
 		const reply = fetch('http://127.0.0.1:' + port + '/parked').then((response) => response.text())
-		await waitForCondition('the request parked on the gate', () => entered.count === 1)
+		await waitForCondition('the request parked on the gate', () => entered.calls.length === 1)
+		expect(entered.calls).toEqual([[]])
 		const opening = performance.now()
 		const elapsed = await stopTimed(server, () => {
 			released.handler()
 			gate.resolve()
 		})
 		const outer = performance.now() - opening
-		expect(released.count).toBe(1)
+		expect(released.calls).toEqual([[]])
 		expect(await reply).toBe('parked')
 		expect(server.status).toBe('stopped')
 		expect(Number.isFinite(elapsed)).toBe(true)
@@ -106,7 +107,7 @@ describe('stopTimed', () => {
 			async () => stopTimed(server, released.handler),
 		)
 		expect(drain).toBeGreaterThanOrEqual(0)
-		expect(released.count).toBe(1)
+		expect(released.calls).toEqual([[]])
 		expect(server.status).toBe('stopped')
 	})
 })

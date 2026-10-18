@@ -202,7 +202,8 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
  * ```
  */
 export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean): boolean {
-	return keys.map((key) => remove(key)).every((removed) => removed)
+	// `Array.from` passes a hole in `keys` to `remove` as `undefined`, as iteration does; `map` skips it.
+	return Array.from(keys, (key) => remove(key)).every((removed) => removed)
 }
 
 /**
@@ -292,8 +293,11 @@ export function hasCalls(message: Pick<Message, 'calls'>): boolean {
 export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
 	const leaders = messages.filter((message) => message.role === 'assistant' && hasCalls(message))
 	const leading = new Set(leaders)
+	// `Array.from` passes a hole in `calls` to the mapper as `undefined`, as iteration does; `map` skips it.
 	const owners = Map.groupBy(
-		leaders.flatMap((leader) => (leader.calls ?? []).map((call) => ({ id: call.id, leader }))),
+		leaders.flatMap((leader) =>
+			Array.from(leader.calls ?? [], (call) => ({ id: call.id, leader })),
+		),
 		(entry) => entry.id,
 	)
 	const starts = [...messages.entries()].flatMap(([index, message]) =>

@@ -1,4 +1,5 @@
 import type { Message } from '@src/core'
+import type { ToolCall } from '@orkestrel/tool'
 import {
 	collectExchanges,
 	collectToolGroups,
@@ -15,6 +16,7 @@ import {
 	sumUsage,
 } from '@src/core'
 import { canonicalStringify } from '@orkestrel/contract'
+import { createRecorder } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildExchangeMessages,
@@ -268,6 +270,21 @@ describe('removeEntries — the folded batch removal', () => {
 		expect(removeEntries(['a', 'b'], (key) => stored.delete(key))).toBe(true)
 		expect(removeEntries([], () => false)).toBe(true)
 	})
+
+	it('passes a hole in the key list to remove as undefined, as a for…of visits it', () => {
+		const keys: string[] = []
+		keys[0] = 'a'
+		keys[2] = 'c'
+		const stored = new Set<string | undefined>(['a', 'c'])
+		const removals = createRecorder<readonly [string | undefined]>()
+		const removed = removeEntries<string | undefined>(keys, (key) => {
+			removals.handler(key)
+			return stored.delete(key)
+		})
+		expect(removals.calls).toEqual([['a'], [undefined], ['c']])
+		expect(removed).toBe(false)
+		expect(stored.size).toBe(0)
+	})
 })
 
 describe('MESSAGE_ROLES — the one role list', () => {
@@ -354,6 +371,17 @@ describe('collectToolGroups', () => {
 		expect(collectToolGroups([{ id: 'U', role: 'user', content: 'Which order is late?' }])).toEqual(
 			[],
 		)
+	})
+
+	it('reads a hole in a call list as undefined, as a for…of does, so the id read throws', () => {
+		const calls: ToolCall[] = []
+		calls[1] = createToolCall()
+		const messages: readonly Message[] = [
+			{ id: 'A', role: 'assistant', content: '', calls },
+			{ id: 'T', role: 'tool', content: 'late', call: 'c1' },
+		]
+
+		expect(() => collectToolGroups(messages)).toThrow(TypeError)
 	})
 })
 

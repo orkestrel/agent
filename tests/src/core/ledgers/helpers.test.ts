@@ -1,4 +1,10 @@
-import type { LedgerRecord } from '../../../../src/core/ledgers/types.js'
+import type {
+	GaugeCall,
+	LedgerLine,
+	LedgerLookupReading,
+	LedgerOwner,
+	LedgerRecord,
+} from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import {
 	buildRecallMessage,
@@ -36,6 +42,7 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
+import { captureError } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildGaugeCall,
@@ -50,6 +57,7 @@ import {
 	LEDGER_DESK_OWNERS,
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
+	replaceLedgerRecord,
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
@@ -506,6 +514,19 @@ describe('linkOwners', () => {
 		)
 		expect(links.size).toBe(0)
 	})
+
+	it('refuses a hole in the reading list, as a for…of visits it as an undefined reading', () => {
+		const readings: LedgerLookupReading[] = []
+		readings[1] = buildLedgerReading(
+			'tool-1',
+			'lookup_customer',
+			{ account: 'BW-20931' },
+			'Account BW-20931',
+			LEDGER_EMPTY_FOUND,
+		)
+		const held = new Map([['BW-20931', ['Brightwater Studio']]])
+		expect(captureError(() => linkOwners(readings, held))).toBeInstanceOf(TypeError)
+	})
 })
 
 describe('collectRegistry', () => {
@@ -548,6 +569,24 @@ describe('collectRegistry', () => {
 			}),
 		])
 		expect(registry.owners.get('OM-30418')).toEqual(['Odile Marlow'])
+	})
+
+	it('refuses a hole in the reading list, as a for…of visits it as an undefined reading', () => {
+		const readings: LedgerLookupReading[] = []
+		readings[1] = buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+			ids: ['BW-20931'],
+			owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+		})
+		expect(captureError(() => collectRegistry(readings))).toBeInstanceOf(TypeError)
+	})
+
+	it('refuses a hole in a reading owner list, as a for…of visits it as an undefined owner', () => {
+		const owners: LedgerOwner[] = []
+		owners[1] = { id: 'BW-20931', names: ['Brightwater Studio'] }
+		const readings = [
+			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', { ids: ['BW-20931'], owners }),
+		]
+		expect(captureError(() => collectRegistry(readings))).toBeInstanceOf(TypeError)
 	})
 })
 
@@ -594,6 +633,16 @@ describe('matchEntities', () => {
 		])
 		expect([...matchEntities(odd, 'Call A+B (Studio) now', false)]).toEqual(['BW-20931'])
 		expect(matchEntities(odd, 'Call AAB Studio now', false).size).toBe(0)
+	})
+
+	it('refuses a hole in an owner name list, as a for…of visits it as an undefined name', () => {
+		const names: string[] = []
+		names[0] = 'Brightwater Studio'
+		names[2] = 'Odile Marlow'
+		const sparse = { ids: new Set<string>(), owners: new Map([['BW-20931', names]]) }
+		expect(
+			captureError(() => matchEntities(sparse, 'Brightwater Studio called', false)),
+		).toBeInstanceOf(TypeError)
 	})
 })
 
@@ -1291,6 +1340,32 @@ describe('selectRecords', () => {
 		])
 	})
 
+	it('drops a hole in the rules lines and orders the lines around it', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('user-a', 'user', 'Standing rule about returns.'),
+				buildLedgerMessage('user-b', 'user', 'Standing rule about refunds.'),
+			],
+			classification: {
+				categories: { 'user-a': 'rule', 'user-b': 'rule' },
+				topics: { 'user-a': ['returns'], 'user-b': ['refunds'] },
+			},
+		})
+		const dense = buildRecords(input)
+		const rules = dense.records.find((record) => record.key === 'rules')
+		const [first, second] = rules?.lines ?? []
+		expect(first?.source).toBe('user-a')
+		expect(second?.source).toBe('user-b')
+		const sparse = replaceLedgerRecord(dense, 'rules', (record) => ({
+			...record,
+			lines: Object.assign(new Array<LedgerLine>(3), { 0: first, 2: second }),
+		}))
+		expect(1 in (sparse.records.find((record) => record.key === 'rules')?.lines ?? [])).toBe(false)
+		const [view] = selectRecords(sparse, { owners: [], topics: ['refunds'] })
+		expect(view?.lines.map((line) => line.source)).toEqual(['user-b', 'user-a'])
+		expect(view?.lines).toHaveLength(2)
+	})
+
 	it('selects only the rules record for a request that names no owner', () => {
 		expect(selectRecords(built, { owners: [], topics: [] }).map((view) => view.key)).toEqual([
 			'rules',
@@ -1521,5 +1596,12 @@ describe('fitSlope', () => {
 				],
 			]),
 		).toBe(1.3)
+	})
+
+	it('refuses a hole in the group list, as a for…of visits it as an undefined group', () => {
+		const groups: GaugeCall[][] = []
+		groups[0] = [buildGaugeCall(100, 100, 1), buildGaugeCall(200, 200, 1)]
+		groups[2] = [buildGaugeCall(100, 150, 1), buildGaugeCall(300, 350, 1)]
+		expect(captureError(() => fitSlope(groups))).toBeInstanceOf(TypeError)
 	})
 })

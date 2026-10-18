@@ -116,6 +116,14 @@ other terms still bind (tarball, never link; record the replaced range; restore 
   - `dist/` was rebuilt from that tree, and `test:studies` passes 100 of 100 against it.
   - Unit D (guide parity, Opus) is running. The tree-wide verifier, an Agent census re-run and Agent's falsify round
     follow.
+- **Census gap: count-only recorders (2026-10-18), fleet-wide.** The draft-4 census key's N2 and N6 signatures never
+  match `createRecorder`, `.count` or `toHaveLength` on `calls`. Yet the rule bans a recorder whose every read is a
+  count or a length: `running.carriers` and `logs.reads`, whose own example is a test reading only a length.
+  - So every census so far missed test recorders that are read only for their count: scaffold, Study, budget and
+    Agent.
+  - Agent's fix round sweeps them (unit FS), and scaffold's fix chain adds C9.
+  - **Owed:** a recorder sweep of Study and budget, each with its own falsify round, before their final acceptance,
+    and the corrected N2 and N6 signatures in the census key.
 - **Scaffold falsify round 3 (2026-10-18).**
   - Verdict: `.orkestrel/scaffold/scaffold-fix-audit-verdict.md`. Objective Astra failed 1, 2, 4, 6, 7, 8. Subjective
     Opus failed 4, 5, 6, 7, 8, plus S1.

@@ -1,4 +1,4 @@
-import type { JudgeAnswer, JudgeQuestion } from '@src/core'
+import type { JudgeAnswer, JudgeQuestion, JudgeResult } from '@src/core'
 import { getEventListeners } from 'node:events'
 import {
 	armReaderAbort,
@@ -397,6 +397,15 @@ describe('computeReading — the measures derived from a judge answer', () => {
 			expect(error).toMatchObject({ code: 'PROTOCOL', status: undefined })
 		}
 	})
+
+	it('refuses a hole in a score distribution, as a for…of visits it as an undefined candidate', () => {
+		const probabilities: number[] = []
+		probabilities[0] = 0.2
+		probabilities[2] = 0.8
+		expect(captureError(() => computeReading({ form: 'score', probabilities }))).toBeInstanceOf(
+			TypeError,
+		)
+	})
 })
 
 describe('buildJudgeResult — the merge of a judge request’s calls', () => {
@@ -442,6 +451,12 @@ describe('buildJudgeResult — the merge of a judge request’s calls', () => {
 		})
 		expect(Object.hasOwn(result, 'refusals')).toBe(false)
 		expect(Object.hasOwn(buildJudgeResult('m', [{ model: 'm', answers: {} }]), 'usage')).toBe(false)
+	})
+
+	it('refuses a hole in the call list, as a for…of visits it as an undefined result', () => {
+		const results: JudgeResult[] = []
+		results[1] = { model: 'jev-1.13.0', answers: { label: TEV1_CHOICE } }
+		expect(captureError(() => buildJudgeResult('jev-latest', results))).toBeInstanceOf(TypeError)
 	})
 })
 

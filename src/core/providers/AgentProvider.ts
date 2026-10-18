@@ -276,7 +276,7 @@ export abstract class AgentProvider<
 		return buildProviderResult(
 			splitter?.content ?? folded.map((one) => one.content).join(''),
 			joinThinking(splitter?.thinking, folded.map((one) => one.thinking).join('')),
-			folded.flatMap((one) => one.tools),
+			folded.flatMap((one) => [...one.tools]),
 			folded.findLast((one) => one.usage !== undefined)?.usage,
 			folded.findLast((one) => one.truncated !== undefined)?.truncated,
 		)

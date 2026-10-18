@@ -59,12 +59,13 @@ import { isProviderAbortError } from '../providers/index.js'
  *   whether or not the live `events` are drained; `generate` awaits that same
  *   settled `result` — so the two can never diverge.
  * - **The turn.** `#execute` builds the provider input once, then runs up to `limit` turns,
- *   each returning one readonly {@link AgentTurn} record: drive `provider.stream(...)`,
+ *   each appending one readonly {@link AgentTurn} record: drive `provider.stream(...)`,
  *   yielding each content delta as a `token` chunk and charging its estimate to the
- *   `allowance` when one is set; reconcile the turn's usage against the `budget` and yield a
- *   `usage` chunk; if the model requested tools, append the assistant turn, pass them to the tool
- *   manager's `execute` method, yield a `tool` chunk per call, append each tool result message,
- *   and continue; otherwise append the final assistant message and stop. The run's content,
+ *   `allowance` when one is set; reconcile the turn's usage against the `budget`, before a
+ *   genuine provider error rejects the run too, and yield a `usage` chunk; if the model
+ *   requested tools, append the assistant turn, pass them to the tool manager's `execute`
+ *   method, yield a `tool` chunk per call, append each tool result message, and continue;
+ *   otherwise append the final assistant message and stop. The run's content,
  *   thinking, usage, and stop derive from the turn records. Each assistant message stores its
  *   call's non-empty thinking.
  *   Provider calls and prompt estimates apply the provider's `replay` policy to the working
@@ -358,6 +359,10 @@ export class Agent implements AgentInterface {
 	// requested tools. A cancel (the bound abort) ends a turn with a `cancel` record — it never
 	// throws; only a genuine provider / tool error propagates. Every record is local to one call, so
 	// concurrent runs share nothing, and the settled `AgentRunResult` derives from the records.
+	// Each turn runs in this generator, which delegates only the provider stream to `#provide`: a
+	// delta crosses these two layers before `#drive` pushes it, and no per-turn generator settles
+	// between a turn's chunks. Every further layer would let a consumer's early `return()` cancel the
+	// provider a step sooner.
 	async *#execute(
 		abort: AbortInterface,
 		think: boolean | undefined,
@@ -394,20 +399,157 @@ export class Agent implements AgentInterface {
 		const cancelled = abort.signal.aborted
 		// One readonly record per turn; the turn index is the list length.
 		const turns: AgentTurn[] = []
+		// One turn per step: observe it, pace the boundary, admit the request, stream the provider,
+		// reconcile the usage, then dispatch the requested tools or record the final answer. A cancel
+		// appends a `cancel` record, which ends the loop; a genuine error throws. The section before
+		// the provider call adds no `await` on the default path, so the provider's `stream()` is
+		// entered in `agent.stream()`'s own call.
 		while (turns.length < limit && (turns.at(-1)?.ending ?? 'tools') === 'tools') {
-			turns.push(
-				yield* this.#turn(
-					turns.length,
-					turns.at(-1),
-					entry.messages,
-					request,
-					tools,
-					options,
-					abort,
-					budget,
-					allowance,
-				),
+			const index = turns.length
+			const base = turns.at(-1)?.messages ?? entry.messages
+			const futile = turns.at(-1)?.futile ?? false
+			// The record of a turn a cancel stopped before its provider call.
+			const stopped: AgentTurn = {
+				content: '',
+				thinking: undefined,
+				usage: undefined,
+				spent: undefined,
+				messages: base,
+				ending: 'cancel',
+				partial: true,
+				futile,
+				estimate: undefined,
+				interrupted: false,
+				truncated: false,
+			}
+			// Observe each turn begin (the turn index). The emitter isolates a listener throw, so it
+			// can't perturb the turn that immediately follows.
+			this.#emitter.emit('turn', index)
+			// Pace between expensive turns — never before the first. A scheduler honours the signal by
+			// rejecting a pending yield on abort, so a cancel landing at the turn boundary surfaces here
+			// as a throw; it stops the turn like any cancel, while a genuine scheduler fault propagates.
+			if (index > 0) {
+				try {
+					await this.#scheduler?.yield({ signal: abort.signal })
+				} catch (error) {
+					if (!abort.signal.aborted) throw error
+				}
+			}
+			if (abort.signal.aborted) {
+				turns.push(stopped)
+				continue
+			}
+			// Snapshot the allow-list before listeners can change the active scope this turn.
+			const names = this.#context.scope?.tools?.slice()
+			const advertised = filterAllowList(
+				names,
+				tools.definitions(),
+				(definition) => definition.name,
 			)
+			const definitions = advertised.length > 0 ? advertised : undefined
+			// Admit the request: compose it once from the replay-filtered messages and this turn's tool
+			// and option snapshot, measure it against `#window`, and dispatch exactly the request the
+			// window last measured (the rebuilt one after a fold). With no `window` it is composed and
+			// dispatched with no extra `await`.
+			const composed = this.#compose(base, definitions, options)
+			const admitted =
+				this.#window === undefined
+					? { dispatch: composed, messages: base, spent: undefined, futile }
+					: await this.#admit(
+							this.#window,
+							composed,
+							base,
+							request,
+							index > 0,
+							futile,
+							abort,
+							budget,
+						)
+			if (admitted.dispatch === undefined) {
+				turns.push({
+					...stopped,
+					messages: admitted.messages,
+					spent: admitted.spent,
+					futile: admitted.futile,
+				})
+				continue
+			}
+			// The turn's streamed content, one entry per content delta; the meter charges only when an
+			// allowance exists.
+			const streamed: string[] = []
+			const meter =
+				allowance === undefined
+					? undefined
+					: createTokenMeter({ budget: allowance, estimator: estimateTokens })
+			const provided = yield* this.#provide(admitted.dispatch, abort.signal, streamed, meter)
+			const settled = this.#reconcile(provided, abort, streamed, admitted, meter, budget, allowance)
+			if (!provided.success) {
+				turns.push({ ...settled, ending: 'cancel', partial: true })
+				continue
+			}
+			const result = provided.value
+			const recorded = settled.thinking === undefined ? {} : { thinking: settled.thinking }
+			if (settled.usage !== undefined) {
+				// Observe this turn's usage — the result already exists; emit beside the yield.
+				this.#emitter.emit('usage', settled.usage, settled.estimate)
+				yield { category: 'usage', usage: settled.usage, estimate: settled.estimate }
+			}
+			if (definitions === undefined) {
+				for (const call of result.tools ?? []) {
+					this.#emitter.emit('deny', call, 'no tool is advertised in the active scope')
+				}
+			} else if (result.tools !== undefined && result.tools.length > 0) {
+				const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
+				const authorization = this.#authorize(result.tools, admittedCalls)
+				if (abort.signal.aborted) {
+					turns.push({ ...settled, ending: 'cancel', partial: true })
+					continue
+				}
+				const assistant = this.#context.messages.add({
+					role: 'assistant',
+					content: result.content,
+					calls: result.tools,
+					...recorded,
+				})
+				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
+				// Each dispatched call's tool message, appended per step of a loop that yields.
+				const replies: Message[] = []
+				for (const [position, call] of result.tools.entries()) {
+					const outcome = results[position]
+					if (outcome === undefined) continue
+					// Observe the dispatched tool + its result — beside the `tool` yield (the result
+					// already exists). Carries the same pair the chunk carries.
+					this.#emitter.emit('tool', call, outcome)
+					yield { category: 'tool', call, result: outcome }
+					// `call` comes from the paired call rather than the result's `id`, so tool message
+					// `position` names `calls[position]` even when a supplied tool manager returns another id.
+					replies.push(
+						this.#context.messages.add({
+							role: 'tool',
+							content: outcome.success ? renderToolValue(outcome.value) : outcome.error,
+							call: call.id,
+						}),
+					)
+				}
+				// The next turn's admission measures and folds the grown prompt, so a final answer never
+				// pays for a fold. A tools turn's truncation does not end the run, so it is not recorded.
+				turns.push({
+					...settled,
+					messages: [...admitted.messages, assistant, ...replies],
+					ending: 'tools',
+					partial: true,
+				})
+				continue
+			}
+			// No tools: this turn's content is the final answer — record it and finish.
+			this.#context.messages.add({ role: 'assistant', content: result.content, ...recorded })
+			turns.push({
+				...settled,
+				content: result.content,
+				ending: 'answer',
+				partial: abort.signal.aborted,
+				truncated: result.truncated === true,
+			})
 		}
 		const final = turns.at(-1)
 		const thinkings = turns.flatMap((turn) => (turn.thinking === undefined ? [] : [turn.thinking]))
@@ -432,103 +574,43 @@ export class Agent implements AgentInterface {
 		}
 	}
 
-	// One turn: observe it, pace the boundary, admit the request, stream the provider, reconcile the
-	// usage, then dispatch the requested tools or record the final answer. A cancel returns a
-	// `cancel` record; a genuine error throws. The section before the provider call adds no `await`
-	// on the default path, so the provider's `stream()` is entered in `agent.stream()`'s own call.
-	async *#turn(
-		index: number,
-		previous: AgentTurn | undefined,
-		entry: readonly Message[],
-		request: Message | undefined,
-		tools: ToolManagerInterface,
-		options: ProviderRequest['options'],
+	// Settles one provider call into its turn's record fields, charges the cost budget at the one
+	// charge site, then rethrows a genuine failure. A cancelled call's fields still describe what it
+	// streamed; the caller adds the ending.
+	#reconcile(
+		provided: Result<ProviderResult>,
 		abort: AbortInterface,
+		streamed: readonly string[],
+		admitted: Pick<AgentTurn, 'messages' | 'spent' | 'futile'>,
+		meter: MeterInterface | undefined,
 		budget: BudgetInterface<TokenUsage> | undefined,
 		allowance: BudgetInterface<TokenUsage> | undefined,
-	): AsyncGenerator<AgentChunk, AgentTurn> {
-		const base = previous?.messages ?? entry
-		const futile = previous?.futile ?? false
-		// The record of a turn a cancel stopped before its provider call.
-		const stopped: AgentTurn = {
-			content: '',
-			thinking: undefined,
-			usage: undefined,
-			spent: undefined,
-			messages: base,
-			ending: 'cancel',
-			partial: true,
-			futile,
-			estimate: undefined,
-			interrupted: false,
-			truncated: false,
-		}
-		// Observe each turn begin (the turn index). The emitter isolates a listener throw, so it
-		// can't perturb the turn that immediately follows.
-		this.#emitter.emit('turn', index)
-		// Pace between expensive turns — never before the first. A scheduler honours the signal by
-		// rejecting a pending yield on abort, so a cancel landing at the turn boundary surfaces here as
-		// a throw; it stops the turn like any cancel, while a genuine scheduler fault propagates.
-		if (index > 0) {
-			try {
-				await this.#scheduler?.yield({ signal: abort.signal })
-			} catch (error) {
-				if (abort.signal.aborted) return stopped
-				throw error
-			}
-		}
-		if (abort.signal.aborted) return stopped
-		// Snapshot the allow-list before listeners can change the active scope this turn.
-		const names = this.#context.scope?.tools?.slice()
-		const advertised = filterAllowList(names, tools.definitions(), (definition) => definition.name)
-		const definitions = advertised.length > 0 ? advertised : undefined
-		// Admit the request: compose it once from the replay-filtered messages and this turn's tool
-		// and option snapshot, measure it against `#window`, and dispatch exactly the request the
-		// window last measured (the rebuilt one after a fold). With no `window` it is composed and
-		// dispatched with no extra `await`.
-		const composed = this.#compose(base, definitions, options)
-		const admitted =
-			this.#window === undefined
-				? { dispatch: composed, messages: base, spent: undefined, futile }
-				: await this.#admit(this.#window, composed, base, request, index > 0, futile, abort, budget)
-		if (admitted.dispatch === undefined) {
-			return {
-				...stopped,
-				messages: admitted.messages,
-				spent: admitted.spent,
-				futile: admitted.futile,
-			}
-		}
-		// The turn's streamed content, one entry per content delta; the meter charges only when an
-		// allowance exists.
-		const streamed: string[] = []
-		const meter =
-			allowance === undefined
-				? undefined
-				: createTokenMeter({ budget: allowance, estimator: estimateTokens })
-		const provided = yield* this.#attemptProvide(admitted.dispatch, abort.signal, streamed, meter)
-		// Read before any reconcile: an abort seen here landed while the call ran.
+	) {
+		// Read before any reconcile: an abort seen here landed while the call ran, and a charge that
+		// trips a bound below cannot turn a genuine failure into a partial.
 		const interrupted = abort.signal.aborted
-		if (!provided.success && !interrupted) throw provided.error
-		// The abort partial is the only carrier of a cancelled call's reasoning and usage; the
-		// streamed deltas already hold its content.
+		// The abort partial of an interrupted call is the only carrier of its reasoning and usage; the
+		// streamed deltas already hold its content. A genuine failure contributes no usage.
 		const partial =
-			!provided.success && isProviderAbortError(provided.error) ? provided.error.partial : undefined
+			!provided.success && interrupted && isProviderAbortError(provided.error)
+				? provided.error.partial
+				: undefined
 		const reasoning = provided.success ? provided.value.thinking : partial?.thinking
 		const thinking = reasoning !== undefined && reasoning.length > 0 ? reasoning : undefined
 		const content = streamed.join('')
 		const estimate = estimateTokens(content)
 		const reported = provided.success ? provided.value.usage : partial?.usage
 		const usage = reported === undefined ? undefined : sanitizeUsage(reported)
-		// The one charge site for both paths. The estimate is already on the cost budget only when the
-		// meter charged that same instance; a call that reported no usage keeps its estimate on the
-		// cost budget, unless the meter put it there.
+		// The one charge site for every path, a genuine failure included. The estimate is already on
+		// the cost budget only when the meter charged that same instance; a call that reported no usage
+		// keeps its estimate on the cost budget, unless the meter put it there.
 		const charged = allowance === budget ? (meter?.charged ?? 0) : 0
 		const billed =
 			usage ??
 			(allowance === budget ? undefined : { prompt: 0, completion: estimate, total: estimate })
 		if (billed !== undefined) chargeUsage(budget, billed, charged)
-		const settled = {
+		if (!provided.success && !interrupted) throw provided.error
+		return {
 			content,
 			thinking,
 			usage,
@@ -538,66 +620,6 @@ export class Agent implements AgentInterface {
 			estimate,
 			interrupted,
 			truncated: false,
-		}
-		if (!provided.success) return { ...settled, ending: 'cancel', partial: true }
-		const result = provided.value
-		const recorded = thinking === undefined ? {} : { thinking }
-		if (usage !== undefined) {
-			// Observe this turn's usage — the result already exists; emit beside the yield.
-			this.#emitter.emit('usage', usage, estimate)
-			yield { category: 'usage', usage, estimate }
-		}
-		if (definitions === undefined) {
-			for (const call of result.tools ?? []) {
-				this.#emitter.emit('deny', call, 'no tool is advertised in the active scope')
-			}
-		} else if (result.tools !== undefined && result.tools.length > 0) {
-			const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
-			const authorization = this.#authorize(result.tools, admittedCalls)
-			if (abort.signal.aborted) return { ...settled, ending: 'cancel', partial: true }
-			const assistant = this.#context.messages.add({
-				role: 'assistant',
-				content: result.content,
-				calls: result.tools,
-				...recorded,
-			})
-			const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
-			// Each dispatched call's tool message, appended per step of a loop that yields.
-			const replies: Message[] = []
-			for (const [position, call] of result.tools.entries()) {
-				const outcome = results[position]
-				if (outcome === undefined) continue
-				// Observe the dispatched tool + its result — beside the `tool` yield (the result
-				// already exists). Carries the same pair the chunk carries.
-				this.#emitter.emit('tool', call, outcome)
-				yield { category: 'tool', call, result: outcome }
-				// `call` comes from the paired call rather than the result's `id`, so tool message
-				// `position` names `calls[position]` even when a supplied tool manager returns another id.
-				replies.push(
-					this.#context.messages.add({
-						role: 'tool',
-						content: outcome.success ? renderToolValue(outcome.value) : outcome.error,
-						call: call.id,
-					}),
-				)
-			}
-			// The next turn's admission measures and folds the grown prompt, so a final answer never
-			// pays for a fold. A tools turn's truncation does not end the run, so it is not recorded.
-			return {
-				...settled,
-				messages: [...admitted.messages, assistant, ...replies],
-				ending: 'tools',
-				partial: true,
-			}
-		}
-		// No tools: this turn's content is the final answer — record it and finish.
-		this.#context.messages.add({ role: 'assistant', content: result.content, ...recorded })
-		return {
-			...settled,
-			content: result.content,
-			ending: 'answer',
-			partial: abort.signal.aborted,
-			truncated: result.truncated === true,
 		}
 	}
 
@@ -863,46 +885,39 @@ export class Agent implements AgentInterface {
 	// delta is the answer (appended to the turn's `streamed` log, charged through the meter, surfaced
 	// as a `token` chunk, in that order); a `'thinking'` delta is live reasoning (surfaced as a `think`
 	// chunk, never metered — reasoning is not answer content) — returning the provider's assembled
-	// result. It sends the composed {@link ProviderRequest} unchanged — the messages already carry
-	// only the thinking the provider's replay policy permits (default `'none'`), and the tools and
-	// options are the turn's snapshot, absent when there are none.
+	// result or its failure as a Result built through the installed `attempt`, so the turn reads a
+	// provider or meter failure from a value. It sends the composed {@link ProviderRequest}
+	// unchanged — the messages already carry only the thinking the provider's replay policy permits
+	// (default `'none'`), and the tools and options are the turn's snapshot, absent when there are
+	// none. It pulls the provider itself, so no generator layer sits between a delta and the turn.
 	async *#provide(
-		request: ProviderRequest,
-		signal: AbortSignal,
-		streamed: string[],
-		meter: MeterInterface | undefined,
-	): AsyncGenerator<AgentChunk, ProviderResult> {
-		const generator = this.#provider.stream(
-			request.messages,
-			signal,
-			request.tools,
-			request.options,
-		)
-		for (;;) {
-			const next = await generator.next()
-			if (next.done) return next.value
-			const delta = next.value
-			if (delta.channel === 'content') {
-				streamed.push(delta.text)
-				meter?.charge(delta.text)
-				yield { category: 'token', content: delta.text }
-			} else {
-				yield { category: 'think', content: delta.text }
-			}
-		}
-	}
-
-	// Drives `#provide` and returns its outcome as a Result built through the installed `attempt`,
-	// so the turn reads the outcome from a value; the chunks still stream through to the caller.
-	async *#attemptProvide(
 		request: ProviderRequest,
 		signal: AbortSignal,
 		streamed: string[],
 		meter: MeterInterface | undefined,
 	): AsyncGenerator<AgentChunk, Result<ProviderResult>> {
 		try {
-			const result = yield* this.#provide(request, signal, streamed, meter)
-			return attempt(() => result)
+			const generator = this.#provider.stream(
+				request.messages,
+				signal,
+				request.tools,
+				request.options,
+			)
+			for (;;) {
+				const next = await generator.next()
+				if (next.done === true) {
+					const result = next.value
+					return attempt(() => result)
+				}
+				const delta = next.value
+				if (delta.channel === 'content') {
+					streamed.push(delta.text)
+					meter?.charge(delta.text)
+					yield { category: 'token', content: delta.text }
+				} else {
+					yield { category: 'think', content: delta.text }
+				}
+			}
 		} catch (error) {
 			return attempt((): ProviderResult => {
 				throw error

@@ -154,7 +154,8 @@ export function attachUserImages(
  * ```
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {
-	return files.flatMap((file) =>
+	// The spread visits a hole in `files` as an undefined file, as iteration does; `flatMap` skips it.
+	return [...files].flatMap((file) =>
 		isBinary(file.content) && file.content.mime.startsWith('image/') ? [file.content.base64] : [],
 	)
 }

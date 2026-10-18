@@ -387,7 +387,7 @@ describe('agentResultToJSON', () => {
 				},
 			},
 		})
-		expect(reads.count).toBe(0)
+		expect(reads.calls).toEqual([])
 	})
 })
 
@@ -588,8 +588,9 @@ describe('requireBudget', () => {
 	it('refuses a value that does not implement BudgetInterface with a placement error naming the option', () => {
 		const revoked = Proxy.revocable({}, {})
 		revoked.revoke()
+		const consumed = createRecorder<[TokenUsage]>()
 		for (const [value, received] of [
-			[{ consume: createRecorder<[TokenUsage]>().handler }, 'object'],
+			[{ consume: consumed.handler }, 'object'],
 			[null, 'null'],
 			[revoked.proxy, 'object'],
 		] as const) {
@@ -606,6 +607,7 @@ describe('requireBudget', () => {
 				{ path: ['options', 'allowance'], limit: 'BudgetInterface', received },
 			])
 		}
+		expect(consumed.calls).toEqual([])
 	})
 })
 
