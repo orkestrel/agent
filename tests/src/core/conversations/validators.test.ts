@@ -5,7 +5,7 @@ import {
 	isSection,
 	JudgmentManager,
 } from '@src/core'
-import { roundTripJSON } from '@orkestrel/test'
+import { createRecorder, roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
@@ -149,8 +149,8 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 	})
 
 	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
-		let sectionReads = 0
-		let snapshotReads = 0
+		const sectionReads = createRecorder<readonly []>()
+		const snapshotReads = createRecorder<readonly []>()
 		const revoked = Proxy.revocable({}, {})
 		revoked.revoke()
 		expect(
@@ -158,12 +158,12 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 				id: 's',
 				summary: 'recap',
 				get messages(): never {
-					sectionReads += 1
+					sectionReads.handler()
 					throw new Error('unreadable')
 				},
 			}),
 		).toBe(false)
-		expect(sectionReads).toBe(1)
+		expect(sectionReads.count).toBe(1)
 		expect(isSection(revoked.proxy)).toBe(false)
 		expect(
 			isConversationSnapshot({
@@ -173,7 +173,7 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 						id: 's',
 						summary: 'recap',
 						get messages(): never {
-							snapshotReads += 1
+							snapshotReads.handler()
 							throw new Error('unreadable')
 						},
 					},
@@ -181,7 +181,7 @@ describe('isSection — the per-section shape guard (total + defensive)', () => 
 				messages: [],
 			}),
 		).toBe(false)
-		expect(snapshotReads).toBe(1)
+		expect(snapshotReads.count).toBe(1)
 	})
 })
 

@@ -125,13 +125,7 @@ export function attachUserImages(
 	payloads: readonly string[],
 ): readonly Message[] {
 	if (payloads.length === 0) return conversation
-	let target = -1
-	for (let index = conversation.length - 1; index >= 0; index -= 1) {
-		if (conversation[index]?.role === 'user') {
-			target = index
-			break
-		}
-	}
+	const target = conversation.findLastIndex((message) => message.role === 'user')
 	if (target === -1) return conversation
 	return conversation.map((message, index) =>
 		index === target ? attachImages(message, payloads) : message,

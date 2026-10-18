@@ -71,15 +71,9 @@ describe('Channel — buffer-before-close (no truncation)', () => {
 		channel.push(2)
 		channel.push(3)
 		channel.close()
-		const out: number[] = []
 		const iterator = channel.drain()
-		let next = await iterator.next()
-		while (!next.done) {
-			out.push(next.value)
-			next = await iterator.next()
-		}
-		expect(out).toEqual([1, 2, 3])
-		expect(next.done).toBe(true)
+		expect(await collect(iterator)).toEqual([1, 2, 3])
+		expect((await iterator.next()).done).toBe(true)
 	})
 
 	it('flushes a value buffered before close even when drained late', async () => {

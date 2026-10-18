@@ -4,7 +4,7 @@ import type {
 	ProviderRequest,
 	RelayProviderOptions,
 } from './types.js'
-import { cloneJSONValue } from '@orkestrel/contract'
+import { attempt, cloneJSONValue } from '@orkestrel/contract'
 import { AgentProvider } from './AgentProvider.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
 import { requestToRelay } from './helpers.js'
@@ -84,16 +84,14 @@ export class RelayProvider extends AgentProvider {
 	 * projection produced is not a valid wire request
 	 */
 	encode(request: ProviderRequest): object {
-		let snapshot: unknown
-		try {
-			snapshot = cloneJSONValue(requestToRelay(request))
-		} catch (cause) {
-			throw new ProviderError('PROTOCOL', 'relay request is not JSON', { cause })
+		const snapshot = attempt(() => cloneJSONValue(requestToRelay(request)))
+		if (!snapshot.success) {
+			throw new ProviderError('PROTOCOL', 'relay request is not JSON', { cause: snapshot.error })
 		}
-		if (!providerRequestContract.is(snapshot)) {
+		if (!providerRequestContract.is(snapshot.value)) {
 			throw new ProviderError('PROTOCOL', 'relay request is not JSON')
 		}
-		return snapshot
+		return snapshot.value
 	}
 
 	/**

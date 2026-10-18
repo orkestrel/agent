@@ -22,7 +22,7 @@ import {
 	INTEGRATION_USAGE,
 	splitWordDeltas,
 } from '../../setup.js'
-import { collect, requireValue } from '@orkestrel/test'
+import { collect, createRecorder, requireValue } from '@orkestrel/test'
 
 describe('in-process relay hop', () => {
 	it('carries a 401 refusal through the browser without entering stream', async () => {
@@ -254,12 +254,12 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 	it('runs the agent tool loop in Node and feeds the result into the next provider turn', async () => {
 		// The provider boundary requests a tool and returns the next turn through the same contract.
 		const tools = createToolManager()
-		let executed = 0
+		const executions = createRecorder<readonly []>()
 		tools.add(
 			createTool({
 				name: 'add',
 				execute: (args) => {
-					executed += 1
+					executions.handler()
 					return Number(args.a) + Number(args.b)
 				},
 			}),
@@ -278,7 +278,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		const chunks = await collect(stream.events)
 		const result = await stream.result
 
-		expect(executed).toBe(1)
+		expect(executions.count).toBe(1)
 		const dispatched = chunks.flatMap((chunk) =>
 			chunk.category === 'tool' && chunk.result.success
 				? [{ name: chunk.call.name, value: chunk.result.value }]

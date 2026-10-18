@@ -1,4 +1,4 @@
-import type { LedgerOptions, MessageInput, Selection, ThinkingReplay } from '@src/core'
+import type { MessageInput, Selection, ThinkingReplay } from '@src/core'
 import {
 	LEDGER_NOTES,
 	Ledger,
@@ -9,8 +9,8 @@ import {
 } from '@src/core'
 import { isString } from '@orkestrel/contract'
 import { createTool } from '@orkestrel/tool'
-import { requireValue } from '@orkestrel/test'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { createRecorder, requireValue } from '@orkestrel/test'
+import { describe, expect, it } from 'vitest'
 import {
 	buildDeliverySeed,
 	buildLedgerOptions,
@@ -30,14 +30,8 @@ import {
 } from '../../../setup.js'
 
 describe('Ledger', () => {
-	let judge: RecordingJudge
-	let options: LedgerOptions
-	beforeEach(() => {
-		judge = new RecordingJudge()
-		options = buildLedgerOptions({ judge })
-	})
-
 	it('normalizes CRLF lookup and recall lines in answer notes', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
@@ -75,6 +69,7 @@ describe('Ledger', () => {
 	})
 
 	it('commits a partial reply without an answer pass when final usage aborts the caller', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[{ content: 'Done.', usage: { prompt: 10, completion: 2, total: 12 } }],
 			{ recorded: true, repeat: false },
@@ -91,6 +86,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps reordered seed results paired with their retained lookup calls', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
 		ledger.conversation.add([
@@ -115,6 +111,7 @@ describe('Ledger', () => {
 	})
 
 	it('files reordered lookup text under its own owner and names its own call in each stub', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
@@ -159,6 +156,7 @@ describe('Ledger', () => {
 
 	for (const pairing of ['mixed id-and-idless', 'repeated-id'] as const) {
 		it(`sends no unmatched call and reads each result under its own arguments for a ${pairing} group`, async () => {
+			const options = buildLedgerOptions()
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const readings: Array<readonly [unknown, string]> = []
 			const ledger = createLedger(provider, {
@@ -215,6 +213,7 @@ describe('Ledger', () => {
 	}
 
 	it('prices the final hidden stub before accepting a seed tail with a 400-character argument', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
@@ -236,6 +235,7 @@ describe('Ledger', () => {
 	})
 
 	it('calibrates turn and all replay at the next user boundary', async () => {
+		const options = buildLedgerOptions()
 		for (const replay of ['turn', 'all'] as const) {
 			const provider = createScriptedProvider(
 				[
@@ -263,6 +263,8 @@ describe('Ledger', () => {
 
 	for (const phase of ['calibration', 'first pass'] as const) {
 		it(`faults a direct run during ${phase} without judging or replacing the active selection`, async () => {
+			const judge = new RecordingJudge()
+			const options = buildLedgerOptions({ judge })
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
 			const provider = createScriptedProvider(
@@ -332,6 +334,7 @@ describe('Ledger', () => {
 	}
 
 	it('keeps interleaved seed calls and results on the same side of the tail cut', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
 		ledger.conversation.add([
@@ -351,6 +354,7 @@ describe('Ledger', () => {
 	})
 
 	it('sends a leading assistant seed exchange when it fits the tail', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const seed = ledger.conversation.add({ role: 'assistant', content: 'Enjoy the break.' })
@@ -359,6 +363,8 @@ describe('Ledger', () => {
 	})
 
 	it('faults direct agent generation without planning for the earlier request', async () => {
+		const judge = new RecordingJudge()
+		const options = buildLedgerOptions({ judge })
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		await ledger.respond('Earlier request.')
@@ -377,6 +383,7 @@ describe('Ledger', () => {
 	})
 
 	it('recalls a call-free, non-quiet seed assistant statement and lists its amender after it in one item', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: 'Refunds from a later assistant.' },
@@ -444,6 +451,7 @@ describe('Ledger', () => {
 	})
 
 	it('recalls both seed readings of one lookup and lists each once in the answer note', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -486,6 +494,7 @@ describe('Ledger', () => {
 	})
 
 	it('writes lookup lines in the answer note without their call text', async () => {
+		const options = buildLedgerOptions()
 		const text =
 			'Account BW-20931: Brightwater Studio.\nlookup {"id":"prose"}: preserve this prose.'
 		const lookup = requireValue(options.lookups?.[0])
@@ -519,6 +528,7 @@ describe('Ledger', () => {
 	})
 
 	it('lists an earlier answer note through a word match but never through a topic match', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
@@ -566,6 +576,7 @@ describe('Ledger', () => {
 	})
 
 	it('recalls the Halvorsen shipment owner history carried by the v7 00061 answer note', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -648,6 +659,7 @@ describe('Ledger', () => {
 	})
 
 	it('calibrates the replay-filtered view and prices the same messages', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', usage: { prompt: 140, completion: 0, total: 140 } },
@@ -675,6 +687,7 @@ describe('Ledger', () => {
 	})
 
 	it('resolves when a thinking call carries cyclic arguments', async () => {
+		const options = buildLedgerOptions()
 		const args: Record<string, unknown> = {}
 		args.self = args
 		const provider = createScriptedProvider(
@@ -696,7 +709,9 @@ describe('Ledger', () => {
 	})
 
 	it('keeps the replay policy captured at construction through calibration and respond', async () => {
-		let replay: ThinkingReplay = 'none'
+		const options = buildLedgerOptions()
+		// The policy reads `none` until construction has finished, then `all`.
+		const constructed = createRecorder<readonly []>()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
@@ -716,7 +731,7 @@ describe('Ledger', () => {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					return replay
+					return constructed.count === 0 ? 'none' : 'all'
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -726,7 +741,7 @@ describe('Ledger', () => {
 				predict: 1024,
 			},
 		)
-		replay = 'all'
+		constructed.handler()
 		ledger.conversation.add([
 			{ role: 'user', content: 'Seed.' },
 			{ role: 'assistant', content: 'Earlier reply.', thinking: 'Check the account.' },
@@ -747,6 +762,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects invalid generation caps with CAPACITY even before calibration', () => {
+		const options = buildLedgerOptions()
 		const uncalibrated = buildUncalibratedOptions(options)
 		for (const predict of [
 			-1,
@@ -769,6 +785,7 @@ describe('Ledger', () => {
 	})
 
 	it('fits the same plan at 4096 with predict 1024 as at 3072 without predict', async () => {
+		const options = buildLedgerOptions()
 		// The tail total is 2150.4 / 1.06 = 2028.679... units: 2028 fits, 2029 does not.
 		for (const length of [8048, 8052]) {
 			for (const capacity of [3072, 4096]) {
@@ -792,6 +809,7 @@ describe('Ledger', () => {
 	})
 
 	it('defaults to the predict zero plan budget with no first-pass think option and an answer pass with thinking off', async () => {
+		const options = buildLedgerOptions()
 		// These seed exchanges straddle the 2704-unit tail boundary at capacity 4096.
 		for (const length of [10752, 10756]) {
 			const prompts: string[][] = []
@@ -820,6 +838,7 @@ describe('Ledger', () => {
 	})
 
 	it('forwards first-pass thinking when given and always disables answer-pass thinking', async () => {
+		const options = buildLedgerOptions()
 		for (const think of [true, false, undefined]) {
 			const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
 				recorded: true,
@@ -837,6 +856,7 @@ describe('Ledger', () => {
 	})
 
 	it('prices the wire tail and turn observation without discarded thinking', async () => {
+		const options = buildLedgerOptions()
 		const prices: Array<number | undefined> = []
 		const prompts: string[][] = []
 		for (const thinking of [undefined, 'a'.repeat(20000)]) {
@@ -867,6 +887,7 @@ describe('Ledger', () => {
 	})
 
 	it('strips tail thinking before capping a non-empty owner briefing', async () => {
+		const options = buildLedgerOptions()
 		const systems: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(20000)]) {
 			const provider = createScriptedProvider([{ content: 'Done.' }], {
@@ -895,6 +916,7 @@ describe('Ledger', () => {
 	})
 
 	it('reads thinking at recall and respond before sizing results and observing the reply reserve', async () => {
+		const options = buildLedgerOptions()
 		const results: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(800)]) {
 			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }]
@@ -929,6 +951,7 @@ describe('Ledger', () => {
 	})
 
 	it('reserves the generation cap and retains within-pass thinking when closing recall', async () => {
+		const options = buildLedgerOptions()
 		for (const replay of ['none', 'turn', 'all'] as const) {
 			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }]
 			const completion = JSON.stringify(calls).length + 800
@@ -957,6 +980,7 @@ describe('Ledger', () => {
 	})
 
 	it('reads the final reply thinking before observing its reserve for a later request', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -982,6 +1006,7 @@ describe('Ledger', () => {
 	})
 
 	it('passes predict to a calibrated gauge while recall remains open', async () => {
+		const options = buildLedgerOptions()
 		for (const predict of [0, 1024]) {
 			const provider = createScriptedProvider(
 				[
@@ -1012,6 +1037,7 @@ describe('Ledger', () => {
 	})
 
 	it('passes replay to a calibrated gauge when deciding whether recall closes', async () => {
+		const options = buildLedgerOptions()
 		for (const replay of ['none', 'turn'] as const) {
 			const provider = createScriptedProvider(
 				[
@@ -1041,6 +1067,7 @@ describe('Ledger', () => {
 	})
 
 	it('passes the generation reserve to supplied and calibrated gauges', async () => {
+		const options = buildLedgerOptions()
 		for (const calibrated of [false, true]) {
 			const provider = createScriptedProvider(
 				[
@@ -1072,6 +1099,7 @@ describe('Ledger', () => {
 	})
 
 	it('answers in one pass with owner records, a truthful seed stub, and a seed-only tail', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[{ content: 'Approved.', usage: { prompt: 100, completion: 3, total: 103 } }],
 			{ recorded: true },
@@ -1127,6 +1155,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps leading seed messages, empty assistants, and text from dropped calls', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const seed = ledger.conversation.add([
@@ -1153,6 +1182,7 @@ describe('Ledger', () => {
 	})
 
 	it('detects repeats with reused call ids and nested argument order, then collapses every call including the seed', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -1238,6 +1268,7 @@ describe('Ledger', () => {
 	})
 
 	it('runs an answer pass after an empty result or an exhausted first pass', async () => {
+		const options = buildLedgerOptions()
 		const empty = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
 			recorded: true,
 		})
@@ -1258,6 +1289,7 @@ describe('Ledger', () => {
 	})
 
 	it('attempts the answer pass after transport failure and local timeout', async () => {
+		const options = buildLedgerOptions()
 		const broken = createScriptedProvider(
 			[
 				{
@@ -1290,12 +1322,13 @@ describe('Ledger', () => {
 	})
 
 	it('rejects with the answer pass error when both passes reject and admits a later request', async () => {
+		const options = buildLedgerOptions()
 		const fault = new Error('provider unreachable')
-		let failing = true
+		const recovered = createRecorder<readonly []>()
 		const provider = createScriptedProvider([{ content: 'Recovered.' }], {
 			recorded: true,
 			chunk: (content) => {
-				if (failing) throw fault
+				if (recovered.count === 0) throw fault
 				return [content]
 			},
 		})
@@ -1304,11 +1337,12 @@ describe('Ledger', () => {
 		expect(provider.calls).toHaveLength(2)
 		expect(provider.calls[1]?.tools).toBeUndefined()
 		expect(ledger.agent.context.scope).toBeUndefined()
-		failing = false
+		recovered.handler()
 		expect((await ledger.respond('Check again.')).content).toBe('Recovered.')
 	})
 
 	it('rejects a signal that is not a native AbortSignal without locking the ledger', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		await expect(ledger.respond('First.', createForeignSignal())).rejects.toThrow(/AbortSignal/)
@@ -1318,6 +1352,7 @@ describe('Ledger', () => {
 	})
 
 	it('renders a seeded lookup whose arguments JSON cannot carry under its bare tool name', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
@@ -1339,6 +1374,7 @@ describe('Ledger', () => {
 	})
 
 	it('closes recall on the first call at a zero recall limit', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { topic: 'refunds' } }] },
@@ -1358,6 +1394,7 @@ describe('Ledger', () => {
 	})
 
 	it('makes no provider call at a zero agent turn limit', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, agent: { limit: 0 } })
 		const result = await ledger.respond('Check the desk.')
@@ -1366,6 +1403,7 @@ describe('Ledger', () => {
 	})
 
 	it('skips the answer pass after caller abort and refuses concurrency before appending', async () => {
+		const options = buildLedgerOptions()
 		const caller = new AbortController()
 		const provider = createScriptedProvider([{ content: 'Delayed.' }], {
 			delay: 10,
@@ -1388,6 +1426,7 @@ describe('Ledger', () => {
 	})
 
 	it('calibrates with and without tools, disables thinking, and reuses the stored gauge', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', usage: { prompt: 30, completion: 1, total: 31 } },
@@ -1414,6 +1453,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects calibration without usage', async () => {
+		const options = buildLedgerOptions()
 		const uncalibrated = buildUncalibratedOptions(options)
 		const ledger = createLedger(createScriptedProvider([{ content: '' }]), uncalibrated)
 		await expect(ledger.calibrate(new AbortController().signal)).rejects.toMatchObject({
@@ -1423,6 +1463,7 @@ describe('Ledger', () => {
 	})
 
 	it('validates constructor options without relying on the factory', () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([])
 		const bare = buildUncalibratedOptions(options)
 		expect(() => new Ledger(provider, { ...bare, capacity: -1 })).toThrow(
@@ -1457,12 +1498,14 @@ describe('Ledger', () => {
 		)
 	})
 	it('validates constructor options with LedgerError', () => {
+		const options = buildLedgerOptions()
 		expect(() => new Ledger(createScriptedProvider([]), { ...options, capacity: 0 })).toThrow(
 			expect.objectContaining({ code: 'CAPACITY' }),
 		)
 	})
 
 	it('holds calibration admission until it settles and releases it after success or failure', async () => {
+		const options = buildLedgerOptions()
 		for (const prompt of [0, 30]) {
 			const provider = createScriptedProvider(
 				[
@@ -1490,15 +1533,18 @@ describe('Ledger', () => {
 	})
 
 	it('preserves the full view and fault on answer-pass selection failure', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: '' }, { content: 'Recovered.' }], {
 			recorded: true,
 		})
-		let failed = false
+		// The system text fails from each run's start until that run's selection.
+		const starts = createRecorder<readonly []>()
+		const chosen = createRecorder<readonly []>()
 		const fault = new Error('planning failed')
 		const ledger = createLedger(provider, {
 			...options,
 			get system() {
-				if (failed) throw fault
+				if (starts.count > chosen.count) throw fault
 				return options.system
 			},
 		})
@@ -1513,11 +1559,9 @@ describe('Ledger', () => {
 		])
 		const selections: Selection[] = []
 		const views: Array<readonly MessageInput[]> = []
-		ledger.agent.emitter.on('start', () => {
-			failed = true
-		})
+		ledger.agent.emitter.on('start', starts.handler)
 		ledger.agent.emitter.on('select', (selection) => {
-			failed = false
+			chosen.handler()
 			selections.push(selection)
 			views.push(ledger.conversation.view())
 		})
@@ -1531,6 +1575,7 @@ describe('Ledger', () => {
 	})
 
 	it('refuses nonpositive priced usage and recovers the next respond after GAUGE', async () => {
+		const options = buildLedgerOptions()
 		const uncalibrated = buildUncalibratedOptions(options)
 		for (const prompt of [0, -1]) {
 			const provider = createScriptedProvider([
@@ -1549,6 +1594,7 @@ describe('Ledger', () => {
 	})
 
 	it('rejects calibration with the abort reason and refuses calibration during respond', async () => {
+		const options = buildLedgerOptions()
 		const uncalibrated = buildUncalibratedOptions(options)
 		const reason = new Error('caller stopped calibration')
 		for (const responding of [false, true]) {
@@ -1570,10 +1616,11 @@ describe('Ledger', () => {
 	})
 
 	it('returns fallback selections with judgments and spent usage when planning fails', async () => {
+		const options = buildLedgerOptions()
 		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
-		let failed = false
+		const unavailable = createRecorder<readonly []>()
 		const fault = new Error('system unavailable')
 		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
 			...options,
@@ -1585,12 +1632,12 @@ describe('Ledger', () => {
 				fetch: transport.fetch,
 			}),
 			get system() {
-				if (failed) throw fault
+				if (unavailable.count > 0) throw fault
 				return 'Serve the desk.'
 			},
 		})
 		const request = ledger.conversation.add({ role: 'user', content: 'Statement.' })
-		failed = true
+		unavailable.handler()
 		const selections: Selection[] = []
 		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
 		const result = await ledger.respond('Inspect the statement.')
@@ -1613,6 +1660,7 @@ describe('Ledger', () => {
 	})
 
 	it('retains judge usage when the caller aborts classification', async () => {
+		const options = buildLedgerOptions()
 		const controller = new AbortController()
 		const transport: RecordedTransport = new RecordedTransport(async () => {
 			if (transport.requests.length === 2) controller.abort()
@@ -1655,6 +1703,7 @@ describe('Ledger', () => {
 	})
 
 	it('returns the readings of its own request only and keeps direct agent selections out of them', async () => {
+		const options = buildLedgerOptions()
 		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
@@ -1704,6 +1753,7 @@ describe('Ledger', () => {
 	})
 
 	it('resets selection and message boundaries before a pass whose selection throws', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: 'First.', usage: { prompt: 100, completion: 2, total: 102 } },
@@ -1726,6 +1776,8 @@ describe('Ledger', () => {
 	})
 
 	it('files failed lookups as chatter and preserves a successful seed reading after a reader throws', async () => {
+		const judge = new RecordingJudge()
+		const options = buildLedgerOptions({ judge })
 		const lookup = requireValue(options.lookups?.[0])
 		const provider = createScriptedProvider(
 			[
@@ -1809,6 +1861,7 @@ describe('Ledger', () => {
 	})
 
 	it('counts an empty recall against its limit and permits a short nonclosed result', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: '' } }] },
 			{ content: '', tools: [{ id: 'next', name: 'recall', arguments: { topic: 'delivery' } }] },
@@ -1836,6 +1889,7 @@ describe('Ledger', () => {
 	})
 
 	it('recalls joined topics with lookup leads and stops a repeated recall irrespective of category', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -1884,6 +1938,7 @@ describe('Ledger', () => {
 	})
 
 	it('closes recall at its limit and when the provider leaves insufficient room', async () => {
+		const options = buildLedgerOptions()
 		const limited = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { topic: 'delivery' } }] },
@@ -1920,6 +1975,8 @@ describe('Ledger', () => {
 	})
 
 	it('assigns notes, tool failures, calls, and generated answers without category questions', async () => {
+		const judge = new RecordingJudge()
+		const options = buildLedgerOptions({ judge })
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'one', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 			{ content: '', tools: [{ id: 'one', name: 'lookup', arguments: { id: 'BW-20931' } }] },
@@ -1944,6 +2001,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps stale sentences and replaced messages in recall results while the briefing drops them', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { topic: 'refunds' } }] },
@@ -2018,6 +2076,7 @@ describe('Ledger', () => {
 	})
 
 	it('pins owner corrections while holding owner rules for a request with no owner', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		ledger.conversation.add([
@@ -2065,6 +2124,7 @@ describe('Ledger', () => {
 	})
 
 	it('orders group three by score regardless of whether a source is decisive', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		const decisive = ledger.conversation.add({ role: 'user', content: 'For Mira, quantity 10.' })
@@ -2094,6 +2154,7 @@ describe('Ledger', () => {
 	})
 
 	it('renders projected amendments in the briefing and stored sources with amendments in recall', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -2178,6 +2239,7 @@ describe('Ledger', () => {
 	})
 
 	it('leaves a live owner-record amendment out of the briefing when a decisive rule unit has an amendment', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
 		ledger.conversation.add([
@@ -2220,6 +2282,7 @@ describe('Ledger', () => {
 	})
 
 	it('drops an empty seed assistant whose calls were all dropped but keeps an empty assistant without calls', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
@@ -2240,6 +2303,7 @@ describe('Ledger', () => {
 	})
 
 	it('matches partial owner words on units and recall but uses exact ids and label substrings for query topics', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -2286,6 +2350,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps replaced user messages in an otherwise uncut seed tail', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
 		const old = ledger.conversation.add({ role: 'user', content: 'Use instruction 42.' })
@@ -2308,6 +2373,7 @@ describe('Ledger', () => {
 	})
 
 	it('reserves only the final answer completion when a later request recalls', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -2334,6 +2400,7 @@ describe('Ledger', () => {
 	})
 
 	it('cuts off-topic rules before owner lines and keeps tail exchanges and call groups whole', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...options,
@@ -2374,6 +2441,7 @@ describe('Ledger', () => {
 	})
 
 	it('uses the measured default turn limit and the default recall limit', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			Array.from({ length: 8 }, (_unused, at) => ({
 				content: '',
@@ -2407,6 +2475,7 @@ describe('Ledger', () => {
 	})
 
 	it('prices only the recall topic and cuts whole source results to the available room', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{
@@ -2440,6 +2509,7 @@ describe('Ledger', () => {
 	})
 
 	it('keeps recalled results in the digest when a later empty lookup replaces their source', async () => {
+		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
 				{

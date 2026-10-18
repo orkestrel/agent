@@ -5,6 +5,55 @@ Scaffold authority before acting. Paths without a sibling prefix resolve from
 `C:/Users/mikes/WebstormProjects/agent`. The long chronological handoff is archived at Agent
 commit `78ea378`; do not treat its historical process or deadline entries as active.
 
+## Session of 2026-10-17
+
+The live campaign plan is `.orkestrel/plan.md` (goal, exit criterion, units, routing). User instruction: resume the
+`let` sweep, the budget redesign and the Records labeling with full use of Claude, Codex Astra and Cursor Grok; publish
+nothing; regenerate each changed package's distributable and point consumers' `package.json` at it locally, always
+working on the latest builds. That instruction outranks `wave.md`'s keep-the-registry-range sentence; the release law's
+other terms still bind (tarball, never link; record the replaced range; restore before publishing).
+
+- **Records Grok population complete.** PID 53796 exited 0, uncapped, in 8801896 ms: summary
+  `{"labeled":39,"skipped":57,"total":96,"complete":true}` (057–095 labeled in this attempt; 001–056 and the 096 pilot
+  re-verified). Agent's `node_modules/@orkestrel/scaffold` is no longer frozen. The import unit
+  (`tmp/units/records-grok-label-import-brief.md`) audits all four disclosed attempts against grading `4868d734…`.
+- **Records Grok grading imported (2026-10-17).**
+  - Audit: `tmp/units/records-grok-label-import-audit.ts`, exit 0. It covers 96 batches and 384 unique judgments
+    across the four disclosed attempts. The refused 051 and 057 attempts are excluded. The merged labels file is
+    `tmp/studies/records-grok-labels.json`, SHA-256 `48a9a610…5d98`, created once.
+  - Review: an independent Astra review (`tmp/units/records-grok-label-import-review.md`) failed two claims.
+    - Claim 7: the captured `422d549` Study refuses the Records manifest and grading formats.
+    - Claim 6: `report` took an unbound digest.
+  - Fix 2 adopted both prescriptions and closed with 24 mutation probes.
+    - The launcher now runs the inventory-pinned `f977e68` runtime (`tmp/units/study-root-install-f977e68`, 17 files),
+      which imported Sol's Records labels on 2026-10-15.
+    - Its runtime check (`tmp/units/records-grok-label-runtime-check.ts`) proves three things: the runtime reads the
+      Records formats, it rebuilds packet `2ac2a898…`, and it refuses a foreign packet.
+    - `report` takes its digest from the label result record.
+  - `study label` returned grading `69281caeec6e5a8c9f159c922e9f4e1056d86c2d94e9b4091fd06ff2b2ddeafb`: exit 0,
+    uncapped, 4072 ms. Its previous grading is `4868d734…`, its packet `2ac2a898…`, its labeler `grok-4.7-xhigh`.
+  - `study report`: exit 0, uncapped, 1957 ms. Records reads 72 achieved, 312 unsuccessful, 0 unknown and 30 critical
+    out of 384 (0.1875).
+  - Judge usage: 96 calls, 8507083 tokens (6735651 input plus 1771432 output; 559488 cached input, not added again),
+    22647151 ms.
+- **Records against Compaction, judge for judge (exploratory).** Both readings use Grok 4.7 Extra High, which
+  substitutes for the frozen Sol-high adjudicator.
+
+  | Arm | Achieved | Unsuccessful | Unknown | Critical | Share |
+  | --- | --- | --- | --- | --- | --- |
+  | Records (`69281cae…`) | 72 | 312 | 0 | 30 | 0.1875 |
+  | Compaction `compaction-output-2` (`69a7a63a…`) | 56 | 328 | 0 | 41 | 0.146 |
+
+  - **Judge agreement.** On the same Records packet, Sol (`b3636a40…`, 78 achieved, 305 unsuccessful, 1 unknown) and
+    Grok agree on 362 of 384 judgments. That is 0.943, with Cohen's kappa 0.82 (`tmp/units/records-labeler-agreement.json`).
+    The disagreements: 14 Sol achieved where Grok found unsuccessful, 7 the reverse, and 1 Sol unknown where Grok found
+    achieved.
+  - **What this does not show.** Each arm is one repetition. The arms ran on different builds and rooms, and both
+    adjudicate the same 96-goal workload (`e6d2396c…`). So this is descriptive, not a causal claim about the strategies
+    and not a replicated quality difference.
+- **Benches live** (probed 2026-10-17): Codex `gpt-6-astra`, Cursor `grok-4.7-xhigh`, native Claude Haiku.
+- **Stray file removed.** An empty untracked `src/core/compilers.ts` (0 bytes, created 2026-10-16 14:48) was deleted.
+
 ## State and scope
 
 The `compaction-output` attempt is interrupted, unsealed, and preserved; it has no operational
@@ -323,6 +372,312 @@ without imports.
     - The build was cancelled. Its 51 KB partial diff is kept in
       `tmp/units/scaffold-studies-build-grok-partial.patch`, and scaffold was reset to `1f2eed70e` so the Sonnet
       builder starts clean.
+    - **`let` ban (user, 2026-10-16).** The user rejects `let` anywhere, for example `let studies = false`
+      reassigned in a loop.
+      - Scaffold `typescript.md` gains a Bindings rule: `const` only, derive instead of accumulating.
+      - Scaffold sweeps its `let` declarations (116 in `src`, 65 in `tests`) before its release.
+      - Agent sweeps its 156 (including `src`, before its publish) and Study its 109 in this campaign.
+      - A vendored policy lint rule follows in a later scaffold release, after the fleet sweep.
+      - Every brief forbids `let` and scans added lines at acceptance.
+      - Agent and Study sweeps run now (brief `tmp/units/let-sweep-brief.md`, Sonnet, workflow `wf_c2e51d47-2dc`).
+        Scaffold's sweep and its rule text follow its in-flight build.
+      - **The scaffold studies build landed uncommitted** (Sonnet; report `tmp/units/scaffold-studies-build-2-report.md`,
+        diff `tmp/units/scaffold-studies-build-2.patch`).
+        - All gates are green, and 256 recorded `studies: false` outputs are byte-identical across 64 blueprints.
+        - Agent converges in one repair; the only difference is the `setupFiles` line. All four mutations turn red.
+        - It added two `let`s, since it predated the rule, and left local helpers that predate it in scaffold's
+          tests.
+      - **Scaffold sweep** (`tmp/units/scaffold-sweep-brief.md`; three Sonnet lanes `src`, `support` and `tests`;
+        workflow `wf_e336ca46-1b1`):
+        - adds the Bindings rule to `typescript.md` and a `tests/studies` row to `tests.md`;
+        - fixes the factory comment;
+        - removes every `let` and `var` (about 266);
+        - relocates every local test helper and lowercase constant into exported, proven setup members.
+      - **Let-sweep round 1 failed falsify** (claims `tmp/units/let-sweep-claims.md`; verdicts
+        `tmp/units/let-sweep-verdict-{subjective-1,objective-agent-1,objective-study-1}.md`; backups
+        `tmp/units/let-sweep-{agent,study}.patch`). The Orchestrator reproduced the main findings.
+        - Defects in Agent `src`:
+          - `iterateRange` holds 76 MB at a count of 1e7 and up to 256 MB at larger counts (`Array(n).keys()`).
+          - Function-argument spreads (`Math.min(...)`, `unshift(...)`) throw past about 130–140k elements.
+          - Sparse `attachUserImages` now throws.
+          - A guide fence regressed.
+        - In Study, overlapping `StudyLauncher` launches share `#failure`: the hold launch rejects with the burst
+          launch's overflow.
+        - Test claims were weakened:
+          - the CLI build runs at collection time, so it is unbounded and leaks on failure;
+          - the `StudySeries` waits check reads `calls[0]`;
+          - the Ledger fault window changed.
+        - The sweeps removed the keyword but kept the pattern: mutated `const` records and per-call resets of `#`
+          fields.
+        - **User decision "Derive, else per-call entity":**
+          - each step returns a readonly result into a local list, and aggregates are derived from that list;
+          - state that callbacks must mutate lives on a per-call entity;
+          - a mutated `const` record, or a `#` field reset on every call, is the banned pattern.
+          - The extension text is in `tmp/units/bindings-rule-extension.md` and lands in scaffold `typescript.md`
+            § Bindings after the scaffold sweep.
+        - **Round 2** (brief `tmp/units/let-sweep-brief-2.md`; workflow `wf_2b3e3055-f3f`): one pipeline per repo
+          with an Opus design, a Sonnet build of `src`, a Sonnet build of the tests, and a Haiku gate. Designs go to
+          `tmp/units/let-sweep-design-{agent,study}.md`. Falsify round 2 follows.
+        - Study is not restaged into Agent until the Records population ends, to protect custody.
+      - **Scaffold sweep round 1 returned** (`wf_e336ca46-1b1`; reports `tmp/units/scaffold-sweep-{src,support,tests}-report.md`;
+        whole-tree backup `tmp/units/scaffold-sweep-round1.patch`).
+        - **Lane results.** The lanes removed the `let`s. Scoped gates failed on:
+          - a stale `host.json` and built host;
+          - a stale studies-comment expectation;
+          - a guide row;
+          - a timeout under load.
+        - **Mirrored guides.** The support lane rewrote 14 mirrored fleet guides, which `documentation.md:54` forbids. The
+          Orchestrator reverted them and kept the diff in `tmp/units/scaffold-sweep-mirror-guides.patch` for the owning
+          packages.
+        - **Bindings rule.** The Orchestrator added the three extension bullets to scaffold `typescript.md` § Bindings.
+        - **Round 2** (brief `tmp/units/scaffold-sweep-brief-2.md`; workflow `wf_b81bb9a6-50b`): an Opus design, three
+          Sonnet lanes, a Sonnet integrator and a Haiku gate.
+        - **Rulings.**
+          - `BuildState` is lawful.
+          - Widening `PolicyExpression.kind` to `string` is refused.
+          - The `SCRATCHES` and `STAGES` const arrays are banned.
+          - So are unbounded counting allocations and argument spreads.
+      - **Round 2 designs returned** (`tmp/units/let-sweep-design-{agent,study}.md`,
+        `tmp/units/scaffold-sweep-design-2.md`). Every one stopped for a surface question or a ruling.
+        - **User answers.**
+          - Agent: approve `AgentTurn` and the meter, but check whether `Meter` belongs in `@orkestrel/budget` and move it
+            there if it does ("don't be afraid of churn").
+          - Ledger: `LedgerRequest` now.
+          - Study: approve all.
+        - **Orchestrator rulings** are in `tmp/units/let-sweep-rulings-2.md`.
+          - Scaffold `typescript.md` § Bindings now has nine bullets. The ninth lists what is not a running value:
+            - worklists and visited sets;
+            - registries of in-flight per-call entities;
+            - write-once memos;
+            - straight-line lists;
+            - platform-required writes.
+          - Scaffold may delete its `ReadAllowance` type.
+          - Study's single-slot interrupt is a defect.
+        - **In flight.**
+          - The scaffold lanes resumed (`wf_b81bb9a6-50b`).
+          - The Study build and the budget meter design run as one workflow (`wf_499c081b-9e8`; design goes to
+            `tmp/units/budget-meter-design.md`).
+          - The Agent build waits for the budget design and for the Records population to end. Agent's `node_modules`
+            stay frozen until then (the last check showed 52 of 96 batches done at 12:11).
+        - **Session limit (2026-10-16, reset 14:30).** It cut both workflows.
+          - The scaffold `src` and `tests` lanes, the integrator and the gate failed. The `src` and `tests` lanes had each
+            run about 40 minutes, so their partial edits are in the tree. The support lane finished, and its report is
+            saved to `tmp/units/scaffold-sweep-2-support-report.md`.
+          - The Study `src` builder failed. The tree showed 65 changed paths against round 1's 43.
+          - The budget meter design finished (`tmp/units/budget-meter-design.md`): the placement is
+            `@orkestrel/budget`, with eight new names (`Meter`, `MeterInterface`, `MeterOptions`, `TokenMeterOptions`,
+            `createTokenMeter`, `isBudget`, `validateMeterOptions`, `validateTokenMeterOptions`). Agent keeps
+            `estimateTokens`, `chargeUsage` and `AgentTurn`. Three user questions are pending: when budget publishes,
+            strict validation, and where `chargeUsage` lives.
+          - Relaunched as continuation workflows. Each builder is told to verify its predecessor's partial edits
+            against the round-1 patch before trusting them.
+            - Scaffold `src`, `tests`, integrator and gate: `wf_27b65689-d91`.
+            - Study `src`, tests and gate: `wf_b3576ae8-dc0`.
+            - Reports go to `tmp/units/scaffold-sweep-2-{src,tests,integrate}-report.md` and
+              `tmp/units/let-sweep-2-study-{src,tests}-report.md`.
+        - **Records Grok population stopped (12:12), then resumed (14:48).** It had stopped at 51 of 96 batches.
+          - **Cause.** Batch 051 (`ev-13-3`) failed its exact-string model guard. Cursor's init line read `"Grok 4.7
+            Extra High"`, with a double space where `256K` belongs. The request was the same pinned `grok-4.7-xhigh`,
+            and the batch ran to a successful result. The user confirmed Grok still has usage.
+          - **Probe (14:45).** The same pinned request resolved `"Grok 4.7 256K Extra High"` again, so the label drop was
+            transient. The probe directory was deleted.
+          - **Kept immutable.**
+            - The refused attempt moved to `tmp/studies/labels-grok-2ac2a898-refused/051.attempt1`.
+            - Its journals are `tmp/cursor/grok-label-records-051.*.attempt1`.
+            - The population journals are `*.attempt2`.
+          - **User decision "Capture Study, then unfreeze".**
+            - `tmp/units/study-label-grok/helpers.ts` and its test now import Study and contract from the captured series
+              runtime `tmp/studies/compaction-output-2-runtime/node_modules`.
+            - Its Study `dist` and manifest bytes, and its contract bytes, equal Agent's root install (only `LICENSE`
+              and `README.md` are absent). Its `@orkestrel/agent` build differs, but the label checks call only Study's
+              guards.
+            - The helpers run 80 of 80 tests, and all 51 published batches re-verify through `checkPublication`.
+            - Agent's `node_modules` are therefore unfrozen for Study and budget staging. They stay frozen for the
+              scaffold package, because each batch's launcher loads from `node_modules/@orkestrel/scaffold` until the
+              population ends.
+          - **Relaunch.** It is detached through WMI as PID 51700 (receipt
+            `tmp/units/study-label-grok-records-detach-3.json`) and resumed at 051. A skip re-checks each published
+            batch.
+          - **Second stop (15:18) at batch 057** (`ev-15-1`), after 051–056 were labeled.
+            - The refusal read "Journal line 553 has an unexpected event type".
+            - Mid-run, the Cursor CLI lost its connection and resumed from a checkpoint. It wrote `connection`
+              `reconnecting`/`reconnected` and `retry` `starting`/`resuming` (`is_resume: true`) events.
+            - The run resolved Grok 4.7 256K and succeeded. Its usage reports `inputTokens: 70` and `cacheReadTokens:
+              85760`, which is only the resumed segment, so the accounting is incomplete.
+            - The allowlist refusal matches `semantic.md` § Admit labeling: no hidden retry, no missing accounting.
+            - The refused attempt moved to `tmp/studies/labels-grok-2ac2a898-refused/057.attempt1`. Its journals are
+              `*.attempt1`, and the population journals are `*.attempt3`.
+            - **Relaunched** as PID 53796 (receipt `tmp/units/study-label-grok-records-detach-4.json`). Batch 057 runs
+              fresh. Each relaunch is a disclosed re-run of a refused batch, not a hidden retry.
+        - **Study round 2 returned** (`wf_b3576ae8-dc0`; reports `tmp/units/let-sweep-2-study-{src,tests}-report.md`).
+          - **Gates.** All exit 0:
+            - format, lint and check;
+            - `test:src` 560 (round 1: 535), `test:setup` 58, `test:policy` 119, `test:config` 229, `test:guides` 14,
+              `test:distribution` 10.
+          - **New per-call entities.** D4 `StudyLaunchChild`, D5 `StudyTrialLease`, D6 `StudyTaskChild`,
+            `StudyOllamaExchange` and `StudyProcessGoal`. All five are interned, each with a mirrored test.
+          - **Registries under R2.** `StudyAgentScript#serving` and `StudyAgentTrace#flushes`.
+          - **Haiku gate verdict: FAIL** on ten per-goal resets of long-lived entities:
+            - `StudyAgentTrace` `start`/`flush`;
+            - `StudyAgentScript` `prepare`;
+            - `StudyOllamaTransport` `prepare`.
+          - **Orchestrator check of the deviations.**
+            - The tests builder's `decodeSegment` in the self-contained distribution proof is a lawful returning helper
+              (Bindings bullet 4).
+            - The fixture-before-`try` regression in `StudyTask.test.ts` was fixed by the tests builder.
+          - **Fix 3** (brief `tmp/units/let-sweep-study-fix-3-brief.md`; workflow `wf_681241bb-63c`) runs an Opus
+            design, a Sonnet build and a Haiku gate. It adds per-goal entities reached through registries and keeps the
+            public surface. If a public change is needed, it stops for the user.
+          - **Staged files.** Study's builders staged their new files: 10 are staged, none untracked.
+        - **Scaffold round 2 is green** (`wf_27b65689-d91`; reports `tmp/units/scaffold-sweep-2-{src,tests,integrate}-report.md`).
+          - The Haiku gate passed:
+            - format, lint, check and `check:skills` exit 0;
+            - `npm test` passes 8 of 8 projects serially;
+            - every criterion-3 hit is lawful;
+            - the mirrored guides are byte-equal to HEAD.
+          - The integrator also ran `test:templates` (61) and `test:distribution` (11 passed, 1 skipped; the registry was
+            reachable). It repaired two TSDoc examples that the distribution drive exposed.
+          - **Falsify round 2 is running.** Claims are in `tmp/units/scaffold-sweep-2-claims.md` (nine claims).
+            - The tree is backed up as `tmp/units/scaffold-sweep-round2.patch`, plus `scaffold-sweep-round2-untracked/`
+              for `GitQuery.ts` and its test.
+            - Objective lane: Grok 4.7 xhigh, T3 task `scaffold-sweep-2-falsify-objective-grok-1`.
+            - Subjective lane: Opus, a native background agent.
+            - Verdicts go to `tmp/units/scaffold-sweep-2-verdict-{objective,subjective}-1.md`.
+            - The commit follows reconciliation.
+          - **Falsify round 2 returned FAIL from both lanes.**
+            - **Grok failed claims 1, 2, 4, 5, 6 and 9, plus F1:**
+              - `#gather` with a hole, and the `launch.ts` cap above 2^32 ms;
+              - emitted changes beyond the exception list;
+              - rule numbering, and `log.at(-1)`;
+              - seven exports missing from the surface list;
+              - `BuildState.trusted`.
+            - **Opus failed claims 2, 3, 4, 5 and 9, plus O1:**
+              - the studies selector admits a nested `node_modules` path;
+              - rule-text disguises, and the conflict with `architecture.md:206`;
+              - seven syntax-only sites: `Upstream` `notes` and `spent`, `resolveRealPath` `trail`, `stepYamlState`
+                text accretion, `GitQuery`'s published intake, `TestAuditRegistry` and `TestHolder`;
+              - the ambiguous `tests.md` `setupStudy` sentence.
+            - **Orchestrator checks.**
+              - HEAD's emitted journey proof compared a `Set` with an array, so the array form fixes a latent failure.
+              - `SheetEntry` has no importer in the fleet; the only hit is veneer's own emitted copy.
+            - **Reproduction.** Workflow `wf_9b130a7d-07c` runs five Sonnet reproducers, including a HEAD-baselined
+              full-emission diff.
+            - **User answers.**
+              - "Close all, middleware too": the tightening closes every disguise, states R1's conditions, bans
+                reassigning a parameter or a `catch` binding, and moves middleware state into the pluggable class.
+              - "Barrel it per the law" for Study's `StudyProcessGoal`.
+            - **Rule draft.** Workflow `wf_7d9337ac-23a`.
+              - Opus (max) writes the draft to `tmp/units/bindings-rule-3-draft.md`.
+              - Sonnet then takes a census per repository into `tmp/units/bindings-rule-3-census-{repo}.md`.
+              - Next come a Grok objective review of the draft, then the Orchestrator lands the text, then one fix
+                unit per repository.
+        - **Study fix 3.** The user answered the designer's two questions: "Add explicit clear()" and "Approve per-goal
+          attach". The rerun is `wf_e5e69aa9-847`: an Opus revision, then a Sonnet build, then a Haiku gate. Agent's
+          `clear()` calls land with the Agent build.
+          - **Result: PASS** (report `tmp/units/let-sweep-study-fix-3-report.md`).
+            - Gates: `test:src` 584 (56 files), `test:setup` 58, `test:guides` 14, `test:distribution` 10. Format,
+              lint and check exit 0.
+            - There are zero `let` and zero unlawful field assignments.
+            - The only public changes are `clear()` and the documented refusals.
+          - **Orchestrator ruling.** The transport's `#previous` is lawful under Bindings bullet 5. It is cross-goal
+            owner state: updated, never reset, and read by HEAD's next-goal `previous`/`changed` row.
+          - **Agent consumer change** (design § 9): `this.#transport.clear()` in `StudyMemorySession#execute`'s innermost
+            `finally`, and `this.#provider.clear()` in `StudyToolsSession#run`'s. They land with the Study restage,
+            because without them every multi-goal study fails at the second `prepare`.
+          - **Study falsify round.**
+            - The six new untracked files were marked intent-to-add.
+            - Backup: `tmp/units/let-sweep-study-round2.patch`.
+            - Claims: `tmp/units/let-sweep-study-2-claims.md`.
+            - Opus subjective lane is running.
+            - Grok objective lane: T3 task `let-sweep-study-2-falsify-objective-grok-1`, dispatched once the budget
+              review returned.
+          - **Study falsify returned FAIL from both lanes.** Verdicts:
+            `tmp/units/let-sweep-study-2-verdict-{objective,subjective}-1.md`.
+            - **Grok** failed claims 4 and 8:
+              - `StudyAgentTrace#slots` is a latest-value `Map`;
+              - `StudyCommand#prepare` pushes in parallel onto two lists inside an awaiting loop.
+              - Every other claim held: behaviour, leaks, test strength, guide parity, and Agent's restage edits being
+                exactly the two `clear()` calls.
+            - **Opus** failed claims 1, 5 and 8, plus O1:
+              - the timing extractor is now called on every row, against its terminal-only contract;
+              - `StudyProcessGoal` needs barrelling, which the user approved;
+              - O1: the D4 proof is vacuous.
+            - **Reconciliation on claim 1.** The lanes answered different questions: Grok asked whether the
+              recorded timing is unchanged, Opus asked about the callback contract. Both findings stand.
+            - **Reproduction.** Workflow `wf_3d43915c-935`. The Study fix unit follows the final rule text, because
+              the lawful form of `#slots` depends on the "log read only at its last entry" sentence.
+        - **Budget design 2 is final** (`tmp/units/budget-meter-design-2.md`, `wf_50cf95ca-136`; reviews
+          `tmp/units/budget-meter-review-2-{law-intent,code-evidence}.md`). The user accepted every recommendation:
+          - no meter layer by default, with `allowance: budget` giving HEAD's behaviour;
+          - a typed `BudgetError` (`'exhaust'`);
+          - `truncated` and the model layer in this wave;
+          - all the rest as recommended (`tmp/units/let-sweep-rulings-2.md`).
+          - Grok objective review: T3 task `budget-meter-design-2-objective-grok-1`, report
+            `tmp/units/budget-meter-review-2-grok.md`.
+          - Budget's visit (re-pin to the registry, `scaffold overwrite` to 0.0.101, audit, gates, commits): workflow
+            `wf_e5bb6d28-464`. **Green.**
+            - Commits, unpushed: `39e4455` re-pin, `fda8528` catalog agent migration, `edd3553` overwrite with scaffold
+              0.0.101.
+            - The audit drifts 0 of 56 paths.
+            - Gates: `test:src` 132, `policy` 119, `config` 229, `setup` 7, `guides` 26, `test:distribution --mode
+              release` 9.
+            - `compare` finds the dist identical, so no bump is owed by the visit.
+            - The gate's only red was `test:probe` ("No test files found"). That script is a workbench no gate
+              selects, and the Orchestrator ruled it not a gate.
+            - Notices: the `guides/test.md` mirror differs from the hosted guide (scaffold raises this on every run);
+              `typescript` 6 against 7 and `vitest` 4 against 5 are major drift and are not re-pinned.
+          - Next are the build units: U1 budget, U2 Agent's provider contract, U3 Agent's loop on D1, and U4 Ollama.
+          - **Grok review: PASS-WITH-FIXES** (3 major, 4 minor; `tmp/units/budget-meter-review-2-grok.md`).
+            - **Major 1.** A meter stop must also require `allowance.exhausted` and matching `id` and `max`, because a
+              parent linked through the allowance's `signal` wins `AbortSignal.any`.
+            - **Major 2.** A truncated answer counts as a model stop only when the reason is `undefined` or a
+              `BudgetError`. A listener or timeout abort after the return gives no stop.
+            - **Major 3.** B1 also changes queue/workflow's `QueueError` message (`Queue.ts:613-614` via
+              `WorkflowRunner.ts:475`, `Runner.ts:480-481`) and Study's `readStudyFailure` message
+              (`StudyAgentScript.ts:160-165`).
+            - **Minor.** The B5 exception on the HEAD path; three citations; the `tokenUsageToJSON` description; the
+              queue and supervisor staging text.
+          - **The amendment and U1 returned** (`wf_6747e950-b2f`).
+            - **Amendment.** It adopted G1, G3, G4, G5b, G5d, G6 and G7, and adopted G2 in part. It rejected G5a and
+              G5c, both on file readings. The user answered the new Q15 with "Keep stop: 'model'".
+            - **U1.** Every gate exits 0:
+              - `test:src` 244, `test:guides` 30, `test:setup` 15;
+              - check, lint, format and build.
+              - All 11 exports are documented, guided and proven.
+              - The `Budget.ts:108` guard deviation is justified by a probe.
+            - **U1's open item.** Budget's presence-owned `tests/distribution.test.ts` holds pre-existing `let`s at
+              196, 287 and 323, and a text-accreting slot at 513. The first design's inventory missed them. Budget
+              sweeps them against the final rule text.
+          - Workflow `wf_6747e950-b2f` runs two things in parallel:
+            - an Opus amendment of the design, which reproduces each finding and writes a "Grok review reconciliation"
+              section;
+            - U1 in budget (Sonnet build, then Haiku gate; report `tmp/units/budget-u1-report.md`). It does not
+              commit or bump; new files are marked intent-to-add.
+        - **Budget meter answers (user).**
+          - Publication: "Stage now, publish in wave".
+          - `chargeUsage` stays in Agent.
+          - The meter's behaviour is reopened. The meter is "an additional layer", and the user wants to trace "across
+            all three layers of possible allowed failure points" (the meter estimate, the budget, the model). Each
+            layer must be able to fail first. The verbatim answer is in `tmp/units/let-sweep-rulings-2.md`.
+          - The redesign brief is `tmp/units/budget-meter-brief-2.md`. The workflow `wf_50cf95ca-136` runs an Opus
+            planner, then an Opus law and intent critic beside a Sonnet code-evidence critic, then an Opus revision.
+            Its output is `tmp/units/budget-meter-design-2.md`.
+    - **Source-layer naming.** The test-layer fixes landed as Agent `f52daa4`.
+      - The Opus planner's table is `tmp/units/naming-design-planner-1.md`. It confirms the clear rows and names the
+        judgment rows for what they are, for example `StudyLabels` → `StudyLabeling` and `Artifacts` →
+        `ArtifactLoader`.
+      - It rules that derived guards, parsers and builders follow their type, and that persisted keys (`bounds`,
+        `settings`, `labels`) keep their term.
+      - Grok attacks it (task `naming-design-objective-1`). Sonnet implements after reconciliation.
+      - **Reconciled** in `tmp/units/naming-plan.md`.
+        - Grok confirmed every name and failed the table for incomplete families.
+        - Adopted: `resolveStudyMemoryObservation`; `StudyMemorySettings` → `StudyMemoryOptions` after the driver
+          options become `StudyMemoryDriverOptions`; `{Entity}Options` for the other driver and sink classes.
+        - Kept: `StudyBounds` and `StudyScore.total`.
+        - Unit A (Study `src`, tests and guide) runs after the `let` sweeps.
+        - Unit B (Agent consumer, tests and the Study restage) waits for the Records Grok population. The runner
+          imports root Study for every batch. Unit B first repoints the series labeling tools at the captured
+          runtime's Study.
     - The Sonnet successor build runs from `tmp/units/scaffold-studies-build-brief-2.md` (workflow
       `wf_65bc6dda-e7b`). The brief states the law that was broken: declaration placement, no local helpers in test
       files, and the vendored set's helpers as exported members of `tests/setupPolicy.ts`. It also states the naming

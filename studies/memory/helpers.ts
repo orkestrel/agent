@@ -151,41 +151,52 @@ export function buildStudyMemoryRoles(
 export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeReading {
 	const { criterion, attempt, evidence } = target
 	const observation = attempt?.observations.find((entry) => entry.goal === criterion.goal)
-	let verdict: StudyJudgment['verdict'] = 'unknown'
-	let references: readonly StudyReference[] = []
 	const assertion = criterion.assertion
-	if (
+	const eligible =
 		attempt !== undefined &&
 		criterion.method !== 'semantic' &&
 		isStudyMemoryAssertion(assertion) &&
 		observation !== undefined
-	) {
-		const complete = observation.failure === undefined && observation.product !== undefined
-		if (assertion.observation === 'operational') {
-			verdict = complete && attempt.failure === undefined ? 'achieved' : 'unsuccessful'
-			references = [{ file: 'attempt' }]
-		} else if (assertion.observation === 'result') {
-			if (observation.product !== undefined) {
-				verdict = observation.product.partial === assertion.partial ? 'achieved' : 'unsuccessful'
-				references = [{ file: 'attempt' }]
-			}
-		} else {
-			const index = evidence.findIndex(
-				(row) =>
-					row.goal === criterion.goal &&
-					row.event === assertion.observation &&
-					(assertion.observation === 'summary' ||
-						(isRecord(row.value) && 'id' in assertion && row.value.id === assertion.id)),
-			)
-			if (index >= 0) {
-				verdict = 'achieved'
-				references = [{ file: 'evidence', row: index }]
-			} else if (complete) {
-				verdict = 'unsuccessful'
-				references = [{ file: 'attempt' }, { file: 'evidence' }]
-			}
-		}
+	const complete =
+		eligible && observation.failure === undefined && observation.product !== undefined
+	// Only a trace assertion looks for an evidence row; the other two read the attempt alone.
+	const index =
+		eligible && assertion.observation !== 'operational' && assertion.observation !== 'result'
+			? evidence.findIndex(
+					(row) =>
+						row.goal === criterion.goal &&
+						row.event === assertion.observation &&
+						(assertion.observation === 'summary' ||
+							(isRecord(row.value) && 'id' in assertion && row.value.id === assertion.id)),
+				)
+			: -1
+	const unread: { verdict: StudyJudgment['verdict']; references: readonly StudyReference[] } = {
+		verdict: 'unknown',
+		references: [],
 	}
+	const { verdict, references }: typeof unread = !eligible
+		? unread
+		: assertion.observation === 'operational'
+			? {
+					verdict: complete && attempt.failure === undefined ? 'achieved' : 'unsuccessful',
+					references: [{ file: 'attempt' }],
+				}
+			: assertion.observation === 'result'
+				? observation.product === undefined
+					? unread
+					: {
+							verdict:
+								observation.product.partial === assertion.partial ? 'achieved' : 'unsuccessful',
+							references: [{ file: 'attempt' }],
+						}
+				: index >= 0
+					? { verdict: 'achieved', references: [{ file: 'evidence', row: index }] }
+					: complete
+						? {
+								verdict: 'unsuccessful',
+								references: [{ file: 'attempt' }, { file: 'evidence' }],
+							}
+						: unread
 	return {
 		verdict,
 		method: criterion.method === 'semantic' ? 'human' : criterion.method,

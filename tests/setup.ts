@@ -714,13 +714,13 @@ export function createSharedGatedProvider(
 	g1: PromiseWithResolvers<void>,
 	g2: PromiseWithResolvers<void>,
 ): ProviderInterface {
-	let started = 0
+	const starts = createRecorder<readonly []>()
 	return {
 		id: 'm',
 		name: 'm',
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-			started += 1
-			const gate = started === 1 ? g1 : g2
+			starts.handler()
+			const gate = starts.count === 1 ? g1 : g2
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
 			if (signal.aborted) throw new ProviderAbortError({ content: 'part' })
@@ -737,13 +737,13 @@ export function createIndependentGatedProvider(
 	g1: PromiseWithResolvers<void>,
 	g2: PromiseWithResolvers<void>,
 ): ProviderInterface {
-	let started = 0
+	const starts = createRecorder<readonly []>()
 	return {
 		id: 'own',
 		name: 'own',
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
-			started += 1
-			const me = started
+			starts.handler()
+			const me = starts.count
 			const gate = me === 1 ? g1 : g2
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
@@ -758,13 +758,13 @@ export function createIndependentGatedProvider(
 
 /** Requests a tool then fails the following provider turn. */
 export function createSecondTurnFailureProvider(): ProviderInterface {
-	let calls = 0
+	const turns = createRecorder<readonly []>()
 	return {
 		id: 'fault',
 		name: 'fault',
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			calls += 1
-			if (calls === 1) {
+			turns.handler()
+			if (turns.count === 1) {
 				yield { channel: 'content', text: '' }
 				return { content: '', tools: [createToolCall()] }
 			}
@@ -1554,24 +1554,24 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 			if (this.#delay > 0) await waitForDelay(this.#delay)
 			const { result, deltas, thoughts } = splitTurn(this.#next())
 			const chunks = deltas ?? this.#chunk(result.content)
-			let streamed = ''
-			let reasoned = ''
+			const streamed: string[] = []
+			const reasoned: string[] = []
 			for (const thought of thoughts ?? []) {
 				if (signal.aborted) {
-					throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
+					throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
 				}
-				reasoned += thought
+				reasoned.push(thought)
 				if (thought.length > 0) yield { channel: 'thinking', text: thought }
 			}
 			for (const delta of chunks) {
 				if (signal.aborted) {
-					throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
+					throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
 				}
-				streamed += delta
+				streamed.push(delta)
 				if (delta.length > 0) yield { channel: 'content', text: delta }
 			}
 			if (signal.aborted) {
-				throw new ProviderAbortError(buildProviderPartial(streamed, reasoned))
+				throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
 			}
 			return result
 		} finally {
@@ -1586,9 +1586,10 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		options?: ProviderStreamOptions,
 	): Promise<ProviderResult> {
 		const generator = this.stream(messages, signal, tools, options)
-		let step = await generator.next()
-		while (!step.done) step = await generator.next()
-		return step.value
+		for (;;) {
+			const step = await generator.next()
+			if (step.done) return step.value
+		}
 	}
 
 	#next(): ScriptedTurn {
@@ -2804,8 +2805,7 @@ export function driveThinkSplitter(
 	splitter: ThinkSplitterInterface,
 	deltas: readonly string[],
 ): string {
-	let content = ''
-	for (const delta of deltas) content += splitter.split(delta)
+	const content = deltas.map((delta) => splitter.split(delta)).join('')
 	return content + splitter.flush()
 }
 
@@ -3042,12 +3042,11 @@ export async function drainProvider(
 	readonly result: ProviderResult
 }> {
 	const deltas: ProviderDelta[] = []
-	let step = await stream.next()
-	while (!step.done) {
+	for (;;) {
+		const step = await stream.next()
+		if (step.done) return { deltas, result: step.value }
 		deltas.push(step.value)
-		step = await stream.next()
 	}
-	return { deltas, result: step.value }
 }
 
 /**
@@ -3203,13 +3202,13 @@ export class ScriptedJudge extends AgentJudge {
 		this.#values.push(value)
 		this.#abort?.abort()
 		if (!isRecord(value)) throw new JudgeError('PROTOCOL', 'judge error: invalid envelope')
-		let answers: Readonly<Record<string, JudgeAnswer>> = {}
-		let refusals: Readonly<Record<string, Refusal>> = {}
+		const answers: Record<string, JudgeAnswer> = {}
+		const refusals: Record<string, Refusal> = {}
 		for (const id of Object.keys(request.questions)) {
 			const answer = this.#answers[id]
 			const refusal = this.#refusals[id]
-			if (answer !== undefined) answers = { ...answers, [id]: answer }
-			else if (refusal !== undefined) refusals = { ...refusals, [id]: refusal }
+			if (answer !== undefined) answers[id] = answer
+			else if (refusal !== undefined) refusals[id] = refusal
 			else throw new JudgeError('PROTOCOL', `judge error: answer ${id} is missing`)
 		}
 		return {

@@ -276,18 +276,18 @@ export class Conversation implements ConversationInterface {
 		// The newest user message is the request a run serves, so it and its turns stay live.
 		const newest = live.findLastIndex((message) => message.role === 'user')
 		const first = live.findIndex((message) => message.role === 'user')
-		let fold = Math.min(
+		const wanted = Math.min(
 			keep <= 0 ? live.length : live.length - keep,
 			newest === -1 ? live.length : newest,
 		)
-		let start = 0
-		for (const exchange of collectExchanges(live)) {
-			const end = start + exchange.length
-			if (start < fold && fold < end) fold = start
-			start = end
-		}
+		// The exchange edges are each exchange start followed by the final end; a cut inside an
+		// exchange moves back to that exchange's start so a whole exchange folds or stays.
+		const edges = [0]
+		for (const exchange of collectExchanges(live)) edges.push((edges.at(-1) ?? 0) + exchange.length)
+		const aligned =
+			wanted < live.length ? (edges.findLast((edge) => edge <= wanted) ?? wanted) : wanted
 		// Retain the leading context until the first user exchange can fold with it.
-		if (first >= 0 && fold <= first) fold = 0
+		const fold = first >= 0 && aligned <= first ? 0 : aligned
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
 		// A rolling fold digests every prior recap (framed, oldest first) ahead of the slice in one

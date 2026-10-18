@@ -5,7 +5,6 @@ import type { ToolCall } from '@orkestrel/tool'
 import type {
 	AgentEventMap,
 	AgentResult,
-	AgentStreamInterface,
 	ConversationEventMap,
 	Message,
 	ProviderIncrement,
@@ -42,7 +41,7 @@ import {
 } from '../../../setup.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
-import { parseJSONAs } from '@orkestrel/contract'
+import { attempt, parseJSONAs } from '@orkestrel/contract'
 import { createBudget, createTokenBudget } from '@orkestrel/budget'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
@@ -292,11 +291,12 @@ describe('Agent — thinking replay', () => {
 					expect(body).not.toContain('"thinking"')
 					const parsed = requireValue(parseJSONAs(body, providerRequestContract.is))
 					// Independent conversations mint UUIDs; align only those identities before comparing bytes.
-					let aligned = body
-					for (const [index, message] of parsed.messages.entries()) {
-						aligned = aligned.replaceAll(message.id, `message-${index}`)
-					}
-					sent.push(aligned)
+					sent.push(
+						[...parsed.messages.entries()].reduce(
+							(aligned, [index, message]) => aligned.replaceAll(message.id, `message-${index}`),
+							body,
+						),
+					)
 				}
 				bodies.push(sent)
 			}
@@ -4271,12 +4271,12 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		const run1 = agent.stream()
-		let run2: AgentStreamInterface | undefined
-		expect(() => {
-			run2 = agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) })
-		}).not.toThrow()
-		if (run2 === undefined) throw new Error('run2 was not started')
-		const started2 = run2
+		const run2 = attempt(() =>
+			agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) }),
+		)
+		expect(run2.success).toBe(true)
+		if (!run2.success) throw new Error('run2 was not started')
+		const started2 = run2.value
 
 		const drain1 = collect(run1.events)
 		const drain2 = collect(started2.events)

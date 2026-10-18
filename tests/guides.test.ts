@@ -147,6 +147,7 @@ await new GuideCommand({
 		createScriptedProvider,
 		createStubSummarizer,
 		createToolCall,
+		drainProvider,
 		JUDGE_ENVELOPE,
 		RecordedHeader,
 		RecordedProvider,
@@ -1623,8 +1624,8 @@ await new GuideCommand({
 			)
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
-			let calibrating = false
-			let asks = 0
+			const calibrating = createRecorder<readonly []>()
+			const asks = createRecorder<readonly []>()
 			const phrases = createPhraseJudge(['Refunds over'])
 			const ledger = createLedger(
 				{
@@ -1632,7 +1633,7 @@ await new GuideCommand({
 					name: provider.name,
 					generate: async (...args) => {
 						entered.resolve()
-						if (calibrating) await release.promise
+						if (calibrating.count > 0) await release.promise
 						return provider.generate(...args)
 					},
 					stream: (...args) => provider.stream(...args),
@@ -1641,7 +1642,7 @@ await new GuideCommand({
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
-							asks += 1
+							asks.handler()
 							return phrases.ask(request, signal)
 						},
 					},
@@ -1651,7 +1652,7 @@ await new GuideCommand({
 			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.respond('Does a $148.50 refund need a manager?')
-			const asked = asks
+			const asked = asks.count
 			const faults = createRecorder<readonly [unknown]>()
 			const selections = createRecorder<readonly [Selection]>()
 			ledger.agent.emitter.on('fault', faults.handler)
@@ -1681,9 +1682,9 @@ await new GuideCommand({
 					.messages.slice(1)
 					.map(({ role, content }) => [role, content]),
 			).toEqual(asking.map(({ role, content }) => [role, content]))
-			expect(asks).toBe(asked)
+			expect(asks.count).toBe(asked)
 
-			calibrating = true
+			calibrating.handler()
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
 			ledger.conversation.add({ role: 'user', content: 'Can the desk skip the manager this once?' })
@@ -1696,7 +1697,7 @@ await new GuideCommand({
 			expect(isLedgerError(measured.fault)).toBe(true)
 			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
 			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
-			expect(asks).toBe(asked)
+			expect(asks.count).toBe(asked)
 			expect(guideText).toContain(
 				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
 			)
@@ -2151,7 +2152,8 @@ await new GuideCommand({
 				},
 				{ content: 'Done.' },
 			])
-			let filing: 'failing' | 'chatter' = 'failing'
+			// The judge fails every filing until the first `chatter` filing begins.
+			const chattering = createRecorder<readonly []>()
 			const phrases = createPhraseJudge(['Refunds over'])
 			const ledger = createLedger(
 				provider,
@@ -2164,7 +2166,7 @@ await new GuideCommand({
 								(question) => question.form === 'choice',
 							)
 							if (choice && state.includes(caller)) {
-								if (filing === 'failing') throw new Error('judge error: connection reset')
+								if (chattering.count === 0) throw new Error('judge error: connection reset')
 								return {
 									model: 'scripted',
 									answers: Object.fromEntries(
@@ -2201,7 +2203,7 @@ await new GuideCommand({
 
 			await ledger.respond('Look up order BW-5512.')
 			await ledger.respond('Look up order bw-5512 again for Brightwater Studio.')
-			filing = 'chatter'
+			chattering.handler()
 			for (const amount of LEDGER_REFUND_AMOUNTS)
 				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
@@ -2729,21 +2731,18 @@ await new GuideCommand({
 					return new Response('one two')
 				},
 			})
-			const deltas: string[] = []
-			const stream = provider.stream(
-				[{ id: '1', role: 'user', content: 'Say something.' }],
-				new AbortController().signal,
+			const drained = await drainProvider(
+				provider.stream(
+					[{ id: '1', role: 'user', content: 'Say something.' }],
+					new AbortController().signal,
+				),
 			)
-			let step = await stream.next()
-			while (!step.done) {
-				deltas.push(step.value.text)
-				step = await stream.next()
-			}
+			const deltas = drained.deltas.map((delta) => delta.text)
 
 			// The fence's `read` hands every chunk back as content, so the assembled answer is the
 			// body verbatim and `finish` contributes nothing.
 			expect(deltas).toEqual(['one two'])
-			expect(step.value).toEqual({ content: 'one two' })
+			expect(drained.result).toEqual({ content: 'one two' })
 			expect(bodies).toEqual([{ messages: [{ id: '1', role: 'user', content: 'Say something.' }] }])
 			expect(provider.name).toBe('text')
 		})
@@ -2920,7 +2919,7 @@ await new GuideCommand({
 			})
 			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
 			const port = await server.start()
-			let drained: number | undefined
+			const drains: number[] = []
 			try {
 				const abort = createAbort()
 				const browser = createRelayProvider({
@@ -2947,14 +2946,14 @@ await new GuideCommand({
 				gate.resolve()
 				const closing = performance.now()
 				await server.stop()
-				drained = performance.now() - closing
+				drains.push(performance.now() - closing)
 			}
 
 			// A cancel leaves the client's socket aborted rather than idle, so the
 			// `closeIdleConnections` step does not reach it and the `server.close()` call waits on the
 			// socket itself — seconds, on a server that also served a completed call over that reused
 			// keep-alive socket. One server per case keeps the stop immediate.
-			expect(drained).toBeLessThan(1000)
+			expect(drains[0]).toBeLessThan(1000)
 			expect(server.status).toBe('stopped')
 		})
 
@@ -2981,19 +2980,14 @@ await new GuideCommand({
 					)
 				},
 			})
-			const deltas: string[] = []
-			const stream = browser.stream([], new AbortController().signal)
-			let step = await stream.next()
-			while (!step.done) {
-				deltas.push(`${step.value.channel}:${step.value.text}`)
-				step = await stream.next()
-			}
+			const drained = await drainProvider(browser.stream([], new AbortController().signal))
+			const deltas = drained.deltas.map((delta) => `${delta.channel}:${delta.text}`)
 
 			// The browser half constructs on `split: false` and `strict: true`, so each frame's text
 			// survives verbatim and the settled result is the one the `result` frame carried.
 			expect(sent).toEqual(['Bearer fixture'])
 			expect(deltas).toEqual(['thinking:considering ', 'content:relayed answer'])
-			expect(step.value).toEqual({ content: 'relayed answer', thinking: 'considering ' })
+			expect(drained.result).toEqual({ content: 'relayed answer', thinking: 'considering ' })
 		})
 
 		it('refuses a relay body at its byte limit and admits one below it', async () => {

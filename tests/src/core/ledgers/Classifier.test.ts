@@ -90,7 +90,8 @@ describe('Classifier', () => {
 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
-		let model = 'A'
+		// The judge reports the latest model the loop below pushed, `A` before any.
+		const models: string[] = []
 		const transport = new RecordedTransport(() => {
 			throw new JudgeError('QUESTION', 'refused question')
 		})
@@ -106,7 +107,7 @@ describe('Classifier', () => {
 					id: judge.id,
 					name: judge.name,
 					get model() {
-						return model
+						return models.at(-1) ?? 'A'
 					},
 					ask: judge.ask.bind(judge),
 				},
@@ -114,7 +115,7 @@ describe('Classifier', () => {
 			}),
 		)
 		for (const next of ['A', 'A', 'B', 'B', 'A']) {
-			model = next
+			models.push(next)
 			await classifier.classify(new Set(), new AbortController().signal)
 		}
 		expect(transport.requests).toHaveLength(2)

@@ -4,6 +4,7 @@ import {
 	collectToolGroups,
 	filterAllowList,
 	hasCalls,
+	iterateRange,
 	joinThinking,
 	matchesJudgment,
 	stripThinking,
@@ -267,6 +268,24 @@ describe('removeEntries — the folded batch removal', () => {
 		const stored = new Set(['a', 'b'])
 		expect(removeEntries(['a', 'b'], (key) => stored.delete(key))).toBe(true)
 		expect(removeEntries([], () => false)).toBe(true)
+	})
+})
+
+describe('iterateRange — the counter-free count', () => {
+	it('yields zero up to, and excluding, the count in ascending order', () => {
+		expect([...iterateRange(3)]).toEqual([0, 1, 2])
+		expect([...iterateRange(1)]).toEqual([0])
+	})
+
+	it('yields nothing for a count of zero', () => {
+		expect([...iterateRange(0)]).toEqual([])
+	})
+
+	it('stays lazy at the largest safe count, so an early exit costs only the numbers pulled', () => {
+		const range = iterateRange(Number.MAX_SAFE_INTEGER)
+		expect(range.next()).toEqual({ value: 0, done: false })
+		expect(range.next()).toEqual({ value: 1, done: false })
+		expect(range.return()).toEqual({ value: undefined, done: true })
 	})
 })
 

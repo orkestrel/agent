@@ -86,7 +86,8 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	// have reset a moment earlier (the reclassification).
 	#scan(delta: string): string {
 		this.#pending += delta
-		let content = ''
+		// The clean content this call surfaces, in order; a reclassification empties it.
+		const surfaced: string[] = []
 		for (;;) {
 			if (this.#inside) {
 				const close = this.#pending.indexOf(THINK_CLOSE)
@@ -94,7 +95,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 					// No close yet — route all but a possible partial close-tag suffix to
 					// thinking, holding that suffix for the next delta to disambiguate.
 					this.#thinking += this.#hold([THINK_CLOSE])
-					return content
+					return surfaced.join('')
 				}
 				this.#thinking += this.#pending.slice(0, close)
 				this.#pending = this.#pending.slice(close + THINK_CLOSE.length)
@@ -108,9 +109,9 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 				// span — everything surfaced so far was reasoning. Reclassify it.
 				const close = this.#pending.indexOf(THINK_CLOSE)
 				if (close !== -1 && (open === -1 || close < open)) {
-					this.#thinking += this.#content + content + this.#pending.slice(0, close)
+					this.#thinking += this.#content + surfaced.join('') + this.#pending.slice(0, close)
 					this.#content = ''
-					content = ''
+					surfaced.length = 0
 					this.#pending = this.#pending.slice(close + THINK_CLOSE.length)
 					this.#opened = true
 					continue
@@ -121,11 +122,11 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 				// (before any tag event a split leading close must not leak either, so the
 				// close tag's prefixes are held back too).
 				const tags = this.#opened ? [THINK_OPEN] : [THINK_OPEN, THINK_CLOSE]
-				content += this.#hold(tags)
-				return content
+				surfaced.push(this.#hold(tags))
+				return surfaced.join('')
 			}
 			this.#opened = true
-			content += this.#pending.slice(0, open)
+			surfaced.push(this.#pending.slice(0, open))
 			this.#pending = this.#pending.slice(open + THINK_OPEN.length)
 			this.#inside = true
 		}
@@ -146,9 +147,10 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	// how many trailing characters are an ambiguous partial tag and must be held back.
 	#overlap(tag: string): number {
 		const max = Math.min(this.#pending.length, tag.length - 1)
-		for (let length = max; length > 0; length -= 1) {
-			if (this.#pending.endsWith(tag.slice(0, length))) return length
-		}
-		return 0
+		return (
+			Array.from({ length: max }, (_, index) => max - index).find((length) =>
+				this.#pending.endsWith(tag.slice(0, length)),
+			) ?? 0
+		)
 	}
 }

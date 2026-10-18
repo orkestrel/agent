@@ -14,7 +14,7 @@ import type {
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
 } from './types.js'
-import { cloneJSONValue, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
+import { isObject, isRecord } from '@orkestrel/contract'
 import { createTool, createToolManager, isToolCall } from '@orkestrel/tool'
 import { errorToMessage } from '@orkestrel/workflow'
 import { open, realpath, rm } from 'node:fs/promises'
@@ -23,7 +23,11 @@ import { StudyError, failStudyTicket } from '@orkestrel/study'
 import { StudyAgentScript, encodeStudyJSON } from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
-import { observeStudyToolsFile, resolveStudyToolsPath } from './helpers.js'
+import {
+	observeStudyToolsFile,
+	readStudyToolsObservation,
+	resolveStudyToolsPath,
+} from './helpers.js'
 import { parseStudyToolsInput } from './parsers.js'
 import { isStudyToolsAgent, isStudyToolsRead, isStudyToolsWrite } from './validators.js'
 
@@ -186,14 +190,11 @@ export class StudyToolsSession implements StudySessionInterface {
 			if (!isStudyToolsWrite(args)) throw new StudyToolsRefusal('Write arguments refused')
 			const target = await resolveStudyToolsPath(this.#options.directory, args.path)
 			signal.throwIfAborted()
-			let file
-			try {
-				file = await open(target, 'wx')
-			} catch (error) {
+			const file = await open(target, 'wx').catch((error: unknown) => {
 				if (isObject(error) && 'code' in error && error.code === 'EEXIST')
 					throw new StudyToolsRefusal('Existing scratch file refused')
 				throw error
-			}
+			})
 			try {
 				signal.throwIfAborted()
 				await file.writeFile(args.content, 'utf8')
@@ -240,10 +241,7 @@ export class StudyToolsSession implements StudySessionInterface {
 				ticket.signal,
 			])
 			signal.throwIfAborted()
-			let value: JSONValue
-			try {
-				value = await operation(signal)
-			} catch (error) {
+			const value = await operation(signal).catch((error: unknown) => {
 				if (!isStudyToolsRefusal(error)) throw error
 				ticket.finish({
 					role: 'tool',
@@ -253,7 +251,7 @@ export class StudyToolsSession implements StudySessionInterface {
 					duration: Math.ceil(performance.now() - started),
 				})
 				throw error
-			}
+			})
 			signal.throwIfAborted()
 			ticket.finish({
 				role: 'tool',
@@ -273,40 +271,7 @@ export class StudyToolsSession implements StudySessionInterface {
 		try {
 			if (this.#active === undefined || !isRecord(envelope) || !isToolCall(envelope.call))
 				throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool observation')
-			const call = envelope.call
-			let value: JSONValue
-			if (event === 'denial')
-				value = {
-					id: call.id,
-					name: call.name,
-					...(typeof envelope.reason === 'string' ? { reason: envelope.reason } : {}),
-				}
-			else {
-				const result = envelope.result
-				if (!isObject(result) || !('success' in result) || typeof result.success !== 'boolean')
-					throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool result')
-				if (result.success) {
-					if (!('value' in result) || !isJSONValue(result.value))
-						throw new StudyError('FAULT', 'Admitted Agent supplied non-JSON tool value')
-					value = {
-						id: call.id,
-						name: call.name,
-						arguments: cloneJSONValue(call.arguments),
-						success: true,
-						value: cloneJSONValue(result.value),
-					}
-				} else {
-					if (!('error' in result) || typeof result.error !== 'string')
-						throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool error')
-					value = {
-						id: call.id,
-						name: call.name,
-						arguments: cloneJSONValue(call.arguments),
-						success: false,
-						error: result.error,
-					}
-				}
-			}
+			const value = readStudyToolsObservation(event, envelope.call, envelope)
 			this.#trace.push({ event, goal: this.#active.goal, value })
 		} catch (error) {
 			this.#fault = error

@@ -35,13 +35,15 @@ result.content // the assembled content
 result.usage // { prompt, completion, total } — folds into a token budget
 
 const generator = provider.stream(messages, abort.signal)
-let step = await generator.next()
-while (!step.done) {
+for (;;) {
+	const step = await generator.next()
+	if (step.done) {
+		const streamed = step.value // the assembled ProviderResult (content === the joined content deltas)
+		break
+	}
 	if (step.value.channel === 'content') process.stdout.write(step.value.text)
 	if (step.value.channel === 'thinking') process.stderr.write(step.value.text)
-	step = await generator.next()
 }
-const streamed = step.value // the assembled ProviderResult (content === the joined content deltas)
 ```
 
 Pass `tools` (a non-empty `ToolDefinition[]`) to advertise callable tools for the turn; when the model calls one, `result.tools` is a `ToolCall[]` (each with an `id`, the tool `name`, and parsed `arguments`). Aborting a `stream` mid-flight throws a `ProviderAbortError` whose `partial` holds whatever streamed before the cancel.
@@ -750,6 +752,7 @@ The following table lists the helpers the root declares:
 | `stripThinking`     | function | Applies a `ThinkingReplay` policy to a conversation, returning the messages a provider sends with only the assistant thinking the policy allows.                                                                                                                                                                               |
 | `sumUsage`          | function | Adds two `TokenUsage` values field by field — the running total an agent run keeps across its provider calls.                                                                                                                                                                                                                  |
 | `removeEntries`     | function | Removes each key through a single-key remover and folds the outcomes, so a batch `remove` reports whether the whole batch applied.                                                                                                                                                                                             |
+| `iterateRange`      | function | Yields each whole number from zero up to, and excluding, a count, one at a time, so a loop counts turns without a reassigned counter.                                                                                                                                                                                          |
 | `collectExchanges`  | function | Collects whole exchanges, joining every exchange spanned by a tool group.                                                                                                                                                                                                                                                      |
 | `collectToolGroups` | function | Collects each assistant message that carries calls together with the tool messages that answer it, then each run of tool messages that no assistant message owns.                                                                                                                                                              |
 | `hasCalls`          | function | Checks whether a message carries at least one tool call.                                                                                                                                                                                                                                                                       |
@@ -2638,7 +2641,7 @@ The following practices apply when you build on this package:
 The following test files back this guide:
 
 - [`tests/guides.test.ts`](../tests/guides.test.ts) — the Surface and method parity with `src/core`, the `Summary`, titled example, and pitch equality, and the executed flagship fences with the Contract clauses they back: scope timing, selection, judgments, modes, answer-only runs, recorded thinking and the replay policy, the ledger over a scripted provider and judge with its thinking budget, the classifier and the gauge, the relay over a loopback listener, and the System One judge over a recorded response.
-- [`tests/src/core/helpers.test.ts`](../tests/src/core/helpers.test.ts) — the root helpers `filterAllowList`, `joinThinking`, `stripThinking`, `sanitizeToken`, `sanitizeUsage`, `sumUsage`, `removeEntries`, `collectExchanges`, `hasCalls`, `collectToolGroups`, `renderJSON`, and `matchesJudgment`, and the `MESSAGE_ROLES` role list.
+- [`tests/src/core/helpers.test.ts`](../tests/src/core/helpers.test.ts) — the root helpers `filterAllowList`, `joinThinking`, `stripThinking`, `sanitizeToken`, `sanitizeUsage`, `sumUsage`, `removeEntries`, `iterateRange`, `collectExchanges`, `hasCalls`, `collectToolGroups`, `renderJSON`, and `matchesJudgment`, and the `MESSAGE_ROLES` role list.
 - [`tests/src/core/cloners.test.ts`](../tests/src/core/cloners.test.ts) — `copyJSON` copying a proxied record where a structured clone refuses it and returning `undefined` for a value JSON can't carry.
 - [`tests/src/core/validators.test.ts`](../tests/src/core/validators.test.ts) — the root guards `isJudgeEntry`, `isJudgeQuestion`, and `isNonNegativeSafeInteger`, each total over hostile input.
 - [`tests/src/core/contracts.test.ts`](../tests/src/core/contracts.test.ts) — the message contract's round trip and malformed paths, and function-valued arguments accepted in the domain and refused on the wire.

@@ -4,7 +4,6 @@ import type {
 	RelayOptions,
 	RelayProviderOptions,
 	SystemOneJudgeOptions,
-	TextRead,
 	ThinkSplitterInterface,
 } from './types.js'
 import type { JudgeInterface } from '../types.js'
@@ -72,10 +71,10 @@ export function createRelay(options: RelayOptions): RelayHandler {
 			return new Response(undefined, { status: UNAUTHORIZED_RELAY_STATUS })
 		}
 		if (request.body === null) return new Response(undefined, { status: INVALID_RELAY_STATUS })
-		let read: TextRead
-		try {
-			read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal)
-		} catch {
+		const read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal).catch(
+			() => undefined,
+		)
+		if (read === undefined) {
 			return new Response(undefined, {
 				status: request.signal.aborted ? OVERSIZED_RELAY_STATUS : INVALID_RELAY_STATUS,
 			})

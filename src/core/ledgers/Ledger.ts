@@ -363,12 +363,15 @@ export class Ledger implements LedgerInterface {
 				this.#calls,
 				!last.partial && last.content.trim() !== '' ? this.#calls.at(-1) : undefined,
 			)
-			let usage: TokenUsage | undefined
-			let thinking: string | undefined
-			for (const pass of passes) {
-				if (pass.usage !== undefined) usage = sumUsage(usage, pass.usage)
-				if (pass.thinking !== undefined) thinking = joinThinking(thinking, pass.thinking)
-			}
+			const usage = passes.reduce<TokenUsage | undefined>(
+				(total, pass) => (pass.usage === undefined ? total : sumUsage(total, pass.usage)),
+				undefined,
+			)
+			const thinking = passes.reduce<string | undefined>(
+				(joined, pass) =>
+					pass.thinking === undefined ? joined : joinThinking(joined, pass.thinking),
+				undefined,
+			)
 			return {
 				content: last.content,
 				partial: last.partial,
@@ -564,39 +567,50 @@ export class Ledger implements LedgerInterface {
 	}
 
 	async #select(request: Message, signal: AbortSignal): Promise<Selection> {
-		let filing: Omit<ClassifierResult, 'readings'> = { judgments: [] }
-		try {
-			if (
-				!this.#active ||
-				this.#request === undefined ||
-				(request.id !== this.#request.id && !this.#annotations.has(request.id))
-			)
-				throw new LedgerError(
+		const selected = this.#request
+		if (
+			!this.#active ||
+			selected === undefined ||
+			(request.id !== selected.id && !this.#annotations.has(request.id))
+		)
+			return this.#refuse(
+				new LedgerError(
 					'REQUEST',
 					'ledger selection requires a request owned by an active respond call',
-				)
-			if (this.#annotations.has(request.id) && this.#entered !== undefined)
-				return {
-					messages: [...this.#entered.messages, ...this.#collectAfter()],
-					judgments: [],
-					...(this.#entered.briefing === undefined ? {} : { briefing: this.#entered.briefing }),
-				}
-			const selected = this.#request
-			const { readings, ...filed } = await this.#classifier.classify(this.#requests, signal)
-			this.#readings = [...this.#readings, ...readings]
-			filing = filed
-			if (filing.fault !== undefined) throw filing.fault
-			const plan = this.#plan(selected)
-			this.#entered = { ...plan, ...filing }
-			return this.#annotations.has(request.id)
-				? { ...this.#entered, messages: [...this.#entered.messages, ...this.#collectAfter()] }
-				: this.#entered
-		} catch (error) {
+				),
+				{ judgments: [] },
+			)
+		if (this.#annotations.has(request.id) && this.#entered !== undefined)
 			return {
-				...filing,
-				messages: this.#conversation.view(),
-				fault: isError(error) ? error : new Error(String(error)),
+				messages: [...this.#entered.messages, ...this.#collectAfter()],
+				judgments: [],
+				...(this.#entered.briefing === undefined ? {} : { briefing: this.#entered.briefing }),
 			}
+		const classified = await this.#classifier.classify(this.#requests, signal).then(
+			(value) => ({ success: true as const, value }),
+			(error: unknown) => ({ success: false as const, error }),
+		)
+		if (!classified.success) return this.#refuse(classified.error, { judgments: [] })
+		const { readings, ...filed } = classified.value
+		this.#readings = [...this.#readings, ...readings]
+		const planned = attempt(() => {
+			if (filed.fault !== undefined) throw filed.fault
+			return { ...this.#plan(selected), ...filed }
+		})
+		if (!planned.success) return this.#refuse(planned.error, filed)
+		this.#entered = planned.value
+		return this.#annotations.has(request.id)
+			? { ...this.#entered, messages: [...this.#entered.messages, ...this.#collectAfter()] }
+			: this.#entered
+	}
+
+	// Falls back to the conversation view with the failure as the selection's fault, keeping the
+	// filing completed before it.
+	#refuse(error: unknown, filing: Omit<ClassifierResult, 'readings'>): Selection {
+		return {
+			...filing,
+			messages: this.#conversation.view(),
+			fault: isError(error) ? error : new Error(String(error)),
 		}
 	}
 
@@ -728,20 +742,7 @@ export class Ledger implements LedgerInterface {
 			source: unit.source,
 			record: this.#buildUnitRecord(unit.source, unit.category, input, projection, held),
 		}))
-		let briefing = this.#render(
-			kept,
-			mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
-		)
-		for (const step of steps) {
-			const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
-			if (this.#price([{ id: 'system', role: 'system', content }]) <= cap) break
-			if (step.record !== undefined) step.record.lines.pop()
-			if (step.source !== undefined) included.delete(step.source)
-			briefing = this.#render(
-				kept,
-				mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
-			)
-		}
+		const briefing = this.#trim(steps, kept, mapped, included, cap)
 		const shown = new Set<string>(included)
 		for (const record of records)
 			for (const source of record.members) {
@@ -758,6 +759,34 @@ export class Ledger implements LedgerInterface {
 			),
 			...(briefing === '' ? {} : { briefing }),
 		}
+	}
+
+	// Renders the briefing and applies cut steps (popping a record line, dropping a source) until the
+	// rendered system message fits `cap`; the last step's render is returned unchecked.
+	#trim<TRecord extends LedgerRecord & { readonly lines: LedgerLine[] }>(
+		steps: ReadonlyArray<{
+			readonly record: TRecord | undefined
+			readonly source: string | undefined
+		}>,
+		kept: readonly TRecord[],
+		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
+		included: Set<string>,
+		cap: number,
+	): string {
+		for (const step of steps) {
+			const briefing = this.#render(
+				kept,
+				mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
+			)
+			const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
+			if (this.#price([{ id: 'system', role: 'system', content }]) <= cap) return briefing
+			if (step.record !== undefined) step.record.lines.pop()
+			if (step.source !== undefined) included.delete(step.source)
+		}
+		return this.#render(
+			kept,
+			mapped.filter((unit) => included.has(unit.source)).map((unit) => unit.record),
+		)
 	}
 
 	#buildUnitRecord(
@@ -876,11 +905,10 @@ export class Ledger implements LedgerInterface {
 							: { id: message.id, role: message.role, content: message.content }
 						: message,
 			)
-		let tail = [request]
+		const tail = [request]
 		for (const exchange of collectExchanges(history).toReversed()) {
-			const next = [...exchange, ...tail]
-			if (this.#price(stripThinking(next, this.#replay)) > cap) break
-			tail = next
+			if (this.#price(stripThinking([...exchange, ...tail], this.#replay)) > cap) break
+			tail.unshift(...exchange)
 		}
 		return tail
 	}

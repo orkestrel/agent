@@ -1,15 +1,12 @@
 import type { LedgerAgentOptions, LedgerOptions } from '@src/core'
 import { Classifier, Gauge, Ledger, createLedger } from '@src/core'
 import { createTool } from '@orkestrel/tool'
-import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { buildLedgerOptions, createScriptedProvider } from '../../../setup.js'
 
 describe('createLedger', () => {
-	let options: LedgerOptions
-	beforeEach(() => {
-		options = buildLedgerOptions({ topics: [], lookups: [] })
-	})
 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('strict')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('budget')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('signal')
@@ -24,6 +21,7 @@ describe('createLedger', () => {
 		expect(ledger.agent.context.conversations.count).toBe(1)
 	})
 	it('checks missing threshold keys on both construction routes', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes']) {
 			const thresholds = { ...options.thresholds }
 			Reflect.deleteProperty(thresholds, key)
@@ -36,6 +34,7 @@ describe('createLedger', () => {
 		}
 	})
 	it('rejects every threshold outside (0, 1] with THRESHOLD', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const key of Object.keys(options.thresholds))
 			for (const value of [0, -0, -1, 1.01, NaN, Infinity, -Infinity])
 				expect(() =>
@@ -52,6 +51,7 @@ describe('createLedger', () => {
 		).not.toThrow()
 	})
 	it('rejects shares, capacity, and limits with their matching codes and accepts zero limits', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const value of [0, -1, 1.1, NaN, Infinity]) {
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, share: { prompt: value } }),
@@ -81,6 +81,7 @@ describe('createLedger', () => {
 		).not.toThrow()
 	})
 	it('rejects empty or duplicate topics and duplicate or reserved lookup names', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const name of ['', '  '])
 			expect(() =>
 				createLedger(createScriptedProvider([]), {
@@ -112,6 +113,7 @@ describe('createLedger', () => {
 		).toThrow(expect.objectContaining({ code: 'LOOKUP' }))
 	})
 	it('refuses invalid supplied gauge values', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const scale of [0, -1, NaN, Infinity])
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, gauge: { scale, overhead: 0 } }),

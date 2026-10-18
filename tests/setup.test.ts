@@ -541,12 +541,10 @@ describe('createScriptedProvider abort', () => {
 	it('throws a ProviderAbortError with an empty partial when the signal is already aborted', async () => {
 		const provider = createScriptedProvider([{ content: 'never streamed' }])
 		const generator = provider.stream(messages, AbortSignal.abort())
-		let caught: unknown
-		try {
-			await generator.next()
-		} catch (error) {
-			caught = error
-		}
+		const caught = await generator.next().then(
+			() => undefined,
+			(error: unknown) => error,
+		)
 		if (!isProviderAbortError(caught)) throw new Error('expected a ProviderAbortError')
 		expect(caught.partial).toEqual({ content: '' })
 	})
@@ -558,12 +556,10 @@ describe('createScriptedProvider abort', () => {
 		const first = await generator.next()
 		expect(first.value).toEqual({ channel: 'content', text: 'a' })
 		controller.abort()
-		let caught: unknown
-		try {
-			await generator.next()
-		} catch (error) {
-			caught = error
-		}
+		const caught = await generator.next().then(
+			() => undefined,
+			(error: unknown) => error,
+		)
 		if (!isProviderAbortError(caught)) throw new Error('expected a ProviderAbortError')
 		// The partial is a GENUINE partial: what streamed, never the turn's whole content.
 		expect(caught.partial).toEqual({ content: 'a' })
@@ -577,12 +573,10 @@ describe('createScriptedProvider abort', () => {
 		const generator = provider.stream(messages, controller.signal)
 		await generator.next()
 		controller.abort()
-		let caught: unknown
-		try {
-			await generator.next()
-		} catch (error) {
-			caught = error
-		}
+		const caught = await generator.next().then(
+			() => undefined,
+			(error: unknown) => error,
+		)
 		if (!isProviderAbortError(caught)) throw new Error('expected a ProviderAbortError')
 		expect(caught.partial).toEqual({ content: '', thinking: 't1' })
 	})

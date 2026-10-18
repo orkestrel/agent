@@ -134,9 +134,10 @@ export abstract class AgentProvider<
 		options?: ProviderStreamOptions,
 	): Promise<ProviderResult> {
 		const stream = this.stream(messages, signal, tools, options)
-		let step = await stream.next()
-		while (!step.done) step = await stream.next()
-		return step.value
+		for (;;) {
+			const step = await stream.next()
+			if (step.done) return step.value
+		}
 	}
 
 	/**
@@ -161,12 +162,18 @@ export abstract class AgentProvider<
 		const timeout = new Timeout({ ms: this.#timeout })
 		timeout.start()
 		const combined = AbortSignal.any([timeout.signal, signal])
-		let parser: ProviderParserInterface<TRecord> | undefined
-		let splitter: ThinkSplitterInterface | undefined
-		let state: ProviderIncrement = { content: '', thinking: '', tools: [] }
+		// The call's framing, splitting, and folded state, one record per call: the cancellation
+		// path and the cleanup read what the body produced before it stopped.
+		const call: {
+			parser: ProviderParserInterface<TRecord> | undefined
+			splitter: ThinkSplitterInterface | undefined
+			state: ProviderIncrement
+		} = { parser: undefined, splitter: undefined, state: { content: '', thinking: '', tools: [] } }
 		try {
-			parser = this.frame()
-			splitter = this.#split ? new ThinkSplitter() : undefined
+			const parser = this.frame()
+			call.parser = parser
+			const splitter = this.#split ? new ThinkSplitter() : undefined
+			call.splitter = splitter
 			const response = await this.#request(
 				{
 					messages,
@@ -181,31 +188,31 @@ export abstract class AgentProvider<
 			for await (const chunk of readChunks(response.body, combined)) {
 				combined.throwIfAborted()
 				for (const record of parser.parse(chunk)) {
-					yield* this.#fold(record, state, splitter, combined, (increment) => {
-						state = increment
+					yield* this.#fold(record, call.state, splitter, combined, (increment) => {
+						call.state = increment
 					})
 					combined.throwIfAborted()
-					if (state.result !== undefined) return state.result
+					if (call.state.result !== undefined) return call.state.result
 				}
 			}
 			combined.throwIfAborted()
 			for (const record of this.finish(parser)) {
-				yield* this.#fold(record, state, splitter, combined, (increment) => {
-					state = increment
+				yield* this.#fold(record, call.state, splitter, combined, (increment) => {
+					call.state = increment
 				})
 				combined.throwIfAborted()
-				if (state.result !== undefined) return state.result
+				if (call.state.result !== undefined) return call.state.result
 			}
 			const tail = splitter?.flush() ?? ''
 			if (tail.length > 0) yield { channel: 'content', text: tail }
 			combined.throwIfAborted()
 			if (this.#strict)
 				throw new ProviderError('PROTOCOL', 'provider error: missing settled result')
-			return this.#assemble(splitter, state)
+			return this.#assemble(splitter, call.state)
 		} catch (error) {
 			if (combined.aborted) {
-				splitter?.flush()
-				const partial = this.#assemble(splitter, state)
+				call.splitter?.flush()
+				const partial = this.#assemble(call.splitter, call.state)
 				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.
 				throw new ProviderAbortError(
 					partial,
@@ -215,7 +222,7 @@ export abstract class AgentProvider<
 			throw error
 		} finally {
 			try {
-				parser?.clear()
+				call.parser?.clear()
 			} finally {
 				timeout.clear()
 			}

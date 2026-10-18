@@ -12,9 +12,11 @@ import type {
 } from './types.js'
 import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
 import type { AgentContextInterface, Selection } from '../contexts/index.js'
+import type { ConversationInterface } from '../conversations/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { Result } from '@orkestrel/contract'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import type { ToolCall, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
@@ -38,6 +40,7 @@ import {
 } from './helpers.js'
 import {
 	filterAllowList,
+	iterateRange,
 	joinThinking,
 	sanitizeUsage,
 	stripThinking,
@@ -266,7 +269,7 @@ export class Agent implements AgentInterface {
 	// discards a generator's return value — the settled `AgentRunResult` is that return value, so the run
 	// owns its state and nothing is threaded through a caller-held box. Because the pump runs
 	// regardless of whether anyone drains `events`, `result` always settles even when nothing drains
-	// it. The deadline `clear()` lives in the `finally` so it always fires (drained or not), and
+	// it. `#drive` never rejects, so the deadline `clear()` always fires (drained or not), and
 	// `result` settles exactly once through the shared resolvers (the underlying promise obeys native
 	// settle-once — the first resolve / reject wins).
 	async #pump(
@@ -279,55 +282,58 @@ export class Agent implements AgentInterface {
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	): Promise<void> {
-		let failure: { error: unknown } | undefined
-		// The outcome of a run that produced nothing — replaced by whatever `#execute` returns, and
-		// read only on the success path (a genuine failure rejects from `failure` instead).
-		let outcome: AgentRunResult = {
-			content: '',
-			thinking: undefined,
-			usage: undefined,
-			partial: false,
-			exhausted: false,
+		const driven = await this.#drive(abort, channel, think, schema, limit, budget)
+		timeout?.clear()
+		// This run is settling — drop its handle so a later `agent.abort()` no longer
+		// fires it and release its budget instance to the next run (the map never leaks
+		// finished runs).
+		this.#runs.delete(abort)
+		if (driven.success) {
+			const outcome = driven.value
+			this.#settled = 'done'
+			channel.close()
+			const result = assembleResult(outcome)
+			settled.resolve(result)
+			// Observe the settle — after `settled.resolve(...)` (the result is already
+			// settled; emit only observes it). A cancel still resolves a partial, so a
+			// cancelled run emits `abort` (the cancel reason) then `finish` (the settled
+			// partial) — observers see both "it was cancelled" and the partial outcome; a
+			// natural / cap finish (`partial: false`) emits `finish` only. Limit exhaustion
+			// (unresolved tool intent at the turn cap) is not a cancel — it emits `exhaust`
+			// (the turn count) instead of `abort`, still followed by `finish`. Both emits are
+			// post-settle, so an isolated listener throw can't reorder the latch.
+			if (outcome.exhausted) this.#emitter.emit('exhaust', limit)
+			else if (outcome.partial) this.#emitter.emit('abort', abort.signal.reason)
+			this.#emitter.emit('finish', result)
+		} else {
+			this.#settled = 'error'
+			channel.fail(driven.error)
+			settled.reject(driven.error)
+			// Observe the genuine (non-cancel) failure — after `settled.reject(...)`.
+			this.#emitter.emit('error', driven.error)
 		}
+	}
+
+	// Drives `#execute` by hand, pushing each chunk into the channel, and returns the generator's
+	// return value as a success or the thrown error as a failure — never rejects, so `#pump` settles
+	// from a value rather than from state a `catch` assigned.
+	async #drive(
+		abort: AbortInterface,
+		channel: Channel<AgentChunk>,
+		think: boolean | undefined,
+		schema: Readonly<Record<string, unknown>> | undefined,
+		limit: number,
+		budget: BudgetInterface<TokenUsage> | undefined,
+	): Promise<Result<AgentRunResult>> {
 		try {
 			const run = this.#execute(abort, think, schema, limit, budget)
-			let next = await run.next()
-			while (next.done !== true) {
+			for (;;) {
+				const next = await run.next()
+				if (next.done === true) return { success: true, value: next.value }
 				channel.push(next.value)
-				next = await run.next()
 			}
-			outcome = next.value
 		} catch (error) {
-			failure = { error }
-		} finally {
-			timeout?.clear()
-			// This run is settling — drop its handle so a later `agent.abort()` no longer
-			// fires it and release its budget instance to the next run (the map never leaks
-			// finished runs).
-			this.#runs.delete(abort)
-			if (failure === undefined) {
-				this.#settled = 'done'
-				channel.close()
-				const result = assembleResult(outcome)
-				settled.resolve(result)
-				// Observe the settle — after `settled.resolve(...)` (the result is already
-				// settled; emit only observes it). A cancel still resolves a partial, so a
-				// cancelled run emits `abort` (the cancel reason) then `finish` (the settled
-				// partial) — observers see both "it was cancelled" and the partial outcome; a
-				// natural / cap finish (`partial: false`) emits `finish` only. Limit exhaustion
-				// (unresolved tool intent at the turn cap) is not a cancel — it emits `exhaust`
-				// (the turn count) instead of `abort`, still followed by `finish`. Both emits are
-				// post-settle, so an isolated listener throw can't reorder the latch.
-				if (outcome.exhausted) this.#emitter.emit('exhaust', limit)
-				else if (outcome.partial) this.#emitter.emit('abort', abort.signal.reason)
-				this.#emitter.emit('finish', result)
-			} else {
-				this.#settled = 'error'
-				channel.fail(failure.error)
-				settled.reject(failure.error)
-				// Observe the genuine (non-cancel) failure — after `settled.reject(...)`.
-				this.#emitter.emit('error', failure.error)
-			}
+			return { success: false, error }
 		}
 	}
 
@@ -384,19 +390,30 @@ export class Agent implements AgentInterface {
 						...(think === undefined ? {} : { think }),
 						...(schema === undefined ? {} : { schema }),
 					}
-		let content = ''
-		let thinking: string | undefined
-		let usage: TokenUsage | undefined
+		// The run's accumulated outcome, one record per call so concurrent runs share nothing.
 		// Limit-exhaustion tracking — `pending` is `true` while the most recent turn left
 		// unresolved tool intent (the tool branch was taken and the loop is about to `continue`);
 		// `exited` marks whether the loop exited through an explicit `break` (a cancel, or the natural
 		// final-answer finish) rather than the `for` condition failing. Exhaustion is exactly
 		// "the condition failed (`!exited`) while tool intent was still pending" — a `limit: 0` run
 		// never enters the loop, so both stay `false` and the outcome is non-partial.
-		let pending = false
-		let exited = false
-		let partial = false
-		let exhausted = false
+		const run: {
+			content: string
+			thinking: string | undefined
+			usage: TokenUsage | undefined
+			pending: boolean
+			exited: boolean
+			partial: boolean
+			exhausted: boolean
+		} = {
+			content: '',
+			thinking: undefined,
+			usage: undefined,
+			pending: false,
+			exited: false,
+			partial: false,
+			exhausted: false,
+		}
 		// Per-run admission state — a local, so it starts fresh each run (never carried across runs
 		// or a conversation switch). `futile` is the futile-compaction guard: after a `compact()`
 		// returns `undefined` on a later turn while the request is still over the window, the
@@ -408,8 +425,8 @@ export class Agent implements AgentInterface {
 		// switch. A `limit: 0` run never measures or folds, and adds no `await` when `window` is unset.
 		this.#window?.clear()
 		// A cancel at the entry select site of a `limit: 0` run never reaches the loop's own abort checks.
-		if (abort.signal.aborted) partial = true
-		for (let turn = 0; turn < limit; turn += 1) {
+		if (abort.signal.aborted) run.partial = true
+		for (const turn of iterateRange(limit)) {
 			// Observe each iteration begin (the turn index). The emitter isolates a listener
 			// throw, so it can't perturb the loop that immediately follows.
 			this.#emitter.emit('turn', turn)
@@ -424,16 +441,16 @@ export class Agent implements AgentInterface {
 					await this.#scheduler?.yield({ signal: abort.signal })
 				} catch (error) {
 					if (abort.signal.aborted) {
-						partial = true
-						exited = true
+						run.partial = true
+						run.exited = true
 						break
 					}
 					throw error
 				}
 			}
 			if (abort.signal.aborted) {
-				partial = true
-				exited = true
+				run.partial = true
+				run.exited = true
 				break
 			}
 			// Snapshot the allow-list before listeners can change the active scope this turn.
@@ -448,27 +465,27 @@ export class Agent implements AgentInterface {
 			// tool and option snapshot, measure it against `#window`, and dispatch exactly the
 			// request the window last measured (the rebuilt one after a fold). With no `window` it
 			// is composed and dispatched with no extra `await`.
-			let dispatch = this.#compose(messages, definitions, options)
-			if (this.#window !== undefined) {
-				const admitted = await this.#admit(
-					dispatch,
-					messages,
-					request,
-					turn > 0,
-					admission,
-					abort,
-					budget,
-					spent,
-				)
-				if (admitted === undefined) {
-					partial = true
-					exited = true
-					break
-				}
-				dispatch = admitted
+			const composed = this.#compose(messages, definitions, options)
+			const dispatch =
+				this.#window === undefined
+					? composed
+					: await this.#admit(
+							composed,
+							messages,
+							request,
+							turn > 0,
+							admission,
+							abort,
+							budget,
+							spent,
+						)
+			if (dispatch === undefined) {
+				run.partial = true
+				run.exited = true
+				break
 			}
-			// Bounded mid-stream budget enforcement — a per-turn local accumulator (`turnContent`,
-			// distinct from the run-spanning `content`) so `charged` (the amount already consumed
+			// Bounded mid-stream budget enforcement — a per-turn local accumulator (`metered.text`,
+			// distinct from the run-spanning `run.content`) so `metered.charged` (the amount already consumed
 			// against `budget` this turn) never mixes with earlier turns' content. As each content delta
 			// arrives, re-estimate the turn's token footprint so far and consume only the increment
 			// over what was already charged — the running `budget.consume` therefore mirrors the live
@@ -477,35 +494,33 @@ export class Agent implements AgentInterface {
 			// `'content'` deltas are), so there is no live thinking text to estimate mid-stream — the
 			// honest choice given the loop's existing delta wiring; thinking is metered, like content,
 			// only through the post-turn usage reconcile that follows (which charges the full reported usage).
-			let charged = 0
-			let turnContent = ''
-			let result: ProviderResult
-			try {
-				result = yield* this.#provide(dispatch, abort.signal, (delta) => {
-					content += delta
-					turnContent += delta
-					const estimate = estimateTokens(turnContent)
-					if (estimate > charged) {
-						budget?.consume({
-							prompt: 0,
-							completion: estimate - charged,
-							total: estimate - charged,
-						})
-						charged = estimate
-					}
-				})
-			} catch (error) {
+			const metered = { text: '', charged: 0 }
+			const provided = yield* this.#attemptProvide(dispatch, abort.signal, (delta) => {
+				run.content += delta
+				metered.text += delta
+				const estimate = estimateTokens(metered.text)
+				if (estimate > metered.charged) {
+					budget?.consume({
+						prompt: 0,
+						completion: estimate - metered.charged,
+						total: estimate - metered.charged,
+					})
+					metered.charged = estimate
+				}
+			})
+			if (!provided.success) {
+				const error = provided.error
 				// A cancel mid-stream (the bound signal aborted): stop and mark partial. The
-				// deltas streamed before the cancel were already accumulated into `content`
+				// deltas streamed before the cancel were already accumulated into `run.content`
 				// through `onDelta`, and a ProviderAbortError's `partial.content` is exactly those
-				// same yielded deltas (the contract) — so `content` already holds the partial;
+				// same yielded deltas (the contract) — so `run.content` already holds the partial;
 				// do not re-add it (that double-counts). The separated reasoning has no delta
 				// channel, though — the abort partial is its only carrier, so harvest it. A
 				// non-abort error (the signal is not aborted) propagates so the run rejects.
 				if (abort.signal.aborted) {
 					if (isProviderAbortError(error)) {
 						if (error.partial.thinking !== undefined && error.partial.thinking.length > 0) {
-							thinking = joinThinking(thinking, error.partial.thinking)
+							run.thinking = joinThinking(run.thinking, error.partial.thinking)
 						}
 						// The abort's partial usage — when the provider observed it mid-stream — is
 						// folded and reconciled exactly like the normal post-turn path that follows: the
@@ -518,32 +533,33 @@ export class Agent implements AgentInterface {
 							// non-finite or negative field floors to `0`, a fractional field floors to its
 							// integer part. The normal post-turn usage path is untouched.
 							const abortUsage = sanitizeUsage(error.partial.usage)
-							chargeUsage(budget, abortUsage, charged)
-							usage = sumUsage(usage, abortUsage)
+							chargeUsage(budget, abortUsage, metered.charged)
+							run.usage = sumUsage(run.usage, abortUsage)
 						}
 					}
-					partial = true
-					exited = true
+					run.partial = true
+					run.exited = true
 					break
 				}
 				throw error
 			}
+			const result = provided.value
 			const recorded =
 				result.thinking === undefined || result.thinking.length === 0
 					? {}
 					: { thinking: result.thinking }
 			if (result.thinking !== undefined && result.thinking.length > 0) {
-				thinking = joinThinking(thinking, result.thinking)
+				run.thinking = joinThinking(run.thinking, result.thinking)
 			}
 			if (result.usage !== undefined) {
 				// Sanitize the provider's post-turn usage before charging and folding it, like the
 				// preceding abort path: unsanitized, a non-finite field would reach `budget.consume`,
 				// which refuses it with a `range` error, and a negative field would shrink `sumUsage`.
 				const resultUsage = sanitizeUsage(result.usage)
-				// The mid-stream estimate already consumed `charged` of this turn's completion, so only
+				// The mid-stream estimate already consumed `metered.charged` of this turn's completion, so only
 				// the remainder is charged here while the emitted `usage` chunk carries the full report.
-				chargeUsage(budget, resultUsage, charged)
-				usage = sumUsage(usage, resultUsage)
+				chargeUsage(budget, resultUsage, metered.charged)
+				run.usage = sumUsage(run.usage, resultUsage)
 				// Observe this turn's usage — the result already exists; emit beside the yield.
 				this.#emitter.emit('usage', resultUsage)
 				yield { category: 'usage', usage: resultUsage }
@@ -556,8 +572,8 @@ export class Agent implements AgentInterface {
 				const admitted = filterAllowList(names, result.tools, (call) => call.name)
 				const authorization = this.#authorize(result.tools, admitted)
 				if (abort.signal.aborted) {
-					partial = true
-					exited = true
+					run.partial = true
+					run.exited = true
 					break
 				}
 				const assistant = this.#context.messages.add({
@@ -568,10 +584,9 @@ export class Agent implements AgentInterface {
 				})
 				messages.push(assistant)
 				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
-				for (let index = 0; index < result.tools.length; index += 1) {
-					const call = result.tools[index]
+				for (const [index, call] of result.tools.entries()) {
 					const outcomeResult = results[index]
-					if (call === undefined || outcomeResult === undefined) continue
+					if (outcomeResult === undefined) continue
 					// Observe the dispatched tool + its result — beside the existing `tool` yield
 					// (the result already exists). Carries the same pair the chunk carries.
 					this.#emitter.emit('tool', call, outcomeResult)
@@ -589,7 +604,7 @@ export class Agent implements AgentInterface {
 				}
 				// The next turn's admission measures and folds the grown prompt, so a final answer never
 				// pays for a fold.
-				pending = true
+				run.pending = true
 				continue
 			}
 			// No tools: this turn's content is the final answer — record it and finish.
@@ -600,10 +615,10 @@ export class Agent implements AgentInterface {
 					...recorded,
 				}),
 			)
-			content = result.content
-			partial = abort.signal.aborted
-			pending = false
-			exited = true
+			run.content = result.content
+			run.partial = abort.signal.aborted
+			run.pending = false
+			run.exited = true
 			break
 		}
 		// The loop exhausted `limit` (the `for` condition failed, never a `break`) while the
@@ -615,12 +630,17 @@ export class Agent implements AgentInterface {
 		// exhaustion. Checking `abort.signal.aborted` here classifies that case correctly: the pump
 		// then emits `abort` (the cancel reason), never `exhaust`. An uncancelled `limit: 0` run never
 		// enters the loop (`pending` stays `false`), so it stays non-partial.
-		if (!exited && pending) {
-			partial = true
-			exhausted = !abort.signal.aborted
+		if (!run.exited && run.pending) {
+			run.partial = true
+			run.exhausted = !abort.signal.aborted
 		}
-		for (const one of spent) usage = sumUsage(usage, one)
-		return { content, thinking, usage, partial, exhausted }
+		return {
+			content: run.content,
+			thinking: run.thinking,
+			usage: spent.reduce<TokenUsage | undefined>((total, one) => sumUsage(total, one), run.usage),
+			partial: run.partial,
+			exhausted: run.exhausted,
+		}
 	}
 
 	// Composes the exact request one provider dispatch sends: the working messages after the
@@ -675,41 +695,22 @@ export class Agent implements AgentInterface {
 		// provider reads; the next run's first admission folds instead.
 		if (abort.signal.aborted) return undefined
 		const conversation = this.#context.conversations.active
-		let current = composed
-		if (conversation?.summarizable === true && !admission.futile) {
-			let section: Awaited<ReturnType<typeof conversation.compact>>
-			try {
-				// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
-				// commits nothing, even when the summarizer ignores the signal.
-				section = await conversation.compact({ signal: abort.signal })
-			} catch (error) {
-				// A cancel wins over the failure it caused, as on the select path: the run settles
-				// partial without a `fault`, and strict mode does not turn the cancel into an error.
-				if (abort.signal.aborted) return undefined
-				// Surface the summarizer failure observably first (always). Lenient (default): skip
-				// compaction this turn and send the over-window request. Strict: rethrow after the
-				// event so the caught error propagates through `#execute` and the run settles `error`.
-				this.#emitter.emit('fault', error)
-				if (this.#strict) throw error
-				return composed
-			}
-			if (abort.signal.aborted) return undefined
-			if (section === undefined) {
-				// Nothing folded. On a later turn the tail had its chance to grow yet still won't fold
-				// ⇒ genuinely futile: latch so the run stops churning. On the first turn the tail is
-				// too short yet ⇒ no latch, leaving later turns free to fold as the tail grows.
-				admission.futile = latch
-			} else {
-				// Compaction changes the view the handler evaluates, so rebuild through selection, then
-				// measure the rebuilt request with the unchanged tools and options.
-				const selecting = this.#select(request, messages, abort, budget, spent)
-				if (selecting !== undefined) await selecting
-				if (abort.signal.aborted) return undefined
-				current = this.#compose(messages, composed.tools, composed.options)
-				window.clear()
-				window.consume(current)
-			}
-		}
+		const current =
+			conversation?.summarizable === true && !admission.futile
+				? await this.#shrink(
+						conversation,
+						window,
+						composed,
+						messages,
+						request,
+						latch,
+						admission,
+						abort,
+						budget,
+						spent,
+					)
+				: composed
+		if (current === undefined) return undefined
 		if (this.#strict && window.exhausted) {
 			throw new AgentError(
 				'WINDOW',
@@ -718,6 +719,57 @@ export class Agent implements AgentInterface {
 			)
 		}
 		return current
+	}
+
+	// Folds the over-window conversation once and returns the request to dispatch: the rebuilt and
+	// re-measured request after a fold, `composed` when nothing folded or a lenient summarizer failure
+	// skipped the fold, or `undefined` when a cancel settles the run partial.
+	async #shrink(
+		conversation: ConversationInterface,
+		window: BudgetInterface<ProviderRequest>,
+		composed: ProviderRequest,
+		messages: Message[],
+		request: Message | undefined,
+		latch: boolean,
+		admission: { futile: boolean },
+		abort: AbortInterface,
+		budget: BudgetInterface<TokenUsage> | undefined,
+		spent: TokenUsage[],
+	): Promise<ProviderRequest | undefined> {
+		// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
+		// commits nothing, even when the summarizer ignores the signal.
+		const folded = await conversation.compact({ signal: abort.signal }).then(
+			(value) => ({ success: true as const, value }),
+			(error: unknown) => ({ success: false as const, error }),
+		)
+		if (!folded.success) {
+			// A cancel wins over the failure it caused, as on the select path: the run settles
+			// partial without a `fault`, and strict mode does not turn the cancel into an error.
+			if (abort.signal.aborted) return undefined
+			// Surface the summarizer failure observably first (always). Lenient (default): skip
+			// compaction this turn and send the over-window request. Strict: rethrow after the
+			// event so the caught error propagates through `#execute` and the run settles `error`.
+			this.#emitter.emit('fault', folded.error)
+			if (this.#strict) throw folded.error
+			return composed
+		}
+		if (abort.signal.aborted) return undefined
+		if (folded.value === undefined) {
+			// Nothing folded. On a later turn the tail had its chance to grow yet still won't fold
+			// ⇒ genuinely futile: latch so the run stops churning. On the first turn the tail is
+			// too short yet ⇒ no latch, leaving later turns free to fold as the tail grows.
+			admission.futile = latch
+			return composed
+		}
+		// Compaction changes the view the handler evaluates, so rebuild through selection, then
+		// measure the rebuilt request with the unchanged tools and options.
+		const selecting = this.#select(request, messages, abort, budget, spent)
+		if (selecting !== undefined) await selecting
+		if (abort.signal.aborted) return undefined
+		const rebuilt = this.#compose(messages, composed.tools, composed.options)
+		window.clear()
+		window.consume(rebuilt)
+		return rebuilt
 	}
 
 	// One select site: rebuild the working array from the handler's selection, or from `view()` when
@@ -750,18 +802,20 @@ export class Agent implements AgentInterface {
 		budget: BudgetInterface<TokenUsage> | undefined,
 		spent: TokenUsage[],
 	): Promise<void> {
-		let selection: Selection
-		try {
-			selection = await pending
-		} catch (error) {
+		const picked = await pending.then(
+			(value) => ({ success: true as const, value }),
+			(error: unknown) => ({ success: false as const, error }),
+		)
+		if (!picked.success) {
 			if (!abort.signal.aborted) {
-				this.#emitter.emit('fault', error)
+				this.#emitter.emit('fault', picked.error)
 				// A `fault` listener can cancel the run synchronously; the cancel then wins over `strict`.
-				if (this.#strict && !abort.signal.aborted) throw error
+				if (this.#strict && !abort.signal.aborted) throw picked.error
 			}
 			messages.splice(0, messages.length, ...this.#context.build())
 			return
 		}
+		const selection = picked.value
 		if (selection.usage !== undefined) {
 			const usage = sanitizeUsage(selection.usage)
 			chargeUsage(budget, usage, 0)
@@ -841,11 +895,9 @@ export class Agent implements AgentInterface {
 		const { allowed, denials } = authorization
 		const executed = allowed.size > 0 ? await tools.execute([...allowed.values()], { signal }) : []
 		const results = new Map<number, ToolResult>(denials)
-		let offset = 0
-		for (const index of allowed.keys()) {
+		for (const [offset, index] of [...allowed.keys()].entries()) {
 			const result = executed[offset]
 			if (result !== undefined) results.set(index, result)
-			offset += 1
 		}
 		return calls.map((call, index) => results.get(index) ?? denyCall(call, undefined))
 	}
@@ -868,8 +920,9 @@ export class Agent implements AgentInterface {
 			request.tools,
 			request.options,
 		)
-		let next = await generator.next()
-		while (!next.done) {
+		for (;;) {
+			const next = await generator.next()
+			if (next.done) return next.value
 			const delta = next.value
 			if (delta.channel === 'content') {
 				onDelta(delta.text)
@@ -877,9 +930,21 @@ export class Agent implements AgentInterface {
 			} else {
 				yield { category: 'think', content: delta.text }
 			}
-			next = await generator.next()
 		}
-		return next.value
+	}
+
+	// Drives `#provide` and returns its result as a success or the thrown error as a failure, so the
+	// loop reads the outcome from a value; the chunks still stream through to the caller.
+	async *#attemptProvide(
+		request: ProviderRequest,
+		signal: AbortSignal,
+		onDelta: (delta: string) => void,
+	): AsyncGenerator<AgentChunk, Result<ProviderResult>> {
+		try {
+			return { success: true, value: yield* this.#provide(request, signal, onDelta) }
+		} catch (error) {
+			return { success: false, error }
+		}
 	}
 
 	// The parent signal for a run's abort: the external signal, an optional per-run signal

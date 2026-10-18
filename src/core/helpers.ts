@@ -202,11 +202,34 @@ export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): Tok
  * ```
  */
 export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean): boolean {
-	let removed = true
-	for (const key of keys) {
-		if (!remove(key)) removed = false
+	return keys.map((key) => remove(key)).every((removed) => removed)
+}
+
+/**
+ * Yields each whole number from zero up to, and excluding, a count, one at a time, so a loop counts
+ * turns without a reassigned counter.
+ *
+ * @remarks
+ * Lazy: it holds no list of the numbers, so a count near `Number.MAX_SAFE_INTEGER` costs nothing
+ * until a consumer pulls that far. A count of `0` yields nothing.
+ *
+ * @param count - The nonnegative safe integer count of numbers to yield
+ * @returns A generator of `0` through `count - 1` in ascending order
+ *
+ * @example
+ * ```ts
+ * [...iterateRange(3)] // [0, 1, 2]
+ * [...iterateRange(0)] // []
+ * ```
+ */
+export function* iterateRange(count: number): Generator<number, void> {
+	// `Array(n).keys()` walks indexes without allocating them, but `n` stops at `2 ** 32 - 1`, so
+	// a larger count is yielded block by block.
+	const block = 2 ** 30
+	for (const start of Array(Math.ceil(count / block)).keys()) {
+		const base = start * block
+		for (const offset of Array(Math.min(block, count - base)).keys()) yield base + offset
 	}
-	return removed
 }
 
 /**
@@ -232,14 +255,11 @@ export function collectExchanges(messages: readonly Message[]): ReadonlyArray<re
 	for (const [index, message] of messages.entries())
 		if (message.role === 'user') boundaries.add(index)
 	for (const group of collectToolGroups(messages)) {
-		let start = messages.length
-		let end = 0
-		for (const message of group) {
-			const position = positions.get(message)
-			if (position === undefined) continue
-			start = Math.min(start, position)
-			end = Math.max(end, position)
-		}
+		const spanned = group
+			.map((message) => positions.get(message))
+			.filter((position): position is number => position !== undefined)
+		const start = Math.min(messages.length, ...spanned)
+		const end = Math.max(0, ...spanned)
 		for (const boundary of boundaries)
 			if (start < boundary && boundary <= end) boundaries.delete(boundary)
 	}
@@ -304,27 +324,31 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 			calls.set(call.id, owners)
 		}
 	}
-	let leader: Message | undefined
-	let orphan: Message[] = []
-	const orphans: Message[][] = []
+	// A run is one non-tool message, which leads it when it owns calls, and the tool messages after it.
+	const runs: Array<{ leader: Message | undefined; tools: Message[] }> = [
+		{ leader: undefined, tools: [] },
+	]
 	for (const message of messages) {
-		if (message.role !== 'tool') {
-			leader = groups.has(message) ? message : undefined
-			orphan = []
-			continue
-		}
-		const local = leader?.calls ?? []
-		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
-		const paired =
-			leader !== undefined &&
-			(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
-		const owners = message.call === undefined ? undefined : calls.get(message.call)
-		const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
-		const group = owner === undefined ? undefined : groups.get(owner)
-		if (group !== undefined) group.push(message)
-		else {
-			if (orphan.length === 0) orphans.push(orphan)
-			orphan.push(message)
+		if (message.role === 'tool') runs.at(-1)?.tools.push(message)
+		else runs.push({ leader: groups.has(message) ? message : undefined, tools: [] })
+	}
+	const orphans: Message[][] = []
+	for (const { leader, tools } of runs) {
+		const orphan: Message[] = []
+		for (const message of tools) {
+			const local = leader?.calls ?? []
+			const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+			const paired =
+				leader !== undefined &&
+				(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
+			const owners = message.call === undefined ? undefined : calls.get(message.call)
+			const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
+			const group = owner === undefined ? undefined : groups.get(owner)
+			if (group !== undefined) group.push(message)
+			else {
+				if (orphan.length === 0) orphans.push(orphan)
+				orphan.push(message)
+			}
 		}
 	}
 	return [...groups.values(), ...orphans]

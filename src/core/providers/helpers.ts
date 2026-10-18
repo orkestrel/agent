@@ -134,21 +134,23 @@ export async function readFailure(
 	signal: AbortSignal,
 ): Promise<FailureRead> {
 	const status = response.status
-	let detail: string
-	try {
-		detail =
-			response.body === null
-				? ''
-				: (await readText(response.body, MAX_ERROR_BODY_LENGTH, signal)).text
-	} catch (cause) {
+	const body = response.body
+	const read =
+		body === null
+			? { success: true as const, text: '' }
+			: await readText(body, MAX_ERROR_BODY_LENGTH, signal).then(
+					(value) => ({ success: true as const, text: value.text }),
+					(cause: unknown) => ({ success: false as const, cause }),
+				)
+	if (!read.success) {
 		return {
 			message: `${prefix} ${status} - (error body unavailable)`,
 			status,
-			...(cause === undefined ? {} : { cause }),
+			...(read.cause === undefined ? {} : { cause: read.cause }),
 		}
 	}
 	signal.throwIfAborted()
-	return { message: `${prefix} ${status}${detail === '' ? '' : ` - ${detail}`}`, status }
+	return { message: `${prefix} ${status}${read.text === '' ? '' : ` - ${read.text}`}`, status }
 }
 
 /**
@@ -179,27 +181,28 @@ export async function readText(
 ): Promise<TextRead> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
-	let cleanup: AbortController | undefined
-	let remaining = limit ?? Infinity
-	let text = ''
-	let complete = false
+	// The decoded prefix, the byte budget left, and whether EOF arrived, one record per call.
+	const read = { text: '', remaining: limit ?? Infinity, complete: false }
 	try {
-		cleanup = await armReaderAbort(reader, signal)
-		while (remaining > 0) {
-			if (signal?.aborted) break
-			const step = await reader.read()
-			if (signal?.aborted) break
-			if (step.done) {
-				complete = true
-				break
+		const cleanup = await armReaderAbort(reader, signal)
+		try {
+			while (read.remaining > 0) {
+				if (signal?.aborted) break
+				const step = await reader.read()
+				if (signal?.aborted) break
+				if (step.done) {
+					read.complete = true
+					break
+				}
+				const bytes = step.value.subarray(0, read.remaining)
+				read.text += decoder.decode(bytes, { stream: true })
+				read.remaining -= bytes.byteLength
 			}
-			const bytes = step.value.subarray(0, remaining)
-			text += decoder.decode(bytes, { stream: true })
-			remaining -= bytes.byteLength
+			return { text: read.text + decoder.decode(), complete: read.complete }
+		} finally {
+			cleanup.abort()
 		}
-		return { text: text + decoder.decode(), complete }
 	} finally {
-		cleanup?.abort()
 		await releaseReader(reader)
 	}
 }
@@ -222,21 +225,23 @@ export async function* readChunks(
 ): AsyncGenerator<string> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
-	let cleanup: AbortController | undefined
 	try {
-		cleanup = await armReaderAbort(reader, signal)
-		if (signal?.aborted) return
-		for (;;) {
-			const step = await reader.read()
+		const cleanup = await armReaderAbort(reader, signal)
+		try {
 			if (signal?.aborted) return
-			if (step.done) break
-			const chunk = decoder.decode(step.value, { stream: true })
-			if (chunk.length > 0) yield chunk
+			for (;;) {
+				const step = await reader.read()
+				if (signal?.aborted) return
+				if (step.done) break
+				const chunk = decoder.decode(step.value, { stream: true })
+				if (chunk.length > 0) yield chunk
+			}
+			const tail = decoder.decode()
+			if (tail.length > 0) yield tail
+		} finally {
+			cleanup.abort()
 		}
-		const tail = decoder.decode()
-		if (tail.length > 0) yield tail
 	} finally {
-		cleanup?.abort()
 		await releaseReader(reader)
 	}
 }
@@ -285,27 +290,24 @@ export function computeReading(answer: JudgeAnswer): Reading {
 	if (count < 2) {
 		throw new JudgeError('PROTOCOL', 'judge error: an answer needs at least 2 candidates')
 	}
-	let winner = ''
-	let index = 0
-	let probability = -Infinity
-	for (const [position, [name, candidate]] of candidates.entries()) {
-		if (candidate > probability) {
-			winner = name
-			index = position
-			probability = candidate
-		}
-	}
+	// The first strictly greatest candidate wins a tie.
+	const { winner, index, probability } = candidates.reduce(
+		(top, [name, candidate], position) =>
+			candidate > top.probability ? { winner: name, index: position, probability: candidate } : top,
+		{ winner: '', index: 0, probability: -Infinity },
+	)
 	if (answer.form === 'choice') {
 		return { winner, probability, confidence: (probability - 1 / count) / (1 - 1 / count) }
 	}
-	let spread = 0
-	let even = 0
-	let score = 0
-	for (const [level, candidate] of answer.probabilities.entries()) {
-		spread += candidate * Math.abs(level - index)
-		even += Math.abs(level - (count - 1) / 2)
-		score += level * candidate
-	}
+	const spread = answer.probabilities.reduce(
+		(sum, candidate, level) => sum + candidate * Math.abs(level - index),
+		0,
+	)
+	const even = answer.probabilities.reduce(
+		(sum, _candidate, level) => sum + Math.abs(level - (count - 1) / 2),
+		0,
+	)
+	const score = answer.probabilities.reduce((sum, candidate, level) => sum + level * candidate, 0)
 	return { winner, probability, confidence: Math.max(0, 1 - spread / (even / count)), score }
 }
 
@@ -333,14 +335,19 @@ export function computeReading(answer: JudgeAnswer): Reading {
  * ```
  */
 export function buildJudgeResult(model: string, results: readonly JudgeResult[]): JudgeResult {
-	let answers: Readonly<Record<string, JudgeAnswer>> = {}
-	let refusals: Readonly<Record<string, Refusal>> = {}
-	let usage: TokenUsage | undefined
-	for (const result of results) {
-		answers = { ...answers, ...result.answers }
-		refusals = { ...refusals, ...result.refusals }
-		if (result.usage !== undefined) usage = sumUsage(usage, sanitizeUsage(result.usage))
-	}
+	const answers = results.reduce<Readonly<Record<string, JudgeAnswer>>>(
+		(merged, result) => ({ ...merged, ...result.answers }),
+		{},
+	)
+	const refusals = results.reduce<Readonly<Record<string, Refusal>>>(
+		(merged, result) => ({ ...merged, ...result.refusals }),
+		{},
+	)
+	const usage = results.reduce<TokenUsage | undefined>(
+		(total, result) =>
+			result.usage === undefined ? total : sumUsage(total, sanitizeUsage(result.usage)),
+		undefined,
+	)
 	return {
 		model: results[0]?.model ?? model,
 		answers,
@@ -516,7 +523,7 @@ export function extractSystemOneAnswer(
 	}
 	if (answer.type !== 'score' || question.form !== 'score') return undefined
 	const probabilities: number[] = []
-	for (let level = 0; level < question.criteria.length; level++) {
+	for (const level of question.criteria.keys()) {
 		if (!Object.hasOwn(answer.probabilities, level)) return undefined
 		const probability = isArray(answer.probabilities)
 			? answer.probabilities[level]

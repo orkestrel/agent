@@ -53,60 +53,19 @@ export class Classifier implements ClassifierInterface {
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
-		let fault: Error | undefined
-		try {
-			const messages = this.#options.conversation.messages()
-			const asked = messages.filter((message) => this.#options.assign(message) === undefined)
-			for (const message of asked) {
-				if (!requests.has(message.id))
-					results.push(
-						await this.#ask(this.#buildCategory(message.id), 'category', signal, results),
-					)
-			}
-			for (const message of asked) {
-				if (!requests.has(message.id) && this.quiet(message.id)) continue
-				for (const topic of this.#options.topics) {
-					if (requests.has(message.id) && topic.requested === false) continue
-					results.push(
-						await this.#ask(this.#buildTopic(message.id, topic), 'topic', signal, results),
-					)
-				}
-			}
-			for (const later of asked) {
-				if (
-					later.role !== 'user' ||
-					(this.#readCategories(later.id)?.probabilities.correction ?? 0) <
-						this.#options.thresholds.correction
-				)
-					continue
-				const near = this.#collectNear(later)
-				if (near.size === 0) continue
-				for (const earlier of messages) {
-					if (earlier.id === later.id) break
-					if (
-						this.quiet(earlier.id) ||
-						![...this.#collectNear(earlier)].some((topic) => near.has(topic))
-					)
-						continue
-					const spec = this.#buildPair('amends', earlier.id, later.id)
-					results.push(await this.#ask(spec, 'amends', signal, results))
-					if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
-						results.push(
-							await this.#ask(
-								this.#buildPair('supersedes', earlier.id, later.id),
-								'supersedes',
-								signal,
-								results,
-							),
-						)
-				}
-			}
-		} catch (error) {
-			fault = isError(error) ? error : new Error(errorToMessage(error))
-		}
-		let usage: TokenUsage | undefined
-		for (const result of results)
-			if (result.usage !== undefined) usage = sumUsage(usage, result.usage)
+		const asking = await this.#gather(requests, signal, results).then(
+			() => ({ success: true as const }),
+			(error: unknown) => ({ success: false as const, error }),
+		)
+		const fault = asking.success
+			? undefined
+			: isError(asking.error)
+				? asking.error
+				: new Error(errorToMessage(asking.error))
+		const usage = results.reduce<TokenUsage | undefined>(
+			(total, result) => (result.usage === undefined ? total : sumUsage(total, result.usage)),
+			undefined,
+		)
 		return {
 			judgments: results.flatMap((result) => result.judgments),
 			readings: results.flatMap((result) => result.readings),
@@ -126,20 +85,19 @@ export class Classifier implements ClassifierInterface {
 		const assigned = this.#options.assign(message)
 		if (assigned !== undefined) return assigned
 		const answer = this.#readCategories(id)
-		let best: LedgerCategory | undefined
-		let highest = this.#options.thresholds.category
-		for (const [option, probability] of Object.entries(answer?.probabilities ?? {})) {
-			const category = LEDGER_CATEGORIES.find((candidate) => candidate === option)
-			if (
-				category !== undefined &&
-				probability >= highest &&
-				(best === undefined || probability > highest)
-			) {
-				best = category
-				highest = probability
-			}
-		}
-		return best
+		const cutoff = this.#options.thresholds.category
+		const candidates = Object.entries(answer?.probabilities ?? {}).flatMap(
+			([option, probability]) => {
+				const category = LEDGER_CATEGORIES.find((candidate) => candidate === option)
+				return category !== undefined && probability >= cutoff ? [{ category, probability }] : []
+			},
+		)
+		// The first category with the highest probability wins a tie.
+		return candidates.reduce<{ category: LedgerCategory; probability: number } | undefined>(
+			(best, candidate) =>
+				best === undefined || candidate.probability > best.probability ? candidate : best,
+			undefined,
+		)?.category
 	}
 
 	/**
@@ -234,6 +192,57 @@ export class Classifier implements ClassifierInterface {
 					[...ids].sort((left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0)),
 				)
 		return { quiet, categories, topics, amendments, supersessions }
+	}
+
+	// Asks every question in order, appending each answer to `results` so a throw still leaves the
+	// answers completed before it.
+	async #gather(
+		requests: ReadonlySet<string>,
+		signal: AbortSignal,
+		results: ClassifierResult[],
+	): Promise<void> {
+		const messages = this.#options.conversation.messages()
+		const asked = messages.filter((message) => this.#options.assign(message) === undefined)
+		for (const message of asked) {
+			if (!requests.has(message.id))
+				results.push(await this.#ask(this.#buildCategory(message.id), 'category', signal, results))
+		}
+		for (const message of asked) {
+			if (!requests.has(message.id) && this.quiet(message.id)) continue
+			for (const topic of this.#options.topics) {
+				if (requests.has(message.id) && topic.requested === false) continue
+				results.push(await this.#ask(this.#buildTopic(message.id, topic), 'topic', signal, results))
+			}
+		}
+		for (const later of asked) {
+			if (
+				later.role !== 'user' ||
+				(this.#readCategories(later.id)?.probabilities.correction ?? 0) <
+					this.#options.thresholds.correction
+			)
+				continue
+			const near = this.#collectNear(later)
+			if (near.size === 0) continue
+			for (const earlier of messages) {
+				if (earlier.id === later.id) break
+				if (
+					this.quiet(earlier.id) ||
+					![...this.#collectNear(earlier)].some((topic) => near.has(topic))
+				)
+					continue
+				const spec = this.#buildPair('amends', earlier.id, later.id)
+				results.push(await this.#ask(spec, 'amends', signal, results))
+				if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
+					results.push(
+						await this.#ask(
+							this.#buildPair('supersedes', earlier.id, later.id),
+							'supersedes',
+							signal,
+							results,
+						),
+					)
+			}
+		}
 	}
 
 	#renderState(id: string): string {

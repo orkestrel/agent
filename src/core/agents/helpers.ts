@@ -65,17 +65,15 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 		if (!isString(content) || !isBoolean(partial)) return undefined
 		if (thinking !== undefined && !isString(thinking)) return undefined
 
-		let projectedUsage: TokenUsage | undefined
-		if (usage !== undefined) {
-			if (!isObject(usage)) return undefined
-			const prompt = Reflect.get(usage, 'prompt')
-			const completion = Reflect.get(usage, 'completion')
-			const total = Reflect.get(usage, 'total')
-			if (!isFiniteNumber(prompt) || !isFiniteNumber(completion) || !isFiniteNumber(total)) {
-				return undefined
-			}
-			projectedUsage = { prompt, completion, total }
-		}
+		if (usage !== undefined && !isObject(usage)) return undefined
+		const prompt = isObject(usage) ? Reflect.get(usage, 'prompt') : undefined
+		const completion = isObject(usage) ? Reflect.get(usage, 'completion') : undefined
+		const total = isObject(usage) ? Reflect.get(usage, 'total') : undefined
+		const counted = isFiniteNumber(prompt) && isFiniteNumber(completion) && isFiniteNumber(total)
+		if (usage !== undefined && !counted) return undefined
+		const projectedUsage: TokenUsage | undefined = counted
+			? { prompt, completion, total }
+			: undefined
 
 		return {
 			content,
@@ -175,11 +173,8 @@ export function estimateMessages(messages: readonly Message[]): number {
  * ```
  */
 export function measureMessage(message: Message): MessageMeasure {
-	let calls = 0
-	if (hasCalls(message)) {
-		const rendered = renderJSON(message.calls)
-		calls = rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
-	}
+	const rendered = hasCalls(message) ? renderJSON(message.calls) : ''
+	const calls = rendered === undefined ? MESSAGE_TOKEN_OVERHEAD : estimateTokens(rendered)
 	return {
 		id: message.id,
 		role: message.role,

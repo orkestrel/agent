@@ -1,6 +1,6 @@
 import type { ThinkingReplay } from '@src/core'
 import { parseJSONAs } from '@orkestrel/contract'
-import { requireValue, waitForDelay } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { getEventListeners } from 'node:events'
 import {
 	ProviderAbortError,
@@ -21,14 +21,15 @@ import {
 
 describe('RelayStream', () => {
 	it('resolves the upstream policy when the stream is constructed', async () => {
-		let replay: ThinkingReplay = 'none'
+		// The policy reads `none` until construction has finished, then `all`.
+		const constructed = createRecorder<readonly []>()
 		const provider = createScriptedProvider([{ content: 'done' }], { recorded: true })
 		const relay = new RelayStream({
 			provider: {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					return replay
+					return constructed.count === 0 ? 'none' : 'all'
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -36,7 +37,7 @@ describe('RelayStream', () => {
 			request: { messages: [{ id: 'a', role: 'assistant', content: 'answer', thinking: 'plan' }] },
 			signal: new AbortController().signal,
 		})
-		replay = 'all'
+		constructed.handler()
 		await relay.response.text()
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.messages[0]).toEqual({

@@ -357,9 +357,11 @@ export class StudyMemorySession implements StudySessionInterface {
 		if (active === undefined) throw new StudyError('FAULT', 'Lookup outside an active goal')
 		try {
 			const encoder = new TextEncoder()
-			let bytes = encoder.encode(JSON.stringify(args)).byteLength
+			const request = encoder.encode(JSON.stringify(args)).byteLength
+			// The request bytes, then the reply bytes once the lookup produced one.
+			const sizes = [request]
 			const bound = this.#options.profile.bounds.request
-			if (bytes > bound.bytes)
+			if (request > bound.bytes)
 				throw new StudyError('CAPACITY', 'Lookup arguments exceed the byte allowance')
 			const ticket = await active.context.meter.admit({
 				role: 'tool',
@@ -380,7 +382,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				const record = this.#records.get(args.id)
 				const value =
 					record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
-				bytes += encoder.encode(JSON.stringify(value)).byteLength
+				sizes.push(encoder.encode(JSON.stringify(value)).byteLength)
 				this.#trace.append('lookup', { id: args.id, found: record !== undefined })
 				signal.throwIfAborted()
 				return value
@@ -390,7 +392,7 @@ export class StudyMemorySession implements StudySessionInterface {
 						role: 'tool',
 						calls: 1,
 						tokens: 0,
-						bytes,
+						bytes: sizes.reduce((total, size) => total + size, 0),
 						duration: Math.ceil(performance.now() - started),
 					})
 			}

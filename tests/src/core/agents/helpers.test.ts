@@ -30,7 +30,7 @@ import {
 	requireLimit,
 	extractQueueOptions,
 } from '@src/core'
-import { isRecord } from '@orkestrel/contract'
+import { attempt, isRecord } from '@orkestrel/contract'
 import { createRecorder } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { createToolCall, createTokenUsage } from '../../../setup.js'
@@ -234,11 +234,9 @@ describe('agentResultToJSON', () => {
 	it.each(createInvalidAgentResultCases())(
 		'returns undefined without throwing for %s',
 		(_label, input) => {
-			let projected: unknown = 'not called'
-			expect(() => {
-				projected = agentResultToJSON(input)
-			}).not.toThrow()
-			expect(projected).toBeUndefined()
+			const projected = attempt(() => agentResultToJSON(input))
+			expect(projected.success).toBe(true)
+			expect(projected.success && projected.value).toBeUndefined()
 		},
 	)
 })
@@ -304,14 +302,12 @@ describe('estimateMessages', () => {
 		const calls = [createToolCall({ id: 'c1', name: 'search', arguments: circular })]
 		const withCircularCalls: Message = { id: 'm', role: 'assistant', content: '', calls }
 
-		let estimate = 0
-		expect(() => {
-			estimate = estimateMessages([withCircularCalls])
-		}).not.toThrow()
-		expect(Number.isFinite(estimate)).toBe(true)
+		const estimate = attempt(() => estimateMessages([withCircularCalls]))
+		expect(estimate.success).toBe(true)
+		expect(estimate.success && Number.isFinite(estimate.value)).toBe(true)
 		// The fallback contribution matches the documented constant exactly (no partial/garbage
 		// serialization sneaks through) — the message's total is its overhead plus that fallback.
-		expect(estimate).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
+		expect(estimate.success && estimate.value).toBe(2 * MESSAGE_TOKEN_OVERHEAD)
 	})
 
 	it('adds images.length * IMAGE_TOKEN_ESTIMATE when a message has images', () => {

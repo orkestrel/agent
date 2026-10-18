@@ -732,7 +732,7 @@ describe('Conversation — view() frames each section summary as a RECAP (D2)', 
 		// `recap of <n>` (the stub) — the framed view() prefixes each with CONVERSATION_RECAP_PREFIX.
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
-		for (let n = 0; n < 3; n += 1) {
+		for (const n of Array(3).keys()) {
 			conversation.add({ role: 'assistant', content: `turn ${n}` })
 			await conversation.compact()
 		}
@@ -1033,7 +1033,7 @@ describe('Conversation — sections cap', () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize, sections: 2, keep: 1 })
 
-		for (let n = 0; n < 5; n += 1) {
+		for (const n of Array(5).keys()) {
 			conversation.add({ role: 'user', content: `msg-${n}` })
 			await conversation.compact()
 		}
@@ -1092,7 +1092,7 @@ describe('Conversation — sections cap', () => {
 		const stub = createStubSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 
-		for (let n = 0; n < 4; n += 1) {
+		for (const n of Array(4).keys()) {
 			conversation.add({ role: 'assistant', content: `turn-${n}` })
 			await conversation.compact()
 		}
@@ -1107,11 +1107,11 @@ describe('Conversation — sections cap', () => {
 	// folds at call 3 and merges at call 4, the only call that throws.
 	it('keeps the unmerged sections and propagates the error when the overflow merge throws', async () => {
 		const boom = new Error('merge summarizer boom')
-		let calls = 0
+		const calls = createRecorder<readonly []>()
 		const conversation = new Conversation({
 			summarize: async (messages) => {
-				calls += 1
-				if (calls === 4) throw boom
+				calls.handler()
+				if (calls.count === 4) throw boom
 				return `recap of ${messages.length}`
 			},
 			sections: 2,
@@ -1655,12 +1655,12 @@ describe('Conversation — rolling folds', () => {
 
 	it('commits nothing and emits nothing when the summarizer throws, then folds on retry', async () => {
 		const boom = new Error('rolling summarizer boom')
-		let calls = 0
+		const calls = createRecorder<readonly []>()
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize(messages) {
-				calls += 1
-				if (calls === 2) throw boom
+				calls.handler()
+				if (calls.count === 2) throw boom
 				return `recap of ${messages.length}`
 			},
 		})
@@ -1694,12 +1694,12 @@ describe('Conversation — rolling folds', () => {
 
 	it('commits nothing when aborted mid-fold, even if the summarizer ignores the signal', async () => {
 		const gate = Promise.withResolvers<string>()
-		let calls = 0
+		const calls = createRecorder<readonly []>()
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize() {
-				calls += 1
-				return calls === 1 ? 'recap' : gate.promise
+				calls.handler()
+				return calls.count === 1 ? 'recap' : gate.promise
 			},
 		})
 		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
@@ -1720,7 +1720,7 @@ describe('Conversation — rolling folds', () => {
 		const reason = new Error('cancelled')
 
 		const pending = conversation.compact({ signal: controller.signal })
-		await waitForCondition('the rolling summarizer call', () => calls === 2)
+		await waitForCondition('the rolling summarizer call', () => calls.count === 2)
 		controller.abort(reason)
 		await expect(pending).rejects.toBe(reason)
 		gate.resolve('late recap')
@@ -1734,12 +1734,12 @@ describe('Conversation — rolling folds', () => {
 
 	it('commits nothing when a slice message is removed while the summarizer runs', async () => {
 		const gate = Promise.withResolvers<string>()
-		let calls = 0
+		const calls = createRecorder<readonly []>()
 		const conversation = new Conversation({
 			rolling: true,
 			async summarize() {
-				calls += 1
-				return calls === 1 ? 'recap' : gate.promise
+				calls.handler()
+				return calls.count === 1 ? 'recap' : gate.promise
 			},
 		})
 		const events = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
@@ -1757,7 +1757,7 @@ describe('Conversation — rolling folds', () => {
 		])
 
 		const pending = conversation.compact()
-		await waitForCondition('the rolling summarizer call', () => calls === 2)
+		await waitForCondition('the rolling summarizer call', () => calls.count === 2)
 		expect(conversation.remove(requireValue(dropped).id)).toBe(true)
 		gate.resolve('late recap')
 

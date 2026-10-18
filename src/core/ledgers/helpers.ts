@@ -107,13 +107,16 @@ export function renderTopicNames(topics: readonly LedgerTopic[]): string {
  * ```
  */
 export function renderCauseChain(error: unknown): string {
-	const parts: string[] = []
-	let current: unknown = error
-	for (let depth = 0; current !== undefined && depth < 4; depth += 1) {
-		parts.push(isError(current) ? `${current.name}: ${current.message}` : String(current))
-		current = isError(current) ? current.cause : undefined
+	const chain: unknown[] = error === undefined ? [] : [error]
+	while (chain.length < 4) {
+		const last = chain.at(-1)
+		const cause = isError(last) ? last.cause : undefined
+		if (cause === undefined) break
+		chain.push(cause)
 	}
-	return parts.join(' <- ')
+	return chain
+		.map((one) => (isError(one) ? `${one.name}: ${one.message}` : String(one)))
+		.join(' <- ')
 }
 
 /**
@@ -836,24 +839,24 @@ export function renderStub(
  * ```
  */
 export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | undefined {
-	let spread = 0
-	let product = 0
-	for (const group of groups) {
-		for (const set of Map.groupBy(group, (call) => call.tools).values()) {
+	const terms = groups.flatMap((group) =>
+		[...Map.groupBy(group, (call) => call.tools).values()].flatMap((set) => {
 			const points = set.flatMap((call) =>
 				isFiniteNumber(call.prompt) && call.estimate > 0
 					? [{ estimate: call.estimate, prompt: call.prompt }]
 					: [],
 			)
-			if (points.length < 2) continue
+			if (points.length < 2) return []
 			const meanX = points.reduce((sum, point) => sum + point.estimate, 0) / points.length
 			const meanY = points.reduce((sum, point) => sum + point.prompt, 0) / points.length
-			for (const point of points) {
-				spread += (point.estimate - meanX) ** 2
-				product += (point.estimate - meanX) * (point.prompt - meanY)
-			}
-		}
-	}
+			return points.map((point) => ({
+				spread: (point.estimate - meanX) ** 2,
+				product: (point.estimate - meanX) * (point.prompt - meanY),
+			}))
+		}),
+	)
+	const spread = terms.reduce((sum, term) => sum + term.spread, 0)
+	const product = terms.reduce((sum, term) => sum + term.product, 0)
 	return spread > 0 ? product / spread : undefined
 }
 

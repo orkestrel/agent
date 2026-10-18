@@ -1,6 +1,6 @@
 import type { AgentJobInput } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { captureError, requireValue } from '@orkestrel/test'
+import { captureError, createRecorder, requireValue } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -215,7 +215,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 	})
 
 	it('resolves an `authority` name and the rehydrated loop consults it (a denial is fed back)', async () => {
-		let executed = 0
+		const executions = createRecorder<readonly []>()
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'c1', name: 'add', arguments: {} }] },
 			{ content: 'blocked' },
@@ -226,7 +226,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 				add: createTool({
 					name: 'add',
 					execute: () => {
-						executed += 1
+						executions.handler()
 						return 5
 					},
 				}),
@@ -246,7 +246,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		})
 		const result = await agent.generate()
 		// The resolved authority denied `add` → its handler never ran, yet the run settled.
-		expect(executed).toBe(0)
+		expect(executions.count).toBe(0)
 		expect(result.content).toBe('blocked')
 		expect(result.partial).toBe(false)
 	})

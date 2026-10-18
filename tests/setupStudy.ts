@@ -614,37 +614,42 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 	})
 	const fixture = createMemoryContext(profile)
 	const products: StudyProduct[] = []
-	let failure: string | undefined
-	let session: StudySessionInterface | undefined
+	const failures: string[] = []
 	// Construction and open sit inside the cleanup boundary so a refused treatment still releases the server and accounting.
 	try {
-		session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+		const session: StudySessionInterface = await new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			profile,
+		}).open(
 			{ id: 'observation', scenario: 'public', arm: options.arm, repetition: 0 },
 			fixture.context.signal,
 		)
-		for (const goal of options.goals) {
-			try {
-				products.push(await session.execute(goal, fixture.context))
-			} catch (error) {
-				failure = error instanceof Error ? error.message : String(error)
-				break
+		try {
+			for (const goal of options.goals) {
+				try {
+					products.push(await session.execute(goal, fixture.context))
+				} catch (error) {
+					failures.push(error instanceof Error ? error.message : String(error))
+					break
+				}
 			}
-		}
-		await session.close()
-		return {
-			requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
-			products,
-			failure,
-			usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
-				role: row.role,
-				calls: row.calls,
-				tokens: row.tokens,
-				bytes: row.bytes,
-			})),
-			evidence: [...fixture.evidence],
+			await session.close()
+			return {
+				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+				products,
+				failure: failures[0],
+				usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
+					role: row.role,
+					calls: row.calls,
+					tokens: row.tokens,
+					bytes: row.bytes,
+				})),
+				evidence: [...fixture.evidence],
+			}
+		} finally {
+			await session.close()
 		}
 	} finally {
-		await session?.close()
 		fixture.close()
 		await server.close()
 	}
@@ -664,48 +669,53 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 	})
 	const fixture = createMemoryContext(profile)
 	const products: StudyProduct[] = []
-	let session: StudySessionInterface | undefined
 	try {
-		session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+		const session: StudySessionInterface = await new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			profile,
+		}).open(
 			{ id: 'failure', scenario: 'public', arm: options.arm, repetition: 0 },
 			fixture.context.signal,
 		)
-		let first: unknown
-		for (const goal of options.goals) {
-			try {
-				products.push(await session.execute(goal, fixture.context))
-			} catch (error) {
-				first = error
-				break
+		try {
+			const firsts: unknown[] = []
+			for (const goal of options.goals) {
+				try {
+					products.push(await session.execute(goal, fixture.context))
+				} catch (error) {
+					firsts.push(error)
+					break
+				}
 			}
-		}
-		const sent = server.requests.length
-		const latched = await session
-			.execute(
-				{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
-				fixture.context,
-			)
-			.then(
-				() => undefined,
-				(error: unknown) => error,
-			)
-		return {
-			first,
-			latched,
-			products,
-			requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
-			sent,
-			queued: server.responses.length,
-			usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
-				role: row.role,
-				calls: row.calls,
-				tokens: row.tokens,
-				bytes: row.bytes,
-			})),
-			evidence: [...fixture.evidence],
+			const sent = server.requests.length
+			const latched = await session
+				.execute(
+					{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
+					fixture.context,
+				)
+				.then(
+					() => undefined,
+					(error: unknown) => error,
+				)
+			return {
+				first: firsts[0],
+				latched,
+				products,
+				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+				sent,
+				queued: server.responses.length,
+				usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
+					role: row.role,
+					calls: row.calls,
+					tokens: row.tokens,
+					bytes: row.bytes,
+				})),
+				evidence: [...fixture.evidence],
+			}
+		} finally {
+			await session.close()
 		}
 	} finally {
-		await session?.close()
 		fixture.close()
 		await server.close()
 	}
@@ -810,15 +820,15 @@ export function readMemoryParts(parts: unknown): {
 		typeof parts.schema !== 'number'
 	)
 		throw new Error('Invalid context parts')
-	let total = parts.tools + parts.schema
-	for (const message of parts.messages) {
+	const components = parts.messages.flatMap((message): readonly number[] => {
 		if (!isRecord(message)) throw new Error('Invalid context message')
-		for (const key of ['content', 'framing', 'calls', 'thinking', 'images']) {
+		return ['content', 'framing', 'calls', 'thinking', 'images'].map((key) => {
 			const component = message[key]
 			if (typeof component !== 'number') throw new Error('Invalid context component')
-			total += component
-		}
-	}
+			return component
+		})
+	})
+	const total = components.reduce((sum, component) => sum + component, parts.tools + parts.schema)
 	return { count: parts.messages.length, tools: parts.tools, schema: parts.schema, total }
 }
 

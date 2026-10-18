@@ -1,3 +1,4 @@
+import { createRecorder } from '@orkestrel/test'
 import { expect, it } from 'vitest'
 import {
 	isStudyToolsAgent,
@@ -96,18 +97,19 @@ it('validates actual admitted constructors and bounds every declared workload wi
 	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: 'a'.repeat(129) })).toBe(false)
 	expect(isStudyToolsResponse({ content: 'x', calls: [], consume: '' })).toBe(false)
 	// A foreign proxy that passes the shared guard and then throws on a later read stays total.
-	let reads = 0
+	const reads = createRecorder<readonly []>()
 	const hostile = new Proxy(
 		{ content: '', calls: [] },
 		{
 			get(target, key, receiver) {
-				if (key === 'content' && ++reads > 1) throw new Error('Later read refused')
+				if (key === 'content') reads.handler()
+				if (key === 'content' && reads.count > 1) throw new Error('Later read refused')
 				return Reflect.get(target, key, receiver)
 			},
 		},
 	)
 	expect(isStudyToolsResponse(hostile)).toBe(false)
-	expect(reads).toBe(2)
+	expect(reads.count).toBe(2)
 	expect(() => parseStudyToolsInput({})).toThrow('Invalid')
 })
 
