@@ -6,7 +6,7 @@ import { createStudyAdapter } from '../../../studies/tools/factories.js'
 import {
 	observeStudyToolsFile,
 	readStudyToolsGrade,
-	readStudyToolsObservation,
+	buildStudyToolsObservation,
 	readStudyToolsPredicate,
 	resolveStudyToolsPath,
 	validateStudyToolsRubric,
@@ -170,14 +170,14 @@ it('cites the zero-based matched row as a one-based retained reference and keeps
 
 it('reads a denial, a successful result and a failed result into evidence values and refuses a malformed result', () => {
 	const call = { id: 'c1', name: 'write', arguments: { path: 'note.txt' } }
-	expect(readStudyToolsObservation('denial', call, { call, reason: 'refused' })).toEqual({
+	expect(buildStudyToolsObservation('denial', call, { call, reason: 'refused' })).toEqual({
 		id: 'c1',
 		name: 'write',
 		reason: 'refused',
 	})
-	expect(readStudyToolsObservation('denial', call, { call })).toEqual({ id: 'c1', name: 'write' })
+	expect(buildStudyToolsObservation('denial', call, { call })).toEqual({ id: 'c1', name: 'write' })
 	expect(
-		readStudyToolsObservation('tool', call, { call, result: { success: true, value: 'stored' } }),
+		buildStudyToolsObservation('tool', call, { call, result: { success: true, value: 'stored' } }),
 	).toEqual({
 		id: 'c1',
 		name: 'write',
@@ -186,7 +186,10 @@ it('reads a denial, a successful result and a failed result into evidence values
 		value: 'stored',
 	})
 	expect(
-		readStudyToolsObservation('tool', call, { call, result: { success: false, error: 'refused' } }),
+		buildStudyToolsObservation('tool', call, {
+			call,
+			result: { success: false, error: 'refused' },
+		}),
 	).toEqual({
 		id: 'c1',
 		name: 'write',
@@ -194,13 +197,13 @@ it('reads a denial, a successful result and a failed result into evidence values
 		success: false,
 		error: 'refused',
 	})
-	expect(() => readStudyToolsObservation('tool', call, { call, result: 'stored' })).toThrow(
+	expect(() => buildStudyToolsObservation('tool', call, { call, result: 'stored' })).toThrow(
 		'invalid tool result',
 	)
 	expect(() =>
-		readStudyToolsObservation('tool', call, { call, result: { success: true, value: undefined } }),
+		buildStudyToolsObservation('tool', call, { call, result: { success: true, value: undefined } }),
 	).toThrow('non-JSON tool value')
 	expect(() =>
-		readStudyToolsObservation('tool', call, { call, result: { success: false } }),
+		buildStudyToolsObservation('tool', call, { call, result: { success: false } }),
 	).toThrow('invalid tool error')
 })

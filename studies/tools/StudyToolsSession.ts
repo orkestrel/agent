@@ -2,14 +2,12 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext } from '@orkestrel/tool'
 import type {
 	StudyContext,
-	StudyEvidence,
 	StudyGoal,
 	StudyProduct,
 	StudySessionInterface,
 	StudyTicket,
 } from '@orkestrel/study'
 import type {
-	StudyToolsActive,
 	StudyToolsAgentInterface,
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
@@ -24,11 +22,12 @@ import { StudyAgentScript, encodeStudyJSON } from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
 import {
+	buildStudyToolsObservation,
 	observeStudyToolsFile,
-	readStudyToolsObservation,
 	resolveStudyToolsPath,
 } from './helpers.js'
 import { parseStudyToolsInput } from './parsers.js'
+import { StudyToolsWorkload } from './StudyToolsWorkload.js'
 import { isStudyToolsAgent, isStudyToolsRead, isStudyToolsWrite } from './validators.js'
 
 /** Retains one actual Agent and scratch-file state across the declared trial goals. */
@@ -37,11 +36,9 @@ export class StudyToolsSession implements StudySessionInterface {
 	readonly #provider = new StudyAgentScript({ bytes: STUDY_TOOLS_BYTES })
 	readonly #tools = createToolManager()
 	readonly #agent: StudyToolsAgentInterface
-	#active: StudyToolsActive | undefined
-	#work: Promise<StudyProduct> | undefined
+	readonly #live = new Set<StudyToolsWorkload>()
+	readonly #flights = new Set<Promise<StudyProduct>>()
 	#closing: Promise<void> | undefined
-	#trace: StudyEvidence[] = []
-	#fault: unknown
 
 	/**
 	 * Constructs the actual admitted Agent with real scratch tools and an explicit authority gate.
@@ -69,7 +66,7 @@ export class StudyToolsSession implements StudySessionInterface {
 			authority: {
 				evaluate: () => ({
 					zone: 'study',
-					allowed: this.#active?.input.admitted ?? false,
+					allowed: this.#current()?.input.admitted ?? false,
 					reason: 'Declared workload tool admission refused',
 				}),
 			},
@@ -78,7 +75,7 @@ export class StudyToolsSession implements StudySessionInterface {
 				deny: (call, reason) => this.#capture('denial', { call, reason }),
 			},
 			error: (error) => {
-				this.#fault = error
+				this.#current()?.fail(error)
 			},
 		})
 		if (!isStudyToolsAgent(agent)) {
@@ -96,14 +93,14 @@ export class StudyToolsSession implements StudySessionInterface {
 	 * @throws StudyError - Thrown when the session is closed or already executing
 	 */
 	async execute(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
-		if (this.#closing !== undefined || this.#active !== undefined)
+		if (this.#closing !== undefined || this.#live.size > 0)
 			throw new StudyError('CONFIG', 'Tools session is closed or already executing')
-		const work = this.#run(goal, context)
-		this.#work = work
+		const flight = this.#executeGoal(goal, context)
+		this.#flights.add(flight)
 		try {
-			return await work
+			return await flight
 		} finally {
-			this.#work = undefined
+			this.#flights.delete(flight)
 		}
 	}
 
@@ -116,24 +113,22 @@ export class StudyToolsSession implements StudySessionInterface {
 		return this.#closing
 	}
 
-	async #run(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
+	async #executeGoal(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
 		context.signal.throwIfAborted()
 		context.meter.signal.throwIfAborted()
 		const input = parseStudyToolsInput(goal.input)
-		const workload = new AbortController()
-		this.#active = { input, goal: goal.id, context, workload }
-		this.#trace = []
-		this.#fault = undefined
+		const workload = new StudyToolsWorkload({ input, goal: goal.id, context })
+		this.#live.add(workload)
 		try {
 			this.#provider.prepare({
 				responses: input.responses,
 				goal: goal.id,
 				context,
-				workload,
+				workload: workload.controller,
 			})
 			this.#agent.context.messages.add({ role: 'user', content: input.prompt })
 			const result: unknown = await this.#agent.generate({
-				signal: AbortSignal.any([context.signal, context.meter.signal, workload.signal]),
+				signal: AbortSignal.any([context.signal, context.meter.signal, workload.controller.signal]),
 			})
 			context.signal.throwIfAborted()
 			context.meter.signal.throwIfAborted()
@@ -143,7 +138,8 @@ export class StudyToolsSession implements StudySessionInterface {
 			const partial = 'partial' in result ? result.partial : undefined
 			if (typeof content !== 'string' || typeof partial !== 'boolean')
 				throw new StudyError('FAULT', 'Admitted Agent returned invalid result fields')
-			if (this.#fault !== undefined) throw new StudyError('FAULT', errorToMessage(this.#fault))
+			if (workload.fault !== undefined)
+				throw new StudyError('FAULT', errorToMessage(workload.fault))
 			for (const file of input.files) {
 				const started = performance.now()
 				const ticket = await context.meter.admit({
@@ -178,9 +174,10 @@ export class StudyToolsSession implements StudySessionInterface {
 			})
 		} finally {
 			try {
-				for (const row of this.#trace) await context.evidence.append(row)
+				for (const row of workload.trace) await context.evidence.append(row)
 			} finally {
-				this.#active = undefined
+				this.#live.delete(workload)
+				this.#provider.clear()
 			}
 		}
 	}
@@ -223,12 +220,12 @@ export class StudyToolsSession implements StudySessionInterface {
 		context: ToolContext,
 		operation: StudyToolsOperation,
 	): Promise<JSONValue> {
-		const active = this.#active
-		if (active === undefined) throw new StudyError('CONFIG', 'No tools workload is active')
+		const workload = this.#current()
+		if (workload === undefined) throw new StudyError('CONFIG', 'No tools workload is active')
 		const request = encodeStudyJSON(args).byteLength
 		if (request > STUDY_TOOLS_BYTES) throw new StudyToolsRefusal('Oversized tool arguments refused')
 		const started = performance.now()
-		const ticket: StudyTicket = await active.context.meter.admit({
+		const ticket: StudyTicket = await workload.context.meter.admit({
 			role: 'tool',
 			tokens: 0,
 			bytes: STUDY_TOOLS_BYTES,
@@ -236,8 +233,8 @@ export class StudyToolsSession implements StudySessionInterface {
 		try {
 			const signal = AbortSignal.any([
 				context.signal,
-				active.context.signal,
-				active.context.meter.signal,
+				workload.context.signal,
+				workload.context.meter.signal,
 				ticket.signal,
 			])
 			signal.throwIfAborted()
@@ -267,20 +264,27 @@ export class StudyToolsSession implements StudySessionInterface {
 		}
 	}
 
+	// The session refuses a second goal while one is live, so the registry holds at most one workload.
+	#current(): StudyToolsWorkload | undefined {
+		const [workload] = this.#live
+		return workload
+	}
+
 	#capture(event: 'tool' | 'denial', envelope: unknown): void {
+		const workload = this.#current()
 		try {
-			if (this.#active === undefined || !isRecord(envelope) || !isToolCall(envelope.call))
+			if (workload === undefined || !isRecord(envelope) || !isToolCall(envelope.call))
 				throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool observation')
-			const value = readStudyToolsObservation(event, envelope.call, envelope)
-			this.#trace.push({ event, goal: this.#active.goal, value })
+			const value = buildStudyToolsObservation(event, envelope.call, envelope)
+			workload.record({ event, goal: workload.goal, value })
 		} catch (error) {
-			this.#fault = error
+			workload?.fail(error)
 		}
 	}
 
 	async #dispose(): Promise<void> {
 		this.#agent.abort(new Error('Tools session closed'))
-		await this.#work?.catch(() => undefined)
+		await Promise.allSettled(this.#flights)
 		this.#tools.destroy()
 		this.#agent.emitter.destroy()
 		const directory = resolve(this.#options.directory)

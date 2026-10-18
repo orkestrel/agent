@@ -10,7 +10,7 @@ import {
 	readStudyMemoryJudge,
 	readStudyMemoryProvenance,
 	readStudyMemoryRecap,
-	readStudyMemorySettings,
+	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
 } from '../../../studies/memory/index.js'
 import {
@@ -158,15 +158,25 @@ describe('memory declaration and mechanical evidence', () => {
 	})
 
 	it('reads observation switches only from well-formed settings and refuses malformed ones', () => {
-		expect(readStudyMemorySettings(undefined)).toEqual({ observe: false, checkpoints: new Set() })
+		expect(resolveStudyMemoryObservation(undefined)).toEqual({
+			observe: false,
+			checkpoints: new Set(),
+		})
 		for (const settings of [{}, { observe: false }, STUDY_MEMORY_SETTINGS])
-			expect(readStudyMemorySettings(settings)).toEqual({ observe: false, checkpoints: new Set() })
-		expect(readStudyMemorySettings({ observe: true })).toEqual({
+			expect(resolveStudyMemoryObservation(settings)).toEqual({
+				observe: false,
+				checkpoints: new Set(),
+			})
+		expect(resolveStudyMemoryObservation({ observe: true })).toEqual({
 			observe: true,
 			checkpoints: new Set(),
 		})
 		expect(
-			readStudyMemorySettings({ ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['a', 'b'] }),
+			resolveStudyMemoryObservation({
+				...STUDY_MEMORY_SETTINGS,
+				observe: true,
+				checkpoints: ['a', 'b'],
+			}),
 		).toEqual({ observe: true, checkpoints: new Set(['a', 'b']) })
 		for (const settings of [
 			...STUDY_MEMORY_MALFORMED_SETTINGS.map((entry) => entry.settings),
@@ -174,7 +184,7 @@ describe('memory declaration and mechanical evidence', () => {
 			[],
 			'observe',
 		])
-			expect(() => readStudyMemorySettings(settings)).toThrow(
+			expect(() => resolveStudyMemoryObservation(settings)).toThrow(
 				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
 			)
 	})

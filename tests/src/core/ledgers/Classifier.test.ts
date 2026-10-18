@@ -1,7 +1,7 @@
 import type { ClassifierReading } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
-import { requireValue } from '@orkestrel/test'
+import { createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
@@ -25,6 +25,7 @@ import {
 	ScriptedJudge,
 	SequentialSystemOneJudge,
 	summarizeReadings,
+	SwitchingJudge,
 } from '../../../setup.js'
 
 describe('Classifier', () => {
@@ -90,32 +91,26 @@ describe('Classifier', () => {
 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
-		// The judge reports the latest model the loop below pushed, `A` before any.
-		const models: string[] = []
 		const transport = new RecordedTransport(() => {
 			throw new JudgeError('QUESTION', 'refused question')
 		})
-		const judge = new SequentialSystemOneJudge({
-			url: 'http://judge.test',
-			model: 'A',
-			fetch: transport.fetch,
-		})
+		// The judge reports the model the loop below last set, `A` before any.
+		const judge = new SwitchingJudge(
+			new SequentialSystemOneJudge({
+				url: 'http://judge.test',
+				model: 'A',
+				fetch: transport.fetch,
+			}),
+		)
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
-				judge: {
-					id: judge.id,
-					name: judge.name,
-					get model() {
-						return models.at(-1) ?? 'A'
-					},
-					ask: judge.ask.bind(judge),
-				},
+				judge,
 				topics: [],
 			}),
 		)
 		for (const next of ['A', 'A', 'B', 'B', 'A']) {
-			models.push(next)
+			judge.use(next)
 			await classifier.classify(new Set(), new AbortController().signal)
 		}
 		expect(transport.requests).toHaveLength(2)
@@ -560,7 +555,7 @@ describe('Classifier', () => {
 			{ role: 'user', content: 'Second statement.' },
 		])
 		const controller = new AbortController()
-		const asked: string[] = []
+		const asked = createRecorder<readonly [key: string]>()
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
@@ -580,7 +575,7 @@ describe('Classifier', () => {
 		expect(result.fault).toEqual(expect.objectContaining({ name: 'AbortError' }))
 		expect(result.judgments).toEqual([JSON.stringify(['category', requireValue(messages[0]).id])])
 		expect(result.usage).toEqual({ prompt: 4, completion: 1, total: 5 })
-		expect(asked).toEqual(result.judgments)
+		expect(asked.calls.map(([key]) => key)).toEqual(result.judgments)
 		expect(summarizeReadings(result.readings)).toEqual([
 			{
 				key: JSON.stringify(['category', requireValue(messages[0]).id]),
@@ -612,16 +607,18 @@ describe('Classifier', () => {
 			['topic', JSON.stringify(['topic', one, 'refunds'])],
 			['topic', JSON.stringify(['topic', two, 'refunds'])],
 		] as const
-		const readings: ClassifierReading[] = []
+		const rounds: Array<readonly ClassifierReading[]> = []
 		for (const round of [1, 2]) {
 			const result = await classifier.classify(new Set(), new AbortController().signal)
 			expect(result.judgments).toEqual([])
 			expect(summarizeReadings(result.readings)).toEqual(buildReadingSummaries(asks, 'resolved'))
-			readings.push(...result.readings)
+			rounds.push(result.readings)
 			expect(judge.requests).toHaveLength(round * asks.length)
 		}
 		expect(
-			readings.filter((reading) => ['resolved', 'failed', 'aborted'].includes(reading.outcome)),
+			rounds
+				.flat()
+				.filter((reading) => ['resolved', 'failed', 'aborted'].includes(reading.outcome)),
 		).toHaveLength(judge.requests.length)
 		expect(judge.requests.map((request) => Object.keys(request.questions))).toEqual(
 			[...asks, ...asks].map(([, key]) => [key]),
@@ -697,7 +694,7 @@ describe('Classifier', () => {
 				{ role: 'user', content: 'Unasked statement.' },
 			])
 			const controller = new AbortController()
-			const asked: string[] = []
+			const asked = createRecorder<readonly [key: string]>()
 			const classifier = new Classifier(
 				buildClassifierOptions({
 					conversation,
@@ -742,7 +739,7 @@ describe('Classifier', () => {
 					duration: 'valid',
 				},
 			])
-			expect(asked).toEqual(result.judgments)
+			expect(asked.calls.map(([key]) => key)).toEqual(result.judgments)
 			expect(conversation.judgments.count).toBe(2)
 		}
 	})
@@ -751,7 +748,7 @@ describe('Classifier', () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'First statement.' })
 		conversation.add({ role: 'user', content: 'Second statement.' })
-		const asked: string[] = []
+		const asked = createRecorder<readonly [key: string]>()
 		const judge = createLedgerJudge(
 			asked,
 			() => Promise.reject(new JudgeAbortError({ model: 'aborting-model', answers: {} })),
@@ -775,13 +772,13 @@ describe('Classifier', () => {
 				duration: 'valid',
 			})),
 		)
-		expect(asked).toHaveLength(2)
+		expect(asked.count).toBe(2)
 	})
 
 	it('holds a deterministic failure that sits as the cause of another error', async () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'First statement.' })
-		const asked: string[] = []
+		const asked = createRecorder<readonly [key: string]>()
 		const judge = createLedgerJudge(
 			asked,
 			() =>
@@ -801,7 +798,7 @@ describe('Classifier', () => {
 		)
 		await classifier.classify(new Set(), new AbortController().signal)
 		await classifier.classify(new Set(), new AbortController().signal)
-		expect(asked).toHaveLength(1)
+		expect(asked.count).toBe(1)
 	})
 
 	it('keeps the recorded topic of an assigned message and files an assigned distractor as quiet', () => {

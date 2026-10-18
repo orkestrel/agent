@@ -4,7 +4,6 @@ import {
 	collectToolGroups,
 	filterAllowList,
 	hasCalls,
-	iterateRange,
 	joinThinking,
 	matchesJudgment,
 	stripThinking,
@@ -271,24 +270,6 @@ describe('removeEntries — the folded batch removal', () => {
 	})
 })
 
-describe('iterateRange — the counter-free count', () => {
-	it('yields zero up to, and excluding, the count in ascending order', () => {
-		expect([...iterateRange(3)]).toEqual([0, 1, 2])
-		expect([...iterateRange(1)]).toEqual([0])
-	})
-
-	it('yields nothing for a count of zero', () => {
-		expect([...iterateRange(0)]).toEqual([])
-	})
-
-	it('stays lazy at the largest safe count, so an early exit costs only the numbers pulled', () => {
-		const range = iterateRange(Number.MAX_SAFE_INTEGER)
-		expect(range.next()).toEqual({ value: 0, done: false })
-		expect(range.next()).toEqual({ value: 1, done: false })
-		expect(range.return()).toEqual({ value: undefined, done: true })
-	})
-})
-
 describe('MESSAGE_ROLES — the one role list', () => {
 	it('lists the four roles in wire order', () => {
 		expect(MESSAGE_ROLES).toEqual(['system', 'user', 'assistant', 'tool'])
@@ -309,6 +290,27 @@ describe('collectExchanges', () => {
 		expect(collectExchanges(messages.slice(0, 1))).toEqual([messages.slice(0, 1)])
 		expect(messages).toHaveLength(9)
 	})
+
+	it('joins one call and 150000 results into a single exchange without an argument spread', () => {
+		const lookup: Message = {
+			id: 'lookup',
+			role: 'assistant',
+			content: '',
+			calls: [createToolCall()],
+		}
+		const request: Message = { id: 'request', role: 'user', content: 'Read the order.' }
+		const results = Array.from({ length: 150_000 }, (): Message => ({
+			id: 'result',
+			role: 'tool',
+			content: 'LH-81660 is late',
+			call: 'c1',
+		}))
+		const exchanges = collectExchanges([lookup, request, ...results])
+		expect(exchanges).toHaveLength(1)
+		expect(exchanges[0]).toHaveLength(150_002)
+		expect(exchanges[0]?.[0]).toBe(lookup)
+		expect(exchanges[0]?.[1]).toBe(request)
+	})
 })
 
 describe('collectToolGroups', () => {
@@ -319,6 +321,32 @@ describe('collectToolGroups', () => {
 			['A1', 'R1', 'L1'],
 			['A2', 'R2'],
 			['O1', 'O2'],
+		])
+	})
+
+	it('seeds a repeated leader once, so its group holds every result that follows either occurrence', () => {
+		const lookup: Message = { id: 'A', role: 'assistant', content: '', calls: [createToolCall()] }
+		const messages: readonly Message[] = [
+			lookup,
+			{ id: 'T1', role: 'tool', content: 'first', call: 'c1' },
+			lookup,
+			{ id: 'T2', role: 'tool', content: 'second', call: 'c1' },
+		]
+
+		expect(collectToolGroups(messages).map((group) => group.map(({ id }) => id))).toEqual([
+			['A', 'T1', 'T2'],
+		])
+	})
+
+	it('gathers tool messages before any other message into one orphan run', () => {
+		const messages: readonly Message[] = [
+			{ id: 'T1', role: 'tool', content: 'first', call: 'missing' },
+			{ id: 'T2', role: 'tool', content: 'second' },
+			{ id: 'U', role: 'user', content: 'Which order is late?' },
+		]
+
+		expect(collectToolGroups(messages).map((group) => group.map(({ id }) => id))).toEqual([
+			['T1', 'T2'],
 		])
 	})
 

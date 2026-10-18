@@ -108,7 +108,8 @@ export function attachImages(message: Message, payloads: readonly string[]): Mes
  * Pure and total: the conversation and its messages are never mutated, and the returned array
  * replaces exactly the one target message with the copy {@link attachImages} builds. Empty
  * data returns the conversation unchanged; a conversation with no user message returns it
- * unchanged too (there is nowhere to attach, and the images already rode the system block).
+ * unchanged too (there is nowhere to attach, and the images already rode the system block). A hole
+ * in a sparse conversation is not a user message.
  *
  * @param conversation - The messages to attach into (left unchanged)
  * @param payloads - The base64 image data to attach
@@ -125,7 +126,9 @@ export function attachUserImages(
 	payloads: readonly string[],
 ): readonly Message[] {
 	if (payloads.length === 0) return conversation
-	const target = conversation.findLastIndex((message) => message.role === 'user')
+	const target = conversation.findLastIndex(
+		(message: Message | undefined) => message?.role === 'user',
+	)
 	if (target === -1) return conversation
 	return conversation.map((message, index) =>
 		index === target ? attachImages(message, payloads) : message,
@@ -151,13 +154,9 @@ export function attachUserImages(
  * ```
  */
 export function collectImageData(files: readonly FileInterface[]): readonly string[] {
-	const payloads: string[] = []
-	for (const file of files) {
-		if (isBinary(file.content) && file.content.mime.startsWith('image/')) {
-			payloads.push(file.content.base64)
-		}
-	}
-	return payloads
+	return files.flatMap((file) =>
+		isBinary(file.content) && file.content.mime.startsWith('image/') ? [file.content.base64] : [],
+	)
 }
 
 /**

@@ -156,6 +156,44 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
+	it('charges a lookup to the goal that is running and never to a goal that already settled', async () => {
+		const lookup = {
+			path: '/api/chat',
+			body: buildMemoryReply({
+				content: '',
+				calls: [{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } }],
+			}),
+		}
+		const server = await createMemoryServer([
+			lookup,
+			{ path: '/api/chat', body: buildMemoryReply() },
+			lookup,
+			{ path: '/api/chat', body: buildMemoryReply() },
+		])
+		const profile = buildMemoryProfile({ url: server.url })
+		const earlier = createMemoryContext(profile)
+		const later = createMemoryContext(profile)
+		try {
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'accounting', scenario: 'public', arm: 'full', repetition: 0 },
+				earlier.context.signal,
+			)
+			try {
+				const input = { prompt: 'Read lookup id order:BC-7301', arrivals: [], records: [] }
+				await session.execute({ id: 'first', input }, earlier.context)
+				await session.execute({ id: 'second', input }, later.context)
+				expect(earlier.context.meter.usage.filter((row) => row.role === 'tool')).toHaveLength(1)
+				expect(later.context.meter.usage.filter((row) => row.role === 'tool')).toHaveLength(1)
+			} finally {
+				await session.close()
+			}
+		} finally {
+			earlier.close()
+			later.close()
+			await server.close()
+		}
+	})
+
 	it('dispatches actual memory work after generic validation and rejects invalid room controls', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url })
@@ -1093,7 +1131,7 @@ describe('summary admission under the Compaction gauge', () => {
 			revision: admission?.revision,
 			max: STUDY_MEMORY_SUMMARY_LIMIT,
 		})
-		for (const event of ['dispatch', 'wire', 'wire-failure'])
+		for (const event of ['dispatch', 'wire', 'failure'])
 			expect(
 				readMemoryEvents(result.evidence, event).filter(
 					(value) => value.role === 'summary' || value.role === 'agent',
@@ -1347,12 +1385,9 @@ describe('passive observation of actual memory requests', () => {
 		const on = await runMemoryTrial({ ...failing, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
 		expect(off.failure).toBeDefined()
 		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
-		const [observed] = readMemoryEvents(on.evidence, 'wire-failure')
+		const [observed] = readMemoryEvents(on.evidence, 'failure')
 		expect(Object.keys(observed ?? {}).sort()).toEqual(
-			listMemoryKeys(
-				STUDY_MEMORY_EVENT_KEYS['wire-failure'],
-				STUDY_MEMORY_OBSERVED_KEYS['wire-failure'],
-			),
+			listMemoryKeys(STUDY_MEMORY_EVENT_KEYS.failure, STUDY_MEMORY_OBSERVED_KEYS.failure),
 		)
 	})
 
@@ -1360,16 +1395,19 @@ describe('passive observation of actual memory requests', () => {
 		const result = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_OBSERVED_SETTINGS })
 		const rows = result.evidence.filter((row) => row.event === 'dispatch' || row.event === 'wire')
 		const selected = new Set(STUDY_MEMORY_OBSERVED_SETTINGS.checkpoints)
-		const carried = new Set<string>()
-		const expected = rows.map((row) => {
-			const extra: string[] = []
-			if (row.event === 'dispatch' && selected.has(row.goal)) {
-				extra.push('body')
-				if (!carried.has(row.goal)) {
-					carried.add(row.goal)
-					extra.push('snapshot')
-				}
-			}
+		const bodied = rows.map((row) => row.event === 'dispatch' && selected.has(row.goal))
+		// The earliest bodied dispatch of each selected goal carries the snapshot; reversing lets the earliest index win the key.
+		const firsts = new Map(
+			[...rows.entries()]
+				.toReversed()
+				.filter(([index]) => bodied[index])
+				.map(([index, row]): [string, number] => [row.goal, index]),
+		)
+		const expected = rows.map((row, index) => {
+			const extra = [
+				...(bodied[index] ? ['body'] : []),
+				...(firsts.get(row.goal) === index ? ['snapshot'] : []),
+			]
 			return row.event === 'dispatch'
 				? listMemoryKeys(
 						STUDY_MEMORY_EVENT_KEYS.dispatch,
@@ -1381,7 +1419,10 @@ describe('passive observation of actual memory requests', () => {
 		expect(rows.map((row) => (isRecord(row.value) ? Object.keys(row.value).sort() : []))).toEqual(
 			expected,
 		)
-		expect([...carried]).toEqual(['opening', 'closure'])
+		const carried = [...firsts]
+			.toSorted(([, left], [, right]) => left - right)
+			.map(([goal]) => goal)
+		expect(carried).toEqual(['opening', 'closure'])
 		expect(rows.some((row) => row.event === 'dispatch' && row.goal === 'correction')).toBe(true)
 		const dispatches = result.evidence.filter((row) => row.event === 'dispatch')
 		expect(dispatches).toHaveLength(result.requests.length)

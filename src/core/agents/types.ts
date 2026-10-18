@@ -9,7 +9,7 @@ import type {
 	ConversationManagerInterface,
 	ConversationStoreInterface,
 } from '../conversations/index.js'
-import type { MessageInput, MessageRole } from '../types.js'
+import type { Message, MessageInput, MessageRole } from '../types.js'
 import type { ProviderInterface, ProviderRequest } from '../providers/index.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
@@ -41,12 +41,14 @@ export type AgentStatus = 'idle' | 'running' | 'done' | 'error'
  *   emitted after the tool runs (so a consumer sees what was called and what came back).
  * - `usage` — one provider call's {@link TokenUsage}, emitted after each turn's
  *   provider response that reported it (folded into the running total + any budget).
+ *   `estimate` is the token estimate of the answer the call streamed, the meter layer's reading
+ *   beside the reported usage.
  */
 export type AgentChunk =
 	| { readonly category: 'token'; readonly content: string }
 	| { readonly category: 'think'; readonly content: string }
 	| { readonly category: 'tool'; readonly call: ToolCall; readonly result: ToolResult }
-	| { readonly category: 'usage'; readonly usage: TokenUsage }
+	| { readonly category: 'usage'; readonly usage: TokenUsage; readonly estimate: number }
 
 /**
  * Holds the settled outcome of an agent turn — the assembled assistant `content`, the
@@ -71,7 +73,10 @@ export type AgentChunk =
  * it stays out of `content`. Each call's non-empty thinking is recorded on the assistant
  * message that call appends. The joined result also includes thinking from calls that appended
  * no message, such as an aborted call. Only recorded thinking can return to a provider,
- * as its `replay` policy allows.
+ * as its `replay` policy allows. A run stopped by the `meter` or `budget` layer settles
+ * `partial: true`. A `model` stop settles `partial: false`, because its answer is complete as the
+ * model ended it, unless that call's reconciled usage then exhausted a budget or a cancel landed
+ * before the run settled, which settles `partial: true` with that reason on the `abort` event.
  */
 export interface AgentResult {
 	readonly content: string
@@ -89,6 +94,13 @@ export interface AgentResult {
 	 * contains calls: those calls are dropped and observed through the `deny` event.
 	 */
 	readonly partial: boolean
+	/**
+	 * Names the layer that stopped the run — the meter's estimate allowance, the cost budget, or the
+	 * model's own token limit — with the readings it crossed. Absent when the run finished by
+	 * itself, reached its `limit`, or was cancelled by a signal, a deadline, or `abort()` before the
+	 * model ended its final answer.
+	 */
+	readonly stop?: AgentStop
 }
 
 /**
@@ -102,7 +114,8 @@ export interface AgentResult {
  * a provider call or a selection reported it), `partial` is `true` when a cancel committed the run early or
  * when the loop exhausted its `limit` with unresolved tool intent, and `exhausted` is `true`
  * in that second case specifically (a distinct, non-cancel cause the {@link AgentEventMap}
- * `exhaust` event observes). It is the settled outcome one run returns, before the agent folds
+ * `exhaust` event observes), and `stop` the {@link AgentStop} of the layer that stopped the run
+ * (`undefined` when none did). It is the settled outcome one run returns, before the agent folds
  * it into the {@link AgentResult} resolved by the stream handle's `result` promise.
  */
 export interface AgentRunResult {
@@ -111,7 +124,73 @@ export interface AgentRunResult {
 	readonly usage: TokenUsage | undefined
 	readonly partial: boolean
 	readonly exhausted: boolean
+	readonly stop: AgentStop | undefined
 }
+
+/**
+ * Holds what one agent loop turn contributed to its run and how the turn ended — the readonly
+ * record each turn returns, from which the run derives its {@link AgentRunResult}.
+ *
+ * @remarks
+ * `content` is the final answer on an `answer` turn and the content the provider streamed on any
+ * other turn. `thinking` and `usage` are this turn's own non-empty reasoning and sanitized usage;
+ * `spent` is the sanitized usage of a selection this turn's admission rebuilt through. `messages`
+ * is the working conversation the next turn starts from. `partial` is the run's partial flag if the
+ * run ends after this turn, and `futile` is the compaction latch after this turn's admission.
+ * `estimate` is the token estimate of the content this turn's call streamed, `undefined` on a turn
+ * a cancel stopped before its call. `interrupted` reports that the run's signal had aborted when
+ * this turn's call returned, before its usage was reconciled. `truncated` reports that the model
+ * ended this turn's final answer at its own token limit.
+ */
+export interface AgentTurn {
+	readonly content: string
+	readonly thinking: string | undefined
+	readonly usage: TokenUsage | undefined
+	readonly spent: TokenUsage | undefined
+	readonly messages: readonly Message[]
+	readonly ending: 'answer' | 'tools' | 'cancel'
+	readonly partial: boolean
+	readonly futile: boolean
+	readonly estimate: number | undefined
+	readonly interrupted: boolean
+	readonly truncated: boolean
+}
+
+/**
+ * Represents why one of a run's three allowed failure layers stopped it — the meter's estimate
+ * allowance, the cost budget, or the model's own token limit — with the readings that layer crossed.
+ *
+ * @remarks
+ * `layer` names the failure point. A `meter` or `budget` stop copies the tripped budget's `id`, its
+ * `max`, and its `consumed` tally at the crossing from the `BudgetError` that aborted the run; a
+ * `meter` stop is a crossing of the run's `allowance`, a `budget` stop any other budget's, including
+ * a budget folded into an external signal or linked as the allowance's own parent signal. A `model`
+ * stop carries the provider instance's trace `id`, not the model's name: the provider reported that
+ * the model ended its answer at its own token limit, and the reason the wire gave is not carried
+ * beyond that. `estimate` is the token estimate of the answer the stopped provider call streamed,
+ * and `usage` the sanitized usage that call reported; each is present only when the stop landed on
+ * a provider call that produced it.
+ *
+ * @example
+ * ```ts
+ * const stop: AgentStop = { layer: 'meter', id: 'meter', max: 2_000, consumed: 2_001, estimate: 2_001 }
+ * ```
+ */
+export type AgentStop =
+	| {
+			readonly layer: 'meter' | 'budget'
+			readonly id: string
+			readonly max: number
+			readonly consumed: number
+			readonly estimate?: number
+			readonly usage?: TokenUsage
+	  }
+	| {
+			readonly layer: 'model'
+			readonly id: string
+			readonly estimate?: number
+			readonly usage?: TokenUsage
+	  }
 
 /**
  * Maps the push observation surface of an {@link AgentInterface} — the lifecycle, usage, and tool
@@ -148,8 +227,12 @@ export type AgentEventMap = {
 	readonly turn: readonly [index: number]
 	/** Reports a dispatched {@link ToolCall} paired with its {@link ToolResult} (executed or a denial). */
 	readonly tool: readonly [call: ToolCall, result: ToolResult]
-	/** Reports a turn's {@link TokenUsage} — emitted after a usage-bearing provider call. */
-	readonly usage: readonly [usage: TokenUsage]
+	/**
+	 * Reports a turn's {@link TokenUsage} — emitted after a usage-bearing provider call. Carries the
+	 * call's streamed-answer `estimate` beside its reported usage, so the meter's allowance can be
+	 * calibrated without a failure.
+	 */
+	readonly usage: readonly [usage: TokenUsage, estimate: number]
 	/**
 	 * Reports a call denied by scope or authority, before dispatch.
 	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
@@ -290,6 +373,9 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `budget` — an optional token {@link BudgetInterface} cost bound; the loop charges
  *   each provider call's usage and its signal folds into the turn's bound, committing
  *   a partial result after the budget is exhausted.
+ * - `allowance` — an optional token {@link BudgetInterface} the meter layer charges each content
+ *   delta's mid-stream estimate against; its signal folds into the turn's bound beside the
+ *   `budget`'s. Pass the `budget` itself to share one ceiling. Omitted ⇒ no meter layer.
  * - `scheduler` — an optional {@link SchedulerInterface} that paces the loop —
  *   the loop calls its `yield` method between turns, so the host regains control between expensive provider calls.
  * - `signal` — an optional external `AbortSignal` whose abort cancels the turn (a
@@ -357,8 +443,23 @@ export interface AgentOptions {
 	readonly limit?: number
 	/** Sets a wall-clock deadline (ms) for the whole turn; its abort commits a partial result. */
 	readonly timeout?: number
-	/** Bounds the token cost; each provider call's usage is charged and its abort commits a partial. */
+	/**
+	 * Bounds the token cost; each provider call's usage is charged and its abort commits a partial.
+	 * A call that reports no usage charges the `budget` its streamed-answer estimate, unless the
+	 * `allowance` is the `budget` and already charged it.
+	 */
 	readonly budget?: BudgetInterface<TokenUsage>
+	/**
+	 * Holds the meter layer's allowance: the token budget each content delta's mid-stream estimate is
+	 * charged against, beside the reported usage the cost `budget` is reconciled to. Its signal folds
+	 * into the run's bound with the `budget`'s, so the estimate can stop a stream before the provider
+	 * reports usage. Pass the `budget` itself to make the estimate and the reported usage share one
+	 * ceiling; pass a separate budget with a smaller `max` to let the estimate stop the run first, or
+	 * a larger one to let the reported usage or the model's own limit stop it instead. Cumulative
+	 * across turns and runs, like the `budget`. Default: no meter layer; the estimate is still
+	 * measured for the `usage` event and charges nothing mid-stream.
+	 */
+	readonly allowance?: BudgetInterface<TokenUsage>
 	/** Paces the loop — the loop yields to it between turns so the host regains control. */
 	readonly scheduler?: SchedulerInterface
 	/** Carries an external cancel; its abort commits a partial result. */
@@ -428,7 +529,7 @@ export interface AgentOptions {
  * Every member is optional and resolved independently, so an omitted member leaves the
  * agent's constructed value in force and a caller that passes no options runs exactly the
  * agent it configured. `think` / `schema` ride through to the provider as
- * {@link ProviderStreamOptions}; `limit` / `timeout` / `budget` replace their construction
+ * {@link ProviderStreamOptions}; `limit` / `timeout` / `budget` / `allowance` replace their construction
  * defaults for this run only; `signal` composes with the constructed `signal` (both fold into
  * the run's bound abort) rather than replacing it. Nothing here mutates the agent — the next
  * run reads the construction defaults again.
@@ -465,6 +566,11 @@ export interface AgentRunOptions {
 	 */
 	readonly budget?: BudgetInterface<TokenUsage>
 	/**
+	 * Overrides {@link AgentOptions.allowance} for this run only; started for this run with
+	 * `start()`, as the constructed allowance is. Default: the agent's constructed `allowance`.
+	 */
+	readonly allowance?: BudgetInterface<TokenUsage>
+	/**
 	 * Carries an additional per-run external cancel, composed with {@link AgentOptions.signal} (both
 	 * fold into the run's bound abort through `AbortSignal.any` — neither is dropped). Omitted ⇒
 	 * only the agent's constructed `signal` (if any) applies.
@@ -481,12 +587,12 @@ export interface AgentRunOptions {
  *   can never diverge: `generate` awaits the settled {@link AgentResult} of the run `stream`
  *   exposes and leaves its live chunks undrained.
  * - **Bounded.** Each turn arms a single cancel folded from the external `signal`, the
- *   `timeout` deadline, and the `budget` signal (through `AbortSignal.any`); any of them —
- *   or `abort()` — stops the loop and settles the result `partial: true`.
+ *   `timeout` deadline, and the `budget` and `allowance` signals (through `AbortSignal.any`); any
+ *   of them — or `abort()` — stops the loop and settles the result `partial: true`.
  *   Tool handlers receive that run's signal through their `ToolContext`. An agent abort,
- *   stream abort, external signal, or deadline can reach a running handler. The budget is
- *   charged during provider streaming and between turns, before tool dispatch; exhaustion
- *   ends the run without dispatching, never inside a handler. An abort before dispatch
+ *   stream abort, external signal, or deadline can reach a running handler. The allowance is
+ *   charged during provider streaming and the budget after each provider call and between turns,
+ *   before tool dispatch; exhaustion ends the run without dispatching, never inside a handler. An abort before dispatch
  *   appends neither the assistant call turn nor tool messages and emits no tool chunk;
  *   streamed content remains in the partial result. Cancellation after entry is cooperative:
  *   the loop awaits a running handler even when it ignores the signal, records its tool message,
@@ -517,15 +623,18 @@ export interface AgentInterface {
 	 * @remarks
 	 * A run started while another is live throws an {@link import('./errors.js').AgentError} with
 	 * `code: 'CONCURRENCY'` when the agent carries a `window`, or when the run's effective
-	 * `budget` is the instance a live run holds; a run whose `limit` is not a nonnegative safe
-	 * integer throws one with `code: 'LIMIT'`. Both throw synchronously, before any `Promise` is
+	 * `budget` or `allowance` is an instance a live run holds; a run whose `limit` is not a nonnegative safe
+	 * integer throws one with `code: 'LIMIT'`. A `budget` or `allowance` that does not implement
+	 * `BudgetInterface` throws a `ContractError` with code `'placement'` before either bound starts.
+	 * Each throws synchronously, before any `Promise` is
 	 * returned. A fire-and-forget `agent.generate().catch(...)` therefore will not catch them (the
 	 * throw happens on the call itself, ahead of the `.catch` ever attaching) — await the call
 	 * (inside a `try`/`catch`) or wrap the call expression itself in `try`/`catch`.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
-	 * @throws {AgentError} Thrown when a live run shares the `window` or the budget instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window` or a budget or allowance instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `budget` or `allowance` does not implement `BudgetInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
@@ -534,16 +643,18 @@ export interface AgentInterface {
 	 * on a genuine error.
 	 *
 	 * @remarks
-	 * Like `generate()`, a run that would share the `window` or a live run's budget instance
-	 * throws an {@link import('./errors.js').AgentError} with `code: 'CONCURRENCY'`, and an invalid
-	 * `limit` throws one with `code: 'LIMIT'`, synchronously — before the
+	 * Like `generate()`, a run that would share the `window` or a live run's budget or allowance
+	 * instance throws an {@link import('./errors.js').AgentError} with `code: 'CONCURRENCY'`, an
+	 * invalid `limit` throws one with `code: 'LIMIT'`, and a `budget` or `allowance` that does not
+	 * implement `BudgetInterface` throws a `ContractError` with code `'placement'`, synchronously — before the
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
 	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. A `signal` that
 	 * `AbortSignal.any` refuses throws its `TypeError` the same way, before any deadline is armed.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
-	 * @throws {AgentError} Thrown when a live run shares the `window` or the budget instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window` or a budget or allowance instance (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `budget` or `allowance` does not implement `BudgetInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**

@@ -1,5 +1,5 @@
 import type { AgentJudgeInput, AgentJudgeInterface, ProviderOptions } from './types.js'
-import type { JudgeQuestion, JudgeRequest, JudgeResult } from '../types.js'
+import type { JudgeRequest, JudgeResult } from '../types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
@@ -112,14 +112,13 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 		}
 		const questions = isRecord(request.questions) ? Object.entries(request.questions) : []
 		if (questions.length === 0) throw new JudgeError('QUESTION', 'judge error: no questions')
-		const entries: Array<readonly [string, JudgeQuestion]> = []
-		for (const [id, question] of questions) {
+		const entries = questions.map(([id, question]) => {
 			const copy = copyJSON(question)
 			if (!isJudgeQuestion(copy)) {
 				throw new JudgeError('QUESTION', `judge error: question ${id} is malformed`)
 			}
-			entries.push([id, copy])
-		}
+			return [id, copy] as const
+		})
 		const owned: JudgeRequest = { state, questions: Object.fromEntries(entries) }
 		const parts: readonly JudgeRequest[] = this.#batch
 			? [owned]

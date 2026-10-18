@@ -25,7 +25,9 @@ import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
  * allows. `tools` is present only when the model requests tool calls (an
  * empty array is never surfaced — its absence means "no calls"). `usage` is present
  * only when the wire reported it (on the stream's `done` line, or the non-stream
- * body), so a caller folds it into a token budget exactly when it exists.
+ * body), so a caller folds it into a token budget exactly when it exists. `truncated` is present
+ * only when the provider's wire reports that the model stopped at its limit; the agent attributes a
+ * truncated final answer to the model layer.
  */
 export interface ProviderResult {
 	readonly content: string
@@ -35,6 +37,12 @@ export interface ProviderResult {
 	readonly tools?: readonly ToolCall[]
 	/** Carries token consumption for this turn when present (from the wire's `done` line / body). */
 	readonly usage?: TokenUsage
+	/**
+	 * Reports that the model ended its answer at its own token limit (an output cap or a full context
+	 * window) rather than by finishing; present only when the provider's wire reports that stop. It
+	 * is not the request's prompt `truncate` setting.
+	 */
+	readonly truncated?: boolean
 }
 
 /**
@@ -214,6 +222,7 @@ export interface ProviderIncrement {
 	readonly thinking: string
 	readonly tools: readonly ToolCall[]
 	readonly usage?: TokenUsage
+	readonly truncated?: boolean
 	readonly result?: ProviderResult
 }
 

@@ -113,14 +113,13 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * 		this.#pending += chunk
  * 		const lines = this.#pending.split(/\r\n|\n/)
  * 		this.#pending = lines.pop() ?? ''
- * 		const records: Array<Readonly<Record<string, unknown>>> = []
- * 		for (const line of lines) {
- * 			if (line.trim().length === 0) continue
- * 			const record = parseJSONAs(line, isRecord)
- * 			if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
- * 			records.push(record)
- * 		}
- * 		return records
+ * 		return lines
+ * 			.filter((line) => line.trim().length > 0)
+ * 			.map((line) => {
+ * 				const record = parseJSONAs(line, isRecord)
+ * 				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+ * 				return record
+ * 			})
  * 	}
  * 	clear(): void {
  * 		this.#pending = ''

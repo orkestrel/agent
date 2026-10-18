@@ -53,15 +53,10 @@ export class Classifier implements ClassifierInterface {
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
-		const asking = await this.#gather(requests, signal, results).then(
-			() => ({ success: true as const }),
-			(error: unknown) => ({ success: false as const, error }),
+		const fault = await this.#gather(requests, signal, results).then(
+			(): Error | undefined => undefined,
+			(error: unknown) => (isError(error) ? error : new Error(errorToMessage(error))),
 		)
-		const fault = asking.success
-			? undefined
-			: isError(asking.error)
-				? asking.error
-				: new Error(errorToMessage(asking.error))
 		const usage = results.reduce<TokenUsage | undefined>(
 			(total, result) => (result.usage === undefined ? total : sumUsage(total, result.usage)),
 			undefined,
@@ -129,13 +124,17 @@ export class Classifier implements ClassifierInterface {
 	 */
 	topics(id: string): ReadonlySet<string> {
 		const message = this.#options.conversation.message(id)
-		const found = new Set<string>()
-		if (message === undefined) return found
-		for (const topic of this.#options.topics) {
-			if ((this.#readNoul(this.#buildTopic(id, topic)) ?? 0) >= this.#options.thresholds.topic)
-				found.add(topic.name)
-		}
-		return found
+		return new Set(
+			message === undefined
+				? []
+				: this.#options.topics
+						.filter(
+							(topic) =>
+								(this.#readNoul(this.#buildTopic(id, topic)) ?? 0) >=
+								this.#options.thresholds.topic,
+						)
+						.map((topic) => topic.name),
+		)
 	}
 
 	/**
@@ -145,23 +144,19 @@ export class Classifier implements ClassifierInterface {
 	classification(): LedgerClassification {
 		const messages = this.#options.conversation.messages()
 		const positions = new Map(messages.map((message, at) => [message.id, at]))
-		const quiet = new Set<string>()
-		const categories = new Map<string, LedgerCategory>()
-		const topics = new Map<string, readonly string[]>()
-		const amendments = new Map<string, string[]>()
-		const supersessions = new Map<string, string[]>()
-		for (const message of messages) {
-			if (this.quiet(message.id)) quiet.add(message.id)
-			const category = this.category(message.id)
-			if (category !== undefined) categories.set(message.id, category)
-			topics.set(message.id, [...this.topics(message.id)])
-		}
-		for (const judgment of this.#options.conversation.judgments.judgments()) {
+		// Each message files in HEAD's call order: quiet, then category, then topics.
+		const filed = messages.map((message) => ({
+			id: message.id,
+			quiet: this.quiet(message.id),
+			category: this.category(message.id),
+			topics: [...this.topics(message.id)],
+		}))
+		const pairs = this.#options.conversation.judgments.judgments().flatMap((judgment) => {
 			const key = parseJSONAs(judgment.id, isArray)
-			if (key === undefined) continue
+			if (key === undefined) return []
 			const [head, earlier, later] = key
 			if ((head !== 'amends' && head !== 'supersedes') || !isString(earlier) || !isString(later))
-				continue
+				return []
 			const before = this.#options.conversation.message(earlier)
 			const after = this.#options.conversation.message(later)
 			if (
@@ -170,28 +165,45 @@ export class Classifier implements ClassifierInterface {
 				(this.#readNoul(this.#buildPair(head, earlier, later)) ?? 0) <
 					this.#options.thresholds[head]
 			)
-				continue
-			if (head === 'amends') {
-				const own = extractTokens(before.content)
-				const other = extractTokens(after.content)
-				if (
-					![...own.ids].some((id) => other.ids.has(id)) &&
-					![...own.numbers].some((number) => other.numbers.has(number))
-				)
-					continue
-			}
-			for (const map of head === 'supersedes' ? [supersessions, amendments] : [amendments]) {
-				const ids = map.get(earlier) ?? []
-				if (!ids.includes(later)) map.set(earlier, [...ids, later])
-			}
+				return []
+			const own = extractTokens(before.content)
+			const other = extractTokens(after.content)
+			return head === 'amends' &&
+				![...own.ids].some((id) => other.ids.has(id)) &&
+				![...own.numbers].some((number) => other.numbers.has(number))
+				? []
+				: [{ head, earlier, later }]
+		})
+		return {
+			quiet: new Set(filed.filter((one) => one.quiet).map((one) => one.id)),
+			categories: new Map(
+				filed.flatMap((one) =>
+					one.category === undefined ? [] : [[one.id, one.category] as const],
+				),
+			),
+			topics: new Map(filed.map((one) => [one.id, one.topics])),
+			amendments: this.#sortLaters(pairs, positions),
+			supersessions: this.#sortLaters(
+				pairs.filter((pair) => pair.head === 'supersedes'),
+				positions,
+			),
 		}
-		for (const map of [amendments, supersessions])
-			for (const [id, ids] of map)
-				map.set(
-					id,
-					[...ids].sort((left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0)),
-				)
-		return { quiet, categories, topics, amendments, supersessions }
+	}
+
+	// Groups the later ids under each earlier id in first-seen order, each without repeats and in
+	// conversation order; a stable sort keeps the first-seen order of ids at one position.
+	#sortLaters(
+		pairs: ReadonlyArray<{ readonly earlier: string; readonly later: string }>,
+		positions: ReadonlyMap<string, number>,
+	): ReadonlyMap<string, readonly string[]> {
+		return new Map(
+			[...Map.groupBy(pairs, (pair) => pair.earlier)].map(([earlier, grouped]) => [
+				earlier,
+				[...new Set(grouped.map((pair) => pair.later))].sort(
+					(left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0),
+				),
+			]),
+		)
 	}
 
 	// Asks every question in order, appending each answer to `results` so a throw still leaves the

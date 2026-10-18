@@ -12,6 +12,8 @@ describe('wire shapes', () => {
 	it('infers a result wire projection assignable to its domain', () => {
 		expectTypeOf<Infer<typeof providerResultShape>>().toExtend<ProviderResult>()
 		expect(createContract(providerResultShape).is({ content: '' })).toBe(true)
+		expect(createContract(providerResultShape).is({ content: '', truncated: true })).toBe(true)
+		expect(createContract(providerResultShape).is({ content: '', truncated: 'length' })).toBe(false)
 	})
 	it('infers a relay wire projection assignable to its domain', () => {
 		expectTypeOf<Infer<typeof relayFrameShape>>().toExtend<RelayFrame>()

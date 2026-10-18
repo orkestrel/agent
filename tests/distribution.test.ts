@@ -515,16 +515,14 @@ function checkProject(stage: Stage, project: string): readonly string[] {
 	if (refused.length > 0) {
 		throw new Error(`The consumer compiler wrote ${refused} to its error stream`)
 	}
-	const reported: string[] = []
-	for (const line of `${result.stdout ?? ''}`.split(/\r\n|\n/u)) {
-		if (line.trim().length === 0) continue
-		const last = reported.at(-1)
-		// An elaborated diagnostic prints its detail on indented lines under its own
-		// first line, so each of those joins the diagnostic it elaborates.
-		if (/^\s/u.test(line) && last !== undefined) {
-			reported[reported.length - 1] = `${last} ${line.trim()}`
-			continue
-		}
+	const kept = `${result.stdout ?? ''}`.split(/\r\n|\n/u).filter((line) => line.trim().length > 0)
+	// An elaborated diagnostic prints its detail on indented lines under its own
+	// first line, so each of those joins the diagnostic it elaborates. The first
+	// kept line opens a diagnostic whatever its indentation.
+	const heads = kept
+		.map((line, index) => ({ line, index }))
+		.filter(({ line, index }) => index === 0 || !/^\s/u.test(line))
+	const reported = heads.map(({ line, index }, at) => {
 		const located = DIAGNOSTIC_PATTERN.exec(line)?.[1]
 		if (located === undefined) {
 			throw new Error(`The consumer compiler reported ${line}, which names no location`)
@@ -532,8 +530,11 @@ function checkProject(stage: Stage, project: string): readonly string[] {
 		if (resolve(stage.consumer, located) === project) {
 			throw new Error(`The scratch project is itself at fault: ${line}`)
 		}
-		reported.push(line)
-	}
+		return [
+			line,
+			...kept.slice(index + 1, heads[at + 1]?.index).map((detail) => detail.trim()),
+		].join(' ')
+	})
 	if (reported.length === 0 && result.status !== 0) {
 		throw new Error(`The consumer compiler refused the project: ${readOutput(result)}`)
 	}
@@ -570,13 +571,14 @@ const surfaced: Record<keyof typeof published, true> = declared
 // One consumer module importing every installed entry, written where its own
 // resolution finds the installed package.
 function writeConsumerProbe(stage: Stage, path: string, specifiers: readonly string[]): void {
-	const names: string[] = []
-	const bindings: string[] = []
-	for (const [index, specifier] of specifiers.entries()) {
-		const binding = `entry${String(index)}`
-		names.push(binding)
-		bindings.push(`import * as ${binding} from ${JSON.stringify(specifier)}`)
-	}
+	const probes = specifiers.map((specifier, index) => ({
+		binding: `entry${String(index)}`,
+		specifier,
+	}))
+	const names = probes.map(({ binding }) => binding)
+	const bindings = probes.map(
+		({ binding, specifier }) => `import * as ${binding} from ${JSON.stringify(specifier)}`,
+	)
 	const source = `${bindings.join('\n')}\nexport const surface = [${names.join(', ')}]\n`
 	writeFile(join(stage.consumer, path), source)
 }
@@ -624,16 +626,9 @@ function buildStage(): Stage {
 	if (!isRecord(manifest) || !isRecord(manifest.exports)) {
 		throw new Error('The installed manifest publishes no exports map')
 	}
-	const entries: Entry[] = []
-	const targets: string[] = []
-	const subpaths: string[] = []
-	const undeclared: string[] = []
-	const excluded: string[] = []
-	for (const [subpath, entry] of Object.entries(manifest.exports)) {
-		const files = collectTargets(entry)
-		targets.push(...files)
-		subpaths.push(subpath)
-		const declaration = readDeclaration(entry, installed)
+	const classified = Object.entries(manifest.exports).map(([subpath, mapping]) => {
+		const files = collectTargets(mapping)
+		const declaration = readDeclaration(mapping, installed)
 		// A subpath resolving no declaration is partitioned rather than dropped. It is a
 		// defect when a runtime loads one of its targets for names, because a consumer
 		// importing it compiles against nothing under `node16`. It is an excluded
@@ -644,20 +639,23 @@ function buildStage(): Stage {
 			declaration.commonjs === undefined &&
 			declaration.browser === undefined
 		) {
-			if (files.some(isModule)) undeclared.push(subpath)
-			else excluded.push(subpath)
-			continue
+			return {
+				subpath,
+				files,
+				partition: files.some(isModule) ? 'undeclared' : 'excluded',
+				entry: undefined,
+			}
 		}
-		const imported = resolveTarget(entry, RUNTIME_CONDITIONS.module)
-		const requiredTarget = resolveTarget(entry, RUNTIME_CONDITIONS.commonjs)
-		const browserTarget = resolveTarget(entry, RUNTIME_CONDITIONS.browser)
-		const browser = resolvesBrowser(entry)
+		const imported = resolveTarget(mapping, RUNTIME_CONDITIONS.module)
+		const requiredTarget = resolveTarget(mapping, RUNTIME_CONDITIONS.commonjs)
+		const browserTarget = resolveTarget(mapping, RUNTIME_CONDITIONS.browser)
+		const browser = resolvesBrowser(mapping)
 		const required = requiredTarget !== undefined && !(browser && requiredTarget === browserTarget)
-		const commonjs = required && resolvesCommonJS(entry, installed)
-		entries.push({
+		const commonjs = required && resolvesCommonJS(mapping, installed)
+		const entry: Entry = {
 			subpath,
 			specifier: subpath === '.' ? name : `${name}${subpath.slice(1)}`,
-			mapping: entry,
+			mapping,
 			declaration: {
 				module: declaration.module !== undefined,
 				commonjs: declaration.commonjs !== undefined,
@@ -667,9 +665,23 @@ function buildStage(): Stage {
 			module: imported !== undefined && !(browser && imported === browserTarget),
 			commonjs,
 			required,
-		})
+		}
+		return { subpath, files, partition: 'declared', entry }
+	})
+	return {
+		consumer,
+		installed,
+		archives,
+		entries: classified.flatMap(({ entry }) => (entry === undefined ? [] : [entry])),
+		subpaths: classified.map(({ subpath }) => subpath),
+		undeclared: classified
+			.filter(({ partition }) => partition === 'undeclared')
+			.map(({ subpath }) => subpath),
+		excluded: classified
+			.filter(({ partition }) => partition === 'excluded')
+			.map(({ subpath }) => subpath),
+		targets: classified.flatMap(({ files }) => files),
 	}
-	return { consumer, installed, archives, entries, subpaths, undeclared, excluded, targets }
 }
 
 // The scratch tree holds the npm cache, the packed archive, and the installed
@@ -845,26 +857,24 @@ describe('installed package consumer', () => {
 	it('compiles a consumer under every module resolution [requires the registry]', (context) => {
 		const stage = requireStage(context)
 		const name = readManifestName(join(stage.installed, 'package.json'))
-		const reported: string[] = []
-		const silent: string[] = []
-		for (const driver of RESOLUTIONS) {
-			for (const [extension, format] of FORMATS) {
+		const probes = RESOLUTIONS.flatMap((driver) =>
+			FORMATS.flatMap(([extension, format]) => {
 				const written = selectEntries(stage.entries, driver.conditions[format])
-				if (written.length === 0) continue
+				if (written.length === 0) return []
 				const label = `${driver.label}.${extension}`
 				const probe = `probe.${label}`
 				const specifiers = written.map((entry) => entry.specifier)
 				writeConsumerProbe(stage, probe, specifiers)
 				const project = writeProject(stage, probe, driver, [`./${probe}`])
-				for (const message of checkProject(stage, project)) {
-					reported.push(`${label}: ${message}`)
-				}
+				const messages = checkProject(stage, project).map((message) => `${label}: ${message}`)
 				const control = `control.${label}`
 				writeConsumerProbe(stage, control, [`${name}${ABSENT_SUBPATH}`])
 				const refused = writeProject(stage, control, driver, [`./${control}`])
-				if (checkProject(stage, refused).length === 0) silent.push(label)
-			}
-		}
+				return [{ label, messages, quiet: checkProject(stage, refused).length === 0 }]
+			}),
+		)
+		const reported = probes.flatMap(({ messages }) => messages)
+		const silent = probes.filter(({ quiet }) => quiet).map(({ label }) => label)
 		expect(reported).toStrictEqual([])
 		expect(silent).toStrictEqual([])
 	})

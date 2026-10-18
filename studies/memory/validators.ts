@@ -4,9 +4,9 @@ import type {
 	StudyMemoryClassifier,
 	StudyMemoryInput,
 	StudyMemoryLedger,
+	StudyMemoryOptions,
 	StudyMemoryProvider,
 	StudyMemoryRuntime,
-	StudyMemorySettings,
 } from './types.js'
 import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
 import { isStudyAgentRuntime } from '@orkestrel/study'
@@ -37,7 +37,7 @@ export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger 
 }
 
 /** Checks the driver-owned settings exactly. @param value - Profile settings. @returns Whether every present member is valid and no member is unknown. */
-export function isStudyMemorySettings(value: unknown): value is StudyMemorySettings {
+export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOptions {
 	return holds(() => {
 		if (!isRecord(value)) return false
 		if (
@@ -115,37 +115,34 @@ export function isStudyMemoryInput(value: unknown): value is StudyMemoryInput {
 			value.records.length > STUDY_MEMORY_ENTRIES
 		)
 			return false
-		const ids = new Set<string>()
-		for (const arrival of value.arrivals) {
-			if (
-				!isRecord(arrival) ||
-				typeof arrival.id !== 'string' ||
-				arrival.id.length === 0 ||
-				arrival.id.length > 128 ||
-				ids.has(arrival.id) ||
-				typeof arrival.content !== 'string' ||
-				arrival.content.length > STUDY_MEMORY_TEXT
-			)
-				return false
-			ids.add(arrival.id)
-		}
-		ids.clear()
-		for (const record of value.records) {
-			if (
-				!isRecord(record) ||
-				typeof record.id !== 'string' ||
-				record.id.length === 0 ||
-				record.id.length > 128 ||
-				ids.has(record.id) ||
-				typeof record.name !== 'string' ||
-				record.name.length > 128 ||
-				typeof record.content !== 'string' ||
-				record.content.length > STUDY_MEMORY_TEXT
-			)
-				return false
-			ids.add(record.id)
-		}
-		return true
+		const { arrivals, records } = value
+		// Each list is shaped first, so the identifier read below always meets a string.
+		return (
+			arrivals.every(
+				(arrival) =>
+					isRecord(arrival) &&
+					typeof arrival.id === 'string' &&
+					arrival.id.length > 0 &&
+					arrival.id.length <= 128 &&
+					typeof arrival.content === 'string' &&
+					arrival.content.length <= STUDY_MEMORY_TEXT,
+			) &&
+			new Set(arrivals.map((arrival) => (isRecord(arrival) ? arrival.id : undefined))).size ===
+				arrivals.length &&
+			records.every(
+				(record) =>
+					isRecord(record) &&
+					typeof record.id === 'string' &&
+					record.id.length > 0 &&
+					record.id.length <= 128 &&
+					typeof record.name === 'string' &&
+					record.name.length <= 128 &&
+					typeof record.content === 'string' &&
+					record.content.length <= STUDY_MEMORY_TEXT,
+			) &&
+			new Set(records.map((record) => (isRecord(record) ? record.id : undefined))).size ===
+				records.length
+		)
 	})
 }
 

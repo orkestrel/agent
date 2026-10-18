@@ -1,5 +1,5 @@
 import type { StudyDriverInterface, StudySessionInterface, StudyTrial } from '@orkestrel/study'
-import type { StudyToolsOptions, StudyToolsRuntime } from './types.js'
+import type { StudyToolsDriverOptions, StudyToolsRuntime } from './types.js'
 import { mkdtemp, realpath, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { StudyError } from '@orkestrel/study'
@@ -17,7 +17,7 @@ export class StudyToolsDriver implements StudyDriverInterface {
 	 * @param options - The supplied Agent runtime namespace and scratch parent
 	 * @throws StudyError - Thrown when the namespace or parent declaration is malformed
 	 */
-	constructor(options: StudyToolsOptions) {
+	constructor(options: StudyToolsDriverOptions) {
 		if (
 			!isStudyToolsRuntime(options.agent) ||
 			typeof options.directory !== 'string' ||

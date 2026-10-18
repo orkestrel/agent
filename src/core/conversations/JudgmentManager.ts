@@ -1,11 +1,5 @@
 import type { JudgmentManagerInterface } from './types.js'
-import type {
-	JudgeInterface,
-	JudgeQuestion,
-	JudgeRequest,
-	Judgment,
-	JudgmentInput,
-} from '../types.js'
+import type { JudgeInterface, JudgeRequest, Judgment, JudgmentInput } from '../types.js'
 import { isArray, isRecord } from '@orkestrel/contract'
 import { ConversationError } from './errors.js'
 import { buildJudgments, requireJudgment } from './helpers.js'
@@ -31,17 +25,18 @@ import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
  * ```
  */
 export class JudgmentManager implements JudgmentManagerInterface {
-	readonly #judgments = new Map<string, Judgment>()
+	readonly #judgments: Map<string, Judgment>
 
 	/**
 	 * Restores records without replacing their storage times.
 	 * @param judgments - The previously stored judgments to restore. Default: an empty list
 	 */
 	constructor(judgments: readonly Judgment[] = []) {
-		for (const judgment of judgments) {
-			const owned = requireJudgment(copyJSON(judgment))
-			this.#judgments.set(owned.id, owned)
-		}
+		this.#judgments = new Map(
+			judgments
+				.map((judgment) => requireJudgment(copyJSON(judgment)))
+				.map((owned) => [owned.id, owned]),
+		)
 	}
 
 	get count(): number {
@@ -93,42 +88,63 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		const rendered = typeof state === 'string' ? state : JSON.stringify(state)
 		const origins = [...sources]
 		const entries = isRecord(request.questions) ? Object.entries(request.questions) : []
-		const resolved = new Map<string, Judgment>()
-		const pending: Array<readonly [string, JudgeQuestion]> = []
-		for (const [id, raw] of entries) {
+		const checked = entries.map(([id, raw]) => {
 			const question = copyJSON(raw)
 			if (!isJudgeQuestion(question)) {
 				throw new ConversationError('JUDGMENT', `conversation error: question ${id} is malformed`, {
 					context: { question: id },
 				})
 			}
-			const judgment = this.#judgments.get(id)
-			if (
-				judgment !== undefined &&
-				matchesJudgment(judgment, question, origins, rendered, judge.model)
-			)
-				resolved.set(id, judgment)
-			else pending.push([id, question])
-		}
-		if (pending.length > 0) {
-			if (signal.aborted) throw new JudgeAbortError({ model: judge.model, answers: {} })
-			const unmatched: JudgeRequest = { state, questions: Object.fromEntries(pending) }
-			try {
-				const result = await judge.ask(unmatched, signal)
-				for (const judgment of this.add(
-					buildJudgments(unmatched, result, origins, rendered, judge.model),
-				))
-					resolved.set(judgment.id, judgment)
-			} catch (error) {
-				if (isJudgeAbortError(error))
-					this.add(buildJudgments(unmatched, error.partial, origins, rendered, judge.model))
-				throw error
-			}
-		}
+			return [id, question] as const
+		})
+		const matched = new Map(
+			checked.flatMap(([id, question]) => {
+				const judgment = this.#judgments.get(id)
+				return judgment !== undefined &&
+					matchesJudgment(judgment, question, origins, rendered, judge.model)
+					? [[id, judgment] as const]
+					: []
+			}),
+		)
+		const pending = checked.filter(([id]) => !matched.has(id))
+		const added =
+			pending.length === 0
+				? []
+				: await this.#ask(
+						judge,
+						{ state, questions: Object.fromEntries(pending) },
+						origins,
+						rendered,
+						signal,
+					)
+		const resolved = new Map([
+			...matched,
+			...added.map((judgment) => [judgment.id, judgment] as const),
+		])
 		return entries.flatMap(([id]) => {
 			const judgment = resolved.get(id)
 			return judgment === undefined ? [] : [structuredClone(judgment)]
 		})
+	}
+
+	// Asks the judge for the unmatched questions and stores what it answered. An aborted ask stores
+	// its partial answers before it rethrows, so finished work survives the cancellation.
+	async #ask(
+		judge: JudgeInterface,
+		unmatched: JudgeRequest,
+		origins: readonly string[],
+		rendered: string,
+		signal: AbortSignal,
+	): Promise<readonly Judgment[]> {
+		if (signal.aborted) throw new JudgeAbortError({ model: judge.model, answers: {} })
+		try {
+			const result = await judge.ask(unmatched, signal)
+			return this.add(buildJudgments(unmatched, result, origins, rendered, judge.model))
+		} catch (error) {
+			if (isJudgeAbortError(error))
+				this.add(buildJudgments(unmatched, error.partial, origins, rendered, judge.model))
+			throw error
+		}
 	}
 
 	#store(input: JudgmentInput): Judgment {

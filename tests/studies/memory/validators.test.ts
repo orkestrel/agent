@@ -5,9 +5,9 @@ import {
 	isStudyMemoryClassifier,
 	isStudyMemoryInput,
 	isStudyMemoryLedger,
+	isStudyMemoryOptions,
 	isStudyMemoryProvider,
 	isStudyMemoryRuntime,
-	isStudyMemorySettings,
 } from '../../../studies/memory/index.js'
 import { STUDY_MEMORY_MODULES } from '../../setupStudy.js'
 
@@ -73,9 +73,9 @@ describe('memory declaration and mechanical evidence', () => {
 			['sections beside rolling', { gauge, rolling: true, sections: 2 }],
 		]
 		for (const [label, value] of accepted)
-			expect([label, isStudyMemorySettings(value)]).toEqual([label, true])
+			expect([label, isStudyMemoryOptions(value)]).toEqual([label, true])
 		for (const [label, value] of refused)
-			expect([label, isStudyMemorySettings(value)]).toEqual([label, false])
+			expect([label, isStudyMemoryOptions(value)]).toEqual([label, false])
 	})
 
 	it('checks each admitted capability its treatments invoke and tolerates a hostile namespace', () => {
@@ -155,6 +155,18 @@ describe('memory declaration and mechanical evidence', () => {
 				records: [],
 			}),
 		).toBe(false)
+		const record = { id: 'one', name: 'Owner', content: 'fact' }
+		expect(
+			isStudyMemoryInput({ prompt: 'request', arrivals: [], records: [record, { ...record }] }),
+		).toBe(false)
+		// An arrival and a record may share an identifier: each list holds its own namespace.
+		expect(
+			isStudyMemoryInput({
+				prompt: 'request',
+				arrivals: [{ id: 'one', content: 'fact' }],
+				records: [record],
+			}),
+		).toBe(true)
 		expect(isStudyMemoryInput({ prompt: 'x'.repeat(16385), arrivals: [], records: [] })).toBe(false)
 		expect(isStudyMemoryRuntime({})).toBe(false)
 		expect(isStudyMemoryProvider({})).toBe(false)

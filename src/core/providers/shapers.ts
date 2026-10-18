@@ -58,6 +58,7 @@ export const providerResultShape = objectShape({
 			total: numberShape(),
 		}),
 	),
+	truncated: optionalShape(booleanShape()),
 }) satisfies ContractShape
 
 /**

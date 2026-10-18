@@ -3,8 +3,11 @@ import { isStudyCustodyManifest } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { StudyMemoryDriver } from '../studies/memory/index.js'
 import {
+	MemoryServer,
 	buildCustodyManifest,
 	buildMemoryGradingFixture,
 	buildStudyGrading,
@@ -32,16 +35,19 @@ import {
 	readMemorySnapshot,
 	readMemoryTimeline,
 	createStudyInstallFixture,
+	executeMemoryGoals,
 	executeStudyInstall,
 	executeStudyProcess,
 	executeStudyTopology,
 	loadStudyDeclaration,
 	readMemoryToolResults,
+	readStudyJSON,
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
+	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVED_EVENTS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_REFUSAL_KEYS,
@@ -154,6 +160,12 @@ describe('study install fixtures', () => {
 				subject: entry,
 				qualification: 'tmp/studies/memory-capacity',
 				settings: { gauge: { scale: 1, overhead: 0 } },
+				bounds: {
+					request: { duration: 3000 },
+					goal: { duration: 30000 },
+					trial: { duration: 90000 },
+					series: { duration: 240000 },
+				},
 				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
 				roots: fixture.packages.map((captured) => captured.target),
 			})
@@ -198,6 +210,164 @@ describe('study install fixtures', () => {
 		} finally {
 			fixture.close()
 			await server.close()
+		}
+	})
+
+	it('serves scripted replies in order, leaves an unscripted path to its default and logs every request', async () => {
+		const script = [
+			{ path: '/api/chat', body: 'first' },
+			{ path: '/api/chat', status: 503, body: 'second' },
+			{ path: '/api/generate', body: 'third' },
+		]
+		const server = new MemoryServer(script)
+		await server.start()
+		try {
+			expect(server.responses).toEqual(script)
+			// The getters hand out copies, so a caller cannot reorder what is still scripted.
+			server.responses.pop()
+			server.requests.pop()
+			expect(server.responses).toHaveLength(3)
+			const observed: Array<readonly [string, number, string, number]> = []
+			for (const path of [
+				'/api/generate',
+				'/api/chat',
+				'/api/show',
+				'/api/chat',
+				'/api/generate',
+				'/api/chat',
+			]) {
+				const reply = await fetch(`${server.url}${path}`, { method: 'POST', body: path })
+				observed.push([path, reply.status, await reply.text(), server.responses.length])
+			}
+			// Only a reply scripted for the path at the head is consumed; every other request is answered by default.
+			expect(observed.map(([path, status, , remaining]) => [path, status, remaining])).toEqual([
+				['/api/generate', 200, 3],
+				['/api/chat', 200, 2],
+				['/api/show', 200, 2],
+				['/api/chat', 503, 1],
+				['/api/generate', 200, 0],
+				['/api/chat', 200, 0],
+			])
+			expect(
+				observed
+					.map(([, , body]) => body)
+					.filter((body) => ['first', 'second', 'third'].includes(body)),
+			).toEqual(['first', 'second', 'third'])
+			expect(parseJSON(observed[0]?.[2] ?? '')).toMatchObject({ done: true, done_reason: 'length' })
+			expect(parseJSON(observed[2]?.[2] ?? '')).toMatchObject({
+				model_info: { 'fixture.context_length': 32768 },
+			})
+			expect(observed[5]?.[2]).toBe(buildMemoryReply())
+			expect(server.requests).toEqual(observed.map(([path]) => ({ path, body: path })))
+			expect(script).toHaveLength(3)
+		} finally {
+			await server.close()
+		}
+	})
+
+	it('answers a model list unless the script heads with one, and gives each server its own script', async () => {
+		const script = [{ path: '/api/tags', status: 500, body: 'down' }]
+		const down = await createMemoryServer(script)
+		const other = await createMemoryServer(script)
+		try {
+			const refused = await fetch(`${down.url}/api/tags`)
+			expect([refused.status, await refused.text()]).toEqual([500, 'down'])
+			const listed = await fetch(`${down.url}/api/tags`)
+			expect(parseJSON(await listed.text())).toMatchObject({
+				models: [{ name: 'model' }, { name: 'judge' }],
+			})
+			expect(down.responses).toEqual([])
+			expect(other.responses).toEqual(script)
+			expect((await fetch(`${other.url}/api/tags`)).status).toBe(500)
+		} finally {
+			await Promise.all([down.close(), other.close()])
+		}
+	})
+
+	it('executes goals in order and stops at the first refusal, keeping the earlier products and the error itself', async () => {
+		// The second goal is refused before it reaches the wire, so the third would complete if it ran.
+		const goals = [
+			{ id: 'one', input: { prompt: 'Respond', arrivals: [], records: [] } },
+			{ id: 'two', input: { prompt: '', arrivals: [], records: [] } },
+			{ id: 'three', input: { prompt: 'Respond', arrivals: [], records: [] } },
+		]
+		const server = await createMemoryServer([
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Retained one' }) },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
+		])
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		try {
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'goals', scenario: 'public', arm: 'full', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				const stopped = await executeMemoryGoals(session, goals, fixture.context)
+				expect(stopped.products).toEqual([{ value: { content: 'Retained one' }, partial: false }])
+				expect(stopped.failure?.error).toBeInstanceOf(Error)
+				expect(stopped.failure?.error).toMatchObject({
+					code: 'CONFIG',
+					message: 'Malformed public memory input',
+				})
+				expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+				expect(server.responses).toHaveLength(1)
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('executes every goal and reports no failure when none refuses', async () => {
+		const goals = ['one', 'two'].map((id) => ({
+			id,
+			input: { prompt: 'Respond', arrivals: [], records: [] },
+		}))
+		const server = await createMemoryServer()
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		try {
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'goals', scenario: 'public', arm: 'full', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				const completed = await executeMemoryGoals(session, goals, fixture.context)
+				expect(completed.failure).toBeUndefined()
+				expect(completed.products).toEqual([
+					{ value: { content: 'Receipt retained.' }, partial: false },
+					{ value: { content: 'Receipt retained.' }, partial: false },
+				])
+				expect(await executeMemoryGoals(session, [], fixture.context)).toEqual({
+					products: [],
+					failure: undefined,
+				})
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('reads one JSON file beneath a root and refuses a missing one', async () => {
+		const scratch = createScratch({ prefix: 'study-json-setup-' })
+		try {
+			scratch.write('nested/value.json', '{"name":"declared","list":[1,2]}')
+			scratch.write('nested/broken.json', '{')
+			const root = new URL(`${pathToFileURL(scratch.path).href}/`)
+			expect(await readStudyJSON(root, 'nested/value.json')).toEqual({
+				name: 'declared',
+				list: [1, 2],
+			})
+			expect(await readStudyJSON(root, 'nested/broken.json')).toBeUndefined()
+			await expect(readStudyJSON(root, 'nested/absent.json')).rejects.toThrow(/ENOENT/)
+		} finally {
+			await destroyScratch(scratch)
 		}
 	})
 
@@ -358,7 +528,7 @@ describe('study install fixtures', () => {
 		expect(result.usage.filter((row) => row.role === 'agent')).toEqual([
 			{ role: 'agent', calls: 1, tokens: undefined, bytes: undefined },
 		])
-		const [failure] = readMemoryEvents(result.evidence, 'wire-failure')
+		const [failure] = readMemoryEvents(result.evidence, 'failure')
 		expect(failure).toMatchObject({ role: 'agent', path: '/api/chat', status: 503 })
 	})
 
@@ -402,7 +572,7 @@ describe('study install fixtures', () => {
 		])
 		expect([...STUDY_MEMORY_CONTEXT_KEYS].sort()).toEqual([...STUDY_MEMORY_CONTEXT_KEYS])
 		expect(STUDY_MEMORY_CONTEXT_KEYS).not.toContain('dispatch')
-		for (const event of ['dispatch', 'wire', 'wire-failure'] as const) {
+		for (const event of ['dispatch', 'wire', 'failure'] as const) {
 			expect(STUDY_MEMORY_OBSERVED_KEYS[event]).toEqual(
 				expect.arrayContaining(['canonical', 'revision']),
 			)

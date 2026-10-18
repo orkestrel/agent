@@ -206,33 +206,6 @@ export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean
 }
 
 /**
- * Yields each whole number from zero up to, and excluding, a count, one at a time, so a loop counts
- * turns without a reassigned counter.
- *
- * @remarks
- * Lazy: it holds no list of the numbers, so a count near `Number.MAX_SAFE_INTEGER` costs nothing
- * until a consumer pulls that far. A count of `0` yields nothing.
- *
- * @param count - The nonnegative safe integer count of numbers to yield
- * @returns A generator of `0` through `count - 1` in ascending order
- *
- * @example
- * ```ts
- * [...iterateRange(3)] // [0, 1, 2]
- * [...iterateRange(0)] // []
- * ```
- */
-export function* iterateRange(count: number): Generator<number, void> {
-	// `Array(n).keys()` walks indexes without allocating them, but `n` stops at `2 ** 32 - 1`, so
-	// a larger count is yielded block by block.
-	const block = 2 ** 30
-	for (const start of Array(Math.ceil(count / block)).keys()) {
-		const base = start * block
-		for (const offset of Array(Math.min(block, count - base)).keys()) yield base + offset
-	}
-}
-
-/**
  * Collects whole exchanges, joining every exchange spanned by a tool group.
  *
  * @remarks
@@ -250,25 +223,29 @@ export function* iterateRange(count: number): Generator<number, void> {
  * ```
  */
 export function collectExchanges(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
-	const boundaries = new Set([0])
+	if (messages.length === 0) return []
 	const positions = new Map(messages.map((message, index) => [message, index]))
-	for (const [index, message] of messages.entries())
-		if (message.role === 'user') boundaries.add(index)
-	for (const group of collectToolGroups(messages)) {
-		const spanned = group
-			.map((message) => positions.get(message))
-			.filter((position): position is number => position !== undefined)
-		const start = Math.min(messages.length, ...spanned)
-		const end = Math.max(0, ...spanned)
-		for (const boundary of boundaries)
-			if (start < boundary && boundary <= end) boundaries.delete(boundary)
-	}
-	const exchanges: Message[][] = []
-	for (const [index, message] of messages.entries()) {
-		if (boundaries.has(index)) exchanges.push([])
-		exchanges.at(-1)?.push(message)
-	}
-	return exchanges
+	const spans = collectToolGroups(messages).map((group) => {
+		const spanned = group.flatMap((message) => {
+			const position = positions.get(message)
+			return position === undefined ? [] : [position]
+		})
+		return {
+			start: spanned.reduce((least, position) => Math.min(least, position), messages.length),
+			end: spanned.reduce((most, position) => Math.max(most, position), 0),
+		}
+	})
+	const starts = [
+		...new Set([
+			0,
+			...[...messages.entries()].flatMap(([index, message]) =>
+				message.role === 'user' ? [index] : [],
+			),
+		]),
+	].filter((boundary) => !spans.some((span) => span.start < boundary && boundary <= span.end))
+	return starts.map((start, position) =>
+		messages.slice(start, starts[position + 1] ?? messages.length),
+	)
 }
 
 /**
@@ -313,45 +290,51 @@ export function hasCalls(message: Pick<Message, 'calls'>): boolean {
  * ```
  */
 export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
-	const groups = new Map<Message, Message[]>()
-	const calls = new Map<string, Message[]>()
-	for (const message of messages) {
-		if (message.role !== 'assistant' || !hasCalls(message)) continue
-		groups.set(message, [message])
-		for (const call of message.calls ?? []) {
-			const owners = calls.get(call.id) ?? []
-			owners.push(message)
-			calls.set(call.id, owners)
-		}
-	}
+	const leaders = messages.filter((message) => message.role === 'assistant' && hasCalls(message))
+	const leading = new Set(leaders)
+	const owners = Map.groupBy(
+		leaders.flatMap((leader) => (leader.calls ?? []).map((call) => ({ id: call.id, leader }))),
+		(entry) => entry.id,
+	)
+	const starts = [...messages.entries()].flatMap(([index, message]) =>
+		message.role === 'tool' ? [] : [index],
+	)
 	// A run is one non-tool message, which leads it when it owns calls, and the tool messages after it.
-	const runs: Array<{ leader: Message | undefined; tools: Message[] }> = [
-		{ leader: undefined, tools: [] },
+	const runs = [
+		{ leader: undefined, tools: messages.slice(0, starts[0] ?? messages.length) },
+		...starts.map((start, position) => {
+			const message = messages[start]
+			return {
+				leader: message !== undefined && leading.has(message) ? message : undefined,
+				tools: messages.slice(start + 1, starts[position + 1] ?? messages.length),
+			}
+		}),
 	]
-	for (const message of messages) {
-		if (message.role === 'tool') runs.at(-1)?.tools.push(message)
-		else runs.push({ leader: groups.has(message) ? message : undefined, tools: [] })
-	}
-	const orphans: Message[][] = []
-	for (const { leader, tools } of runs) {
-		const orphan: Message[] = []
-		for (const message of tools) {
-			const local = leader?.calls ?? []
-			const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+	const placed = runs.map(({ leader, tools }) => {
+		const local = leader?.calls ?? []
+		const duplicate = new Set(local.map((call) => call.id)).size !== local.length
+		return tools.map((message) => {
 			const paired =
 				leader !== undefined &&
 				(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
-			const owners = message.call === undefined ? undefined : calls.get(message.call)
-			const owner = owners?.length === 1 ? owners[0] : paired ? leader : undefined
-			const group = owner === undefined ? undefined : groups.get(owner)
-			if (group !== undefined) group.push(message)
-			else {
-				if (orphan.length === 0) orphans.push(orphan)
-				orphan.push(message)
-			}
-		}
-	}
-	return [...groups.values(), ...orphans]
+			const sharing = message.call === undefined ? undefined : owners.get(message.call)
+			const owner = sharing?.length === 1 ? sharing[0]?.leader : paired ? leader : undefined
+			return { message, owner }
+		})
+	})
+	const owned = Map.groupBy(
+		placed.flat().filter((entry) => entry.owner !== undefined),
+		(entry) => entry.owner,
+	)
+	const groups = [...leading].map((leader) => [
+		leader,
+		...(owned.get(leader) ?? []).map((entry) => entry.message),
+	])
+	const orphans = placed.flatMap((run) => {
+		const orphan = run.filter((entry) => entry.owner === undefined).map((entry) => entry.message)
+		return orphan.length > 0 ? [orphan] : []
+	})
+	return [...groups, ...orphans]
 }
 
 /**

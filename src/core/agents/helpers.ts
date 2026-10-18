@@ -6,6 +6,8 @@ import type {
 	AgentRegistryInterface,
 	AgentResult,
 	AgentRunResult,
+	AgentStop,
+	AgentTurn,
 	MessageMeasure,
 	RequestMeasure,
 } from './types.js'
@@ -13,14 +15,16 @@ import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
 import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
-import type { ControllerInterface } from '@orkestrel/workflow'
+import { isBudget, isBudgetError } from '@orkestrel/budget'
 import {
 	attempt,
+	ContractError,
 	isBoolean,
 	isFiniteNumber,
 	isObject,
 	isString,
 	parseJSONValue,
+	preview,
 } from '@orkestrel/contract'
 import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
@@ -39,8 +43,11 @@ import { isNonNegativeSafeInteger } from '../validators.js'
  * through Contract's sanctioned exception boundary, so conforming accessors and inherited
  * properties are supported while a throwing getter or revoked proxy returns `undefined`.
  * Present usage counts must be finite numbers; negative and fractional values are preserved,
- * not normalized. Extra input properties are dropped while a fresh exact plain object is rebuilt
- * and deep-gated through
+ * not normalized. The result is exact `{ content, thinking?, usage?, partial, stop? }`. A present
+ * `stop` is read once, then its `layer`, `id`, `max`, `consumed`, `estimate`, and `usage` once each
+ * in that order, `max` and `consumed` only on a `meter` or `budget` arm; the arm is rebuilt
+ * exactly, omitting absent readings, and a malformed `stop` refuses the whole value. Extra input
+ * properties are dropped while a fresh exact plain object is rebuilt and deep-gated through
  * {@link import('@orkestrel/contract').parseJSONValue}.
  *
  * @param value - The unknown value to project
@@ -62,28 +69,148 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 		const thinking = Reflect.get(value, 'thinking')
 		const usage = Reflect.get(value, 'usage')
 		const partial = Reflect.get(value, 'partial')
+		const stop = Reflect.get(value, 'stop')
 		if (!isString(content) || !isBoolean(partial)) return undefined
 		if (thinking !== undefined && !isString(thinking)) return undefined
+		const projectedUsage = usage === undefined ? undefined : tokenUsageToJSON(usage)
+		if (usage !== undefined && projectedUsage === undefined) return undefined
+		if (stop !== undefined && !isObject(stop)) return undefined
 
-		if (usage !== undefined && !isObject(usage)) return undefined
-		const prompt = isObject(usage) ? Reflect.get(usage, 'prompt') : undefined
-		const completion = isObject(usage) ? Reflect.get(usage, 'completion') : undefined
-		const total = isObject(usage) ? Reflect.get(usage, 'total') : undefined
-		const counted = isFiniteNumber(prompt) && isFiniteNumber(completion) && isFiniteNumber(total)
-		if (usage !== undefined && !counted) return undefined
-		const projectedUsage: TokenUsage | undefined = counted
-			? { prompt, completion, total }
-			: undefined
+		const layer = isObject(stop) ? Reflect.get(stop, 'layer') : undefined
+		const id = isObject(stop) ? Reflect.get(stop, 'id') : undefined
+		const ranked = layer === 'meter' || layer === 'budget'
+		const max = isObject(stop) && ranked ? Reflect.get(stop, 'max') : undefined
+		const consumed = isObject(stop) && ranked ? Reflect.get(stop, 'consumed') : undefined
+		const estimate = isObject(stop) ? Reflect.get(stop, 'estimate') : undefined
+		const spent = isObject(stop) ? Reflect.get(stop, 'usage') : undefined
+		const projectedSpent = spent === undefined ? undefined : tokenUsageToJSON(spent)
+		const readings = {
+			...(isFiniteNumber(estimate) ? { estimate } : {}),
+			...(projectedSpent === undefined ? {} : { usage: projectedSpent }),
+		}
+		const projectedStop =
+			!isString(id) ||
+			(estimate !== undefined && !isFiniteNumber(estimate)) ||
+			(spent !== undefined && projectedSpent === undefined)
+				? undefined
+				: ranked && isFiniteNumber(max) && isFiniteNumber(consumed)
+					? { layer, id, max, consumed, ...readings }
+					: layer === 'model'
+						? { layer, id, ...readings }
+						: undefined
+		if (stop !== undefined && projectedStop === undefined) return undefined
 
 		return {
 			content,
 			...(thinking === undefined ? {} : { thinking }),
 			...(projectedUsage === undefined ? {} : { usage: projectedUsage }),
 			partial,
+			...(projectedStop === undefined ? {} : { stop: projectedStop }),
 		}
 	})
 
 	return captured.success ? parseJSONValue(captured.value) : undefined
+}
+
+/**
+ * Projects an unknown value onto a fresh, exact `TokenUsage` — capturing `prompt`, `completion`, and
+ * `total` once each through a total boundary, preserving finite negative and fractional counts,
+ * dropping extras, and resolving `undefined` for a non-object, a missing or non-finite count, a
+ * throwing getter, or a hostile or revoked proxy.
+ *
+ * @remarks
+ * The capture runs inside Contract's sanctioned exception boundary, so conforming accessors and
+ * inherited properties are read while a throwing getter or a revoked proxy returns `undefined`.
+ * Counts are not normalized. A caller that treats an absent usage as valid checks for `undefined`
+ * before it projects, because this function refuses `undefined` like any other non-object.
+ *
+ * @param value - The unknown value to project
+ * @returns A fresh `{ prompt, completion, total }`, or `undefined` when the value is not a finite usage triple
+ *
+ * @example
+ * ```ts
+ * import { tokenUsageToJSON } from '@orkestrel/agent'
+ *
+ * tokenUsageToJSON({ prompt: 2, completion: -1, total: 1.5, cached: 4 }) // { prompt: 2, completion: -1, total: 1.5 }
+ * tokenUsageToJSON({ prompt: 2, completion: Infinity, total: 3 }) // undefined
+ * ```
+ */
+export function tokenUsageToJSON(value: unknown): TokenUsage | undefined {
+	const captured = attempt(() => {
+		if (!isObject(value)) return undefined
+		const prompt = Reflect.get(value, 'prompt')
+		const completion = Reflect.get(value, 'completion')
+		const total = Reflect.get(value, 'total')
+		return isFiniteNumber(prompt) && isFiniteNumber(completion) && isFiniteNumber(total)
+			? { prompt, completion, total }
+			: undefined
+	})
+	return captured.success ? captured.value : undefined
+}
+
+/**
+ * Infers which of a run's three failure layers stopped it — the meter allowance, a cost budget, or
+ * the model's own token limit — and returns the stop record with the final call's readings, or
+ * `undefined` when no layer stopped the run.
+ *
+ * @remarks
+ * The layer that stopped the final provider call first wins. A model-truncated final answer whose
+ * call returned unaborted is a `model` stop, even when that call's reconciled usage then exhausted a
+ * budget or a cancel then landed before the run settled. Otherwise a `BudgetError` reason is a
+ * `meter` stop when the allowance is exhausted, the reason is the allowance signal's own reason, its
+ * context carries the allowance's `id` and `max`, and either the allowance is a separate instance or
+ * the run had aborted when the call returned; any other `BudgetError` is a `budget` stop. The
+ * identity test tells an allowance and a budget that share an `id` apart, and the readings test
+ * tells a parent budget linked through the allowance's `signal` option apart from the allowance. An
+ * external cancel, a deadline, or an `abort()` reason yields `undefined`. Two inputs still read as
+ * the meter's: a charge a caller makes to the run's shared allowance from its own code while a call
+ * streams, and a parent with the allowance's own `id` and `max` that aborted before `start()` when
+ * the allowance then exhausts.
+ *
+ * @param reason - The run signal's abort reason (`undefined` while it is unaborted)
+ * @param allowance - The run's meter allowance, or `undefined` for a run with no meter layer
+ * @param budget - The run's cost budget, or `undefined` for an unbudgeted run
+ * @param provider - The provider's trace `id`, named by a `model` stop
+ * @param turn - The run's final turn record, or `undefined` when the run took no turn
+ * @returns The stop record, or `undefined` when no layer stopped the run
+ *
+ * @example
+ * ```ts
+ * const allowance = createTokenBudget({ id: 'meter', max: 2 })
+ * allowance.start()
+ * allowance.consume({ prompt: 0, completion: 3, total: 3 })
+ * inferStop(allowance.signal.reason, allowance, undefined, 'ollama', undefined)
+ * // { layer: 'meter', id: 'meter', max: 2, consumed: 3 }
+ * ```
+ */
+export function inferStop(
+	reason: unknown,
+	allowance: BudgetInterface<TokenUsage> | undefined,
+	budget: BudgetInterface<TokenUsage> | undefined,
+	provider: string,
+	turn: AgentTurn | undefined,
+): AgentStop | undefined {
+	const readings = {
+		...(turn?.estimate === undefined ? {} : { estimate: turn.estimate }),
+		...(turn?.usage === undefined ? {} : { usage: turn.usage }),
+	}
+	const interrupted = turn?.interrupted === true
+	if (!interrupted && turn?.truncated === true) return { layer: 'model', id: provider, ...readings }
+	if (!isBudgetError(reason)) return undefined
+	const metered =
+		allowance !== undefined &&
+		allowance.exhausted &&
+		reason === allowance.signal.reason &&
+		reason.context.id === allowance.id &&
+		reason.context.max === allowance.max &&
+		(allowance !== budget || interrupted)
+	return {
+		layer: metered ? 'meter' : 'budget',
+		id: reason.context.id,
+		max: reason.context.max,
+		consumed: reason.context.consumed,
+		...readings,
+	}
 }
 
 /**
@@ -318,70 +445,34 @@ export function handleAgentQueueJob(
 }
 
 /**
- * Handles one runner agent job by fanning out its declared children once per unit, rehydrating
- * the parent through a registry with the controller signal, and applying the shared
- * partial-result policy.
- *
- * @remarks
- * Children are fired and tracked through the runner controller without awaiting them
- * inline, preserving bounded-runner progress. The runner calls the handler once per attempt
- * with the same unit id, so `spawned` records each unit whose children were spawned and a retried
- * attempt spawns none again. The handler adds to `spawned` and never removes from it; bind one set
- * per runner.
- *
- * @param registry - The registry that rehydrates serializable jobs
- * @param partial - The partial policy. If `true`, a partial result resolves; if `false`, it throws
- * @param spawned - The ids of the units whose children were already spawned, shared by every attempt
- * @param controller - The runner controller for this parent job
- * @returns The settled parent agent result
- *
- * @example
- * ```ts
- * const result = await handleAgentRunnerJob(registry, false, new Set<string>(), controller)
- * ```
- */
-export function handleAgentRunnerJob(
-	registry: AgentRegistryInterface,
-	partial: boolean,
-	spawned: Set<string>,
-	controller: ControllerInterface<AgentJobInput, AgentResult>,
-): Promise<AgentResult> {
-	const children = controller.input.children
-	if (children !== undefined && !spawned.has(controller.id)) {
-		spawned.add(controller.id)
-		for (const child of children) void controller.spawn(child)
-	}
-	return settleAgentJob(registry.build(controller.input, controller.signal), partial)
-}
-
-/**
- * Assembles the settled {@link AgentResult} from a run's {@link AgentRunResult} — `thinking` and
- * `usage` are carried only when the run surfaced them, and the loop-internal `exhausted` flag is
- * left out.
+ * Assembles the settled {@link AgentResult} from a run's {@link AgentRunResult} — `thinking`,
+ * `usage`, and `stop` are carried only when the run surfaced them, and the loop-internal
+ * `exhausted` flag is left out.
  *
  * @remarks
  * Pure and total. An absent optional is omitted rather than stored as `undefined` (the
  * present-when-given convention the message store follows), so a settled result JSON
- * round-trips without an explicit `undefined` field. `exhausted` is loop bookkeeping and does
- * not reach the public result — the `exhaust` event carries it instead.
+ * round-trips without an explicit `undefined` field. The keys follow `content`, `partial`,
+ * `thinking`, `usage`, then `stop`. `exhausted` is loop bookkeeping and does not reach the public
+ * result — the `exhaust` event carries it instead.
  *
  * @param outcome - The run's settled outcome
  * @returns The public {@link AgentResult}
  *
  * @example
  * ```ts
- * assembleResult({ content: 'hi', thinking: undefined, usage: undefined, partial: false, exhausted: false })
+ * assembleResult({ content: 'hi', thinking: undefined, usage: undefined, partial: false, exhausted: false, stop: undefined })
  * // { content: 'hi', partial: false }
  * ```
  */
 export function assembleResult(outcome: AgentRunResult): AgentResult {
-	const result: { content: string; thinking?: string; usage?: TokenUsage; partial: boolean } = {
+	return {
 		content: outcome.content,
 		partial: outcome.partial,
+		...(outcome.thinking === undefined ? {} : { thinking: outcome.thinking }),
+		...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
+		...(outcome.stop === undefined ? {} : { stop: outcome.stop }),
 	}
-	if (outcome.thinking !== undefined) result.thinking = outcome.thinking
-	if (outcome.usage !== undefined) result.usage = outcome.usage
-	return result
 }
 
 /**
@@ -414,11 +505,12 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
 
 /**
  * Consumes a reported usage against a budget over what was already charged, so a turn's total
- * draw matches the report and nothing is charged twice.
+ * draw is never less than the report and nothing is charged twice.
  *
  * @remarks
  * The full `prompt` count is consumed because no earlier charge covers it. Each of `completion`
- * and `total` is consumed less `charged`, floored at 0. The usage must already be sanitized: a
+ * and `total` is consumed less `charged`, floored at 0. An estimate above the report is not
+ * refunded. The usage must already be sanitized: a
  * non-finite field yields a non-finite charge, which the installed `Budget` refuses by throwing
  * a `range` `ContractError`. Without a budget the call consumes nothing.
  *
@@ -471,6 +563,37 @@ export function requireLimit(limit: number): number {
 		})
 	}
 	return limit
+}
+
+/**
+ * Returns a run's budget or allowance after checking it implements `BudgetInterface`, or throws a
+ * coded error before the run starts it.
+ *
+ * @remarks
+ * The check is `isBudget` from `@orkestrel/budget`, a total guard. `undefined` passes, because an
+ * absent bound is no bound. The error's `context` carries the option path, the limit
+ * `'BudgetInterface'`, and a preview of the refused value.
+ *
+ * @param value - The effective `budget` or `allowance`, or `undefined`
+ * @param key - The option the value came from, named in the error's path
+ * @returns The value unchanged
+ * @throws {ContractError} Thrown when `value` is defined and does not implement `BudgetInterface` (code `'placement'`)
+ *
+ * @example
+ * ```ts
+ * requireBudget(createTokenBudget({ max: 10 }), 'budget') // the budget
+ * requireBudget({ consume() {} }, 'allowance') // throws ContractError ('placement')
+ * ```
+ */
+export function requireBudget(
+	value: BudgetInterface<TokenUsage> | undefined,
+	key: 'budget' | 'allowance',
+): BudgetInterface<TokenUsage> | undefined {
+	if (value === undefined || isBudget(value)) return value
+	throw new ContractError(`Agent: ${key} must implement BudgetInterface`, {
+		code: 'placement',
+		context: { path: ['options', key], limit: 'BudgetInterface', received: preview(value) },
+	})
 }
 
 /**

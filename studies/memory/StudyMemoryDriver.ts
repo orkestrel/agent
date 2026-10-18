@@ -6,8 +6,8 @@ import type {
 } from '@orkestrel/study'
 import type {
 	StudyMemoryClassifier,
+	StudyMemoryDriverOptions,
 	StudyMemoryLedger,
-	StudyMemoryOptions,
 	StudyMemoryProvider,
 	StudyMemoryRuntime,
 } from './types.js'
@@ -32,7 +32,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 	readonly #classifier: StudyMemoryClassifier | undefined
 
 	/** Validates the admitted runtime surfaces and finite profile. @param options - Admitted Agent runtime, tested subject identity, provider and profile. */
-	constructor(options: StudyMemoryOptions) {
+	constructor(options: StudyMemoryDriverOptions) {
 		if (!isStudyMemoryRuntime(options.agent) || !isStudyMemoryProvider(options.provider))
 			throw new StudyError(
 				'CONFIG',

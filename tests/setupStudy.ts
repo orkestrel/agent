@@ -18,6 +18,7 @@ import type {
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
 	StudyBounds,
+	StudyContext,
 	StudyCriterion,
 	StudyDefinition,
 	StudyGrading,
@@ -34,7 +35,9 @@ import type {
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
+import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isRecord, parseJSON } from '@orkestrel/contract'
+import { createRecorder } from '@orkestrel/test'
 import {
 	parseStudyDefinition,
 	parseStudyProfile,
@@ -220,17 +223,16 @@ export function createStudyInstallFixture(
 		cpSync(resolve('studies', target), scratch.ensure(join('studies', target)), { recursive: true })
 	const raw = parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')
 	if (!isRecord(raw) || !isRecord(raw.bounds)) throw new Error('Missing authored memory profile')
-	const bounds: Record<string, unknown> = {}
-	for (const [scope, duration] of Object.entries({
-		request: 3000,
-		goal: 30000,
-		trial: 90000,
-		series: 240000,
-	})) {
-		const limit = raw.bounds[scope]
-		if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
-		bounds[scope] = { ...limit, duration }
-	}
+	const authored = raw.bounds
+	const bounds = Object.fromEntries(
+		Object.entries({ request: 3000, goal: 30000, trial: 90000, series: 240000 }).map(
+			([scope, duration]) => {
+				const limit = authored[scope]
+				if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
+				return [scope, { ...limit, duration }]
+			},
+		),
+	)
 	const entry = join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js')
 	scratch.write(
 		'studies/memory/profiles/local.json',
@@ -322,7 +324,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/contract/dist/src/core/index.js')).href)}
 import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
-import { Artifacts } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
+import { ArtifactLoader } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
 
 const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')))
 const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
@@ -340,7 +342,7 @@ const identities = [subject, dependency, provider].map((path) => ({
 	digest: createHash('sha256').update(readFileSync(path)).digest('hex'),
 }))
 console.log(JSON.stringify({ event: 'selection', roots, entries, subject, provider, dependency, identities }))
-const artifacts = new Artifacts({ roots, entries })
+const artifacts = new ArtifactLoader({ roots, entries })
 const inventory = artifacts.inspect()
 console.log(JSON.stringify({ event: 'inventory', ...inventory }))
 const selected = await artifacts.load(subject)
@@ -367,18 +369,65 @@ console.log(JSON.stringify({
 	return executeStudyProcess(['--experimental-import-meta-resolve', entry], resolve('.'), 60000)
 }
 
-/** Starts a native loopback Ollama protocol fixture on an ephemeral port. */
-export async function createMemoryServer(
-	responses: readonly MemoryWireFixture[] = [],
-): Promise<MemoryServerFixture> {
-	const queue = [...responses]
-	const requests: MemoryServerFixture['requests'] = []
-	const server = createServer(async (request, response) => {
+/**
+ * Serves a native loopback Ollama protocol fixture on an ephemeral port.
+ * @remarks
+ * Create one per test. A scripted reply is consumed by the next request for its path while it heads
+ * the script; any other request is answered by default. The script and the request log are
+ * replaced and appended by this entity alone, and its getters return copies.
+ */
+export class MemoryServer implements MemoryServerFixture {
+	readonly #server: Server
+	readonly #requests: Array<{ readonly path: string; readonly body: string }> = []
+	#pending: readonly MemoryWireFixture[]
+
+	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. */
+	constructor(responses: readonly MemoryWireFixture[] = []) {
+		this.#pending = responses
+		this.#server = createServer((request, response) => this.#serve(request, response))
+	}
+
+	/** Holds the origin of the started fixture. @throws Error - Thrown when the fixture is not listening. */
+	get url(): string {
+		const address = this.#server.address()
+		if (address === null || typeof address === 'string')
+			throw new Error('Missing native fixture address')
+		return `http://127.0.0.1:${address.port}`
+	}
+
+	/** Holds a copy of every request received, in arrival order. */
+	get requests(): Array<{ readonly path: string; readonly body: string }> {
+		return [...this.#requests]
+	}
+
+	/** Holds a copy of the scripted replies not yet consumed. */
+	get responses(): MemoryWireFixture[] {
+		return [...this.#pending]
+	}
+
+	/** Begins listening on an ephemeral loopback port. @returns Completion once the fixture accepts connections. */
+	start(): Promise<void> {
+		return new Promise<void>((resolveListen, reject) => {
+			this.#server.once('error', reject)
+			this.#server.listen(0, '127.0.0.1', resolveListen)
+		})
+	}
+
+	/** Drops every connection and stops listening. @returns Completion after the fixture is closed. */
+	close(): Promise<void> {
+		return new Promise<void>((resolveClose, reject) => {
+			this.#server.closeAllConnections()
+			this.#server.close((error) => (error === undefined ? resolveClose() : reject(error)))
+		})
+	}
+
+	async #serve(request: IncomingMessage, response: ServerResponse): Promise<void> {
 		const chunks: Buffer[] = []
 		for await (const chunk of request)
 			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-		requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
-		if (request.url === '/api/tags' && queue[0]?.path !== '/api/tags') {
+		this.#requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
+		const [next, ...rest] = this.#pending
+		if (request.url === '/api/tags' && next?.path !== '/api/tags') {
 			response.end(
 				JSON.stringify({
 					models: [
@@ -389,11 +438,11 @@ export async function createMemoryServer(
 			)
 			return
 		}
-		const supplied = queue[0]?.path === request.url ? queue.shift() : undefined
-		if (supplied !== undefined) {
-			response.writeHead(supplied.status ?? 200)
-			if (supplied.open === true) response.write(supplied.body)
-			else response.end(supplied.body)
+		if (next !== undefined && next.path === request.url) {
+			this.#pending = rest
+			response.writeHead(next.status ?? 200)
+			if (next.open === true) response.write(next.body)
+			else response.end(next.body)
 			return
 		}
 		if (request.url === '/api/show') {
@@ -427,24 +476,20 @@ export async function createMemoryServer(
 			return
 		}
 		response.end(buildMemoryReply())
-	})
-	await new Promise<void>((resolveListen, reject) => {
-		server.once('error', reject)
-		server.listen(0, '127.0.0.1', resolveListen)
-	})
-	const address = server.address()
-	if (address === null || typeof address === 'string')
-		throw new Error('Missing native fixture address')
-	return {
-		url: `http://127.0.0.1:${address.port}`,
-		requests,
-		responses: queue,
-		close: () =>
-			new Promise<void>((resolveClose, reject) => {
-				server.closeAllConnections()
-				server.close((error) => (error === undefined ? resolveClose() : reject(error)))
-			}),
 	}
+}
+
+/**
+ * Starts a native loopback Ollama protocol fixture on an ephemeral port.
+ * @param responses - The scripted replies in the order their paths are requested. Default: none.
+ * @returns A listening fixture the caller closes.
+ */
+export async function createMemoryServer(
+	responses: readonly MemoryWireFixture[] = [],
+): Promise<MemoryServerFixture> {
+	const server = new MemoryServer(responses)
+	await server.start()
+	return server
 }
 
 /** Builds inert protocol output consumed by the actual Ollama package. */
@@ -474,14 +519,14 @@ export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
 		'prompt',
 		'role',
 	]),
-	'wire-failure': Object.freeze(['bytes', 'path', 'reason', 'role', 'status']),
+	failure: Object.freeze(['bytes', 'path', 'reason', 'role', 'status']),
 })
 
 /** Pins the keys observation adds to each existing event, excluding selected-goal body and snapshot. */
 export const STUDY_MEMORY_OBSERVED_KEYS = Object.freeze({
 	dispatch: Object.freeze(['canonical', 'changed', 'digest', 'id', 'previous', 'revision']),
 	wire: Object.freeze(['canonical', 'elapsed', 'id', 'revision', 'sent', 'started', 'timing']),
-	'wire-failure': Object.freeze(['canonical', 'elapsed', 'id', 'revision', 'sent', 'started']),
+	failure: Object.freeze(['canonical', 'elapsed', 'id', 'revision', 'sent', 'started']),
 })
 
 /** Pins the keys an observed estimate row holds: the calibration pair plus the revision and canonical dispatch it joins to. */
@@ -600,6 +645,33 @@ export function buildMemoryObservationResponses(
 	]
 }
 
+/** Executes goals against one session in order and stops at the first refusal.
+ * @param session - The open session that retains state across goals.
+ * @param goals - Ordered public goals.
+ * @param context - Parent accounting and evidence.
+ * @returns The products of the goals before the refusal, and the refusal itself in `failure.error` when one occurred.
+ */
+export function executeMemoryGoals(
+	session: StudySessionInterface,
+	goals: readonly StudyGoal[],
+	context: StudyContext,
+): Promise<{
+	readonly products: readonly StudyProduct[]
+	readonly failure: { readonly error: unknown } | undefined
+}> {
+	return goals.reduce<ReturnType<typeof executeMemoryGoals>>(
+		async (previous, goal) => {
+			const run = await previous
+			if (run.failure !== undefined) return run
+			return session.execute(goal, context).then(
+				(product) => ({ products: [...run.products, product], failure: undefined }),
+				(error: unknown) => ({ products: run.products, failure: { error } }),
+			)
+		},
+		Promise.resolve({ products: [], failure: undefined }),
+	)
+}
+
 /** Runs a real driver session against a fresh protocol fixture and returns everything it sent, admitted and retained.
  * @param options - Treatment, queued replies, ordered goals and optional driver settings.
  * @returns Request bytes, products, the first failure, comparable usage and evidence rows.
@@ -613,8 +685,6 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		...(options.room === undefined ? {} : { room: options.room }),
 	})
 	const fixture = createMemoryContext(profile)
-	const products: StudyProduct[] = []
-	const failures: string[] = []
 	// Construction and open sit inside the cleanup boundary so a refused treatment still releases the server and accounting.
 	try {
 		const session: StudySessionInterface = await new StudyMemoryDriver({
@@ -625,19 +695,17 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 			fixture.context.signal,
 		)
 		try {
-			for (const goal of options.goals) {
-				try {
-					products.push(await session.execute(goal, fixture.context))
-				} catch (error) {
-					failures.push(error instanceof Error ? error.message : String(error))
-					break
-				}
-			}
+			const run = await executeMemoryGoals(session, options.goals, fixture.context)
 			await session.close()
 			return {
 				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
-				products,
-				failure: failures[0],
+				products: run.products,
+				failure:
+					run.failure === undefined
+						? undefined
+						: run.failure.error instanceof Error
+							? run.failure.error.message
+							: String(run.failure.error),
 				usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
 					role: row.role,
 					calls: row.calls,
@@ -668,7 +736,6 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 		...(options.room === undefined ? {} : { room: options.room }),
 	})
 	const fixture = createMemoryContext(profile)
-	const products: StudyProduct[] = []
 	try {
 		const session: StudySessionInterface = await new StudyMemoryDriver({
 			...STUDY_MEMORY_MODULES,
@@ -678,15 +745,7 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 			fixture.context.signal,
 		)
 		try {
-			const firsts: unknown[] = []
-			for (const goal of options.goals) {
-				try {
-					products.push(await session.execute(goal, fixture.context))
-				} catch (error) {
-					firsts.push(error)
-					break
-				}
-			}
+			const run = await executeMemoryGoals(session, options.goals, fixture.context)
 			const sent = server.requests.length
 			const latched = await session
 				.execute(
@@ -698,9 +757,9 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 					(error: unknown) => error,
 				)
 			return {
-				first: firsts[0],
+				first: run.failure?.error,
 				latched,
-				products,
+				products: run.products,
 				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
 				sent,
 				queued: server.responses.length,
@@ -741,12 +800,15 @@ export function readMemoryAdmission(result: MemoryTrialResult): MemoryAdmissionF
 export function totalMemoryUsage(
 	usage: readonly MemoryUsageFixture[],
 ): Readonly<Record<string, { readonly calls: number; readonly tokens: number }>> {
-	const totals: Record<string, { readonly calls: number; readonly tokens: number }> = {}
-	for (const row of usage) {
-		const total = totals[row.role] ?? { calls: 0, tokens: 0 }
-		totals[row.role] = { calls: total.calls + row.calls, tokens: total.tokens + (row.tokens ?? 0) }
-	}
-	return totals
+	return Object.fromEntries(
+		[...Map.groupBy(usage, (row) => row.role)].map(([role, rows]) => [
+			role,
+			{
+				calls: rows.reduce((sum, row) => sum + row.calls, 0),
+				tokens: rows.reduce((sum, row) => sum + (row.tokens ?? 0), 0),
+			},
+		]),
+	)
 }
 
 /** Reads the object values of one retained event kind in append order.
@@ -1170,16 +1232,24 @@ export async function loadStudyDeclaration(
 	driver: string,
 ): Promise<Omit<StudyValidation, 'profile'>> {
 	const root = new URL('../studies/', import.meta.url)
-	const read = async (path: string): Promise<unknown> =>
-		parseJSON(await readFile(new URL(path, root), 'utf8'))
-	const definition = parseStudyDefinition(await read(`${target}/study.json`))
-	const rubric = parseStudyRubric(await read(`${target}/rubric.json`))
+	const definition = parseStudyDefinition(await readStudyJSON(root, `${target}/study.json`))
+	const rubric = parseStudyRubric(await readStudyJSON(root, `${target}/rubric.json`))
 	const scenarios = await Promise.all(
 		definition.scenarios.map(async (scenario) =>
-			parseStudyScenario(await read(`${driver}/scenarios/${scenario}.json`)),
+			parseStudyScenario(await readStudyJSON(root, `${driver}/scenarios/${scenario}.json`)),
 		),
 	)
 	return { definition, rubric, scenarios }
+}
+
+/** Reads one JSON file beneath a root URL.
+ * @param root - Directory URL that ends with a slash.
+ * @param path - File path relative to the root.
+ * @returns The parsed value, or undefined when the text is not valid JSON.
+ * @throws Error - Thrown when the file cannot be read.
+ */
+export async function readStudyJSON(root: URL, path: string): Promise<unknown> {
+	return parseJSON(await readFile(new URL(path, root), 'utf8'))
 }
 
 /** Reads actual tool-result strings from recorded Ollama chat request bytes.
@@ -1189,14 +1259,12 @@ export async function loadStudyDeclaration(
 export function readMemoryToolResults(body: string): readonly string[] {
 	const value = parseJSON(body)
 	if (!isRecord(value) || !Array.isArray(value.messages)) throw new Error('Invalid chat request')
-	const receipts: string[] = []
-	for (const message of value.messages) {
+	return value.messages.flatMap((message): readonly string[] => {
 		if (!isRecord(message)) throw new Error('Invalid chat message')
-		if (message.role !== 'tool') continue
+		if (message.role !== 'tool') return []
 		if (typeof message.content !== 'string') throw new Error('Invalid tool receipt')
-		receipts.push(message.content)
-	}
-	return receipts
+		return [message.content]
+	})
 }
 
 /** Creates actual hierarchical request accounting and an evidence recorder. */
@@ -1205,18 +1273,20 @@ export function createMemoryContext(
 	signal = new AbortController().signal,
 ): MemoryContextFixture {
 	const accounting = createStudyMeterFixture(profile.bounds, signal)
-	const evidence: StudyEvidence[] = []
+	const appended = createRecorder<readonly [row: StudyEvidence]>()
 	return {
 		context: {
 			signal,
 			meter: accounting.meter,
 			evidence: {
 				append: async (row) => {
-					evidence.push(row)
+					appended.handler(row)
 				},
 			},
 		},
-		evidence,
+		get evidence(): StudyEvidence[] {
+			return appended.calls.map(([row]) => row)
+		},
 		close: () => accounting.close(),
 	}
 }

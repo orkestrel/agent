@@ -17,10 +17,11 @@ import type { RunnerInterface } from '@orkestrel/workflow'
 import { createQueue } from '@orkestrel/queue'
 import { createRunner } from '@orkestrel/workflow'
 import { Agent } from './Agent.js'
+import { AgentFanout } from './AgentFanout.js'
 import { Channel } from './Channel.js'
 import { Authority } from './Authority.js'
 import { AgentRegistry } from './AgentRegistry.js'
-import { extractQueueOptions, handleAgentQueueJob, handleAgentRunnerJob } from './helpers.js'
+import { extractQueueOptions, handleAgentQueueJob } from './helpers.js'
 
 /**
  * Creates an agent loop — an {@link AgentInterface} composing a
@@ -31,7 +32,7 @@ import { extractQueueOptions, handleAgentQueueJob, handleAgentRunnerJob } from '
  * @remarks
  * One private loop drives the turn; `generate` awaits the settled result of the same run
  * `stream` exposes and leaves its live chunks undrained, so they can never diverge. Each turn is bounded by one cancel folded from
- * `signal` + `timeout` + `budget` (through `AbortSignal.any`) — any trip (or `abort()`)
+ * `signal` + `timeout` + `budget` + `allowance` (through `AbortSignal.any`) — any trip (or `abort()`)
  * commits a partial result (the stream's `result` resolves on a cancel, rejects only
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
  * iteration is capped at `limit`. Default: `DEFAULT_AGENT_LIMIT`. Tools are advertised
@@ -259,8 +260,9 @@ export function createAgentRunner(
 	options: AgentRunnerOptions,
 ): RunnerInterface<AgentJobInput, AgentResult> {
 	const { registry, partial = false } = options
+	const fanout = new AgentFanout(registry, partial)
 	return createRunner<AgentJobInput, AgentResult>({
 		...extractQueueOptions(options),
-		handler: handleAgentRunnerJob.bind(undefined, registry, partial, new Set<string>()),
+		handler: fanout.execute.bind(fanout),
 	})
 }

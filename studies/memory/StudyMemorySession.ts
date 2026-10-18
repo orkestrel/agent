@@ -25,7 +25,7 @@ import {
 	StudyOllamaTransport,
 	buildStudyAgentReadings,
 	buildStudyOllamaModels,
-	buildStudyOllamaSettings,
+	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_JUDGE,
@@ -38,9 +38,9 @@ import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	readStudyMemoryCompaction,
-	readStudyMemorySettings,
+	resolveStudyMemoryObservation,
 } from './helpers.js'
-import { isStudyMemoryInput, isStudyMemorySettings } from './validators.js'
+import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
@@ -48,7 +48,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #transport: StudyOllamaTransport
 	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
-	readonly #settings: StudyMemoryObservation
+	readonly #observation: StudyMemoryObservation
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
@@ -58,9 +58,10 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #explicit = new Map<string, StudyMemoryProvenance>([
 		['summary-instruction', { origin: 'instructions', source: 'summary' }],
 	])
+	// The goal in flight: added when it starts, deleted on every path that ends it, and capped at one by the busy refusal.
+	readonly #live = new Set<StudyOllamaActivity>()
+	readonly #flights = new Set<Promise<StudyProduct>>()
 	#input: string | undefined
-	#active: StudyOllamaActivity | undefined
-	#work: Promise<StudyProduct> | undefined
 	#closing: Promise<void> | undefined
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
@@ -70,35 +71,35 @@ export class StudyMemorySession implements StudySessionInterface {
 		const gauge = compaction?.gauge
 		this.#options = options
 		this.#tools = createToolManager()
-		this.#settings = readStudyMemorySettings(options.profile.settings)
-		const settings = options.profile.provider
-		if (settings === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
+		this.#observation = resolveStudyMemoryObservation(options.profile.settings)
+		const provider = options.profile.provider
+		if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 		const room = options.profile.room
 		// One declaration of every role's wire policy feeds both the transport and the provider constructors.
 		const roles = buildStudyMemoryRoles(options.profile, options.arm)
 		const policy = roles.agent
 		if (policy === undefined) throw new StudyError('CONFIG', 'Memory agent role is required')
 		this.#transport = new StudyOllamaTransport({
-			url: settings.url,
+			url: provider.url,
 			room,
 			limit: options.profile.bounds.request,
-			models: buildStudyOllamaModels(settings),
+			models: buildStudyOllamaModels(provider),
 			roles,
 			signal: options.signal,
-			observe: this.#settings.observe,
+			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
 			latch: this.#transport,
-			observe: this.#settings.observe,
+			observe: this.#observation.observe,
 			origins: (messages) => buildStudyMemoryOrigins(messages, this.#provenance()),
 		})
 		// Every arm wraps the agent provider, so toggling passive capture keeps the same wrapper overhead.
-		const provider = new StudyAgentObserver({
+		const observer = new StudyAgentObserver({
 			provider: options.provider.createOllama({
-				...buildStudyOllamaSettings(policy),
-				url: settings.url,
+				...buildStudyOllamaOptions(policy),
+				url: provider.url,
 				timeout: options.profile.bounds.request.duration,
 				fetch: (input, init) =>
 					this.#transport.fetch('agent', input, init, this.#trace.canonical('agent')),
@@ -116,8 +117,8 @@ export class StudyMemorySession implements StudySessionInterface {
 				? undefined
 				: new StudyAgentSummary({
 						provider: options.provider.createOllama({
-							...buildStudyOllamaSettings(recap),
-							url: settings.url,
+							...buildStudyOllamaOptions(recap),
+							url: provider.url,
 							timeout: options.profile.bounds.request.duration,
 							fetch: (input, init) =>
 								this.#transport.fetch('summary', input, init, this.#trace.canonical('summary')),
@@ -151,14 +152,14 @@ export class StudyMemorySession implements StudySessionInterface {
 				options.classifier.createOllamaJudge({
 					model: role.model,
 					system: STUDY_MEMORY_JUDGE,
-					url: settings.url,
+					url: provider.url,
 					timeout: options.profile.bounds.request.duration,
 					options: role.options,
 					fetch: (input, init) => this.#transport.fetch('judge', input, init),
 				}),
 				this.#transport,
 			)
-			this.#ledger = options.ledger.createLedger(provider, {
+			this.#ledger = options.ledger.createLedger(observer, {
 				judge,
 				system: STUDY_MEMORY_SYSTEM,
 				topics: STUDY_MEMORY_TOPICS,
@@ -197,13 +198,13 @@ export class StudyMemorySession implements StudySessionInterface {
 					: {
 							keep: 2,
 							summarize: (messages, signal) => summary.summarize(messages, signal),
-							...(isStudyMemorySettings(options.profile.settings) &&
+							...(isStudyMemoryOptions(options.profile.settings) &&
 							options.profile.settings.rolling === true
 								? { rolling: true }
 								: {}),
 						},
 			)
-			this.#agent = new options.agent.Agent(provider, {
+			this.#agent = new options.agent.Agent(observer, {
 				conversations,
 				tools: this.#tools,
 				strict: true,
@@ -227,16 +228,16 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Executes a public goal against preserved state and retains its observable product. @param goal - Public arrivals, request and references. @param context - Parent accounting and evidence. @returns Actual complete or partial content. */
 	async execute(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
-		if (this.#closing !== undefined || this.#work !== undefined)
+		if (this.#closing !== undefined || this.#flights.size > 0)
 			throw new StudyError('CONFIG', 'Memory session is closed or busy')
 		if (!isStudyMemoryInput(goal.input))
 			throw new StudyError('CONFIG', 'Malformed public memory input')
-		const work = this.#execute(goal.id, goal.input, context)
-		this.#work = work
+		const flight = this.#execute(goal.id, goal.input, context)
+		this.#flights.add(flight)
 		try {
-			return await work
+			return await flight
 		} finally {
-			this.#work = undefined
+			this.#flights.delete(flight)
 		}
 	}
 
@@ -253,11 +254,11 @@ export class StudyMemorySession implements StudySessionInterface {
 	): Promise<StudyProduct> {
 		const activity = { goal, context, checkpoint: this.#checkpoint(goal, input) }
 		this.#transport.prepare(activity)
-		this.#active = activity
 		this.#trace.start(goal)
 		// The previous goal's input is history now; membership or a section names it from here on.
 		if (this.#input !== undefined) this.#explicit.delete(this.#input)
 		this.#input = undefined
+		this.#live.add(activity)
 		try {
 			await this.#transport.verify()
 			for (const record of input.records) {
@@ -271,7 +272,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					role: 'user',
 					content: `[Source ${arrival.id}] ${arrival.content}`,
 				})
-				if (this.#settings.observe)
+				if (this.#observation.observe)
 					this.#explicit.set(message.id, { origin: 'arrival', source: arrival.id })
 				await context.evidence.append({
 					event: 'arrival',
@@ -282,7 +283,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			const signal = AbortSignal.any([this.#options.signal, context.signal, context.meter.signal])
 			if (this.#ledger === undefined) {
 				const prompt = this.#conversation.add({ role: 'user', content: input.prompt })
-				if (this.#settings.observe) {
+				if (this.#observation.observe) {
 					this.#input = prompt.id
 					this.#explicit.set(prompt.id, { origin: 'input', source: goal })
 				}
@@ -309,7 +310,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					content: result.content,
 					partial: result.partial,
 					conversation: this.#conversation.id,
-					...(this.#settings.observe && this.#ledger !== undefined
+					...(this.#observation.observe && this.#ledger !== undefined
 						? { readings: buildStudyAgentReadings(result) }
 						: {}),
 				},
@@ -324,7 +325,8 @@ export class StudyMemorySession implements StudySessionInterface {
 			try {
 				await this.#trace.flush(context.evidence)
 			} finally {
-				this.#active = undefined
+				this.#live.delete(activity)
+				this.#transport.clear()
 			}
 		}
 	}
@@ -339,7 +341,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	}
 
 	#checkpoint(goal: string, input: StudyMemoryInput): JSONValue | undefined {
-		if (!this.#settings.observe || !this.#settings.checkpoints.has(goal)) return undefined
+		if (!this.#observation.observe || !this.#observation.checkpoints.has(goal)) return undefined
 		const value: unknown = {
 			conversation: this.#conversation.snapshot(),
 			records: [...this.#records.values()],
@@ -353,7 +355,8 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	async #lookup(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {
 		this.#transport.check()
-		const active = this.#active
+		// The busy refusal caps the registry at the one goal that added its entry.
+		const [active] = this.#live
 		if (active === undefined) throw new StudyError('FAULT', 'Lookup outside an active goal')
 		try {
 			const encoder = new TextEncoder()
@@ -405,7 +408,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	async #dispose(): Promise<void> {
 		this.#agent.abort(new StudyError('FAULT', 'Memory session closed'))
 		await this.#transport.close()
-		await this.#work?.catch(() => undefined)
+		await Promise.allSettled([...this.#flights])
 		this.#tools.destroy()
 		this.#agent.emitter.destroy()
 		this.#conversation.emitter.destroy()

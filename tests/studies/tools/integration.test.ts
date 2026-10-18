@@ -13,8 +13,8 @@ import {
 	parseStudyProfile,
 } from '@orkestrel/study'
 import {
-	StudyArtifacts,
-	StudyResults,
+	StudyArtifactLoader,
+	StudyResultStore,
 	collectStudyEvidence,
 	encodeStudyJSON,
 	hashStudyBytes,
@@ -44,7 +44,7 @@ it('inspects the shipped package-root profile against the real offline artifact 
 	}
 	const entry = realpathSync(resolve(root, 'node_modules/@orkestrel/study/dist/bin/main.js'))
 	const adapter = realpathSync(resolve(root, 'studies/tools/index.ts'))
-	const artifacts = new StudyArtifacts({ root, entry, adapter, profile: resolved })
+	const artifacts = new StudyArtifactLoader({ root, entry, adapter, profile: resolved })
 	const identity = await artifacts.inspect()
 	expect(identity.subject).toMatch(/^[a-f0-9]{64}$/)
 	expect(identity.instrument).toMatch(/^[a-f0-9]{64}$/)
@@ -58,7 +58,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 	try {
 		const directory = join(scratch.path, 'result')
 		const work = scratch.ensure('work')
-		const store = new StudyResults({ directory, manifest: fixture.manifest })
+		const store = new StudyResultStore({ directory, manifest: fixture.manifest })
 		await store.create()
 		const driver = new StudyToolsDriver({
 			agent: fixture.agent,
@@ -177,7 +177,7 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 		}
 		const directory = join(scratch.path, 'denied')
 		const work = scratch.ensure('work')
-		const store = new StudyResults({ directory, manifest })
+		const store = new StudyResultStore({ directory, manifest })
 		await store.create()
 		const attempts = await new StudySeries({
 			manifest,

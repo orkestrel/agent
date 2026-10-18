@@ -16,11 +16,11 @@ import type {
 } from './types.js'
 import { isRecord } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
-import { isStudyMemoryAssertion, isStudyMemorySettings } from './validators.js'
+import { isStudyMemoryAssertion, isStudyMemoryOptions } from './validators.js'
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
 export function readStudyMemoryGauge(settings: unknown): LedgerGauge {
-	if (!isStudyMemorySettings(settings) || settings.gauge === undefined)
+	if (!isStudyMemoryOptions(settings) || settings.gauge === undefined)
 		throw new StudyError('CONFIG', 'Memory compaction requires an explicit settings gauge')
 	return { scale: settings.gauge.scale, overhead: settings.gauge.overhead }
 }
@@ -45,10 +45,10 @@ export function readStudyMemoryJudge(provider: StudyProvider): string {
 	return provider.judge
 }
 
-/** Reads the passive observation switches from generic driver settings. @param settings - Optional profile settings. @returns Disabled observation unless `observe` is true; selected goal ids only while enabled. @throws StudyError - CONFIG when present settings are malformed. */
-export function readStudyMemorySettings(settings: unknown): StudyMemoryObservation {
+/** Resolves the passive observation switches from generic driver settings. @param settings - Optional profile settings. @returns Disabled observation unless `observe` is true; selected goal ids only while enabled. @throws StudyError - CONFIG when present settings are malformed. */
+export function resolveStudyMemoryObservation(settings: unknown): StudyMemoryObservation {
 	if (settings === undefined) return { observe: false, checkpoints: new Set() }
-	if (!isStudyMemorySettings(settings))
+	if (!isStudyMemoryOptions(settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	const observe = settings.observe === true
 	return { observe, checkpoints: new Set(observe ? (settings.checkpoints ?? []) : []) }
@@ -87,7 +87,7 @@ export function validateStudyMemoryProfile(
 	arms: readonly StudyMemoryArm[],
 ): void {
 	const { room, provider } = profile
-	if (profile.settings !== undefined && !isStudyMemorySettings(profile.settings))
+	if (profile.settings !== undefined && !isStudyMemoryOptions(profile.settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	if (provider === undefined || !isStudyProvider(provider))
 		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')

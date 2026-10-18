@@ -83,10 +83,10 @@ export async function observeStudyToolsFile(
  * @throws StudyError - Thrown when the payload carries a malformed or non-JSON result
  * @example
  * ```ts
- * readStudyToolsObservation('denial', call, { call, reason: 'refused' }) // { id: 'c1', name: 'write', reason: 'refused' }
+ * buildStudyToolsObservation('denial', call, { call, reason: 'refused' }) // { id: 'c1', name: 'write', reason: 'refused' }
  * ```
  */
-export function readStudyToolsObservation(
+export function buildStudyToolsObservation(
 	event: 'tool' | 'denial',
 	call: ToolCall,
 	envelope: Readonly<Record<string, unknown>>,

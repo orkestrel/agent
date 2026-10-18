@@ -28,3 +28,30 @@ export function createFixtureServer(routes: readonly RouteInput[]): ServerInterf
 		port: 0,
 	})
 }
+
+/**
+ * Releases a parked scenario, stops a started fixture server, and times the stop.
+ *
+ * @remarks
+ * The interval opens after `release` returns, so it measures what the server spends draining
+ * the work the release unparked, never the release itself. The caller supplies the failure path:
+ * stopping from a rejection handler runs the same cleanup before the error is rethrown.
+ *
+ * @param server - The started server to stop
+ * @param release - Unparks the work the server is holding, such as a gate's `resolve`
+ * @returns The milliseconds `server.stop()` took, read with `performance.now()`
+ * @example
+ * ```ts
+ * const gate = Promise.withResolvers<void>()
+ * const elapsed = await stopTimed(server, gate.resolve)
+ * ```
+ */
+export async function stopTimed(
+	server: ServerInterface<undefined>,
+	release: () => void,
+): Promise<number> {
+	release()
+	const closing = performance.now()
+	await server.stop()
+	return performance.now() - closing
+}

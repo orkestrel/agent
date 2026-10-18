@@ -1495,6 +1495,40 @@ describe('Conversation — compact() cancellation through CompactOptions.signal'
 		expect(calls.count).toBe(2)
 		expect(conversation.sections).toHaveLength(2)
 	})
+
+	it('an aborted intermediate waiter leaves a later compact waiting on the earlier fold', async () => {
+		const gate = Promise.withResolvers<string>()
+		const calls = createRecorder<readonly [readonly Message[]]>()
+		const conversation = new Conversation({
+			async summarize(messages) {
+				calls.handler(messages)
+				return gate.promise
+			},
+		})
+		conversation.add([
+			{ role: 'user', content: 'First request.' },
+			{ role: 'assistant', content: 'First answer.' },
+			{ role: 'user', content: 'Second request.' },
+		])
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+
+		const first = conversation.compact()
+		await waitForCondition('the first summarizer call', () => calls.count === 1)
+		const intermediate = conversation.compact({ signal: controller.signal })
+		// The third call joins while both earlier folds are pending, then the middle waiter aborts.
+		const third = conversation.compact()
+		controller.abort(reason)
+		await expect(intermediate).rejects.toBe(reason)
+		await waitForDelay()
+		expect(calls.count).toBe(1)
+
+		gate.resolve('recap')
+		await first
+		await third
+		expect(calls.count).toBe(1)
+		expect(conversation.sections).toHaveLength(1)
+	})
 })
 
 describe('Conversation — keep must be a nonnegative safe integer', () => {

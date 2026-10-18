@@ -37,15 +37,41 @@ import {
 
 describe('buildProviderResult — the assembled provider turn', () => {
 	it('omits empty result optionals and retains populated calls and usage', () => {
-		expect(buildProviderResult('answer', '', [], undefined)).toEqual({ content: 'answer' })
+		expect(buildProviderResult('answer', '', [], undefined, undefined)).toEqual({
+			content: 'answer',
+		})
 		const tools = [{ id: '1', name: 'lookup', arguments: {} }]
 		const usage = { prompt: 1, completion: 2, total: 3 }
-		expect(buildProviderResult('answer', 'reason', tools, usage)).toEqual({
+		expect(buildProviderResult('answer', 'reason', tools, usage, undefined)).toEqual({
 			content: 'answer',
 			thinking: 'reason',
 			tools,
 			usage,
 		})
+	})
+	it('omits an undefined truncation and keeps true and false', () => {
+		expect(buildProviderResult('answer', '', [], undefined, undefined)).toStrictEqual({
+			content: 'answer',
+		})
+		expect(buildProviderResult('answer', '', [], undefined, true)).toStrictEqual({
+			content: 'answer',
+			truncated: true,
+		})
+		expect(buildProviderResult('answer', '', [], undefined, false)).toStrictEqual({
+			content: 'answer',
+			truncated: false,
+		})
+	})
+	it('places the truncation after every other member', () => {
+		const usage = { prompt: 1, completion: 2, total: 3 }
+		const tools = [{ id: '1', name: 'lookup', arguments: {} }]
+		expect(Object.keys(buildProviderResult('answer', 'reason', tools, usage, true))).toEqual([
+			'content',
+			'thinking',
+			'tools',
+			'usage',
+			'truncated',
+		])
 	})
 })
 
@@ -164,6 +190,24 @@ describe('readText — bounded decoded text', () => {
 	})
 	it('reads an empty body as empty text', async () => {
 		expect(await readText(new RecordedBody([]).stream)).toEqual({ text: '', complete: true })
+	})
+	it('reads no chunk for a NaN limit', async () => {
+		const body = new RecordedBody([new TextEncoder().encode('abc')])
+		expect(await readText(body.stream, NaN)).toEqual({ text: '', complete: false })
+		expect(body.count).toBe(0)
+		expect(body.cancelled).toBe(true)
+		expect(body.stream.locked).toBe(false)
+	})
+	it('reads fifty thousand one-byte chunks to completion', async () => {
+		const body = new RecordedBody(Array.from({ length: 50_000 }, () => new Uint8Array([97])))
+		expect(await readText(body.stream)).toEqual({ text: 'a'.repeat(50_000), complete: true })
+		expect(body.count).toBe(50_000)
+	})
+	it('counts the byte limit across chunks and keeps a split character whole', async () => {
+		const bytes = new TextEncoder().encode('é!')
+		const body = new RecordedBody([bytes.subarray(0, 1), bytes.subarray(1, 2), bytes.subarray(2)])
+		expect(await readText(body.stream, 3)).toEqual({ text: 'é!', complete: false })
+		expect(body.count).toBe(3)
 	})
 })
 
@@ -598,6 +642,23 @@ describe('System One helpers', () => {
 			),
 		).toBeUndefined()
 		expect(extractSystemOneAnswer({ type: 'noul', noul: NaN }, { form: 'noul' })).toBeUndefined()
+	})
+
+	it('visits a hole in the criteria list as a requested level', () => {
+		const criteria: [null, null, null] = [null, null, null]
+		Reflect.deleteProperty(criteria, 1)
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: [0.1, 0.2, 0.3] },
+				{ form: 'score', criteria },
+			),
+		).toEqual({ form: 'score', probabilities: [0.1, 0.2, 0.3] })
+		expect(
+			extractSystemOneAnswer(
+				{ type: 'score', probabilities: { '0': 0.1, '2': 0.3 } },
+				{ form: 'score', criteria },
+			),
+		).toBeUndefined()
 	})
 
 	it('ignores an unrequested candidate outside [0, 1]', () => {

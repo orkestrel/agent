@@ -1,5 +1,5 @@
 import type { SystemOneJudgeOptions, SystemOneRequest } from './types.js'
-import type { JudgeAnswer, JudgeRequest, JudgeResult } from '../types.js'
+import type { JudgeRequest, JudgeResult } from '../types.js'
 import { AgentJudge } from './AgentJudge.js'
 import { SYSTEM_ONE_PATH } from './constants.js'
 import { extractSystemOneAnswer, extractSystemOneUsage, questionToSystemOne } from './helpers.js'
@@ -96,8 +96,7 @@ export class SystemOneJudge extends AgentJudge {
 		if (!isSystemOneResponse(value)) {
 			throw new JudgeError('PROTOCOL', 'judge error: invalid System One response envelope')
 		}
-		const entries: Array<readonly [string, JudgeAnswer]> = []
-		for (const [id, question] of Object.entries(request.questions)) {
+		const entries = Object.entries(request.questions).map(([id, question]) => {
 			if (!Object.hasOwn(value.answers, id)) {
 				throw new JudgeError('PROTOCOL', `judge error: question ${id} has no System One answer`)
 			}
@@ -115,8 +114,8 @@ export class SystemOneJudge extends AgentJudge {
 					`judge error: question ${id} has a mismatched or incomplete System One answer`,
 				)
 			}
-			entries.push([id, answer])
-		}
+			return [id, answer] as const
+		})
 		const usage = extractSystemOneUsage(value.usage)
 		return {
 			model: value.model ?? this.model,

@@ -10,6 +10,7 @@ import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentResult,
 	AgentRegistryInterface,
+	AgentTurn,
 	AuthorityContext,
 	ChannelInterface,
 } from '@src/core'
@@ -852,63 +853,62 @@ export function createMessage(content: string): Message {
 	return { id: 'm', role: 'user', content }
 }
 
-/** Records accesses while a result is projected. */
-export class AgentResultAccessCounter {
-	content = 0
-	thinking = 0
-	usage = 0
-	partial = 0
-	prompt = 0
-	completion = 0
-	total = 0
-}
+/** Names a result or usage member whose read a {@link CountingAgentResult} records. */
+export type AccessedMember =
+	| 'content'
+	| 'thinking'
+	| 'usage'
+	| 'partial'
+	| 'prompt'
+	| 'completion'
+	| 'total'
 
-/** Records accesses while a result is projected. */
+/** Records each usage member read while a result is projected. */
 export class CountingTokenUsage {
-	#counter: AgentResultAccessCounter
+	readonly #accesses: RecorderInterface<readonly [member: AccessedMember]>
 
-	constructor(counter: AgentResultAccessCounter) {
-		this.#counter = counter
+	constructor(accesses: RecorderInterface<readonly [member: AccessedMember]>) {
+		this.#accesses = accesses
 	}
 
 	get prompt(): number {
-		this.#counter.prompt += 1
+		this.#accesses.handler('prompt')
 		return 2
 	}
 
 	get completion(): number {
-		this.#counter.completion += 1
+		this.#accesses.handler('completion')
 		return 1
 	}
 
 	get total(): number {
-		this.#counter.total += 1
+		this.#accesses.handler('total')
 		return 3
 	}
 }
 
-/** Records accesses while a result is projected. */
+/** Records each result member read while a result is projected, in read order, on `accesses`. */
 export class CountingAgentResult {
-	readonly counter = new AgentResultAccessCounter()
-	#usage = new CountingTokenUsage(this.counter)
+	readonly accesses = createRecorder<readonly [member: AccessedMember]>()
+	readonly #usage = new CountingTokenUsage(this.accesses)
 
 	get content(): string {
-		this.counter.content += 1
+		this.accesses.handler('content')
 		return 'done'
 	}
 
 	get thinking(): string {
-		this.counter.thinking += 1
+		this.accesses.handler('thinking')
 		return 'reasoning'
 	}
 
 	get usage(): CountingTokenUsage {
-		this.counter.usage += 1
+		this.accesses.handler('usage')
 		return this.#usage
 	}
 
 	get partial(): boolean {
-		this.counter.partial += 1
+		this.accesses.handler('partial')
 		return false
 	}
 }
@@ -1424,14 +1424,13 @@ export class RelayParser implements ProviderParserInterface {
 		this.#pending += chunk
 		const lines = this.#pending.split('\n')
 		this.#pending = lines.pop() ?? ''
-		const records: Array<Readonly<Record<string, unknown>>> = []
-		for (const line of lines) {
-			if (line.trim().length === 0) continue
-			const record = parseJSONAs(line, isRecord)
-			if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
-			records.push(record)
-		}
-		return records
+		return lines
+			.filter((line) => line.trim().length > 0)
+			.map((line) => {
+				const record = parseJSONAs(line, isRecord)
+				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+				return record
+			})
 	}
 	clear(): void {
 		this.#pending = ''
@@ -1554,24 +1553,26 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 			if (this.#delay > 0) await waitForDelay(this.#delay)
 			const { result, deltas, thoughts } = splitTurn(this.#next())
 			const chunks = deltas ?? this.#chunk(result.content)
-			const streamed: string[] = []
-			const reasoned: string[] = []
-			for (const thought of thoughts ?? []) {
+			const thoughtList = thoughts ?? []
+			const reasoned = thoughtList.join('')
+			for (const [index, thought] of thoughtList.entries()) {
 				if (signal.aborted) {
-					throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
+					throw new ProviderAbortError(
+						buildProviderPartial('', thoughtList.slice(0, index).join('')),
+					)
 				}
-				reasoned.push(thought)
 				if (thought.length > 0) yield { channel: 'thinking', text: thought }
 			}
-			for (const delta of chunks) {
+			for (const [index, delta] of chunks.entries()) {
 				if (signal.aborted) {
-					throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
+					throw new ProviderAbortError(
+						buildProviderPartial(chunks.slice(0, index).join(''), reasoned),
+					)
 				}
-				streamed.push(delta)
 				if (delta.length > 0) yield { channel: 'content', text: delta }
 			}
 			if (signal.aborted) {
-				throw new ProviderAbortError(buildProviderPartial(streamed.join(''), reasoned.join('')))
+				throw new ProviderAbortError(buildProviderPartial(chunks.join(''), reasoned))
 			}
 			return result
 		} finally {
@@ -1764,6 +1765,31 @@ export function createToolCall(overrides?: Partial<ToolCall>): ToolCall {
  */
 export function createTokenUsage(overrides?: Partial<TokenUsage>): TokenUsage {
 	return { prompt: 5, completion: 7, total: 12, ...overrides }
+}
+
+/**
+ * Builds an {@link AgentTurn} record for a stop-inference case — by default an `answer` turn whose
+ * call streamed nothing, reported no usage, returned unaborted, and was not truncated, with
+ * per-case overrides for the readings a case varies.
+ *
+ * @param overrides - Fields to override on the default turn
+ * @returns The assembled turn record
+ */
+export function createAgentTurn(overrides?: Partial<AgentTurn>): AgentTurn {
+	return {
+		content: '',
+		thinking: undefined,
+		usage: undefined,
+		spent: undefined,
+		messages: [],
+		ending: 'answer',
+		partial: false,
+		futile: false,
+		estimate: 0,
+		interrupted: false,
+		truncated: false,
+		...overrides,
+	}
 }
 
 /** Supplies assistant thinking before and after the last user turn. */
@@ -2031,13 +2057,13 @@ export function createRecordingSelection(
 	options?: RecordingSelectionOptions,
 ): RecordingSelectionInterface {
 	const recorder: RecorderInterface<SelectionCall> = createRecorder<SelectionCall>()
-	const selections: Selection[] = []
+	const selected = createRecorder<readonly [selection: Selection]>()
 	return {
 		get calls() {
 			return recorder.calls
 		},
 		get selections() {
-			return selections
+			return selected.calls.map(([selection]) => selection)
 		},
 		handler: async (conversation, request, signal) => {
 			recorder.handler(conversation, request, signal)
@@ -2048,7 +2074,7 @@ export function createRecordingSelection(
 				judgments: [],
 				...(options?.usage === undefined ? {} : { usage: options.usage }),
 			}
-			selections.push(selection)
+			selected.handler(selection)
 			return selection
 		},
 	}
@@ -2636,14 +2662,14 @@ export interface RefusingTransportInterface {
  * @returns The transport with the signals it recorded
  */
 export function createRefusingTransport(): RefusingTransportInterface {
-	const signals: AbortSignal[] = []
+	const recorded = createRecorder<readonly [signal: AbortSignal]>()
 	return {
 		get signals() {
-			return signals
+			return recorded.calls.map(([signal]) => signal)
 		},
 		fetch(_input, init) {
 			const signal = init?.signal
-			if (signal !== null && signal !== undefined) signals.push(signal)
+			if (signal !== null && signal !== undefined) recorded.handler(signal)
 			return Promise.reject(new Error('fetch failed'))
 		},
 	}
@@ -3202,15 +3228,24 @@ export class ScriptedJudge extends AgentJudge {
 		this.#values.push(value)
 		this.#abort?.abort()
 		if (!isRecord(value)) throw new JudgeError('PROTOCOL', 'judge error: invalid envelope')
-		const answers: Record<string, JudgeAnswer> = {}
-		const refusals: Record<string, Refusal> = {}
-		for (const id of Object.keys(request.questions)) {
+		const entries = Object.keys(request.questions).map((id) => {
 			const answer = this.#answers[id]
 			const refusal = this.#refusals[id]
-			if (answer !== undefined) answers[id] = answer
-			else if (refusal !== undefined) refusals[id] = refusal
-			else throw new JudgeError('PROTOCOL', `judge error: answer ${id} is missing`)
-		}
+			if (answer === undefined && refusal === undefined) {
+				throw new JudgeError('PROTOCOL', `judge error: answer ${id} is missing`)
+			}
+			return { id, answer, refusal }
+		})
+		const answers = Object.fromEntries(
+			entries.flatMap(({ id, answer }): ReadonlyArray<readonly [string, JudgeAnswer]> => {
+				return answer === undefined ? [] : [[id, answer]]
+			}),
+		)
+		const refusals = Object.fromEntries(
+			entries.flatMap(({ id, answer, refusal }): ReadonlyArray<readonly [string, Refusal]> => {
+				return answer !== undefined || refusal === undefined ? [] : [[id, refusal]]
+			}),
+		)
 		return {
 			model: isString(value.model) ? value.model : this.model,
 			answers,
@@ -3750,11 +3785,12 @@ export function listPlacementKeys(
 	earlierSides: ReadonlyMap<string, readonly string[]>,
 	links: ReadonlyMap<string, string>,
 ): ReadonlySet<string> {
-	const owners = new Set<string>()
-	for (const entity of input.entities.get(id) ?? []) {
-		const owner = input.owners.has(entity) ? entity : links.get(entity)
-		if (owner !== undefined) owners.add(`owner:${owner}`)
-	}
+	const owners = new Set(
+		(input.entities.get(id) ?? []).flatMap((entity) => {
+			const owner = input.owners.has(entity) ? entity : links.get(entity)
+			return owner === undefined ? [] : [`owner:${owner}`]
+		}),
+	)
 	if (owners.size > 0) return owners
 	const sides = (earlierSides.get(id) ?? []).filter((earlier) => !seen.has(earlier))
 	if (sides.length > 0) {
@@ -3813,7 +3849,6 @@ export function checkLedgerProjection(
 	built: LedgerProjection,
 	input: LedgerProjectionInput,
 ): readonly string[] {
-	const faults: string[] = []
 	const byId = new Map(input.messages.map((message, at) => [message.id, { ...message, at }]))
 	const { classification } = input
 	const excluded = new Set(input.exclusions)
@@ -3821,20 +3856,18 @@ export function checkLedgerProjection(
 		[...classification.supersessions].flatMap(([id, laters]) => (laters.length > 0 ? [id] : [])),
 	)
 	const lookups = new Map(input.readings.map((reading) => [reading.id, reading]))
-	const replaced = new Set<string>()
-	for (const reading of lookups.values()) {
-		for (const later of lookups.values()) {
-			const earlierAt = byId.get(reading.id)?.at ?? -1
-			const laterAt = byId.get(later.id)?.at ?? -1
-			if (
-				laterAt > earlierAt &&
-				computeLedgerIdentity(later.name, later.arguments) ===
-					computeLedgerIdentity(reading.name, reading.arguments)
-			) {
-				replaced.add(reading.id)
-			}
-		}
-	}
+	const replaced = new Set(
+		[...lookups.values()]
+			.filter((reading) =>
+				[...lookups.values()].some(
+					(later) =>
+						(byId.get(later.id)?.at ?? -1) > (byId.get(reading.id)?.at ?? -1) &&
+						computeLedgerIdentity(later.name, later.arguments) ===
+							computeLedgerIdentity(reading.name, reading.arguments),
+				),
+			)
+			.map((reading) => reading.id),
+	)
 	const live = new Set(
 		[...byId.values()]
 			.filter(
@@ -3852,39 +3885,30 @@ export function checkLedgerProjection(
 	const staleKeys = new Set(built.stale.map((entry) => `${entry.source} ${entry.sentence}`))
 	const lines = built.records.flatMap((record) => record.lines.map((line) => ({ record, line })))
 
-	for (const { record, line } of lines) {
+	const verbatim = lines.flatMap(({ record, line }) => {
 		const sentences = splitSentences(byId.get(line.source)?.content ?? '')
 		const prefix = line.party === undefined ? '' : `${line.party}: `
-		if (
-			!line.text.startsWith(prefix) ||
-			line.text.slice(prefix.length) !== sentences[line.sentence]
-		) {
-			faults.push(
-				`verbatim ${record.key}: "${line.text}" is not sentence ${line.sentence} of ${line.source}`,
-			)
-		}
-		if (
+		const unmatched =
+			!line.text.startsWith(prefix) || line.text.slice(prefix.length) !== sentences[line.sentence]
+		const unnamed =
 			line.party !== undefined &&
 			!collectNames(sentences[line.sentence - 1] ?? '').includes(line.party)
-		) {
-			faults.push(
-				`verbatim ${record.key}: party "${line.party}" is absent from the sentence before ${line.source} sentence ${line.sentence}`,
-			)
-		}
-	}
+		return [
+			...(unmatched
+				? [
+						`verbatim ${record.key}: "${line.text}" is not sentence ${line.sentence} of ${line.source}`,
+					]
+				: []),
+			...(unnamed
+				? [
+						`verbatim ${record.key}: party "${line.party}" is absent from the sentence before ${line.source} sentence ${line.sentence}`,
+					]
+				: []),
+		]
+	})
 
-	for (const { record, line } of lines) {
+	const dead = lines.flatMap(({ record, line }) => {
 		const tokens = extractTokens(line.text)
-		for (const entry of built.stale) {
-			if (
-				entry.source === line.source &&
-				entry.tokens.some((token) => tokens.ids.has(token) || tokens.numbers.has(Number(token)))
-			) {
-				faults.push(
-					`dead ${record.key}: "${line.text}" holds ${entry.tokens.join(', ')}, which stale lists for ${line.source}`,
-				)
-			}
-		}
 		const message = byId.get(line.source)
 		const reason =
 			message === undefined
@@ -3902,83 +3926,118 @@ export function checkLedgerProjection(
 									: live.has(line.source)
 										? undefined
 										: 'not live'
-		if (reason !== undefined)
-			faults.push(`dead ${record.key}: "${line.text}" comes from a ${reason} source ${line.source}`)
-	}
+		return [
+			...built.stale
+				.filter(
+					(entry) =>
+						entry.source === line.source &&
+						entry.tokens.some(
+							(token) => tokens.ids.has(token) || tokens.numbers.has(Number(token)),
+						),
+				)
+				.map(
+					(entry) =>
+						`dead ${record.key}: "${line.text}" holds ${entry.tokens.join(', ')}, which stale lists for ${line.source}`,
+				),
+			...(reason === undefined
+				? []
+				: [`dead ${record.key}: "${line.text}" comes from a ${reason} source ${line.source}`]),
+		]
+	})
 
-	for (const record of built.records) {
-		for (const id of record.members) {
-			if (!live.has(id)) continue
-			for (const [at] of splitSentences(byId.get(id)?.content ?? '').entries()) {
-				const lined = record.lines.some((line) => line.source === id && line.sentence === at)
-				if (!lined && !staleKeys.has(`${id} ${at}`)) {
-					faults.push(`coverage ${record.key}: sentence ${at} of ${id} is neither a line nor stale`)
-				}
-			}
-		}
-	}
+	const coverage = built.records.flatMap((record) =>
+		record.members
+			.filter((id) => live.has(id))
+			.flatMap((id) =>
+				[...splitSentences(byId.get(id)?.content ?? '').keys()]
+					.filter(
+						(at) =>
+							!record.lines.some((line) => line.source === id && line.sentence === at) &&
+							!staleKeys.has(`${id} ${at}`),
+					)
+					.map(
+						(at) => `coverage ${record.key}: sentence ${at} of ${id} is neither a line nor stale`,
+					),
+			),
+	)
 
 	const links = linkOwners(input.readings, input.owners)
-	const earlierSides = new Map<string, string[]>()
-	for (const [earlier, laters] of classification.amendments) {
-		for (const later of laters)
-			earlierSides.set(later, [...(earlierSides.get(later) ?? []), earlier])
-	}
-	const placedIn = new Map<string, string[]>()
-	for (const record of built.records) {
-		for (const id of record.members) placedIn.set(id, [...(placedIn.get(id) ?? []), record.key])
-	}
-	for (const id of built.orphans) placedIn.set(id, [...(placedIn.get(id) ?? []), 'orphans'])
-	for (const id of new Set([...live, ...placedIn.keys()])) {
+	const earlierSides = new Map(
+		[
+			...Map.groupBy(
+				[...classification.amendments].flatMap(([earlier, laters]) =>
+					laters.map((later): readonly [string, string] => [later, earlier]),
+				),
+				([later]) => later,
+			),
+		].map(([later, pairs]): readonly [string, readonly string[]] => [
+			later,
+			pairs.map(([, earlier]) => earlier),
+		]),
+	)
+	const placedIn = Map.groupBy(
+		[
+			...built.records.flatMap((record) =>
+				record.members.map((id): readonly [string, string] => [id, record.key]),
+			),
+			...built.orphans.map((id): readonly [string, string] => [id, 'orphans']),
+		],
+		([id]) => id,
+	)
+	const placement = [...new Set([...live, ...placedIn.keys()])].flatMap((id) => {
 		const expected = live.has(id)
 			? [...listPlacementKeys(id, new Set([id]), input, earlierSides, links)]
 			: []
 		const want = (expected.length === 0 && live.has(id) ? ['orphans'] : expected).sort().join(', ')
-		const got = [...(placedIn.get(id) ?? [])].sort().join(', ')
-		if (want !== got) faults.push(`placement ${id}: placed in [${got}], expected [${want}]`)
-	}
+		const got = (placedIn.get(id) ?? [])
+			.map(([, key]) => key)
+			.sort()
+			.join(', ')
+		return want === got ? [] : [`placement ${id}: placed in [${got}], expected [${want}]`]
+	})
 
-	const expectedStale: string[] = []
-	for (const id of [...live].sort(
-		(left, right) => (byId.get(left)?.at ?? 0) - (byId.get(right)?.at ?? 0),
-	)) {
-		const laters = (classification.amendments.get(id) ?? []).filter((later) =>
-			hasEffect(later, input, byId, live, excluded, supersessions),
-		)
-		if (laters.length === 0) continue
-		for (const [at, sentence] of splitSentences(byId.get(id)?.content ?? '').entries()) {
-			const own = extractTokens(sentence)
-			const shared = new Set<string>()
-			for (const later of laters) {
-				const other = extractTokens(byId.get(later)?.content ?? '')
-				for (const token of own.ids) if (other.ids.has(token)) shared.add(token)
-				for (const token of own.numbers) if (other.numbers.has(token)) shared.add(String(token))
-			}
-			if (shared.size > 0) expectedStale.push(`${id} ${at} ${[...shared].sort().join(',')}`)
-		}
-	}
+	const expectedStale = [...live]
+		.sort((left, right) => (byId.get(left)?.at ?? 0) - (byId.get(right)?.at ?? 0))
+		.flatMap((id) => {
+			const laters = (classification.amendments.get(id) ?? []).filter((later) =>
+				hasEffect(later, input, byId, live, excluded, supersessions),
+			)
+			return splitSentences(byId.get(id)?.content ?? '').flatMap((sentence, at) => {
+				const own = extractTokens(sentence)
+				const shared = new Set(
+					laters.flatMap((later) => {
+						const other = extractTokens(byId.get(later)?.content ?? '')
+						return [
+							...[...own.ids].filter((token) => other.ids.has(token)),
+							...[...own.numbers].filter((token) => other.numbers.has(token)).map(String),
+						]
+					}),
+				)
+				return shared.size > 0 ? [`${id} ${at} ${[...shared].sort().join(',')}`] : []
+			})
+		})
 	const gotStale = built.stale.map(
 		(entry) => `${entry.source} ${entry.sentence} ${[...entry.tokens].sort().join(',')}`,
 	)
-	if (JSON.stringify(gotStale) !== JSON.stringify(expectedStale)) {
-		faults.push(`stale: built [${gotStale.join('; ')}], expected [${expectedStale.join('; ')}]`)
-	}
+	const stale =
+		JSON.stringify(gotStale) === JSON.stringify(expectedStale)
+			? []
+			: [`stale: built [${gotStale.join('; ')}], expected [${expectedStale.join('; ')}]`]
 
-	for (const { record, line } of lines) {
+	const handle = lines.flatMap(({ record, line }) => {
 		const own = new Set(byId.get(line.source)?.content.match(LEDGER_HANDLE) ?? [])
-		for (const handle of line.text.match(LEDGER_HANDLE) ?? []) {
-			if (!own.has(handle))
-				faults.push(
-					`handle ${record.key}: "${line.text}" holds ${handle}, which ${line.source} lacks`,
-				)
-		}
-	}
+		return (line.text.match(LEDGER_HANDLE) ?? [])
+			.filter((held) => !own.has(held))
+			.map(
+				(held) => `handle ${record.key}: "${line.text}" holds ${held}, which ${line.source} lacks`,
+			)
+	})
 
-	const reversed = canonicalStringify(buildRecords(reverseLedgerInput(input)))
-	if (reversed !== canonicalStringify(built)) {
-		faults.push('order: the build over reversed collections differs from the build')
-	}
-	return faults
+	const order =
+		canonicalStringify(buildRecords(reverseLedgerInput(input))) === canonicalStringify(built)
+			? []
+			: ['order: the build over reversed collections differs from the build']
+	return [...verbatim, ...dead, ...coverage, ...placement, ...stale, ...handle, ...order]
 }
 
 /** Holds the cutoffs shared by fictional ledger scenarios. */
@@ -4163,7 +4222,7 @@ export async function buildLedgerResponse(
  * @returns The judge fixture
  */
 export function createLedgerJudge(
-	asked: string[],
+	asked: RecorderInterface<readonly [key: string]>,
 	answer: (request: JudgeRequest, count: number) => Promise<JudgeResult>,
 	model = 'partial',
 ): JudgeInterface {
@@ -4172,9 +4231,54 @@ export function createLedgerJudge(
 		name: model,
 		model,
 		ask: (request) => {
-			asked.push(...Object.keys(request.questions))
-			return answer(request, asked.length)
+			for (const key of Object.keys(request.questions)) asked.handler(key)
+			return answer(request, asked.count)
 		},
+	}
+}
+
+/**
+ * Wraps a judge whose reported model a test changes between calls, so the model outlives each
+ * call as entity state instead of a cell the test body writes.
+ *
+ * @remarks
+ * `id`, `name`, and `ask` forward to the wrapped judge. `model` reports the identity the last
+ * {@link SwitchingJudge.use} set, or the constructor's `model` before any.
+ *
+ * @example
+ * ```ts
+ * const judge = new SwitchingJudge(inner, 'A')
+ * judge.use('B')
+ * judge.model // 'B'
+ * ```
+ */
+export class SwitchingJudge implements JudgeInterface {
+	readonly #judge: JudgeInterface
+	#model: string
+
+	constructor(judge: JudgeInterface, model: string = judge.model) {
+		this.#judge = judge
+		this.#model = model
+	}
+
+	get id(): string {
+		return this.#judge.id
+	}
+
+	get name(): string {
+		return this.#judge.name
+	}
+
+	get model(): string {
+		return this.#model
+	}
+
+	use(model: string): void {
+		this.#model = model
+	}
+
+	ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
+		return this.#judge.ask(request, signal)
 	}
 }
 
@@ -4369,9 +4473,9 @@ export function createPhraseJudge(
 		model: 'scripted',
 		ask: async (request) => {
 			const state = isString(request.state) ? request.state : ''
-			const answers: Record<string, JudgeAnswer> = {}
-			for (const [id, question] of Object.entries(request.questions)) {
-				answers[id] =
+			const answers = Object.fromEntries(
+				Object.entries(request.questions).map(([id, question]): readonly [string, JudgeAnswer] => [
+					id,
 					question.form === 'choice'
 						? {
 								form: 'choice',
@@ -4389,8 +4493,9 @@ export function createPhraseJudge(
 										amenders.some((amender) => state.includes(amender)))
 										? 0.9
 										: 0.1,
-							}
-			}
+							},
+				]),
+			)
 			return { model: 'scripted', answers }
 		},
 	}
@@ -4595,26 +4700,30 @@ export async function classifyLedgerCorrection(
 	const classifier = new Classifier({
 		conversation,
 		judge: createLedgerJudge(
-			[],
+			createRecorder<readonly [key: string]>(),
 			async (request) => {
 				const state = isString(request.state) ? request.state : ''
-				const answers: Record<string, JudgeAnswer> = {}
-				for (const [id, question] of Object.entries(request.questions))
-					answers[id] =
-						question.form === 'choice'
-							? {
-									form: 'choice',
-									probabilities: state.includes('Correction') ? { correction: 1 } : { rule: 1 },
-								}
-							: {
-									form: 'noul',
-									noul: id.startsWith('["supersedes"')
-										? supersedes
-										: id.startsWith('["amends"') ||
-											  (id.startsWith('["topic"') && state.toLowerCase().includes('refund'))
-											? 0.9
-											: 0.1,
-								}
+				const answers = Object.fromEntries(
+					Object.entries(request.questions).map(
+						([id, question]): readonly [string, JudgeAnswer] => [
+							id,
+							question.form === 'choice'
+								? {
+										form: 'choice',
+										probabilities: state.includes('Correction') ? { correction: 1 } : { rule: 1 },
+									}
+								: {
+										form: 'noul',
+										noul: id.startsWith('["supersedes"')
+											? supersedes
+											: id.startsWith('["amends"') ||
+												  (id.startsWith('["topic"') && state.toLowerCase().includes('refund'))
+												? 0.9
+												: 0.1,
+									},
+						],
+					),
+				)
 				return { model: 'scripted', answers }
 			},
 			'scripted',

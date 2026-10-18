@@ -4,6 +4,7 @@
 
 import type {
 	AgentEventMap,
+	AgentJobInput,
 	JudgeAnswer,
 	JudgeInterface,
 	JudgeRequest,
@@ -11,6 +12,7 @@ import type {
 	LedgerLookup,
 	Message,
 	MessageInput,
+	ProviderDelta,
 	ProviderIncrement,
 	ProviderInterface,
 	ProviderOptions,
@@ -44,7 +46,7 @@ const MODULES = Object.freeze({ [PACKAGE_NAME]: 'src/core', '@src/core': 'src/co
  * intentional rather than forgotten, and the assertion that follows it fails when a name
  * here stops being stranded, so the list cannot rot.
  */
-const INTERNAL: readonly string[] = Object.freeze([])
+const INTERNAL: readonly string[] = Object.freeze(['class LedgerPass'])
 
 await new GuideCommand({
 	root: new URL('../', import.meta.url),
@@ -63,13 +65,15 @@ await new GuideCommand({
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
-	const { createBudget } = await import('@orkestrel/budget')
+	const { createBudget, createTokenBudget } = await import('@orkestrel/budget')
+	const { createRunner } = await import('@orkestrel/workflow')
 	// The relay fence's server half: its router and its adapter are the server application's
 	// dependencies, declared here for development so the transcription can run the real hop.
 	const { createDispatcher } = await import('@orkestrel/router')
 	const { createServer } = await import('@orkestrel/server')
 	const barrel = await import('@src/core')
 	const {
+		AgentFanout,
 		AgentJudge,
 		AgentProvider,
 		Classifier,
@@ -98,6 +102,7 @@ await new GuideCommand({
 		LEDGER_NOTES,
 		LEDGER_QUESTIONS,
 		LEDGER_SCALE_DRIFT,
+		LedgerRequest,
 		MAX_ERROR_BODY_LENGTH,
 		ProviderAbortError,
 		ProviderError,
@@ -149,6 +154,7 @@ await new GuideCommand({
 		createToolCall,
 		drainProvider,
 		JUDGE_ENVELOPE,
+		RecordedBody,
 		RecordedHeader,
 		RecordedProvider,
 		RecordedTransport,
@@ -166,7 +172,7 @@ await new GuideCommand({
 		TEV1_SCORE,
 		LEDGER_DESK_THRESHOLDS,
 	} = await import('./setup.js')
-	const { createFixtureServer } = await import('./setupServer.js')
+	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
 
 	// The provider-subclass fence, transcribed. Its classes are declared here rather than in
@@ -225,14 +231,13 @@ await new GuideCommand({
 			this.#pending += chunk
 			const lines = this.#pending.split(/\r\n|\n/)
 			this.#pending = lines.pop() ?? ''
-			const records: Array<Readonly<Record<string, unknown>>> = []
-			for (const line of lines) {
-				if (line.trim().length === 0) continue
-				const record = parseJSONAs(line, isRecord)
-				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
-				records.push(record)
-			}
-			return records
+			return lines
+				.filter((line) => line.trim().length > 0)
+				.map((line) => {
+					const record = parseJSONAs(line, isRecord)
+					if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
+					return record
+				})
 		}
 		clear(): void {
 			this.#pending = ''
@@ -361,6 +366,55 @@ await new GuideCommand({
 	// comments claim. Change a fence, change the transcription beside it.
 	describe('flagship fences', () => {
 		const guideText = requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`)
+
+		it('drains a stream into the result its generate call assembles, as the provider-boundary fence claims', async () => {
+			// The fence declares `provider`; the transcription supplies a raw-text engine whose wire
+			// inlines its reasoning, served from a body that arrives in three chunks.
+			const chunks = ['<think>Greet ', 'briefly.</think>Hello', ' there.']
+			const provider = new ConfiguredProvider({
+				url: 'https://text.test',
+				fetch: () =>
+					Promise.resolve(
+						new Response(
+							new RecordedBody(chunks.map((chunk) => new TextEncoder().encode(chunk))).stream,
+						),
+					),
+			})
+			const abort = createAbort()
+			const messages: readonly Message[] = [{ id: '1', role: 'user', content: 'Say hello.' }]
+
+			const result = await provider.generate(messages, abort.signal)
+			expect(result).toEqual({ content: 'Hello there.', thinking: 'Greet briefly.' })
+
+			// The fence's `print` drain runs as a callback, with recording sinks in place of
+			// `process.stdout` and `process.stderr`.
+			const stdout = createRecorder<readonly [text: string]>()
+			const stderr = createRecorder<readonly [text: string]>()
+			const streamed = await Promise.resolve(provider.stream(messages, abort.signal)).then(
+				async (stream: AsyncGenerator<ProviderDelta, ProviderResult>): Promise<ProviderResult> => {
+					for (;;) {
+						const step = await stream.next()
+						if (step.done) return step.value
+						if (step.value.channel === 'content') stdout.handler(step.value.text)
+						if (step.value.channel === 'thinking') stderr.handler(step.value.text)
+					}
+				},
+			)
+
+			// The stream settles on the result `generate` assembles, and its content is the joined
+			// content deltas, which arrived as more than one delta. This wire inlines its reasoning, so
+			// the engine routes it to the result's `thinking` and yields no thinking delta.
+			expect(streamed).toEqual(result)
+			expect(stdout.calls.map(([text]) => text)).toEqual(['Hello', ' there.'])
+			expect(streamed.content).toBe(stdout.calls.map(([text]) => text).join(''))
+			expect(stderr.calls).toEqual([])
+			expect(guideText).toContain(
+				'const streamed = await print(provider.stream(messages, abort.signal)) // the assembled ProviderResult (content === the joined content deltas)',
+			)
+			expect(guideText).toContain(
+				"if (step.value.channel === 'content') process.stdout.write(step.value.text)",
+			)
+		})
 
 		it('enforces the scope dispatch and answer-only behavior the guide states', async () => {
 			expect(guideText).toContain('A scoped-out tool is neither described nor callable.')
@@ -1031,11 +1085,12 @@ await new GuideCommand({
 				// No selection under the judging default: a pass-through handler returns view().
 				none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
 			}
-			const modes = new Map<string, ScopeInterface>()
-			for (const { policy, ...data } of MODES) {
-				const select = POLICIES[policy]
-				modes.set(data.name, createScope(select === undefined ? data : { ...data, select }))
-			}
+			const modes = new Map(
+				MODES.map(({ policy, ...data }): [string, ScopeInterface] => {
+					const select = POLICIES[policy]
+					return [data.name, createScope(select === undefined ? data : { ...data, select })]
+				}),
+			)
 
 			const agent = createAgent(provider, { tools, select: judged.handler })
 			// The fence's `ask` helper appends the user turn and runs; the transcription inlines it.
@@ -1085,8 +1140,9 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				'none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),',
 			)
+			expect(guideText).toContain('MODES.map(({ policy, ...data }): [string, ScopeInterface] => {')
 			expect(guideText).toContain(
-				'modes.set(data.name, createScope(select === undefined ? data : { ...data, select }))',
+				'return [data.name, createScope(select === undefined ? data : { ...data, select })]',
 			)
 			expect(guideText).toContain(
 				"await ask('Sort ticket 7.') // `recent` selects; `lookup` is advertised",
@@ -1181,7 +1237,7 @@ await new GuideCommand({
 			const thresholds = LEDGER_DESK_THRESHOLDS
 			// The fence claims what the second prompt leaves out, so the provider keeps each prompt it receives.
 			const prompts = createRecorder<readonly [readonly Message[]]>()
-			const replies: ProviderResult[] = [
+			const script: readonly ProviderResult[] = [
 				{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
 				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
 				{
@@ -1191,13 +1247,14 @@ await new GuideCommand({
 				{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
 				{ content: 'Yes. Refunds over $100 need a manager.' },
 			]
+			const replies = script.values()
 			const provider: ProviderInterface = {
 				id: 'scripted',
 				name: 'scripted',
-				generate: async () => replies.shift() ?? { content: '' },
+				generate: async () => replies.next().value ?? { content: '' },
 				async *stream(messages) {
 					prompts.handler([...messages])
-					const reply = replies.shift() ?? { content: '' }
+					const reply = replies.next().value ?? { content: '' }
 					if (reply.content !== '') yield { channel: 'content', text: reply.content }
 					return reply
 				},
@@ -1206,16 +1263,17 @@ await new GuideCommand({
 				id: 'scripted',
 				name: 'scripted',
 				model: 'scripted',
-				ask: async (request) => {
-					const answers: Record<string, JudgeAnswer> = {}
-					for (const [id, question] of Object.entries(request.questions)) {
-						answers[id] =
+				ask: async (request) => ({
+					model: 'scripted',
+					answers: Object.fromEntries(
+						Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
+							id,
 							question.form === 'choice'
 								? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
-								: { form: 'noul', noul: 0.1 }
-					}
-					return { model: 'scripted', answers }
-				},
+								: { form: 'noul', noul: 0.1 },
+						]),
+					),
+				}),
 			}
 			const lookup: LedgerLookup = {
 				tool: {
@@ -1259,7 +1317,8 @@ await new GuideCommand({
 				'## Rules\n- Refunds over $100 need a manager.',
 				'## Pinned\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.',
 			])
-			expect(replies).toEqual([])
+			// Every scripted reply was taken: two calibration calls and three turns.
+			expect(replies.next()).toEqual({ done: true, value: undefined })
 			// The second prompt is the system text and its briefing, the seed tail, and the request: the
 			// first request and its reply never reach it.
 			expect(prompts.count).toBe(3)
@@ -1273,6 +1332,8 @@ await new GuideCommand({
 				['user', 'Refunds over $100 need a manager.'],
 				['user', 'Does the Brightwater Studio refund need a manager?'],
 			])
+			expect(guideText).toContain('const replies = script.values()')
+			expect(guideText).toContain("generate: async () => replies.next().value ?? { content: '' },")
 			expect(guideText).toContain(
 				'gauge.overhead // 120 — what advertising the tools adds to a prompt',
 			)
@@ -1302,7 +1363,7 @@ await new GuideCommand({
 
 		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {
 			const capacity = 600
-			const tails = new Map<number, number>()
+			const measured: Array<readonly [overhead: number, tail: number]> = []
 			for (const overhead of LEDGER_OVERHEAD_CASES) {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(
@@ -1320,7 +1381,10 @@ await new GuideCommand({
 					})),
 				)
 				await ledger.respond('Review the desk.')
-				tails.set(overhead, estimateMessages(requireValue(provider.calls[0]).messages.slice(1)))
+				measured.push([
+					overhead,
+					estimateMessages(requireValue(provider.calls[0]).messages.slice(1)),
+				])
 			}
 			const exchange = estimateMessages([
 				{
@@ -1331,14 +1395,16 @@ await new GuideCommand({
 			])
 
 			// A tail within one seed exchange of its room shows the room, not the history, ends it.
-			for (const [overhead, tail] of tails) {
+			for (const [overhead, tail] of measured) {
 				const room =
 					(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - overhead)) /
 					(1 + LEDGER_SCALE_DRIFT)
 				expect(tail).toBeLessThanOrEqual(room)
 				expect(tail).toBeGreaterThan(room - exchange)
 			}
-			expect(requireValue(tails.get(0))).toBeGreaterThan(
+			expect(
+				requireValue(measured.find(([overhead]) => overhead === 0)?.[1], 'Missing overhead 0'),
+			).toBeGreaterThan(
 				(DEFAULT_LEDGER_SHARE.tail * (capacity * DEFAULT_LEDGER_SHARE.prompt - 200)) /
 					(1 + LEDGER_SCALE_DRIFT),
 			)
@@ -1624,16 +1690,17 @@ await new GuideCommand({
 			)
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
-			const calibrating = createRecorder<readonly []>()
 			const asks = createRecorder<readonly []>()
 			const phrases = createPhraseJudge(['Refunds over'])
+			// The supplied gauge skips calibration in `respond`, and the agent runs reach the provider
+			// through `stream`, so only the `calibrate` call reaches `generate` and parks there.
 			const ledger = createLedger(
 				{
 					id: provider.id,
 					name: provider.name,
 					generate: async (...args) => {
 						entered.resolve()
-						if (calibrating.count > 0) await release.promise
+						await release.promise
 						return provider.generate(...args)
 					},
 					stream: (...args) => provider.stream(...args),
@@ -1684,7 +1751,6 @@ await new GuideCommand({
 			).toEqual(asking.map(({ role, content }) => [role, content]))
 			expect(asks.count).toBe(asked)
 
-			calibrating.handler()
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
 			ledger.conversation.add({ role: 'user', content: 'Can the desk skip the manager this once?' })
@@ -1841,7 +1907,7 @@ await new GuideCommand({
 
 		it('holds a refused question and the logprob failure and asks any other failure again, as the filing claims', async () => {
 			const [refused, garbled, transient] = LEDGER_FAILURE_MESSAGES
-			const asks = new Map<string, number>()
+			const asked = createRecorder<readonly [text: string]>()
 			const phrases = createPhraseJudge([])
 			const ledger = createLedger(
 				createScriptedProvider([{ content: 'Done.' }]),
@@ -1851,7 +1917,7 @@ await new GuideCommand({
 						ask: async (request, signal) => {
 							const state = isString(request.state) ? request.state : ''
 							for (const text of LEDGER_FAILURE_MESSAGES)
-								if (state.includes(text)) asks.set(text, (asks.get(text) ?? 0) + 1)
+								if (state.includes(text)) asked.handler(text)
 							if (state.includes(refused))
 								throw new JudgeError('QUESTION', 'judge error: refused before inference')
 							if (state.includes(garbled))
@@ -1869,13 +1935,18 @@ await new GuideCommand({
 			)
 
 			await ledger.respond('Review the desk.')
-			const first = new Map(asks)
+			const prefix = asked.count
 			await ledger.respond('Review the desk again.')
 
-			for (const text of LEDGER_FAILURE_MESSAGES) expect(first.get(text)).toBeGreaterThan(0)
-			expect(asks.get(refused)).toBe(first.get(refused))
-			expect(asks.get(garbled)).toBe(first.get(garbled))
-			expect(asks.get(transient)).toBe(2 * requireValue(first.get(transient)))
+			// The asks of each text before and after the second request, counted from the one log.
+			const first = Map.groupBy(asked.calls.slice(0, prefix), ([text]) => text)
+			const total = Map.groupBy(asked.calls, ([text]) => text)
+			for (const text of LEDGER_FAILURE_MESSAGES) expect(first.get(text)?.length).toBeGreaterThan(0)
+			expect(total.get(refused)?.length).toBe(first.get(refused)?.length)
+			expect(total.get(garbled)?.length).toBe(first.get(garbled)?.length)
+			expect(total.get(transient)?.length).toBe(
+				2 * requireValue(first.get(transient), 'Missing transient asks').length,
+			)
 			expect(guideText).toContain(
 				"A judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
 			)
@@ -2152,8 +2223,8 @@ await new GuideCommand({
 				},
 				{ content: 'Done.' },
 			])
-			// The judge fails every filing until the first `chatter` filing begins.
-			const chattering = createRecorder<readonly []>()
+			// The judge fails the caller's filing until the third request begins: each of the first two
+			// requests streams a lookup call and a reply, so the provider has started 4 calls by then.
 			const phrases = createPhraseJudge(['Refunds over'])
 			const ledger = createLedger(
 				provider,
@@ -2166,7 +2237,7 @@ await new GuideCommand({
 								(question) => question.form === 'choice',
 							)
 							if (choice && state.includes(caller)) {
-								if (chattering.count === 0) throw new Error('judge error: connection reset')
+								if (provider.started < 4) throw new Error('judge error: connection reset')
 								return {
 									model: 'scripted',
 									answers: Object.fromEntries(
@@ -2203,7 +2274,7 @@ await new GuideCommand({
 
 			await ledger.respond('Look up order BW-5512.')
 			await ledger.respond('Look up order bw-5512 again for Brightwater Studio.')
-			chattering.handler()
+			expect(provider.started).toBe(4)
 			for (const amount of LEDGER_REFUND_AMOUNTS)
 				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
@@ -2222,18 +2293,73 @@ await new GuideCommand({
 			)
 		})
 
+		it('serves one pass and refuses a repeated lookup and a spent recall, as the ledger request fence claims', () => {
+			const conversation = createConversation()
+			const request = new LedgerRequest('Does the $148.50 refund need a manager?', 1)
+			const message = request.enter(conversation)
+			expect(message).toMatchObject({
+				role: 'user',
+				content: 'Does the $148.50 refund need a manager?',
+			})
+			expect(request.enter(conversation)).toBe(message)
+			expect(conversation.messages()).toEqual([message])
+
+			request.open(conversation.count)
+			const selection: Selection = {
+				messages: [message],
+				judgments: [],
+				usage: { prompt: 30, completion: 2, total: 32 },
+			}
+			request.adopt(selection, conversation.count)
+			request.observe({ estimate: 40, tools: 2 }, conversation.count)
+			request.spend({ prompt: 52, completion: 8, total: 60 })
+			expect(request.selection).toBe(selection)
+			expect(request.usage).toEqual({ prompt: 82, completion: 10, total: 92 })
+			expect(request.calls).toEqual([{ estimate: 40, tools: 2, prompt: 52, completion: 8 }])
+
+			request.admit('lookup_order', { id: 'BW-5512' })
+			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).toThrow(LEDGER_NOTES.repeat)
+			request.recall()
+			expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
+
+			const listed = 'lookup_order {"id":"BW-5512"}: Refund due $148.50.'
+			request.list(
+				listed,
+				new Map([[listed, 'Order BW-5512 for account BW-20931: Brightwater Studio.']]),
+			)
+			expect(request.listing(listed)?.get(listed)).toBe(
+				'Order BW-5512 for account BW-20931: Brightwater Studio.',
+			)
+			expect(request.listing('Refunds over $100 need a manager.')).toBeUndefined()
+			expect(guideText).toContain(
+				"request.usage // { prompt: 82, completion: 10, total: 92 } — the selection's usage and the call's",
+			)
+			expect(guideText).toContain(
+				'request.calls // [{ estimate: 40, tools: 2, prompt: 52, completion: 8 }] — the call in flight took its usage',
+			)
+			expect(guideText).toContain(
+				"request.admit('lookup_order', { id: 'BW-5512' }) // throws Error(LEDGER_NOTES.repeat)",
+			)
+			expect(guideText).toContain(
+				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 1 recall call is spent',
+			)
+		})
+
 		it('files one rule and prices one request as the classifier and gauge fence claims', async () => {
 			// The fence declares the judge, the cutoffs, and the signal; the transcription supplies them.
 			const judge = createLedgerJudge(
-				[],
+				createRecorder<readonly [key: string]>(),
 				async (request) => {
-					const answers: Record<string, JudgeAnswer> = {}
-					for (const [id, question] of Object.entries(request.questions)) {
-						answers[id] =
-							question.form === 'choice'
-								? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
-								: { form: 'noul', noul: 0.9 }
-					}
+					const answers = Object.fromEntries(
+						Object.entries(request.questions).map(
+							([id, question]): readonly [string, JudgeAnswer] => [
+								id,
+								question.form === 'choice'
+									? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+									: { form: 'noul', noul: 0.9 },
+							],
+						),
+					)
 					return { model: 'scripted', answers }
 				},
 				'scripted',
@@ -2676,6 +2802,124 @@ await new GuideCommand({
 			expect(guideText).toContain('const tokens = sanitizeToken(12.7) // 12')
 		})
 
+		it('runs a job through the runner handler the helper fence binds', async () => {
+			const registry = barrel.createAgentRegistry({
+				providers: { main: createScriptedProvider([{ content: 'done' }]) },
+			})
+			const fanout = new AgentFanout(registry, false)
+			const runnerHandler = fanout.execute.bind(fanout)
+			const results = await createRunner({ handler: runnerHandler }).execute([
+				{ provider: 'main', messages: [{ role: 'user', content: 'go' }] },
+			])
+			expect(results.map((result) => result.content)).toEqual(['done'])
+			expect(guideText).toContain('const runnerHandler = fanout.execute.bind(fanout)')
+		})
+
+		it("runs the parent, then the child, through the AgentFanout fence's runner", async () => {
+			const provider = createScriptedProvider([{ content: 'parent' }, { content: 'child' }])
+			const fanout = new AgentFanout(
+				barrel.createAgentRegistry({ providers: { main: provider } }),
+				false,
+			)
+			const runner = createRunner({ handler: fanout.execute.bind(fanout), retries: 1 })
+			const child: AgentJobInput = {
+				provider: 'main',
+				messages: [{ role: 'user', content: 'child' }],
+			}
+			const parent: AgentJobInput = {
+				...child,
+				messages: [{ role: 'user', content: 'parent' }],
+				children: [child],
+			}
+			const results = await runner.execute([parent])
+			expect(results.map((result) => result.content)).toEqual(['parent', 'child'])
+			expect(guideText).toContain(
+				"const results = await runner.execute([parent]) // the parent's result, then the child's",
+			)
+		})
+
+		it('names the meter, the budget, and the model as the three-failure-layers fence claims', async () => {
+			// One scripted story per layer: the first streams past the allowance, the second reports
+			// usage past the budget, and the third reports an answer the model truncated.
+			const chunk = 'x'.repeat(4_000)
+			const providers = [
+				createScriptedProvider([
+					{ result: { content: chunk.repeat(3) }, deltas: [chunk, chunk, chunk] },
+				]),
+				createScriptedProvider([
+					{ content: 'The end.', usage: { prompt: 20, completion: 49_990, total: 50_010 } },
+				]),
+				createScriptedProvider([
+					{
+						content: 'Once upon a time',
+						usage: { prompt: 20, completion: 4, total: 24 },
+						truncated: true,
+					},
+				]),
+			]
+			const readings = await Promise.all(
+				providers.map(async (provider) => {
+					const log =
+						createRecorder<readonly [label: string, estimate: number, completion: number]>()
+					const budget = createTokenBudget({ id: 'budget', max: 50_000, scope: 'total' })
+					const allowance = createTokenBudget({ id: 'meter', max: 2_000, scope: 'completion' })
+					const agent = createAgent(provider, { budget, allowance })
+					agent.emitter.on('usage', (usage, estimate) =>
+						log.handler('calibration', estimate, usage.completion),
+					)
+					agent.context.messages.add({ role: 'user', content: 'Write a very long story.' })
+					const result = await agent.generate()
+					return [result.stop?.layer, log.calls] as const
+				}),
+			)
+			// The second 4,000-character delta brings the first story's estimate to the allowance's
+			// 2,000, so the meter stops it before any usage is reported.
+			expect(readings).toEqual([
+				['meter', []],
+				['budget', [['calibration', 2, 49_990]]],
+				['model', [['calibration', 4, 4]]],
+			])
+			expect(guideText).toContain(
+				"result.stop?.layer // 'meter' when the estimate ran out first, 'budget' when the reported usage did, 'model' when the model ended its own answer",
+			)
+		})
+
+		it('never refunds an estimate above the report on a shared ceiling, as the reconcile paragraph claims', async () => {
+			// Forty streamed characters estimate 10 tokens, above the reported completion of 5.
+			const deltas = ['x'.repeat(20), 'x'.repeat(20)]
+			const usage = { prompt: 3, completion: 5, total: 8 }
+			const shared = createTokenBudget({ max: 1_000, scope: 'completion' })
+			const separate = createTokenBudget({ max: 1_000, scope: 'completion' })
+			const unreported = createTokenBudget({ max: 1_000, scope: 'completion' })
+			for (const [budget, allowance, reported] of [
+				[shared, shared, usage],
+				[separate, createTokenBudget({ max: 1_000 }), usage],
+				[unreported, undefined, undefined],
+			] as const) {
+				const agent = createAgent(
+					createScriptedProvider([
+						{
+							result: {
+								content: 'x'.repeat(40),
+								...(reported === undefined ? {} : { usage: reported }),
+							},
+							deltas,
+						},
+					]),
+					{ budget, ...(allowance === undefined ? {} : { allowance }) },
+				)
+				agent.context.messages.add({ role: 'user', content: 'Write a short story.' })
+				await agent.generate()
+			}
+			expect([shared.consumed, separate.consumed, unreported.consumed]).toEqual([10, 5, 10])
+			expect(guideText).toContain(
+				'so a shared ceiling is never charged less than the reported usage and never charged the estimate twice; an estimate above the report is not refunded.',
+			)
+			expect(guideText).toContain(
+				'With a separate `allowance`, or none, the `budget` is charged exactly the reported usage, or the streamed-answer estimate when the call reported none.',
+			)
+		})
+
 		it('answers the snapshot fence’s durable payload keys', () => {
 			const conversations = createConversationManager()
 			const thread = conversations.add({ id: 'thread-1' })
@@ -2773,15 +3017,15 @@ await new GuideCommand({
 		it('answers the engine-configuration fence’s declared switches', async () => {
 			const urls: string[] = []
 			const sent: Array<string | null> = []
-			const hooks: AbortSignal[] = []
-			const bounds: Array<AbortSignal | null | undefined> = []
+			const hooks = createRecorder<readonly [signal: AbortSignal]>()
+			const bounds = createRecorder<readonly [signal: AbortSignal | null | undefined]>()
 			const caller = new AbortController()
 			const provider = new ConfiguredProvider({
 				url: 'https://api.example',
 				path: '/generate',
 				timeout: 30_000,
 				headers: async (signal) => {
-					hooks.push(signal)
+					hooks.handler(signal)
 					return { authorization: await Promise.resolve('Bearer fixture') }
 				},
 				split: true,
@@ -2792,7 +3036,7 @@ await new GuideCommand({
 					const request = new Request(input, init)
 					urls.push(request.url)
 					sent.push(request.headers.get('authorization'))
-					bounds.push(init?.signal)
+					bounds.handler(init?.signal)
 					return Promise.resolve(new Response('<think>considering</think>the answer'))
 				},
 			})
@@ -2802,11 +3046,16 @@ await new GuideCommand({
 			expect(urls).toEqual(['https://api.example/generate'])
 			// The `headers` hook is awaited and its value reaches the request.
 			expect(sent).toEqual(['Bearer fixture'])
-			// "awaited inside that deadline": the hook receives the same bound the transport does,
-			// and that bound is the call's own fold rather than the caller's signal.
-			expect(hooks[0]).toBe(bounds[0])
-			expect(hooks[0]).not.toBe(caller.signal)
-			expect(requireValue(bounds[0], 'Missing bound').aborted).toBe(false)
+			// "awaited inside that deadline": every hook call receives the very bound a transport call
+			// receives, and that bound is the call's own live fold rather than the caller's signal.
+			expect(hooks.count).toBe(1)
+			expect(bounds.count).toBe(hooks.count)
+			expect(hooks.calls.every(([hook]) => bounds.calls.some(([bound]) => bound === hook))).toBe(
+				true,
+			)
+			expect(hooks.calls.map(([hook]) => [hook === caller.signal, hook.aborted])).toEqual([
+				[false, false],
+			])
 			// `split: true` routes the <think> span to `thinking` and yields the clean answer, and
 			// `strict: false` assembles that result from a wire that carried no settled record.
 			expect(result).toEqual({ content: 'the answer', thinking: 'considering' })
@@ -2919,41 +3168,45 @@ await new GuideCommand({
 			})
 			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
 			const port = await server.start()
-			const drains: number[] = []
-			try {
-				const abort = createAbort()
-				const browser = createRelayProvider({
-					url: `http://127.0.0.1:${port}/relay`,
-					parser: () => new RelayFrameParser(),
-					headers: () => ({ authorization: `Bearer ${bearer}` }),
-				})
-				const stream = browser.stream(messages, abort.signal)
-				const step = stream.next()
-				await waitForCondition('the relay entered the upstream turn', () => upstream.steps === 1)
-				abort.abort()
+			// The cancel steps run as one chain, so the server stops, and its stop is timed, whether
+			// they pass or fail; a failure rethrows after the stop.
+			const drain = await Promise.resolve(port)
+				.then(async (bound) => {
+					const abort = createAbort()
+					const browser = createRelayProvider({
+						url: `http://127.0.0.1:${bound}/relay`,
+						parser: () => new RelayFrameParser(),
+						headers: () => ({ authorization: `Bearer ${bearer}` }),
+					})
+					const stream = browser.stream(messages, abort.signal)
+					const step = stream.next()
+					await waitForCondition('the relay entered the upstream turn', () => upstream.steps === 1)
+					abort.abort()
 
-				// This is the obligation the guide puts on the adapter: aborting the request's signal
-				// when the client disconnects, so a reader that goes away cancels the upstream turn
-				// instead of leaving it running. `@orkestrel/server` is the adapter that meets it.
-				await expect(step).rejects.toBeInstanceOf(ProviderAbortError)
-				await expect(step).rejects.toMatchObject({ code: 'ABORT' })
-				await waitForCondition(
-					'the relay returned the upstream iterator',
-					() => upstream.returns === 1,
+					// This is the obligation the guide puts on the adapter: aborting the request's signal
+					// when the client disconnects, so a reader that goes away cancels the upstream turn
+					// instead of leaving it running. `@orkestrel/server` is the adapter that meets it.
+					await expect(step).rejects.toBeInstanceOf(ProviderAbortError)
+					await expect(step).rejects.toMatchObject({ code: 'ABORT' })
+					await waitForCondition(
+						'the relay returned the upstream iterator',
+						() => upstream.returns === 1,
+					)
+					expect(upstream.aborted).toBe(true)
+				})
+				.then(
+					() => stopTimed(server, gate.resolve),
+					async (error: unknown) => {
+						await stopTimed(server, gate.resolve)
+						throw error
+					},
 				)
-				expect(upstream.aborted).toBe(true)
-			} finally {
-				gate.resolve()
-				const closing = performance.now()
-				await server.stop()
-				drains.push(performance.now() - closing)
-			}
 
 			// A cancel leaves the client's socket aborted rather than idle, so the
 			// `closeIdleConnections` step does not reach it and the `server.close()` call waits on the
 			// socket itself — seconds, on a server that also served a completed call over that reused
 			// keep-alive socket. One server per case keeps the stop immediate.
-			expect(drains[0]).toBeLessThan(1000)
+			expect(drain).toBeLessThan(1000)
 			expect(server.status).toBe('stopped')
 		})
 

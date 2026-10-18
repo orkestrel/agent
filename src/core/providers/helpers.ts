@@ -25,10 +25,11 @@ import { sanitizeUsage, sumUsage } from '../helpers.js'
  * @param thinking - The joined reasoning
  * @param tools - The accumulated calls
  * @param usage - The reported token usage
+ * @param truncated - Whether the model stopped at its own limit, or undefined when the wire did not report it
  * @returns The assembled result
  * @example
  * ```ts
- * buildProviderResult('ok', '', [], undefined) // { content: 'ok' }
+ * buildProviderResult('ok', '', [], undefined, undefined) // { content: 'ok' }
  * ```
  */
 export function buildProviderResult(
@@ -36,12 +37,14 @@ export function buildProviderResult(
 	thinking: string,
 	tools: readonly ToolCall[],
 	usage: TokenUsage | undefined,
+	truncated: boolean | undefined,
 ): ProviderResult {
 	return {
 		content,
 		...(thinking.length === 0 ? {} : { thinking }),
 		...(tools.length === 0 ? {} : { tools }),
 		...(usage === undefined ? {} : { usage }),
+		...(truncated === undefined ? {} : { truncated }),
 	}
 }
 
@@ -135,22 +138,21 @@ export async function readFailure(
 ): Promise<FailureRead> {
 	const status = response.status
 	const body = response.body
-	const read =
-		body === null
-			? { success: true as const, text: '' }
-			: await readText(body, MAX_ERROR_BODY_LENGTH, signal).then(
-					(value) => ({ success: true as const, text: value.text }),
-					(cause: unknown) => ({ success: false as const, cause }),
-				)
-	if (!read.success) {
-		return {
+	if (body === null) {
+		signal.throwIfAborted()
+		return { message: `${prefix} ${status}`, status }
+	}
+	return readText(body, MAX_ERROR_BODY_LENGTH, signal).then(
+		(read) => {
+			signal.throwIfAborted()
+			return { message: `${prefix} ${status}${read.text === '' ? '' : ` - ${read.text}`}`, status }
+		},
+		(cause: unknown) => ({
 			message: `${prefix} ${status} - (error body unavailable)`,
 			status,
-			...(read.cause === undefined ? {} : { cause: read.cause }),
-		}
-	}
-	signal.throwIfAborted()
-	return { message: `${prefix} ${status}${read.text === '' ? '' : ` - ${read.text}`}`, status }
+			...(cause === undefined ? {} : { cause }),
+		}),
+	)
 }
 
 /**
@@ -181,24 +183,27 @@ export async function readText(
 ): Promise<TextRead> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
-	// The decoded prefix, the byte budget left, and whether EOF arrived, one record per call.
-	const read = { text: '', remaining: limit ?? Infinity, complete: false }
 	try {
 		const cleanup = await armReaderAbort(reader, signal)
 		try {
-			while (read.remaining > 0) {
-				if (signal?.aborted) break
-				const step = await reader.read()
-				if (signal?.aborted) break
-				if (step.done) {
-					read.complete = true
-					break
+			// Each step's decoded text and the byte budget left after it: the next read's budget is the
+			// latest step's, and the text joins every step.
+			const steps: Array<{ readonly text: string; readonly remaining: number }> = []
+			for (;;) {
+				const remaining = steps.at(-1)?.remaining ?? limit ?? Infinity
+				const step = remaining > 0 && signal?.aborted !== true ? await reader.read() : undefined
+				if (step === undefined || signal?.aborted === true || step.done) {
+					return {
+						text: steps.map((one) => one.text).join('') + decoder.decode(),
+						complete: step?.done === true && signal?.aborted !== true,
+					}
 				}
-				const bytes = step.value.subarray(0, read.remaining)
-				read.text += decoder.decode(bytes, { stream: true })
-				read.remaining -= bytes.byteLength
+				const bytes = step.value.subarray(0, remaining)
+				steps.push({
+					text: decoder.decode(bytes, { stream: true }),
+					remaining: remaining - bytes.byteLength,
+				})
 			}
-			return { text: read.text + decoder.decode(), complete: read.complete }
 		} finally {
 			cleanup.abort()
 		}
@@ -512,26 +517,29 @@ export function extractSystemOneAnswer(
 		return bounded(answer.noul) ? { form: 'noul', noul: answer.noul } : undefined
 	}
 	if (answer.type === 'choice' && question.form === 'choice') {
-		const entries: Array<readonly [string, number]> = []
-		for (const label of Object.keys(question.criteria)) {
-			if (!Object.hasOwn(answer.probabilities, label)) return undefined
-			const probability = answer.probabilities[label]
-			if (!bounded(probability)) return undefined
-			entries.push([label, probability])
-		}
-		return { form: 'choice', probabilities: Object.fromEntries(entries) }
+		const labels = Object.keys(question.criteria)
+		const entries = labels.flatMap((label) => {
+			const probability = Object.hasOwn(answer.probabilities, label)
+				? answer.probabilities[label]
+				: undefined
+			return bounded(probability) ? [[label, probability] as const] : []
+		})
+		return entries.length === labels.length
+			? { form: 'choice', probabilities: Object.fromEntries(entries) }
+			: undefined
 	}
 	if (answer.type !== 'score' || question.form !== 'score') return undefined
-	const probabilities: number[] = []
-	for (const level of question.criteria.keys()) {
-		if (!Object.hasOwn(answer.probabilities, level)) return undefined
-		const probability = isArray(answer.probabilities)
-			? answer.probabilities[level]
-			: answer.probabilities[String(level)]
-		if (!bounded(probability)) return undefined
-		probabilities.push(probability)
-	}
-	return { form: 'score', probabilities }
+	// `keys()` visits a hole in the criteria list too, so a hole is a requested level.
+	const levels = [...question.criteria.keys()]
+	const probabilities = levels.flatMap((level) => {
+		const probability = Object.hasOwn(answer.probabilities, level)
+			? isArray(answer.probabilities)
+				? answer.probabilities[level]
+				: answer.probabilities[String(level)]
+			: undefined
+		return bounded(probability) ? [probability] : []
+	})
+	return probabilities.length === levels.length ? { form: 'score', probabilities } : undefined
 }
 
 /**

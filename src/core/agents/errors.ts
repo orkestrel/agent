@@ -69,10 +69,11 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  *
  * @remarks
  * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
- * agent carries a `window` (a shared context budget) or when the run's effective `budget` is the
- * instance a live run holds — the second run's `start()` would replace the budget's signal and
- * race its charges against the first run's. Use separate agents, or a distinct budget instance
- * per run with no `window`, for concurrent runs. Its `context` names the `agent` id.
+ * agent carries a `window` (a shared context budget) or when the run's effective `budget` or
+ * `allowance` is an instance a live run holds — the second run's `start()` would replace that
+ * instance's signal and race its charges against the first run's. Use separate agents, or
+ * distinct budget and allowance instances per run with no `window`, for concurrent runs. Its
+ * `context` names the `agent` id.
  * `'LIMIT'` reports a construction or per-run `limit` that is not a nonnegative safe integer,
  * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
  * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`;

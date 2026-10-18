@@ -1,4 +1,4 @@
-import type { ProviderRequest, ProviderResult } from '@src/core'
+import type { ProviderRequest, ProviderResult, RelayFrame } from '@src/core'
 import {
 	isMessage,
 	providerRequestContract,
@@ -40,6 +40,19 @@ describe('wire contracts', () => {
 				usage: { prompt: {}, completion: 2, total: 5 },
 			}),
 		).toEqual(expect.arrayContaining([expect.objectContaining({ path: ['usage', 'prompt'] })]))
+	})
+	it('round-trips a truncated result and leaves a result without the member unchanged', () => {
+		const truncated: ProviderResult = { content: 'cut off', truncated: true }
+		const finished: ProviderResult = { content: 'whole' }
+		expect(providerResultContract.is(truncated)).toBe(true)
+		expect(parseJSONAs(JSON.stringify(truncated), providerResultContract.is)).toEqual(truncated)
+		expect(parseJSONAs(JSON.stringify(finished), providerResultContract.is)).toStrictEqual(finished)
+		const frame: RelayFrame = { channel: 'abort', partial: truncated }
+		expect(relayFrameContract.is(frame)).toBe(true)
+		expect(parseJSONAs(JSON.stringify(frame), relayFrameContract.is)).toEqual(frame)
+		expect(providerResultContract.explain({ content: '', truncated: 'length' })).toEqual(
+			expect.arrayContaining([expect.objectContaining({ path: ['truncated'] })]),
+		)
 	})
 	it('round-trips every relay channel and reports a malformed terminal field', () => {
 		for (const frame of RELAY_WIRE_FRAMES) {

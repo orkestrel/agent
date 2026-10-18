@@ -174,6 +174,17 @@ describe('attachUserImages — the image payload on a conversation last user tur
 
 		expect(attachUserImages(own, ['payload'])[0]?.images).toEqual(['own', 'payload'])
 	})
+
+	it('reads past a hole in a sparse conversation to the last user turn', () => {
+		const user: Message = { id: 'u', role: 'user', content: 'ask' }
+		const assistant: Message = { id: 'a', role: 'assistant', content: 'reply' }
+		const sparse = Object.assign(new Array<Message>(3), { 0: user, 2: assistant })
+
+		const attached = attachUserImages(sparse, ['payload'])
+
+		expect(attached[0]).toEqual({ ...user, images: ['payload'] })
+		expect(attached[2]).toBe(assistant)
+	})
 })
 
 describe('collectImageData — the image carrier split', () => {

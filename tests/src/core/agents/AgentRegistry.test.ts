@@ -153,8 +153,10 @@ describe('AgentRegistry — build (rehydration)', () => {
 		})
 		const result = await agent.generate()
 		expect(result.partial).toBe(true)
-		// Only turn 1 ran before the rebuilt budget exhausted the bound.
+		// Only turn 1 ran before the rebuilt budget exhausted the bound. A job carries no allowance,
+		// so the reported completion of 7 crossed the ceiling, never the streamed estimate.
 		expect(provider.started).toBe(1)
+		expect(result.stop).toMatchObject({ layer: 'budget', max: 5, consumed: 7, estimate: 1 })
 	})
 
 	it('wires `limit` so the rehydrated loop caps tool iteration', async () => {

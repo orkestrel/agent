@@ -162,18 +162,39 @@ export abstract class AgentProvider<
 		const timeout = new Timeout({ ms: this.#timeout })
 		timeout.start()
 		const combined = AbortSignal.any([timeout.signal, signal])
-		// The call's framing, splitting, and folded state, one record per call: the cancellation
-		// path and the cleanup read what the body produced before it stopped.
-		const call: {
-			parser: ProviderParserInterface<TRecord> | undefined
-			splitter: ThinkSplitterInterface | undefined
-			state: ProviderIncrement
-		} = { parser: undefined, splitter: undefined, state: { content: '', thinking: '', tools: [] } }
 		try {
-			const parser = this.frame()
-			call.parser = parser
-			const splitter = this.#split ? new ThinkSplitter() : undefined
-			call.splitter = splitter
+			const parser = this.#frame(combined)
+			try {
+				return yield* this.#read(parser, messages, tools, options, combined)
+			} finally {
+				parser.clear()
+			}
+		} finally {
+			timeout.clear()
+		}
+	}
+
+	// Creates the call's framing state; a failure that raced the cancel becomes the empty partial.
+	#frame(combined: AbortSignal): ProviderParserInterface<TRecord> {
+		try {
+			return this.frame()
+		} catch (error) {
+			throw this.#translate(error, combined, undefined, [])
+		}
+	}
+
+	// Requests, frames, folds, and settles one call. Each decoded increment joins a local list
+	// before its deltas are exposed, so a cancel during a yield assembles from what the body produced.
+	async *#read(
+		parser: ProviderParserInterface<TRecord>,
+		messages: readonly Message[],
+		tools: readonly ToolDefinition[] | undefined,
+		options: ProviderStreamOptions | undefined,
+		combined: AbortSignal,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const splitter = this.#split ? new ThinkSplitter() : undefined
+		const increments: ProviderIncrement[] = []
+		try {
 			const response = await this.#request(
 				{
 					messages,
@@ -188,85 +209,77 @@ export abstract class AgentProvider<
 			for await (const chunk of readChunks(response.body, combined)) {
 				combined.throwIfAborted()
 				for (const record of parser.parse(chunk)) {
-					yield* this.#fold(record, call.state, splitter, combined, (increment) => {
-						call.state = increment
-					})
+					const increment = this.read(record)
+					increments.push(increment)
+					if (increment.result === undefined) yield* this.#emit(increment, splitter, combined)
 					combined.throwIfAborted()
-					if (call.state.result !== undefined) return call.state.result
+					if (increment.result !== undefined) return increment.result
 				}
 			}
 			combined.throwIfAborted()
 			for (const record of this.finish(parser)) {
-				yield* this.#fold(record, call.state, splitter, combined, (increment) => {
-					call.state = increment
-				})
+				const increment = this.read(record)
+				increments.push(increment)
+				if (increment.result === undefined) yield* this.#emit(increment, splitter, combined)
 				combined.throwIfAborted()
-				if (call.state.result !== undefined) return call.state.result
+				if (increment.result !== undefined) return increment.result
 			}
 			const tail = splitter?.flush() ?? ''
 			if (tail.length > 0) yield { channel: 'content', text: tail }
 			combined.throwIfAborted()
-			if (this.#strict)
+			if (this.#strict) {
 				throw new ProviderError('PROTOCOL', 'provider error: missing settled result')
-			return this.#assemble(splitter, call.state)
+			}
+			return this.#assemble(splitter, increments)
 		} catch (error) {
-			if (combined.aborted) {
-				call.splitter?.flush()
-				const partial = this.#assemble(call.splitter, call.state)
-				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.
-				throw new ProviderAbortError(
-					partial,
-					error === combined.reason ? undefined : { cause: error },
-				)
-			}
-			throw error
-		} finally {
-			try {
-				call.parser?.clear()
-			} finally {
-				timeout.clear()
-			}
+			throw this.#translate(error, combined, splitter, increments)
 		}
 	}
 
-	// Both exits assemble alike, so an aborted call's partial carries what a settled call would.
-	#assemble(
-		splitter: ThinkSplitterInterface | undefined,
-		state: ProviderIncrement,
-	): ProviderResult {
-		return buildProviderResult(
-			splitter?.content ?? state.content,
-			joinThinking(splitter?.thinking, state.thinking),
-			state.tools,
-			state.usage,
-		)
-	}
-
-	// Fold every record before exposing deltas, so resumed cancellation retains its contribution.
-	*#fold(
-		record: TRecord,
-		previous: ProviderIncrement,
+	// Surfaces one increment's deltas: the split content, then — unless the call was cancelled in
+	// between — its native thinking.
+	*#emit(
+		increment: ProviderIncrement,
 		splitter: ThinkSplitterInterface | undefined,
 		signal: AbortSignal,
-		commit: (increment: ProviderIncrement) => void,
 	): Generator<ProviderDelta> {
-		const increment = this.read(record)
-		if (increment.result !== undefined) {
-			commit(increment)
-			return
-		}
 		const content = splitter?.split(increment.content) ?? increment.content
-		const usage = increment.usage ?? previous.usage
-		const state: ProviderIncrement = {
-			content: previous.content + increment.content,
-			thinking: previous.thinking + increment.thinking,
-			tools: [...previous.tools, ...increment.tools],
-			...(usage === undefined ? {} : { usage }),
-		}
-		commit(state)
 		if (content.length > 0) yield { channel: 'content', text: content }
 		signal.throwIfAborted()
 		if (increment.thinking.length > 0) yield { channel: 'thinking', text: increment.thinking }
+	}
+
+	// The error a failed call throws: a cancel becomes a ProviderAbortError carrying the partial
+	// assembled so far (a throw that raced the cancel is its cause); any other failure is itself.
+	#translate(
+		error: unknown,
+		combined: AbortSignal,
+		splitter: ThinkSplitterInterface | undefined,
+		increments: readonly ProviderIncrement[],
+	): unknown {
+		if (!combined.aborted) return error
+		splitter?.flush()
+		return new ProviderAbortError(
+			this.#assemble(splitter, increments),
+			error === combined.reason ? undefined : { cause: error },
+		)
+	}
+
+	// Both exits assemble alike, so an aborted call's partial carries what a settled call would. A
+	// settled-result increment replaces the fold.
+	#assemble(
+		splitter: ThinkSplitterInterface | undefined,
+		increments: readonly ProviderIncrement[],
+	): ProviderResult {
+		const last = increments.at(-1)
+		const folded = last?.result === undefined ? increments : [last]
+		return buildProviderResult(
+			splitter?.content ?? folded.map((one) => one.content).join(''),
+			joinThinking(splitter?.thinking, folded.map((one) => one.thinking).join('')),
+			folded.flatMap((one) => one.tools),
+			folded.findLast((one) => one.usage !== undefined)?.usage,
+			folded.findLast((one) => one.truncated !== undefined)?.truncated,
+		)
 	}
 
 	// Send one request and translate its HTTP failure into the shared provider taxonomy.

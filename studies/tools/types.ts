@@ -6,7 +6,7 @@ import type {
 	ProviderInterface,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
-import type { StudyContext, StudyJudgment } from '@orkestrel/study'
+import type { StudyContext, StudyEvidence, StudyJudgment } from '@orkestrel/study'
 import type { StudyAgentResponse } from '@orkestrel/study/server'
 
 /**
@@ -15,7 +15,7 @@ import type { StudyAgentResponse } from '@orkestrel/study/server'
  * `agent` supplies the runtime whose constructor the driver invokes; `subject` identifies the
  * artifact under study and is never loaded or read here.
  */
-export interface StudyToolsOptions {
+export interface StudyToolsDriverOptions {
 	readonly agent: unknown
 	readonly subject: unknown
 	readonly directory: string
@@ -42,12 +42,31 @@ export interface StudyToolsInput {
 	readonly admitted: boolean
 }
 
-/** Holds one goal's parsed workload with its operational context and workload signal. */
-export interface StudyToolsActive {
+/** Holds the values one goal's workload is created from. */
+export interface StudyToolsWorkloadOptions {
 	readonly input: StudyToolsInput
 	readonly goal: string
 	readonly context: StudyContext
-	readonly workload: AbortController
+}
+
+/** Holds one goal's parsed workload with its operational context, workload controller, retained trace and latest fault. */
+export interface StudyToolsWorkloadInterface {
+	readonly input: StudyToolsInput
+	readonly goal: string
+	readonly context: StudyContext
+	readonly controller: AbortController
+	readonly trace: readonly StudyEvidence[]
+	readonly fault: unknown
+	/**
+	 * Appends one observed row to the retained trace in emission order.
+	 * @param row - The evidence row the actual Agent produced
+	 */
+	record(row: StudyEvidence): void
+	/**
+	 * Holds the latest fault the admitted Agent or its observation raised.
+	 * @param error - The raised value
+	 */
+	fail(error: unknown): void
 }
 
 /** Holds the fresh trial resources supplied by the driver. */

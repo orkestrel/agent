@@ -1,6 +1,7 @@
-import type { AgentResult, Message, ProviderRequest } from '@src/core'
-import type { TokenUsage } from '@orkestrel/budget'
+import type { AgentResult, AgentStop, Message, ProviderRequest } from '@src/core'
+import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import {
+	createAgentTurn,
 	createMessage,
 	CountingAgentResult,
 	createInvalidAgentResultCases,
@@ -20,18 +21,22 @@ import {
 	estimateRequest,
 	estimateTokens,
 	IMAGE_TOKEN_ESTIMATE,
+	inferStop,
 	isAgentJobError,
 	measureMessage,
 	measureRequest,
 	MESSAGE_TOKEN_OVERHEAD,
 	renderToolValue,
+	requireBudget,
 	settleAgentJob,
 	requireEntry,
 	requireLimit,
 	extractQueueOptions,
+	tokenUsageToJSON,
 } from '@src/core'
-import { attempt, isRecord } from '@orkestrel/contract'
-import { createRecorder } from '@orkestrel/test'
+import { createTokenBudget } from '@orkestrel/budget'
+import { attempt, isContractError, isRecord, parseJSONValue } from '@orkestrel/contract'
+import { captureError, createRecorder, invokeUnchecked } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { createToolCall, createTokenUsage } from '../../../setup.js'
 
@@ -134,6 +139,7 @@ describe('agentResultToJSON', () => {
 			thinking: true,
 			usage: true,
 			partial: true,
+			stop: true,
 		} satisfies Readonly<Record<keyof AgentResult, true>>
 
 		const projected = agentResultToJSON({
@@ -141,6 +147,7 @@ describe('agentResultToJSON', () => {
 			thinking: 'reasoning',
 			usage: { prompt: 2, completion: 1, total: 3 },
 			partial: false,
+			stop: { layer: 'model', id: 'ollama' },
 			model: 'drop',
 		})
 
@@ -220,15 +227,15 @@ describe('agentResultToJSON', () => {
 			usage: { prompt: 2, completion: 1, total: 3 },
 			partial: false,
 		})
-		expect(source.counter).toEqual({
-			content: 1,
-			thinking: 1,
-			usage: 1,
-			partial: 1,
-			prompt: 1,
-			completion: 1,
-			total: 1,
-		})
+		expect(source.accesses.calls.map(([member]) => member).toSorted()).toEqual([
+			'completion',
+			'content',
+			'partial',
+			'prompt',
+			'thinking',
+			'total',
+			'usage',
+		])
 	})
 
 	it.each(createInvalidAgentResultCases())(
@@ -239,6 +246,367 @@ describe('agentResultToJSON', () => {
 			expect(projected.success && projected.value).toBeUndefined()
 		},
 	)
+
+	it('round-trips each stop arm exactly, keeping absent readings absent and dropping extras', () => {
+		const usage = { prompt: 3, completion: 6, total: 9 }
+		expect(
+			agentResultToJSON({
+				content: 'Once upon',
+				partial: true,
+				stop: { layer: 'meter', id: 'meter', max: 2, consumed: 3, estimate: 3, extra: 'drop' },
+			}),
+		).toEqual({
+			content: 'Once upon',
+			partial: true,
+			stop: { layer: 'meter', id: 'meter', max: 2, consumed: 3, estimate: 3 },
+		})
+		expect(
+			agentResultToJSON({
+				content: '',
+				partial: true,
+				stop: {
+					layer: 'budget',
+					id: 'budget',
+					max: 10,
+					consumed: 14,
+					usage: { ...usage, cached: 1 },
+				},
+			}),
+		).toEqual({
+			content: '',
+			partial: true,
+			stop: { layer: 'budget', id: 'budget', max: 10, consumed: 14, usage },
+		})
+		expect(
+			agentResultToJSON({
+				content: 'Once upon a time',
+				partial: false,
+				stop: { layer: 'model', id: 'ollama', max: 5, consumed: 5, estimate: 4, usage },
+			}),
+		).toEqual({
+			content: 'Once upon a time',
+			partial: false,
+			stop: { layer: 'model', id: 'ollama', estimate: 4, usage },
+		})
+	})
+
+	it('refuses the whole value for a malformed or hostile stop', () => {
+		const revoked = Proxy.revocable({ layer: 'model', id: 'ollama' }, {})
+		revoked.revoke()
+		for (const stop of [
+			'meter',
+			revoked.proxy,
+			{ layer: 'window', id: 'meter', max: 2, consumed: 3 },
+			{ layer: 'meter', id: 7, max: 2, consumed: 3 },
+			{ layer: 'budget', id: 'budget', max: Number.NaN, consumed: 3 },
+			{ layer: 'budget', id: 'budget', max: 2 },
+			{ layer: 'model', id: 'ollama', estimate: Number.POSITIVE_INFINITY },
+			{ layer: 'model', id: 'ollama', usage: { prompt: 1, completion: Number.NaN, total: 1 } },
+			{ layer: 'model', id: 'ollama', usage: 'none' },
+		]) {
+			expect(agentResultToJSON({ content: 'done', partial: true, stop })).toBeUndefined()
+		}
+		expect(
+			agentResultToJSON({
+				content: 'done',
+				partial: true,
+				get stop() {
+					throw new Error('hostile stop')
+				},
+			}),
+		).toBeUndefined()
+	})
+
+	it('reads the stop and each of its members exactly once, in declaration order', () => {
+		const reads = createRecorder<readonly [member: string]>()
+		expect(
+			agentResultToJSON({
+				content: 'done',
+				partial: true,
+				get stop() {
+					reads.handler('stop')
+					return {
+						get layer() {
+							reads.handler('layer')
+							return 'meter'
+						},
+						get id() {
+							reads.handler('id')
+							return 'meter'
+						},
+						get max() {
+							reads.handler('max')
+							return 2
+						},
+						get consumed() {
+							reads.handler('consumed')
+							return 3
+						},
+						get estimate() {
+							reads.handler('estimate')
+							return 3
+						},
+						get usage() {
+							reads.handler('usage')
+							return undefined
+						},
+					}
+				},
+			}),
+		).toEqual({
+			content: 'done',
+			partial: true,
+			stop: { layer: 'meter', id: 'meter', max: 2, consumed: 3, estimate: 3 },
+		})
+		expect(reads.calls.map(([member]) => member)).toEqual([
+			'stop',
+			'layer',
+			'id',
+			'max',
+			'consumed',
+			'estimate',
+			'usage',
+		])
+	})
+
+	it('reads no ceiling member of a model stop', () => {
+		const reads = createRecorder<readonly [member: string]>()
+		agentResultToJSON({
+			content: 'done',
+			partial: false,
+			stop: {
+				layer: 'model',
+				id: 'ollama',
+				get max() {
+					reads.handler('max')
+					return 2
+				},
+				get consumed() {
+					reads.handler('consumed')
+					return 3
+				},
+			},
+		})
+		expect(reads.count).toBe(0)
+	})
+})
+
+describe('tokenUsageToJSON', () => {
+	it('projects a finite triple to a fresh exact usage, keeping negative and fractional counts', () => {
+		const source = { prompt: 2, completion: -1, total: 1.5, cached: 4 }
+		const projected = tokenUsageToJSON(source)
+		expect(projected).toEqual({ prompt: 2, completion: -1, total: 1.5 })
+		expect(projected).not.toBe(source)
+	})
+
+	it('resolves undefined for a non-finite or missing count, a non-object, and a throwing getter', () => {
+		expect(tokenUsageToJSON({ prompt: 2, completion: Number.POSITIVE_INFINITY, total: 3 })).toBe(
+			undefined,
+		)
+		expect(tokenUsageToJSON({ prompt: 2, completion: 1, total: Number.NaN })).toBeUndefined()
+		expect(tokenUsageToJSON({ prompt: 2, completion: 1 })).toBeUndefined()
+		expect(tokenUsageToJSON(undefined)).toBeUndefined()
+		expect(tokenUsageToJSON('12')).toBeUndefined()
+		expect(
+			tokenUsageToJSON({
+				prompt: 1,
+				completion: 1,
+				get total() {
+					throw new Error('hostile total')
+				},
+			}),
+		).toBeUndefined()
+	})
+})
+
+describe('inferStop', () => {
+	const usage: TokenUsage = { prompt: 3, completion: 6, total: 9 }
+
+	it('names no layer for a reason that is not a budget error and a turn the model did not truncate', () => {
+		const allowance = createTokenBudget({ id: 'meter', max: 2 })
+		const budget = createTokenBudget({ id: 'budget', max: 100 })
+		const turn = createAgentTurn({ ending: 'cancel', partial: true, interrupted: true })
+		expect(inferStop(undefined, allowance, budget, 'ollama', turn)).toBeUndefined()
+		expect(
+			inferStop(new DOMException('cancelled', 'AbortError'), allowance, budget, 'ollama', turn),
+		).toBeUndefined()
+	})
+
+	it("names the meter for a separate allowance's own reason, an allowance exhausted at start included", () => {
+		const allowance = createTokenBudget({ id: 'meter', max: 2 })
+		allowance.start()
+		allowance.consume({ prompt: 0, completion: 3, total: 3 })
+		const budget = createTokenBudget({ id: 'budget', max: 100 })
+		const turn = createAgentTurn({ ending: 'cancel', estimate: 3, interrupted: true })
+		expect(inferStop(allowance.signal.reason, allowance, budget, 'ollama', turn)).toEqual({
+			layer: 'meter',
+			id: 'meter',
+			max: 2,
+			consumed: 3,
+			estimate: 3,
+		})
+		const spent = createTokenBudget({ id: 'meter', max: 2 })
+		spent.consume({ prompt: 0, completion: 2, total: 2 })
+		spent.start()
+		expect(inferStop(spent.signal.reason, spent, undefined, 'ollama', undefined)).toEqual({
+			layer: 'meter',
+			id: 'meter',
+			max: 2,
+			consumed: 2,
+		})
+	})
+
+	it('names the meter for a shared allowance only when the run had aborted as the call returned', () => {
+		const shared = createTokenBudget({ id: 'shared', max: 5 })
+		shared.start()
+		shared.consume({ prompt: 0, completion: 5, total: 5 })
+		const reason = shared.signal.reason
+		expect(
+			inferStop(
+				reason,
+				shared,
+				shared,
+				'ollama',
+				createAgentTurn({ estimate: 5, interrupted: true }),
+			),
+		).toEqual({ layer: 'meter', id: 'shared', max: 5, consumed: 5, estimate: 5 })
+		expect(
+			inferStop(reason, shared, shared, 'ollama', createAgentTurn({ estimate: 1, usage })),
+		).toEqual({ layer: 'budget', id: 'shared', max: 5, consumed: 5, estimate: 1, usage })
+	})
+
+	it("names the budget for a foreign budget's reason, with that budget's id", () => {
+		const foreign = createTokenBudget({ id: 'foreign', max: 1 })
+		foreign.start()
+		foreign.consume({ prompt: 0, completion: 2, total: 2 })
+		const allowance = createTokenBudget({ id: 'meter', max: 100 })
+		expect(
+			inferStop(foreign.signal.reason, allowance, undefined, 'ollama', createAgentTurn()),
+		).toEqual({ layer: 'budget', id: 'foreign', max: 1, consumed: 2, estimate: 0 })
+	})
+
+	it('tells a separate allowance and a budget that share an id and a ceiling apart by identity', () => {
+		const allowance = createTokenBudget({ id: 'tokens', max: 5 })
+		allowance.start()
+		allowance.consume({ prompt: 0, completion: 5, total: 5 })
+		const budget = createTokenBudget({ id: 'tokens', max: 5 })
+		budget.start()
+		budget.consume({ prompt: 0, completion: 6, total: 6 })
+		const turn = createAgentTurn({ interrupted: true, estimate: 5 })
+		expect(inferStop(budget.signal.reason, allowance, budget, 'ollama', turn)).toEqual({
+			layer: 'budget',
+			id: 'tokens',
+			max: 5,
+			consumed: 6,
+			estimate: 5,
+		})
+	})
+
+	it("names the budget for a parent linked through the allowance's signal that crossed first", () => {
+		const parent = createTokenBudget({ id: 'parent', max: 1 })
+		parent.start()
+		const allowance = createTokenBudget({ id: 'meter', max: 100, signal: parent.signal })
+		allowance.start()
+		parent.consume({ prompt: 0, completion: 2, total: 2 })
+		expect(allowance.signal.reason).toBe(parent.signal.reason)
+		expect(
+			inferStop(allowance.signal.reason, allowance, undefined, 'ollama', createAgentTurn()),
+		).toEqual({ layer: 'budget', id: 'parent', max: 1, consumed: 2, estimate: 0 })
+	})
+
+	it("reads a parent with the allowance's own id and ceiling, aborted before its start, as the meter", () => {
+		const parent = createTokenBudget({ id: 'meter', max: 2 })
+		parent.start()
+		parent.consume({ prompt: 0, completion: 3, total: 3 })
+		const allowance = createTokenBudget({ id: 'meter', max: 2, signal: parent.signal })
+		allowance.start()
+		allowance.consume({ prompt: 0, completion: 2, total: 2 })
+		expect(inferStop(allowance.signal.reason, allowance, undefined, 'ollama', undefined)).toEqual({
+			layer: 'meter',
+			id: 'meter',
+			max: 2,
+			consumed: 3,
+		})
+	})
+
+	it('names the model for a truncated answer whose call returned unaborted, under any later reason', () => {
+		const budget = createTokenBudget({ id: 'budget', max: 1 })
+		budget.start()
+		budget.consume({ prompt: 0, completion: 2, total: 2 })
+		const truncated = createAgentTurn({ estimate: 4, usage, truncated: true })
+		const model: AgentStop = { layer: 'model', id: 'ollama', estimate: 4, usage }
+		expect(inferStop(undefined, undefined, budget, 'ollama', truncated)).toEqual(model)
+		expect(inferStop(budget.signal.reason, undefined, budget, 'ollama', truncated)).toEqual(model)
+		expect(
+			inferStop(
+				new DOMException('cancelled', 'AbortError'),
+				undefined,
+				budget,
+				'ollama',
+				truncated,
+			),
+		).toEqual(model)
+		const interrupted = createAgentTurn({ estimate: 4, usage, truncated: true, interrupted: true })
+		expect(inferStop(budget.signal.reason, undefined, budget, 'ollama', interrupted)).toEqual({
+			layer: 'budget',
+			id: 'budget',
+			max: 1,
+			consumed: 2,
+			estimate: 4,
+			usage,
+		})
+		expect(
+			inferStop(
+				new DOMException('cancelled', 'AbortError'),
+				undefined,
+				budget,
+				'ollama',
+				interrupted,
+			),
+		).toBeUndefined()
+	})
+
+	it('omits absent readings, so the record passes the JSON gate unchanged', () => {
+		const budget = createTokenBudget({ id: 'budget', max: 1 })
+		budget.start()
+		budget.consume({ prompt: 0, completion: 1, total: 1 })
+		const stopped = createAgentTurn({ ending: 'cancel', partial: true, estimate: undefined })
+		const stop = inferStop(budget.signal.reason, undefined, budget, 'ollama', stopped)
+		expect(stop).toEqual({ layer: 'budget', id: 'budget', max: 1, consumed: 1 })
+		expect(Object.keys(stop ?? {})).toEqual(['layer', 'id', 'max', 'consumed'])
+		expect(parseJSONValue(stop)).toEqual(stop)
+	})
+})
+
+describe('requireBudget', () => {
+	it('returns an absent bound and a real budget unchanged', () => {
+		const budget = createTokenBudget({ max: 10 })
+		expect(requireBudget(undefined, 'budget')).toBeUndefined()
+		expect(requireBudget(budget, 'allowance')).toBe(budget)
+	})
+
+	it('refuses a value that does not implement BudgetInterface with a placement error naming the option', () => {
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		for (const [value, received] of [
+			[{ consume: createRecorder<[TokenUsage]>().handler }, 'object'],
+			[null, 'null'],
+			[revoked.proxy, 'object'],
+		] as const) {
+			const caught = captureError(() =>
+				invokeUnchecked<BudgetInterface<TokenUsage> | undefined>(undefined, requireBudget, [
+					value,
+					'allowance',
+				]),
+			)
+			if (!isContractError(caught)) throw new Error('expected a ContractError')
+			expect([caught.code, caught.message, caught.context]).toEqual([
+				'placement',
+				'Agent: allowance must implement BudgetInterface',
+				{ path: ['options', 'allowance'], limit: 'BudgetInterface', received },
+			])
+		}
+	})
 })
 
 describe('estimateMessages', () => {
@@ -515,13 +883,14 @@ describe('settleAgentJob', () => {
 })
 
 describe('assembleResult — the settled result from a run outcome', () => {
-	it('omits an absent thinking and usage rather than storing undefined', () => {
+	it('omits an absent thinking, usage, and stop rather than storing undefined', () => {
 		const result = assembleResult({
 			content: 'hi',
 			thinking: undefined,
 			usage: undefined,
 			partial: false,
 			exhausted: false,
+			stop: undefined,
 		})
 		expect(result).toEqual({ content: 'hi', partial: false })
 		expect(Object.keys(result)).toEqual(['content', 'partial'])
@@ -535,6 +904,7 @@ describe('assembleResult — the settled result from a run outcome', () => {
 				usage: createTokenUsage({ prompt: 2, completion: 1, total: 3 }),
 				partial: true,
 				exhausted: true,
+				stop: undefined,
 			}),
 		).toEqual({
 			content: 'hi',
@@ -544,6 +914,20 @@ describe('assembleResult — the settled result from a run outcome', () => {
 		})
 	})
 
+	it('carries a present stop last, after the keys in their settled order', () => {
+		const stop: AgentStop = { layer: 'meter', id: 'meter', max: 2, consumed: 3, estimate: 3 }
+		const result = assembleResult({
+			content: 'Once upon',
+			thinking: 'plan',
+			usage: createTokenUsage(),
+			partial: true,
+			exhausted: false,
+			stop,
+		})
+		expect(Object.keys(result)).toEqual(['content', 'partial', 'thinking', 'usage', 'stop'])
+		expect(result.stop).toBe(stop)
+	})
+
 	it('leaves the loop-internal exhausted flag out of the public result', () => {
 		const result = assembleResult({
 			content: '',
@@ -551,6 +935,7 @@ describe('assembleResult — the settled result from a run outcome', () => {
 			usage: undefined,
 			partial: true,
 			exhausted: true,
+			stop: undefined,
 		})
 		expect('exhausted' in result).toBe(false)
 	})

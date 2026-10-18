@@ -9,7 +9,7 @@ import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/
 import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
-export interface StudyMemorySettings {
+export interface StudyMemoryOptions {
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -103,7 +103,7 @@ export interface StudyMemoryProvenanceSource {
  * `agent` supplies the runtime the driver constructs; `subject` identifies the artifact under
  * study and is never loaded or read here.
  */
-export interface StudyMemoryOptions {
+export interface StudyMemoryDriverOptions {
 	readonly agent: unknown
 	readonly subject: unknown
 	readonly provider: unknown

@@ -32,19 +32,23 @@ development dependency.
 | --- | --- | --- | --- | --- |
 | records-grok-label-import | Agent `tmp/` | Records population (complete) | Sonnet builder; Astra review | **done**: grading `69281cae…`, Records 72/312/0 (0.1875) against Compaction 56/328/0 (0.146); Sol–Grok kappa 0.82 |
 | bindings-rule-3-review | text | draft 3 | Astra analyst | FAIL 2–7, 10, F1, each with a prescription |
-| bindings-rule-4 | text | review | Opus planner; Astra re-audit of repaired claims | draft written; re-audit running |
+| bindings-rule-4 | text | review | Opus planner; Astra re-audit of repaired claims | **landed** in scaffold `typescript.md` § Bindings and `architecture.md` § Middleware (re-audit: claims 1–4 confirmed; claim 5 census controls pinned in the draft) |
+| scaffold-fix verify | scaffold | A, B, B2, rule landing | Haiku verifier | running (`wf_23c86f09-0a5`) |
 | agent-round-2-plan | text | designs, census | Opus planner | written (`tmp/units/agent-round-2-plan.md`); D-1 answered "Per-runner entity" |
-| scaffold-fix A, B | scaffold | design, checkpoint `499ade7ab` | Opus (A), Sonnet (B), T3 tasks | running |
+| scaffold-fix A, B, B2, B3 | scaffold | design, checkpoint `499ade7ab` | Opus (A), Sonnet (B, B2, B3), T3 tasks | done; checkpoint `615ae1b72`; falsify round 3 FAIL 1, 2b, 4–8 plus S1 (verdict `.orkestrel/scaffold/scaffold-fix-audit-verdict.md`) |
+| scaffold-fix C, C-instruments | scaffold | round 3 verdict | Sonnet builders (T3 tasks), disjoint files | C done and integrated; C-instruments running; then instruments re-run, Haiku gate, a one-lane review of C's departures, commit |
+| scaffold-local-pins | scaffold | fix chain committed | Opus (T3 task) | queued (`tmp/units/scaffold-local-pins-brief.md`): the user-endorsed `pins.json` ledger convention written into `orkestrel-publish` `release.md`/`wave.md`, and `local-pin.ts` ported as a vendored skill script; then build, pin and `scaffold repair --offline` into the fleet (restore pins, stage, repair, re-pin) |
 | bindings-rule-3-census-{scaffold,agent,study,budget} | read-only | draft 3 | Grok (scaffold); Astra (others) | scaffold, Study, budget returned; Agent running |
 | local-pin | Agent `tmp/` | none | Sonnet builder | accepted (fixture-proved; dry-run on Agent verified) |
+| local-pin-absolute | Agent `tmp/` | local-pin | Sonnet builder (T3 task) | **accepted** (fixture-proved): absolute `file:` specs, so `test:distribution` runs under pins; re-pin Agent after its falsify lanes, then Study and Ollama |
 | scaffold-fix-design | text | verdict | Opus planner | running |
 | rule landing | scaffold rules | draft 4, re-audit | Orchestrator | queued |
 | scaffold fix | scaffold | rule landing | Sonnet builders; falsify Astra + Opus | queued |
-| Study fix 4 | Study | verdict, census, draft 4; checkpoint `42fe9ac` | Sonnet builder (T3 task); falsify Astra + Opus | running |
-| budget sweep and U1 falsify | budget | census | Sonnet builder, Haiku gate; falsify Astra + Opus | falsify FAIL (re-entry, depth cap, contract, pin, wrapper); fix 2 green; Astra re-audit and Grok fleet survey running |
-| Agent round 2 (D1–D9, U2, U3, census, Study restage, naming Unit B) | Agent | budget, Study, rule | Opus design check; Sonnet builders; falsify Astra + Opus | queued |
+| Study fix 4 and 5 | Study | verdict, census, draft 4; checkpoint `42fe9ac` | Sonnet builders (T3 tasks); falsify Astra + Opus | **accepted**, commit `a8e9443` (fix 5 adopted the prescriptions; mutation-proved); Study pinned to budget `4d74195` |
+| budget sweep and U1 falsify | budget | census | Sonnet builder, Haiku gate; falsify Astra + Opus | **accepted**, commit `4d74195` (fix 3 adopted Astra's prescription; fleet survey confirms claim 5); pin into Agent after unit H |
+| Agent round 2 (D1–D10, U2, U3, census, Study restage, naming Unit B; plan `tmp/units/agent-round-2-plan.md`) | Agent | budget, Study, rule | waves 1–4 (T, P, C; A, H; K, L, ST, SM; D); falsify Astra + Opus | checkpoint `9136fd9`; waves 1–4 integrated; gates green (`tmp/units/agent-r2-verify.md`: src:core 1549, setup 168, guides 143, studies 100, distribution 9 under absolute pins); census re-run returned (`tmp/units/agent-r2-census.md`, ruled in `tmp/units/agent-r2-verify.md`): `LedgerPass#call`/`#position` call slots and 11 count-only recorders carried; `#input` ruled lawful; `vite.config.ts` closes by scaffold repair; falsify (Astra + Opus) running |
 | U4 Ollama | Ollama | Agent round 2 | Sonnet builder; Astra review | queued |
-| Study naming Unit A | Study | Study fix | Sonnet builder | queued |
+| Study naming Unit A | Study | Study fix | Sonnet builder (T3 task) | **accepted**, commit `983dba7` (rulings: `buildCustodyPacketLabeling` added to row 10's family; `StudyProcessOptions` kept); built, ready to restage into Agent after K and L |
 
 Staging follows each accepted unit: scaffold into budget, Study, Agent and Ollama; budget into Agent, Study and Ollama;
 Agent into Study and Ollama (and itself through Ollama, by override); Ollama into Agent and Study; Study into Agent.

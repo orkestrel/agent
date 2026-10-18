@@ -53,6 +53,77 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     and not a replicated quality difference.
 - **Benches live** (probed 2026-10-17): Codex `gpt-6-astra`, Cursor `grok-4.7-xhigh`, native Claude Haiku.
 - **Stray file removed.** An empty untracked `src/core/compilers.ts` (0 bytes, created 2026-10-16 14:48) was deleted.
+- **Second stray removed (2026-10-18).** Agent held an untracked `src/core/Meter.ts`, created 2026-10-17 23:22 during
+  budget fix 2. It was a re-encoded copy of budget's fixed `Meter.ts`, with its em dashes turned to mojibake, so a
+  builder had written through a relative path after its shell's working directory reset to Agent. Budget's own file is
+  intact, and no other Agent source or test file changed. Every brief now requires absolute write paths.
+- **Budget U1 accepted (2026-10-18), budget commit `4d74195`.** It covers the meter surface, the typed `BudgetError`,
+  the budget test sweep, and falsify fix rounds 2 and 3 (verdict `.orkestrel/budget/budget-u1-audit-verdict.md`).
+  - `charged` is now the total growth the budget accepted from the meter. Charges in flight sit in a registry of claim
+    records.
+  - Grok's fleet survey (`tmp/units/budget-fleet-survey-grok-1.md`) confirms that design 2 § 1.4 names every
+    consumer-visible sink. The one row it adds is agent-phase's copy of Agent's partial-run payload.
+  - The cross-copy `isBudgetError` hazard is fleet-wide and recorded, not fixed here.
+  - Nothing is published. The budget tarball is pinned into Agent through `tmp/units/local-pin.ts` after Agent's unit H
+    returns.
+- **The local-pin convention (user-endorsed 2026-10-18).** The user's words: "I liked your idea of the pins.json with
+  the `tmp/tarballs` that way we have a manifest to track and make sure we are using the correct build … keep track of
+  that … for later sessions and models and across repos and packages".
+  - **The ledger** is `<consumer>/tmp/tarballs/pins.json`, beside the content-named tarballs. It is the record of which
+    build each consumer runs. `local-pin.ts status` checks the installed bytes against it.
+  - **Canonical home.** Scaffold's `orkestrel-publish` skill, `references/release.md` § Fix a dependency before it
+    publishes and `references/wave.md:48-52`. Both still describe only the `npm install --no-save` route.
+  - **Planned unit `scaffold-local-pins`.** It runs after scaffold's fix chain closes and before the fleet repair, so
+    every target receives it. It writes the ledger convention into the skill and ships `local-pin.ts` as a vendored
+    skill script.
+  - **Scaffold verbs.** The blueprint refuses a non-caret `@orkestrel` range in `dependencies`
+    (`scaffold/src/core/compilers.ts:3284-3291`). So restore the pins, stage the scaffold tarball, run `repair`, then
+    re-pin.
+- **Local pins in Agent (2026-10-18), through `tmp/units/local-pin.ts`.** The ledger is `tmp/tarballs/pins.json`, which
+  records each replaced range; `restore` puts the ranges back.
+  - `@orkestrel/budget` is `file:tmp/tarballs/orkestrel-budget-0.0.13-39343e7e9395.tgz`, built from budget commit
+    `4d74195`, replacing `^0.0.13`.
+  - `@orkestrel/study` is `file:tmp/tarballs/orkestrel-study-0.0.1-5a199349197d.tgz`, replacing `file:../study`. It is
+    packed from a copy of Agent's installed `422d549` build (`tmp/units/study-root-install-422d549`), so the installed
+    Study bytes did not change. The ledger's `commit` field for Study shows Agent's HEAD, because the copy lives in
+    Agent's `tmp/`.
+  - `overrides` maps `@orkestrel/budget` to `$@orkestrel/budget`, so every nested budget dependency resolves to the one
+    copy.
+  - The fresh Study build replaces the Study pin in wave 3, together with the studies' `clear()` edits.
+  - **Standing reading, superseded on 2026-10-18.** Each pinned package's `test:distribution` was red by construction:
+    the packed manifest named `file:tmp/tarballs/…`, which does not resolve in the scratch consumer, as `wave.md`
+    warns.
+    - Unit `local-pin-absolute` (fixture-proved) now writes absolute specs,
+      `file:<consumer>/tmp/tarballs/<file>`, which resolve anywhere on this machine. The tool still recognizes the old
+      relative form.
+    - Under a hand-made absolute manifest, Agent's `test:distribution` passed 9 of 9.
+    - Re-pin each consumer to take the new form. Restore the pins with `tmp/units/local-pin.ts restore` before a release
+      gate as before.
+  - **Formatting.** The tool appends `overrides` last, and `oxfmt` sorts `package.json` keys. Run
+    `npx oxfmt package.json` in the consumer after each pin. Agent's is fixed; Study's is pending.
+  - The pins stay uncommitted. Acceptance commits exclude `package.json` and `package-lock.json`.
+- **Bindings rule landed (2026-10-18).** Draft 4 is in scaffold's `typescript.md` § Bindings and `architecture.md`
+  § Middleware, after an Astra re-audit. Claims 1–4 were confirmed, and claim 5's census controls are pinned to
+  immutable revisions in the draft. User decision (D-1): Agent's runner spawn record becomes a per-runner entity.
+- **Checkpoints before the fix units.** Scaffold `499ade7ab`, Study `42fe9ac` and Agent `9136fd9`. Each is a commit of
+  the falsify-failed sweep tree, not an acceptance.
+- **Study restaged into Agent (2026-10-18).** The pin is now `file:tmp/tarballs/orkestrel-study-0.0.1-bba37038e8d2.tgz`,
+  Study `983dba7` (the fix chain plus naming Unit A). `local-pin.ts` packs a pinned source with its registry ranges, so
+  the tarball carries no `file:` spec.
+- **Agent round 2 (2026-10-18).**
+  - Waves 1–3 are integrated uncommitted on `9136fd9`: units T, P, C, H, A, K, L, ST and SM, with their shared patches
+    applied.
+  - `dist/` was rebuilt from that tree, and `test:studies` passes 100 of 100 against it.
+  - Unit D (guide parity, Opus) is running. The tree-wide verifier, an Agent census re-run and Agent's falsify round
+    follow.
+- **Scaffold falsify round 3 (2026-10-18).**
+  - Verdict: `.orkestrel/scaffold/scaffold-fix-audit-verdict.md`. Objective Astra failed 1, 2, 4, 6, 7, 8. Subjective
+    Opus failed 4, 5, 6, 7, 8, plus S1.
+  - Every finding was reproduced. Among them: a fractional `--cap` crashes `launch.ts` after it has spawned, and the
+    instruments normalized comments and host bytes.
+  - Release evidence: 0.0.102 retypes `@orkestrel/scaffold/server`'s `ReadAllowance` from an interface to a class. No
+    fleet target imports it.
+  - Checkpoint `615ae1b72`. Fix units C (source) and C-instruments (the probes) are running on disjoint files.
 
 ## State and scope
 

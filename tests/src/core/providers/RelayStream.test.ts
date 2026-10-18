@@ -21,15 +21,16 @@ import {
 
 describe('RelayStream', () => {
 	it('resolves the upstream policy when the stream is constructed', async () => {
-		// The policy reads `none` until construction has finished, then `all`.
-		const constructed = createRecorder<readonly []>()
+		// The policy reads `none` for the one read the constructor makes, then `all`.
+		const reads = createRecorder<readonly []>()
 		const provider = createScriptedProvider([{ content: 'done' }], { recorded: true })
 		const relay = new RelayStream({
 			provider: {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					return constructed.count === 0 ? 'none' : 'all'
+					reads.handler()
+					return reads.count === 1 ? 'none' : 'all'
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -37,7 +38,6 @@ describe('RelayStream', () => {
 			request: { messages: [{ id: 'a', role: 'assistant', content: 'answer', thinking: 'plan' }] },
 			signal: new AbortController().signal,
 		})
-		constructed.handler()
 		await relay.response.text()
 		expect(provider.calls).toHaveLength(1)
 		expect(provider.calls[0]?.messages[0]).toEqual({
@@ -172,6 +172,25 @@ describe('RelayStream', () => {
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 		const upstream = requireValue(provider.calls[0]).signal
 		expect(upstream.aborted).toBe(false)
+	})
+	it('writes a truncated result whole and leaves an untruncated result unchanged', async () => {
+		const truncated = { content: 'cut off', truncated: true }
+		const finished = { content: 'whole' }
+		const finals = await Promise.all(
+			[truncated, finished].map(async (result) => {
+				const provider = createScriptedProvider([{ result }])
+				const text = await new RelayStream({
+					provider,
+					request: { messages: [] },
+					signal: new AbortController().signal,
+				}).response.text()
+				return parseJSONAs(text.split('\n').slice(0, -1).at(-1) ?? '', relayFrameContract.is)
+			}),
+		)
+		expect(finals).toStrictEqual([
+			{ channel: 'result', result: truncated },
+			{ channel: 'result', result: finished },
+		])
 	})
 	it('emits a fixed error message without upstream secret text', async () => {
 		const provider = new FailingProvider({ content: '' }, new Error('sk-secret'))

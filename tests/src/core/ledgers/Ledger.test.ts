@@ -7,9 +7,10 @@ import {
 	estimateMessages,
 	isLedgerError,
 } from '@src/core'
+import { createTokenBudget } from '@orkestrel/budget'
 import { isString } from '@orkestrel/contract'
 import { createTool } from '@orkestrel/tool'
-import { createRecorder, requireValue } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildDeliverySeed,
@@ -84,6 +85,96 @@ describe('Ledger', () => {
 		expect(result.usage).toMatchObject({ prompt: 10, completion: 2, total: 12 })
 		expect(provider.calls).toHaveLength(1)
 	})
+
+	it('carries the stop of a final pass a budget stopped', async () => {
+		const options = buildLedgerOptions()
+		const usage = { prompt: 10, completion: 2, total: 12 }
+		const provider = createScriptedProvider([{ content: 'Done.', usage }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(provider, options)
+		const budget = createTokenBudget({ id: 'desk', max: 10, scope: 'total' })
+		ledger.agent.emitter.on('usage', (reported) => budget.consume(reported))
+		const result = await ledger.respond('Finish the request.', budget.signal)
+		expect(result.passes).toHaveLength(1)
+		// 'Done.' estimates ceil(5 / 4) = 2 tokens.
+		expect(result.stop).toEqual({
+			layer: 'budget',
+			id: 'desk',
+			max: 10,
+			consumed: 12,
+			estimate: 2,
+			usage,
+		})
+	})
+
+	it('keeps no request state after respond settles, so a direct run repeats its lookup and recall', async () => {
+		const options = buildLedgerOptions()
+		const calls = [
+			{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } },
+			{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } },
+		]
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: calls },
+				{ content: 'Done.' },
+				{ content: '', tools: calls },
+				{ content: 'Direct done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
+		await ledger.respond('Check BW-20931.')
+		ledger.conversation.add({ role: 'user', content: 'Check it again.' })
+		await expect(ledger.agent.generate()).resolves.toMatchObject({
+			content: 'Direct done.',
+			partial: false,
+		})
+		const read = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+		const recalled = 'nothing on "refunds"; recall an owner name, an id, or one of refunds'
+		// The direct run's calls repeat the settled request's, and neither returns the repeat note.
+		expect(
+			ledger.conversation
+				.messages()
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([read, recalled, read, recalled])
+	})
+
+	// The exchange carries more messages than one call took as spread arguments in this project's
+	// worker (123 823 on the 2026-10-18 host), and filing it takes seconds, so the budget covers a
+	// contended run.
+	it('sends a distant call and result pair whole when the tail cap admits it', async () => {
+		const options = buildLedgerOptions()
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, {
+			...options,
+			topics: [],
+			capacity: 5_000_000,
+			share: { prompt: 1, tail: 1 },
+		})
+		const seed = ledger.conversation.add([
+			{
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'far', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+			...Array.from({ length: 130_000 }, (): MessageInput => ({ role: 'user', content: 'Note.' })),
+			{ role: 'tool', call: 'far', content: 'Account BW-20931: Brightwater Studio.' },
+		])
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the planned selection',
+		)
+		await ledger.respond('What is next?')
+		// The plan's tail, not the whole view a faulted selection falls back to, carries the pair.
+		const [selection] = await selected
+		expect(selection.fault).toBeUndefined()
+		expect(selection.messages.slice(0, -1).map((message) => message.id)).toEqual(
+			seed.map((message) => message.id),
+		)
+	}, 60_000)
 
 	it('keeps reordered seed results paired with their retained lookup calls', async () => {
 		const options = buildLedgerOptions()
@@ -370,14 +461,14 @@ describe('Ledger', () => {
 		await ledger.respond('Earlier request.')
 		const judgments = ledger.conversation.judgments.judgments()
 		const requests = judge.requests.length
-		const selections: Selection[] = []
-		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const selections = createRecorder<readonly [selection: Selection]>()
+		ledger.agent.emitter.on('select', selections.handler)
 		const request = ledger.conversation.add({ role: 'user', content: 'Direct request.' })
 		await ledger.agent.generate()
-		expect(selections).toHaveLength(1)
-		expect(selections[0]?.fault).toBeInstanceOf(Error)
-		expect(selections[0]?.briefing).toBeUndefined()
-		expect(selections[0]?.messages).toContainEqual(request)
+		// One faulted selection with no briefing, built from a view that carries the direct request.
+		expect(selections.calls).toEqual([
+			[{ judgments: [], messages: expect.arrayContaining([request]), fault: expect.any(Error) }],
+		])
 		expect(judge.requests).toHaveLength(requests)
 		expect(ledger.conversation.judgments.judgments()).toEqual(judgments)
 	})
@@ -710,8 +801,9 @@ describe('Ledger', () => {
 
 	it('keeps the replay policy captured at construction through calibration and respond', async () => {
 		const options = buildLedgerOptions()
-		// The policy reads `none` until construction has finished, then `all`.
-		const constructed = createRecorder<readonly []>()
+		// The policy reads `none` for the reads construction makes, the ledger's and its agent's, then
+		// `all` for every later read.
+		const reads = createRecorder<readonly []>()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
@@ -731,7 +823,8 @@ describe('Ledger', () => {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					return constructed.count === 0 ? 'none' : 'all'
+					reads.handler()
+					return reads.count <= 2 ? 'none' : 'all'
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -741,7 +834,7 @@ describe('Ledger', () => {
 				predict: 1024,
 			},
 		)
-		constructed.handler()
+		expect(reads.count).toBe(2)
 		ledger.conversation.add([
 			{ role: 'user', content: 'Seed.' },
 			{ role: 'assistant', content: 'Earlier reply.', thinking: 'Check the account.' },
@@ -1324,11 +1417,11 @@ describe('Ledger', () => {
 	it('rejects with the answer pass error when both passes reject and admits a later request', async () => {
 		const options = buildLedgerOptions()
 		const fault = new Error('provider unreachable')
-		const recovered = createRecorder<readonly []>()
+		// The first request's two passes are the first two calls; every later call succeeds.
 		const provider = createScriptedProvider([{ content: 'Recovered.' }], {
 			recorded: true,
 			chunk: (content) => {
-				if (recovered.count === 0) throw fault
+				if (provider.started <= 2) throw fault
 				return [content]
 			},
 		})
@@ -1337,7 +1430,6 @@ describe('Ledger', () => {
 		expect(provider.calls).toHaveLength(2)
 		expect(provider.calls[1]?.tools).toBeUndefined()
 		expect(ledger.agent.context.scope).toBeUndefined()
-		recovered.handler()
 		expect((await ledger.respond('Check again.')).content).toBe('Recovered.')
 	})
 
@@ -1362,10 +1454,13 @@ describe('Ledger', () => {
 				count: 1n,
 			}),
 		])
-		const selections: Selection[] = []
-		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the planned selection',
+		)
 		await ledger.respond('Check Brightwater Studio.')
-		expect(selections[0]?.fault).toBeUndefined()
+		const [selection] = await selected
+		expect(selection.fault).toBeUndefined()
 		const sent = requireValue(provider.calls[0]).messages
 		expect(sent.find((message) => message.call === 'seed')?.content).toBe(
 			'lookup: result shown under Pinned in the system message',
@@ -1538,13 +1633,12 @@ describe('Ledger', () => {
 			recorded: true,
 		})
 		// The system text fails from each run's start until that run's selection.
-		const starts = createRecorder<readonly []>()
-		const chosen = createRecorder<readonly []>()
+		const phases = createRecorder<readonly [phase: 'start' | 'select']>()
 		const fault = new Error('planning failed')
 		const ledger = createLedger(provider, {
 			...options,
 			get system() {
-				if (starts.count > chosen.count) throw fault
+				if (phases.calls.at(-1)?.[0] === 'start') throw fault
 				return options.system
 			},
 		})
@@ -1557,19 +1651,25 @@ describe('Ledger', () => {
 			},
 			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
 		])
-		const selections: Selection[] = []
-		const views: Array<readonly MessageInput[]> = []
-		ledger.agent.emitter.on('start', starts.handler)
+		const selections =
+			createRecorder<readonly [selection: Selection, view: readonly MessageInput[]]>()
+		ledger.agent.emitter.on('start', () => phases.handler('start'))
 		ledger.agent.emitter.on('select', (selection) => {
-			chosen.handler()
-			selections.push(selection)
-			views.push(ledger.conversation.view())
+			phases.handler('select')
+			selections.handler(selection, ledger.conversation.view())
 		})
 		expect((await ledger.respond('Check the account.')).content).toBe('Recovered.')
-		expect(selections).toHaveLength(2)
-		expect(selections[1]?.fault).toBe(fault)
-		expect(selections[1]?.messages).toEqual(views[1])
-		expect(provider.calls[1]?.messages.slice(1)).toEqual(views[1])
+		expect(phases.calls).toEqual([['start'], ['select'], ['start'], ['select']])
+		// Each pass's selection falls back to the whole view it was selected from, with the fault.
+		expect(selections.calls).toEqual([
+			[expect.objectContaining({ fault }), expect.any(Array)],
+			[expect.objectContaining({ fault }), expect.any(Array)],
+		])
+		for (const [selection, view] of selections.calls) expect(selection.messages).toEqual(view)
+		expect(selections.calls[1]?.[0].fault).toBe(fault)
+		expect(provider.calls.map((call) => call.messages.slice(1))).toEqual(
+			selections.calls.map(([, view]) => view),
+		)
 		expect(provider.calls[1]?.tools).toBeUndefined()
 		expect(ledger.agent.context.scope).toBeUndefined()
 	})
@@ -1620,7 +1720,8 @@ describe('Ledger', () => {
 		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
 		})
-		const unavailable = createRecorder<readonly []>()
+		// The system text reads once at construction, for the agent's options; every later read fails.
+		const reads = createRecorder<readonly []>()
 		const fault = new Error('system unavailable')
 		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
 			...options,
@@ -1632,16 +1733,19 @@ describe('Ledger', () => {
 				fetch: transport.fetch,
 			}),
 			get system() {
-				if (unavailable.count > 0) throw fault
+				reads.handler()
+				if (reads.count > 1) throw fault
 				return 'Serve the desk.'
 			},
 		})
+		expect(reads.count).toBe(1)
 		const request = ledger.conversation.add({ role: 'user', content: 'Statement.' })
-		unavailable.handler()
-		const selections: Selection[] = []
-		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the fallback selection',
+		)
 		const result = await ledger.respond('Inspect the statement.')
-		const selection = selections[0]
+		const [selection] = await selected
 		expect(selection).toEqual({
 			messages: ledger.conversation.view().slice(0, -1),
 			judgments: [JSON.stringify(['category', request.id])],
@@ -2229,13 +2333,15 @@ describe('Ledger', () => {
 				answer: { form: 'choice', probabilities: { rule: 1 } },
 			}),
 		)
-		const selections: Selection[] = []
-		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the planned selection',
+		)
 		await ledger.respond('Inspect the full seed.')
-		const selection = selections[0]
-		expect(selection?.messages.some((message) => message.id === retired.id)).toBe(false)
-		expect(selection?.briefing).toContain('For Mira, keep the receipt.')
-		expect(selection?.briefing).not.toContain(correction.content)
+		const [selection] = await selected
+		expect(selection.messages.some((message) => message.id === retired.id)).toBe(false)
+		expect(selection.briefing).toContain('For Mira, keep the receipt.')
+		expect(selection.briefing).not.toContain(correction.content)
 	})
 
 	it('leaves a live owner-record amendment out of the briefing when a decisive rule unit has an amendment', async () => {
@@ -2273,12 +2379,14 @@ describe('Ledger', () => {
 				buildLedgerPairJudgment(head, rule, amendment, head === 'amends' ? 1 : 0),
 			)
 		await ledger.respond('Greet the desk.')
-		const selections: Selection[] = []
-		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the planned selection',
+		)
 		await ledger.respond('Inspect the full seed.')
-		const selection = selections[0]
-		expect(selection?.briefing).toContain('Brightwater Studio: keep the receipt.')
-		expect(selection?.briefing).not.toContain('AA-11')
+		const [selection] = await selected
+		expect(selection.briefing).toContain('Brightwater Studio: keep the receipt.')
+		expect(selection.briefing).not.toContain('AA-11')
 	})
 
 	it('drops an empty seed assistant whose calls were all dropped but keeps an empty assistant without calls', async () => {

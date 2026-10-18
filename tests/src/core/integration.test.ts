@@ -163,12 +163,12 @@ describe('in-process relay hop', () => {
 			[{ result: { content: 'first second third' }, deltas: ['first', ' second', ' third'] }],
 			{ recorded: true },
 		)
-		const requests: Request[] = []
+		const requests = createRecorder<readonly [request: Request]>()
 		const browser = createRelayHop({
 			provider,
 			request: (input, init) => {
 				const request = new Request(input, init)
-				requests.push(request)
+				requests.handler(request)
 				return request
 			},
 		})
@@ -181,8 +181,8 @@ describe('in-process relay hop', () => {
 			code: 'ABORT',
 			partial: { content: 'first' },
 		})
-		expect(requireValue(requests[0]).signal.aborted).toBe(true)
-		expect(requireValue(provider.calls[0]).signal.aborted).toBe(true)
+		expect(requests.calls.map(([request]) => request.signal.aborted)).toEqual([true])
+		expect(provider.calls.map((call) => call.signal.aborted)).toEqual([true])
 	})
 	it('reconstructs a server abort while the browser signal remains unaborted', async () => {
 		const partial = {

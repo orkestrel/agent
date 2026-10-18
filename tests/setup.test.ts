@@ -83,6 +83,7 @@ import {
 	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
 	createAddTool,
 	createAgentJob,
+	createAgentTurn,
 	createLoopTool,
 	createRecordingScheduler,
 	createRecordedJudge,
@@ -156,6 +157,7 @@ import {
 	buildLedgerExchange,
 	buildLedgerResponse,
 	createLedgerJudge,
+	SwitchingJudge,
 	buildDeliverySeed,
 	buildLedgerPairJudgment,
 	buildLedgerTopicJudgment,
@@ -221,15 +223,15 @@ describe('agent scenario infrastructure', () => {
 		expect(counted.partial).toBe(false)
 		const usage = counted.usage
 		expect([usage.prompt, usage.completion, usage.total]).toEqual([2, 1, 3])
-		expect(counted.counter).toEqual({
-			content: 1,
-			thinking: 1,
-			partial: 1,
-			usage: 1,
-			prompt: 1,
-			completion: 1,
-			total: 1,
-		})
+		expect(counted.accesses.calls).toEqual([
+			['content'],
+			['thinking'],
+			['partial'],
+			['usage'],
+			['prompt'],
+			['completion'],
+			['total'],
+		])
 		const cases = createInvalidAgentResultCases()
 		expect(cases.length).toBeGreaterThan(0)
 		expect(cases.map(([name]) => name)).toContain('revoked root proxy')
@@ -647,6 +649,30 @@ describe('agent data builders', () => {
 	it('builds a token usage from the default counts plus named overrides', () => {
 		expect(createTokenUsage()).toEqual({ prompt: 5, completion: 7, total: 12 })
 		expect(createTokenUsage({ total: 99 })).toEqual({ prompt: 5, completion: 7, total: 99 })
+	})
+
+	it('builds an agent turn from the default unaborted answer turn plus named overrides', () => {
+		expect(createAgentTurn()).toEqual({
+			content: '',
+			thinking: undefined,
+			usage: undefined,
+			spent: undefined,
+			messages: [],
+			ending: 'answer',
+			partial: false,
+			futile: false,
+			estimate: 0,
+			interrupted: false,
+			truncated: false,
+		})
+		// An override replaces only what it names; every unnamed reading keeps its default.
+		const truncated = createAgentTurn({ estimate: 4, truncated: true })
+		expect([truncated.estimate, truncated.truncated, truncated.interrupted]).toEqual([
+			4,
+			true,
+			false,
+		])
+		expect(truncated.ending).toBe('answer')
 	})
 
 	it('builds an agent job from the default provider and seed turn plus named overrides', () => {
@@ -1717,7 +1743,7 @@ describe('ledger setup leaves', () => {
 		).rejects.toThrow('invalid request')
 	})
 	it('records question keys and preserves scripted answers and rejections', async () => {
-		const asked: string[] = []
+		const asked = createRecorder<readonly [key: string]>()
 		const fault = new Error('offline')
 		const judge = createLedgerJudge(
 			asked,
@@ -1731,7 +1757,30 @@ describe('ledger setup leaves', () => {
 			answers: {},
 		})
 		await expect(judge.ask(request, new AbortController().signal)).rejects.toBe(fault)
-		expect(asked).toEqual(['first', 'first'])
+		expect(asked.calls).toEqual([['first'], ['first']])
+	})
+	it('reports the model the last use set and forwards each ask to the wrapped judge', async () => {
+		const asked = createRecorder<readonly [key: string]>()
+		const inner = createLedgerJudge(
+			asked,
+			() => Promise.resolve({ model: 'inner', answers: {} }),
+			'wrapped',
+		)
+		const switching = new SwitchingJudge(inner, 'A')
+		const request = { state: 'Refund.', questions: { first: JUDGMENT_QUESTION } }
+		expect([switching.id, switching.name, switching.model]).toEqual(['wrapped', 'wrapped', 'A'])
+		switching.use('B')
+		expect(switching.model).toBe('B')
+		await expect(switching.ask(request, new AbortController().signal)).resolves.toEqual({
+			model: 'inner',
+			answers: {},
+		})
+		expect(switching.model).toBe('B')
+		switching.use('A')
+		expect(switching.model).toBe('A')
+		expect(inner.model).toBe('wrapped')
+		expect(asked.calls).toEqual([['first']])
+		expect(new SwitchingJudge(inner).model).toBe('wrapped')
 	})
 })
 
@@ -2000,7 +2049,7 @@ describe('shared ledger builders', () => {
 				conversation.judgments.add(buildLedgerTopicJudgment(second, topic, 1))
 				conversation.judgments.add(buildLedgerPairJudgment('amends', first, second, 0.9))
 			}
-			const asked: string[] = []
+			const asked = createRecorder<readonly [key: string]>()
 			const inner = createPhraseJudge(['Refunds over'], ['Correction'])
 			const classifier = new Classifier(
 				buildClassifierOptions({
@@ -2014,7 +2063,9 @@ describe('shared ledger builders', () => {
 				}),
 			)
 			await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-			asks.push(asked.map((key) => key.replace(first.id, 'first').replace(second.id, 'second')))
+			asks.push(
+				asked.calls.map(([key]) => key.replace(first.id, 'first').replace(second.id, 'second')),
+			)
 		}
 		const [fresh, filed] = asks
 		expect(fresh).toEqual(

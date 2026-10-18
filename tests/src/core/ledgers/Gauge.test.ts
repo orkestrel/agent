@@ -138,7 +138,7 @@ describe('Gauge.rate', () => {
 			{ estimate: 200, prompt: 250, tools: 0 },
 		]
 		gauge.observe(calls)
-		calls.length = 0
+		calls.splice(0)
 		expect(gauge.rate([])).toBe(1)
 	})
 

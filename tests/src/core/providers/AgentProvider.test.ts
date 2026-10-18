@@ -5,6 +5,7 @@ import {
 	MAX_ERROR_BODY_LENGTH,
 	ProviderAbortError,
 	ProviderError,
+	RelayProvider,
 	isProviderAbortError,
 	isProviderError,
 } from '@src/core'
@@ -236,6 +237,87 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		})
 		expect(await provider.generate([], new AbortController().signal)).toBe(result)
 		expect(requireValue(provider.parsers[0]).cleared).toBe(true)
+	})
+
+	it('carries the latest reported truncation onto the assembled result', async () => {
+		const records = new Map<string, ProviderIncrement>([
+			['none', { content: '', thinking: '', tools: [] }],
+			['cut', { content: '', thinking: '', tools: [], truncated: true }],
+			['whole', { content: '', thinking: '', tools: [], truncated: false }],
+		])
+		const scripts = [
+			['c:answer', 'none'],
+			['c:answer', 'cut', 'none'],
+			['cut', 'whole'],
+		]
+		const results = await Promise.all(
+			scripts.map((script) =>
+				new ScriptedWire({
+					url: 'https://provider.test',
+					records,
+					fetch: createStreamingTransport(script),
+				}).generate([], new AbortController().signal),
+			),
+		)
+		expect(results).toStrictEqual([
+			{ content: 'answer' },
+			{ content: 'answer', truncated: true },
+			{ content: '', truncated: false },
+		])
+	})
+
+	it('carries a terminal truncation onto a cancelled call’s partial', async () => {
+		const abort = new AbortController()
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records: new Map<string, ProviderIncrement>([
+				['cut', { content: 'cut off', thinking: '', tools: [], truncated: true }],
+			]),
+			fetch: createStreamingTransport(['cut']),
+		})
+		const stream = provider.stream([], abort.signal)
+		await stream.next()
+		abort.abort()
+		await expect(stream.next()).rejects.toMatchObject({
+			partial: { content: 'cut off', truncated: true },
+		})
+	})
+
+	it('returns a settled result’s own truncation unchanged', async () => {
+		const result = { content: 'whole', truncated: false }
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records: new Map<string, ProviderIncrement>([
+				['done', { content: '', thinking: '', tools: [], truncated: true, result }],
+			]),
+			fetch: createStreamingTransport(['done']),
+		})
+		expect(await provider.generate([], new AbortController().signal)).toBe(result)
+	})
+
+	it('assembles ten thousand tool increments in order with the latest reported usage', async () => {
+		const keys = Array.from({ length: 10_000 }, (_, index) => `call-${index}`)
+		const records = new Map<string, ProviderIncrement>(
+			keys.map((key, index) => [
+				key,
+				{
+					content: '',
+					thinking: '',
+					tools: [{ id: key, name: 'lookup', arguments: {} }],
+					...(index % 1_000 === 0
+						? { usage: { prompt: index, completion: 1, total: index + 1 } }
+						: {}),
+				},
+			]),
+		)
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records,
+			fetch: createStreamingTransport(keys),
+		})
+		const result = await provider.generate([], new AbortController().signal)
+		expect(result.tools?.map((call) => call.id)).toEqual(keys)
+		expect(result.usage).toEqual({ prompt: 9_000, completion: 1, total: 9_001 })
 	})
 
 	it('rejects strict end of input without a settled result', async () => {
@@ -744,6 +826,63 @@ describe('AgentProvider — cancellation and partial results', () => {
 		expect(requireValue(caught).partial).toEqual({ content: 'partial' })
 		expect(requireValue(caught).cause).toBeUndefined()
 	})
+
+	it('rejects with the framing cleanup failure rather than the cancel it follows', async () => {
+		const abort = new AbortController()
+		const failure = new Error('clear failed')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['answer']),
+			parser: () => ({
+				parse: (chunk) => [{ channel: 'content', text: chunk }],
+				clear() {
+					throw failure
+				},
+			}),
+		})
+		const stream = provider.stream([], abort.signal)
+		expect(await stream.next()).toEqual({
+			done: false,
+			value: { channel: 'content', text: 'answer' },
+		})
+		abort.abort()
+		await expect(stream.next()).rejects.toBe(failure)
+	})
+
+	it('turns a framing failure that raced the cancel into the empty partial', async () => {
+		const abort = new AbortController()
+		const failure = new Error('frame failed')
+		const transport = createRefusingTransport()
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			parser: () => {
+				abort.abort()
+				throw failure
+			},
+		})
+		const caught = await provider.generate([], abort.signal).then(
+			() => undefined,
+			(error: unknown) => (isProviderAbortError(error) ? error : undefined),
+		)
+		expect(requireValue(caught).partial).toEqual({ content: '' })
+		expect(requireValue(caught).cause).toBe(failure)
+		expect(transport.signals).toEqual([])
+	})
+
+	it('rethrows a framing failure unchanged when nothing cancelled', async () => {
+		const failure = new Error('frame failed')
+		const transport = createRefusingTransport()
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+			parser: () => {
+				throw failure
+			},
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+		expect(transport.signals).toEqual([])
+	})
 })
 
 describe('AgentProvider — deadline clearing and reader release on every exit', () => {
@@ -862,8 +1001,10 @@ describe('AgentProvider — isolation between concurrent calls on one instance',
 			false,
 		)
 		const right = new RecordedBody(['right', 'c:!'].map((chunk) => new TextEncoder().encode(chunk)))
-		const bodies = [left, right]
-		const transport = new RecordedTransport(() => new Response(requireValue(bodies.shift()).stream))
+		const bodies = [left, right].values()
+		const transport = new RecordedTransport(
+			() => new Response(requireValue(bodies.next().value).stream),
+		)
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
 			fetch: transport.fetch,

@@ -26,26 +26,26 @@ export function buildJudgments(
 	state: string,
 	model: string,
 ): readonly JudgmentInput[] {
-	const judgments: JudgmentInput[] = []
 	const single = Object.keys(request.questions).length === 1
-	for (const [id, question] of Object.entries(request.questions)) {
+	return Object.entries(request.questions).flatMap(([id, question]): readonly JudgmentInput[] => {
 		const answer = Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
 		const refusal =
 			result.refusals !== undefined && Object.hasOwn(result.refusals, id)
 				? result.refusals[id]
 				: undefined
-		if (answer === undefined && refusal === undefined) continue
-		judgments.push({
-			id,
-			question,
-			model,
-			sources,
-			state,
-			...(answer !== undefined ? { answer } : refusal !== undefined ? { refusal } : {}),
-			...(single && result.usage !== undefined ? { usage: result.usage } : {}),
-		})
-	}
-	return judgments
+		if (answer === undefined && refusal === undefined) return []
+		return [
+			{
+				id,
+				question,
+				model,
+				sources,
+				state,
+				...(answer !== undefined ? { answer } : refusal !== undefined ? { refusal } : {}),
+				...(single && result.usage !== undefined ? { usage: result.usage } : {}),
+			},
+		]
+	})
 }
 
 /**

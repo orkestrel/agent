@@ -86,8 +86,13 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	// have reset a moment earlier (the reclassification).
 	#scan(delta: string): string {
 		this.#pending += delta
-		// The clean content this call surfaces, in order; a reclassification empties it.
-		const surfaced: string[] = []
+		return [...this.#surface()].join('')
+	}
+
+	// Walk the pending text, yielding each clean content piece in order and routing reasoning to
+	// `#thinking`; return once the remainder is undecided and held for the next delta. A piece is
+	// yielded only after `#opened` is set, so the reclassification below never meets one.
+	*#surface(): Generator<string, void> {
 		for (;;) {
 			if (this.#inside) {
 				const close = this.#pending.indexOf(THINK_CLOSE)
@@ -95,7 +100,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 					// No close yet — route all but a possible partial close-tag suffix to
 					// thinking, holding that suffix for the next delta to disambiguate.
 					this.#thinking += this.#hold([THINK_CLOSE])
-					return surfaced.join('')
+					return
 				}
 				this.#thinking += this.#pending.slice(0, close)
 				this.#pending = this.#pending.slice(close + THINK_CLOSE.length)
@@ -109,9 +114,8 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 				// span — everything surfaced so far was reasoning. Reclassify it.
 				const close = this.#pending.indexOf(THINK_CLOSE)
 				if (close !== -1 && (open === -1 || close < open)) {
-					this.#thinking += this.#content + surfaced.join('') + this.#pending.slice(0, close)
+					this.#thinking += this.#content + this.#pending.slice(0, close)
 					this.#content = ''
-					surfaced.length = 0
 					this.#pending = this.#pending.slice(close + THINK_CLOSE.length)
 					this.#opened = true
 					continue
@@ -122,11 +126,11 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 				// (before any tag event a split leading close must not leak either, so the
 				// close tag's prefixes are held back too).
 				const tags = this.#opened ? [THINK_OPEN] : [THINK_OPEN, THINK_CLOSE]
-				surfaced.push(this.#hold(tags))
-				return surfaced.join('')
+				yield this.#hold(tags)
+				return
 			}
 			this.#opened = true
-			surfaced.push(this.#pending.slice(0, open))
+			yield this.#pending.slice(0, open)
 			this.#pending = this.#pending.slice(open + THINK_OPEN.length)
 			this.#inside = true
 		}

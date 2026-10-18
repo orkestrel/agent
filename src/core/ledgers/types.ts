@@ -1,4 +1,5 @@
 import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
+import type { Selection } from '../contexts/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
 import type { ThinkingReplay } from '../types.js'
 import type {
@@ -275,13 +276,125 @@ export interface LedgerOptions {
  * @remarks
  * `passes` holds the first pass and, when the ledger ran one, the answer pass. `content` and
  * `partial` are the last pass's, `usage` sums the passes' usage, and `thinking` joins the passes'
- * reasoning; each optional member is present when any pass reported it. `readings` lists every
- * {@link ClassifierReading} the request's selections recorded, in asking order. A request's reading
- * count is its logical questions, never its physical wire calls.
+ * reasoning; each optional member is present when any pass reported it. `stop` is the last pass's
+ * stop, when one stopped it. `readings` lists every {@link ClassifierReading} the request's
+ * selections recorded, in asking order. A request's reading count is its logical questions, never
+ * its physical wire calls.
  */
 export interface LedgerResult extends AgentResult {
 	readonly passes: readonly AgentResult[]
 	readonly readings: readonly ClassifierReading[]
+}
+
+/**
+ * Holds what one `respond` call of a ledger keeps while it serves its request: the request message,
+ * the filing readings and the plan its selections produced, the gauge calls of its passes, and its
+ * repeat and recall stops.
+ *
+ * @remarks
+ * A ledger creates one request per `respond` call and drops it when the call settles, so no request
+ * state reaches a later call or a run no call owns. Each agent run the call makes is a pass: `open`
+ * starts one, and `selection`, `boundary`, and `usage` read the current pass, the last one opened.
+ * `calls` lists the gauge calls of every pass in order. A call stays in flight, taking its usage and
+ * thinking, until its pass observes the next call, and is final from then on.
+ */
+export interface LedgerRequestInterface {
+	/** Holds the request message, or undefined until `enter` appends it. */
+	readonly message: Message | undefined
+	/** Holds the selection the request's last successful plan produced, or undefined before one. */
+	readonly plan: Selection | undefined
+	/** Holds the selection the current pass's run adopted last, or undefined before one. */
+	readonly selection: Selection | undefined
+	/** Holds the conversation length at the current pass's start or at its last adopted selection, or undefined before a pass. */
+	readonly boundary: number | undefined
+	/** Holds the summed usage of the current pass's selections and calls, or undefined while none reported usage. */
+	readonly usage: TokenUsage | undefined
+	/** Holds the gauge calls of every pass in order, the call in flight last. */
+	readonly calls: readonly GaugeCall[]
+	/** Holds the filing readings of every planning selection the request made, in asking order. */
+	readonly readings: readonly ClassifierReading[]
+	/**
+	 * Appends the request's content to a conversation as a user message, once, and holds it as `message`.
+	 *
+	 * @param conversation - The conversation the request is served from
+	 * @returns The request message; a later call returns it without appending again
+	 */
+	enter(conversation: ConversationInterface): Message
+	/**
+	 * Opens a pass, which becomes the current pass.
+	 *
+	 * @param boundary - The conversation length when the pass's run starts
+	 */
+	open(boundary: number): void
+	/**
+	 * Records the selection the current pass's run adopted and adds the usage it spent.
+	 *
+	 * @param selection - The selection the run built its prompt from
+	 * @param boundary - The conversation length when the run adopted it
+	 */
+	adopt(selection: Selection, boundary: number): void
+	/**
+	 * Starts a gauge call in the current pass, making that pass's call in flight final.
+	 *
+	 * @param call - The call's estimate and advertised tool count
+	 * @param position - The conversation length when the call starts
+	 */
+	observe(call: GaugeCall, position: number): void
+	/**
+	 * Adds one call's reported usage to the current pass and records it on the call in flight.
+	 *
+	 * @param usage - The usage the provider reported for the call
+	 */
+	spend(usage: TokenUsage): void
+	/**
+	 * Records the thinking share of the call in flight, read from the first assistant message after
+	 * the call's position.
+	 *
+	 * @remarks
+	 * Records nothing while the call in flight has no reported completion or no such message carries
+	 * thinking.
+	 *
+	 * @param messages - The conversation's messages
+	 */
+	think(messages: readonly Message[]): void
+	/**
+	 * Appends the readings of one planning selection and holds its plan when planning succeeded.
+	 *
+	 * @param readings - The selection's filing readings, in asking order
+	 * @param plan - The planned selection, or undefined when planning failed
+	 */
+	file(readings: readonly ClassifierReading[], plan?: Selection): void
+	/**
+	 * Admits one tool call of the request, compared by tool name and canonical arguments.
+	 *
+	 * @param name - The tool name
+	 * @param args - The call's arguments
+	 * @throws {Error} Thrown with the {@link LedgerNote} `repeat` text when the request already admitted the same call
+	 * @throws {Error} Thrown when the arguments have no canonical identity
+	 */
+	admit(name: string, args: Readonly<Record<string, unknown>>): void
+	/**
+	 * Counts one `recall` call, closing the request's recall tool when its recalls reach the limit.
+	 *
+	 * @throws {Error} Thrown with the {@link LedgerNote} `closure` text when the recall tool is closed
+	 */
+	recall(): void
+	/** Closes the request's recall tool, so every later `recall` call throws the closure note. */
+	close(): void
+	/**
+	 * Holds the stored first line of each lookup a recall result listed, keyed by its listed line.
+	 *
+	 * @param result - The recall result text
+	 * @param lines - Each listed lookup line mapped to the first line of its stored content
+	 */
+	list(result: string, lines: ReadonlyMap<string, string>): void
+	/**
+	 * Returns the stored first lines a recall result listed.
+	 *
+	 * @param result - The recall result text
+	 * @returns Each listed lookup line mapped to its stored first line, or undefined when no recall returned `result`
+	 */
+	listing(result: string): ReadonlyMap<string, string> | undefined
 }
 
 /**
@@ -313,6 +426,8 @@ export interface LedgerInterface {
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
 	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
+	 * A run no `respond` call owns, including a run during calibration, reads no request's state:
+	 * its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
 	 * Every rejection leaves the ledger free for a later call.
 	 *
 	 * @param content - The request text

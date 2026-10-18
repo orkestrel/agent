@@ -102,11 +102,12 @@ export class Conversation implements ConversationInterface {
 	#sections: readonly Section[]
 	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
 	// immutable messages keyed by their minted id.
-	readonly #messages = new Map<string, Message>()
+	readonly #messages: Map<string, Message>
 	readonly #judgments: JudgmentManager
-	// The lock `compact()` queues behind — settled only after every earlier call settled, and
-	// `undefined` while no call is in flight.
-	#pending: Promise<unknown> | undefined
+	// The folds in flight, one per `compact()` call from its start until it settles. A later call
+	// waits on every member it finds, so an aborted waiter never releases it ahead of a fold still
+	// running.
+	readonly #pending = new Set<Promise<Section | undefined>>()
 
 	constructor(options?: ConversationOptions) {
 		// A summarizer is a function and is never serialized, so it comes from options beside the
@@ -121,9 +122,7 @@ export class Conversation implements ConversationInterface {
 		this.#rolling = options?.rolling ?? false
 		requireRolling(this.#rolling, this.#cap)
 		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
-		if (snapshot !== undefined) {
-			for (const message of snapshot.messages) this.#messages.set(message.id, message)
-		}
+		this.#messages = new Map(snapshot?.messages.map((message) => [message.id, message]))
 	}
 
 	get id(): string {
@@ -204,16 +203,15 @@ export class Conversation implements ConversationInterface {
 		const keep = requireKeep(options?.keep ?? this.#keep)
 		const signal = options?.signal
 		signal?.throwIfAborted()
-		// Queue behind every earlier call. The lock settles only after the earlier lock and this
-		// call both settle, so an aborted waiter never releases a later call ahead of a fold still
-		// in flight.
-		const previous = this.#pending
+		// Queue behind every earlier fold, captured before this call adds its own. An earlier waiter
+		// that aborts leaves the folds it waited on in the set, so a later call still waits for them.
+		const previous = this.#pending.size === 0 ? undefined : Promise.allSettled([...this.#pending])
 		const fold = this.#fold(previous, summarize, cap, keep, signal)
-		const pending = Promise.allSettled([previous, fold])
-		this.#pending = pending
-		void pending.then(() => {
-			if (this.#pending === pending) this.#pending = undefined
-		})
+		this.#pending.add(fold)
+		void fold.then(
+			() => this.#pending.delete(fold),
+			() => this.#pending.delete(fold),
+		)
 		return fold
 	}
 
@@ -240,13 +238,16 @@ export class Conversation implements ConversationInterface {
 		// model reads the cherry-picked excerpts as foreign material it attributes to that source,
 		// never as its own latest turns.
 		const label = options?.label ?? this.#id
-		const lines = [`[Reference — conversation "${label}" — NOT part of this conversation]`]
 		const messages = options?.messages ?? []
-		if (messages.length > 0) {
-			lines.push('Relevant messages:')
-			for (const message of messages) lines.push(`- ${message.role}: ${message.content}`)
-		}
-		return lines.join('\n')
+		return [
+			`[Reference — conversation "${label}" — NOT part of this conversation]`,
+			...(messages.length > 0
+				? [
+						'Relevant messages:',
+						...messages.map((message) => `- ${message.role}: ${message.content}`),
+					]
+				: []),
+		].join('\n')
 	}
 
 	snapshot(): ConversationSnapshot {
@@ -280,12 +281,15 @@ export class Conversation implements ConversationInterface {
 			keep <= 0 ? live.length : live.length - keep,
 			newest === -1 ? live.length : newest,
 		)
-		// The exchange edges are each exchange start followed by the final end; a cut inside an
-		// exchange moves back to that exchange's start so a whole exchange folds or stays.
-		const edges = [0]
-		for (const exchange of collectExchanges(live)) edges.push((edges.at(-1) ?? 0) + exchange.length)
-		const aligned =
-			wanted < live.length ? (edges.findLast((edge) => edge <= wanted) ?? wanted) : wanted
+		// A cut inside an exchange moves back to that exchange's start so a whole exchange folds or
+		// stays. At most one exchange strictly contains the cut.
+		const { aligned } = collectExchanges(live).reduce(
+			(cut, exchange) => {
+				const end = cut.start + exchange.length
+				return { start: end, aligned: cut.start < wanted && wanted < end ? cut.start : cut.aligned }
+			},
+			{ start: 0, aligned: wanted },
+		)
 		// Retain the leading context until the first user exchange can fold with it.
 		const fold = first >= 0 && aligned <= first ? 0 : aligned
 		if (fold <= 0) return undefined

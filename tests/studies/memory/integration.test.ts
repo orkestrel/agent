@@ -186,8 +186,8 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 			expect(denied.stderr).toMatch(/qualification|memory-capacity|seal|missing|ENOENT/i)
 			expect(server.requests).toEqual([])
 			expect(scratch.has('unqualified')).toBe(false)
-			// The capacity seal id, retained once that target seals; the memory target is qualified by it.
-			const seals: string[] = []
+			// Every target's seal id, appended once that target seals; the memory target is qualified by the capacity one.
+			const sealed: Array<{ readonly target: string; readonly seal: string }> = []
 			for (const target of ['capacity', 'memory']) {
 				const beforeCheck = server.requests.length
 				const check = await executeStudyInstall(fixture, ['check', target])
@@ -249,8 +249,10 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 					STUDY_MEMORY_SCHEDULE,
 				)
 				expect(result.attempts.map((attempt) => attempt.trial)).toEqual(result.manifest.schedule)
-				expect(result.manifest.qualification).toBe(seals[0])
-				if (target === 'capacity') seals.push(result.seal.id)
+				expect(result.manifest.qualification).toBe(
+					sealed.find((one) => one.target === 'capacity')?.seal,
+				)
+				sealed.push({ target, seal: result.seal.id })
 				const retained = await collectStudyEvidence(result)
 				for (const attempt of result.attempts) {
 					expect(attempt.failure).toBeUndefined()

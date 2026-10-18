@@ -7,6 +7,7 @@ import type {
 	AgentResult,
 	ConversationEventMap,
 	Message,
+	ProviderDelta,
 	ProviderIncrement,
 	Selection,
 	ThinkingReplay,
@@ -41,10 +42,11 @@ import {
 } from '../../../setup.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
-import { attempt, parseJSONAs } from '@orkestrel/contract'
-import { createBudget, createTokenBudget } from '@orkestrel/budget'
+import { attempt, isContractError, parseJSONAs, parseJSONValue } from '@orkestrel/contract'
+import { createBudget, createTokenBudget, isBudgetError } from '@orkestrel/budget'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
+	agentResultToJSON,
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
@@ -55,6 +57,7 @@ import {
 	isAgentError,
 	isProviderAbortError,
 	ProviderAbortError,
+	ProviderError,
 	providerRequestContract,
 	Scope,
 } from '@src/core'
@@ -111,7 +114,8 @@ describe('Agent — thinking replay', () => {
 	it('resolves replay at construction for every call and context estimate', async () => {
 		// The policy getter answers `all` once, then `none`: only a construction-time read keeps
 		// the recorded thinking in every later request and estimate.
-		const policies: ThinkingReplay[] = ['all']
+		const replays: readonly ThinkingReplay[] = ['all']
+		const policies = replays.values()
 		const provider = createScriptedProvider(
 			[
 				{ content: '', thinking: 'first', tools: [createToolCall()] },
@@ -129,7 +133,7 @@ describe('Agent — thinking replay', () => {
 				id: provider.id,
 				name: provider.name,
 				get replay(): ThinkingReplay {
-					return policies.shift() ?? 'none'
+					return policies.next().value ?? 'none'
 				},
 				generate: provider.generate.bind(provider),
 				stream: provider.stream.bind(provider),
@@ -188,8 +192,10 @@ describe('Agent — thinking replay', () => {
 
 	it('stores each call thinking and applies every replay policy within and across user turns', async () => {
 		for (const replay of [undefined, 'none', 'turn', 'all'] as const) {
-			const responses = ['tool', 'answer', 'empty']
-			const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+			const responses = ['tool', 'answer', 'empty'].values()
+			const transport = new RecordedTransport(
+				() => new Response(requireValue(responses.next().value)),
+			)
 			const provider = new ScriptedWire({
 				url: 'https://provider.test',
 				fetch: transport.fetch,
@@ -248,8 +254,10 @@ describe('Agent — thinking replay', () => {
 		for (const replay of [undefined, 'none'] as const) {
 			const bodies: string[][] = []
 			for (const thinking of [undefined, 'private reasoning']) {
-				const responses = ['tool', 'answer']
-				const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+				const responses = ['tool', 'answer'].values()
+				const transport = new RecordedTransport(
+					() => new Response(requireValue(responses.next().value)),
+				)
 				const provider = new ScriptedWire({
 					url: 'https://provider.test',
 					fetch: transport.fetch,
@@ -319,8 +327,10 @@ describe('Agent — thinking replay', () => {
 			// This case pins message arithmetic, so the window explicitly measures request messages alone.
 			const window = createBudget<ProviderRequest>({ max: 100, consumer: measureMessages })
 			expect(estimateMessages(conversation.view())).toBeGreaterThan(window.max)
-			const responses = ['tool', 'answer']
-			const transport = new RecordedTransport(() => new Response(requireValue(responses.shift())))
+			const responses = ['tool', 'answer'].values()
+			const transport = new RecordedTransport(
+				() => new Response(requireValue(responses.next().value)),
+			)
 			const provider = new ScriptedWire({
 				url: 'https://provider.test',
 				fetch: transport.fetch,
@@ -1274,14 +1284,14 @@ describe('Agent — generate ↔ stream parity', () => {
 		]
 		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager([createLoopTool()]),
-			budget: createTokenBudget({ max: 12, scope: 'total' }),
+			budget: createTokenBudget({ id: 'budget', max: 12, scope: 'total' }),
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
 		const generated = await a.generate()
 
 		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager([createLoopTool()]),
-			budget: createTokenBudget({ max: 12, scope: 'total' }),
+			budget: createTokenBudget({ id: 'budget', max: 12, scope: 'total' }),
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
 		const stream = b.stream()
@@ -1445,15 +1455,18 @@ describe('Agent — abort', () => {
 		// The streamed delta's mid-stream charge exhausts the budget, aborting the run before the
 		// provider's next pull throws a plain `Error` rather than a `ProviderAbortError`.
 		const provider = createThrowingProvider('connection reset', 'partial')
-		const agent = createAgent(provider, {
-			budget: createTokenBudget({ max: 1, scope: 'completion' }),
-		})
+		const budget = createTokenBudget({ id: 'budget', max: 1, scope: 'completion' })
+		const agent = createAgent(provider, { budget, allowance: budget })
 		const events = createRecorders<AgentEventMap, 'abort' | 'error'>(agent.emitter, [
 			'abort',
 			'error',
 		])
 		agent.context.messages.add({ role: 'user', content: 'hi' })
-		expect(await agent.generate()).toEqual({ content: 'partial', partial: true })
+		expect(await agent.generate()).toEqual({
+			content: 'partial',
+			partial: true,
+			stop: { layer: 'meter', id: 'budget', max: 1, consumed: 2, estimate: 2 },
+		})
 		expect(agent.status).toBe('done')
 		expect(events.abort.count).toBe(1)
 		expect(events.error.count).toBe(0)
@@ -2941,10 +2954,11 @@ describe('Agent — emitter (push observation surface)', () => {
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
-		// `start` once, carrying the agent id; one `turn` (index 0); usage once; finish once.
+		// `start` once, carrying the agent id; one `turn` (index 0); usage once, beside the estimate
+		// of the five streamed characters; finish once.
 		expect(events.start.calls).toEqual([[agent.id]])
 		expect(events.turn.calls).toEqual([[0]])
-		expect(events.usage.calls).toEqual([[AGENT_USAGE]])
+		expect(events.usage.calls).toEqual([[AGENT_USAGE, 2]])
 		expect(events.finish.calls).toEqual([[result]])
 		expect(events.finish.calls[0]?.[0]).toEqual({
 			content: 'hello',
@@ -3976,6 +3990,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			budget,
+			allowance: budget,
 			on: { abort: () => order.push('abort'), finish: () => order.push('finish') },
 		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -3996,7 +4011,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		)
 		const budgetRecorder = createRecorder<[TokenUsage]>()
 		const budget = createRecordedBudget(budgetRecorder)
-		const agent = createAgent(provider, { budget })
+		const agent = createAgent(provider, { budget, allowance: budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.partial).toBe(false)
@@ -4037,7 +4052,7 @@ describe('Agent — mid-stream budget enforcement + reconcile', () => {
 		const provider = createAbortingGatedProvider(gate, abortUsage)
 		const budgetRecorder = createRecorder<[TokenUsage]>()
 		const budget = createRecordedBudget(budgetRecorder)
-		const agent = createAgent(provider, { budget })
+		const agent = createAgent(provider, { budget, allowance: budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -4215,7 +4230,7 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 
 	it('the same per-run budget passed to two overlapping runs throws CONCURRENCY and leaves the first run bound to it', async () => {
 		const gate = Promise.withResolvers<void>()
-		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
+		const budget = createTokenBudget({ id: 'budget', max: 1_000_000, scope: 'total' })
 		const agent = createAgent(createGatedProvider(gate))
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
@@ -4228,11 +4243,21 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 		// The refused run never restarted the budget, so exhausting it still cancels the first run.
 		budget.consume({ prompt: 0, completion: 0, total: 1_000_000 })
 		gate.resolve()
-		expect(await first.result).toEqual({ content: 'full', partial: true })
+		// The call streamed 'part' (estimate 1) and reported no usage, so the budget is also charged
+		// that estimate after the crossing.
+		expect(await first.result).toEqual({
+			content: 'full',
+			partial: true,
+			stop: { layer: 'budget', id: 'budget', max: 1_000_000, consumed: 1_000_000, estimate: 1 },
+		})
 
 		// The settled run released the instance: the next run may hold it, and its exhaustion binds.
 		const next = agent.stream({ budget })
-		expect(await next.result).toEqual({ content: '', partial: true })
+		expect(await next.result).toEqual({
+			content: '',
+			partial: true,
+			stop: { layer: 'budget', id: 'budget', max: 1_000_000, consumed: 1_000_001 },
+		})
 	})
 
 	it('a per-run budget equal to the construction budget is refused while a construction-budget run is live', async () => {
@@ -4685,7 +4710,7 @@ describe('Agent — abort usage sanitize', () => {
 			completion: Number.NaN,
 			total: 12.7,
 		})
-		const agent = createAgent(provider, { budget })
+		const agent = createAgent(provider, { budget, allowance: budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -4724,7 +4749,7 @@ describe('Agent — normal usage sanitize', () => {
 			[{ content: 'full', usage: { prompt: -5, completion: Number.NaN, total: 12.7 } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { budget })
+		const agent = createAgent(provider, { budget, allowance: budget })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 
@@ -5335,11 +5360,12 @@ describe('Agent — selection usage reaches the budget and the result, never a u
 		const chunks = await collect(run.events)
 		const result = await run.result
 
+		// 'done' streams four characters, so the call's estimate is 1.
 		expect(chunks.filter((chunk) => chunk.category === 'usage')).toEqual([
-			{ category: 'usage', usage: AGENT_USAGE },
+			{ category: 'usage', usage: AGENT_USAGE, estimate: 1 },
 		])
 		expect(chunks.filter((chunk) => chunk.category === 'usage')).toHaveLength(provider.calls.length)
-		expect(usages.calls).toEqual([[AGENT_USAGE]])
+		expect(usages.calls).toEqual([[AGENT_USAGE, 1]])
 		expect(result.usage).toEqual({ prompt: 35, completion: 9, total: 44 })
 		expect(budgetRecorder.calls.map(([value]) => value)[0]).toEqual(SELECTION_USAGE)
 		expect(budget.consumed).toBe(44)
@@ -5610,5 +5636,501 @@ describe('Agent — run boundaries', () => {
 		expect(faults.count).toBe(0)
 		expect(conversation.sections).toHaveLength(0)
 		expect(provider.calls).toHaveLength(0)
+	})
+})
+
+describe('Agent — turn records', () => {
+	it('enters the provider stream and fires turn before stream() returns on the default path', async () => {
+		// No select handler and no `window`: nothing before the provider call awaits.
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const turns = createRecorder<AgentEventMap['turn']>()
+		const agent = createAgent(provider, { on: { turn: turns.handler } })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const run = agent.stream()
+		expect([turns.calls, provider.started]).toEqual([[[0]], 1])
+		expect(await run.result).toEqual({ content: 'done', partial: false })
+	})
+
+	it('settles a two-turn script after two turns under the largest safe limit', async () => {
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [createToolCall()] }, { content: 'sum 5' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools: createSeededToolManager(),
+			limit: Number.MAX_SAFE_INTEGER,
+		})
+		agent.context.messages.add({ role: 'user', content: 'add' })
+		expect(await agent.generate()).toEqual({ content: 'sum 5', partial: false })
+		expect(provider.calls).toHaveLength(2)
+	})
+
+	it("counts a rebuild selection's usage when the run cancels right after the rebuild", async () => {
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		conversations.add().add([
+			{ role: 'user', content: 'h'.repeat(40) },
+			{ role: 'assistant', content: 'k'.repeat(40) },
+			{ role: 'user', content: 'go' },
+		])
+		const provider = createScriptedProvider([{ content: 'never' }], AGENT_SCRIPT_OPTIONS)
+		const selected = createRecorder<AgentEventMap['select']>()
+		const agent = createAgent(provider, {
+			conversations,
+			window: createBudget({ max: 1, consumer: measureMessages }),
+			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+		})
+		// The second `select` is the compaction rebuild's; cancelling there stops the turn before its call.
+		agent.emitter.on('select', (selection) => {
+			selected.handler(selection)
+			if (selected.count === 2) agent.abort()
+		})
+		const result = await agent.generate()
+		expect(selected.count).toBe(2)
+		expect(provider.calls).toHaveLength(0)
+		expect(result).toEqual({
+			content: '',
+			partial: true,
+			usage: { prompt: 60, completion: 4, total: 64 },
+		})
+	})
+
+	it('sums one turn usage with one selection usage and keeps a lone turn usage by identity', async () => {
+		const usages = createRecorder<AgentEventMap['usage']>()
+		const lone = createAgent(
+			createScriptedProvider([{ content: 'done', usage: AGENT_USAGE }], AGENT_SCRIPT_OPTIONS),
+			{ on: { usage: usages.handler } },
+		)
+		lone.context.messages.add({ role: 'user', content: 'hi' })
+		const result = await lone.generate()
+		const [reported] = requireValue(usages.calls[0])
+		expect(reported).toEqual(AGENT_USAGE)
+		expect(result.usage).toBe(reported)
+
+		const selected = createAgent(
+			createScriptedProvider([{ content: 'done', usage: AGENT_USAGE }], AGENT_SCRIPT_OPTIONS),
+			{ select: createRecordingSelection({ usage: SELECTION_USAGE }).handler },
+		)
+		selected.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		expect((await selected.generate()).usage).toEqual({ prompt: 35, completion: 9, total: 44 })
+	})
+})
+
+describe('Agent — three failure layers', () => {
+	const usage: TokenUsage = { prompt: 10, completion: 4, total: 14 }
+	// Sixteen streamed characters, so every call below that streams them estimates 4 tokens.
+	const story = { result: { content: 'Once upon a time', usage }, deltas: ['Once upon', ' a time'] }
+
+	it('stops at the meter when a shared allowance crosses mid-stream', async () => {
+		const budget = createTokenBudget({ id: 'shared', max: 5, scope: 'completion' })
+		const deltas = Array.from({ length: 10 }, () => 'abcde')
+		const aborts = createRecorder<AgentEventMap['abort']>()
+		const agent = createAgent(
+			createScriptedProvider(
+				[{ result: { content: deltas.join('') }, deltas }],
+				AGENT_SCRIPT_OPTIONS,
+			),
+			{ budget, allowance: budget, on: { abort: aborts.handler } },
+		)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		// The fourth delta brings the estimate of 20 characters to 5, the ceiling.
+		expect(await agent.generate()).toEqual({
+			content: 'abcde'.repeat(4),
+			partial: true,
+			stop: { layer: 'meter', id: 'shared', max: 5, consumed: 5, estimate: 5 },
+		})
+		const [reason] = requireValue(aborts.calls[0])
+		expect(isBudgetError(reason) ? reason.context.id : undefined).toBe('shared')
+		expect(budget.consumed).toBe(5)
+	})
+
+	it('stops at the budget when a shared allowance crosses at the reconcile of a tool turn', async () => {
+		const budget = createTokenBudget({ id: 'shared', max: 10, scope: 'total' })
+		const reported: TokenUsage = { prompt: 10, completion: 20, total: 30 }
+		const provider = createScriptedProvider(
+			[{ content: 'ok', tools: [createToolCall({ id: 'c', name: 'loop' })], usage: reported }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools: createSeededToolManager([createLoopTool()]),
+			budget,
+			allowance: budget,
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		// 'ok' charged 1 mid-stream, so the reconcile adds 10 + 29 and the post-authorize check stops it.
+		expect(await agent.generate()).toEqual({
+			content: 'ok',
+			partial: true,
+			usage: reported,
+			stop: { layer: 'budget', id: 'shared', max: 10, consumed: 30, estimate: 1, usage: reported },
+		})
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it('stops at a separate tighter meter and bills the budget the reported or estimated usage only', async () => {
+		const partial: TokenUsage = { prompt: 5, completion: 3, total: 8 }
+		for (const [reported, billed] of [
+			[partial, partial],
+			[undefined, { prompt: 0, completion: 1, total: 1 }],
+		] as const) {
+			const gate = Promise.withResolvers<void>()
+			gate.resolve()
+			const charges = createRecorder<[TokenUsage]>()
+			const allowance = createTokenBudget({ id: 'meter', max: 1, scope: 'completion' })
+			const agent = createAgent(createAbortingGatedProvider(gate, reported), {
+				budget: createRecordedBudget(charges),
+				allowance,
+			})
+			agent.context.messages.add({ role: 'user', content: 'go' })
+			// 'part' estimates 1, which reaches the allowance before the provider settles.
+			expect(await agent.generate()).toEqual({
+				content: 'part',
+				partial: true,
+				...(reported === undefined ? {} : { usage: reported }),
+				stop: {
+					layer: 'meter',
+					id: 'meter',
+					max: 1,
+					consumed: 1,
+					estimate: 1,
+					...(reported === undefined ? {} : { usage: reported }),
+				},
+			})
+			expect(charges.calls).toEqual([[billed]])
+		}
+	})
+
+	it('stops at the budget when a separate looser meter lets the reported usage cross', async () => {
+		const allowance = createTokenBudget({ id: 'meter', max: 1_000, scope: 'completion' })
+		const agent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			budget: createTokenBudget({ id: 'budget', max: 10, scope: 'total' }),
+			allowance,
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate()).toEqual({
+			content: 'Once upon a time',
+			partial: true,
+			usage,
+			stop: { layer: 'budget', id: 'budget', max: 10, consumed: 14, estimate: 4, usage },
+		})
+		// 'Once upon' estimates 3, and the whole answer estimates 4.
+		expect(allowance.consumed).toBe(4)
+	})
+
+	it('stops at the model for a truncated answer, and not when an abort landed during the call', async () => {
+		const truncated = { ...story, result: { ...story.result, truncated: true } }
+		const agent = createAgent(createScriptedProvider([truncated], AGENT_SCRIPT_OPTIONS))
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate()).toEqual({
+			content: 'Once upon a time',
+			partial: false,
+			usage,
+			stop: { layer: 'model', id: 'script', estimate: 4, usage },
+		})
+
+		const gate = Promise.withResolvers<void>()
+		const cancelled = createAgent({
+			id: 'gated',
+			name: 'gated',
+			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+				yield { channel: 'content', text: 'Once upon' }
+				await gate.promise
+				return { content: 'Once upon', usage, truncated: true }
+			},
+			async generate(): Promise<ProviderResult> {
+				return { content: 'Once upon', usage, truncated: true }
+			},
+		})
+		cancelled.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		const run = cancelled.stream()
+		run.abort()
+		gate.resolve()
+		expect(await run.result).toEqual({ content: 'Once upon', partial: true, usage })
+	})
+
+	it('keeps the model stop when the reconcile of a truncated answer then exhausts a budget', async () => {
+		const truncated = { ...story, result: { ...story.result, truncated: true } }
+		const aborts = createRecorder<AgentEventMap['abort']>()
+		const agent = createAgent(createScriptedProvider([truncated], AGENT_SCRIPT_OPTIONS), {
+			budget: createTokenBudget({ id: 'budget', max: 10, scope: 'total' }),
+			on: { abort: aborts.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate()).toEqual({
+			content: 'Once upon a time',
+			partial: true,
+			usage,
+			stop: { layer: 'model', id: 'script', estimate: 4, usage },
+		})
+		const [reason] = requireValue(aborts.calls[0])
+		expect(isBudgetError(reason) ? reason.context : undefined).toEqual({
+			id: 'budget',
+			max: 10,
+			consumed: 14,
+		})
+	})
+
+	it('carries the streamed estimate beside the reported usage, with and without a budget', async () => {
+		for (const budget of [undefined, createTokenBudget({ max: 1_000 })]) {
+			const usages = createRecorder<AgentEventMap['usage']>()
+			const agent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+				...(budget === undefined ? {} : { budget }),
+				on: { usage: usages.handler },
+			})
+			agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+			const run = agent.stream()
+			const chunks = await collect(run.events)
+			expect(chunks.filter((chunk) => chunk.category === 'usage')).toEqual([
+				{ category: 'usage', usage, estimate: 4 },
+			])
+			expect(usages.calls).toEqual([[usage, 4]])
+			expect(await run.result).toEqual({ content: 'Once upon a time', partial: false, usage })
+		}
+	})
+
+	it('names no layer for an external cancel, a deadline, or abort(), and keeps a model stop a late cancel follows', async () => {
+		const controller = new AbortController()
+		controller.abort()
+		const external = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			signal: controller.signal,
+		})
+		external.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await external.generate()).toEqual({ content: '', partial: true })
+
+		const deadline = createAgent(
+			createScriptedProvider([story], { ...AGENT_SCRIPT_OPTIONS, delay: 50 }),
+			{ timeout: 5 },
+		)
+		deadline.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(Object.keys(await deadline.generate())).toEqual(['content', 'partial'])
+
+		const aborted = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS))
+		aborted.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		const run = aborted.stream()
+		run.abort()
+		expect(Object.keys(await run.result)).not.toContain('stop')
+
+		const truncated = { ...story, result: { ...story.result, truncated: true } }
+		for (const cancel of ['listener', 'signal'] as const) {
+			const late = new AbortController()
+			const aborts = createRecorder<AgentEventMap['abort']>()
+			const agent = createAgent(createScriptedProvider([truncated], AGENT_SCRIPT_OPTIONS), {
+				signal: late.signal,
+				on: { abort: aborts.handler },
+			})
+			agent.emitter.on('usage', () =>
+				cancel === 'listener' ? agent.abort('listener') : late.abort('signal'),
+			)
+			agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+			expect(await agent.generate()).toEqual({
+				content: 'Once upon a time',
+				partial: true,
+				usage,
+				stop: { layer: 'model', id: 'script', estimate: 4, usage },
+			})
+			expect(aborts.calls).toEqual([[cancel]])
+		}
+	})
+
+	it('names the budget for a selection charge, an outer budget, a linked parent, and two exhausted bounds', async () => {
+		const selecting = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			budget: createTokenBudget({ id: 'budget', max: 10, scope: 'total' }),
+			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+		})
+		selecting.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		expect(await selecting.generate()).toEqual({
+			content: '',
+			partial: true,
+			usage: SELECTION_USAGE,
+			stop: { layer: 'budget', id: 'budget', max: 10, consumed: 32 },
+		})
+
+		const outer = createTokenBudget({ id: 'outer', max: 1, scope: 'completion' })
+		outer.start()
+		// Linked before the crossing, so the allowance composes the outer signal as its parent.
+		const linked = createTokenBudget({ id: 'meter', max: 1_000, signal: outer.signal })
+		outer.consume({ prompt: 0, completion: 2, total: 2 })
+		for (const options of [{ signal: outer.signal }, { allowance: linked }]) {
+			const agent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), options)
+			agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+			expect(await agent.generate()).toEqual({
+				content: '',
+				partial: true,
+				stop: { layer: 'budget', id: 'outer', max: 1, consumed: 2 },
+			})
+		}
+
+		const budget = createTokenBudget({ id: 'budget', max: 1 })
+		budget.consume({ prompt: 0, completion: 1, total: 1 })
+		const allowance = createTokenBudget({ id: 'meter', max: 1 })
+		allowance.consume({ prompt: 0, completion: 1, total: 1 })
+		const both = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			budget,
+			allowance,
+		})
+		both.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await both.generate()).toEqual({
+			content: '',
+			partial: true,
+			stop: { layer: 'budget', id: 'budget', max: 1, consumed: 1 },
+		})
+	})
+
+	it('tells a separate allowance and a budget that share an id apart at the reconcile', async () => {
+		const agent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			budget: createTokenBudget({ id: 'tokens', max: 10, scope: 'total' }),
+			allowance: createTokenBudget({ id: 'tokens', max: 1_000, scope: 'completion' }),
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate()).toEqual({
+			content: 'Once upon a time',
+			partial: true,
+			usage,
+			stop: { layer: 'budget', id: 'tokens', max: 10, consumed: 14, estimate: 4, usage },
+		})
+	})
+
+	it('refuses an allowance a live run holds and charges a per-run allowance only', async () => {
+		const gate = Promise.withResolvers<void>()
+		const allowance = createTokenBudget({ max: 1_000_000 })
+		const agent = createAgent(createGatedProvider(gate), { allowance })
+		agent.context.messages.add({ role: 'user', content: 'hi' })
+		const first = agent.stream()
+		const caught = captureError(() => agent.stream())
+		expect(isAgentError(caught) ? caught.code : undefined).toBe('CONCURRENCY')
+		gate.resolve()
+		await first.result
+
+		// An instance one live run holds as its budget is refused as another run's allowance too.
+		const release = Promise.withResolvers<void>()
+		const shared = createTokenBudget({ max: 1_000_000 })
+		const held = createAgent(createGatedProvider(release))
+		held.context.messages.add({ role: 'user', content: 'hi' })
+		const holding = held.stream({ budget: shared })
+		const refused = captureError(() => held.stream({ allowance: shared }))
+		expect(isAgentError(refused) ? refused.code : undefined).toBe('CONCURRENCY')
+		release.resolve()
+		await holding.result
+
+		const constructed = createTokenBudget({ max: 1_000 })
+		const run = createTokenBudget({ max: 1_000 })
+		const overriding = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+			allowance: constructed,
+		})
+		overriding.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		await overriding.generate({ allowance: run })
+		expect([constructed.consumed, run.consumed]).toEqual([0, 4])
+	})
+
+	it('rejects with a model error and charges the allowance the estimate streamed before it', async () => {
+		const failure = new ProviderError('HTTP', 'the prompt exceeds the context window', {
+			status: 400,
+		})
+		const allowance = createTokenBudget({ id: 'meter', max: 1_000, scope: 'completion' })
+		const agent = createAgent(
+			{
+				id: 'model',
+				name: 'model',
+				async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
+					yield { channel: 'content', text: 'Once upon' }
+					throw failure
+				},
+				async generate(): Promise<ProviderResult> {
+					throw failure
+				},
+			},
+			{ allowance },
+		)
+		const events = createRecorders<AgentEventMap, 'abort' | 'error'>(agent.emitter, [
+			'abort',
+			'error',
+		])
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate().catch((error: unknown) => error)).toBe(failure)
+		expect(events.error.calls).toEqual([[failure]])
+		expect(events.abort.count).toBe(0)
+		expect(allowance.consumed).toBe(3)
+	})
+
+	it('refuses a bound that is not a budget before either bound starts', () => {
+		const starts = createRecorder<readonly []>()
+		const unbudgeted = {
+			id: 'unbudgeted',
+			signal: new AbortController().signal,
+			max: Number.NaN,
+			consumed: 0,
+			remaining: 0,
+			exhausted: false,
+			start: starts.handler,
+			consume: createRecorder<[TokenUsage]>().handler,
+			clear: createRecorder<readonly []>().handler,
+		}
+		const real = createTokenBudget({ max: 100 })
+		const armed = real.signal
+		for (const [agent, options, key] of [
+			[
+				createAgent(createScriptedProvider([story]), { budget: real, allowance: unbudgeted }),
+				{},
+				'allowance',
+			],
+			[
+				createAgent(createScriptedProvider([story]), { allowance: real }),
+				{ budget: unbudgeted },
+				'budget',
+			],
+		] as const) {
+			const caught = captureError(() => agent.stream(options))
+			if (!isContractError(caught)) throw new Error('expected a ContractError')
+			expect([caught.code, caught.message, caught.context]).toEqual([
+				'placement',
+				`Agent: ${key} must implement BudgetInterface`,
+				{ path: ['options', key], limit: 'BudgetInterface', received: 'object' },
+			])
+		}
+		expect(real.signal).toBe(armed)
+		expect(starts.count).toBe(0)
+	})
+
+	it('charges a budget with no meter layer the reported usage, or the estimate when none is reported', async () => {
+		const reported: TokenUsage = { prompt: 2, completion: 3, total: 4 }
+		const deltas = Array.from({ length: 10 }, () => 'abcde')
+		for (const [turn, billed] of [
+			[{ result: { content: deltas.join(''), usage: reported }, deltas }, reported],
+			[
+				{ result: { content: 'Once upon a time' }, deltas: story.deltas },
+				{ prompt: 0, completion: 4, total: 4 },
+			],
+		] as const) {
+			const charges = createRecorder<[TokenUsage]>()
+			// Fifty streamed characters estimate 13 tokens, past this ceiling, yet nothing meters them.
+			const agent = createAgent(createScriptedProvider([turn], AGENT_SCRIPT_OPTIONS), {
+				budget: createRecordedBudget(charges, 5),
+			})
+			agent.context.messages.add({ role: 'user', content: 'go' })
+			expect(await agent.generate()).toMatchObject({ content: turn.result.content, partial: false })
+			expect(charges.calls).toEqual([[billed]])
+		}
+	})
+
+	it('keeps the stop exactly through the JSON gate and the portable projection', async () => {
+		const gate = Promise.withResolvers<void>()
+		gate.resolve()
+		const agent = createAgent(createAbortingGatedProvider(gate, usage), {
+			allowance: createTokenBudget({ id: 'meter', max: 1, scope: 'completion' }),
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.stop).toEqual({
+			layer: 'meter',
+			id: 'meter',
+			max: 1,
+			consumed: 1,
+			estimate: 1,
+			usage,
+		})
+		expect(parseJSONValue(result.stop)).toEqual(result.stop)
+		expect(agentResultToJSON(result)).toEqual(result)
 	})
 })

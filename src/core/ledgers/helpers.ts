@@ -61,7 +61,7 @@ export function scanAmendments(
 		seen.add(id)
 		if (!admit(id)) continue
 		admitted.push(id)
-		queue.push(...(amendments.get(id) ?? []))
+		for (const later of amendments.get(id) ?? []) queue.push(later)
 	}
 	return admitted
 }
@@ -107,14 +107,16 @@ export function renderTopicNames(topics: readonly LedgerTopic[]): string {
  * ```
  */
 export function renderCauseChain(error: unknown): string {
-	const chain: unknown[] = error === undefined ? [] : [error]
-	while (chain.length < 4) {
-		const last = chain.at(-1)
-		const cause = isError(last) ? last.cause : undefined
-		if (cause === undefined) break
-		chain.push(cause)
-	}
-	return chain
+	// The error, then at most three causes: each step extends the chain by the last entry's cause.
+	return Array.from({ length: 3 })
+		.reduce<readonly unknown[]>(
+			(chain) => {
+				const last = chain.at(-1)
+				const cause = isError(last) ? last.cause : undefined
+				return cause === undefined ? chain : [...chain, cause]
+			},
+			error === undefined ? [] : [error],
+		)
 		.map((one) => (isError(one) ? `${one.name}: ${one.message}` : String(one)))
 		.join(' <- ')
 }
@@ -290,14 +292,18 @@ export function splitSentences(text: string): readonly string[] {
  */
 export function extractTokens(text: string): LedgerTokenSet {
 	const idShape = /\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\b/g
-	const ids = new Set<string>()
-	for (const [token] of text.matchAll(idShape)) if (/\d/.test(token)) ids.add(token.toUpperCase())
+	const ids = new Set(
+		[...text.matchAll(idShape)].flatMap(([token]) =>
+			/\d/.test(token) ? [token.toUpperCase()] : [],
+		),
+	)
 	const rest = text.replace(idShape, (token) => (/\d/.test(token) ? ' ' : token))
-	const numbers = new Set<number>()
-	for (const [token] of rest.matchAll(/(?<![\w.])\d[\d,]*(?:\.\d+)?/g)) {
-		const value = Number(token.replace(/,/g, ''))
-		if (Number.isFinite(value)) numbers.add(value)
-	}
+	const numbers = new Set(
+		[...rest.matchAll(/(?<![\w.])\d[\d,]*(?:\.\d+)?/g)].flatMap(([token]) => {
+			const value = Number(token.replace(/,/g, ''))
+			return Number.isFinite(value) ? [value] : []
+		}),
+	)
 	return { ids, numbers }
 }
 
@@ -442,21 +448,22 @@ export function linkOwners(
 	readings: readonly LedgerLookupReading[],
 	owners: ReadonlyMap<string, readonly string[]>,
 ): ReadonlyMap<string, string> {
-	const links = new Map<string, string>()
-	for (const reading of readings) {
-		if (reading.result === undefined) continue
-		const named = [...extractTokens(reading.text).ids].filter((id) => owners.has(id))
-		const [only] = named
-		const subjects = Object.values(reading.arguments)
-			.filter(isString)
-			.map((value) => normalizeArgument(value))
-			.filter((subject) => extractTokens(subject).ids.has(subject))
-		for (const subject of subjects) {
-			if (owners.has(subject)) links.set(subject, subject)
-			else if (named.length === 1 && only !== undefined) links.set(subject, only)
-		}
-	}
-	return links
+	// A later pair of the same argument overwrites an earlier one, as the `Map` constructor does.
+	return new Map(
+		readings.flatMap((reading) => {
+			if (reading.result === undefined) return []
+			const named = [...extractTokens(reading.text).ids].filter((id) => owners.has(id))
+			const [only] = named
+			return Object.values(reading.arguments)
+				.filter(isString)
+				.map((value) => normalizeArgument(value))
+				.filter((subject) => extractTokens(subject).ids.has(subject))
+				.flatMap((subject) => {
+					if (owners.has(subject)) return [[subject, subject] as const]
+					return named.length === 1 && only !== undefined ? [[subject, only] as const] : []
+				})
+		}),
+	)
 }
 
 /**
@@ -478,21 +485,31 @@ export function linkOwners(
  * ```
  */
 export function collectRegistry(readings: readonly LedgerLookupReading[]): LedgerRegistry {
-	const ids = new Set<string>()
-	const owners = new Map<string, readonly string[]>()
-	for (const reading of readings) {
-		if (reading.result === undefined) continue
-		for (const id of reading.result.ids) ids.add(id)
-		for (const owner of reading.result.owners) {
-			ids.add(owner.id)
-			const names = owners.get(owner.id) ?? []
-			const added = owner.names
-				.map((name) => name.trim())
-				.filter((name) => /\p{L}/u.test(name) && !names.includes(name))
-			owners.set(owner.id, [...names, ...new Set(added)])
-		}
+	const results = readings.flatMap((reading) =>
+		reading.result === undefined ? [] : [reading.result],
+	)
+	return {
+		ids: new Set(
+			results.flatMap((result) => [...result.ids, ...result.owners.map((owner) => owner.id)]),
+		),
+		owners: new Map(
+			[
+				...Map.groupBy(
+					results.flatMap((result) => result.owners),
+					(owner) => owner.id,
+				),
+			].map(([id, listed]) => [
+				id,
+				[
+					...new Set(
+						listed.flatMap((owner) =>
+							owner.names.map((name) => name.trim()).filter((name) => /\p{L}/u.test(name)),
+						),
+					),
+				],
+			]),
+		),
 	}
-	return { ids, owners }
 }
 
 /**
@@ -520,32 +537,35 @@ export function matchEntities(
 	text: string,
 	partial: boolean,
 ): ReadonlySet<string> {
-	const found = new Set<string>()
 	const tokens = extractTokens(text).ids
-	for (const id of registry.ids) if (tokens.has(id)) found.add(id)
-	const aliases = new Map<string, string[]>()
-	for (const [id, names] of registry.owners) {
-		for (const name of names) aliases.set(name, [...(aliases.get(name) ?? []), id])
-	}
-	const carriers = new Map<string, number>()
-	for (const name of aliases.keys()) {
-		for (const word of new Set(name.split(/\s+/))) carriers.set(word, (carriers.get(word) ?? 0) + 1)
-	}
-	for (const [name, ids] of aliases) {
-		const words = partial
-			? name.split(/\s+/).filter((word) => /^\p{Lu}\p{L}+$/u.test(word) && carriers.get(word) === 1)
-			: []
-		const needles = [
-			{ needle: name, flags: 'iu' },
-			...words.map((word) => ({ needle: word, flags: 'u' })),
-		]
-		const named = needles.some(({ needle, flags }) => {
-			const escaped = needle.replace(/[.*+?^$()|{}[\]\\]/g, '\\$&')
-			return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, flags).test(text)
-		})
-		if (named) for (const id of ids) found.add(id)
-	}
-	return found
+	const aliases = Map.groupBy(
+		[...registry.owners].flatMap(([id, names]) => names.map((name) => ({ name, id }))),
+		(entry) => entry.name,
+	)
+	// A word's carriers are the distinct names it appears in.
+	const carriers = Map.groupBy(
+		[...aliases.keys()].flatMap((name) => [...new Set(name.split(/\s+/))]),
+		(word) => word,
+	)
+	return new Set([
+		...[...registry.ids].filter((id) => tokens.has(id)),
+		...[...aliases].flatMap(([name, entries]) => {
+			const words = partial
+				? name
+						.split(/\s+/)
+						.filter((word) => /^\p{Lu}\p{L}+$/u.test(word) && carriers.get(word)?.length === 1)
+				: []
+			const needles = [
+				{ needle: name, flags: 'iu' },
+				...words.map((word) => ({ needle: word, flags: 'u' })),
+			]
+			const named = needles.some(({ needle, flags }) => {
+				const escaped = needle.replace(/[.*+?^$()|{}[\]\\]/g, '\\$&')
+				return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, flags).test(text)
+			})
+			return named ? entries.map((entry) => entry.id) : []
+		}),
+	])
 }
 
 /**
@@ -587,32 +607,38 @@ export function matchEntities(
  * ```
  */
 export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
-	const position = new Map<string, number>()
-	const byId = new Map<string, Message>()
-	for (const [at, message] of input.messages.entries()) {
-		position.set(message.id, at)
-		byId.set(message.id, message)
-	}
+	const position = new Map(input.messages.map((message, at) => [message.id, at]))
+	const byId = new Map(input.messages.map((message) => [message.id, message]))
 	const live = collectLive(input)
 	const links = linkOwners(input.readings, input.owners)
-	const amending = new Map<string, readonly string[]>()
-	for (const [earlier, laters] of input.classification.amendments) {
-		for (const later of laters) amending.set(later, [...(amending.get(later) ?? []), earlier])
-	}
+	const amending = new Map(
+		[
+			...Map.groupBy(
+				[...input.classification.amendments].flatMap(([earlier, laters]) =>
+					laters.map((later) => ({ earlier, later })),
+				),
+				(pair) => pair.later,
+			),
+		].map(([later, pairs]) => [later, pairs.map((pair) => pair.earlier)]),
+	)
 	const stale = collectStale(input, byId, live)
 	const dead = new Set(stale.map((entry) => `${entry.source} ${entry.sentence}`))
 	const holders = [...input.owners.values()].flat()
 	const system = collectNames(input.system)
-	const members = new Map<string, string[]>()
-	const orphans: string[] = []
+	// The memo belongs to this projection alone: `placeMember` inserts each placement once.
 	const settled = new Map<string, ReadonlySet<string>>()
-	for (const id of live) {
-		const keys = placeMember(input, links, amending, id, new Set(), settled)
-		if (keys.size === 0) orphans.push(id)
-		for (const key of keys) members.set(key, [...(members.get(key) ?? []), id])
-	}
+	const placements = live.map((id) => ({
+		id,
+		keys: placeMember(input, links, amending, id, new Set(), settled),
+	}))
+	const orphans = placements.filter((placement) => placement.keys.size === 0).map(({ id }) => id)
+	const members = Map.groupBy(
+		placements.flatMap(({ id, keys }) => [...keys].map((key) => ({ key, id }))),
+		(entry) => entry.key,
+	)
 	const records = [...members]
-		.map(([key, ids]) => {
+		.map(([key, entries]) => {
+			const ids = entries.map((entry) => entry.id)
 			const lines = ids.flatMap((id) => buildLines(input, byId, id, dead, holders, system))
 			const owner = key.slice(LEDGER_OWNER_PREFIX.length)
 			const holder = input.owners.get(owner)?.[0]
@@ -667,18 +693,25 @@ export function selectRecords(
 	request: LedgerProjectionRequest,
 ): readonly LedgerRecord[] {
 	const topics = new Set(request.topics)
-	const views: LedgerRecord[] = []
-	for (const owner of new Set(request.owners)) {
-		const record = projection.records.find((one) => one.key === `${LEDGER_OWNER_PREFIX}${owner}`)
-		if (record !== undefined) views.push(structuredClone(record))
-	}
 	const rules = projection.records.find((one) => one.key === LEDGER_RULES_KEY)
-	if (rules !== undefined) {
-		const met = rules.lines.filter((line) => line.topics.some((topic) => topics.has(topic)))
-		const rest = rules.lines.filter((line) => !line.topics.some((topic) => topics.has(topic)))
-		views.push(structuredClone({ ...rules, lines: [...met, ...rest] }))
-	}
-	return views
+	// Lines that meet a request topic lead; each side keeps its position order.
+	const sides = Map.groupBy(rules?.lines ?? [], (line) =>
+		line.topics.some((topic) => topics.has(topic)),
+	)
+	return [
+		...[...new Set(request.owners)].flatMap((owner) => {
+			const record = projection.records.find((one) => one.key === `${LEDGER_OWNER_PREFIX}${owner}`)
+			return record === undefined ? [] : [structuredClone(record)]
+		}),
+		...(rules === undefined
+			? []
+			: [
+					structuredClone({
+						...rules,
+						lines: [...(sides.get(true) ?? []), ...(sides.get(false) ?? [])],
+					}),
+				]),
+	]
 }
 
 /**
@@ -756,28 +789,28 @@ export function splitTopic(topic: string): readonly string[] {
  * ```
  */
 export function cutListing(entries: readonly string[], room: number): string {
-	const kept: string[] = []
-	for (const entry of entries) {
-		if (
-			kept.length > 0 &&
+	// The cut keeps at least one entry, and stops at the first entry whose addition passes the room.
+	const stop = [...entries.keys()].findIndex(
+		(at) =>
+			at > 0 &&
 			estimateMessages([
 				{
 					id: 'recall',
 					role: 'tool',
-					content: [...kept, entry].join('\n'),
+					content: entries.slice(0, at + 1).join('\n'),
 				},
-			]) > room
-		)
-			break
-		kept.push(entry)
-	}
+			]) > room,
+	)
+	const kept = entries.slice(0, stop === -1 ? undefined : stop)
 	const left = entries.length - kept.length
-	if (left > 0) {
-		kept.push(
-			`${left} older item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
-		)
-	}
-	return kept.join('\n')
+	return [
+		...kept,
+		...(left > 0
+			? [
+					`${left} older item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+				]
+			: []),
+	].join('\n')
 }
 
 /**
@@ -954,22 +987,23 @@ export function placeMember(
 ): ReadonlySet<string> {
 	const known = settled?.get(id)
 	if (known !== undefined) return known
-	const keys = new Set<string>()
-	for (const entity of input.entities.get(id) ?? []) {
+	const owners = (input.entities.get(id) ?? []).flatMap((entity) => {
 		const owner = input.owners.has(entity) ? entity : links.get(entity)
-		if (owner !== undefined) keys.add(`${LEDGER_OWNER_PREFIX}${owner}`)
-	}
-	const owned = keys.size > 0
+		return owner === undefined ? [] : [`${LEDGER_OWNER_PREFIX}${owner}`]
+	})
+	const owned = owners.length > 0
 	const sides = owned ? [] : (amending.get(id) ?? []).filter((side) => side !== id)
 	const earlier = sides.filter((side) => !seen.has(side))
-	for (const side of earlier) {
-		for (const key of placeMember(input, links, amending, side, new Set([...seen, id]), settled))
-			keys.add(key)
-	}
-	if (!owned && earlier.length === 0) {
-		const category = input.classification.categories.get(id)
-		if (category !== undefined && PLACED_CATEGORIES.includes(category)) keys.add(LEDGER_RULES_KEY)
-	}
+	const category = input.classification.categories.get(id)
+	const ruled =
+		!owned && earlier.length === 0 && category !== undefined && PLACED_CATEGORIES.includes(category)
+	const keys = new Set([
+		...owners,
+		...earlier.flatMap((side) => [
+			...placeMember(input, links, amending, side, new Set([...seen, id]), settled),
+		]),
+		...(ruled ? [LEDGER_RULES_KEY] : []),
+	])
 	if (
 		settled !== undefined &&
 		earlier.length === sides.length &&
@@ -1017,26 +1051,25 @@ export function collectStale(
 			)
 			.map((message) => message.id),
 	])
-	const stale: LedgerStaleSentence[] = []
-	for (const id of live) {
+	return live.flatMap((id) => {
 		const laters = (classification.amendments.get(id) ?? [])
 			.filter((later) => effective.has(later))
 			.flatMap((later) => {
 				const message = byId.get(later)
 				return message === undefined ? [] : [extractTokens(message.content)]
 			})
-		if (laters.length === 0) continue
-		for (const [sentence, text] of splitSentences(byId.get(id)?.content ?? '').entries()) {
+		if (laters.length === 0) return []
+		return splitSentences(byId.get(id)?.content ?? '').flatMap((text, sentence) => {
 			const own = extractTokens(text)
-			const tokens = new Set<string>()
-			for (const other of laters) {
-				for (const token of own.ids) if (other.ids.has(token)) tokens.add(token)
-				for (const token of own.numbers) if (other.numbers.has(token)) tokens.add(String(token))
-			}
-			if (tokens.size > 0) stale.push({ source: id, sentence, tokens: [...tokens] })
-		}
-	}
-	return stale
+			const tokens = new Set(
+				laters.flatMap((other) => [
+					...[...own.ids].filter((token) => other.ids.has(token)),
+					...[...own.numbers].filter((token) => other.numbers.has(token)).map(String),
+				]),
+			)
+			return tokens.size > 0 ? [{ source: id, sentence, tokens: [...tokens] }] : []
+		})
+	})
 }
 
 /**
