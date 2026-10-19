@@ -64,3 +64,61 @@ This verdict supersedes `.orkestrel/agent/let-sweep-study-2-audit-verdict.md`, w
 
 Fix 5 closes with mutation probes, because each item adopts its lane's prescription. Naming Unit A lands on the
 result, and the restage into Agent with the `clear()` edits and Unit B runs in Agent's wave 3.
+
+## SB-study: the recorder and hole sweep (2026-10-18)
+
+T3 `sb-study-sonnet-1`, brief `tmp/units/study-budget-sweep-brief.md`. The baseline is `ca81174`.
+
+- **Source regressions found and fixed.** The failing-first run was 6 of 67. Each fix is mutation-proved.
+  - **B1.** `isStudyCustodyAttempt` accepted an observation hole that the baseline refused.
+  - **B2.** `buildStudyPacketLinks` skipped holes in the criteria or the schedule, where the baseline threw.
+  - **B3.** `buildStudyPacket` ran every lookup before the first absent-horizon or capacity refusal, so a later hole
+    won.
+  - **B4.** `StudyAgentTrace` delivered the first row a microtask late, ended an empty goal late, and refused a second
+    flush one turn later. The fix adds an internal `rows` getter on `StudyAgentTraceGoal`. The public `flush` is
+    unchanged, and Agent's caller at `studies/memory/StudyMemorySession.ts:326` is unaffected.
+  - **B5.** `StudyChannel` registered a request after its handler's synchronous path, so re-entry bypassed the limit
+    of 64.
+- **Differential coverage.** The comparisons covered:
+  - 433 server-helper cases and 98 store and process cases;
+  - 21 924 series and lease runs;
+  - 1 793 script cases;
+  - process sessions with real child programs;
+  - the launcher, the transport, and the built CLI end to end.
+
+  Controls C1–C4 each reddened a probe.
+- **Tests.**
+  - About 25 count-only recorders were converted to whole-history assertions.
+  - The served-count log is now the entity `OllamaReplyQueue`.
+  - New setup helpers: `buildStudySparse` and `buildStudyHole`.
+- **Gates.** src 596, policy 119, config 229, setup 72, guides 15 and distribution 10. Format, lint, check and build
+  are clean.
+- **Ruled by the Orchestrator.** The `__proto__` model label stays in its own-key form. The baseline's assignment loop
+  set a prototype and dropped a pinned model, so that was a latent defect, now fixed.
+- **Left to the review lane.**
+  - One launcher now interrupts every child it launched, where the baseline interrupted only the latest.
+  - `StudyProcessSession.#appends` is a `Set<Promise>` that could collapse a shared promise.
+  - The reviewer is GPT-6 Astra (T3 `sb-study-falsify-astra-1`), against claims `tmp/units/sb-study-claims.md`.
+### SB-study review (one lane), 2026-10-18
+
+GPT-6 Astra high, T3 `sb-study-falsify-astra-1`. The report is `tmp/units/sb-study-verdict-objective-1.md`:
+FAIL 5, 6; outside the claims: O1.
+
+- **CONFIRMED.**
+  - **1:** B1–B5 restore the baseline, and each control distinguishes its defect.
+  - **2:** Bindings and the surface hold. `StudyAgentTraceGoal` stays internal, and `flush` keeps its contract.
+  - **3:** the recorders.
+  - **4:** the launcher. Interrupting every child of the launcher it owns is a cleanup defect fix, since `StudyCLI`
+    constructs a launcher per invocation. The appends `Set<Promise>` holds too: its consumer checks only for unsettled
+    evidence.
+- **BROKEN.**
+  - **5:** the grading traversal (`src/server/adapters/helpers.ts:126`) filters the criteria eagerly. The baseline's
+    nested `for…of` reads each next criterion after the preceding predicate returns, so a predicate that replaces a
+    criterion in its own rubric array is seen by the baseline and missed here. Fix: a lazy iterator traversal.
+  - **O1:** B5 reintroduced a baseline defect. Both reply paths re-read `value.id` after awaiting the handler, so a
+    listener that mutates the received frame misroutes the reply (99 instead of 1). `983dba7` was correct. Fix:
+    capture the validated id before invoking the handler, and keep the registration order.
+  - **6:** follows from 5 and O1.
+- **Fix unit.** SB-study-F (T3 `sb-study-fix-sonnet-1`) adopts both prescriptions verbatim, so it closes with
+  mutation probes. The lane's leftover `objective-*` probes under `study/tmp/units/` serve as its failing-first
+  evidence, and SB-study-F deletes them.

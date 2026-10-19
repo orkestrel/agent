@@ -116,6 +116,158 @@ other terms still bind (tarball, never link; record the replaced range; restore 
   - `dist/` was rebuilt from that tree, and `test:studies` passes 100 of 100 against it.
   - Unit D (guide parity, Opus) is running. The tree-wide verifier, an Agent census re-run and Agent's falsify round
     follow.
+- **Agent round 2 accepted (2026-10-18), commit `53bfe20`.** It carries the Bindings sweep, D1, budget layers U2 and
+  U3, `AgentFanout`, `LedgerRequest` and `LedgerPass`.
+  - **Verdicts.** `.orkestrel/agent/agent-r2-audit-verdict.md` and `agent-r2-fix-audit-verdict.md`. Every finding was
+    reproduced against the `f52daa4` baseline.
+  - **Gates.**
+
+    | Project | Result |
+    | --- | --- |
+    | src:core | 1580 |
+    | policy | 119 |
+    | config | 229 |
+    | setup | 175 |
+    | guides | 147 |
+    | studies | 100 |
+    | distribution | 9 of 9, under the absolute pins |
+  - **Downstream pins.**
+    - Study is pinned to Agent tarball `f22e76bd50c9` and to budget, and its gates are running on it.
+    - Ollama is pinned to the same two, for U4.
+  - **The live proof.** U4's runs on a dedicated daemon on port 11435, under a cap with its PID recorded. Port 11434
+    is untouched.
+- **Study and budget sweeps (2026-10-18).**
+  - **budget, commit `a26ff9a`, tests only.**
+    - The recorders are converted.
+    - 30 000 differential sequences found no regression.
+    - The tarball `39343e7e9395` is unchanged.
+  - **Study, commit `c1a289f`.**
+    - **Restored, all found by a differential sweep against `ca81174`:**
+      - a custody-attempt hole;
+      - holes in the packet links;
+      - the packet lookup order;
+      - the trace flush timing;
+      - the channel's re-entry limit.
+    - **The review then found two more,** both fixed: the grading traversal was eager, and the channel misrouted a
+      reply when the request frame was mutated.
+    - **Restage.** Study is restaged into Agent as `62b0c34f2995`, and Agent's studies pass 100 of 100.
+  - **Ollama's own Bindings sweep is now in scope (2026-10-18).** The user's words: "Why not do the ollama let sweep?
+    Id rather you get it out of the way as soon as possible unless there is an actual issue."
+    - **Done: Ollama commit `c7c611a`**, on the baseline `ba171bd`, with the pins left uncommitted.
+      - **The work:** six builders (`tmp/units/ollama-sweep-brief.md`), three falsify rounds, fix rounds OS-F, OS-G and
+        OS-H, and one closure check under the exit rule.
+      - **Published `src`:** only `src/core/helpers.ts` changed, and it is proven equivalent to `ba171bd`.
+      - **Evidence:** live passes 80 of 80 on 11435 and discovery exits 0. The guarded gates are green.
+      - **Restaged** as `9a5756095d99` into Agent (devDependency) and Study.
+      - **The record:** `.orkestrel/ollama/u4-audit-verdict.md`.
+    - **Follow-up `ollama-probes-drift`, done.** The git-ignored series probes typecheck again. `wire-dump` dumps
+      `provider.encode(...)`, which `0a36af3` renamed from `body`, and both wrappers drop `format`.
+    - **Follow-up `study-admission-timing`, queued.** A Study case fails under full three-project load and passes
+      alone. It is recorded in `.orkestrel/plan.md`, and Study's quiet rerun is owed.
+    - **Exit rule (the user, 2026-10-18): "One closure check, then commit".** Once the gates and the live run are
+      green, one single-reviewer round checks that each named finding is closed, and then the work is committed. Ollama
+      has finished under this rule, and scaffold takes it after E3. New minor findings become follow-up units.
+    - **Hazard, found 2026-10-18: Ollama's `setup` project contacts the user's 11434 daemon.**
+      - `tests/setupStore.ts` imports `tests/setupService.ts`, and that module's load gate sends a warm-up chat with
+        `keep_alive: '30m'` to `OLLAMA_HOST`, which defaults to 11434. This predates the sweep.
+      - Until unit OS-hermetic lands and is verified, and as a standing guard afterwards, run every non-service Ollama
+        command with `$env:OLLAMA_HOST = 'http://127.0.0.1:1'`. That covers `npm test`, `setup`, gates and probes.
+      - Never merge the `probe` project into a probe config, because `tmp/probes/**` holds live probes.
+      - The record is in `.orkestrel/ollama/u4-audit-verdict.md`.
+    - **T3 task ids** are `node:delegated-task:command%3Amcp%3A11386d00-6ff3-44cb-aa2b-c3824db22fc7%3Adelegate-task%3A`
+      followed by the clientRequestId, such as `os-store-sonnet-1`. The bare clientRequestId gives `task_not_found`.
+- **Scaffold Bindings fix chain: accepted, commit `4d67f0f32` (2026-10-19).**
+  - **How it closed.** Round E, then F1. Then a closure check (B1, fixed by round F's `iterateAnswers`), then a
+    narrow re-check (B2, a `@throws` form, fixed).
+  - **Gates.** The build and every gate are green.
+  - **`PARALLEL.md`** carries the hash and the next steps.
+  - **Records:** `.orkestrel/scaffold/scaffold-fix-audit-verdict.md` § Fix round E.
+  - **`scaffold-local-pins` is accepted**, commit `8cc944140` on branch `local-pins`. It ships
+    `.agents/skills/orkestrel-publish/scripts/swap.ts` (`--pin`, `--restore`, `--status`) and the ledger convention in
+    `release.md` and `wave.md`. It passed a falsify lane, two fix units, and a closure check.
+  - **Scaffold 0.0.102 (2026-10-19).** The Veneer session relays the user's rulings in `PARALLEL.md`: 0.0.102 ships the
+    chain plus Veneer's commands hook U1 (`2cc1ded7a` on branch `commands`, from `4d67f0f32`). The fleet re-pins to
+    0.0.102 **after it publishes**. This session answered there: local-pins rides 0.0.102, and this session carries
+    the fleet re-pin.
+  - **The order:**
+    1. Veneer fast-forwards `main` to `2cc1ded7a`. The window is granted, with `main` idle at `4d67f0f32`.
+    2. This session rebases `local-pins` onto it, rebuilds, gates, fast-forwards `main`, and writes the section.
+    3. Veneer runs its falsify round and the release commit.
+    4. The user publishes.
+    5. The fleet repair runs to the registry `^0.0.102`, from `tmp/units/fleet-repair-brief.md` (restore, repair,
+       commit the index, re-pin the local builds). Expect G1's `ERESOLVE` in Agent, Ollama and Study.
+  - **Done ahead of the window (2026-10-19, 6:59 AM),** in worktree `scaffold/tmp/worktrees/local-pins`:
+    - `local-pins` is rebased onto U1. It reads `2cc1ded7a`, then `cb5745417` (the swap script; every gate green,
+      with src:core 586 and skills 122), then `5ae2e8d8f` (the serve hoist, `createServedList`).
+    - `PARALLEL.md` offers Veneer one fast-forward of `main` to `5ae2e8d8f`.
+    - The scaffold checkout's own working tree and `main` (`4d67f0f32`) are untouched.
+  - **Observation.** `tests/setupServer.test.ts`'s distribution-boundary test needs `<root>/tmp`, so a fresh clone
+    fails it. It predates the chain. Closed by Veneer's `97eea2ea3`.
+  - **Scaffold 0.0.102 is published (2026-10-19, about 8:37 AM).** Veneer fast-forwarded `main` to `5ae2e8d8f`, then
+    to its fixes `97eea2ea3` and `06f329115` and the release commit `19671436e` (falsify round: Astra and Opus; the
+    whole `prepublishOnly` chain green in a standalone clone). The user published it, and `main` is pushed.
+    - **Fleet repair done (2026-10-19).** Brief `tmp/units/fleet-repair-brief.md`; reports under
+      `tmp/units/fleet-repair/`. Every repair ran `scaffold repair --offline`, committed only the scaffold-owned paths and
+      the manifest and lock, with no pins, and then re-pinned.
+
+      | Repo | Commit | Gates against the pins |
+      | --- | --- | --- |
+      | budget | `ca99510` | src 255, policy 120, config 280, setup 17, guides 33, distribution 9 (no ledger) |
+      | Agent | `e8cdcba` | format, lint, check, build; test green (policy 120, config 280, setup 175, guides 147, src:core); distribution 9; studies 100 |
+      | Ollama | `3ddedba` | src 183, setup 597, policy 120, config 280, guides 47, conformance 17, distribution 9 (guarded) |
+      | Study | `4d97e8d` | src 598, policy 120, config 280, setup 72, guides 15, distribution 10 |
+
+      - **Pins now.**
+        - Agent: budget `7b84bb63fa67` (`ca99510`), Study `30f5cc940540` (`4d97e8d`), Ollama `21664fdcacd7`
+          (`3ddedba`), and its own override `be567d309dc1` (`e8cdcba`).
+        - Ollama and Study pin the same budget and Agent tarballs. Study also pins MCP `4d6d65c80d4f` (`b0e9d7f`,
+          unchanged).
+        - After the final refresh, Agent's `check`, studies 100 and distribution 9 are green.
+      - **Rulings (Orchestrator), recorded in the brief.** Agent commits `@orkestrel/study: file:../study`, because Study
+        is unpublished.
+        - `repair --offline` refuses that spec ("names no concrete floor"). It ran with `^0.0.1` for the verb only.
+        - Agent's committable lock was generated with Study restored.
+        - `swap.ts --pin` refuses to pack Agent ("would pack a local dependency spec", `devDependencies` included), so
+          every Agent row is pinned with `tmp/units/local-pin.ts`. `swap --status` exits 3 on that one row (no
+          `inventory`), and `local-pin.ts status` exits 0.
+        - Both gaps close when Study publishes, or when scaffold rules on unpublished `file:` devDependencies.
+      - **Follow-ups.**
+        - `guides/scaffold.md` and `guides/test.md` mirrors are stale against 0.0.102, because offline repair skips the
+          catalog. Run `scaffold catalog` online.
+        - `@orkestrel/test` stayed `^0.0.25`, because repair did not move it. An `overwrite` would.
+        - Budget's builder amended its own unpushed commit message, and its tree is unchanged. Briefs now say never
+          amend.
+    - **Realignment running** (workflow `wf_70cdc1b9-ec6`, reports under `tmp/units/realign/`). The user asked to
+      re-read every message and file, find what was missed, and plan forward: the studies extraction cleanup, the
+      budget meter and `let` work, and the series boost (Records first, then Compaction). The human messages of all 63
+      sessions are extracted to `tmp/units/realign/user-messages.md` by `extract-user-messages.mjs`.
+- **Study `65e0188` (2026-10-19).** The admission test's custody margin is widened, tests only.
+- **Scaffold is shared (2026-10-18).**
+  - The user, 2026-10-18: "There's another session working on scaffold so be careful and communicate with it through
+    the PARALLEL.md".
+  - The Veneer session, which is releasing `@orkestrel/test` 0.0.26, wrote `scaffold/PARALLEL.md`. It asked about a
+    browser-wrapper candidate (`chooseFiles`) and about anything that touches `@orkestrel/test`, `wave.ts` or the
+    journey templates.
+  - **This session's reply.**
+    - The candidate is not in this chain.
+    - Nothing is published.
+    - The chain changes the emitted journey and integration templates (`tests/app/*/integration.test.ts`,
+      `configs/browsers.ts`, `DistributionSuite`, `mergeOverride`).
+    - G1 (`wave.ts` cluster pin) and G2 (`captures.md`) are queued.
+  - **This session's hold section** says what it holds and what it writes next.
+  - **The rule:** re-read `PARALLEL.md` before every scaffold commit, build, `repair` or `overwrite`, and never commit
+    the file.
+- **U4 Ollama (2026-10-18).**
+  - **The work.** Design 2 § 4.3 is built on Agent `53bfe20`. The live proof ran on a dedicated daemon on port 11435,
+    which was stopped afterwards by its recorded PID; port 11434 was untouched.
+    - `budget.test.ts` passed 9 of 9.
+    - After the user re-pulled `tev1:0.8b`, the full service suite passed 80 of 80.
+    - The daemon answers `done_reason: 'length'` at the cap.
+  - **The review.** One Astra lane (`.orkestrel/ollama/u4-audit-verdict.md`) confirmed the mechanism, the layers, the
+    contract sites, the guide, and that no test was weakened.
+  - **Closed since.**
+    - O1, fixture placement, closed by U4-F.
+    - Ollama's own Bindings sweep is committed as `c7c611a`.
 - **Census gap: count-only recorders (2026-10-18), fleet-wide.** The draft-4 census key's N2 and N6 signatures never
   match `createRecorder`, `.count` or `toHaveLength` on `calls`. Yet the rule bans a recorder whose every read is a
   count or a length: `running.carriers` and `logs.reads`, whose own example is a test reading only a length.
@@ -124,6 +276,29 @@ other terms still bind (tarball, never link; record the replaced range; restore 
   - Agent's fix round sweeps them (unit FS), and scaffold's fix chain adds C9.
   - **Owed:** a recorder sweep of Study and budget, each with its own falsify round, before their final acceptance,
     and the corrected N2 and N6 signatures in the census key.
+  - **Owed fleet-wide (2026-10-18): `distribution.test.ts` helpers.** The Ollama falsify round overturned the
+    ruling that kept them local.
+    - `tests.md` § Shared test infrastructure has no exception for the emitted gate, and scaffold's own
+      `tests/distribution.test.ts` imports from `./setupServer.js`.
+    - Budget, Study and Agent, all accepted, keep `decodeSegment` and `readPackageType` local. Each owes a move into
+      `tests/setupServer.ts`.
+    - Scaffold's template (`src/core/templates.ts:1891-`) emits `isPackageTarget`, `resolvePackageTarget`,
+      `resolveTarget` and `readPackageType` locally. It owes a ruling: make an explicit exception, or emit them into
+      the setup module.
+    - **Sized 2026-10-19: rule on the template first.** budget's `tests/distribution.test.ts` holds 37 local helpers,
+      Study's 35 and Agent's 34: the template's whole emitted harness (`runNpm`, `checkSurface`, `buildStage`,
+      `driveRuntime` and the rest), not two helpers. The file is `presence`-owned, so repair never overwrites it. But
+      moving the harness consumer by consumer forks every workspace from its template.
+      - Ollama has already moved its helpers (OS-F-dist).
+      - The template ruling is a scaffold design lane (Opus), not a follow-up patch. Then come one template change and
+        one fleet pass.
+  - **Owed too: the key's mis-cited controls.** OS-store and OS-server found them independently, 2026-10-18.
+    - **N7's pool control.** It sits at scaffold `Upstream.ts` about 963-1003 (`Array.from({ length`,
+      `Promise.allSettled`). It is not at the cited `:210-211`, which holds the `spent` creation.
+    - **N5's `Ledger.ts:366-376` and N8's `renderCauseChain`.** At Agent `f52daa4` both are `let` loops of the N1
+      shape, not a fold and a worklist.
+    - **N16's `MemorySessionStore.ts:106` clear control.** It was never run.
+    - **No Agent revision is pinned for Agent controls.** OS-server chose `f52daa4`.
 - **Scaffold falsify round 3 (2026-10-18).**
   - Verdict: `.orkestrel/scaffold/scaffold-fix-audit-verdict.md`. Objective Astra failed 1, 2, 4, 6, 7, 8. Subjective
     Opus failed 4, 5, 6, 7, 8, plus S1.

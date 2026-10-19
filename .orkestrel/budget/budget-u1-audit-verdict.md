@@ -105,3 +105,25 @@
 - Astra found the re-entry and the depth cap, but prescribed a refusal that the rule bans.
 - Opus found the dual-package guard gap, the host-dependent mutant, the types contract and the false pin sentence.
   Its re-entry prescription is the one adopted.
+
+## SB-budget: the recorder and hole sweep (2026-10-18)
+
+T3 `sb-budget-sonnet-1`, brief `tmp/units/study-budget-sweep-brief.md`. The baseline is `edd3553`.
+
+- **Class A, count-only recorders.** Six sites were converted to whole-history `BudgetError` payload assertions:
+  - `tests/src/core/Budget.test.ts:158` and `:247`;
+  - `tests/src/core/factories.test.ts:27`;
+  - `tests/src/core/Meter.test.ts:577`;
+  - `tests/guides.test.ts:173` and `:201`.
+
+  The `depths` fixture-logic counter (`Meter.test.ts:473`) is now the entity `CallCounter` (`tests/setup.ts:114`),
+  with proofs at `tests/setup.test.ts:112`. Under mutation M1 (`consumed + 1` in `Budget#exhaust`) the old assertions
+  pass and the new ones fail.
+- **Class B, holes and catch boundaries.** No mismatch. The run drove `Budget.consume`, `start` and `clear` through
+  30 000 seeded sequences against the staged baseline, normalizing only the approved `BudgetError` reason, and ran 198
+  `ReadingProxy` cases. Three probe controls each diverged. `src/**` is byte-identical to `4d74195`, so the budget
+  tarball `39343e7e9395` stays valid and no restage is owed.
+- **Gates.** src:core 255, policy 119, config 229, setup 17, guides 33 and distribution 9. Format, lint, check and
+  build are clean.
+- **Closing.** The fixes adopt the ruling's lawful form and are mutation-proved, so they close by probe. An independent
+  Haiku checker runs before the commit.
