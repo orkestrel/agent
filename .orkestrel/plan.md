@@ -39,9 +39,46 @@ The exit criterion is met.
 4. Every consumer pins fresh local builds, and the fleet runs on scaffold 0.0.102 (repairs `ca99510`, `e8cdcba`,
    `3ddedba` and `4d97e8d`).
 
+The successor campaign, the series boost, is open. Its plan of record is `tmp/units/ladder/ladder-2.md`; the
+closure check ruled CLOSED. The user approved, 2026-10-19:
+
+- the 0.40.6 runner with fresh same-seed controls;
+- Records optimized for both quality and speed, quality first;
+- development atoms with a held-out check;
+- every remaining recommendation.
+
+**Boost exit criterion (user-approved):** report the calibrated same-root pairs, the targeted semantic and cost effects,
+the frozen rubric by kind and quarter, every guard, and every unresolved or capped idea. Completed runs alone are not
+"solid improvement". The decision and run ledger is `tmp/units/ladder/dispatch-ledger.md`.
+
+The text below records the queue as it stood at acceptance.
+
 The open queue moves to the successor campaign, the series boost. Its plan is drafted as a micro-to-macro ladder
 (`tmp/units/ladder/ladder.md`) under the user's 2026-10-19 directive: try everything but bounded, micro before macro,
 and seed long runs from staged checkpoints. Its exit criterion waits for the user's approval.
+
+**Sweep and clean (user, 2026-10-19).** "Once we are done with the publishing and the boost design, we need to sweep
+and clean, the tmp and relevant `.orkestrel` folders." It runs after the release lands and the ladder is approved, in
+every touched repository: Agent, Study, budget, Ollama, and MCP where a visit wrote there.
+
+1. **Inventory** every `tmp/` entry and every `.orkestrel/` file, read-only. Classify each one:
+   - **Keep:** custody and the boost's inputs.
+     - The sealed results, captured runtimes, labels and gradings.
+     - The checkpoint, replay and stage tooling the ladder names.
+     - The live series probes under `tmp/probes/`.
+     - `local-pin.ts`, until Agent's Study devDependency is a registry range and `swap.ts` packs Agent.
+     - The pins ledgers and tarballs that are in use.
+   - **Promote:** any instrument that settled a claim becomes a test (`quality.md` § Instruments). Any standing
+     reading moves into the plan or the handoff.
+   - **Delete:** accepted units' briefs, reports, transcripts, receipts and scratch, once their decisions are recorded.
+2. **`.orkestrel` cleanup** per `orchestration.md` § Cleanup and the realign critic's CR-11 and CR-17:
+   - delete each verdict whose seam is closed, after carrying its standing readings (the `OLLAMA_HOST` hazard) into
+     the plan;
+   - rewrite the handoff's superseded lines;
+   - fix the misfiled verdicts and the `study.md` placement, along with its links;
+   - commit the records without pins.
+3. **Prove it.** Every kept path still resolves and every reader pin still verifies. The boost ladder's first wave runs
+   on the cleaned tree.
 
 **Sweep guard.** Never run `sweep.ts --tmp` in Agent while the boost series is open. Its threshold deletes custody
 and pin tooling: the `compaction-output-2-*` tooling and receipts, the `study-root-install-*` runtimes,

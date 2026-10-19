@@ -237,6 +237,81 @@ other terms still bind (tarball, never link; record the replaced range; restore 
         - `@orkestrel/test` stayed `^0.0.25`, because repair did not move it. An `overwrite` would.
         - Budget's builder amended its own unpushed commit message, and its tree is unchanged. Briefs now say never
           amend.
+    - **Release order for the Agent–Study cycle (user decision, 2026-10-19).** Agent publishes first, then Study
+      re-pins to it and publishes 0.0.1, then Agent adds Study as a registry devDependency and pushes, with no bump.
+      - Agent's release commit leaves `@orkestrel/study` out of `devDependencies`, because the online overwrite refuses
+        an unpublished package.
+      - Its gates run on registry ranges, with Study staged `--no-save`.
+      - `test:studies` runs against Agent's own packed release tarball. That split from the single `prepublishOnly`
+        run is a recorded ruling.
+      - The full registry proof of `test:studies` comes in the final Agent step.
+      - Before any visit: a backup branch per repository, and copies of the pinned manifest, lock and `pins.json` under
+        `tmp/units/release/`. Restore the pins before each visit and re-pin after it. The user holds every window.
+      - The readiness assessment is workflow `wf_a3600de5-195`, with reports under `tmp/units/publish-readiness/`.
+        Its verdict: not ready yet. No visit, release commit or push had run. The round, in windows:
+
+        | Window | Packages |
+        | --- | --- |
+        | W1 | budget 0.0.14, terminal 0.0.20, mcp 0.0.39 (each has every dependency served) |
+        | W2 | workflow 0.0.23, middleware 0.0.25, browser 0.0.29, probe 0.0.24 |
+        | W3 | agent 0.0.31 |
+        | W4 | ollama 0.0.24, toolbox 0.0.20 |
+        | W5 | study 0.0.1 |
+        | After W5 | Agent's dev-only commit |
+
+      - **User answers (2026-10-19).**
+        - The `BudgetError` brand: "go with your recommendation … all i care about is transparency, clarity, and chain
+          of responsibility that we can follow to audit". So BR-1 brands it, and SL-1 adds Study's layer trace.
+        - terminal ships in the round.
+        - The user created `github.com/orkestrel/study`, and Study's `origin` points at it.
+        - "Prepare and push": every layer is prepared end to end and pushed, and the user is called only for each window.
+      - **Orchestrator ruling.** Agent's `studies/` also imports Ollama's unpublished `extractTiming`, a second
+        development edge. The Study staging split extends to it: Ollama's local build is staged with Study for `check` and
+        `test:studies`, and the registry proof runs after W5.
+      - `handleAgentRunnerJob` leaves Agent's surface on purpose: round 2's per-runner entity (D-1) replaced it. The
+        release note names the removal.
+      - **OL-1 done (Ollama `a07d08a`, tests only).** Three live service cases cover the user's "each layer fails
+        first" requirement:
+        - meter first, under a tighter separate allowance;
+        - model first, under loose bounds;
+        - the default truncation claim.
+
+        They ran live on a dedicated 11435 daemon (PID 39676, stopped by PID with its children 46508 and 72040;
+        receipts in `tmp/units/ol-1-daemon/`), and `tests/service/budget.test.ts` passed 12 of 12. Port 11434 was
+        untouched.
+        - The first two runs failed. The new cases named `tev1:0.8b` as the chat model, because the brief said so,
+          which was the Orchestrator's error. `tev1:0.8b` is the suite's decision model (`OLLAMA_DECISION_MODEL`,
+          capability `decision`) and refuses chat.
+        - The chat model is `qwen3.5:2b-q4_K_M` (`OLLAMA_CONFIG.model`). The Orchestrator fixed the four constructions to
+          use it.
+      - **AG-1 done (Agent `4a3f52e`).** GPT-6.1 Sol built it on Codex (`ag-1-sol-1`), and the Orchestrator reviewed
+        the report and the diff.
+        - A case where a malformed delta rejects the run with the meter's `ContractError`, leaves the allowance unmoved
+          and emits the error once. The swallow mutant fails it, and `Agent.ts` was restored, with matching SHA-256.
+        - A case where a prompt-scoped allowance stays uncharged.
+        - The allowance TSDoc and the guide state the meter's completion-only charge.
+        - Gates: src:core 1582, guides 147.
+        - Agent's declarations moved, so the Agent tarball pinned in Ollama and Study is stale until the next re-pin or
+          the W3 visit.
+      - **W1 published (2026-10-19).** `@orkestrel/budget` 0.0.14 (`38c9a66`, carrying the brand `53f3b46`),
+        `@orkestrel/terminal` 0.0.20 (`afe1a87`) and `@orkestrel/mcp` 0.0.39 (`5b90ebc`) are all served, and their
+        tarballs answer 200.
+        - terminal's list support (`802834a`) failed an Astra review on a buffered-EOF truncation. It was fixed in
+          `afe1a87` and closed by one closure check.
+        - W2 preparation runs on Codex Sol: workflow, middleware, browser and probe.
+      - **Keep Ollama current (user, 2026-10-19).** Use the latest daemon and the latest `ollama` npm client, the
+        conformance reference.
+        - The daemon is 0.40.6, the latest stable; 0.40.7-rc0 is a pre-release and is not adopted.
+        - `@orkestrel/ollama` pins `"ollama": "0.6.3"` while the registry serves 0.6.4. W4's preparation moves it to
+          `"0.6.4"`, keeping the exact pin, and reruns conformance.
+        - A daemon change opens a new runner lineage for the boost: screen it with G0 first. Memory:
+          `feedback-ollama-latest`.
+      - **Rule slip (2026-10-19), disclosed to the user.** The Orchestrator ran `ollama.exe --version` without the
+        `OLLAMA_HOST` guard. That command asks the default server for its version, so one read-only `GET /api/version`
+        most likely reached the user's 11434 daemon. No model was loaded and nothing changed. Guard every Ollama command,
+        `--version` included.
+      - **Preparation brief:** `tmp/units/release/layer-prep-brief.md`. terminal and mcp are being prepared now (workflow
+        `wf_bfede446-695`).
     - **Realignment running** (workflow `wf_70cdc1b9-ec6`, reports under `tmp/units/realign/`). The user asked to
       re-read every message and file, find what was missed, and plan forward: the studies extraction cleanup, the
       budget meter and `let` work, and the series boost (Records first, then Compaction). The human messages of all 63
