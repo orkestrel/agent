@@ -451,8 +451,11 @@ export interface AgentOptions {
 	readonly budget?: BudgetInterface<TokenUsage>
 	/**
 	 * Holds the meter layer's allowance: the token budget each content delta's mid-stream estimate is
-	 * charged against, beside the reported usage the cost `budget` is reconciled to. Its signal folds
-	 * into the run's bound with the `budget`'s, so the estimate can stop a stream before the provider
+	 * charged against, beside the reported usage the cost `budget` is reconciled to.
+	 * The meter charges completion growth as `{ prompt: 0, completion: n, total: n }`, so a
+	 * `completion`- or `total`-scoped allowance tracks the answer, while a `prompt`-scoped allowance
+	 * is charged `0` and never trips through the meter. Its signal folds into the run's bound with
+	 * the `budget`'s, so the estimate can stop a stream before the provider
 	 * reports usage. Pass the `budget` itself to make the estimate and the reported usage share one
 	 * ceiling; pass a separate budget with a smaller `max` to let the estimate stop the run first, or
 	 * a larger one to let the reported usage or the model's own limit stop it instead. Cumulative

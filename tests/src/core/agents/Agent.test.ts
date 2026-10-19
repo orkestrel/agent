@@ -5788,6 +5788,44 @@ describe('Agent — three failure layers', () => {
 	// Sixteen streamed characters, so every call below that streams them estimates 4 tokens.
 	const story = { result: { content: 'Once upon a time', usage }, deltas: ['Once upon', ' a time'] }
 
+	it('rejects a non-string content delta without charging the allowance and emits its contract error', async () => {
+		const allowance = createTokenBudget({ max: 100, scope: 'completion' })
+		allowance.consume({ prompt: 0, completion: 2, total: 2 })
+		const consumed = allowance.consumed
+		const errors = createRecorder<AgentEventMap['error']>()
+		const deltas = ['invalid']
+		Object.defineProperty(deltas, '0', { value: { length: 1 } })
+		const agent = createAgent(
+			createScriptedProvider([{ result: { content: 'invalid' }, deltas }], AGENT_SCRIPT_OPTIONS),
+			{ allowance, on: { error: errors.handler } },
+		)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const run = agent.stream()
+		await expect(run.result).rejects.toMatchObject({
+			name: 'ContractError',
+			code: 'literal',
+			message: 'Meter.charge: delta must be a string',
+		})
+		expect(allowance.consumed).toBe(consumed)
+		expect(errors.calls).toHaveLength(1)
+		const [reason] = requireValue(errors.calls[0])
+		expect(isContractError(reason)).toBe(true)
+		await expect(run.result).rejects.toBe(reason)
+	})
+
+	it('leaves a prompt-scoped allowance uncharged while metering completion growth', async () => {
+		const allowance = createTokenBudget({ max: 1, scope: 'prompt' })
+		const agent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), { allowance })
+		agent.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		expect(await agent.generate()).toEqual({
+			content: 'Once upon a time',
+			partial: false,
+			usage,
+		})
+		expect(allowance.consumed).toBe(0)
+		expect(allowance.signal.aborted).toBe(false)
+	})
+
 	it('stops at the meter when a shared allowance crosses mid-stream', async () => {
 		const budget = createTokenBudget({ id: 'shared', max: 5, scope: 'completion' })
 		const deltas = Array.from({ length: 10 }, () => 'abcde')
