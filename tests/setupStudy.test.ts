@@ -91,6 +91,12 @@ describe('study declaration fixtures', () => {
 			first.schedule.map((item) => item.id),
 		)
 		const grading = buildMemoryGradingFixture()
+		expect(grading.failure).toEqual({
+			cause: 'capacity',
+			message: 'Output cap',
+			role: 'agent',
+			stop: { layer: 'model', id: 'num_predict', max: 512, consumed: 512 },
+		})
 		const scheduled = grading.manifest.schedule.map((item) => item.id)
 		expect(isStudyCustodyManifest(grading.manifest)).toBe(true)
 		expect(scheduled).toEqual([grading.complete.trial.id, grading.faulted.trial.id])

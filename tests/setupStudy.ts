@@ -1423,7 +1423,17 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 	const source = buildMemoryCriterion('source', 'trace', { observation: 'arrival', id: 'receipt' })
 	const lookup = buildMemoryCriterion('lookup', 'trace', { observation: 'lookup', id: 'record' })
 	const result = buildMemoryCriterion('result', 'state', { observation: 'result', partial: false })
-	const failure = { cause: 'capacity', message: 'Output cap', role: 'agent' } as const
+	const failure: MemoryGradingFixture['failure'] = {
+		cause: 'capacity',
+		message: 'Output cap',
+		role: 'agent',
+		stop: {
+			layer: 'model',
+			id: 'num_predict',
+			max: profile.room.output,
+			consumed: profile.room.output,
+		},
+	}
 	const complete: MemoryGradingFixture['complete'] = {
 		trial: first,
 		attempt: {
