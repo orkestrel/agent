@@ -70,39 +70,117 @@ approved the exit criterion in the preceding paragraph (`.orkestrel/ledger.md:19
 
 **Sweep and clean (user, 2026-10-19).** "Once we are done with the publishing and the boost design, we need to sweep
 and clean, the tmp and relevant `.orkestrel` folders." It runs after the release lands and the ladder is approved, in
-every touched repository: Agent, Study, budget, Ollama, and MCP where a visit wrote there.
+every touched repository: Agent, Study, budget, Ollama, and MCP where a visit wrote there. The sweep of 2026-10-20 has
+the following shape. The executor's `tmp/units/sweep/plan.json` names every root the sweep removes, so a `tmp/` path
+that another record cites is gone after the sweep when it falls under one of those roots. The sweep archive keeps each
+removed file that is neither regenerable nor secret-named.
 
-State at 2026-10-19 22:34 local: the trigger is met (§ Release round; the ladder is approved). The inventory
-(`wf_53634417-a82`) wrote five manifests to `tmp/units/sweep/` (`.orkestrel/ledger.md:280`), and nothing is deleted.
-The `.orkestrel` manifest is `tmp/units/sweep/agent-orkestrel.json`. Its deletions wait for § Standing readings, the
-records rewrite of 2026-10-19 (`tmp/units/sweep/records-rewrite-report.md`) and the Orchestrator's review, and then run
-as one records commit without pins. Deletion waits until no unit is live (`tmp/units/sweep/orchestrator-overrides.md`);
-Study 0.0.2 S2 and the W5 closure are live at that time.
-
-1. **Inventory** every `tmp/` entry and every `.orkestrel/` file, read-only. Classify each one:
-   - **Keep:** custody and the boost's inputs.
-     - The sealed results, captured runtimes, labels and gradings.
-     - The checkpoint, replay and stage tooling the ladder names.
-     - The live series probes under `tmp/probes/`.
-     - `tmp/units/local-pin.ts`, for the whole boost campaign (`tmp/units/ladder/ladder-2.md:58`). Its earlier keep
-       condition is met: Agent takes Study `^0.0.1` from the registry (`b47ce06`), `swap.ts` accepts the Agent
-       self-override (`.orkestrel/ledger.md:252`), and the pin ledger is empty (`:273`). A `swap.ts` pack of Agent
-       under the registry Study is unproven (`tmp/units/realign-2/critic.md` § 3).
-     - The pins ledgers and tarballs that are in use.
-     - `tmp/units/title-diff.mjs`, until its TypeScript port lands (§ Standing readings, Equivalence contract).
-   - **Promote:** any instrument that settled a claim becomes a test (`quality.md` § Instruments). Any standing
-     reading moves into the plan or the handoff.
-   - **Delete:** accepted units' briefs, reports, transcripts, receipts and scratch, after their decisions are recorded.
-2. **`.orkestrel` cleanup** per `orchestration.md` § Cleanup and the realign critic's CR-11 and CR-17:
-   - delete each verdict whose seam is closed, after carrying its standing readings (the `OLLAMA_HOST` hazard) into
-     the plan;
-   - rewrite the handoff's superseded lines;
-   - fix the misfiled verdicts and the `study.md` placement, along with its links (the `.orkestrel` manifest deletes
-     the two misfiled verdicts with their successors, and leaves the `study.md` placement as a separate decision);
-   - commit the records without pins.
-3. **Prove it.** Every kept path still resolves and every reader pin still verifies. The boost's first wave (W1, W2,
-   W4 and W5) ran before the sweep. Run the sweep window before the tracked-file writers W7, W3b, W11 and W12, as
-   `tmp/units/realign-2/boost.md` § 6 recommends.
+- **Manifests.** The inventory `wf_53634417-a82` (`.orkestrel/ledger.md:271`, `:280`) wrote five manifests to
+  `tmp/units/sweep/`, each delete list attacked by a skeptic: `agent-orkestrel.json` (Agent's `.orkestrel/`),
+  `agent-units-dirs.json` and `agent-units-files.json` (the directories and the files of Agent's `tmp/units/`),
+  `agent-tmp-root.json` (the rest of Agent's `tmp/`, its worktrees and the scaffold release clone), and
+  `other-repos.json` (the round's other repositories). Each row deletes, keeps, saves, promotes or rewrites.
+- **Records passes.** The `.orkestrel` pass carried `agent-orkestrel.json`'s promote rows and the title diff into
+  § Standing readings, and the records commit `b56eb69` deleted the closed verdicts (`.orkestrel/ledger.md:292`,
+  `:295`). The carry pass of 2026-10-20 carried the other manifests' promote rows into § Standing readings,
+  § Packages and layer order and § Units, Queued by the sweep, and rewrote the handoff lines that cite a removed path
+  (`tmp/units/sweep/records-carry-report.md`).
+- **Executor.** `tmp/units/sweep/execute.ts`, run by `node` (`sweep-executor-sol-1`, `.orkestrel/ledger.md:285`):
+  - `--plan` resolves the four `tmp` manifests and the binding overrides into `plan.json`, `plan.md` and
+    `plan.sha256`, and deletes nothing. The first plan, `ef4130d5…`, refused 19 conflicts, on which the
+    secret-named-file and internal-link overrides rule; the round-2 plan `402219ce…` (2026-10-20) names no refusal.
+  - `--apply --plan-sha SHA256` refuses until the Orchestrator records `tmp/units/sweep/readiness.json`: the plan's
+    SHA-256, `idle: true`, and the completed disposition of every requirement the plan lists. It revalidates the plan,
+    its sources and every live path, refuses while a journal under a swept `tmp/` changed within five minutes, refuses a
+    worktree that is not clean, and creates no backup ref, so the refs the worktree rows name must exist first. It
+    unlinks each junction by itself before any `fs.rmSync`.
+  - It archives each removed root that is not regenerable under `tmp/units/sweep/archive/`, one `.tar.gz` per
+    repository. A regenerable root, such as a `node_modules` tree or a clean worktree, and a secret-named file go
+    without an archive. Before apply, the Orchestrator copied the ignored `tmp/` files of the removed worktrees (113
+    files, each hash-verified: `empty-recap` 7, `performance` 8, `promotion-consumer` 58, `summary-task` 40,
+    `study-slim` none) to `tmp/units/sweep/kept/worktree-reports/<worktree>/`, among them
+    `performance/tmp/units/calibration-stage-report.md`, which has no other copy. The worktrees' uncommitted edits are
+    snapshotted under `refs/backup/wt-empty-recap` (`ea70d2a`), `refs/backup/wt-promotion-consumer` (`0f40da3`) and
+    `refs/backup/wt-summary-task` (`328fbbf`), and their clean heads under `backup/wt-performance-b6904bd` and
+    `backup/wt-study-slim-7018039`.
+  - It writes `tmp/units/sweep/apply-receipt.json` with the absence, kept-path and link-target proofs.
+  - Until `tmp/units/sweep/apply-receipt.json` exists, each record line that says a path was removed in the 2026-10-20
+    sweep describes the planned state. Commit this plan and the handoff with the deletion, after three preconditions
+    hold: the backup branches `backup/wt-performance-b6904bd` and `backup/wt-study-slim-7018039` exist; the edits of
+    the worktrees `empty-recap`, `promotion-consumer` and `summary-task` are snapshotted under
+    `refs/backup/wt-empty-recap`, `refs/backup/wt-promotion-consumer` and `refs/backup/wt-summary-task`; and those
+    three worktrees read clean, because `--apply` refuses a dirty worktree even where a manifest row proposes
+    `--force`. On 2026-10-20 at 08:11 none of those refs exists and the three worktrees are dirty. Run `--plan` again
+    first: `orchestrator-overrides.md` changed after the round-2 plan hashed it (`plan.json` embeds `ed7a3a2a…`, the
+    file reads `a75e554a…`), and `--apply` refuses a drifted plan with `PLAN_DRIFT`.
+- **Binding overrides** (`tmp/units/sweep/orchestrator-overrides.md`):
+  - the scaffold release clone may go after its tree reads clean and its `HEAD` is in `origin/main`, because Playwright
+    1248 is in the default cache;
+  - the open units' files stay: `tmp/units/study-002-*`, `sweep/`, `realign-2/`, the whole `ladder/`, and
+    `release/fleet-0103-repair-*`;
+  - apply runs only while no unit is live, and the Study rows only after the Study 0.0.2 units finish or pause;
+  - every junction is unlinked alone and its target verified; no recursive delete follows a junction;
+  - the promote rows and the handoff rewrites are carried before any deletion;
+  - `tmp/runtimes/` and `tmp/units/ladder/fix-w5-2/` stay;
+  - a secret-named file goes with its root, unread and unarchived, and the plan lists it by path only;
+  - a link whose target the same plan deletes is internal and skips the target checks;
+  - `tmp/units/replace-token.ts` is not a secret, and its byte-identical copy is
+    `tmp/units/sweep/kept/replace-token.ts`.
+- **What stays.**
+  - Custody: `tmp/studies/` with the sealed results, captured runtimes, labels and gradings, and the pins ledgers
+    `tmp/tarballs/pins.json` of Agent, Study and Ollama.
+  - The ladder: `tmp/units/ladder/` whole for the boost campaign (`tmp/units/ladder/ladder-2.md:58`), with its
+    `w5-fixture-*` artifact directories until the W5 closure round 2 and its verifier. The closure and fix units keep
+    adding to them under `closure-w5/artifacts/` and `fix-w5-2/artifacts/` while they run.
+  - The live series probes under `tmp/probes/`, and the pinned Node 26 under `tmp/runtimes/` for the W5 native host
+    (`.orkestrel/ledger.md:289`, `:290`).
+  - The checkpoint, replay, stage and pin tooling the ladder names (`ladder-2.md:58`), including
+    `tmp/units/local-pin.ts` for the whole boost campaign. Its earlier keep condition is met: Agent takes Study
+    `^0.0.1` from the registry (`b47ce06`), `swap.ts` accepts the Agent self-override (`.orkestrel/ledger.md:252`), and
+    the pin ledger is empty (`:273`). A `swap.ts` pack of Agent under the registry Study is unproven
+    (`tmp/units/realign-2/critic.md` § 3).
+  - `tmp/units/title-diff.mjs`, until its TypeScript port lands (§ Standing readings, Equivalence contract).
+  - `tmp/units/release/layer-prep-brief.md` and `tmp/units/publish-readiness/readiness.md`, which the kept
+    `tmp/units/release/w5-brief.md` cites, until Study 0.0.2 publishes; and the 28 pre-window review-kit files that
+    the `rest-prewindow-review*` rows of `agent-units-dirs.json` exclude, until the Study 0.0.2 pre-window review
+    reuses them. Then carry one generalized review kit into scaffold `orkestrel-publish` as a `PARALLEL.md` queue
+    item, or discard the files.
+  - The source of each queued test promotion, until its unit lands (§ Units, Queued by the sweep).
+  - `tmp/units/bindings-rule-4-draft.md`, whose § 5 is the census key, until the corrected key lands in scaffold
+    (§ Standing readings, Let-sweep rulings and the census key).
+  - `tmp/units/let-sweep-rulings-2.md` and `tmp/units/budget-meter-design-2.md`, until their remaining rulings reach
+    the owners' guides or this plan: among them the user's answers on the Agent surface, `LedgerRequest` and the Study
+    surface, "Close all, middleware too", `StudyProcessGoal` in Study's server barrel, Study `#goals` to `#goal`, the
+    `DistributionSuite.start` ban, the `Conversation#pending` form, and the Study fix 3 answers
+    (`let-sweep-rulings-2.md:39-117`).
+  - `tmp/units/agent-r2-head-orch/`, which `tmp/probes/orchestrator-r2-repro.test.ts` and
+    `orchestrator-r2-fix-repro.test.ts` import.
+  - `tmp/units/u4-daemon-2/` and `tmp/units/os-daemon-4/`, whose daemon logs read Ollama 0.40.6 on 11435
+    (2026-10-18) and which `tmp/units/ladder/probes.md:36` cites, until G0 records its own 0.40.6 daemon receipt and
+    the citations are re-pointed.
+  - `tmp/units/study-install-before-roots/`, the sole byte copy of the Study build whose digests
+    `tmp/studies/endurance-plan.json` pins (`:356`, `:366`).
+  - The `tmp/codex` daemon logs, `tmp/claude/scaffold-history/` until the post-results sweep, and the
+    `tmp/worktrees/` directory, where the ladder and the Study 0.0.2 consumer proofs create worktrees.
+  - The sweep's own record in `tmp/units/sweep/`: `plan.json`, `plan.md`, `plan.sha256`, `archive/`,
+    `kept/replace-token.ts` and `apply-receipt.json`, until the user rules the archive disposable. This plan and the
+    handoff cite the archive as the remaining copy of each removed file that is neither regenerable nor secret-named,
+    and `plan.json` `kept` lists the paths the plan protects.
+- **Prove it.** After apply, every kept path still resolves, every reader pin still verifies, and every external link
+  target keeps its entry count (`apply-receipt.json`). The boost's first wave (W1, W2, W4 and W5) ran before the
+  sweep. Run the sweep window before the tracked-file writers W7, W3b, W11 and W12, as `tmp/units/realign-2/boost.md`
+  § 6 recommends.
+- **Open after the sweep.** These edits to other `.orkestrel` records stay owed:
+  - The placement of `.orkestrel/study.md` stays a separate decision (`tmp/units/realign/critic.md` § CR-11). Its
+    lines 21-26 still say to preserve the physical proof trees. After the worktree removals, rewrite them as the
+    `agent-tmp-root.json` rewrite row for that file prescribes (`agent-orkestrel.json` R6): the dependency trees under
+    `tmp/studies/` stay as custody, the Study server SHA-256 sentence stays, and the proof worktrees were removed on
+    2026-10-20, with Agent `34862bc` and the backup refs as their sources.
+  - Append to `.orkestrel/agent/relocation.md:13` the deletion date of `tmp/units/scaffold-history/`, which this
+    sweep removes, and later that of the `tmp/claude/scaffold-history/` daemon logs, when the post-results sweep
+    removes them (`agent-orkestrel.json` R4).
+  - Correct row S4 of `.orkestrel/agent/studies-cleanup-ledger.md` when track X-residue appends rows: the user's
+    correction of 2026-10-16 reversed it (`agent-orkestrel.json` R5; § Standing readings, Studies cleanup acceptance).
 
 **Sweep guard.** Never run `sweep.ts --tmp` in Agent while the boost series is open. Its threshold deletes custody
 and pin tooling: the `compaction-output-2-*` tooling and receipts, the `study-root-install-*` runtimes,
@@ -210,9 +288,9 @@ unmodified in git at `acff094`.
 - **Load-sensitive gates.** Under concurrent Codex load, the default `npm test` chains of scaffold, probe, browser and
   Study timed out, and each passed on a quiet serial run, scaffold's after its Playwright cache was set (`:221`, `:229`,
   `:231`, `:235`, `:239`, `:244`). Run release gates serially on a quiet machine, and rerun a timed-out gate one time
-  before treating it as a failure. Write the quiet serial runner as a TypeScript file run by `node`:
-  `tmp/units/release/quiet-run.ps1` (`:238`) broke the script law in scaffold's `AGENTS.md` and
-  `.agents/orchestration.md` § Dispatch.
+  before treating it as a failure. Write the quiet serial runner as a TypeScript file run by `node`: the PowerShell
+  runner `quiet-run.ps1` of row `:238`, removed in the 2026-10-20 sweep, broke the script law in scaffold's
+  `AGENTS.md` and `.agents/orchestration.md` § Dispatch.
 - **Study CLI durations.** In the W5 gates of 2026-10-19, `tests/src/bin/main.test.ts` took 63 s,
   `StudyLauncher.test.ts` 62 s (its default-deadline case waits 60 s by design), and the adapter integration 42 s
   (`:266`). Run Study's gates quiet and serial.
@@ -224,11 +302,48 @@ unmodified in git at `acff094`.
 - **Upload the proved bytes.** `window.ts --publish` runs `npm publish --ignore-scripts` in each package directory, so
   it uploads the working tree. Before each upload, restore the pins (`swap.ts --restore`), `npm pack` the clean tree,
   and compare its SHA-256 with the proved artifact (`:253`).
+- **A fresh worktree pins twice.** In the W3 proof of 2026-10-19, the first `swap.js --pin` into a fresh worktree
+  exited 1 after 24410 ms: with no installed baseline, its proof reported the other Orkestrel packages as added by the
+  install, and it refused no source. An identical second run exited 0 after 21754 ms with no problems and the same
+  tarball hashes. Before treating a first pin's exit 1 in a fresh worktree as a failure, read its problems, and rerun
+  the pin one time when they name only packages the install added. The report,
+  `tmp/units/release/agent-w3-report-3.md`, was removed in the 2026-10-20 sweep, and the sweep archive keeps it.
 - **A first publish lags.** A first publish can read pending on `--confirm` for minutes; Study 0.0.1 confirmed served
   under `--confirm --wait 540` (`:268`).
 - **Keep Ollama current.** Use the stable daemon (0.40.6 on 2026-10-19; 0.40.7-rc0 is a pre-release and is not adopted)
   and the exact conformance pin `ollama` 0.6.4 (`f56f2cc`). Re-check both releases at each Ollama visit and before each
   GPU phase. A daemon change opens another runner lineage, which G0 screens first (handoff § Session of 2026-10-17).
+- **The 0.40.3 lineage.** The c1 dedicated daemons, relocated from scaffold (`.orkestrel/agent/relocation.md:13`),
+  served Ollama 0.40.3 on 11435: each log reads "Listening on 127.0.0.1:11435 (version 0.40.3)"
+  (`tmp/claude/scaffold-history/c1-daemon.err:5` and `c1-daemon-1/c1-daemon.err`), and the start receipt
+  `tmp/claude/scaffold-history/c1-daemon-1/c1-daemon-start.json` sets `OLLAMA_NUM_PARALLEL=1`,
+  `OLLAMA_MAX_LOADED_MODELS=0`, `LLAMA_ARG_CONTEXT_SHIFT=0` and `LLAMA_ARG_N_PARALLEL=1`. The sealed runs used 0.40.3
+  too (`tmp/units/realign/critic.md` claim 10). On 2026-10-20 scoop holds 0.40.3 only in its cache
+  (`ollama-full#0.40.3#495099e.exe`) and has 0.40.6 installed. The daemon logs stay until the post-results sweep.
+- **Empty recaps.** In the rolling successor run that closed on 2026-10-15 (`.orkestrel/agent/rolling.md` § Execution
+  closed on 2026-10-15), each of the 8 empty summaries among the 12 completed recorded a completion count of 1 and a
+  decode duration of 1000 ns, while the 4 nonempty ones recorded 1050 to 1444 completion tokens. The retained
+  projection holds no per-row `done_reason` or wire content, so the cause (a stop or special token, a model that
+  declines to start, or a decode loss) is not established. The scout report, `tmp/claude/empty-recap-scout-report.md`,
+  names the one terminal wire row of an empty summary whose read can settle it, and that raw-evidence read needs the
+  user's approval. The 2026-10-20 sweep removed the report, and the sweep archive keeps it.
+- **Grok takes a long prompt on stdin.** Cursor Grok 4.7 received a 40,312-character prompt on stdin as one `user`
+  event, resolved "Grok 4.7 256K Extra High", and closed with a `success` result in 14310 ms
+  (`tmp/cursor/grok-stdin-probe.jsonl`, 2026-10-15). The probe tests the transport only; the model declined the
+  probe's request. The retained label runner `tmp/units/study-label-grok/` sends its prompt on stdin and never as an
+  argument (`helpers.ts:286`), fails a call whose stdin write does not finish (`main.ts:57-75`), and asserts that its
+  Cursor arguments carry no `--force` (`helpers.test.ts:500`).
+- **Browser gates in a linked worktree.** A linked MCP worktree whose `node_modules` was a junction failed MCP's
+  `src:browser` and `setup:browser` projects: `environmentBoundary` in `configs/helpers.ts` refused with "package
+  root", because `packageRootOf` found no `@orkestrel/contract` root among the resolved file's ancestors. The cause, an
+  optimized-cache path under `node_modules/.vite` or the junction's resolution, was not established; the accepted route
+  was a physical `npm ci` tree, MCP's worktree `study-refusal-physical` at `f9fffad` (handoff § State and scope). Run
+  browser-project gates in a linked worktree on a physical `node_modules`. The diagnosis,
+  `../mcp/tmp/claude/mcp-browser-gate-report.md`, was removed in the 2026-10-20 sweep, and the sweep archive keeps it.
+- **Probe's guide receipt pins the toolchain.** The `verdict.receipt` sample in probe's `guides/probe.md` and in the
+  `Probe` TSDoc (`src/server/Probe.ts`) embeds the installed TypeScript, oxlint and vitest versions. Each move of
+  one of them fails probe's guides test until both samples are re-pinned, as probe `fccd508` did for oxlint 1.89.0
+  and vitest 4.1.12. The guides test is the standing gate, so no other test is owed.
 - **Scaffold's gates read `PARALLEL.md`.** Write each `PARALLEL.md` section in oxfmt form and without the terms
   scaffold's `writing.md` bans. Scaffold's `format:check` runs `oxfmt --check .`, and the untracked root `PARALLEL.md`
   is not git-ignored (`git check-ignore` exits 1); the policy prose sweep (`readPolicyProse`,
@@ -302,6 +417,27 @@ contract a home (§ Scaffold queue).
   title diff found it, and OS-F-dist restored it (U4 verdict). The tool is a JavaScript module, outside scaffold's
   `AGENTS.md` script law: keep it until a TypeScript port lands (§ Scaffold queue).
 
+### Let-sweep rulings and the census key
+
+Sources: `tmp/units/let-sweep-rulings-2.md` and `tmp/units/bindings-rule-4-draft.md` § 5. The remaining `let` visits
+(the user's decision of 2026-10-19) judge by scaffold `typescript.md` § Bindings and `architecture.md` § Middleware.
+
+- **Landed.** The Orchestrator's round-2 rulings are in the landed rule: a step that carries an aggregate from the
+  record before it (R1) under **Lists and logs**; the in-flight registry, kept even when a refusal stops calls from
+  overlapping (R2), under **Call slots** and **Registries**; and traversal worklists and membership sets (R4),
+  write-once memos (R5), straight-line lists, and platform or fixture writes (scaffold A to C) under **Exemptions**,
+  except that scaffold B's append-only logs in synchronous dependent-step loops belong under **Lists and logs**.
+- **Not in the rule text.** Keep a traversal's O(V+E) worklist; never trade it for O(V²) persistent-set recursion
+  (R4).
+- **Pinned census controls** (re-audit claim 5). Run a historical control with `git show REVISION:PATH` at the
+  immutable revision named for it: scaffold `499ade7ab09ce8bbd26f153c8466ac57f2dedc0c` for the draft-era controls,
+  Study `ca81174e319194dc68c8a96caf7f663ff8262449` for the former HEAD scalar-slot and unit-reset controls, and Study
+  `42fe9ac7194efec9881f2e60091be353662de356` for the draft-era goal collections and retained registries. Treat a live
+  repaired site as a clear control, never as the historical hit control. No Agent revision is pinned for Agent controls
+  (§ Scaffold queue, Census key).
+- **The key** is `tmp/units/bindings-rule-4-draft.md` § 5, items N1 to N21, each with its signatures, its reading and
+  its controls. Keep that file until the corrected key lands in scaffold.
+
 ### Cross-copy error guards
 
 Source: the budget U1 verdict, archived as `budget-u1-audit-verdict.md`.
@@ -318,8 +454,27 @@ Source: the budget U1 verdict, archived as `budget-u1-audit-verdict.md`.
 - **Meter bounds.** Never add a re-entry flag, slot or refusal to the meter, because a flag is a call slot under
   § Bindings. Never advance `charged` after a failed charge.
 - **`createBudget`** is a pass-through factory, which scaffold `.claude/rules/architecture.md:165` deletes. It is
-  recorded as a separate fleet finding and not repaired (`tmp/units/budget-meter-design.md:101`), and it is still
-  published API (`budget/src/core/factories.ts:52`).
+  recorded as a separate fleet finding and not repaired (the first budget meter design, `budget-meter-design.md:101`,
+  removed in the 2026-10-20 sweep; the sweep archive keeps it), and it is still published API
+  (`budget/src/core/factories.ts:52`).
+
+### Budget design 2
+
+Source: `tmp/units/budget-meter-design-2.md` (2026-10-16) and the user's answers on it
+(`tmp/units/let-sweep-rulings-2.md`). Budget 0.0.14, agent 0.0.31 and ollama 0.0.24 ship it. Its home is the owners'
+guides: budget's `guides/budget.md` (`BudgetError`, `isBudgetError`, § Trace an exhaustion) and Agent's
+`guides/agent.md` § Three failure layers: meter, budget, model, which states the layers. This section keeps only what
+those guides lack.
+
+- **Recorded text changes.** A budget's abort reason is a `BudgetError` with the fixed message "budget reached its
+  ceiling". The design's fleet survey (§ 1.4, 2026-10-16) found three sinks that record that text where they recorded
+  "This operation was aborted": the `ToolManager` tool result, the `Queue` entry-abort `QueueError` message, and
+  Study's recorded agent failure.
+- **Deferred and unscheduled**, as the user accepted the design's recommendations ("Accept all",
+  `tmp/units/let-sweep-rulings-2.md:74`): metering reasoning
+  deltas, decided on calibration data (Question 8); validating `ProviderDelta.text` on runs with no meter
+  (Question 7); and an `allowance` member on `AgentJobInput` (Question 10). `@orkestrel/timeout`'s untyped deadline
+  reason is a finding outside the design (Question 2).
 
 ### Study write sets
 
@@ -342,12 +497,45 @@ Source: the budget U1 verdict, archived as `budget-u1-audit-verdict.md`.
   its two unbound seams) and cleanup-close (`tmp/units/realign/studies.md:169-183`). `studies-cleanup-ledger.md`,
   `studies-cleanup-audit-verdict.md`, `relocation.md` and `history/` under `.orkestrel/agent/` stay until cleanup-close.
 
+### Evaluation canon
+
+Source: the evaluation research of 2026-10-14 under `tmp/units/`: the six `agent-eval-*-report.md` files, the
+user-supplied article `agent-eval-article-supplied.md`, and `agent-study-proposal.md`. The boost carries part of it
+as its plan of record: eligible denominators (`tmp/units/ladder/ladder-2.md` § S2.1) and the frozen development and
+held-out split (row B-M8). Judge a study design, a report or a boost reading by it.
+
+- **Pair the arms.** Give every arm the same initial world, task, tools, model, prompt and user behaviour, from a reset
+  state (see [τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World
+  Domains](https://arxiv.org/abs/2406.12045)).
+- **Freeze the failure classes before execution:** capacity, charged to the arm and never re-executed to improve it;
+  infrastructure, which voids the trial pair, with each re-execution listed as another attempt; grader, re-gradable
+  without a rollout; and outcome.
+- **Headline denominators cover every declared goal.** An unserved or capacity-failed goal counts as unachieved with
+  its cause. A served-only score is secondary and compares only goals every arm served. A grader's unscored item stays
+  in the coverage count (see [Inspect scoring policy](https://inspect.aisi.org.uk/scoring-policy.html)).
+- **Report separate columns:** facts, downstream work, obligations, critical violations, coverage, blind semantic
+  score, feasibility, and cost per role (agent, memory filing, summarization, simulated user, grader).
+- **One trajectory per arm is a point observation,** and its paired differences are descriptive. Size a repeated
+  subset from pilot dispersion and the paid budget before execution, and report its observed interval or dispersion
+  (see [Towards Reproducible LLM Evaluation: Quantifying Uncertainty in LLM Benchmark
+  Scores](https://arxiv.org/html/2410.03492v2)). Report pass^k, success on every repeat, apart from pass@k, success on
+  at least one (see [τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World
+  Domains](https://arxiv.org/abs/2406.12045)). Counterbalance arm order and record host load per trial
+  (`tmp/units/agent-eval-review-report.md` O1).
+- **Grade checkable facts with deterministic predicates,** each with a negative control. Run a `null` arm: a `null`
+  pass on a goal that needs an action fails the check, and a `null` pass on a refusal or abstention goal is a coverage
+  finding (see the [ABC benchmark audit](https://arxiv.org/abs/2507.02825)). A model judge scores only what predicates
+  cannot settle, blind to arm, in randomized order, with its outputs retained (see [Judging LLM-as-a-Judge with
+  MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685)).
+- **Keep truth away from the agent.** A held-out oracle lives outside the checkout, and only its digest enters the
+  study declaration. A report carries verdicts and coverage, never oracle values.
+- **An equal context and output envelope is a controlled resource envelope, not equal compute.** A cost-matched
+  comparison is a separate study.
+
 ### Harness retirement order
 
-- Before `harness-retire` deletes `.orkestrel/agent/instruments/`, promote the complete-capture request-byte golden into
-  Agent's ledger tests: the git-ignored `tmp/probes/ledger-golden.test.ts` and `ledger-golden-full.test.ts`, with
-  `.orkestrel/agent/instruments/harness/golden/`. Ladder W7 owns that capture in
-  `tests/src/core/ledgers/Ledger.test.ts` and creates no `golden.test.ts` (`tmp/units/ladder/ladder-2.md:401`).
+- Before `harness-retire` deletes `.orkestrel/agent/instruments/`, land the ledger golden promotion (§ Units, Queued
+  by the sweep, Ledger golden).
 - The same retirement waits for W11, which reads the development and evaluation oracles under
   `.orkestrel/agent/instruments/units/aggregates/endurance/private/`, and for the move of the evaluation oracle that
   `tests/studies/endurance/study.test.ts` reads (`tmp/units/realign-2/boost.md` § 6; `tmp/units/realign-2/plan.md`
@@ -419,6 +607,19 @@ L4; `@orkestrel/agent` L5; `@orkestrel/ollama` L6. `@orkestrel/scaffold` is ever
 stages on its own. `@orkestrel/study` 0.0.1 is published (2026-10-19) and consumes Agent, Ollama and budget; Agent
 takes Study `^0.0.1` from the registry as a development dependency (`b47ce06`).
 
+The publish-readiness assessment read these repositories as outside the round on 2026-10-19
+(`tmp/units/publish-readiness/readiness.md` § 1). The five decisions it listed are answered (handoff § Session of
+2026-10-17, User answers (2026-10-19) and the Orchestrator ruling that follows them).
+
+- **test:** the Veneer session published 0.0.27, and the local `main` was 23 commits behind `origin/main` (`84af7d0`).
+- **supervisor:** its unpublished 0.0.2 has stale ranges and no `dist/`, so it needs its own unit.
+- **tactica:** it sits on `rewrite/orkestrel`, 149 commits ahead of `origin/main`.
+- **veneer:** the Veneer session owns it.
+- **agent-phase:** a retained proof tree, waiting on the user's budget ruling D6.
+
+The assessment does not name desk and taverna. They break on agent 0.0.31 and are outside the round too (§ Release
+round, the follow-ups outside the round, unit BR-5).
+
 ## Units
 
 The table records the queue as it stood at acceptance, with later outcomes marked.
@@ -456,6 +657,57 @@ The table records the queue as it stood at acceptance, with later outcomes marke
 Staging follows each accepted unit: scaffold into budget, Study, Agent and Ollama; budget into Agent, Study and Ollama;
 Agent into Study and Ollama (and itself through Ollama, by override); Ollama into Agent and Study; Study into Agent.
 That staging ran until the release round; from 2026-10-19 the consumers take registry ranges (§ Release round).
+
+### Queued by the sweep (2026-10-20)
+
+Each unit promotes an instrument that settled a claim into a test (`.claude/rules/quality.md` § Instruments), or repairs
+a defect the sweep found. None is dispatched. Keep each source until its unit lands.
+
+- **Endurance preflight test** (Agent).
+  - Source: `tmp/units/endurance-preflight.ts` and `tmp/units/endurance-preflight-test.ts`.
+  - Settled: the endurance admission preflight refuses six negative controls, each with its exact reason
+    (`DUPLICATE_ARRIVAL:arrival.id`, `DUPLICATE_GOAL:goal.id`, `ORDERED_ARRAY:goal.input.arrivals`,
+    `FINITE_SAFE_INTEGER:goal.calls` for an unsafe bound and for a nonfinite bound, and
+    `FINITE_SAFE_INTEGER:arithmetic.goal.tokens` for an unsafe product), refuses the former profile
+    (`PUBLIC_ENVELOPE:trial.calls`), and admits the room profile with its exact population
+    (`endurance-preflight-test.ts:112-142`); `tmp/units/endurance-preflight-audit-report.md` claim 1 confirmed it.
+  - Target: an Agent test under `tests/` that regenerates its controls in a scratch directory. The script writes its
+    outputs as `tmp/units/endurance-preflight-*.json` (`endurance-preflight-test.ts:125`, `:150`, `:173`), among them
+    the `-room`, `-check-endurance`, `-check-qualification` and `-test` files that `tmp/studies` custody pins by path
+    (keep row K4 of `tmp/units/sweep/agent-units-files.json`), so neither the test nor a rerun of the script may write
+    there.
+  - Deadline: before either source file is deleted. Both are custody-pinned by the same keep row. The 2026-10-20 sweep
+    removed the controls directory `tmp/units/endurance-preflight-controls/`, the per-case outputs
+    `endurance-preflight-{old,duplicate,goals,order,unsafe,nonfinite,product}.{json,err}`, the `.err` files of `-room`
+    and `-check-*`, and the unit's brief, report, audit brief, audit diff and audit status. The sweep archive keeps all
+    of them. A run of the script regenerates them but also rewrites the custody-pinned files, so take them from the
+    archive or from the test's scratch run.
+- **Ledger golden** (Agent, ladder W7).
+  - Source: the git-ignored `tmp/probes/ledger-golden.test.ts` and `tmp/probes/ledger-golden-full.test.ts`, with
+    `.orkestrel/agent/instruments/harness/golden/` and its `baseline-materialize.ts`.
+  - Settled: the complete-capture request-byte golden for the Records design.
+  - Target: `tests/src/core/ledgers/Ledger.test.ts`, with no `golden.test.ts`. `tmp/units/ladder/ladder-2.md:401`
+    governs; `tmp/units/ladder/probes.md:236` still names `tests/src/core/ledgers/golden.test.ts`.
+  - Deadline: before `harness-retire` deletes `.orkestrel/agent/instruments/`, and before any sweep touches
+    `tmp/probes/`.
+- **Performance gates** (Study, conditional).
+  - Source: `tmp/units/compaction-output-2-perf-gates.ts`, kept with the `compaction-output-2-*` tooling.
+  - Settled: over one sealed reader result, a component is prioritized at 20% or more of its role's request wall and is
+    a sole whole-run candidate at 15% or more of the attempt wall; the script refuses a role whose phase sum exceeds its
+    provider total, a provider total above its request wall plus 1%, and role walls above the attempt wall
+    (`compaction-output-2-perf-gates.ts:1-4`).
+  - Target: a Study performance-reader test whose control triples the summary prefill and is refused with "phase sum
+    1919193 ms exceeds provider total 898587 ms" (`tmp/units/ladder/probes.md:241`), only if the ladder keeps using
+    the script ("a test if the ladder keeps using it", `tmp/units/sweep/agent-units-files.json`). Otherwise the script
+    is deleted with the campaign tooling at the boost's acceptance (`probes.md:248`).
+  - Deadline: before the boost closes and releases its tooling (`tmp/units/ladder/ladder-2.md:58`).
+- **Browser service scratch path** (browser).
+  - Defect: `tests/service/document.test.ts:101-104` writes `tmp/codex/reading-joining-source.json` with no
+    `mkdirSync`, so the service run fails with `ENOENT` in a fresh clone or after a sweep that removes `tmp/codex/`
+    (browser `be09c02`, read 2026-10-20). Browser's `ROADMAP.md` does not name it.
+  - Repair: create the directory recursively, or write into a scratch path.
+  - The 2026-10-20 sweep removed only the files in browser's `tmp/codex/` (`tmp/units/sweep/other-repos.json`, delete
+    row 47), so the directory stays until this lands.
 
 ## Routing
 

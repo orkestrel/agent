@@ -36,6 +36,15 @@ holds. The live plan, its standing readings and the scaffold queue are in `.orke
   `.orkestrel/plan.md` § Standing readings, and this file's superseded lines are scoped in place: the dark Codex bench,
   the Sol-first next-work list, Study held at `422d549`, and the bans on replaying Records. The report is
   `tmp/units/sweep/records-rewrite-report.md`.
+- **The sweep of 2026-10-20.** A carry pass moved the remaining promote rows of the `tmp` manifests into
+  `.orkestrel/plan.md` and rewrote the lines of this file that cite a removed path
+  (`tmp/units/sweep/records-carry-report.md`); `.orkestrel/plan.md` § Sweep and clean gives the executed shape. The
+  sweep removed accepted units' files and directories under `tmp/` here and in the round's other repositories.
+  `tmp/units/sweep/plan.json` names every removed root, so a `tmp/` path that an older section of this file cites is
+  gone when it falls under one of those roots. The sweep archive under `tmp/units/sweep/archive/` keeps each removed
+  file that is neither regenerable nor secret-named. Custody under `tmp/studies/`, the ladder, `tmp/probes/` and the
+  kept tools stay. Until `tmp/units/sweep/apply-receipt.json` exists, each line of this file that says the 2026-10-20
+  sweep removed a path describes the planned state (`.orkestrel/plan.md` § Sweep and clean, Executor).
 
 ## Session of 2026-10-17
 
@@ -244,9 +253,10 @@ range; restore before publishing).
   - **Scaffold 0.0.102 is published (2026-10-19, about 8:37 AM).** Veneer fast-forwarded `main` to `5ae2e8d8f`, then
     to its fixes `97eea2ea3` and `06f329115` and the release commit `19671436e` (falsify round: Astra and Opus; the
     whole `prepublishOnly` chain green in a standalone clone). The user published it, and `main` is pushed.
-    - **Fleet repair done (2026-10-19).** Brief `tmp/units/fleet-repair-brief.md`; reports under
-      `tmp/units/fleet-repair/`. Every repair ran `scaffold repair --offline`, committed only the scaffold-owned paths and
-      the manifest and lock, with no pins, and then re-pinned.
+    - **Fleet repair done (2026-10-19).** Brief `tmp/units/fleet-repair-brief.md`. Its reports sat under
+      `tmp/units/fleet-repair/`, which the 2026-10-20 sweep removed; the sweep archive keeps them, and the following
+      table carries their commits and gates. Every repair ran `scaffold repair --offline`, committed only the
+      scaffold-owned paths and the manifest and lock, with no pins, and then re-pinned.
 
       | Repo | Commit | Gates against the pins |
       | --- | --- | --- |
@@ -287,8 +297,11 @@ range; restore before publishing).
       - The full registry proof of `test:studies` comes in the final Agent step.
       - Before any visit: a backup branch per repository, and copies of the pinned manifest, lock and `pins.json` under
         `tmp/units/release/`. Restore the pins before each visit and re-pin after it. The user holds every window.
-      - The readiness assessment is workflow `wf_a3600de5-195`, with reports under `tmp/units/publish-readiness/`.
-        Its verdict: not ready yet. No visit, release commit or push had run. The round, in windows:
+      - The readiness assessment is workflow `wf_a3600de5-195`. Its report `tmp/units/publish-readiness/readiness.md`
+        stays until Study 0.0.2 publishes, and `.orkestrel/plan.md` § Packages and layer order carries its reading of
+        the repositories outside the round. The 2026-10-20 sweep removed the rest of `tmp/units/publish-readiness/`,
+        the evidence files and scratch, which the sweep archive keeps. The assessment's verdict: not ready yet. No
+        visit, release commit or push had run. The round, in windows:
 
         | Window | Packages |
         | --- | --- |
@@ -316,9 +329,9 @@ range; restore before publishing).
         - model first, under loose bounds;
         - the default truncation claim.
 
-        They ran live on a dedicated 11435 daemon (PID 39676, stopped by PID with its children 46508 and 72040;
-        receipts in `tmp/units/ol-1-daemon/`), and `tests/service/budget.test.ts` passed 12 of 12. Port 11434 was
-        untouched.
+        They ran live on a dedicated 11435 daemon (PID 39676, stopped by PID with its children 46508 and 72040), and
+        `tests/service/budget.test.ts` passed 12 of 12. Port 11434 was untouched. The daemon receipts sat in
+        `tmp/units/ol-1-daemon/`, which the 2026-10-20 sweep removed; the sweep archive keeps them.
         - The first two runs failed. The new cases named `tev1:0.8b` as the chat model, because the brief said so,
           which was the Orchestrator's error. `tev1:0.8b` is the suite's decision model (`OLLAMA_DECISION_MODEL`,
           capability `decision`) and refuses chat.
@@ -689,7 +702,8 @@ without imports.
   before it publishes and `wave.md:50-52` govern: manifests keep registry ranges and local builds are packed and staged
   with `npm install --no-save`. A first attempt that added a tracked `tools/siblings/`, a `tools` test project and
   `file:` ranges in Study's manifest contradicted those laws and the project model; it was taken out of both trees on
-  2026-10-16 (kept for reference in `tmp/units/siblings-retired/`). `tmp/units/local-stage.ts` stages local Agent, Ollama
+  2026-10-16. Its reference copy in `tmp/units/siblings-retired/` was removed in the 2026-10-20 sweep, and the sweep
+  archive keeps it. `tmp/units/local-stage.ts` stages local Agent, Ollama
   and MCP builds into Study; Study's audit is clean, its build stays byte-identical to the accepted `422d549` build, and
   its gates pass (two `test:src` timeouts under load pass alone). Rerun it after any source change. Agent's installed
   Study was to stay held at the captured `422d549` build until Sol grading closed. Superseded: the user set Sol aside,
@@ -866,8 +880,9 @@ without imports.
             against the round-1 patch before trusting them.
             - Scaffold `src`, `tests`, integrator and gate: `wf_27b65689-d91`.
             - Study `src`, tests and gate: `wf_b3576ae8-dc0`.
-            - Reports go to `tmp/units/scaffold-sweep-2-{src,tests,integrate}-report.md` and
-              `tmp/units/let-sweep-2-study-{src,tests}-report.md`.
+            - Reports went to `tmp/units/scaffold-sweep-2-{src,tests,integrate}-report.md` and
+              `tmp/units/let-sweep-2-study-{src,tests}-report.md`, which the 2026-10-20 sweep removed and the sweep
+              archive keeps.
         - **Records Grok population stopped (12:12), then resumed (14:48).** It had stopped at 51 of 96 batches.
           - **Cause.** Batch 051 (`ev-13-3`) failed its exact-string model guard. Cursor's init line read `"Grok 4.7
             Extra High"`, with a double space where `256K` belongs. The request was the same pinned `grok-4.7-xhigh`,
@@ -931,11 +946,13 @@ without imports.
           - The integrator also ran `test:templates` (61) and `test:distribution` (11 passed, 1 skipped; the registry was
             reachable). It repaired two TSDoc examples that the distribution drive exposed.
           - **Falsify round 2 is running.** Claims are in `tmp/units/scaffold-sweep-2-claims.md` (nine claims).
-            - The tree is backed up as `tmp/units/scaffold-sweep-round2.patch`, plus `scaffold-sweep-round2-untracked/`
-              for `GitQuery.ts` and its test.
+            - The tree was backed up as `tmp/units/scaffold-sweep-round2.patch`, plus `scaffold-sweep-round2-untracked/`
+              for `GitQuery.ts` and its test. The 2026-10-20 sweep removed both, and the sweep archive keeps them;
+              both files are tracked in scaffold as `src/bin/GitQuery.ts` and `tests/src/bin/GitQuery.test.ts`.
             - Objective lane: Grok 4.7 xhigh, T3 task `scaffold-sweep-2-falsify-objective-grok-1`.
             - Subjective lane: Opus, a native background agent.
-            - Verdicts go to `tmp/units/scaffold-sweep-2-verdict-{objective,subjective}-1.md`.
+            - Verdicts went to `tmp/units/scaffold-sweep-2-verdict-{objective,subjective}-1.md`, which the 2026-10-20
+              sweep removed and the sweep archive keeps.
             - The commit follows reconciliation.
           - **Falsify round 2 returned FAIL from both lanes.**
             - **Grok failed claims 1, 2, 4, 5, 6 and 9, plus F1:**
@@ -1260,10 +1277,12 @@ packages are byte-unchanged (`tmp/units/compaction-output-2-root-orkestrel-befor
 `package.json` and `package-lock.json`. The refresh happened after staging; staging reads Study from
 the build worktree. A Haiku verifier then measured `npm run check` passing (54 type errors before),
 `npm test` passing 2118 with two applicability skips, and `npm run test:service` passing 154 of 155.
-The failing test, `StudyMemoryDriver.test.ts:704` (rolling recap framing), passes alone in
-`tmp/worktrees/study-slim` and fails alone at root. The difference is the `@orkestrel/agent` that
-Ollama loads: published 0.0.30 at root, a development build in the slim tree. That is the unpublished
-Agent API limit, not a Study install defect.
+The failing test, `StudyMemoryDriver.test.ts:704` (rolling recap framing), passed alone in the slim
+proof worktree and failed alone at root. The difference was the `@orkestrel/agent` that Ollama
+loaded: published 0.0.30 at root, a development build in the slim tree. That was the unpublished
+Agent API limit, not a Study install defect. The registry-range proof supersedes this diagnostic:
+on `b47ce06`, with no pin, `npm test` passed 2305 with 2 skipped and `test:studies` passed 100
+(the `b47ce06` commit body; `.orkestrel/ledger.md:273`).
 
 npm's `install-links` is `false` in this project, so a plain `npm install` replaces the copy with a
 link to `../study` (a dry run reports `change @orkestrel/study`). Because the version stays 0.0.1,
@@ -1274,9 +1293,10 @@ list Study's `f977e68` dependency set, without `@orkestrel/agent`, `@orkestrel/o
 `@orkestrel/tool`. The checkout's own build cannot compile against the published Agent 0.0.30 it
 resolves (`RequestMeasure`, `estimateRequest` and `measureRequest` are absent), so root restored
 `../study/dist` from the accepted build after a failed rebuild. Study root `dist` equals that
-build. The accepted consumer proof worktree is
-`tmp/worktrees/study-slim`, with physical dependencies under
-`tmp/studies/study-slim-dependencies`. Its Study server SHA-256 is
+build. The accepted consumer proof worktree was `tmp/worktrees/study-slim`; the 2026-10-20 sweep
+removed it, after its detached `HEAD` `7018039`, which no branch held, was kept on the backup branch
+`backup/wt-study-slim-7018039`. Its physical dependencies stay as custody under
+`tmp/studies/study-slim-dependencies`, whose Study server SHA-256 is
 `01bff1edf977435415d21bb572150ae6434fb900a65dd3c53c877720a6304ecd`.
 Study's older `tmp/worktrees/slim` proof tree is dirty but source-equivalent to accepted root;
 do not reset it. Its dependencies live under `../study/tmp/studies/slim-dependencies`.
@@ -1340,17 +1360,40 @@ and the archived verdicts. The sweep helper was also retired. A native Luna chec
 no live dependency on the candidates. After deletion, reader pins and the external build
 receipt hash still matched; progress remained at 32/96 and the supervisor error file was empty.
 
-Remove further accepted bench transcripts, briefs, duplicate drafts and preparation copies
-only after their decisions/readings are retained.
-Protect all captured runtimes/results, original c1 evidence/oracle/golden inputs, worktrees and
-physical dependencies, label batches/receipts, and canonical dispatch tools. In particular,
-the current launcher rechecks the external build receipt; deleting it invalidates the run.
-Keep `tmp/units/compaction-output-{stage,launch,daemon,controls,progress,watch,reader}.ts`,
-their stage/build/launch/daemon/control/validation receipts, and every active check/series/
-daemon/supervisor/observer journal and PID file. Keep every `tmp/units/compaction-output-2-*`
-script, receipt, detach receipt, reader result and grade journal, every
-`tmp/codex/compaction-output-2-*` journal and PID file, and the preserved
-`tmp/units/study-root-install-f977e68` copy until semantic grading and the Records comparison
-close. Keep historical `compaction-task-*` and other frozen proof tools until their custody is
-retired. Do not use a broad `sweep --tmp` before that grading. The next session must verify these
-paths before a further sweep.
+The cleanup guard of 2026-10-15 that stood here is superseded by `.orkestrel/plan.md` § Sweep and
+clean and its Sweep guard, under which the 2026-10-20 sweep ran. Remove further accepted bench
+transcripts, briefs, duplicate drafts and preparation copies only after their decisions and
+readings are retained. Protect all captured runtimes and results, the original c1 evidence, oracle
+and golden inputs, physical dependencies, label batches and receipts, and canonical dispatch tools.
+Keep every active check, series, daemon, supervisor and observer journal and PID file.
+The 2026-10-20 sweep removed the five Agent worktrees that `tmp/units/sweep/agent-tmp-root.json`
+lists (`empty-recap`, `performance`, `promotion-consumer`, `study-slim` and `summary-task` under
+`tmp/worktrees/`), with backup refs first for the commits and edits that no branch held
+(`refs/backup/wt-{empty-recap,promotion-consumer,summary-task}`, `backup/wt-performance-b6904bd`,
+`backup/wt-study-slim-7018039`). The ignored `tmp/` files inside those worktrees, their bench
+journals, briefs and reports, were copied to `tmp/units/sweep/kept/worktree-reports/` first.
+Protect the worktrees that remain: `agent-phase` under budget ruling D6, and
+`tmp/worktrees/study-002` while the Study 0.0.2 unit is open.
+
+Keep for the boost campaign (`tmp/units/ladder/ladder-2.md:58`): every
+`tmp/units/compaction-output-2-*` script, receipt, detach receipt, reader result and grade journal;
+the `tmp/units/compaction-output-*` predecessors, the build receipt
+`tmp/units/compaction-output-build-receipt.json` included, which their launcher rechecks; every
+`tmp/codex/compaction-output-2-*` journal and PID file and the other `tmp/codex` daemon logs; the
+performance replay files; and the `tmp/units/study-root-install-f977e68` and
+`tmp/units/study-root-install-422d549` copies. Keep the historical `compaction-task-*` and the other
+frozen proof tools until their custody is retired (keep rows K2, K3, K7, K14 and K15 of
+`tmp/units/sweep/agent-units-files.json`). Never run `sweep.ts --tmp` while the boost series is
+open, and verify these paths before a further sweep.
+
+Known issue: the capacity harness test
+`.orkestrel/agent/instruments/harness-capacity/bench5/tests/continuous/Capacity.test.ts` creates
+`tmp/c1-capacity-proof-*`, `tmp/c1-capacity-control-*` and `tmp/c1-capacity-deadline-*` with
+`mkdtempSync` (lines 26, 87 and 124) and never removes them. The permissive control
+`tmp/units/c1-capacity-permissive-control.ts` (line 9) left `tmp/c1-capacity-permissive-*` the same
+way; the 2026-10-20 sweep removed that script, which the sweep archive keeps, and the 23 such
+directories found on 2026-10-19. After any run of that test, remove those directories by hand.
+Never edit the test to clean up after itself: the capacity build manifest pins its SHA-256
+(`.orkestrel/agent/instruments/harness-capacity/.build/build-manifest.json:1356-1357`), and each
+`proof*.json` receipt under `.orkestrel/agent/instruments/results/c1/capacity/` binds that manifest's
+SHA-256.
