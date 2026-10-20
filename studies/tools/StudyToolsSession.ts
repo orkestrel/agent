@@ -12,20 +12,21 @@ import type {
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
 } from './types.js'
-import { isObject, isRecord } from '@orkestrel/contract'
-import { createTool, createToolManager, isToolCall } from '@orkestrel/tool'
+import { isObject } from '@orkestrel/contract'
+import { createTool, createToolManager } from '@orkestrel/tool'
 import { errorToMessage } from '@orkestrel/workflow'
 import { open, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { StudyError, failStudyTicket } from '@orkestrel/study'
-import { StudyAgentScript, encodeStudyJSON } from '@orkestrel/study/server'
+import {
+	StudyAgentScript,
+	buildStudyAgentToolDenial,
+	buildStudyAgentToolResult,
+	encodeStudyJSON,
+} from '@orkestrel/study/server'
 import { STUDY_TOOLS_BYTES } from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
-import {
-	buildStudyToolsObservation,
-	observeStudyToolsFile,
-	resolveStudyToolsPath,
-} from './helpers.js'
+import { observeStudyToolsFile, resolveStudyToolsPath } from './helpers.js'
 import { parseStudyToolsInput } from './parsers.js'
 import { StudyToolsWorkload } from './StudyToolsWorkload.js'
 import { isStudyToolsAgent, isStudyToolsRead, isStudyToolsWrite } from './validators.js'
@@ -71,8 +72,10 @@ export class StudyToolsSession implements StudySessionInterface {
 				}),
 			},
 			on: {
-				tool: (call, result) => this.#capture('tool', { call, result }),
-				deny: (call, reason) => this.#capture('denial', { call, reason }),
+				tool: (call, result) =>
+					this.#capture('tool', () => buildStudyAgentToolResult(call, result)),
+				deny: (call, reason) =>
+					this.#capture('denial', () => buildStudyAgentToolDenial(call, reason)),
 			},
 			error: (error) => {
 				this.#current()?.fail(error)
@@ -270,12 +273,12 @@ export class StudyToolsSession implements StudySessionInterface {
 		return workload
 	}
 
-	#capture(event: 'tool' | 'denial', envelope: unknown): void {
+	#capture(event: 'tool' | 'denial', project: () => JSONValue): void {
 		const workload = this.#current()
 		try {
-			if (workload === undefined || !isRecord(envelope) || !isToolCall(envelope.call))
+			if (workload === undefined)
 				throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool observation')
-			const value = buildStudyToolsObservation(event, envelope.call, envelope)
+			const value = project()
 			workload.record({ event, goal: workload.goal, value })
 		} catch (error) {
 			workload?.fail(error)

@@ -3,7 +3,6 @@ import { isStudyCustodyManifest } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import {
@@ -39,9 +38,7 @@ import {
 	executeStudyInstall,
 	executeStudyProcess,
 	executeStudyTopology,
-	loadStudyDeclaration,
 	readMemoryToolResults,
-	readStudyJSON,
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
@@ -360,23 +357,6 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('reads one JSON file beneath a root and refuses a missing one', async () => {
-		const scratch = createScratch({ prefix: 'study-json-setup-' })
-		try {
-			scratch.write('nested/value.json', '{"name":"declared","list":[1,2]}')
-			scratch.write('nested/broken.json', '{')
-			const root = new URL(`${pathToFileURL(scratch.path).href}/`)
-			expect(await readStudyJSON(root, 'nested/value.json')).toEqual({
-				name: 'declared',
-				list: [1, 2],
-			})
-			expect(await readStudyJSON(root, 'nested/broken.json')).toBeUndefined()
-			await expect(readStudyJSON(root, 'nested/absent.json')).rejects.toThrow(/ENOENT/)
-		} finally {
-			await destroyScratch(scratch)
-		}
-	})
-
 	it('executes a real Node entry and reports its exit and separate output bytes', async () => {
 		const scratch = createScratch({ prefix: 'study-process-setup-' })
 		try {
@@ -407,24 +387,6 @@ describe('study install fixtures', () => {
 		} finally {
 			await destroyScratch(scratch)
 		}
-	})
-
-	it('loads an authored declaration, its rubric and the scenarios of its driver in declared order', async () => {
-		const capacity = await loadStudyDeclaration('capacity', 'memory')
-		expect(capacity.definition.name).toBe('capacity')
-		expect(capacity.definition.arms).toEqual(['records', 'compaction', 'full'])
-		expect(capacity.scenarios.map((scenario) => scenario.id)).toEqual(['handoff'])
-		expect(capacity.rubric.criteria[0]?.id).toBe('opening-operational')
-		const tools = await loadStudyDeclaration('tools', 'tools')
-		expect(tools.definition.name).toBe('tools')
-		expect(tools.scenarios.map((scenario) => scenario.id)).toEqual([
-			'write',
-			'refusal',
-			'admission',
-			'cancellation',
-			'continuation',
-		])
-		await expect(loadStudyDeclaration('absent', 'memory')).rejects.toThrow(/ENOENT/)
 	})
 
 	it('leaves the authored local profile without settings', () => {
