@@ -5,13 +5,46 @@ Scaffold authority before acting. Paths without a sibling prefix resolve from
 `C:/Users/mikes/WebstormProjects/agent`. The long chronological handoff is archived at Agent
 commit `78ea378`; do not treat its historical process or deadline entries as active.
 
+Read § Session of 2026-10-19 (evening) first. Where an older section of this file disagrees with it, the newer section
+holds. The live plan, its standing readings and the scaffold queue are in `.orkestrel/plan.md`.
+
+## Session of 2026-10-19 (evening)
+
+- **The release round is closed.** Every window published with the user's one-time code: budget, terminal and mcp
+  (W1); middleware, workflow and probe (W2a); scaffold 0.0.103 and browser (W2b); agent 0.0.31 (W3); ollama 0.0.24 and
+  toolbox (W4); study 0.0.1, its first publish (W5). The evidence is the ledger from W1's preparation
+  (`.orkestrel/ledger.md:196`) through the publish-readiness row (`:245`) to the fleet repair (`:275`);
+  `.orkestrel/plan.md` § Release round cites each window's rows.
+- **Agent takes the registry.** `b47ce06` holds Study `^0.0.1`, Ollama `^0.0.24` and scaffold `^0.0.103`, with no pin
+  and no bump, and `tmp/tarballs/pins.json` is empty (`.orkestrel/ledger.md:273`). The round's packages and Agent
+  declare scaffold `^0.0.103` (manifests read 2026-10-19; the fleet repair is `:275`).
+- **Playwright revision 1248** is in the user's default cache (user-approved host change, `:282`).
+- **Realignment 2** (`wf_15af4308-907`, lane reports in `tmp/units/realign-2/`) read the boost, the plan and the user's
+  messages, with a completeness critic (`:278`). The user's decisions after it (`:279`):
+  - Study 0.0.2 builds all four moves (the gauge guard, the quality rule, the tool projections and the declaration
+    reader) and publishes when green, pushing Study `main` first.
+  - The W5 closure covers the native Job Object bridge: keep it only if it is safe and Node has no equivalent, otherwise
+    replace it before G0. Then add the driver-adapter unit and the successor stage, freeze, pin and reader unit.
+  - Install Playwright 1248 into the default cache.
+  - Finish the `let` sweep per package visit with a corrected census key and a review each; the scaffold lint rule lands
+    after the last visit.
+- **The boost** is at L0: W0, W1, W2 and W4 are accepted, the widened W5 closure is dispatched (`:284`), and nothing has
+  run on the GPU. `.orkestrel/plan.md` § State on 2026-10-19 (evening) gives the next order.
+- **Work in flight:** Study 0.0.2 (`tmp/units/study-002-design.md`; S1 committed locally as Study `88acd00`, unpushed;
+  S2 building, `:281`, `:283`), the W5 closure, and the sweep (`tmp/units/sweep/`).
+- **Records rewrite (2026-10-19).** The standing readings of the closed verdicts and of the release round moved into
+  `.orkestrel/plan.md` § Standing readings, and this file's superseded lines are scoped in place: the dark Codex bench,
+  the Sol-first next-work list, Study held at `422d549`, and the bans on replaying Records. The report is
+  `tmp/units/sweep/records-rewrite-report.md`.
+
 ## Session of 2026-10-17
 
 The live campaign plan is `.orkestrel/plan.md` (goal, exit criterion, units, routing). User instruction: resume the
 `let` sweep, the budget redesign and the Records labeling with full use of Claude, Codex Astra and Cursor Grok; publish
-nothing; regenerate each changed package's distributable and point consumers' `package.json` at it locally, always
-working on the latest builds. That instruction outranks `wave.md`'s keep-the-registry-range sentence; the release law's
-other terms still bind (tarball, never link; record the replaced range; restore before publishing).
+nothing (superseded by the release round of 2026-10-19); regenerate each changed package's distributable and point
+consumers' `package.json` at it locally, always working on the latest builds. That instruction outranks `wave.md`'s
+keep-the-registry-range sentence; the release law's other terms still bind (tarball, never link; record the replaced
+range; restore before publishing).
 
 - **Records Grok population complete.** PID 53796 exited 0, uncapped, in 8801896 ms: summary
   `{"labeled":39,"skipped":57,"total":96,"complete":true}` (057–095 labeled in this attempt; 001–056 and the 096 pilot
@@ -58,12 +91,15 @@ other terms still bind (tarball, never link; record the replaced range; restore 
   builder had written through a relative path after its shell's working directory reset to Agent. Budget's own file is
   intact, and no other Agent source or test file changed. Every brief now requires absolute write paths.
 - **Budget U1 accepted (2026-10-18), budget commit `4d74195`.** It covers the meter surface, the typed `BudgetError`,
-  the budget test sweep, and falsify fix rounds 2 and 3 (verdict `.orkestrel/budget/budget-u1-audit-verdict.md`).
+  the budget test sweep, and falsify fix rounds 2 and 3 (verdict archived in git at `acff094` as
+  `budget-u1-audit-verdict.md`; its standing readings are in `.orkestrel/plan.md` § Standing readings).
   - `charged` is now the total growth the budget accepted from the meter. Charges in flight sit in a registry of claim
     records.
   - Grok's fleet survey (`tmp/units/budget-fleet-survey-grok-1.md`) confirms that design 2 § 1.4 names every
     consumer-visible sink. The one row it adds is agent-phase's copy of Agent's partial-run payload.
-  - The cross-copy `isBudgetError` hazard is fleet-wide and recorded, not fixed here.
+  - The cross-copy `isBudgetError` hazard is fleet-wide and recorded, not fixed here. The brand closed it for
+    `BudgetError` on 2026-10-19 (BR-1, `53f3b46`); the fleet question is BR-2 (`.orkestrel/plan.md` § Standing
+    readings).
   - Nothing is published. The budget tarball is pinned into Agent through `tmp/units/local-pin.ts` after Agent's unit H
     returns.
 - **The local-pin convention (user-endorsed 2026-10-18).** The user's words: "I liked your idea of the pins.json with
@@ -118,8 +154,8 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     follow.
 - **Agent round 2 accepted (2026-10-18), commit `53bfe20`.** It carries the Bindings sweep, D1, budget layers U2 and
   U3, `AgentFanout`, `LedgerRequest` and `LedgerPass`.
-  - **Verdicts.** `.orkestrel/agent/agent-r2-audit-verdict.md` and `agent-r2-fix-audit-verdict.md`. Every finding was
-    reproduced against the `f52daa4` baseline.
+  - **Verdicts.** Archived in git at `acff094` as `agent-r2-audit-verdict.md` and `agent-r2-fix-audit-verdict.md`.
+    Every finding was reproduced against the `f52daa4` baseline.
   - **Gates.**
 
     | Project | Result |
@@ -159,11 +195,11 @@ other terms still bind (tarball, never link; record the replaced range; restore 
       - **Published `src`:** only `src/core/helpers.ts` changed, and it is proven equivalent to `ba171bd`.
       - **Evidence:** live passes 80 of 80 on 11435 and discovery exits 0. The guarded gates are green.
       - **Restaged** as `9a5756095d99` into Agent (devDependency) and Study.
-      - **The record:** `.orkestrel/ollama/u4-audit-verdict.md`.
+      - **The record:** the verdict archived in git at `acff094` as `u4-audit-verdict.md`.
     - **Follow-up `ollama-probes-drift`, done.** The git-ignored series probes typecheck again. `wire-dump` dumps
       `provider.encode(...)`, which `0a36af3` renamed from `body`, and both wrappers drop `format`.
-    - **Follow-up `study-admission-timing`, queued.** A Study case fails under full three-project load and passes
-      alone. It is recorded in `.orkestrel/plan.md`, and Study's quiet rerun is owed.
+    - **Follow-up `study-admission-timing`, done in Study `65e0188` (2026-10-19).** A Study case failed under full
+      three-project load and passed alone. It is recorded in `.orkestrel/plan.md`.
     - **Exit rule (the user, 2026-10-18): "One closure check, then commit".** Once the gates and the live run are
       green, one single-reviewer round checks that each named finding is closed, and then the work is committed. Ollama
       has finished under this rule, and scaffold takes it after E3. New minor findings become follow-up units.
@@ -173,7 +209,8 @@ other terms still bind (tarball, never link; record the replaced range; restore 
       - Until unit OS-hermetic lands and is verified, and as a standing guard afterwards, run every non-service Ollama
         command with `$env:OLLAMA_HOST = 'http://127.0.0.1:1'`. That covers `npm test`, `setup`, gates and probes.
       - Never merge the `probe` project into a probe config, because `tmp/probes/**` holds live probes.
-      - The record is in `.orkestrel/ollama/u4-audit-verdict.md`.
+      - The record is the verdict archived in git at `acff094` as `u4-audit-verdict.md`. The guard, the collection-time
+        contact and the series-read probes are in `.orkestrel/plan.md` § Standing readings.
     - **T3 task ids** are `node:delegated-task:command%3Amcp%3A11386d00-6ff3-44cb-aa2b-c3824db22fc7%3Adelegate-task%3A`
       followed by the clientRequestId, such as `os-store-sonnet-1`. The bare clientRequestId gives `task_not_found`.
 - **Scaffold Bindings fix chain: accepted, commit `4d67f0f32` (2026-10-19).**
@@ -181,7 +218,8 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     narrow re-check (B2, a `@throws` form, fixed).
   - **Gates.** The build and every gate are green.
   - **`PARALLEL.md`** carries the hash and the next steps.
-  - **Records:** `.orkestrel/scaffold/scaffold-fix-audit-verdict.md` § Fix round E.
+  - **Records:** the verdict archived in git at `acff094` as `scaffold-fix-audit-verdict.md`. Its equivalence
+    contract (§ Fix round E) is in `.orkestrel/plan.md` § Standing readings.
   - **`scaffold-local-pins` is accepted**, commit `8cc944140` on branch `local-pins`. It ships
     `.agents/skills/orkestrel-publish/scripts/swap.ts` (`--pin`, `--restore`, `--status`) and the ledger convention in
     `release.md` and `wave.md`. It passed a falsify lane, two fix units, and a closure check.
@@ -217,14 +255,16 @@ other terms still bind (tarball, never link; record the replaced range; restore 
       | Ollama | `3ddedba` | src 183, setup 597, policy 120, config 280, guides 47, conformance 17, distribution 9 (guarded) |
       | Study | `4d97e8d` | src 598, policy 120, config 280, setup 72, guides 15, distribution 10 |
 
-      - **Pins now.**
+      - **Pins after the fleet repair** (superseded: the pin ledger is empty and Agent takes registry ranges; see
+        § Session of 2026-10-19 (evening)).
         - Agent: budget `7b84bb63fa67` (`ca99510`), Study `30f5cc940540` (`4d97e8d`), Ollama `21664fdcacd7`
           (`3ddedba`), and its own override `be567d309dc1` (`e8cdcba`).
         - Ollama and Study pin the same budget and Agent tarballs. Study also pins MCP `4d6d65c80d4f` (`b0e9d7f`,
           unchanged).
         - After the final refresh, Agent's `check`, studies 100 and distribution 9 are green.
-      - **Rulings (Orchestrator), recorded in the brief.** Agent commits `@orkestrel/study: file:../study`, because Study
-        is unpublished.
+      - **Rulings (Orchestrator), recorded in the brief** (superseded: Study 0.0.1 published, and `b47ce06` takes it
+        from the registry; see § Session of 2026-10-19 (evening)). Agent commits `@orkestrel/study: file:../study`,
+        because Study is unpublished.
         - `repair --offline` refuses that spec ("names no concrete floor"). It ran with `^0.0.1` for the verb only.
         - Agent's committable lock was generated with Study restored.
         - `swap.ts --pin` refuses to pack Agent ("would pack a local dependency spec", `devDependencies` included), so
@@ -298,21 +338,22 @@ other terms still bind (tarball, never link; record the replaced range; restore 
         tarballs answer 200.
         - terminal's list support (`802834a`) failed an Astra review on a buffered-EOF truncation. It was fixed in
           `afe1a87` and closed by one closure check.
-        - W2 preparation runs on Codex Sol: workflow, middleware, browser and probe.
+        - W2 preparation ran on Codex Sol: workflow, middleware, browser and probe.
       - **Keep Ollama current (user, 2026-10-19).** Use the latest daemon and the latest `ollama` npm client, the
         conformance reference.
         - The daemon is 0.40.6, the latest stable; 0.40.7-rc0 is a pre-release and is not adopted.
-        - `@orkestrel/ollama` pins `"ollama": "0.6.3"` while the registry serves 0.6.4. W4's preparation moves it to
-          `"0.6.4"`, keeping the exact pin, and reruns conformance.
+        - `@orkestrel/ollama` pinned `"ollama": "0.6.3"` while the registry served 0.6.4. W4's preparation moved it to
+          `"0.6.4"` in `f56f2cc`, keeping the exact pin, and conformance passed 17 (`.orkestrel/ledger.md:259`).
         - A daemon change opens a new runner lineage for the boost: screen it with G0 first. Memory:
           `feedback-ollama-latest`.
       - **Rule slip (2026-10-19), disclosed to the user.** The Orchestrator ran `ollama.exe --version` without the
         `OLLAMA_HOST` guard. That command asks the default server for its version, so one read-only `GET /api/version`
         most likely reached the user's 11434 daemon. No model was loaded and nothing changed. Guard every Ollama command,
         `--version` included.
-      - **Preparation brief:** `tmp/units/release/layer-prep-brief.md`. terminal and mcp are being prepared now (workflow
-        `wf_bfede446-695`).
-    - **Realignment running** (workflow `wf_70cdc1b9-ec6`, reports under `tmp/units/realign/`). The user asked to
+      - **Preparation brief:** `tmp/units/release/layer-prep-brief.md`. terminal and mcp were prepared in workflow
+        `wf_bfede446-695` and published in W1 (`.orkestrel/ledger.md:200`).
+    - **Realignment done** (workflow `wf_70cdc1b9-ec6`, reports under `tmp/units/realign/`; the boost ladder
+      `tmp/units/ladder/ladder-2.md` replaced its plan's phases). The user asked to
       re-read every message and file, find what was missed, and plan forward: the studies extraction cleanup, the
       budget meter and `let` work, and the series boost (Records first, then Compaction). The human messages of all 63
       sessions are extracted to `tmp/units/realign/user-messages.md` by `extract-user-messages.mjs`.
@@ -338,8 +379,8 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     - `budget.test.ts` passed 9 of 9.
     - After the user re-pulled `tev1:0.8b`, the full service suite passed 80 of 80.
     - The daemon answers `done_reason: 'length'` at the cap.
-  - **The review.** One Astra lane (`.orkestrel/ollama/u4-audit-verdict.md`) confirmed the mechanism, the layers, the
-    contract sites, the guide, and that no test was weakened.
+  - **The review.** One Astra lane (verdict archived in git at `acff094` as `u4-audit-verdict.md`) confirmed the
+    mechanism, the layers, the contract sites, the guide, and that no test was weakened.
   - **Closed since.**
     - O1, fixture placement, closed by U4-F.
     - Ollama's own Bindings sweep is committed as `c7c611a`.
@@ -350,7 +391,9 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     Agent.
   - Agent's fix round sweeps them (unit FS), and scaffold's fix chain adds C9.
   - **Owed:** a recorder sweep of Study and budget, each with its own falsify round, before their final acceptance,
-    and the corrected N2 and N6 signatures in the census key.
+    and the corrected N2 and N6 signatures in the census key. (Superseded: SB-budget `a26ff9a` and SB-study `c1a289f`
+    are accepted, `.orkestrel/plan.md` § Units; the census key correction stays queued in `.orkestrel/plan.md`
+    § Scaffold queue.)
   - **Owed fleet-wide (2026-10-18): `distribution.test.ts` helpers.** The Ollama falsify round overturned the
     ruling that kept them local.
     - `tests.md` § Shared test infrastructure has no exception for the emitted gate, and scaffold's own
@@ -375,15 +418,18 @@ other terms still bind (tarball, never link; record the replaced range; restore 
     - **N16's `MemorySessionStore.ts:106` clear control.** It was never run.
     - **No Agent revision is pinned for Agent controls.** OS-server chose `f52daa4`.
 - **Scaffold falsify round 3 (2026-10-18).**
-  - Verdict: `.orkestrel/scaffold/scaffold-fix-audit-verdict.md`. Objective Astra failed 1, 2, 4, 6, 7, 8. Subjective
-    Opus failed 4, 5, 6, 7, 8, plus S1.
+  - Verdict: archived in git at `acff094` as `scaffold-fix-audit-verdict.md`. Objective Astra failed 1, 2, 4, 6, 7,
+    8. Subjective Opus failed 4, 5, 6, 7, 8, plus S1.
   - Every finding was reproduced. Among them: a fractional `--cap` crashes `launch.ts` after it has spawned, and the
     instruments normalized comments and host bytes.
   - Release evidence: 0.0.102 retypes `@orkestrel/scaffold/server`'s `ReadAllowance` from an interface to a class. No
     fleet target imports it.
-  - Checkpoint `615ae1b72`. Fix units C (source) and C-instruments (the probes) are running on disjoint files.
+  - Checkpoint `615ae1b72`. Fix units C (source) and C-instruments (the probes) ran on disjoint files; the chain was
+    accepted as scaffold `4d67f0f32` (`.orkestrel/plan.md` § Units).
 
 ## State and scope
+
+This section records the state of 2026-10-15 and 2026-10-16; § Session of 2026-10-19 (evening) holds where they differ.
 
 The `compaction-output` attempt is interrupted, unsealed, and preserved; it has no operational
 reading. T3 Code stopped the owning Codex session at `2026-10-15T22:50:24.140Z` and its process tree
@@ -391,8 +437,13 @@ died with it, during goal 95 (`ev-24-3`) with 94 of 96 products complete. See
 § Interrupted Compaction attempt. Its successor `compaction-output-2`, with the same treatment and
 detached through WMI outside every provider session tree, sealed 96/96 at `2026-10-16T00:51Z`. Its
 reader status is `acceptance-candidate`, and its operational grading achieved 96/96. Semantic grading
-waits for the frozen Sol-high adjudicator, by the user's choice; see § Sealed successor attempt.
-Records is sealed and labeled at 96/96. Never rerun, replay, or relabel Records for this campaign.
+waits for the frozen Sol-high adjudicator, by the user's choice; see § Sealed successor attempt. (Superseded: the user
+set Sol aside, and Grok graded both arms judge for judge on 2026-10-17; see § Session of 2026-10-17.)
+Records is sealed and labeled at 96/96. The sealed run and its gradings stay untouched. The ban on rerunning,
+replaying or relabeling Records governed the closed qualification campaign only: the user had Grok grade the sealed
+Records packet (§ Session of 2026-10-17), and the boost is a separate series that captures, replays and seeds from
+Records custody under `tmp/units/ladder/ladder-2.md` (`tmp/units/ladder/dispatch-ledger.md` rows U2a to U2c; § Work in
+flight on 2026-10-16, Boost and boosted series).
 The original c1 thinking comparison is graded and closed; this run is the separate q4
 thinking-off Compaction qualification, not a restart of that comparison.
 
@@ -415,12 +466,13 @@ abandoned Scaffold runtime-root proposal.
 The user authorizes necessary Orkestrel dependencies and requires their latest published
 versions for ordinary development. Non-Orkestrel additions need explicit authorization.
 Frozen experiments retain their admitted versions. No version bump or publication was
-authorized for this continuation. Scaffold was published by another session; leave its
-release and `PARALLEL.md` work alone. Use the canonical contracts and direct matching Orkestrel
-primitives; retain the user's single setup-file-per-layer convention. In both Agent and Study, `tests/setupStudy.ts`
-is the harness and development setup module, kept separate from implementation setup (`setup.ts`, `setupServer.ts`)
-the way `tests/setupPolicy.ts` is (user decision, 2026-10-16). Scaffold does not plan it or the `tests/studies`
-project; that deviation stands until Study is production-ready and scaffold is updated to propagate the structure.
+authorized for this continuation; the user authorized the release round on 2026-10-19.
+Scaffold was published by another session; leave its release and `PARALLEL.md` work alone. Use the canonical
+contracts and direct matching Orkestrel primitives; retain the user's single setup-file-per-layer convention. In both
+Agent and Study, `tests/setupStudy.ts` is the harness and development setup module, kept separate from implementation
+setup (`setup.ts`, `setupServer.ts`) the way `tests/setupPolicy.ts` is (user decision, 2026-10-16). Scaffold does not
+plan it or the `tests/studies` project; that deviation stands until Study is production-ready and scaffold is updated
+to propagate the structure.
 
 The user requests Claude models for implementation: Sonnet for bounded work, Opus for
 subjective and adversarial work, and Haiku for precise lookups. No Fable without fresh explicit
@@ -443,7 +495,10 @@ and the Ollama daemon died with the session. None wrote an exit record; the daem
 mid-generation of request 695. The observer stopped writing after goal 32. The Codex app-server
 restarted at `23:04:07.126Z`, and its next turn refused on a usage limit until
 `2026-10-22 06:12` local, so the Codex bench, and with it the frozen Sol-high semantic
-adjudicator, is dark until then.
+adjudicator, was dark from then. That darkness is history: the Codex bench probed live on
+2026-10-17 (§ Session of 2026-10-17, Benches live) and ran the release round's Codex lanes
+(`.orkestrel/ledger.md:182` on), and the user set Sol aside on 2026-10-16, so Grok 4.7 Extra
+High labels in place of the frozen Sol-high adjudicator.
 
 The result tree holds `execution/manifest.json` and an unsealed trial `evidence.jsonl`
 (4717180 bytes, SHA-256 `d08fc82b2fcf2b71bb07a7ae1d27b60653d1be519c6d5a266917cc4e3bce7811`, no
@@ -579,9 +634,10 @@ records, written through a separate append, arrive reliably.
 
 The tooling passed one independent review round on numbered claims, retired with this record. The
 Codex bench was probed dark at 2026-10-15T23:48Z (session `01a141f7-1001-7532-9de5-0dc254c4d4e8`,
-usage limit until 2026-10-22 06:12 local), so Claude Opus held the objective lane, with a Haiku
-checker. Two repairs followed the prescriptions. `pin` refuses unless the execute deadline still
-leaves the supervisor's 9805000 ms plus 120 s; a live negative control refused before any write.
+usage limit until 2026-10-22 06:12 local; live again by 2026-10-17), so Claude Opus held the
+objective lane, with a Haiku checker. Two repairs followed the prescriptions. `pin` refuses unless
+the execute deadline still leaves the supervisor's 9805000 ms plus 120 s; a live negative control
+refused before any write.
 `detach` writes its receipt whenever WMI started a process. The adopted advisories are canonical ISO
 deadlines, mirrored daemon checks in `pin`, and complete-line observer parsing. Validation
 (`tmp/units/compaction-output-2-validation.json`) ran strict `tsc --erasableSyntaxOnly`, the reader
@@ -591,8 +647,10 @@ without imports.
 
 ## Work in flight on 2026-10-16
 
-- **Exploratory Grok semantic labeling (user decision).** Grok 4.7 Extra High labels `compaction-output-2` only; Sol-high
-  labels it after 2026-10-22 06:12 local for the Records comparison, and Records is never relabeled. Semantic grading
+- **Exploratory Grok semantic labeling (user decision).** Grok 4.7 Extra High labels `compaction-output-2` only;
+  Sol-high labels it after 2026-10-22 06:12 local for the Records comparison, and Records is never relabeled.
+  (Superseded the same day: the user set Sol aside and had Grok grade the sealed Records packet, § Session of
+  2026-10-17.) Semantic grading
   `54a3e4844ae71627aab629e282094f9efd50cb5dd3f7456b85e37e560f6557de` created packet `30e98922…` (trial `t-e41a44ec…`);
   batches are `tmp/studies/labels-30e98922/` (96, largest 410211 bytes). The reviewed Cursor runner is
   `tmp/units/study-label-grok/` (Opus review: resolved model pinned to `Grok 4.7 256K Extra High`, atomic labels write).
@@ -621,8 +679,9 @@ without imports.
   (0.146), with 96 of 96 goals completed and no faults. Judge usage: 96 calls, 7512618 tokens (6110917 input plus
   1401701 output; 559872 cached input not added again), 17944685 ms. **Exploratory only:** Grok 4.7 Extra High
   substituted for the frozen GPT-6.1 Sol high adjudicator. Records (78 achieved, 305 unsuccessful, 1 unknown, Sol
-  labels over a different build and room) is not comparable with it. The honest Records comparison waits for Sol
-  labels after 2026-10-22 06:12 local.
+  labels over a different build and room) is not comparable with it. The honest Records comparison waited for Sol
+  labels after 2026-10-22 06:12 local; it ran instead judge for judge under Grok on 2026-10-17 (§ Session of
+  2026-10-17).
 - **Performance diagnostic (complete).** See `tmp/units/compaction-output-2-perf-diagnostic.md`: gate table, the
   cold/warm/changed checkpoint replay (21.2 minutes of model time), and the single admitted candidate, summary prefix
   alignment. Prefix reuse is output-neutral on this runner; uncached prefill is fixed near 223 tokens/s.
@@ -633,11 +692,14 @@ without imports.
   2026-10-16 (kept for reference in `tmp/units/siblings-retired/`). `tmp/units/local-stage.ts` stages local Agent, Ollama
   and MCP builds into Study; Study's audit is clean, its build stays byte-identical to the accepted `422d549` build, and
   its gates pass (two `test:src` timeouts under load pass alone). Rerun it after any source change. Agent's installed
-  Study stays held at the captured `422d549` build until Sol grading closes; run no npm install in Agent root before then.
+  Study was to stay held at the captured `422d549` build until Sol grading closed. Superseded: the user set Sol aside,
+  the fleet repair re-pinned Study (§ Session of 2026-10-17, Fleet repair done), and from `b47ce06` Agent takes Study
+  `^0.0.1` from the registry. A grading uses its run's captured Study, never the registry Study
+  (`tmp/units/realign-2/boost.md` § 4, row 7).
 - **Routing decision (user, 2026-10-16).** While Grok serves series work, non-series absorption uses another model
   rather than waiting: Claude Sonnet 5.5 native lanes for classification reading, and Cursor models for quick small
-  subagent work (`composer-2.5-fast` bench-probed live, session `6dea88b0-d445-4f31-b160-95f389d6e2e9`). Codex stays dark
-  until 2026-10-22 06:12 local.
+  subagent work (`composer-2.5-fast` bench-probed live, session `6dea88b0-d445-4f31-b160-95f389d6e2e9`). The 2026-10-15
+  refusal named 2026-10-22 06:12 local as Codex's return; Codex probed live on 2026-10-17 (§ Session of 2026-10-17).
 - **Open cleanup (user request 2026-10-16).** Finish the studies extraction cleanup: keep Agent's study tests in
   `tests/studies` under a renamed project and script (the blueprint plans no such project, so its audit question
   stands), move tests of extracted mechanisms to Study with their code, drop what neither package needs, and decide what
@@ -676,7 +738,9 @@ without imports.
   - Set Sol aside for now.
   - Do the deferred performance and quality work and implement it.
   - Then run Records and Compaction again with the boost, as one boosted run per arm compared against the sealed
-    runs. The user chose this over fresh paired baselines; the plan must disclose its confounds.
+    runs. The user chose this over fresh paired baselines; the plan must disclose its confounds. (Superseded
+    2026-10-19: the boost uses Ollama 0.40.6 with fresh same-seed controls, and comparisons with the sealed runs are
+    descriptive only, `tmp/units/ladder/dispatch-ledger.md` row U1b.)
   - Grade semantics with Grok 4.7 Extra High through the Cursor CLI. It is outside the Cursor premium limit:
     `grok-4.7-xhigh` was bench-probed live after the limit hit.
   - This is a new series. The sealed runs and their gradings stay untouched; the "never rerun Records" line governed
@@ -1023,7 +1087,8 @@ without imports.
       - `setupFiles` is `['./tests/setup.ts']` only. That was the planner's reading and matches the user's `setupPolicy.ts` analogy. Agent's `vite.config.ts` rewrites once on repair.
       - Widening the `setupPolicy.ts` sweeps to `studies/` is deferred to a later release.
     - Build brief: `tmp/units/scaffold-studies-build-brief.md`, Grok task `scaffold-studies-build-1`.
-  - **Cleanup falsify round.** Verdict `.orkestrel/agent/studies-cleanup-audit-verdict.md`.
+  - **Cleanup falsify round.** Verdict `.orkestrel/agent/studies-cleanup-audit-verdict.md`. Its acceptance record is
+    `.orkestrel/plan.md` § Standing readings, Studies cleanup acceptance (written 2026-10-19).
     - Grok and Opus both returned FAIL. Study mechanisms unproven by any test: reported durations, the summary role
       on room refusal, and the `collectStudyEvidence` checks. Also misplaced files, two uncovered removed
       assertions, a guide sentence, a non-durable ledger, and a forbidden poll.
@@ -1057,7 +1122,8 @@ without imports.
       - The Orchestrator checked every row against `names.md`. Fix unit `tmp/units/naming-u8-brief.md` (Sonnet,
         workflow `wf_0ea2cbe8-bb8`) applies them. The source-area audit is still running.
   - Each upload window needs the user at the keyboard for `npm login` and the one-time code.
-  - The boosted series uses one boosted run per arm, with no control run. Grok also grades the sealed Records packet,
+  - The boosted series uses one boosted run per arm, with no control run (superseded 2026-10-19 by fresh same-seed
+    controls, `tmp/units/ladder/dispatch-ledger.md` row U1b). Grok also grades the sealed Records packet,
     started in parallel: `tmp/units/study-label-grok-records-population.ts`, output
     `tmp/studies/labels-grok-2ac2a898`, journals `tmp/cursor/grok-label-records-*`. The largest batch runs first as the
     pilot. Sol's labels stay untouched.
@@ -1183,7 +1249,10 @@ skips and 155 separate study integration tests. Both packages passed formatting,
 and build. Agent's discovery instrument still flags core as ungated, but direct discovery
 matched 44 files and `npm test` ran them with 1474 passes; no configuration was changed.
 
-Agent consumes Study as the devDependency `file:../study`, a copied `--install-links
+From `b47ce06` (2026-10-19) Agent takes Study `^0.0.1` from the registry. The rest of this section records the
+2026-10-16 installation, which the retained proof trees still describe.
+
+Agent consumed Study as the devDependency `file:../study`, a copied `--install-links
 --ignore-scripts` installation. On 2026-10-16 root replaced the frozen `f977e68` copy (preserved at
 `tmp/units/study-root-install-f977e68`) with the accepted `422d549` build: all 14 installed `dist`
 files equal `../study/tmp/worktrees/compaction-output/dist`, and the other 32 root `@orkestrel`
@@ -1214,32 +1283,22 @@ do not reset it. Its dependencies live under `../study/tmp/studies/slim-dependen
 A Study build needs the development Agent and Ollama, so build in an isolated worktree whose
 `node_modules` resolves them (as `slim-dependencies` does), then compare its `dist` before copying.
 
-The next work follows these dependencies:
+The next-work list that stood here on 2026-10-16 is superseded; it remains in git at `acff094`. Its items resolved
+as follows:
 
-1. Grade `compaction-output-2` semantically after the Sol bench returns (2026-10-22 06:12 local);
-   its terminal custody and operational reading are complete. Then close the qualification with
-   an honest comparison against retained Records. Preserve failures and unknowns. The labeling
-   tools import `@orkestrel/study` from the root installation, which equals the captured `422d549`
-   build; confirm that equality again before dispatching labelers.
-2. Read qualified Compaction phase/component/checkpoint evidence before a performance
-   diagnostic. Observation is implemented; no optimization or speedup is accepted. Follow
-   [performance protocol](../../../study/.orkestrel/performance.md), which supersedes the
-   early suggestions in [direction](direction.md). History's context share is not elapsed-time
-   attribution; retained decoding measurements point to substantial Agent generation cost.
-3. Admit only measured candidates under that protocol: eager filing, batching, pending joins,
-   repeat handling, runtime preparation, and residency changes remain conditional. Records
-   lacks exact request checkpoints and must not be replayed to fill them. No parallel GPU
-   treatment during this run. The historical protocol's 1200-minute total is a ceiling for
-   gated stages, not permission to execute every stage. Require its paired quality and
-   whole-trajectory criteria; no component-only speedup claim.
-4. Reconcile publication/installed consumption only when authorized. Study's physical
-   integration proofs use unpublished Agent/Ollama APIs; registry loading is not proof that
-   those APIs are published. Needed owner releases and installed-consumer verification remain
-   before publication readiness. MCP's repair is accepted, not implicitly published.
-5. Before retiring historical harness custody, preserve raw runs/builds and promote the
-   complete-capture golden probe with negative controls into Agent ledger tests as the
-   separate unit described in `direction.md`. Do not remove the temporary harness build ignore
-   or relocate absolute-path inputs while a retained proof still binds them.
+- **Sol grading and the Records comparison.** The user set Sol aside, and Grok graded both arms, compared judge for
+  judge on 2026-10-17 (§ Session of 2026-10-17).
+- **The performance and quality work.** The boost ladder `tmp/units/ladder/ladder-2.md` replaced it, with its own gates
+  and caps. The old rule that Records must not be replayed to fill missing request checkpoints governed the closed
+  campaign only; the ladder captures, replays and seeds Records under its own bounds. The boost's next order is in
+  `.orkestrel/plan.md` § State on 2026-10-19 (evening).
+- **Publication and installed consumption.** The release round of 2026-10-19 published the owners, and Agent consumes
+  the registry packages (`.orkestrel/plan.md` § Release round).
+
+One item still binds: before retiring historical harness custody, preserve raw runs and builds, and promote the
+complete-capture golden probe with negative controls into Agent's ledger tests (ladder W7; `.orkestrel/plan.md`
+§ Standing readings, Harness retirement order). Do not remove the temporary harness build ignore or relocate
+absolute-path inputs while a retained proof still binds them.
 
 See [metrics follow-up](../../../study/.orkestrel/metrics.md) for optional measurements and
 model-context ablations. Its attempted/unexecuted reporting defect was already repaired at
