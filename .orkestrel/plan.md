@@ -554,8 +554,31 @@ held-out split (row B-M8). Judge a study design, a report or a boost reading by 
 ## Scaffold queue
 
 No scaffold window is open. Read `scaffold/PARALLEL.md` before every scaffold commit, build, `repair` or `overwrite`,
-and carry each item there before its unit runs. `tmp/units/realign-2/plan.md` D5 recommends one 0.0.104 window for the
-queue; the user has not ruled on it.
+and carry each item there before its unit runs.
+
+**Scaffold 0.0.104 is published (2026-10-20).** It shipped every item of the queue that stood before it (the list
+below, kept as history), under `tmp/units/scaffold-0104/plan.md` § 1.1, with the falsify verdict in
+`.orkestrel/scaffold/0104-audit-verdict.md`. A3.2 closed at the first fleet visits: budget and middleware each ran
+`git diff --check` after `scaffold catalog`, exit 0 (`tmp/units/release/fleet-0104-repair-lane{1,2}.md`).
+
+### Queue for 0.0.105
+
+- **Deferred from 0.0.104** (`tmp/units/scaffold-0104/plan.md` § 1.2):
+  - L1 and L2, the window refusals and the `--digest` comparison;
+  - L5, the resume ranges, and L7, the swap fresh baseline;
+  - `@types/node` against the 22.18.0 floor, which needs its own fleet scan;
+  - a BR-2 instrument, after the fleet conforms to the brand rule;
+  - the alias lint over `app/*`;
+  - the Bindings lint rule, after the last `let` visit (the user's decision of 2026-10-19).
+- **From the Veneer session (`PARALLEL.md` § visit readings, a Sass 1.106.0 regression, 2026-10-20):**
+  - Sass 1.106.0 refuses empty attribute-selector values and unquotes identifier-like ones; a visit's `pin` step and
+    `STYLES_DEV_DEPENDENCIES` `^1.105.1` both admit it. Hold or exclude 1.106.x for styles targets until Sass fixes
+    it;
+  - three `writing.md` § Substitutions hits in vendored tests, which surface in every target's release pass:
+    `tests/policy.test.ts:799` and `:852` ("above"), and `tests/setupPolicy.ts:351` ("once").
+- **Not scaffold's:** item I, the type-proof instrument resolving the wrong root, sits in the probe package's queue.
+
+### Queue before 0.0.104 (history)
 
 - **G1.** `wave.ts --visit` cannot move the exact-peer vitest cluster from an existing lockfile (`ERESOLVE`). A visit
   needs a step that regenerates the lock and `node_modules`; Codex's policy refuses that destructive remedy, so the
