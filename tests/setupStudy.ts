@@ -39,9 +39,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { createRecorder } from '@orkestrel/test'
 import {
-	parseStudyDefinition,
 	parseStudyProfile,
-	parseStudyRubric,
 	parseStudyScenario,
 	buildStudySchedule,
 	validateStudyInputs,
@@ -49,6 +47,7 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
+import { readStudyDeclaration } from '@orkestrel/study/server'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
@@ -58,7 +57,7 @@ import { cpSync, lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 /** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ agent, subject: agent, provider })
@@ -1219,37 +1218,11 @@ export async function loadMemoryInputs(
 	profile: StudyProfile,
 	name = 'capacity',
 ): Promise<StudyValidation> {
-	return { ...(await loadStudyDeclaration(name, 'memory')), profile }
-}
-
-/** Loads one authored declaration as the CLI resolves it: the declaration and rubric from its own directory, the scenarios from its driver's.
- * @param target - The declaration directory under `studies/`.
- * @param driver - The driver directory under `studies/` whose `scenarios/` holds the declared scenarios.
- * @returns The parsed definition, rubric and scenarios in declared order.
- */
-export async function loadStudyDeclaration(
-	target: string,
-	driver: string,
-): Promise<Omit<StudyValidation, 'profile'>> {
-	const root = new URL('../studies/', import.meta.url)
-	const definition = parseStudyDefinition(await readStudyJSON(root, `${target}/study.json`))
-	const rubric = parseStudyRubric(await readStudyJSON(root, `${target}/rubric.json`))
-	const scenarios = await Promise.all(
-		definition.scenarios.map(async (scenario) =>
-			parseStudyScenario(await readStudyJSON(root, `${driver}/scenarios/${scenario}.json`)),
-		),
+	const { definition, scenarios, rubric } = await readStudyDeclaration(
+		fileURLToPath(new URL('../', import.meta.url)),
+		name,
 	)
-	return { definition, rubric, scenarios }
-}
-
-/** Reads one JSON file beneath a root URL.
- * @param root - Directory URL that ends with a slash.
- * @param path - File path relative to the root.
- * @returns The parsed value, or undefined when the text is not valid JSON.
- * @throws Error - Thrown when the file cannot be read.
- */
-export async function readStudyJSON(root: URL, path: string): Promise<unknown> {
-	return parseJSON(await readFile(new URL(path, root), 'utf8'))
+	return { definition, scenarios, rubric, profile }
 }
 
 /** Reads actual tool-result strings from recorded Ollama chat request bytes.
@@ -1296,7 +1269,10 @@ export function createMemoryContext(
  * @returns Actual declarations and a built ESM namespace
  */
 export async function loadStudyToolsFixture(): Promise<StudyToolsFixture> {
-	const { definition, rubric, scenarios } = await loadStudyDeclaration('tools', 'tools')
+	const { definition, rubric, scenarios } = await readStudyDeclaration(
+		fileURLToPath(new URL('../', import.meta.url)),
+		'tools',
+	)
 	const profile = parseStudyProfile(
 		parseJSON(
 			await readFile(new URL('../studies/tools/profiles/local.json', import.meta.url), 'utf8'),

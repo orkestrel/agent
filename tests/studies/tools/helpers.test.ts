@@ -6,7 +6,6 @@ import { createStudyAdapter } from '../../../studies/tools/factories.js'
 import {
 	observeStudyToolsFile,
 	readStudyToolsGrade,
-	buildStudyToolsObservation,
 	readStudyToolsPredicate,
 	resolveStudyToolsPath,
 	validateStudyToolsRubric,
@@ -166,44 +165,4 @@ it('cites the zero-based matched row as a one-based retained reference and keeps
 			criterion: { ...target.criterion, assertion: { unsupported: true } },
 		}),
 	).toThrow('Unsupported')
-})
-
-it('reads a denial, a successful result and a failed result into evidence values and refuses a malformed result', () => {
-	const call = { id: 'c1', name: 'write', arguments: { path: 'note.txt' } }
-	expect(buildStudyToolsObservation('denial', call, { call, reason: 'refused' })).toEqual({
-		id: 'c1',
-		name: 'write',
-		reason: 'refused',
-	})
-	expect(buildStudyToolsObservation('denial', call, { call })).toEqual({ id: 'c1', name: 'write' })
-	expect(
-		buildStudyToolsObservation('tool', call, { call, result: { success: true, value: 'stored' } }),
-	).toEqual({
-		id: 'c1',
-		name: 'write',
-		arguments: { path: 'note.txt' },
-		success: true,
-		value: 'stored',
-	})
-	expect(
-		buildStudyToolsObservation('tool', call, {
-			call,
-			result: { success: false, error: 'refused' },
-		}),
-	).toEqual({
-		id: 'c1',
-		name: 'write',
-		arguments: { path: 'note.txt' },
-		success: false,
-		error: 'refused',
-	})
-	expect(() => buildStudyToolsObservation('tool', call, { call, result: 'stored' })).toThrow(
-		'invalid tool result',
-	)
-	expect(() =>
-		buildStudyToolsObservation('tool', call, { call, result: { success: true, value: undefined } }),
-	).toThrow('non-JSON tool value')
-	expect(() =>
-		buildStudyToolsObservation('tool', call, { call, result: { success: false } }),
-	).toThrow('invalid tool error')
 })

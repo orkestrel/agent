@@ -214,3 +214,13 @@ Repairs of the falsify findings. Study mutations are transient and reverted; eac
 | A5 | `StudyMemorySession.test.ts` polls with `waitForCondition(..., { budget: 5000 })` from `@orkestrel/test` instead of `vi.waitFor` | none |
 | A6 | This file | none |
 
+## Study 0.0.2 tools adoption (V3)
+
+V3 removes the local projection and declaration readers. The Study claims and mutations were recorded by the S2 and S3 units; V3 also mutates a disposable copy of the installed projection for C27. The pin stays uncommitted.
+
+| # | Removed Agent test | Disposition | Covering Study test or fold target | Mutation | More |
+| --- | --- | --- | --- | --- | --- |
+| V3-tool | tests/studies/tools/helpers.test.ts :: reads a denial, a successful result and a failed result into evidence values and refuses a malformed result | drop | C22: tests/src/server/agents/helpers.test.ts, buildStudyAgentToolResult and buildStudyAgentToolDenial cases; name filters `refuses non-JSON values` and `owns nested arguments` | C22-final-JSON-value: bypass the successful value clone/JSON refusal; C22-final-JSON-arguments: bypass the arguments clone/JSON refusal; C22-final-copy-arguments: return the foreign arguments. Each selected Study case reddens, then passes after restoration (S3 report). | C27 drops success from both result arms in a disposable installed-package copy; Agent's kept tools integration evidence must redden. |
+| V3-json | tests/setupStudy.test.ts :: study install fixtures > reads one JSON file beneath a root and refuses a missing one | drop | C13: tests/src/bin/main.test.ts, `refuses a missing declaration file`; C16: tests/src/server/commands/helpers.test.ts, `reads the declared rubric` | C13-missing: remove declaration ENOENT translation (6 red, then 6 green); C16-rubric: read fixed rubric.json instead of definition.rubric (1 red, then 1 green), recorded by S2. | The removed generic JSON reader has no remaining consumer; declaration bytes and parsing belong to Study. |
+| V3-declaration | tests/setupStudy.test.ts :: study install fixtures > loads an authored declaration, its rubric and the scenarios of its driver in declared order | drop | C16: tests/src/server/commands/helpers.test.ts, `reads the declared rubric`, `refuses a declaration whose name`, and `refuses a scenario whose id`; C13 missing-declaration cases in tests/src/bin/main.test.ts | C16-rubric: fixed rubric.json; C16-name: drop the name check; C16-prefix: remove scenarios/ from retained fixture paths; C16-scenario: drop the scenario id check. Each selected case is 1 red, then 1 green (S2 report). | Agent keeps loadMemoryInputs and loadStudyToolsFixture wiring, selecting definition, scenarios, and rubric explicitly. |
+

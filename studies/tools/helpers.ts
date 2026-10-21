@@ -1,9 +1,7 @@
-import type { JSONValue } from '@orkestrel/contract'
-import type { ToolCall } from '@orkestrel/tool'
 import type { StudyEvidence, StudyRubric } from '@orkestrel/study'
 import type { StudyGradeReading, StudyGradeTarget } from '@orkestrel/study/server'
 import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
-import { cloneJSONValue, isJSONValue, isObject, isRecord } from '@orkestrel/contract'
+import { isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { StudyError, isStudyRubric } from '@orkestrel/study'
@@ -71,54 +69,6 @@ export async function observeStudyToolsFile(
 		if (isObject(error) && 'code' in error && error.code === 'ENOENT')
 			return Object.freeze({ path: name, exists: false })
 		throw error
-	}
-}
-
-/**
- * Reads one admitted Agent tool observation into the JSON evidence value the trace retains.
- * @param event - Whether the Agent dispatched the call or denied it
- * @param call - The observed call
- * @param envelope - The Agent's event payload carrying the denial reason or the tool result
- * @returns The call identity with a denial reason, or with its arguments and the successful value or the error text
- * @throws StudyError - Thrown when the payload carries a malformed or non-JSON result
- * @example
- * ```ts
- * buildStudyToolsObservation('denial', call, { call, reason: 'refused' }) // { id: 'c1', name: 'write', reason: 'refused' }
- * ```
- */
-export function buildStudyToolsObservation(
-	event: 'tool' | 'denial',
-	call: ToolCall,
-	envelope: Readonly<Record<string, unknown>>,
-): JSONValue {
-	if (event === 'denial')
-		return {
-			id: call.id,
-			name: call.name,
-			...(typeof envelope.reason === 'string' ? { reason: envelope.reason } : {}),
-		}
-	const result = envelope.result
-	if (!isObject(result) || !('success' in result) || typeof result.success !== 'boolean')
-		throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool result')
-	if (result.success) {
-		if (!('value' in result) || !isJSONValue(result.value))
-			throw new StudyError('FAULT', 'Admitted Agent supplied non-JSON tool value')
-		return {
-			id: call.id,
-			name: call.name,
-			arguments: cloneJSONValue(call.arguments),
-			success: true,
-			value: cloneJSONValue(result.value),
-		}
-	}
-	if (!('error' in result) || typeof result.error !== 'string')
-		throw new StudyError('FAULT', 'Admitted Agent supplied invalid tool error')
-	return {
-		id: call.id,
-		name: call.name,
-		arguments: cloneJSONValue(call.arguments),
-		success: false,
-		error: result.error,
 	}
 }
 
