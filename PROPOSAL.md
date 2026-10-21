@@ -26,13 +26,13 @@
 
 **The reported evidence supports targeted repairs, not a general quality victory.** The following findings determine priority; the right column states the limit on each inference.
 
-| Reported finding | Proposed response | Evidence limit |
-| --- | --- | --- |
-| 95/96 goals referenced prior products; later replies were not carried as work. | Prioritize R2: addressable request/reply work records. | The exposure rule is source-supported; the size of its quality effect needs a treatment test. |
-| Records had 21/24 off-focus handoffs and 11 stale dates; the seed case appeared in 32/88 other-case products. | Test R1: a moving recent exchange with standing pins separate from seed examples. | These associations do not isolate a cause. |
-| A bounded probe distinguished a recognized bare ID from its prefixed lookup subject. | Repair R3 at the subject/owner-link boundary. | The probe establishes that case, not complete-workload benefit. |
-| Goals 49/53/77 accounted for 410/729 judge calls and 240,908/335,490 judge prompt tokens: 56.2% and 71.8%, respectively. | Target predecessor eligibility and repeated work, with correction-recall guards. | Historical pair identities and judge payloads are missing. Call counts do not identify which questions were unnecessary. |
-| The retained Records reference completed 96 goals, but later semantic judgments rarely passed facts, work, and obligations. | Keep operational completion separate from semantic acceptance. | One trajectory and differing captured builds do not establish general strategy superiority. |
+| Reported finding                                                                                                            | Proposed response                                                                 | Evidence limit                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 95/96 goals referenced prior products; later replies were not carried as work.                                              | Prioritize R2: addressable request/reply work records.                            | The exposure rule is source-supported; the size of its quality effect needs a treatment test.                            |
+| Records had 21/24 off-focus handoffs and 11 stale dates; the seed case appeared in 32/88 other-case products.               | Test R1: a moving recent exchange with standing pins separate from seed examples. | These associations do not isolate a cause.                                                                               |
+| A bounded probe distinguished a recognized bare ID from its prefixed lookup subject.                                        | Repair R3 at the subject/owner-link boundary.                                     | The probe establishes that case, not complete-workload benefit.                                                          |
+| Goals 49/53/77 accounted for 410/729 judge calls and 240,908/335,490 judge prompt tokens: 56.2% and 71.8%, respectively.    | Target predecessor eligibility and repeated work, with correction-recall guards.  | Historical pair identities and judge payloads are missing. Call counts do not identify which questions were unnecessary. |
+| The retained Records reference completed 96 goals, but later semantic judgments rarely passed facts, work, and obligations. | Keep operational completion separate from semantic acceptance.                    | One trajectory and differing captured builds do not establish general strategy superiority.                              |
 
 These findings are reported in the analysis's Records diagnostics, source reading, retained-reference table, and semantic-label section.[^a-diagnostics][^a-records][^a-reference]
 
@@ -48,20 +48,20 @@ These findings are reported in the analysis's Records diagnostics, source readin
 
 **Separate source repairs from ranking changes so each result remains attributable.** The following matrix defines the intended scope; implementation acceptance still requires the owning source, tests, and campaign gate.
 
-| Area | Disposition | Recommendation |
-| --- | --- | --- |
-| Evidence capture, R7/W7/W12 | Retain and complete the required coverage | Record source membership, filing, selection, and dispatch without changing request bytes. Add a package observation only when public state cannot supply a required fact. |
-| Prefixed owner linking, R3 | Repair | Parse the declared lookup subject and link recognized identities without changing unrelated argument semantics. |
-| Earlier products, R2 | Implement | Retrieve actual prior request/reply pairs as own work, distinct from authoritative source observations and completion receipts. |
-| Recent context, R1 | Implement as an isolated treatment | Replace seed-only conversational continuity with a bounded moving exchange; retain standing instructions and grants separately. |
-| Obligations and supersessions, R4a/R5a | Repair presentation where evidence supports it | Render already-filed obligations, prerequisites, and replacement relationships before adding classifier questions. |
-| BM25 record selection | Implement and evaluate | Rank eligible source units within and across record groups without another model call. |
-| BM25-assisted recall | Implement through the same index | Search source material and return bounded, attributable results with continuation and exact reads. |
-| Predecessor pruning, R5b | Separate gated treatment | Combine direct relationships with lexical candidates; retain unresolved coverage rather than assuming omitted pairs are negative. |
-| Incremental materialization | Measure, then implement the supported scope | Update affected records and index entries; preserve equivalence with a full projection over the same inputs. |
-| Exact judgment reuse, admission, repeat/recovery behavior | Retain | Do not replace working mechanisms or weaken their failure semantics. |
-| Added obligation/correction questions, R4b/R5c | Defer to their existing diagnosis gates | BM25 does not supply missing interpretation; extra questions require their own evidence and cost. |
-| Embeddings, vector search, rerankers, record compaction | Exclude | Do not include these mechanisms in this messaging proposal or its acceptance prerequisites. |
+| Area                                                      | Disposition                                    | Recommendation                                                                                                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence capture, R7/W7/W12                               | Retain and complete the required coverage      | Record source membership, filing, selection, and dispatch without changing request bytes. Add a package observation only when public state cannot supply a required fact. |
+| Prefixed owner linking, R3                                | Repair                                         | Parse the declared lookup subject and link recognized identities without changing unrelated argument semantics.                                                           |
+| Earlier products, R2                                      | Implement                                      | Retrieve actual prior request/reply pairs as own work, distinct from authoritative source observations and completion receipts.                                           |
+| Recent context, R1                                        | Implement as an isolated treatment             | Replace seed-only conversational continuity with a bounded moving exchange; retain standing instructions and grants separately.                                           |
+| Obligations and supersessions, R4a/R5a                    | Repair presentation where evidence supports it | Render already-filed obligations, prerequisites, and replacement relationships before adding classifier questions.                                                        |
+| BM25 record selection                                     | Implement and evaluate                         | Rank eligible source units within and across record groups without another model call.                                                                                    |
+| BM25-assisted recall                                      | Implement through the same index               | Search source material and return bounded, attributable results with continuation and exact reads.                                                                        |
+| Predecessor pruning, R5b                                  | Separate gated treatment                       | Combine direct relationships with lexical candidates; retain unresolved coverage rather than assuming omitted pairs are negative.                                         |
+| Incremental materialization                               | Measure, then implement the supported scope    | Update affected records and index entries; preserve equivalence with a full projection over the same inputs.                                                              |
+| Exact judgment reuse, admission, repeat/recovery behavior | Retain                                         | Do not replace working mechanisms or weaken their failure semantics.                                                                                                      |
+| Added obligation/correction questions, R4b/R5c            | Defer to their existing diagnosis gates        | BM25 does not supply missing interpretation; extra questions require their own evidence and cost.                                                                         |
+| Embeddings, vector search, rerankers, record compaction   | Exclude                                        | Do not include these mechanisms in this messaging proposal or its acceptance prerequisites.                                                                               |
 
 R1–R7 and the related aliases retain the meanings assigned in `ANALYSIS.md`. The file distinguishes implemented mechanisms, proposed treatments, diagnostic prerequisites, and held alternatives.[^a-quality]
 
@@ -125,11 +125,11 @@ R2 and the own-work-status proposal already name this distinction. The analysis 
 
 **Keep searchability separate from permission to act on content.** The following populations need different eligibility rules even when they share one index implementation.
 
-| Population | Search purpose | Admission rule |
-| --- | --- | --- |
-| Live source evidence | Supply applicable facts, rules, and corrections. | Require released, accessible sources and resolve relevant amendment relationships. |
-| Prior work | Locate a request/reply product to continue, compare, or revise. | Label it as own work; preserve its actual result and supporting receipts separately. |
-| Historical or unresolved source material | Recover an omitted source or inspect a prior decision. | Preserve historical, disputed, or unclassified status; do not silently promote it into active fact. |
+| Population                               | Search purpose                                                  | Admission rule                                                                                      |
+| ---------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Live source evidence                     | Supply applicable facts, rules, and corrections.                | Require released, accessible sources and resolve relevant amendment relationships.                  |
+| Prior work                               | Locate a request/reply product to continue, compare, or revise. | Label it as own work; preserve its actual result and supporting receipts separately.                |
+| Historical or unresolved source material | Recover an omitted source or inspect a prior decision.          | Preserve historical, disputed, or unclassified status; do not silently promote it into active fact. |
 
 **A quiet filing must not erase the recovery path.** Keep its original source searchable for bounded historical recall. A lexical hit can expose evidence for reconsideration; it does not overrule a supersession or turn irrelevant chatter into a standing instruction.
 
@@ -241,13 +241,13 @@ score(Q, d) = sum over matching terms t in Q of:
 
 The following cache boundaries keep reuse specific.
 
-| Cached value | Validity inputs |
-| --- | --- |
-| Analyzed source unit | Original source revision, span/group identity, analyzer revision. |
-| Derived record membership and lines | Source identities, relevant lookup links, judgment identities, projection policy. |
-| Judge answer | Existing exact question, ordered sources, rendered state, and pinned model configuration. |
-| Retrieval result | Analyzed query, access/release filters, corpus revision, scoring configuration. |
-| Selected briefing | Selected source/projection revisions, applicable instructions, request identity, and admission configuration. |
+| Cached value                        | Validity inputs                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Analyzed source unit                | Original source revision, span/group identity, analyzer revision.                                             |
+| Derived record membership and lines | Source identities, relevant lookup links, judgment identities, projection policy.                             |
+| Judge answer                        | Existing exact question, ordered sources, rendered state, and pinned model configuration.                     |
+| Retrieval result                    | Analyzed query, access/release filters, corpus revision, scoring configuration.                               |
+| Selected briefing                   | Selected source/projection revisions, applicable instructions, request identity, and admission configuration. |
 
 **Pin a model configuration to immutable evidence.** A mutable model tag is insufficient when weights or serving configuration change behind it. Preserve historical records; invalidate incompatible derived decisions rather than relabeling a former result as one produced by the replacement.
 
@@ -297,15 +297,15 @@ The following cache boundaries keep reuse specific.
 
 The following source map identifies responsibilities, not a frozen API or a claim that this proposal inspected these files.
 
-| Existing location | Intended responsibility |
-| --- | --- |
-| `src/core/ledgers/Ledger.ts` | Compose records, work references, lexical selection, bounded recall, and existing admission. |
-| `src/core/ledgers/Classifier.ts` | Retain dependent filing and exact reuse; accept a separately tested predecessor-candidate mechanism only in its own treatment. |
-| `src/core/ledgers/helpers.ts` | Source-unit projection, identity relations, scoring leaves, and deterministic packing where they remain pure. |
-| Ledger module's centralized declarations | Define only the types, parameters, guards, and errors required by the accepted behavior. |
-| `tests/src/core/ledgers/Ledger.test.ts` | Complete request capture and public behavioral controls; retain the W7 home rather than inventing a golden-test tree. |
-| Existing mirrored classifier/helper tests | Pair eligibility, scoring, update parity, and failure behavior. |
-| `studies/memory` | Public-data treatment wiring, measurements, source-exposure diagnostics, and accepted reusable study instruments. |
+| Existing location                         | Intended responsibility                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `src/core/ledgers/Ledger.ts`              | Compose records, work references, lexical selection, bounded recall, and existing admission.                                   |
+| `src/core/ledgers/Classifier.ts`          | Retain dependent filing and exact reuse; accept a separately tested predecessor-candidate mechanism only in its own treatment. |
+| `src/core/ledgers/helpers.ts`             | Source-unit projection, identity relations, scoring leaves, and deterministic packing where they remain pure.                  |
+| Ledger module's centralized declarations  | Define only the types, parameters, guards, and errors required by the accepted behavior.                                       |
+| `tests/src/core/ledgers/Ledger.test.ts`   | Complete request capture and public behavioral controls; retain the W7 home rather than inventing a golden-test tree.          |
+| Existing mirrored classifier/helper tests | Pair eligibility, scoring, update parity, and failure behavior.                                                                |
+| `studies/memory`                          | Public-data treatment wiring, measurements, source-exposure diagnostics, and accepted reusable study instruments.              |
 
 **Follow `AGENTS.md` and its linked Scaffold rules rather than treating this proposal as another coding convention file.** Keep centralized declarations, one-word entity members, origin-package imports, owned inputs, public parity, and real-interface tests in their established locations. Update affected consumers together; do not add compatibility aliases. Source positions cited in `ANALYSIS.md` are navigation leads and must be re-read at the target revision.
 
@@ -325,22 +325,22 @@ The following source map identifies responsibilities, not a frozen API or a clai
 
 **Each acceptance claim needs a control that reaches and breaks the behavior under test.** Use real owned implementations and the sanctioned recorded/scripted boundary facilities; do not mock project-owned retrieval or classification logic.
 
-| Behavior | Required scenario and failure control |
-| --- | --- |
-| Owner linking | A parser-recognized bare/prefixed pair links identically; another namespace or owner does not inherit that link. |
-| Prior work | A request retrieves the actual earlier product; an assistant claim without a receipt cannot establish external completion. |
-| Recent tail | A referential request carries its preceding proposal; a later unrelated case does not inherit a seed example's case/date. |
-| Standing obligations | A low-overlap applicable restriction survives optional ranking; a closed or unrelated restriction is not falsely reopened. |
-| Correction scope | A field-specific correction preserves another live statement sharing the entity ID; an explicit cross-reference remains reachable despite vocabulary change. |
-| Search scoring | Hand-derived scores and an independently organized reference calculation agree; repeated terms, empty input, common terms, and nonmatches exercise their defined boundaries. |
-| Ranking population | A source with zero lexical overlap is not inserted as a BM25 hit; an exact direct reference remains available without lexical overlap. |
-| Record membership | One source appearing in several owner records has one search identity; distinct events with identical text remain distinct. |
-| Incremental index | Update, membership change, and rebuild produce the same results at the same revision; a deliberately stale posting is detected by the comparison. |
-| Release isolation | A source becomes searchable only after release; a future release or private rubric cannot influence the query or statistics. |
-| Recall continuation | A later page reaches omitted evidence; an identical page request still triggers the repeat policy. |
-| Capacity and cancellation | Expanded dependencies and large results reach actual admission; an abort or stale revision cannot publish an apparently complete selection. |
-| Exact judgment reuse | Changed wording, state, ordered sources, or model identity misses, including equal-length changes; a matching request reuses the recorded answer. |
-| Treatment isolation | Observation-off preserves request bytes; a selection-only treatment adds no relevance-model call or summarizer call. |
+| Behavior                  | Required scenario and failure control                                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner linking             | A parser-recognized bare/prefixed pair links identically; another namespace or owner does not inherit that link.                                                             |
+| Prior work                | A request retrieves the actual earlier product; an assistant claim without a receipt cannot establish external completion.                                                   |
+| Recent tail               | A referential request carries its preceding proposal; a later unrelated case does not inherit a seed example's case/date.                                                    |
+| Standing obligations      | A low-overlap applicable restriction survives optional ranking; a closed or unrelated restriction is not falsely reopened.                                                   |
+| Correction scope          | A field-specific correction preserves another live statement sharing the entity ID; an explicit cross-reference remains reachable despite vocabulary change.                 |
+| Search scoring            | Hand-derived scores and an independently organized reference calculation agree; repeated terms, empty input, common terms, and nonmatches exercise their defined boundaries. |
+| Ranking population        | A source with zero lexical overlap is not inserted as a BM25 hit; an exact direct reference remains available without lexical overlap.                                       |
+| Record membership         | One source appearing in several owner records has one search identity; distinct events with identical text remain distinct.                                                  |
+| Incremental index         | Update, membership change, and rebuild produce the same results at the same revision; a deliberately stale posting is detected by the comparison.                            |
+| Release isolation         | A source becomes searchable only after release; a future release or private rubric cannot influence the query or statistics.                                                 |
+| Recall continuation       | A later page reaches omitted evidence; an identical page request still triggers the repeat policy.                                                                           |
+| Capacity and cancellation | Expanded dependencies and large results reach actual admission; an abort or stale revision cannot publish an apparently complete selection.                                  |
+| Exact judgment reuse      | Changed wording, state, ordered sources, or model identity misses, including equal-length changes; a matching request reuses the recorded answer.                            |
+| Treatment isolation       | Observation-off preserves request bytes; a selection-only treatment adds no relevance-model call or summarizer call.                                                         |
 
 **Use actual development failures and clean guards at both early and late positions.** Scale cases to the load and error being tested. This document does not prescribe arbitrary candidate counts, token shares, fixtures, or acceptance percentages; inherit the applicable frozen ladder gates and declare BM25-specific thresholds before running the treatment.
 
@@ -387,16 +387,29 @@ The following source map identifies responsibilities, not a frozen API or a clai
 **Local citations identify the supplied analysis, not independently read repository receipts.** Place this file beside `ANALYSIS.md`. The analysis's source definitions resolve to the underlying repository documents; its source-line references must be checked against the implementation revision the session uses.
 
 [^a-scope]: See [Analysis: scope and sources](ANALYSIS.md#1-scope-and-sources), lines 5–13. The analysis distinguishes source reading, reported measurements, and unperformed verification.
+
 [^a-records]: See [Analysis: how Records works](ANALYSIS.md#2-how-records-works), lines 19–50, especially the projection description, dependent classifier phases, prior-reply exclusion, owner-link defect, and Ledger-private replay requirements.
+
 [^a-admission]: See [Analysis: complete-request admission](ANALYSIS.md#3-how-compaction-works), lines 64–68, and [Analysis: cross-arm and earlier proposals](ANALYSIS.md#cross-arm-and-earlier-proposals), especially the retained admission/accounting row. This reference records existing runtime behavior; it does not propose compaction.
+
 [^a-reference]: See [Analysis: retained Study references](ANALYSIS.md#thinking-off-study-adaptation-and-compaction-qualification-october-1416), lines 170–184, and [Analysis: semantic labels](ANALYSIS.md#semantic-labels-on-the-retained-study-references), lines 188–200. The Records result prefix is `fe9bd623…`; its reported seal prefix is `3fbafc2b…`.
+
 [^a-diagnostics]: See [Analysis: failure analysis and performance probes](ANALYSIS.md#failure-analysis-and-performance-probes-october-1619), lines 204–218. The selection, correction-burst, and mechanical-metric findings are reported observations with stated attribution limits.
+
 [^a-tape]: See [Analysis: offline reconstruction and instrument proofs](ANALYSIS.md#offline-reconstruction-and-instrument-proofs), lines 220–226, and [Analysis: open questions and limits](ANALYSIS.md#7-open-questions-and-limits), lines 408–427. Missing historical answers remain missing; offline replay cost excludes fresh inference.
+
 [^a-quality]: See [Analysis: Records quality and selection](ANALYSIS.md#records-quality-and-selection), lines 250–274. R1–R7 and the related aliases identify the existing proposals and their prerequisites; none is represented here as an accepted live gain.
+
 [^a-speed]: See [Analysis: Records speed and alternative designs](ANALYSIS.md#records-speed-and-alternative-designs), lines 276–292. Eager filing, batching, residency, prefix reuse, and additional topics retain their separate dispositions.
+
 [^a-status]: See [Analysis: units and execution status](ANALYSIS.md#earlier-boost-plan-versus-the-current-units), lines 349–373, and lines 406–427. W5/A acceptance is infrastructure acceptance; the 2026-10-20 pause and unit B dependency are distinct from treatment authorization.
+
 [^a-gates]: See [Analysis: gates and prospective cost limits](ANALYSIS.md#gates-comparisons-and-prospective-cost-limits), lines 375–406. Inherit applicable controls, coverage, causal-continuation rules, and budgets; do not interpret planned thresholds as observed improvements.
+
 [^database]: See the supplied Database guide's `ConditionOperator`, `QueryInput`, and driver contracts, and its design statement at lines 12–20. The uploaded guide is a capability reference, not evidence that an FTS5 retrieval seam is installed in the target checkout.
+
 [^bm25]: External algorithm reference checked on 2026-10-20: see [Okapi BM25: a non-binary model](https://nlp.stanford.edu/IR-book/html/htmledition/okapi-bm25-a-non-binary-model-1.html). It supports the lexical scoring factors and development-set parameter selection, not Orkestrel performance claims.
+
 [^lucene]: External implementation reference checked on 2026-10-20: see [Lucene 10.3.1 BM25Similarity](https://lucene.apache.org/core/10_3_1/core/org/apache/lucene/search/similarities/BM25Similarity.html). It documents the stated IDF form and parameter roles. It is a pinned reference, not a recommendation to add Lucene or a claim about the most recent release.
+
 [^fts5]: External capability reference checked on 2026-10-20: see [SQLite FTS5 Extension](https://sqlite.org/fts5.html), particularly its BM25 auxiliary function and tokenizer sections. A native adapter remains deferred; this proposal does not add a SQLite dependency or claim scoring parity.
